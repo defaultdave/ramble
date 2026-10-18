@@ -65,7 +65,7 @@ Model tiering is Dave's rule: Opus only for genuinely hard ports, Sonnet for imp
 
 ## Hard lines
 
-- **Never** `git push`, open or merge PRs, create or close issues, create repos, or deploy. Print the exact command and let Dave run it.
+- **Never** merge PRs, create or close issues, create repos, or deploy. Print the exact command and let Dave run it. Pushing unit branches, opening PRs, and starting PR reviews need Dave's approval each time until he switches on auto mode (ADR 0010); after that the pipeline does them itself.
 - **Never** approve your own gate. PRD sign-off, ADRs, design sign-off, plan freeze, and scope or phase changes are Dave's.
 - **Never** lift names, URLs, copy, URL shapes, or architecture language from the prior client work. It is evidence, not a template. Cat Pass still carries that framing.
 - **Never** edit frozen plan files after the freeze tag.

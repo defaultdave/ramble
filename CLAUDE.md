@@ -12,4 +12,4 @@ Demo marketplace for bookable experiences, built to prove a planning method and 
 - Prior client work is evidence, never a template. No names, URLs, copy, or URL shapes from it.
 - Plan files are read-only after the `plan-frozen-*` tag. Reality goes in `docs/plan/delta-log.md`.
 - The client brief in `docs/product/discovery/sealed/` is the PRD's source since 2026-10-18 (see `docs/plan/DECISIONS.md`). `ramble-pm` may read it.
-- No push, PR, issue, repo creation, or deploy without Dave. Print the command.
+- No repo creation, issue, merge to `main`, or deploy without Dave. Print the command. Pushes to unit branches, PRs, and PR reviews need Dave's approval each time until he opts in to auto mode (ADR 0010).

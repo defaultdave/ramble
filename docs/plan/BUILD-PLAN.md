@@ -2,7 +2,7 @@
 title: Ramble build plan (spec for the PM agent)
 created: 2026-09-28
 owner: Dave (decisions) / ramble-pm (running it)
-status: P1 in progress (PRD drafted from the client brief; discovery skipped 2026-10-18)
+status: P1 and P2 done (PRD signed off and ten ADRs accepted 2026-10-18); P3 next
 ---
 
 # Ramble build plan
@@ -59,7 +59,7 @@ Treat Ramble as a client engagement: a company that wants a brand-new e-commerce
 
 4. **Reveal.** After sign-off, and only then, the PM compares the PRD with the sealed brief and writes `docs/product/discovery/discovery-delta.md`: what discovery found, what it missed, and which misses would have changed the build.
 
-**Exit:** Dave signs off the PRD as "the client." (The discovery delta was dropped on 2026-10-18.)
+**Exit:** Dave signs off the PRD as "the client." (The discovery delta was dropped on 2026-10-18.) ✅ Signed off 2026-10-18.
 
 ### P2. Research → ADRs
 One ADR per question in `docs/adr/NNNN-slug.md`: context, the PRD requirements that drive it (`PRD-##`), options (at least two), recommendation, what would change the call. An ADR that can't cite a PRD requirement is either missing a requirement or answering a question nobody asked. Research runs as parallel Sonnet agents; contested calls get a Council pass. P2 and P3 can run in parallel once the PRD is signed.
@@ -77,7 +77,7 @@ One ADR per question in `docs/adr/NNNN-slug.md`: context, the PRD requirements t
 | R9 | Cat Pass salvage | Lift specific code after a strip pass, or build clean. A clean build is the stronger evidence for the plan. |
 | R10 | Agent workflow wiring | Which pipeline runs units (global `/senior` + `/review-pr`, or the vig squad), where units are tracked (GitHub Issues + Project board vs `units.yaml` only), how actuals are captured (PR timestamps, `token-audit`). |
 
-**Exit:** every ADR has a recommendation and Dave's decision recorded in `docs/plan/DECISIONS.md`.
+**Exit:** every ADR has a recommendation and Dave's decision recorded in `docs/plan/DECISIONS.md`. ✅ Met 2026-10-18.
 
 ### P3. Design, mobile first
 In the same Figma file:
@@ -141,7 +141,7 @@ Reference class for #6: Dave's prior checkout epic (about 65 PRs, 13 sections, 3
 2. Each ADR in P2.
 3. Mobile flow and states sign-off in P3.
 4. Plan freeze in P4.
-5. Any `git push`, PR, issue, repo creation, or deploy. The PM prints the command; Dave runs it.
+5. Repo creation, issues, merges to `main`, and deploys: the PM prints the command; Dave runs it. Pushes to unit branches, opening PRs, and starting PR reviews need Dave's approval on each action until he opts in to auto mode; then the pipeline does them (ADR 0010, changed 2026-10-18).
 6. Any change to phase order or scope.
 
 ## Open decisions for Dave

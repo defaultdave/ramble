@@ -1,6 +1,6 @@
 ---
 title: Ramble marketplace PRD
-status: DRAFT v0.3, for client sign-off
+status: SIGNED OFF 2026-10-18 (v1.0, from draft v0.3)
 date: 2026-10-18
 author: ramble-pm
 approver: Dave, as the client
@@ -292,6 +292,8 @@ All values in this section are [proposed] unless a source says otherwise.
 
 ## 10. Open questions and decisions the client owes
 
+> **At sign-off (2026-10-18)** the client adopted our recommendation for the 14 judgment calls: Q-01 to Q-10, Q-15, Q-17, Q-18, and Q-22. Those rows are now decisions, and requirements that depend on them, or that say [proposed] because of them, follow the adopted answer. The 8 questions that need facts stay open as tracked work: Q-11, Q-12, Q-13, Q-14, Q-16, Q-19, Q-20, and Q-21. See "Decisions at sign-off" below.
+
 "Needed by" refers to the plan's phases: P2 is the technical decision records, P3 is design, P4 is the plan and estimate.
 
 | ID | Question | Who holds what | Our recommendation | Owner | Needed by | Blocks |
@@ -336,7 +338,7 @@ All values in this section are [proposed] unless a source says otherwise.
 13. PRD-35 group requests
 14. PRD-48 host staff access
 
-Not cut: PRD-54 help pages (support load). PRD-34 gift cards stay until Q-13 is answered; if Q-13 says the sponsor does not need them, they go first.
+Not cut: PRD-54 help pages (support load). PRD-34 gift cards stay until Q-13 is answered; if Q-13 says the sponsor does not need them, they go first. (Working assumption from the ADR sitting, 2026-10-18: the sponsor does not need gift cards, so PRD-34 goes first.)
 
 If cutting every Should still doesn't fit, launch in two releases. Three Musts are not needed until the first sessions have run and can follow within 30 days: PRD-29 (review invites can go out late), PRD-56 (the finance export), and PRD-59 (the first monthly report is due a month in). Everything else ships first, including whatever Q-13 says the sponsor payment needs (at least PRD-04 and PRD-33, plus PRD-34 if required). Beyond that, a Must moves only with the client's agreement.
 
@@ -348,4 +350,24 @@ Ramble is a demo marketplace built to prove a planning method. This PRD is writt
 
 | Role | Name | Date | Decision |
 |---|---|---|---|
-| Client | Dave | | |
+| Client | Dave | 2026-10-18 | Signed off. Recommendations adopted for Q-01 to Q-10, Q-15, Q-17, Q-18, Q-22. |
+
+### Decisions at sign-off
+
+| ID | Decision |
+|---|---|
+| Q-01 | (c): the host is the seller; Ramble collects payment as the host's agent, pending counsel (Q-16). Gift cards (PRD-34) still need their own answer if Q-13 requires them (RK-03). |
+| Q-02 | Guest checkout with newsletter opt-in; the opt-in rate is a guardrail. |
+| Q-03 | No buyer fee at launch. Commission is 15% of the ticket price before tax; card processing fees come out of Ramble's 15%. |
+| Q-04 | Host-chosen Ramble tiers from "full refund up to 24 hours before start" to "no refund within 7 days"; default is full refund up to 24 hours before start. |
+| Q-05 | Hosts are paid weekly after the session, explained before they sign. |
+| Q-06 | The host refunds in full; Ramble returns its commission. |
+| Q-07 | Plan to December 1; the P4 estimate says what fits. |
+| Q-08 | No native app at launch. |
+| Q-09 | Collect reviews from day one; show them at 5 or more; never import. |
+| Q-10 | White-glove onboarding at launch; self-serve later. |
+| Q-15 | Guide listings for hosts who are not bookable stay as link-out guide pages, with affiliate links where they exist, until the host goes live. |
+| Q-17 | Per-person single sessions at launch; charters through private requests (PRD-35); series later. |
+| Q-18 | Decided with Q-01. Under the agent model the host, as seller, bears chargebacks, and Ramble responds to disputes with the host's evidence. (Our reading of the adopted answer; confirmed in the payments ADR.) |
+| Q-22 | "First quarter" in G3 means the first 90 days after launch. |
+| PRD-69 | WCAG 2.2 AA, as written. |

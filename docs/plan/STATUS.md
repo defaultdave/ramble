@@ -30,7 +30,7 @@
 In this demo, the client facts have no one to ask. Where a fact blocks a decision, the PM proposes a working assumption and logs it as one.
 
 ## Blocked on Dave
-1. **Create the GitHub repo** (ADR 0007, now, private) and push. The PM printed the commands.
+1. **Create the GitHub repo** (ADR 0007, now, private), push, then **create the "Ramble" Project board** and its fields (ADR 0010). The PM printed both sets of commands. The Section field is added at plan freeze.
 2. **Figma connector** needs authorizing before P3 can start.
 3. **Workbook order** (open decision 1 in `BUILD-PLAN.md`). Needed before P4.
 4. **Method Layer 0** (open decision 3). Not needed until P6.

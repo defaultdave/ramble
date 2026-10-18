@@ -37,7 +37,7 @@ What exists today:
 
 - **1. `units.yaml` only.** One file holds every unit's estimate, status, and actuals; a script computes the critical path. No external tool.
 - **2. GitHub Issues and a Project board,** mirroring units. More visible, but Dave creates every issue (gate 5), and two records drift.
-- **3. `units.yaml` as the record, mirrored to Issues once the repo is public.** The PM prints the `gh issue create` commands at plan freeze, and Dave runs them.
+- **3. `units.yaml` as the record, mirrored to Issues and a GitHub Project board once the repo exists.** The PM prints the `gh issue create` commands at plan freeze, and Dave runs them. (Wording corrected 2026-10-18: this said "once the repo is public"; Dave accepted "once the repo exists", and the repo is private.)
 
 **Actuals capture**
 
@@ -51,6 +51,24 @@ What exists today:
 
 - Every unit ticket carries a scope manifest (IN SCOPE, OUT OF SCOPE, REFERENCE CODE).
 - `units.yaml` gains `actual_days`, `dave_minutes`, and `tokens` per unit.
+- **Project board (added 2026-10-18).** A GitHub Project named "Ramble", owned by `defaultdave` and linked to the `ramble` repo. Each unit's issue is an item on it. Fields mirror `units.yaml`:
+
+| Board field | Type | From `units.yaml` |
+|---|---|---|
+| Status (built in) | Single select: Todo, In Progress, Done | `status`: todo maps to Todo; in progress and in review map to In Progress; done maps to Done |
+| Unit ID | Text | `id` |
+| Section | Single select, created at plan freeze once the work breakdown names the sections | `section` |
+| Complexity | Single select: 1, 2, 3 | `complexity` |
+| Uncertainty | Single select: 1, 2, 3 | `uncertainty` |
+| Spike | Single select: Yes, No | `spike` |
+| Execution | Single select: Human-only, Human-led, Agent fan-out | `execution` |
+| Depends on | Text | `depends_on` (unit IDs) |
+| Estimate optimistic, likely, pessimistic (days) | Number, three fields | `estimate_days` o, m, p |
+| Actual days | Number | `actual_days` |
+| Dave minutes | Number | `dave_minutes` |
+| Tokens | Number | `tokens` |
+
+`units.yaml` stays the record. The PM updates the board when a unit's status or actuals change; if they disagree, `units.yaml` wins. Creating the board and its fields is Dave's (the PM prints the commands); adding issues to it follows the issue rule above.
 - The PM closes each unit only after checking it against its acceptance criteria and manifest.
 - **Planning input for P4:** budget Dave's gate time explicitly. With fan-out, the bottleneck is Dave's pushes and reviews, not agent build time.
 - **Auto mode (accepted change).** Two modes for pushes to unit branches, opening PRs, and starting PR reviews: *approval* (the pipeline prepares the action and Dave approves each one) for the first couple of units, then *auto* (the pipeline does them itself) once Dave opts in. Switching on auto needs the permission prompts for `git push` and `gh pr create` relaxed for this project, which is Dave's change to make. P4 estimates both modes, since gate time shrinks in auto.
@@ -59,4 +77,4 @@ What exists today:
 
 - Dave's gate time becomes the critical path in P4: consider relaxing gate 5 for pushes to unit branches (never `main`), or batching reviews.
 - Fan-out volume makes manual merging the bottleneck: port the vig merge desk as its own unit.
-- The repo stays private: tracking 1 is enough.
+- The board drifts from `units.yaml` faster than the PM can sync it: generate the board updates from `units.yaml` with a script.

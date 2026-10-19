@@ -10,10 +10,10 @@ Ramble's answers to every rule that [`react-nextjs.md`](~/.claude/standards/reac
 | React version | 19.3 (ADR 0001) |
 | Package manager (SET-14, SET-16) | |
 | Node version (`engines`) | Current active LTS, pinned in `engines` at the walking skeleton |
-| Hosting and deploy target | Vercel, US East; Hobby for the demo with scheduled jobs triggered by hand, Pro for the real job (ADR 0007) |
+| Hosting and deploy target | Vercel, US East. Demo on Hobby (checkout states no payment is taken); one 30-minute pulse from GitHub Actions once the repo is public; real job on Pro with per-minute cron. Staged production deployments promoted by Dave (ADR 0007) |
 | Backend contract (REST, GraphQL, RPC) and who owns it | No separate API. Server Components read the server-only data layer; mutations are Server Actions; Route Handlers only for payment webhooks and scheduled jobs. Ramble owns it (ADR 0001, 0002, 0003) |
 | Web only, or web and mobile | Web only, mobile first (PRD Q-08) |
-| Analytics, monitoring, and feature-flag vendors (each gets a wrapper, ARCH-8) | Vercel Speed Insights (real-user Core Web Vitals), Sentry (errors), a synthetic test booking; none load on the checkout page. Attribution (PRD-58) is stored in Ramble's own database. No feature-flag vendor (ADR 0007) |
+| Analytics, monitoring, and feature-flag vendors (each gets a wrapper, ARCH-8) | First-party `events` table and `web-vitals` reporter (ADR 0007); Vercel Speed Insights as the summary, off checkout; Sentry for errors, browser script off checkout; Better Stack free for uptime, heartbeats, and the status page; Axiom free for logs; BotID Basic for bot checks, off checkout; Resend for email in the real job (fake adapter and dev mailbox in the demo). No feature-flag vendor: ops switches live in a settings table. PostHog is the named analytics alternative |
 | Design system or component library | In-house primitives on native elements; React Aria Components for the date picker, calendar, and dialog only; Storybook for the primitives (ADR 0005) |
 
 ## Decisions
@@ -40,7 +40,7 @@ Ramble's answers to every rule that [`react-nextjs.md`](~/.claude/standards/reac
 | UI-2 | Styling system: CSS Modules or Tailwind | CSS Modules beside the component | CSS Modules, with Figma-sourced tokens as CSS custom properties (ADR 0005) |
 | PERF-6 | Bundle analyzer | Decide before the first dependency review | |
 | PERF-7 | Hand memoization | Follows STATE-14: none in new code when the compiler is on | |
-| SEC-10 | Content Security Policy | Report-only first | Report-only first; the checkout page also carries no third-party tags and keeps a script inventory, for PCI SAQ A (ADR 0003) |
+| SEC-10 | Content Security Policy | Report-only first | Report-only first. Checkout carries no third-party tags, and its script inventory lists the payment scripts and Ramble's first-party web-vitals and events reporter, for PCI SAQ A (ADR 0003, ADR 0007) |
 
 ## Departures
 

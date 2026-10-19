@@ -80,13 +80,17 @@ One ADR per question in `docs/adr/NNNN-slug.md`: context, the PRD requirements t
 **Exit:** every ADR has a recommendation and Dave's decision recorded in `docs/plan/DECISIONS.md`. ✅ Met 2026-10-18.
 
 ### P3. Design, mobile first
+> **Changed 2026-10-18 (Dave):** the design system (step 4) is built first, as a proper Figma library (variables, then components with variants and variable bindings), so the mobile flow is drawn from it. It is wired to code with Figma Code Connect: a spike in P4, the full mapping as a P5 unit (ADR 0005). The v0 desktop wireframes are reviewed against the signed PRD before the mobile flow starts.
+
+> **Changed 2026-10-18 (Dave), from the wireframe review** (`docs/design/wireframe-review.md`): the mobile page has 01 to 06 with variants (no cart; 04 "choose date and party" replaces it; gifting runs as variants of 04 to 06), plus 07 Manage booking and 08 Gift redemption. The states page drops "empty cart" and adds hold blocked, sold out before the hold, and paid after the hold lapsed (auto refund). Host and ops screens stay out of P3.
+
 In the same Figma file:
 1. Page **Core flow (mobile)**: 01 to 06 at 390 wide. Must include the filter drawer, the booking bar that replaces the sticky widget, and checkout on a phone.
 2. Page **States**: loading skeletons, zero results, error with retry, empty cart, hold expired, slot sold out mid-checkout, card declined, network failure after submit.
 3. Revise the desktop page as the expansion of mobile.
 4. Tokens and primitives in Figma (variables, then Header, Card, Chip, Button, Input, Order summary), matched to R5.
 
-**Exit:** Dave signs off the mobile flow and the states page.
+**Exit:** Dave signs off the mobile flow and the states page. ✅ Signed off 2026-10-18, with a waiver for stand-in brand assets (tone checklist B3). The desktop revision (step 3) is still open.
 
 ### P4. Plan: the seven artifacts
 Written into `docs/plan/`. Where a workbook template does not exist yet, the Ramble artifact becomes the draft template (see Open decisions).
@@ -146,6 +150,6 @@ Reference class for #6: Dave's prior checkout epic (about 65 PRs, 13 sections, 3
 
 ## Open decisions for Dave
 
-1. **Workbook order.** The roadmap puts the workbook templates before planning Ramble. Recommendation: plan Ramble now and extract the templates from its filled artifacts, since a template drawn from a real example is better than one drawn from nothing.
+1. ~~**Workbook order.**~~ **Closed 2026-10-18 (Dave):** plan Ramble now and extract the workbook templates from its filled artifacts afterward. See `DECISIONS.md`.
 2. ~~**Timing of the early research.**~~ Closed: the market scan ran in the background, and discovery waited until Dave was free.
 3. **Method update.** The planning method starts at the design doc because at the prior client the product already existed. Greenfield work needs a Layer 0 (discovery + PRD) ahead of it. Fold this into the deck and workbook.

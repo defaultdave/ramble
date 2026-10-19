@@ -19,4 +19,6 @@ Research notes behind the researched ADRs are in `research/`.
 
 ## Decided 2026-10-18
 
+**Amended the same day** with the [industry-gap review](research/industry-gap-review.md): caching, SEO, and product surfaces in 0001; jobs, email, security, and data rules in 0002; added checks in 0006; hosting tier, repo, domain, operations, and delivery in 0007. Also 0005 (Code Connect) and 0007 (measurement).
+
 All ten accepted in one sitting (see `docs/plan/DECISIONS.md`). Changes from the recommendations: 0003, the demo runs on the fake gateway with no Stripe account; 0007, the GitHub repo is created now, private; 0010, pushes to unit branches, PRs, and PR reviews become automatic once Dave opts in. R11 and R12 were folded into 0005 and 0002 as PM notes. PRD-33 stays as signed, with gift validity as configuration and the New York gift law risk logged for counsel. The project's stack decisions are in `.claude/standards/stack-decisions.md`.

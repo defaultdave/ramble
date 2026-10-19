@@ -71,6 +71,33 @@ Dave folded R12 into this ADR rather than opening a new one. PM note, not separa
 
 PRD-33 stays as signed (12 months, refund to the buyer if unredeemed), but the validity period and the expiry action are configuration, not code. New York's gift certificate law (GBL 396-i, as published: a nine-year minimum expiry) may apply to a gift of one specific experience; that is a counsel question (Q-16). If counsel says it applies, the configuration changes and gift money moves off the Stripe balance (ADR 0003).
 
+## Amendment 2026-10-18: jobs, email, security, and data rules
+
+Accepted by Dave with the [industry-gap review](research/industry-gap-review.md) (decision D4). Detail and sources are in the review and its [area notes](research/industry/).
+
+**New tables, added once.** `jobs`, `messages` (with suppression), `provider_events` (already listed), `rate_limits`, `settings` (ops switches and gift validity), `synthetic_runs`, `support_requests`, `privacy_requests`, `consents`, `legal_documents` and acceptances, `report_snapshots`, `slug_history`, `photos` (metadata, rights, required alt text or a decorative flag), `host_documents` (private storage), `incidents`. A PII inventory lists every table and vendor holding personal data, so a deletion request (PRD-73) reaches all of them.
+
+**Background jobs and email**
+- An outbox: `jobs` rows are written in the same transaction as the state change and drained with `FOR UPDATE SKIP LOCKED`, with backoff and dead letters. A scheduled tick calls one secured, idempotent drain route; cron is a best-effort tick, not the queue (scheduling in ADR 0007).
+- Inbound webhooks: verify the signature on the raw body, store with a unique event ID, return 2xx, process through `jobs`.
+- Email sits behind `lib/email` with `resend` (real job), `postmark` (spare), and `fake` adapters. `EMAIL_MODE` (sink, allowlist, live) is enforced in the wrapper and is live only in production. Templates are React Email in the repo. The demo has no domain (decision D3), so every email goes to an in-app dev mailbox.
+- `.ics` attachments and add-to-calendar links with a stable UID; Reply-To a monitored support address; gift emails only after payment, capped per sender and recipient, plain text with no links.
+
+**Security data rules**
+- App-level rate limits in `rate_limits` behind a wrapper: sign-in links per email, reserve, payment attempts (at most 5 per hold), manage-booking, forms. Payment is created only against an active hold.
+- Staff sign-in: passkeys required for ops and admin through Better Auth, email links off for those roles, 8-hour sessions with a 30-minute idle timeout [proposed], and step-up for refunds, cancellations, payout and role changes. This replaces this ADR's earlier trigger for moving to a hosted identity provider.
+- Sign-in and capability links: random tokens hashed at rest, single-use sign-in links with a 5-minute expiry, uniform replies.
+- Audit log (PRD-74): a SQL-created role with insert and select only, a trigger that blocks updates and deletes, a nightly export to locked storage (Cloudflare R2 free tier in the demo). A hash chain is optional; if used, check it doesn't become a lock hotspot during a mass weather cancellation.
+- An authorization matrix (role by action by resource) runs in CI against the real database (ADR 0006).
+
+**Data operations**
+- Connections: the pooled host for app traffic; the direct host for migrations and dumps; the HTTP driver for single reads; a pooled transaction for holds.
+- The hourly `pg_dump` runs from a scheduled GitHub Actions workflow (free once the repo is public, decision D1) to Cloudflare R2, with a monthly restore test.
+- Events quality: the `events` table filters bots and internal traffic, dedupes, and flags synthetic runs, so funnel numbers (PRD-61) aren't inflated by crawlers, tests, and staff.
+- Reporting: a PII-free reporting schema and a read-only role; synthetic data excluded; month snapshots tied out to the ledger.
+- Children's data stays limited to age and guardian contact and never enters analytics events. New York's Child Data Protection Act may apply to records with actual knowledge of a minor (counsel, Q-16).
+- Real job: Neon Launch with an always-on compute floor; a read replica only if reads crowd checkout.
+
 ## What would change the call
 
 - R12 picks Supabase for login and storage: switch to B with the point-in-time add-on; the hold design doesn't change.

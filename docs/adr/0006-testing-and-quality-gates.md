@@ -47,6 +47,17 @@ The house standards already fix most of the testing approach (section 8): Vitest
 
 Lighthouse budgets match PRD-68 in the mobile lab profile (LCP 2.5 s, CLS 0.1, Total Blocking Time 200 ms as the lab stand-in for INP). The PRD-68 field check after launch reads real-user Core Web Vitals through the analytics wrapper (ADR 0007).
 
+## Amendment 2026-10-18: added checks
+
+Accepted by Dave with the [industry-gap review](research/industry-gap-review.md) (decision D4).
+
+- **Load tests** run k6 against a self-hosted production build (`next start`) on a Neon branch, not against Vercel, because Vercel's policy limits load tests on its platform. Cache-header behavior is checked on Vercel previews with Playwright. Scenarios include hold hoarding and decline storms.
+- **Synthetic booking:** every 30 minutes in the demo, through the shared pulse (ADR 0007), because a 5-minute cadence exhausts Neon Free's compute hours; every 5 minutes in the real job.
+- **Per PR, added:** the authorization matrix, the checkout script-inventory test (scripts and frames on checkout match ADR 0003's list), the cache-safe header test, the crawler-view test (key pages fetched as Googlebot show title, canonical, JSON-LD, and body text), the redirect-map check (one hop, 301 or 308, ending in a 200), and events-quality tests.
+- **Devices:** Playwright WebKit and Chromium device profiles in CI, plus a manual pass on a real iPhone and Android phone, including the Instagram and mail in-app browsers, at the P3 and pre-launch gates (PRD-67).
+- **Nightly, added:** axe over a template-and-state matrix.
+- **Later (Tier C):** a ZAP baseline scan and security header grading.
+
 ## What would change the call
 
 - PR checks take longer than about 10 minutes and block the fan-out: move Lighthouse CI to nightly and keep the smoke test.

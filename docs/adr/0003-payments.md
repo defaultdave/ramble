@@ -51,7 +51,7 @@ Ramble keeps about $17.15 (11.5%) on an average $149.50 booking after Stripe's U
 5. **Fraud:** Radar from day one, with dynamic 3-D Secure; review Radar's paid tier after a month of dispute data. Hold limits stay in ADR 0002.
 6. **Idempotency:** layered as in ADR 0002, with FORM-8 settled as above.
 7. **Tax:** manual per-experience treatment and a configured rate at launch (PRD-78). Revisit Stripe Tax after Q-12 and counsel.
-8. **PCI:** SAQ A. The embedded Payment Element brings the script-control criterion, so the checkout page carries a report-only Content Security Policy first (SEC-10), a script inventory, and no third-party tags.
+8. **PCI:** SAQ A. The embedded Payment Element brings the script-control criterion, so the checkout page carries a report-only Content Security Policy first (SEC-10), a script inventory whose only entry beyond the payment scripts is Ramble's first-party web-vitals and events reporter (ADR 0007, amended 2026-10-18), and no third-party tags.
 9. **Gift cards (PRD-34):** not on Stripe. If Q-13 requires them, Ramble sells them as its own product on its own ledger (Q-01 option a for that product only), or uses a licensed gift-card vendor, after the legal questions below.
 10. **Code shape:** one payments service module with a Stripe adapter and a fake adapter, wire types mapped inside (ARCH-2, ARCH-3), secrets server-only, and the webhook route as a thin shell.
 

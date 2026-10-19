@@ -60,6 +60,32 @@ Also screened and not weighed: TanStack Start (stable only since 2026-10-13); an
 
 - **Patch ownership:** the framework's patch cadence is heavy (a server-component remote code execution in December 2025, two Critical advisories on 2026-10-14). The real job needs a named person and a response time inside the $8k monthly retainer. SEC-9 already blocks merges with a fixable advisory.
 
+## Amendment 2026-10-18: caching, SEO, and product surfaces
+
+Accepted by Dave with the [industry-gap review](research/industry-gap-review.md) (decision D4: fold into existing ADRs). Row-level detail and sources are in the review and its [area notes](research/industry/).
+
+**Caching and performance**
+- Every cached function sets `cacheLife` explicitly. Guest routes never send `Set-Cookie` or `Vary: Cookie` (a CI test checks), so the CDN can store them.
+- "Spaces left" reads go through Vercel Runtime Cache (`'use cache: remote'`, revalidate 5 to 10 s, a tag per session). Postgres stays authoritative at reserve (ADR 0002). No Redis.
+- The catalog is cached as two low-cardinality indexes filtered in memory. Category, neighborhood, and Picks pages are prerendered.
+- One tag module and a `tagsForChange()` plain function map every publish or booking change to the tags it invalidates: `updateTag` from admin Server Actions, `revalidateTag` from webhooks and jobs.
+- Deploys prerender published pages and warm them after release. No production promotion from 30 minutes before to 3 hours after a newsletter send (ADR 0007).
+- Degraded mode: stale pages on failed revalidation; the availability island falls back to a "Check availability" button; checkout has a maintenance state driven by the ops switches (ADR 0002).
+- Images: photo ingest validates size (1,600 to 8,192 px), re-encodes, strips location data, and stores a blur placeholder; `next/image` serves WebP at one quality with trimmed sizes and a long cache. Hobby allows 5,000 transformations a month, so the scale fixture reuses the curated photo pool.
+- Fonts through `next/font/local`, two families at most. Prefetch only on the main call to action.
+
+**Search engines, addresses, and sharing**
+- Sitemaps split by page type with real last-modified dates; robots and noindex per environment (the demo stays noindex); `rel=sponsored` on affiliate links on guide pages.
+- Experience and host slugs carry an ID, and a slug-history table 301s every renamed address, so PRD-63 holds as the catalog changes.
+- Branded Open Graph images per experience and Pick; token links (manage-booking, gift redemption) are noindex and never unfurl.
+
+**Product surfaces added to the route map**
+- Support contact form (honeypot, minimum-time check, rate limit) feeding an ops queue with reason tags.
+- Help articles, an accessibility statement with a feedback path, and versioned legal pages, all edited in the editorial admin (ADR 0005).
+- A receipt page with seller-of-record wording for the agent model, and printable host statements.
+- Ops pages: the investor report with month snapshots, trust and safety (host insurance and licence documents, incident intake, suspend, a copyright takedown contact), and ops switches (site banner, pause bookings, gifts off).
+- The demo checkout says plainly that no payment is taken (ADR 0007, decision D2).
+
 ## What would change the call
 
 - A walking-skeleton measurement (home and experience pages on a mid-range Android phone over throttled 4G) fails on Next.js and passes on an Astro prototype, with the gap traced to framework JavaScript: reconsider A3 for guest pages.

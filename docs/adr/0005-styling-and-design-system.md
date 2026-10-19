@@ -37,9 +37,19 @@ Ramble has a logo and illustrations from a freelance designer and no design syst
 
 ## Recommendation
 
-**A, with React Aria Components for the date picker, calendar, and dialog or drawer only,** each behind a wrapper component (ARCH-8). Tokens come from Figma variables through one export step, so Figma and code share names. Storybook covers the six P3 primitives plus the booking bar and filter drawer, with its accessibility addon, and its build runs in CI (SET-12). Figma Code Connect waits until the primitives are stable and the Figma plan is confirmed to include it.
+**A, with React Aria Components for the date picker, calendar, and dialog or drawer only,** each behind a wrapper component (ARCH-8). Tokens come from Figma variables through one export step, so Figma and code share names. Storybook covers the six P3 primitives plus the booking bar and filter drawer, with its accessibility addon, and its build runs in CI (SET-12). **Code Connect (amended 2026-10-18 at Dave's request):** the design system is built as a proper Figma library in P3 (variables, then components with variants whose names and properties match the planned code props). A Code Connect spike runs in P4 on a throwaway branch: one primitive coded and published with the Code Connect CLI, to learn the workflow and estimate the real unit. The full mapping is a P5 unit once the primitives are coded. Code Connect needs a Full or Dev seat on a Professional, Organization, or Enterprise plan; Professional allows one library and one framework, enough for Ramble ([Figma help](https://help.figma.com/hc/en-us/articles/23920389749655-Code-Connect), checked 2026-10-18).
 
 House rule for presentation logic (BUILD-PLAN seam 3): a decision about what to show is a plain function in `lib/` (ARCH-1). A custom hook is only for stateful logic shared by components (STATE-12). Don't wrap a pure computation in a hook.
+
+## Token naming contract (PM note, added 2026-10-18 at Dave's approval of the P3 design system plan)
+
+The token export must emit CSS custom properties named exactly as the Figma variables, with `/` replaced by `-` and a `--` prefix: `color/bg/canvas` becomes `--color-bg-canvas`, `space/4` becomes `--space-4`, `font/size/heading-l` becomes `--font-size-heading-l`. Every Figma variable carries that name as its WEB code syntax (`var(--color-bg-canvas)`), so Dev Mode, the Figma MCP tools, and Code Connect show the same names the CSS uses.
+
+- **Collections:** `Primitives` (raw palette, `--palette-…`, never used by components directly); `Color` with Light and Dark modes, mapped to `prefers-color-scheme`; `Space`; `Radius`; `Type` with Mobile and Desktop modes, Desktop applying at `min-width: 768px`. Breakpoints are not tokens, since media queries can't read custom properties.
+- **Shadows:** Figma effect styles `elevation/1` to `elevation/3`, emitted as `--elevation-1` to `--elevation-3` box-shadow values, with their color from `--color-shadow`.
+- **Text styles:** bound to the `Type` variables, so components use the style names and code uses the matching size and line-height properties.
+- **Components:** Figma variant and property names match the React props (`variant`, `size`, `state` and so on), so Code Connect maps them one to one.
+- The full variable list is in `docs/design/design-system-plan.md`. A rename in Figma is a breaking change for code and needs a matching change in the export.
 
 ## Editorial content management (R11, folded in 2026-10-18)
 

@@ -2,7 +2,7 @@
 
 Demo marketplace for bookable experiences, built to prove a planning method and an AI agent team workflow.
 
-- **Run the project:** `claude --agent ramble-pm`. The PM reads `docs/plan/BUILD-PLAN.md` (the spec) and `docs/plan/STATUS.md` (where things are).
+- **Run the project:** `/ramble-pm` in a desktop chat (project skill in `.claude/skills/ramble-pm/`), or `claude --agent ramble-pm` in a terminal. The PM reads `docs/plan/BUILD-PLAN.md` (the spec) and `docs/plan/STATUS.md` (where things are).
 - **Discovery:** skipped on 2026-10-18; the PRD is drafted from the client brief. `ramble-client` stays available for follow-up questions in character. See `docs/product/discovery/README.md`.
 - **Decisions:** `docs/plan/DECISIONS.md`. ADRs in `docs/adr/`.
 - **Design:** Figma `Ramble Core Flow Wireframes`, https://www.figma.com/design/tGNKJSWGHyx4UVmpnd5LUp

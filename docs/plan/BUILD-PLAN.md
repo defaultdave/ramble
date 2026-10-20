@@ -90,9 +90,11 @@ In the same Figma file:
 3. Revise the desktop page as the expansion of mobile.
 4. Tokens and primitives in Figma (variables, then Header, Card, Chip, Button, Input, Order summary), matched to R5.
 
-**Exit:** Dave signs off the mobile flow and the states page. ✅ Signed off 2026-10-18, with a waiver for stand-in brand assets (tone checklist B3). The desktop revision (step 3) is still open.
+**Exit:** Dave signs off the mobile flow and the states page. ✅ Signed off 2026-10-18, with a waiver for stand-in brand assets (tone checklist B3). The desktop revision (step 3) was done the same day: page "Core flow (desktop)", five templates at 1440.
 
 ### P4. Plan: the seven artifacts
+> **Changed 2026-10-18 (Dave):** the design doc's seam 2 section carries the data contracts: field-level specs for holds, orders, the ledger, gifts, and payment in flight; entities and boundary interfaces for everything else. Exact schemas are written in code in P5, as an early unit at the root of the dependency graph. See `DECISIONS.md`.
+
 Written into `docs/plan/`. Where a workbook template does not exist yet, the Ramble artifact becomes the draft template (see Open decisions).
 
 | # | Artifact | File |

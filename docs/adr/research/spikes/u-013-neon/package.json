@@ -1,0 +1,14 @@
+{
+  "name": "u-013-neon-spike",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@neondatabase/serverless": "^1.2.0",
+    "embedded-postgres": "^18.4.0-beta.17",
+    "pg": "^8.23.1",
+    "ws": "^8.22.0"
+  },
+  "trustedDependencies": [
+    "@embedded-postgres/darwin-arm64"
+  ]
+}

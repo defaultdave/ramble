@@ -1,0 +1,312 @@
+[
+  {
+    "name": "pg + pooler (transaction)",
+    "rounds": [
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 42,
+        "p50": 39,
+        "p95": 41,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 6,
+        "p50": 4,
+        "p95": 5,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 5,
+        "p50": 4,
+        "p95": 5,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 6,
+        "p50": 4,
+        "p95": 6,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 6,
+        "p50": 4,
+        "p95": 5,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      }
+    ],
+    "attempts": 60,
+    "oversoldRounds": 0,
+    "totalOverBy": 0,
+    "errors": 0,
+    "medianP50": 4,
+    "medianP95": 5,
+    "medianWall": 6
+  },
+  {
+    "name": "pg + direct host (transaction)",
+    "rounds": [
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 43,
+        "p50": 34,
+        "p95": 41,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 5,
+        "p50": 4,
+        "p95": 5,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 5,
+        "p50": 3,
+        "p95": 5,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 6,
+        "p50": 3,
+        "p95": 6,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 5,
+        "p50": 3,
+        "p95": 5,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      }
+    ],
+    "attempts": 60,
+    "oversoldRounds": 0,
+    "totalOverBy": 0,
+    "errors": 0,
+    "medianP50": 3,
+    "medianP95": 5,
+    "medianWall": 5
+  },
+  {
+    "name": "pg autocommit, one statement, lock + sum subquery",
+    "rounds": [
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 39,
+        "p50": 4,
+        "p95": 37,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 32,
+        "errors": 0,
+        "wallMs": 3,
+        "p50": 2,
+        "p95": 3,
+        "maxHeld": 24,
+        "oversoldSessions": 3,
+        "overBy": 28
+      },
+      {
+        "accepted": 32,
+        "errors": 0,
+        "wallMs": 3,
+        "p50": 2,
+        "p95": 2,
+        "maxHeld": 24,
+        "oversoldSessions": 3,
+        "overBy": 27
+      },
+      {
+        "accepted": 30,
+        "errors": 0,
+        "wallMs": 2,
+        "p50": 2,
+        "p95": 2,
+        "maxHeld": 22,
+        "oversoldSessions": 3,
+        "overBy": 21
+      },
+      {
+        "accepted": 32,
+        "errors": 0,
+        "wallMs": 2,
+        "p50": 2,
+        "p95": 2,
+        "maxHeld": 24,
+        "oversoldSessions": 3,
+        "overBy": 27
+      }
+    ],
+    "attempts": 60,
+    "oversoldRounds": 4,
+    "totalOverBy": 103,
+    "errors": 0,
+    "medianP50": 2,
+    "medianP95": 2,
+    "medianWall": 3
+  },
+  {
+    "name": "pg autocommit, one statement, counter column",
+    "rounds": [
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 2,
+        "p50": 1,
+        "p95": 2,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 2,
+        "p50": 1,
+        "p95": 2,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 2,
+        "p50": 1,
+        "p95": 2,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 2,
+        "p50": 1,
+        "p95": 2,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 2,
+        "p50": 1,
+        "p95": 2,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      }
+    ],
+    "attempts": 60,
+    "oversoldRounds": 0,
+    "totalOverBy": 0,
+    "errors": 0,
+    "medianP50": 1,
+    "medianP95": 2,
+    "medianWall": 2
+  },
+  {
+    "name": "pg transaction, NO lock (control)",
+    "rounds": [
+      {
+        "accepted": 19,
+        "errors": 0,
+        "wallMs": 40,
+        "p50": 31,
+        "p95": 39,
+        "maxHeld": 11,
+        "oversoldSessions": 1,
+        "overBy": 1
+      },
+      {
+        "accepted": 27,
+        "errors": 0,
+        "wallMs": 4,
+        "p50": 3,
+        "p95": 4,
+        "maxHeld": 18,
+        "oversoldSessions": 3,
+        "overBy": 16
+      },
+      {
+        "accepted": 26,
+        "errors": 0,
+        "wallMs": 4,
+        "p50": 3,
+        "p95": 4,
+        "maxHeld": 18,
+        "oversoldSessions": 3,
+        "overBy": 15
+      },
+      {
+        "accepted": 27,
+        "errors": 0,
+        "wallMs": 3,
+        "p50": 3,
+        "p95": 3,
+        "maxHeld": 21,
+        "oversoldSessions": 3,
+        "overBy": 18
+      },
+      {
+        "accepted": 26,
+        "errors": 0,
+        "wallMs": 3,
+        "p50": 3,
+        "p95": 3,
+        "maxHeld": 18,
+        "oversoldSessions": 3,
+        "overBy": 15
+      }
+    ],
+    "attempts": 60,
+    "oversoldRounds": 5,
+    "totalOverBy": 65,
+    "errors": 0,
+    "medianP50": 3,
+    "medianP95": 4,
+    "medianWall": 4
+  }
+]

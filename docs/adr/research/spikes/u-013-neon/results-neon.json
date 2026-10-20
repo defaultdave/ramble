@@ -1,0 +1,554 @@
+[
+  {
+    "name": "pg + pooler (transaction)",
+    "rounds": [
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 992,
+        "p50": 533,
+        "p95": 901,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 969,
+        "p50": 530,
+        "p95": 910,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 1023,
+        "p50": 659,
+        "p95": 963,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 887,
+        "p50": 527,
+        "p95": 828,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 988,
+        "p50": 543,
+        "p95": 845,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 987,
+        "p50": 525,
+        "p95": 830,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 981,
+        "p50": 546,
+        "p95": 920,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 983,
+        "p50": 544,
+        "p95": 922,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      }
+    ],
+    "attempts": 60,
+    "oversoldRounds": 0,
+    "totalOverBy": 0,
+    "errors": 0,
+    "medianP50": 543,
+    "medianP95": 910,
+    "medianWall": 987
+  },
+  {
+    "name": "pg + direct host (transaction)",
+    "rounds": [
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 872,
+        "p50": 530,
+        "p95": 812,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 873,
+        "p50": 527,
+        "p95": 816,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 868,
+        "p50": 530,
+        "p95": 810,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 901,
+        "p50": 548,
+        "p95": 837,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 985,
+        "p50": 536,
+        "p95": 838,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 971,
+        "p50": 541,
+        "p95": 834,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 953,
+        "p50": 529,
+        "p95": 813,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 959,
+        "p50": 538,
+        "p95": 820,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      }
+    ],
+    "attempts": 60,
+    "oversoldRounds": 0,
+    "totalOverBy": 0,
+    "errors": 0,
+    "medianP50": 536,
+    "medianP95": 820,
+    "medianWall": 953
+  },
+  {
+    "name": "neon WebSocket Pool + pooler (transaction)",
+    "rounds": [
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 999,
+        "p50": 555,
+        "p95": 941,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 1047,
+        "p50": 595,
+        "p95": 907,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 1014,
+        "p50": 563,
+        "p95": 951,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 1016,
+        "p50": 565,
+        "p95": 956,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 1017,
+        "p50": 571,
+        "p95": 958,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 1075,
+        "p50": 547,
+        "p95": 1017,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 1025,
+        "p50": 649,
+        "p95": 964,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 1045,
+        "p50": 608,
+        "p95": 987,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      }
+    ],
+    "attempts": 60,
+    "oversoldRounds": 0,
+    "totalOverBy": 0,
+    "errors": 0,
+    "medianP50": 571,
+    "medianP95": 958,
+    "medianWall": 1025
+  },
+  {
+    "name": "neon HTTP, one statement, lock + sum subquery",
+    "rounds": [
+      {
+        "accepted": 30,
+        "errors": 0,
+        "wallMs": 80,
+        "p50": 59,
+        "p95": 80,
+        "maxHeld": 30,
+        "oversoldSessions": 2,
+        "overBy": 30
+      },
+      {
+        "accepted": 49,
+        "errors": 0,
+        "wallMs": 119,
+        "p50": 85,
+        "p95": 118,
+        "maxHeld": 48,
+        "oversoldSessions": 3,
+        "overBy": 66
+      },
+      {
+        "accepted": 60,
+        "errors": 0,
+        "wallMs": 65,
+        "p50": 50,
+        "p95": 62,
+        "maxHeld": 60,
+        "oversoldSessions": 3,
+        "overBy": 90
+      },
+      {
+        "accepted": 60,
+        "errors": 0,
+        "wallMs": 64,
+        "p50": 51,
+        "p95": 64,
+        "maxHeld": 60,
+        "oversoldSessions": 3,
+        "overBy": 90
+      },
+      {
+        "accepted": 60,
+        "errors": 0,
+        "wallMs": 71,
+        "p50": 54,
+        "p95": 71,
+        "maxHeld": 60,
+        "oversoldSessions": 3,
+        "overBy": 90
+      },
+      {
+        "accepted": 60,
+        "errors": 0,
+        "wallMs": 64,
+        "p50": 51,
+        "p95": 64,
+        "maxHeld": 60,
+        "oversoldSessions": 3,
+        "overBy": 90
+      },
+      {
+        "accepted": 53,
+        "errors": 0,
+        "wallMs": 65,
+        "p50": 52,
+        "p95": 64,
+        "maxHeld": 40,
+        "oversoldSessions": 3,
+        "overBy": 69
+      },
+      {
+        "accepted": 60,
+        "errors": 0,
+        "wallMs": 63,
+        "p50": 52,
+        "p95": 61,
+        "maxHeld": 60,
+        "oversoldSessions": 3,
+        "overBy": 90
+      }
+    ],
+    "attempts": 60,
+    "oversoldRounds": 8,
+    "totalOverBy": 615,
+    "errors": 0,
+    "medianP50": 52,
+    "medianP95": 64,
+    "medianWall": 65
+  },
+  {
+    "name": "neon HTTP, one statement, counter column",
+    "rounds": [
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 70,
+        "p50": 55,
+        "p95": 68,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 66,
+        "p50": 50,
+        "p95": 66,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 152,
+        "p50": 50,
+        "p95": 63,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 63,
+        "p50": 48,
+        "p95": 62,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 70,
+        "p50": 52,
+        "p95": 63,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 119,
+        "p50": 117,
+        "p95": 119,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 68,
+        "p50": 53,
+        "p95": 68,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      },
+      {
+        "accepted": 18,
+        "errors": 0,
+        "wallMs": 63,
+        "p50": 51,
+        "p95": 63,
+        "maxHeld": 10,
+        "oversoldSessions": 0,
+        "overBy": 0
+      }
+    ],
+    "attempts": 60,
+    "oversoldRounds": 0,
+    "totalOverBy": 0,
+    "errors": 0,
+    "medianP50": 52,
+    "medianP95": 66,
+    "medianWall": 70
+  },
+  {
+    "name": "pg transaction, NO lock (control)",
+    "rounds": [
+      {
+        "accepted": 27,
+        "errors": 0,
+        "wallMs": 326,
+        "p50": 243,
+        "p95": 326,
+        "maxHeld": 18,
+        "oversoldSessions": 3,
+        "overBy": 16
+      },
+      {
+        "accepted": 27,
+        "errors": 0,
+        "wallMs": 318,
+        "p50": 237,
+        "p95": 318,
+        "maxHeld": 18,
+        "oversoldSessions": 3,
+        "overBy": 16
+      },
+      {
+        "accepted": 27,
+        "errors": 0,
+        "wallMs": 227,
+        "p50": 148,
+        "p95": 227,
+        "maxHeld": 18,
+        "oversoldSessions": 3,
+        "overBy": 16
+      },
+      {
+        "accepted": 27,
+        "errors": 0,
+        "wallMs": 250,
+        "p50": 169,
+        "p95": 250,
+        "maxHeld": 18,
+        "oversoldSessions": 3,
+        "overBy": 16
+      },
+      {
+        "accepted": 27,
+        "errors": 0,
+        "wallMs": 307,
+        "p50": 230,
+        "p95": 305,
+        "maxHeld": 18,
+        "oversoldSessions": 3,
+        "overBy": 16
+      },
+      {
+        "accepted": 27,
+        "errors": 0,
+        "wallMs": 316,
+        "p50": 147,
+        "p95": 316,
+        "maxHeld": 18,
+        "oversoldSessions": 3,
+        "overBy": 16
+      },
+      {
+        "accepted": 27,
+        "errors": 0,
+        "wallMs": 227,
+        "p50": 150,
+        "p95": 227,
+        "maxHeld": 18,
+        "oversoldSessions": 3,
+        "overBy": 16
+      },
+      {
+        "accepted": 27,
+        "errors": 0,
+        "wallMs": 238,
+        "p50": 158,
+        "p95": 238,
+        "maxHeld": 18,
+        "oversoldSessions": 3,
+        "overBy": 16
+      }
+    ],
+    "attempts": 60,
+    "oversoldRounds": 8,
+    "totalOverBy": 128,
+    "errors": 0,
+    "medianP50": 169,
+    "medianP95": 305,
+    "medianWall": 307
+  }
+]

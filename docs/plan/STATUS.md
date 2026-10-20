@@ -1,7 +1,7 @@
 # Status
 
-**Updated:** 2026-10-18
-**Phase:** P1 ✅, P2 ✅, and the P3 gate ✅ (all 2026-10-18; the mobile flow and States page are signed off). P3's desktop revision is still open. P4 Plan starts when Dave says go.
+**Updated:** 2026-10-20
+**Phase:** P1 ✅, P2 ✅, and the P3 gate ✅ (all 2026-10-18; the mobile flow and States page are signed off). P3 is complete, including the desktop revision. **P4 Plan started 2026-10-18:** artifacts 1 to 7 done; Dave adopted the recommendations on 2026-10-20 (tiered merge plus levers 2, 3, 4a; December 1 moves). Applied to every plan file. **Plan frozen 2026-10-20** (Dave approved; committed on `main`; tag `plan-frozen-2026-10-20` is Dave's to run). From here the plan files are read-only; reality goes in `delta-log.md`.
 
 ## Done
 - P0: desktop wireframes v0 in Figma (6 screens, notes, click-through); repo, PM agent, project memory, build plan spec; discovery kit.
@@ -12,6 +12,7 @@
 - 2026-10-18: First commit `9707f47` on `main` (local only).
 - 2026-10-18: **Industry-gap review done** (`docs/adr/research/industry-gap-review.md`, area notes in `docs/adr/research/industry/`): 113 capabilities plus 17 from a critic; 249 free-tier claims checked. Dave adopted Tier A as P4 input, folded into amendments to ADRs 0001, 0002, 0006, 0007. Repo public at plan freeze; demo on Hobby with a no-payment checkout notice; no domain.
 - 2026-10-18: **P2 done.** All ten ADRs accepted in one sitting, three with changes (see `docs/adr/README.md`); R11 and R12 folded into ADRs 0005 and 0002; project stack decisions filled; global standards baseline moved to Next.js 16.4.1+ and React 19.3 (uncommitted in the vig repo). Earlier the same day: ADRs proposed, all ten (`docs/adr/0001` to `0010`, index and decision list in `docs/adr/README.md`). R1, R2, R3, and the Q-11 spike researched by four Sonnet agents (notes in `docs/adr/research/`); R4 to R10 drafted by the PM from Dave's standards and the PRD. Vendor facts in R5, R7, R8 checked against live pages. Every ADR checked for sections, real PRD IDs, and style.
+- 2026-10-18: **P3 desktop revision done.** New page "Core flow (desktop)" at 1440 from the library: D01 Home, D02 Browse (three-column grid), D03 Experience (content beside a sticky BookingPanel), D05 Checkout and D06 Confirmation (two columns, summary at the side); other screens follow these templates. Library additions: BookingPanel (desktop replacement for the booking bar and sheet), desktop Header and Footer variants, `size/content-max` (1200). Type uses the Desktop mode in these frames. The v0 page is kept, renamed "Core flow (desktop) v0 · archive", frames untouched. QA: 184 instances, Fraunces and Inter only, no clipped text or overflow.
 - 2026-10-18: **P3 gate met.** Dave, as the client, signed off the mobile flow and the States page against the tone checklist, with a waiver for stand-in brand assets (B3); photography deferred to the seed photos (B4). Logged in `DECISIONS.md`. P3 work in order:
   - **P3 started 2026-10-18** in a session with the Figma tools (Figma account: Full seat, Professional plan, admin).
   - P3 step 1 done: v0 wireframe review, `docs/design/wireframe-review.md`. Dave adopted all four recommendations (logged in `DECISIONS.md`; BUILD-PLAN P3 note added).
@@ -22,7 +23,34 @@
   - P3 step 6 done (2026-10-18): PRD-77 tone checklist, `docs/design/tone-checklist.md` (voice, look, usability; with a PM pre-check). Pre-check: all items pass except B3, which needs a waiver (stand-in wordmark and illustrations), and B4, deferred (photos are placeholders until the seed photos). One copy note: use "From" pricing only when session prices differ. Design notes in three state frames moved into their labels.
 
 ## In flight
-- **P3 desktop revision:** not started. See Next.
+- **Freeze decisions applied 2026-10-20, not committed:** levers 2 and 4a moved U-093, U-096, U-002, U-003, U-116, U-011, U-005, U-024 to agents in `units.yaml` (U-002, U-003, U-024 to the critical tier; U-093 and U-096 carry a results-read people check); lever 3 set `DAVE_SHARE` to 0.35 / 0.5 / 0.65 in `graph.ts`; `execution-model.ts` now reports the tiered merge rule (old rule as a comparison column, 18 weeks); `forecast.ts` runs the record as the plan, with "before the levers" and "lever 4" as comparisons. 02, 04, 05, 06, 07 regenerated; 05 and 04 carry dated notes; 06 and 07 prose updated (07 rewritten as the decided plan). The plan at 12.5 h: Prototype P50 2026-11-30 (P90 12-07), launch-ready P50 2027-03-08 (P90 03-26); Dave leads 9 of 116 units, about 180 h. Roadmap republished.
+- **Project board #19 set up 2026-10-20** by the PM (Dave's call): linked to `defaultdave/ramble`, fields Unit ID, Section, Complexity, Uncertainty, Spike, Execution, Review tier, Depends on, the three estimate fields, Actual days, Dave minutes, Tokens. No items yet; issues come at the freeze.
+- **P4 artifacts 6 and 7 drafted 2026-10-20, not committed:** `docs/plan/06-estimate.md`, `docs/plan/07-resourcing.md`. Record: `estimate_days` on all 132 open units in `units.yaml`; every lens's figures and the solo estimates in `docs/plan/estimate-panel.json`. New script `scripts/plan/forecast.ts` (Monte Carlo over the graph; Dave as a capacity-limited resource; levers and WIP as scenarios). Dave's minutes moved from `execution-model.ts` into `scripts/plan/dave-time.ts` (report output unchanged, checked by diff).
+  - Estimate: blind four-lens panel by workflow (bottom-up, analogy, pipeline, risk), median per point; 3 units moderated (U-001, U-058, U-094b). Demo work 226 to 293 days (P50 257). The floor (every owner full time) is 5.8 to 8.0 weeks, 2026-12-09 to 12-23 from a 10-26 start: **no staffing reaches December 1** (Q-07). The PERT path is 28.7 ± 2.2 days, 11 units, now through the gift chain (U-064a, U-065a, U-065b). A per-run systemic factor 0.9 / 1.1 / 1.5 comes from the reference-class cross-check (checkout epic +36 to 43% unplanned; Discovery early; panel's seam rework).
+  - **Resourcing, second draft 2026-10-20** after Dave's two decisions (tiered auto-merge; Prototype milestone first; DECISIONS 2026-10-20, ADR 0010). `forecast.ts` now models the tiered rule (switch-on 1 to 4 days after U-002; weekly promotion batch; launch waits for the last promotion) and the Prototype (20 units, closure checked by the script), with the "Dave merges all" rows kept as the comparison. `dave-time.ts` gained the tiered terms (`tieredGateTerms`, `batchReadMinutes`, `PROMOTION`, `TIERED_SWITCH_ON`).
+    - Tiered alone at 12.5 h: Prototype P50 2026-12-21 (P90 2027-01-06); full build P50 2027-04-26 (P90 05-24). Only 3.7 weeks better than merging everything, because Dave's own units (about 214 h) bind, not the gates.
+    - **Recommended: tiered plus levers 2, 3, 4a at 12.5 h:** Prototype P50 2026-12-01 (P90 12-07); full build P50 2027-03-08 (P90 03-29); about 184 h, 10.4 h a week.
+    - Gate time under tiered is about 63 h, not the decision's 30 h: people checks, escalations, and the weekly promotion remain.
+    - **U-118 Merge desk and agent identity added 2026-10-20 (Dave's request):** a Foundation root unit, Dave-led, critical tier, PM estimate 1.5 / 3 / 7 days; U-001 now depends on it, so no fan-out unit merges before it. It adds 3.4 days to the path (28.7 to 32.1), moves the floor from 6.8 to 7.5 weeks, the Prototype (now 21 units) floor from 2.6 to 3.3, and each forecast by about a week. The forecast's switch-on is now U-118's merge, not an assumed 1 to 4 days after U-002. The auto-mode permission exemption moved from Dave's task list into U-118. 02, 04, 05 (in points, with dated notes), 06, and 07 are regenerated.
+    - **Runbook:** `docs/plan/merge-desk-runbook.md`, steps labelled Dave or PM; the PM runs no step that changes GitHub settings. It includes the exact edits `CLAUDE.md` and `ramble-pm.md` need when auto-merge is switched on (D3); neither file is changed.
+    - The first draft (Dave merges everything; levers 1 to 3 and 4a; 2027-03-15) stays in the tables as the comparison. Real job, with U-118: one engineer with agents 14.1 weeks (11.0 tiered), two 9.0, none 83.
+  - Biggest unconfirmed assumption: how much Dave's time an agent-built unit costs (about 1.1 h at the gate if he merges all; under tiered, whether agent verdicts hold without his read). Calibration after the first three fan-out merges.
+  - 02, 04, 05, 06, and 07 regenerated 2026-10-20 with U-118. 04 and 05 stay in points as approved, with a dated note on what U-118 changed; their prose predates it.
+- **Executive roadmap** (Dave asked 2026-10-20): `docs/plan/roadmap/` (template, `status.json`, `schedule.json`, built `index.html`), published at https://claude.ai/artifact/8vvxU5shDbM9uQkYSTLEiw. Built by `scripts/plan/roadmap.ts`; the per-unit schedule comes from `forecast.ts --report schedule`. The PM refreshes it at the end of every session.
+- **P4 spikes, run 2026-10-19** (results in `docs/adr/research/`):
+  - **U-008a and U-009 (combined Cache Components spike), local part done:** `u-008a-u-009-cache-components-spike.md`. The nonce CSP works only on fully dynamic routes (`instant = false`, own route group and root layout); on a partially prerendered route the shell's scripts have no nonce and the browser blocks them. Tags, `updateTag`, `revalidateTag`, and `use cache: remote` behave as designed locally; a failing remote handler needs a try/catch fallback to Postgres. Re-scored to uncertainty 2, agent fan-out. The Vercel Hobby run passed 2026-10-20 (project `ramble-spike`).
+  - **U-028 Code Connect, done:** `u-028-code-connect-spike.md`. A Button template authors and parses, but Figma **refuses to publish on the Professional plan** (Organization or Enterprise only), which corrects the P3 step 2 plan check. U-029 is blocked on Dave's call (below). U-029 complexity 1 to 2.
+  - **U-013 Neon, done:** `u-013-neon-concurrency-spike.md`. On a real Neon project the pooled interactive transaction (pooler, direct, and WebSocket pool all tried) never oversold in 8 rounds; the HTTP driver with a row-reading check oversold every round; a counter column is safe over HTTP but is a design change. ADR 0002 holds, no change. Re-scoring: none needed beyond status.
+  - The execution model and graph blocks are regenerated: Dave leads 16 demo units (was 18), agents build 99; critical path unchanged at 26 points; Dave's lane 40 points (was 42); gates and tasks about 93 h likely, 15.6 h a week.
+- **Two design doc amendments accepted 2026-10-19:** gift delivery lock (yes) and capability tokens option A (derived). In `01-design-doc.md` 4.2.3, `DECISIONS.md`, and ADR 0002.
+- **P4 artifact 1 done:** design doc approved 2026-10-18 (`docs/plan/01-design-doc.md`), with the review fixes and the four proposed items accepted (addresses, 5-minute grace, gift snapshot prices, gift reinstated on cancel).
+- **P4 artifact 2 done:** work breakdown scope approved 2026-10-18 (132 units; Stripe adapter estimated not built; Shoulds estimated, cut order after; listed exclusions). Four review rounds by workflow.
+- **P4 artifact 3 done:** scores approved 2026-10-18 (`docs/plan/03-scores.md`), with the spike plan (U-013; one combined Cache Components spike for U-008a and U-009; U-028) and Tiptap for the editorial rich text. U-093, U-101, U-046, U-096 carry wide ranges instead of spikes.
+- **P4 artifacts 4 and 5 done, approved 2026-10-19:** `docs/plan/04-dependency-graph.md` and `docs/plan/05-execution-model.md`, computed by `scripts/plan/critical-path.ts` and `scripts/plan/execution-model.ts` (Bun) over `units.yaml`. Three adversarial review rounds by workflow plus a check of the token proposal (the third round found no path shortening); the breakdown is now 134 units (U-116 caller contract, U-117 rich-text renderer), and `02-work-breakdown.md` is regenerated from `units.yaml`. Results in complexity points, a stand-in until artifact 6:
+  - Critical path 26 points: platform, data, holds, the webhook intake and `confirmOrder`, then four tied routes to the launch review (the confirmation and failure screens into gift redemption and exchange; the redemption and exchange confirm; manage booking and the synthetic booking into uptime monitoring; the smoke test and staged releases into the runbooks and the cutover rehearsal). 18 tied chains; the graph allows about 9 units in parallel.
+  - Routing: agents build 97 of the 115 demo units, Dave leads 18; 49 demo units are on the critical review tier.
+  - Dave is the constraint: his 18 units in series finish at 42 points (31.5 if agents carry the last 35% of each), and his gates, people checks, recurring work, and tasks come to about 92 h likely, about 15.4 h a week over six weeks.
+  - Two proposed design doc amendments in 4.2.3, for Dave to accept with artifact 4: the gift delivery job locks the gift row; how capability links (manage, gift, and confirmation) are made: A, derived by HMAC so any unit can rebuild a link (recommended; amends ADR 0002), or B, random tokens hashed at rest as ADR 0002 says. Units are written for A.
 
 ## Open client facts (from the PRD, tracked work, not decisions)
 | Q | Needs | Feeds |
@@ -39,9 +67,9 @@
 In this demo, the client facts have no one to ask. Where a fact blocks a decision, the PM proposes a working assumption and logs it as one.
 
 ## Blocked on Dave
-1. **Board fields.** Repo pushed and board #19 "Ramble" created (checked 2026-10-18), but the second board command (link to the repo and add the fields) has not run: the board has no custom fields and no repo link. Dave runs it, or asks the PM to. The Section field is added at plan freeze.
-2. **Publish the Figma library** (Dave, in Figma: Assets panel, Publish). Needed before the P4 Code Connect spike, not before the mobile flow.
-3. **Method Layer 0** (open decision 3). Not needed until P6.
+1. **Freeze commands** (printed by the PM 2026-10-20): tag, push, make the repo public, runbook phase C, `bun scripts/plan/issues.ts --run`.
+2. **Method Layer 0** (open decision 3). Not needed until P6.
+3. **Merge desk App, before the freeze** (`docs/plan/merge-desk-runbook.md`, phase A): create the GitHub App with the minimum permissions, keep its key in `~/.config/ramble-agents/`, install it on `ramble` only, record the IDs in `app.conf` (A1 to A4). About 20 minutes. Phases C and D (repo settings, rulesets, the permission relaxation, the hard-line edits) come at and after the freeze, once the repo is public.
 
 Resolved: Figma tools in a new session (2026-10-18, working in the P3 session). Workbook order (2026-10-18: plan Ramble first, extract the templates from its artifacts afterward). The Perf Lab spec conflict: the signed PRD's `PRD-68` is the requirement the detail-page fixes trace to; the router question went to ADR 0001.
 
@@ -50,9 +78,22 @@ Open item from the ADR 0007 measurement amendment (2026-10-18): what New York an
 Legal and vendor questions for the real job, logged, not blocking the demo: Ramble holding host money and the New York gift law (counsel, Q-16); card refund age limit at 12 months (ask Stripe); Stripe's Connect review time.
 
 ## Next
-P3 gate met 2026-10-18. The next action is the **desktop revision**, recommended before P4 because the booking panel and two-column checkout are real component work the estimate should count:
-- New page at 1440 from the library; keep the v0 desktop page as an archive.
-- Library additions: a booking panel (desktop replacement for the booking bar and sheet), desktop Header and Footer variants.
-- Full frames for home, browse (card grid, filter side panel), experience (two columns, sticky booking panel), checkout, and confirmation (two columns, order summary at the side). The other screens follow these templates.
-- Type uses the Desktop mode (min-width 768 px).
-Then P4 (the seven planning artifacts) when Dave says go; read the vault `Projects/Personal/Playbook/Project Planning Method.md` first.
+The plan is frozen and committed (2026-10-20). Dave runs, in order:
+1. `git tag plan-frozen-2026-10-20` and the push of `main` and the tag.
+2. Make the repo public, then turn on secret scanning and push protection.
+3. Runbook phase A (the GitHub App), then phase C (merge settings, the `integration` branch, the rulesets).
+4. `bun scripts/plan/issues.ts --run`: 133 issues, each added to board #19 with its fields.
+
+After the tag, the plan files are read-only and reality goes in `delta-log.md`. P5 starts Oct 26 with U-118, the merge desk, which Dave builds.
+
+## Next chat
+
+**Before you start:** if the freeze is committed and tagged, do runbook phase A (the App) and phase C (rulesets), and run the printed issue commands. If not, finish the freeze in this chat first.
+
+**Run:** `/ramble-pm` in a new desktop chat (terminal: `claude --agent ramble-pm`), then paste the prompt. **Model and effort:** Sonnet, medium (U-118 is setup work from a written runbook). No workflow.
+
+**Prompt:**
+
+```
+Read docs/plan/STATUS.md and docs/plan/merge-desk-runbook.md. The plan is frozen (tag plan-frozen-2026-10-20). Start P5 with U-118, the merge desk: do the [PM] steps of runbook phase B on branch unit/U-118 (scripts/merge-desk/app-token.ts, post-check.ts, agent-git.ts, scope-check.ts, revert.sh, and the two workflows), with unit tests for the three TypeScript scripts. Do not run any step marked [Dave] or change any GitHub setting. Log U-118's start in units.yaml and refresh the roadmap. Done looks like: the branch ready for my review, tests passing, a list of the [Dave] steps left. Don't commit to main; stop before push and print the push and PR commands.
+```

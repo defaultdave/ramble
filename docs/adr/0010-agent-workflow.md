@@ -1,6 +1,6 @@
 # ADR 0010: Agent workflow wiring
 
-- **Status:** Accepted 2026-10-18 (Dave), with a change to gate 5: pushing unit branches, opening PRs, and starting PR reviews become automatic once Dave opts in. The first couple of units run with his approval on each action; the goal is fully automatic. Merges to `main`, deploys, issues, and repo creation stay Dave's.
+- **Status:** Accepted 2026-10-18 (Dave), with a change to gate 5: pushing unit branches, opening PRs, and starting PR reviews become automatic once Dave opts in. The first couple of units run with his approval on each action; the goal is fully automatic. Merges to `main`, deploys, issues, and repo creation stay Dave's. **Amended 2026-10-20 (Dave): tiered auto-merge for the P5 build, see "Merge rule" below; it takes effect when Dave switches it on at the walking skeleton.**
 - **Date:** 2026-10-18
 - **Question:** R10 in `docs/plan/BUILD-PLAN.md`
 - **Depends on:** ADR 0007 (repository and CI)
@@ -72,6 +72,17 @@ What exists today:
 - The PM closes each unit only after checking it against its acceptance criteria and manifest.
 - **Planning input for P4:** budget Dave's gate time explicitly. With fan-out, the bottleneck is Dave's pushes and reviews, not agent build time.
 - **Auto mode (accepted change).** Two modes for pushes to unit branches, opening PRs, and starting PR reviews: *approval* (the pipeline prepares the action and Dave approves each one) for the first couple of units, then *auto* (the pipeline does them itself) once Dave opts in. Switching on auto needs the permission prompts for `git push` and `gh pr create` relaxed for this project, which is Dave's change to make. P4 estimates both modes, since gate time shrinks in auto.
+
+## Merge rule for the P5 build (amended 2026-10-20, Dave)
+
+Dave's gate time (about 108 h at P50) is what pushes the demo into spring 2027 (`docs/plan/07-resourcing.md`), and the build is meant to show the agent team working. So agents may merge their own units, in two tiers:
+
+- **Standard-tier units** (`review: standard`) merge to `main` themselves once every required check approves: CI green, the `review` agent's verdict, the `qa` agent's pass, and `spec-compliance`, with no out-of-scope files against the scope manifest.
+- **Critical-tier units** (`review: critical`: holds, payments, the ledger, auth, security headers, anything that moves money or spaces) merge the same way, but into an `integration` branch. Dave promotes `integration` to `main` in one reviewed batch (weekly by default) after a nightly smoke test and an overnight run of the race and access tests.
+- **Still Dave's, always:** deploys and production promotion, issues, repo and project creation, secrets, changes to the rules in this section, the plan freeze, and any scope change.
+- **Needed before it is switched on:** branch rules on `main` and `integration` requiring the CI checks and blocking direct pushes (a unit at the walking skeleton); a merge desk that checks the agent verdicts before merging (port from vig or write as a unit); a nightly smoke test; an automatic revert path (one command reverts a merge); and Dave relaxing the permission prompts for `git push`, `gh pr create`, and `gh pr merge` for this project.
+- **Known weakness:** agents reviewing agents share blind spots, which is why the money and hold paths go through the integration branch and Dave's batch read, not straight to `main`.
+- **Overnight runs** need somewhere to run: the PM's session on Dave's machine while it is awake, or cloud sessions; decide at the walking skeleton.
 
 ## What would change the call
 

@@ -1,0 +1,449 @@
+<title>Ramble Roadmap</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: one reading column; summary first (phase, dates, decisions), then the sprint chart, then the detail. Ramble's "Sunday paper" palette. */
+:root {
+  --paper: #FBF6EE;
+  --sheet: #FFFFFF;
+  --sunk: #F3EBDF;
+  --ink: #2A211B;
+  --ink-2: #6A5B4F;
+  --rule: #E4D8C7;
+  --tomato: #B93A22;
+  --tomato-soft: #F6DED6;
+  --marigold: #E2A031;
+  --marigold-soft: #FBEBCB;
+  --agent: #4F6F78;
+  --agent-soft: #DCE6E8;
+  --ok: #2F7A4B;
+  --ok-soft: #DDEFE2;
+  --warn: #9A6A12;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #18130F; --sheet: #221B16; --sunk: #2B231D; --ink: #F3EADF; --ink-2: #BBAA99; --rule: #3D3229;
+    --tomato: #EE7A60; --tomato-soft: #4A2219; --marigold: #F0B54F; --marigold-soft: #47361A;
+    --agent: #8FB3BC; --agent-soft: #23363A; --ok: #7CC495; --ok-soft: #1E3527; --warn: #E6B45A;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #18130F; --sheet: #221B16; --sunk: #2B231D; --ink: #F3EADF; --ink-2: #BBAA99; --rule: #3D3229;
+  --tomato: #EE7A60; --tomato-soft: #4A2219; --marigold: #F0B54F; --marigold-soft: #47361A;
+  --agent: #8FB3BC; --agent-soft: #23363A; --ok: #7CC495; --ok-soft: #1E3527; --warn: #E6B45A;
+  color-scheme: dark;
+}
+body { background: var(--paper); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 28px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 36px; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 650; text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.1; }
+h2 { font-size: 22px; }
+h3 { font-size: 16px; font-family: var(--font-body); font-weight: 600; letter-spacing: 0; }
+p { margin: 0; }
+.eyebrow { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); font-weight: 600; }
+.muted { color: var(--ink-2); }
+.num { font-variant-numeric: tabular-nums; }
+section { display: grid; gap: 14px; min-width: 0; }
+.section-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; }
+
+/* Header */
+header { display: grid; gap: 12px; }
+.lede { font-size: 18px; max-width: 62ch; }
+
+/* Phase strip */
+.phases { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.phase { padding: 10px 10px 12px; background: var(--sunk); border-top: 4px solid var(--rule); display: grid; gap: 2px; min-width: 0; }
+.phase b { font-size: 13px; }
+.phase span { font-size: 12px; color: var(--ink-2); }
+.phase[data-state="done"] { border-top-color: var(--ok); }
+.phase[data-state="now"] { border-top-color: var(--tomato); background: var(--tomato-soft); }
+.phase .tag { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.phase[data-state="done"] .tag { color: var(--ok); }
+.phase[data-state="now"] .tag { color: var(--tomato); }
+@media (max-width: 760px) { .phases { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Scenario switch */
+.switch { display: inline-flex; border: 1px solid var(--rule); background: var(--sheet); padding: 3px; gap: 3px; flex-wrap: wrap; }
+.switch button { font: inherit; font-size: 13px; font-weight: 500; border: 0; background: transparent; color: var(--ink-2); padding: 6px 12px; cursor: pointer; }
+.switch button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.switch button:focus-visible, .ws-toggle:focus-visible { outline: 2px solid var(--tomato); outline-offset: 2px; }
+
+/* Key dates */
+.dates { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.date { background: var(--sheet); border: 1px solid var(--rule); padding: 16px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.date .big { font-family: var(--font-display); font-size: 30px; font-weight: 650; line-height: 1.1; }
+.date .late { font-size: 13px; color: var(--ink-2); }
+.date.key { border-color: var(--tomato); }
+.client { font-size: 13px; color: var(--ink-2); }
+.client b { color: var(--tomato); }
+@media (max-width: 760px) { .dates { grid-template-columns: minmax(0, 1fr); } }
+
+/* Decisions and held up */
+.stack { display: grid; gap: 14px; min-width: 0; align-content: start; }
+.two { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 860px) { .two { grid-template-columns: minmax(0, 1fr); } }
+ol.decisions { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: d; }
+ol.decisions li { counter-increment: d; background: var(--sheet); border: 1px solid var(--rule); border-left: 4px solid var(--tomato); padding: 14px 16px; display: grid; gap: 6px; }
+ol.decisions li h3::before { content: counter(d) ". "; color: var(--tomato); }
+.impact { font-size: 14px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--ink-2); }
+.meta b { color: var(--ink); font-weight: 600; }
+.chip { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.chip.rec { background: var(--ok-soft); color: var(--ok); }
+.chip.dave { background: var(--tomato-soft); color: var(--tomato); }
+.chip.agents { background: var(--agent-soft); color: var(--agent); }
+.chip.proto { background: var(--marigold-soft); color: var(--warn); }
+.chip.client-chip { background: var(--sunk); color: var(--ink-2); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); font-weight: 600; }
+.panel { background: var(--sheet); border: 1px solid var(--rule); padding: 4px 6px; }
+.scroll { overflow-x: auto; min-width: 0; }
+.actions { display: grid; gap: 8px; }
+.action { display: grid; gap: 2px; padding: 10px 12px; background: var(--marigold-soft); }
+.action code { font-size: 12px; }
+
+/* Gantt */
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 12.5px; color: var(--ink-2); align-items: center; }
+.key-sw { display: inline-block; width: 18px; height: 10px; vertical-align: -1px; margin-right: 6px; }
+.gantt { position: relative; min-width: 760px; background: var(--sheet); border: 1px solid var(--rule); }
+.g-row { display: grid; grid-template-columns: 230px minmax(0, 1fr); border-bottom: 1px solid var(--rule); }
+.g-row:last-child { border-bottom: 0; }
+.g-label { padding: 7px 10px; font-size: 13px; display: flex; flex-direction: column; justify-content: center; gap: 1px; min-width: 0; border-right: 1px solid var(--rule); }
+.g-label small { color: var(--ink-2); font-size: 11.5px; }
+.g-track { position: relative; min-height: 34px; }
+.g-head .g-track { min-height: 40px; }
+.sprint-col { position: absolute; top: 0; bottom: 0; border-left: 1px dashed var(--rule); }
+.sprint-col.alt { background: var(--sunk); opacity: 0.55; }
+.sprint-lbl { position: absolute; top: 4px; font-size: 11px; color: var(--ink-2); padding-left: 5px; white-space: nowrap; line-height: 1.25; }
+.sprint-lbl b { color: var(--ink); font-weight: 600; }
+.bar { position: absolute; top: 9px; height: 16px; border-radius: 3px; }
+.bar.ws { background: var(--ink); opacity: 0.85; }
+.bar.unit { height: 12px; top: 6px; }
+.bar.unit.Dave { background: var(--tomato); }
+.bar.unit.agents { background: var(--agent); }
+.bar.unit.proto { box-shadow: 0 0 0 2px var(--marigold); }
+.g-unit .g-label { padding-left: 22px; font-size: 12.5px; }
+.g-unit .g-track { min-height: 24px; }
+.ws-toggle { all: unset; cursor: pointer; display: flex; flex-direction: column; gap: 1px; }
+.ws-toggle .name::before { content: "▸"; display: inline-block; width: 14px; color: var(--ink-2); transition: transform 0.15s; }
+.ws-toggle[aria-expanded="true"] .name::before { transform: rotate(90deg); }
+.vline { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px solid var(--tomato); pointer-events: none; z-index: 2; }
+.vline.client { border-left-style: dashed; border-left-color: var(--ink-2); }
+.ms { position: absolute; top: 4px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 1px; z-index: 3; }
+.ms i { width: 11px; height: 11px; background: var(--tomato); transform: rotate(45deg); display: block; }
+.ms span { font-size: 11px; font-weight: 600; white-space: nowrap; background: var(--sheet); padding: 0 3px; }
+.ms.low { top: 20px; }
+.ms.proto i { background: var(--marigold); }
+.today-note { font-size: 12.5px; color: var(--ink-2); }
+@media (prefers-reduced-motion: reduce) { .ws-toggle .name::before { transition: none; } }
+
+/* Sprint table, workload */
+td.ms-cell { min-width: 140px; }
+.load { display: grid; gap: 6px; }
+.load-row { display: grid; grid-template-columns: 190px minmax(0, 1fr) 92px; gap: 10px; align-items: center; font-size: 13px; }
+.load-bar { display: flex; height: 14px; background: var(--sunk); min-width: 0; }
+.load-bar span { display: block; height: 100%; }
+@media (max-width: 600px) { .load-row { grid-template-columns: minmax(0, 1fr) 70px; } .load-row .load-bar { grid-column: 1 / -1; grid-row: 2; } }
+ul.made { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+ul.made li { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--rule); font-size: 14px; }
+ul.made li span { color: var(--ink-2); font-size: 13px; }
+.watch { display: grid; gap: 10px; }
+.watch div { padding: 10px 12px; border-left: 3px solid var(--marigold); background: var(--sheet); display: grid; gap: 2px; }
+footer { font-size: 12.5px; color: var(--ink-2); display: grid; gap: 6px; border-top: 1px solid var(--rule); padding-top: 16px; }
+footer code { font-size: 12px; }
+</style>
+
+<script type="application/json" id="schedule-data">__SCHEDULE__</script>
+<script type="application/json" id="status-data">__STATUS__</script>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow" id="asof">Ramble · project roadmap</p>
+    <h1>Where Ramble stands</h1>
+    <p class="lede" id="headline"></p>
+    <div class="phases" id="phases" aria-label="Phases"></div>
+  </header>
+
+  <section aria-labelledby="dates-h">
+    <div class="section-head">
+      <h2 id="dates-h">Key dates</h2>
+      <div class="switch" role="group" aria-label="Plan">
+        <button type="button" id="sc-0" aria-pressed="true">The plan</button>
+        <button type="button" id="sc-1" aria-pressed="false">Before the levers</button>
+      </div>
+    </div>
+    <p class="muted" id="sc-note"></p>
+    <div class="dates" id="dates"></div>
+    <p class="client" id="client"></p>
+  </section>
+
+  <section class="two">
+    <div class="stack">
+      <h2>Decisions needed from you</h2>
+      <ol class="decisions" id="decisions"></ol>
+    </div>
+    <div class="stack">
+      <h2>Held up</h2>
+      <div class="panel scroll"><table><thead><tr><th>What</th><th>Waiting on</th></tr></thead><tbody id="held"></tbody></table></div>
+      <h3>Your to-dos</h3>
+      <div class="actions" id="actions"></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="road-h">
+    <div class="section-head">
+      <h2 id="road-h">Roadmap by sprint</h2>
+      <div class="legend">
+        <span><i class="key-sw" style="background:var(--tomato)"></i>Dave builds</span>
+        <span><i class="key-sw" style="background:var(--agent)"></i>Agents build</span>
+        <span><i class="key-sw" style="background:var(--sheet);box-shadow:0 0 0 2px var(--marigold) inset"></i>Part of the Prototype</span>
+        <span><i class="key-sw" style="border-left:2px dashed var(--ink-2);width:0;height:12px"></i>Dec 1 (client's date)</span>
+      </div>
+    </div>
+    <p class="muted">Two-week sprints from the build start. Each workstream bar runs from its first unit's likely start to its last unit's likely finish. Open a workstream to see its units.</p>
+    <div class="scroll"><div class="gantt" id="gantt"></div></div>
+  </section>
+
+  <section aria-labelledby="sprint-h">
+    <h2 id="sprint-h">Sprint by sprint</h2>
+    <div class="panel scroll"><table>
+      <thead><tr><th>Sprint</th><th>Dates</th><th>Lands</th><th>Units finishing</th><th class="num">Work in flight</th><th class="num">Dave's hours</th></tr></thead>
+      <tbody id="sprints"></tbody>
+    </table></div>
+  </section>
+
+  <section aria-labelledby="load-h">
+    <div class="section-head">
+      <h2 id="load-h">How much work, and where</h2>
+      <p class="muted num" id="load-total"></p>
+    </div>
+    <div class="load" id="load"></div>
+  </section>
+
+  <section class="two">
+    <div class="stack">
+      <h2>Decisions made</h2>
+      <ul class="made" id="made"></ul>
+    </div>
+    <div class="stack">
+      <h2>Watch</h2>
+      <div class="watch" id="watch"></div>
+      <h3>Planning documents</h3>
+      <div class="panel scroll"><table><tbody id="artifacts"></tbody></table></div>
+    </div>
+  </section>
+
+  <footer>
+    <p><b>How to read the dates.</b> "Likely" is the middle outcome of 2,000 simulated builds (P50). "Late case" is the date only 1 in 10 runs miss (P90). Dates assume the build starts Oct 26 and Dave works 12.5 hours a week.</p>
+    <p>Source: <code>docs/plan/units.yaml</code> through <code>scripts/plan/forecast.ts</code>; status from <code>docs/plan/STATUS.md</code> and <code>DECISIONS.md</code>. Detail: <code>06-estimate.md</code>, <code>07-resourcing.md</code>. Rebuilt with <code>bun scripts/plan/roadmap.ts</code>.</p>
+  </footer>
+</div>
+
+<script>
+(() => {
+  const S = JSON.parse(document.getElementById("schedule-data").textContent);
+  const T = JSON.parse(document.getElementById("status-data").textContent);
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const byId = new Map(S.units.map((u) => [u.id, u]));
+  const mean = (d) => (d.o + 4 * d.m + d.p) / 6;
+  const fmt = (iso, withYear) => {
+    const d = new Date(iso + "T12:00:00Z");
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC", ...(withYear ? { year: "numeric" } : {}) });
+  };
+  const dayToDate = (day) => { // the sprint calendar carries the working-day dates
+    const sp = S.sprints.find((s) => day >= s.startDay && day < s.endDay) || S.sprints[S.sprints.length - 1];
+    return sp;
+  };
+
+  // Static parts: header, phases, decisions, held up, made, watch, artifacts.
+  document.getElementById("asof").textContent = `Ramble · project roadmap · as of ${fmt(T.asOf, true)}`;
+  document.getElementById("headline").textContent = T.headline;
+  const phases = document.getElementById("phases");
+  for (const p of T.phases) {
+    const d = el("div", "phase"); d.dataset.state = p.state;
+    d.append(el("span", "tag", p.state === "done" ? "Done" : p.state === "now" ? "Now" : p.state === "next" ? "Next" : "Later"));
+    d.append(el("b", null, `${p.id} ${p.name}`), el("span", null, p.when), el("span", null, p.note));
+    phases.append(d);
+  }
+  const dec = document.getElementById("decisions");
+  for (const x of T.decisionsNeeded) {
+    const li = el("li");
+    li.append(el("h3", null, x.title), el("p", "impact", x.impact), el("p", "muted", x.detail));
+    const m = el("div", "meta");
+    const r = el("span"); r.append(el("span", "chip rec", `Recommend: ${x.recommendation}`)); m.append(r);
+    const b = el("span"); b.append("Holds up "); b.append(el("b", null, x.blocks)); m.append(b);
+    li.append(m); dec.append(li);
+  }
+  const held = document.getElementById("held");
+  for (const h of T.heldUp) {
+    const tr = el("tr");
+    const td1 = el("td"); td1.append(el("b", null, h.what));
+    const td2 = el("td", null, h.waitingOn); td2.append(" "); td2.append(el("span", h.owner === "Dave" ? "chip dave" : "chip client-chip", h.owner));
+    tr.append(td1, td2); held.append(tr);
+  }
+  const actions = document.getElementById("actions");
+  for (const a of T.actionsForDave) {
+    const d = el("div", "action"); d.append(el("b", null, a.title), el("span", null, a.detail), el("code", null, a.where)); actions.append(d);
+  }
+  const made = document.getElementById("made");
+  for (const m of T.decisionsMade) { const li = el("li"); li.append(el("span", "num", m.when), el("div", null, m.what)); made.append(li); }
+  const watch = document.getElementById("watch");
+  for (const w of T.watch) { const d = el("div"); d.append(el("b", null, w.what), el("span", "muted", w.detail)); watch.append(d); }
+  const arts = document.getElementById("artifacts");
+  for (const a of T.artifacts) {
+    const tr = el("tr");
+    const st = el("td"); st.append(el("span", a.state === "approved" ? "chip rec" : "chip proto", a.state === "approved" ? "Approved" : "Draft"));
+    tr.append(el("td", "num", String(a.n)), el("td", null, a.name + (a.note ? ` (${a.note})` : "")), st, el("td", "muted", a.when));
+    arts.append(tr);
+  }
+
+  // Scenario-driven parts.
+  let current = 0;
+  try { const saved = Number(localStorage.getItem("ramble-roadmap-scenario")); if (saved === 0 || saved === 1) current = saved; } catch (e) { /* storage blocked: default view */ }
+  const open = new Set();
+
+  function render() {
+    const sc = S.scenarios[current];
+    const units = new Map(sc.units.map((u) => [u.id, u]));
+    document.getElementById("sc-0").setAttribute("aria-pressed", String(current === 0));
+    document.getElementById("sc-1").setAttribute("aria-pressed", String(current === 1));
+    document.getElementById("sc-note").textContent = current === 0
+      ? "Decided Oct 20: agents merge their own work, carry half of each unit Dave leads, and build six pattern-setting units. Dave keeps holds, payments, and the ledger."
+      : "For comparison: agents merge their own work, but Dave builds all 17 units he led before the Oct 20 decisions.";
+
+    // Key dates
+    const ms = (unitId) => units.get(unitId);
+    const dates = document.getElementById("dates"); dates.replaceChildren();
+    const tile = (label, likely, late, note, key) => {
+      const d = el("div", "date" + (key ? " key" : ""));
+      d.append(el("span", "eyebrow", label), el("span", "big", fmt(likely, true)), el("span", "late", `Late case ${fmt(late, true)}`));
+      if (note) d.append(el("span", "late", note));
+      dates.append(d);
+    };
+    tile("Prototype", sc.prototype.dates.p50, sc.prototype.dates.p90, "Clickable guest flow on seed data", true);
+    tile("Launch-ready", sc.finish.dates.p50, sc.finish.dates.p90, `Full build, about ${Math.round(sc.finish.weeks.p50)} weeks`, true);
+    tile("Fastest possible", S.floor.dates.p50, S.floor.dates.p90, "Unlimited people; nobody waits");
+    const c = document.getElementById("client"); c.replaceChildren();
+    c.append("The client asked for ", el("b", null, "Dec 1"), `. The full build cannot make it under any staffing; the Prototype lands ${fmt(sc.prototype.dates.p50)} (late case ${fmt(sc.prototype.dates.p90)}).`);
+
+    // Gantt
+    const last = Math.max(...sc.units.map((u) => u.end));
+    const nSprints = Math.min(S.sprints.length, Math.ceil(last / 10) + 1);
+    const span = nSprints * 10;
+    const pct = (day) => `${(Math.max(0, Math.min(day, span)) / span) * 100}%`;
+    const g = document.getElementById("gantt"); g.replaceChildren();
+    const grid = (track, withLabels) => {
+      for (let k = 0; k < nSprints; k++) {
+        const col = el("div", "sprint-col" + (k % 2 ? " alt" : "")); col.style.left = pct(k * 10); col.style.width = `${100 / nSprints}%`; track.append(col);
+        if (withLabels) { const l = el("div", "sprint-lbl"); l.style.left = pct(k * 10); l.append(el("b", null, `S${k + 1}`), el("br"), fmt(S.sprints[k].startDate)); track.append(l); }
+      }
+    };
+    const deadlineSprint = S.sprints.find((s) => s.endDate >= S.deadline);
+    const clientDay = deadlineSprint ? deadlineSprint.startDay + Math.min(9, workdaysBetween(deadlineSprint.startDate, S.deadline)) : null;
+    function workdaysBetween(a, b) { let n = 0; const d = new Date(a + "T12:00:00Z"); const e = new Date(b + "T12:00:00Z"); while (d < e) { const w = d.getUTCDay(); if (w !== 0 && w !== 6) n++; d.setUTCDate(d.getUTCDate() + 1); } return n; }
+    const markers = (track) => { if (clientDay != null && clientDay < span) { const v = el("div", "vline client"); v.style.left = pct(clientDay); track.append(v); } };
+
+    const head = el("div", "g-row g-head");
+    const hl = el("div", "g-label"); hl.append(el("b", null, "Sprint"), el("small", null, "Plan freeze before Oct 26"));
+    const ht = el("div", "g-track"); grid(ht, true); markers(ht);
+    head.append(hl, ht); g.append(head);
+
+    const msRow = el("div", "g-row");
+    const ml = el("div", "g-label"); ml.append(el("b", null, "Milestones"));
+    const mt = el("div", "g-track"); mt.style.minHeight = "42px"; grid(mt, false); markers(mt);
+    const milestones = [
+      { label: "Agents can merge", day: ms("U-118").end },
+      { label: "Prototype", day: Math.max(...S.units.filter((u) => u.prototype).map((u) => units.get(u.id).end)), proto: true },
+      { label: "Money core", day: ms("U-049").end },
+      { label: "Launch-ready", day: ms("U-104").end },
+    ].sort((a, b) => a.day - b.day);
+    milestones.forEach((m, i) => {
+      const d = el("div", "ms" + (i % 2 ? " low" : "") + (m.proto ? " proto" : "")); d.style.left = pct(m.day);
+      d.append(el("i"), el("span", null, `${m.label} · ${fmt(dayToDateIso(m.day))}`)); mt.append(d);
+    });
+    msRow.append(ml, mt); g.append(msRow);
+
+    function dayToDateIso(day) { // nearest sprint date, refined by unit dates when a unit ends there
+      const u = sc.units.find((x) => Math.abs(x.end - day) < 1e-6);
+      return u ? u.endDate : dayToDate(day).startDate;
+    }
+
+    const sections = Object.keys(T.workstreams).filter((s) => S.units.some((u) => u.section === s));
+    sections.sort((a, b) => Math.min(...sc.units.filter((u) => byId.get(u.id).section === a).map((u) => u.start)) - Math.min(...sc.units.filter((u) => byId.get(u.id).section === b).map((u) => u.start)));
+    for (const s of sections) {
+      const us = sc.units.filter((u) => byId.get(u.id).section === s).sort((a, b) => a.start - b.start || a.end - b.end);
+      const st = Math.min(...us.map((u) => u.start)), en = Math.max(...us.map((u) => u.end));
+      const days = us.reduce((a, u) => a + mean(byId.get(u.id).days), 0);
+      const dave = us.filter((u) => u.builtBy === "Dave").length;
+      const row = el("div", "g-row");
+      const lab = el("div", "g-label");
+      const btn = el("button", "ws-toggle"); btn.type = "button"; btn.setAttribute("aria-expanded", String(open.has(s)));
+      btn.append(el("span", "name", T.workstreams[s]), el("small", null, `${us.length} units · ${Math.round(days)} days${dave ? ` · Dave ${dave}` : ""} · ${fmt(us.find((u) => u.start === st).startDate)} to ${fmt(us.find((u) => u.end === en).endDate)}`));
+      btn.addEventListener("click", () => { open.has(s) ? open.delete(s) : open.add(s); render(); });
+      lab.append(btn);
+      const tr = el("div", "g-track"); grid(tr, false); markers(tr);
+      const bar = el("div", "bar ws"); bar.style.left = pct(st); bar.style.width = `calc(${pct(en)} - ${pct(st)})`; tr.append(bar);
+      row.append(lab, tr); g.append(row);
+      if (open.has(s)) for (const u of us) {
+        const info = byId.get(u.id);
+        const r = el("div", "g-row g-unit");
+        const l = el("div", "g-label"); l.append(el("span", null, `${u.id} ${info.title}`), el("small", null, `${u.builtBy === "Dave" ? "Dave" : "Agents"} · ${fmt(u.startDate)} to ${fmt(u.endDate)}${info.prototype ? " · Prototype" : ""}`));
+        const t = el("div", "g-track"); grid(t, false); markers(t);
+        const b = el("div", `bar unit ${u.builtBy}${info.prototype ? " proto" : ""}`); b.style.left = pct(u.start); b.style.width = `max(3px, calc(${pct(u.end)} - ${pct(u.start)}))`;
+        b.title = `${u.id} ${info.title}: ${fmt(u.startDate)} to ${fmt(u.endDate)}`;
+        t.append(b); r.append(l, t); g.append(r);
+      }
+    }
+
+    // Sprint table
+    const tb = document.getElementById("sprints"); tb.replaceChildren();
+    for (let k = 0; k < nSprints; k++) {
+      const s0 = k * 10, s1 = s0 + 10;
+      const ending = sc.units.filter((u) => u.end >= s0 && u.end < s1);
+      const flight = sc.units.filter((u) => u.start < s1 && u.end >= s0).length;
+      const lands = milestones.filter((m) => m.day >= s0 && m.day < s1).map((m) => m.label);
+      const hours = (sc.peopleHoursByWeek[2 * k] || 0) + (sc.peopleHoursByWeek[2 * k + 1] || 0);
+      if (!ending.length && !flight) continue;
+      const big = [...ending].sort((a, b) => mean(byId.get(b.id).days) - mean(byId.get(a.id).days)).slice(0, 3).map((u) => byId.get(u.id).title);
+      const tr = el("tr");
+      const lc = el("td", "ms-cell"); if (lands.length) for (const l of lands) { lc.append(el("span", l === "Prototype" ? "chip proto" : "chip dave", l), " "); } else lc.append(el("span", "muted", "None"));
+      const fin = el("td"); fin.append(el("b", "num", `${ending.length}`), ending.length ? ` · ${big.join("; ")}${ending.length > 3 ? "; …" : ""}` : "");
+      tr.append(el("td", null, `S${k + 1}`), el("td", "num", `${fmt(S.sprints[k].startDate)} to ${fmt(S.sprints[k].endDate)}`), lc, fin, el("td", "num", `${flight} units`), el("td", "num", `${Math.round(hours)} h`));
+      tb.append(tr);
+    }
+
+    // Workload by workstream
+    const load = document.getElementById("load"); load.replaceChildren();
+    const totals = sections.map((s) => {
+      const us = sc.units.filter((u) => byId.get(u.id).section === s);
+      const d = (who) => us.filter((u) => u.builtBy === who).reduce((a, u) => a + mean(byId.get(u.id).days), 0);
+      return { s, n: us.length, dave: d("Dave"), agents: d("agents") };
+    }).sort((a, b) => (b.dave + b.agents) - (a.dave + a.agents));
+    const maxD = Math.max(...totals.map((t) => t.dave + t.agents));
+    for (const t of totals) {
+      const row = el("div", "load-row");
+      const bar = el("div", "load-bar");
+      const a = el("span"); a.style.width = `${(t.agents / maxD) * 100}%`; a.style.background = "var(--agent)";
+      const d = el("span"); d.style.width = `${(t.dave / maxD) * 100}%`; d.style.background = "var(--tomato)";
+      bar.append(d, a);
+      row.append(el("span", null, T.workstreams[t.s]), bar, el("span", "num muted", `${Math.round(t.dave + t.agents)} days · ${t.n}`));
+      load.append(row);
+    }
+    const all = totals.reduce((a, t) => a + t.dave + t.agents, 0), daveDays = totals.reduce((a, t) => a + t.dave, 0);
+    const nDave = sc.units.filter((u) => u.builtBy === "Dave").length;
+    document.getElementById("load-total").textContent = `${sc.units.length} units · ${Math.round(all)} days of work · Dave leads ${nDave} (${Math.round(daveDays)} days), agents ${sc.units.length - nDave}`;
+  }
+
+  for (const i of [0, 1]) document.getElementById(`sc-${i}`).addEventListener("click", () => {
+    current = i; try { localStorage.setItem("ramble-roadmap-scenario", String(i)); } catch (e) { /* storage blocked */ }
+    render();
+  });
+  render();
+})();
+</script>

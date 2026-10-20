@@ -1,0 +1,285 @@
+#!/usr/bin/env bun
+// P4 artifact 4: dependency graph, critical path, and parallel branches over docs/plan/units.yaml.
+//
+// Run: bun scripts/plan/critical-path.ts [options]
+//   --scope demo|real-job  demo (default): the P5 units the demo builds. real-job adds the units
+//                          estimated but not built (mode: real-job), which the launch review then waits for.
+//   --should               include Should units (default: Foundation and Must; Shoulds go first in the cut order)
+//   --weight auto|pert|points|count
+//                          pert: (o + 4m + p) / 6 from estimate_days. points: complexity 1 to 3.
+//                          count: 1 per unit. auto (default): pert once every unit in scope has an estimate, else points.
+//   --near N               slack at or under N counts as near-critical (default 2)
+//   --write FILE           replace the generated block for this scope in FILE (markers below)
+//   --brief                measures, checks, path, and near-critical units only
+//   --json                 print the computed graph as JSON instead of Markdown
+//
+// units.yaml is the record. Nothing computed here is written back to it, because the path moves when estimates land.
+// Markers in the target file: <!-- critical-path:BLOCK:start --> and <!-- critical-path:BLOCK:end -->,
+// where BLOCK is the scope name, plus "+should" with --should.
+
+import {
+  CHAIN_CAP,
+  checkRecord,
+  DAVE_SHARE,
+  levelledSchedule,
+  resolveWeight,
+  schedule,
+  selectScope,
+  topoOrder,
+  varianceOf,
+  weightOf,
+  type ScopeName,
+} from "./graph";
+import { flag, loadUnits, lookup, option, writeBlock } from "./units";
+
+const scope = option("scope", "demo");
+if (scope !== "demo" && scope !== "real-job") throw new Error(`unknown --scope ${scope}`);
+const withShould = flag("should");
+const near = Number(option("near", "2"));
+const brief = flag("brief");
+const block = scope + (withShould ? "+should" : "");
+const eps = 1e-9;
+
+const all = await loadUnits();
+const byId = new Map(all.map((u) => [u.id, u]));
+const picked = selectScope(all, scope satisfies ScopeName, withShould);
+const errors = [...checkRecord(all), ...picked.errors];
+const warnings: string[] = [];
+const { units, deps, metInP4, syntheticEdges } = picked;
+const excluded = picked.excluded.map((x) => x.unit);
+const reasonById = new Map(picked.excluded.map((x) => [x.unit.id, x.reason]));
+const exclusionReason = (u: { id: string }) => reasonById.get(u.id) ?? null;
+
+const weightName = resolveWeight(option("weight", "auto"), units);
+const weight = (u: (typeof units)[number]) => weightOf(u, weightName);
+const unitLabel = weightName === "pert" ? "days" : weightName === "points" ? "points" : "units";
+
+const plan = schedule(units, deps, weight);
+const { order, es, ef, slack, level, length, chains, path, descendants, isCritical } = plan;
+const w = plan.weight;
+const needsDave = (u: (typeof units)[number]) => u.execution !== "agent-fan-out";
+const lane = levelledSchedule(units, deps, w, plan, needsDave);
+const laneLikely = levelledSchedule(units, deps, w, plan, needsDave, (u) => (u.execution === "human-only" ? 1 : DAVE_SHARE.m));
+const totalWork = units.reduce((a, u) => a + lookup(w, u.id), 0);
+const pathVariance = path.reduce((a, id) => a + varianceOf(lookup(byId, id), weightName), 0);
+
+// Legacy-retirement tail: post-launch units, whose P5 dependencies are met at launch.
+const tail = all.filter((u) => u.phase === "post-launch");
+// The tail is out of scope, so it may lack estimates after the P5 units have them: weigh it on its own.
+const tailWeight = resolveWeight(weightName === "pert" ? "auto" : weightName, tail);
+if (tail.length && tailWeight !== weightName)
+  warnings.push(`the post-launch tail (${tail.map((u) => u.id).join(", ")}) has no estimates yet, so it is weighed in ${tailWeight}`);
+const tailIds = new Set(tail.map((u) => u.id));
+const tailOrder = topoOrder(
+  tail.map((u) => u.id),
+  (id) => lookup(byId, id).depends_on.filter((d) => tailIds.has(d)),
+);
+
+// ---------- output ----------
+const fmt = (n: number) => (weightName === "pert" ? n.toFixed(1) : String(Math.round(n * 100) / 100));
+const u = (id: string) => lookup(byId, id);
+
+if (flag("json")) {
+  console.log(
+    JSON.stringify(
+      {
+        scope: block,
+        weight: weightName,
+        length,
+        totalWork,
+        errors,
+        warnings,
+        syntheticEdges,
+        chains,
+        units: order.map((id) => ({
+          id,
+          es: es.get(id),
+          ef: ef.get(id),
+          slack: slack.get(id),
+          level: level.get(id),
+          critical: isCritical(id),
+          descendants: lookup(descendants, id).size,
+        })),
+      },
+      null,
+      2,
+    ),
+  );
+  process.exit(errors.length ? 1 : 0);
+}
+
+const md: string[] = [];
+const line = (s = "") => md.push(s);
+const sectionsInPath = [...new Set(path.map((id) => u(id).section))];
+
+line(`#### Scope \`${block}\`, weighted by ${weightName}`);
+line();
+line(
+  `Generated by \`bun scripts/plan/critical-path.ts --scope ${scope}${withShould ? " --should" : ""}${brief ? " --brief" : ""}${option("weight", "auto") !== "auto" ? ` --weight ${weightName}` : ""}${near !== 2 ? ` --near ${near}` : ""}\`. Do not edit by hand.`,
+);
+line();
+line(`| Measure | Value |`);
+line(`|---|---|`);
+line(`| Units in scope | ${units.length} |`);
+line(
+  `| Dependency edges in scope | ${units.reduce((a, x) => a + lookup(deps, x.id).length, 0) - syntheticEdges.length}${syntheticEdges.length ? ` (plus ${syntheticEdges.length} added into U-104)` : ""} |`,
+);
+line(`| Critical path length | ${fmt(length)} ${unitLabel}, ${path.length} units |`);
+line(
+  `| Finish with one Dave (his units one at a time) | ${fmt(lane.length)} ${unitLabel}; ${fmt(laneLikely.length)} if agents carry ${Math.round((1 - DAVE_SHARE.m) * 100)}% of each |`,
+);
+line(`| Total work | ${fmt(totalWork)} ${unitLabel} |`);
+line(`| Work ÷ path (average parallelism the graph allows) | ${(totalWork / length).toFixed(1)} |`);
+line(`| Zero-slack units | ${units.filter((x) => isCritical(x.id)).length} |`);
+line(`| Near-critical units (slack ≤ ${near}) | ${units.filter((x) => !isCritical(x.id) && lookup(slack, x.id) <= near + eps).length} |`);
+if (weightName === "pert") {
+  const sd = Math.sqrt(pathVariance);
+  line(
+    `| Path mean ± 1 sd | ${fmt(length)} ± ${fmt(sd)} days (P10 to P90 about ${fmt(length - 1.28 * sd)} to ${fmt(length + 1.28 * sd)}) |`,
+  );
+}
+line();
+line(
+  `**Checks.** ${errors.length ? `${errors.length} errors:` : "No duplicate IDs, missing dependencies, cycles, Must-on-Should dependencies, or out-of-scope dependencies."}`,
+);
+for (const e of errors) line(`- ${e}`);
+for (const x of warnings) line(`- warning: ${x}`);
+if (metInP4.length) line(`- Dependencies met in P4: ${metInP4.join(", ")}.`);
+if (syntheticEdges.length) line(`- Added so the launch review waits for everything in scope: ${syntheticEdges.join(", ")}.`);
+const exclusionGroups = new Map<string, string[]>();
+for (const x of excluded) {
+  const r = exclusionReason(x) ?? "in scope";
+  exclusionGroups.set(r, [...(exclusionGroups.get(r) ?? []), x.id]);
+}
+for (const [r, ids] of exclusionGroups) line(`- Out of scope, ${r}: ${ids.join(", ")}.`);
+line();
+
+line(`**Critical path** (${sectionsInPath.join(" → ")}):`);
+line();
+line(`| # | Unit | Title | Section | C | U | Weight | Ends at |`);
+line(`|---|---|---|---|---|---|---|---|`);
+path.forEach((id, i) =>
+  line(
+    `| ${i + 1} | ${id} | ${u(id).title} | ${u(id).section} | ${u(id).complexity} | ${u(id).uncertainty} | ${fmt(lookup(w, id))} | ${fmt(lookup(ef, id))} |`,
+  ),
+);
+line();
+if (chains.length > 1) {
+  line(
+    `**Other zero-slack chains** (${plan.chainCount - 1} tie with the path; ${chains.length - 1} shown, chosen so each zero-slack unit appears on at least one):`,
+  );
+  line();
+  for (const c of chains.slice(1)) line(`- ${c.join(" → ")}`);
+  const shown = new Set(chains.flat());
+  const hidden = units.filter((x) => isCritical(x.id) && !shown.has(x.id)).map((x) => x.id);
+  if (hidden.length) line(`- Zero-slack units on no chain shown: ${hidden.join(", ")}.`);
+  line();
+}
+const nearCritical = units
+  .filter((x) => !isCritical(x.id) && lookup(slack, x.id) <= near + eps)
+  .sort((a, b) => lookup(slack, a.id) - lookup(slack, b.id) || a.id.localeCompare(b.id));
+if (nearCritical.length) {
+  line(`**Near-critical** (slack ≤ ${near} ${unitLabel}; a slip here joins the path):`);
+  line();
+  line(`| Unit | Title | Section | Slack |`);
+  line(`|---|---|---|---|`);
+  for (const x of nearCritical) line(`| ${x.id} | ${x.title} | ${x.section} | ${fmt(lookup(slack, x.id))} |`);
+  line();
+}
+
+if (!brief) {
+  line(`**Sections** (parallel branches: a section with slack can run beside the path):`);
+  line();
+  line(`| Section | Units | Work | Zero slack | Least slack | Most slack | Earliest start |`);
+  line(`|---|---|---|---|---|---|---|`);
+  const sections = [...new Set(units.map((x) => x.section))];
+  for (const s of sections) {
+    const xs = units.filter((x) => x.section === s);
+    const sl = xs.map((x) => lookup(slack, x.id));
+    line(
+      `| ${s} | ${xs.length} | ${fmt(xs.reduce((a, x) => a + lookup(w, x.id), 0))} | ${xs.filter((x) => isCritical(x.id)).length} | ${fmt(Math.min(...sl))} | ${fmt(Math.max(...sl))} | ${fmt(Math.min(...xs.map((x) => lookup(es, x.id))))} |`,
+    );
+  }
+  line();
+
+  line(`**Keystones** (most work downstream; a slip here delays the most units):`);
+  line();
+  line(`| Unit | Title | Downstream units | Slack |`);
+  line(`|---|---|---|---|`);
+  for (const x of [...units]
+    .sort((a, b) => lookup(descendants, b.id).size - lookup(descendants, a.id).size || a.id.localeCompare(b.id))
+    .slice(0, 12))
+    line(`| ${x.id} | ${x.title} | ${lookup(descendants, x.id).size} | ${fmt(lookup(slack, x.id))} |`);
+  line();
+
+  line(`**Width by depth** (units whose longest chain of predecessors has this many units; the fan-out ceiling at each depth):`);
+  line();
+  line(`| Depth | Units | Work | Sections |`);
+  line(`|---|---|---|---|`);
+  const maxLevel = Math.max(...units.map((x) => lookup(level, x.id)));
+  for (let l = 0; l <= maxLevel; l++) {
+    const xs = units.filter((x) => level.get(x.id) === l);
+    const secs = [...new Set(xs.map((x) => x.section))];
+    line(`| ${l} | ${xs.length} | ${fmt(xs.reduce((a, x) => a + lookup(w, x.id), 0))} | ${secs.join(", ")} |`);
+  }
+  line();
+
+  line(
+    `**Section graph** (an arrow means units in the second section need units in the first; the number counts those edges; the critical path's sections are marked):`,
+  );
+  line();
+  line("```mermaid");
+  line("flowchart LR");
+  const slug = (s: string) => s.replace(/[^a-z0-9]/gi, "_");
+  for (const s of sections) line(`  ${slug(s)}["${s}"]`);
+  const sectionEdges = new Map<string, number>();
+  for (const x of units)
+    for (const d of lookup(deps, x.id)) {
+      if (syntheticEdges.includes(`${d} → ${x.id}`)) continue;
+      const a = u(d).section;
+      if (a === x.section) continue;
+      const k = `${a}|${x.section}`;
+      sectionEdges.set(k, (sectionEdges.get(k) ?? 0) + 1);
+    }
+  for (const [k, n] of [...sectionEdges].sort()) {
+    const [a, b] = k.split("|");
+    line(`  ${slug(a)} -->|${n}| ${slug(b)}`);
+  }
+  line(`  classDef critical stroke-width:3px`);
+  if (sectionsInPath.length) line(`  class ${sectionsInPath.map(slug).join(",")} critical`);
+  line("```");
+  line();
+
+  if (tail.length) {
+    const tailLen = new Map<string, number>();
+    for (const id of tailOrder) {
+      const ds = u(id).depends_on.filter((d) => tailIds.has(d));
+      tailLen.set(id, Math.max(0, ...ds.map((d) => lookup(tailLen, d))) + weightOf(u(id), tailWeight));
+    }
+    line(
+      `**Legacy-retirement tail** (after launch; the plan ends at the old site removed): ${tailOrder.map((id) => `${id} ${u(id).title}${u(id).note ? ` (${u(id).note})` : ""}`).join(" → ")}, ${tailWeight === "pert" ? Math.max(...tailLen.values()).toFixed(1) : Math.max(...tailLen.values())} ${tailWeight === "pert" ? "days" : tailWeight === "points" ? "points" : "units"} of work.`,
+    );
+    line();
+  }
+
+  line(`<details><summary>Every unit in scope: earliest start, slack, downstream units</summary>`);
+  line();
+  line(`| Unit | Title | Section | C | U | Depth | Starts at | Slack | Downstream |`);
+  line(`|---|---|---|---|---|---|---|---|---|`);
+  for (const id of order)
+    line(
+      `| ${id}${isCritical(id) ? " ★" : ""} | ${u(id).title} | ${u(id).section} | ${u(id).complexity} | ${u(id).uncertainty} | ${level.get(id)} | ${fmt(lookup(es, id))} | ${fmt(lookup(slack, id))} | ${lookup(descendants, id).size} |`,
+    );
+  line();
+  line(`</details>`);
+}
+
+const output = md.join("\n");
+const target = option("write", "");
+if (target) {
+  await writeBlock(target, "critical-path", block, output);
+  console.error(`wrote block ${block} to ${target}`);
+} else {
+  console.log(output);
+}
+process.exit(errors.length ? 1 : 0);

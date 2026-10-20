@@ -86,7 +86,7 @@ Accepted by Dave with the [industry-gap review](research/industry-gap-review.md)
 **Security data rules**
 - App-level rate limits in `rate_limits` behind a wrapper: sign-in links per email, reserve, payment attempts (at most 5 per hold), manage-booking, forms. Payment is created only against an active hold.
 - Staff sign-in: passkeys required for ops and admin through Better Auth, email links off for those roles, 8-hour sessions with a 30-minute idle timeout [proposed], and step-up for refunds, cancellations, payout and role changes. This replaces this ADR's earlier trigger for moving to a hosted identity provider.
-- Sign-in and capability links: random tokens hashed at rest, single-use sign-in links with a 5-minute expiry, uniform replies.
+- Sign-in links: random tokens hashed at rest, single-use, 5-minute expiry, uniform replies. Capability links (manage, gift, order) are derived instead: HMAC-SHA256 of kind, row ID, and a version under `CAPABILITY_TOKEN_SECRET`, only the hash stored, so any unit can rebuild a link (amended 2026-10-19, design doc 4.2.3, `DECISIONS.md`).
 - Audit log (PRD-74): a SQL-created role with insert and select only, a trigger that blocks updates and deletes, a nightly export to locked storage (Cloudflare R2 free tier in the demo). A hash chain is optional; if used, check it doesn't become a lock hotspot during a mass weather cancellation.
 - An authorization matrix (role by action by resource) runs in CI against the real database (ADR 0006).
 

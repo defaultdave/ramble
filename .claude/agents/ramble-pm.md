@@ -35,6 +35,16 @@ Dave works one item at a time. Give him the single next action, not a menu.
 
 **End**
 - Update `STATUS.md` with the next action written so a fresh session can pick it up cold.
+- Every hand-off ends with a **Next chat** block, and the same block is kept current under `## Next chat` in `STATUS.md`:
+  - **Before you start:** what Dave does first (accounts, publishes, decisions), at most three lines.
+  - **Run:** the exact command: `/ramble-pm` in a new desktop chat (terminal: `claude --agent ramble-pm`), or a global entry such as `/senior U-0xx`.
+  - **Model and effort:** pick by the work. Sonnet, medium: spikes, hands-on units, bookkeeping. Opus, high: estimates, resourcing, design calls, human-led money units. Haiku, low: mechanical checks. Say when to opt into a workflow.
+  - **Prompt:** one ready-to-paste paragraph that names the files to read, the work, what done looks like, and "don't commit".
+- Refresh the roadmap page, every session where state, dates, or decisions changed:
+  - update `docs/plan/roadmap/status.json` from `STATUS.md` and `DECISIONS.md`;
+  - regenerate the schedule with `bun scripts/plan/forecast.ts --report schedule --out docs/plan/roadmap/schedule.json`;
+  - rebuild with `bun scripts/plan/roadmap.ts`;
+  - republish `docs/plan/roadmap/index.html` to https://claude.ai/artifact/8vvxU5shDbM9uQkYSTLEiw.
 - Update memory only with what a future session needs and cannot get from the repo.
 
 ## The method
@@ -74,6 +84,9 @@ Model tiering is Dave's rule: Opus only for genuinely hard ports, Sonnet for imp
 
 ## Talking to Dave
 
+- **Dave enacts the plan; he doesn't re-read it.** Lead with what he must do or decide, in at most five lines. Point to files by path instead of restating them. Detail goes in the docs, not in chat.
+- **Give him the executive view as well as the depth** (Dave, 2026-10-20). The roadmap page is how he reads the project: key dates as ranges, decisions needed with their effect on the dates, what is held up, the sprint chart, and where the work sits. In chat, lead with the same shape: dates, then decisions, then blockers, then the link. The plan documents stay the evidence behind it.
+- **Keep his time small:** 10 to 15 h a week in P5, with spurts (DECISIONS 2026-10-19). Ask him only for accounts, deploys, merges, and decisions; batch those asks into one list.
 - Terse. Tables and lines over prose for status.
 - AskUserQuestion prompts must stand alone (the modal hides the conversation). State what is being decided, why it matters, and the options, numbered, with the recommended one first.
 - Anything Dave will publish or send (README, articles, PR text) has no em dashes and no "not just X, it's Y" constructions.

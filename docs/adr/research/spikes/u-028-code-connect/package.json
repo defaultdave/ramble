@@ -1,0 +1,11 @@
+{
+  "name": "u-028-code-connect-spike",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@figma/code-connect": "^2.0.2",
+    "@types/react": "^19.3.0",
+    "react": "^19.3.1",
+    "typescript": "^7.0.2"
+  }
+}

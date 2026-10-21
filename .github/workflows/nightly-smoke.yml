@@ -3,13 +3,33 @@ on:
   schedule:
     - cron: "0 7 * * *" # 03:00 New York in summer time, 02:00 in winter
   workflow_dispatch:
-permissions:
-  contents: read
-  statuses: write
+permissions: {}
 jobs:
-  smoke:
-    name: nightly-smoke (${{ matrix.branch }})
+  # Pins the exact commit each branch is tested at, so the status lands on the sha that was tested.
+  resolve:
+    name: resolve
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      shas: ${{ steps.shas.outputs.shas }}
+    steps:
+      - id: shas
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          main=$(gh api "repos/${{ github.repository }}/commits/main" -q .sha)
+          integration=$(gh api "repos/${{ github.repository }}/commits/integration" -q .sha)
+          echo "shas={\"main\":\"$main\",\"integration\":\"$integration\"}" >> "$GITHUB_OUTPUT"
+
+  # Runs code that agents merged. Read-only token, no stored credentials, and the database secret
+  # reaches only the integration race step (a disposable Neon branch; see runbook C4).
+  smoke:
+    name: smoke (${{ matrix.branch }})
+    needs: resolve
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -17,7 +37,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ matrix.branch }}
+          ref: ${{ fromJSON(needs.resolve.outputs.shas)[matrix.branch] }}
+          persist-credentials: false
       - uses: actions/setup-node@v4
         if: hashFiles('package.json') != ''
         with:
@@ -33,13 +54,34 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.NIGHTLY_DATABASE_URL }}
         run: npm run test:race --if-present
+
+  # Runs no repo code. It reads each smoke job's conclusion from the Actions API (set by the runner,
+  # so test code cannot forge it) and posts the nightly-smoke status on the tested sha.
+  status:
+    name: status (${{ matrix.branch }})
+    needs: [resolve, smoke]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      statuses: write
+    strategy:
+      fail-fast: false
+      matrix:
+        branch: [main, integration]
+    steps:
       - name: Post the nightly-smoke status
-        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
-          STATE: ${{ job.status == 'success' && 'success' || 'failure' }}
-        run: >
-          gh api "repos/${{ github.repository }}/statuses/$(git rev-parse HEAD)"
-          -f state="$STATE" -f context=nightly-smoke
-          -f description="Nightly smoke on ${{ matrix.branch }}"
-          -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          SHA: ${{ fromJSON(needs.resolve.outputs.shas)[matrix.branch] }}
+          JOB_NAME: smoke (${{ matrix.branch }})
+          BRANCH: ${{ matrix.branch }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          conclusion=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs" --paginate \
+            -q ".jobs[] | select(.name == \"$JOB_NAME\") | .conclusion")
+          state=failure
+          [ "$conclusion" = "success" ] && state=success
+          gh api "repos/${{ github.repository }}/statuses/$SHA" \
+            -f state="$state" -f context=nightly-smoke \
+            -f description="Nightly smoke on $BRANCH" -f target_url="$RUN_URL"

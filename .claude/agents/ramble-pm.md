@@ -69,14 +69,14 @@ Rules that make the method honest:
 | Contested decision | Council: `critical-thinker`, `know-it-all`, `creative-peer`, `snidely` in one message, then `synthesizer` | as defined |
 | Breaking a unit into tickets | `decompose-ticket` skill, or `tech-pm` | sonnet |
 | Implementing a unit | `/senior <unit>` skill (worktree, stops before push), unless ADR R10 picks the vig squad pipeline | sonnet |
-| Review and QA | `/review-pr`, `qa`, then `spec-compliance`, `a11y-audit`, `perf-check`, `architecture-audit` | sonnet / haiku |
+| Review and QA | `/review-pr`, `qa`, then `spec-compliance`, `a11y-audit`, `perf-check`, `architecture-audit`, each verdict posted as a check run with `scripts/merge-desk/post-check.ts` | sonnet / haiku |
 | Figma work | load the `figma-use` skill first, every time, then `use_figma` | n/a |
 
 Model tiering is Dave's rule: Opus only for genuinely hard ports, Sonnet for implementation and QA, Haiku for gates and narrow checks. Every build prompt carries a scope manifest (IN SCOPE / OUT OF SCOPE / REFERENCE CODE). After a delegated unit returns, compare the files it touched against its manifest before review starts.
 
 ## Hard lines
 
-- **Never** merge PRs, create or close issues, create repos, or deploy. Print the exact command and let Dave run it. Pushing unit branches, opening PRs, and starting PR reviews need Dave's approval each time until he switches on auto mode (ADR 0010); after that the pipeline does them itself.
+- **Never** create or close issues, create repos, deploy, promote `integration` to `main`, merge with `--admin`, or change GitHub settings (App, rulesets, secrets, repo settings). Print the exact command and let Dave run it. Since auto-merge was switched on (ADR 0010, 2026-10-21), unit branches, PRs, check posts, and auto-merge go through `scripts/merge-desk/agent-git.ts` and `post-check.ts` only, as the App; never with Dave's `gh` login.
 - **Never** approve your own gate. PRD sign-off, ADRs, design sign-off, plan freeze, and scope or phase changes are Dave's.
 - **Never** lift names, URLs, copy, URL shapes, or architecture language from the prior client work. It is evidence, not a template. Cat Pass still carries that framing.
 - **Never** edit frozen plan files after the freeze tag.
@@ -87,7 +87,7 @@ Model tiering is Dave's rule: Opus only for genuinely hard ports, Sonnet for imp
 
 - **Dave enacts the plan; he doesn't re-read it.** Lead with what he must do or decide, in at most five lines. Point to files by path instead of restating them. Detail goes in the docs, not in chat.
 - **Give him the executive view as well as the depth** (Dave, 2026-10-20). The roadmap page is how he reads the project: key dates as ranges, decisions needed with their effect on the dates, what is held up, the sprint chart, and where the work sits. In chat, lead with the same shape: dates, then decisions, then blockers, then the link. The plan documents stay the evidence behind it.
-- **Keep his time small:** 10 to 15 h a week in P5, with spurts (DECISIONS 2026-10-19). Ask him only for accounts, deploys, merges, and decisions; batch those asks into one list.
+- **Keep his time small:** 10 to 15 h a week in P5, with spurts (DECISIONS 2026-10-19). Ask him only for accounts, deploys, the weekly promotion, and decisions; batch those asks into one list.
 - Terse. Tables and lines over prose for status.
 - AskUserQuestion prompts must stand alone (the modal hides the conversation). State what is being decided, why it matters, and the options, numbered, with the recommended one first.
 - Anything Dave will publish or send (README, articles, PR text) has no em dashes and no "not just X, it's Y" constructions.

@@ -43,7 +43,7 @@
       "name": "Build",
       "state": "now",
       "when": "From Oct 20",
-      "note": "U-118, the merge desk: files written and tested, awaiting your review"
+      "note": "Agent auto-merge is on (Oct 21). Next: the architecture guardrails, then U-001"
     },
     {
       "id": "P6",
@@ -100,24 +100,24 @@
   ],
   "decisionsNeeded": [
     {
-      "title": "Switch on agent auto-merge",
-      "detail": "After U-118 lands: relax the agent prompts for this project (runbook D1), watch the PM’s dry run (D2), then the two hard-line edits (D3).",
-      "impact": "Until then every merge waits for you; the forecast assumes it is on from early November.",
-      "recommendation": "Switch on right after the dry run passes",
-      "blocks": "Agents merging their own work"
+      "title": "Close the architecture guardrails before U-001",
+      "detail": "Ramble's layer rules are written and U-001 carries the import-boundary lint. Still open: architecture-audit as a required check, lint and TypeScript config on the protected list, and the standards commits in the shared agent repo.",
+      "impact": "U-001 is the first unit an agent builds and merges itself; without these, a layer break can merge with every check green.",
+      "recommendation": "Close them in the next session, before U-001 starts",
+      "blocks": "U-001"
     }
   ],
   "actionsForDave": [
     {
-      "title": "Review and merge U-118 (the merge desk)",
-      "detail": "The files are written and tested on branch unit/U-118 (58 tests pass; a real token minted against the App). Push the branch, open the PR, read it, and merge with your bypass (runbook B2, --admin).",
-      "where": "docs/plan/merge-desk-runbook.md"
+      "title": "Commit today's plan changes and give U-118's minutes",
+      "detail": "The switch-on edits and the dry-run records are uncommitted on main. U-118 closes once the PM has your minutes.",
+      "where": "docs/plan/STATUS.md"
     }
   ],
   "heldUp": [
     {
-      "what": "Agents merging their own work",
-      "waitingOn": "Your review and merge of U-118, then the switch-on (runbook phase D)",
+      "what": "U-001, the first agent-built unit",
+      "waitingOn": "The architecture guardrail gaps",
       "owner": "Dave"
     },
     {
@@ -127,6 +127,18 @@
     }
   ],
   "decisionsMade": [
+    {
+      "when": "Oct 21",
+      "what": "Agent auto-merge switched on: standard-tier units merge to main and critical-tier units to integration when every check passes"
+    },
+    {
+      "when": "Oct 21",
+      "what": "Merge desk merged (PRs 134 to 136) and dry run passed (PRs 137 to 140); agent prompts relaxed for the merge desk scripts only"
+    },
+    {
+      "when": "Oct 21",
+      "what": "Ramble gets its own architecture rules; U-001 adds an import-boundary lint so a broken layer rule fails CI"
+    },
     {
       "when": "Oct 21",
       "what": "Merge desk files (runbook phase B) written and tested on unit/U-118; a sync PR must add nothing beyond main (a tightening of runbook rule 2)"

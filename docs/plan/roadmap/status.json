@@ -1,6 +1,6 @@
 {
   "asOf": "2026-10-20",
-  "headline": "The plan is decided: agents build 107 of 116 units, the Prototype comes first, and launch moves to March. Next is the plan freeze, then the build starts Oct 26.",
+  "headline": "The plan is frozen and the repo is public. The build starts Mon Oct 26 with the merge desk (U-118), which Dave leads.",
   "recommended": "Plan, Dave 12.5 h",
   "phases": [
     {
@@ -34,9 +34,9 @@
     {
       "id": "P4",
       "name": "Plan",
-      "state": "now",
-      "when": "Oct 18 to freeze",
-      "note": "Decisions made; the freeze (commit and tag) is next"
+      "state": "done",
+      "when": "Oct 20",
+      "note": "Frozen: tag plan-frozen-2026-10-20"
     },
     {
       "id": "P5",
@@ -100,44 +100,24 @@
   ],
   "decisionsNeeded": [
     {
-      "title": "Approve the frozen plan",
-      "detail": "The PM has applied your decisions to every plan file and regenerated them. Approving the diff lets the PM commit; you run the tag command it prints. From then on the plan files are read-only and reality goes in the delta log.",
-      "impact": "Starts the build on Oct 26. Every week the freeze slips moves every date by a week.",
-      "recommendation": "Approve",
-      "blocks": "The build"
+      "title": "Switch on agent auto-merge",
+      "detail": "After U-118 lands: relax the agent prompts for this project (runbook D1), watch the PM’s dry run (D2), then the two hard-line edits (D3).",
+      "impact": "Until then every merge waits for you; the forecast assumes it is on from early November.",
+      "recommendation": "Switch on right after the dry run passes",
+      "blocks": "Agents merging their own work"
     }
   ],
   "actionsForDave": [
     {
-      "title": "Create the GitHub App for the agents",
-      "detail": "Merge desk runbook, phase A. About 20 minutes, before the freeze.",
+      "title": "Review and merge U-118 (the merge desk)",
+      "detail": "The PM writes the files; you merge with your bypass (runbook B2, --admin). About an hour, first week of the build.",
       "where": "docs/plan/merge-desk-runbook.md"
-    },
-    {
-      "title": "At the freeze: make the repo public, then set up the rulesets",
-      "detail": "Runbook phase C, right after the tag.",
-      "where": "docs/plan/merge-desk-runbook.md"
-    },
-    {
-      "title": "At the freeze: run the printed issue commands",
-      "detail": "One issue per unit, added to board #19, whose fields are now set up.",
-      "where": "docs/plan/STATUS.md"
     }
   ],
   "heldUp": [
     {
-      "what": "Plan freeze",
-      "waitingOn": "Your approval of the diff",
-      "owner": "Dave"
-    },
-    {
-      "what": "Build start (Oct 26)",
-      "waitingOn": "The plan freeze",
-      "owner": "Dave"
-    },
-    {
       "what": "Agents merging their own work",
-      "waitingOn": "The GitHub App (before the freeze), the repo going public (at the freeze), then U-118 in the first build week",
+      "waitingOn": "U-118, then the switch-on (runbook phase D)",
       "owner": "Dave"
     },
     {
@@ -147,6 +127,10 @@
     }
   ],
   "decisionsMade": [
+    {
+      "when": "Oct 20",
+      "what": "Plan frozen (tag plan-frozen-2026-10-20); repo public with secret scanning; 133 unit issues on the board; merge rules live"
+    },
     {
       "when": "Oct 20",
       "what": "Agents get more of the build: they carry half of each unit Dave leads and build the six non-money pattern-setters; Dave keeps holds, payments, and the ledger"

@@ -1,7 +1,7 @@
 # Status
 
 **Updated:** 2026-10-20
-**Phase:** P1 ✅, P2 ✅, and the P3 gate ✅ (all 2026-10-18; the mobile flow and States page are signed off). P3 is complete, including the desktop revision. **P4 Plan started 2026-10-18:** artifacts 1 to 7 done; Dave adopted the recommendations on 2026-10-20 (tiered merge plus levers 2, 3, 4a; December 1 moves). Applied to every plan file. **Plan frozen 2026-10-20** (Dave approved; committed on `main`; tag `plan-frozen-2026-10-20` is Dave's to run). From here the plan files are read-only; reality goes in `delta-log.md`.
+**Phase:** P1 ✅, P2 ✅, and the P3 gate ✅ (all 2026-10-18; the mobile flow and States page are signed off). P3 is complete, including the desktop revision. **P4 Plan started 2026-10-18:** artifacts 1 to 7 done; Dave adopted the recommendations on 2026-10-20 (tiered merge plus levers 2, 3, 4a; December 1 moves). Applied to every plan file. **Plan frozen 2026-10-20:** tag `plan-frozen-2026-10-20` on `8715c42` (history rewritten first to drop personal notes; see `delta-log.md`). Repo public with secret scanning and push protection; GitHub App created (phase A); merge settings, `integration`, and rulesets live (phase C); 133 unit issues on board #19. **P5 starts Oct 26** with U-118. From here the plan files are read-only; reality goes in `delta-log.md`.
 
 ## Done
 - P0: desktop wireframes v0 in Figma (6 screens, notes, click-through); repo, PM agent, project memory, build plan spec; discovery kit.
@@ -67,9 +67,8 @@
 In this demo, the client facts have no one to ask. Where a fact blocks a decision, the PM proposes a working assumption and logs it as one.
 
 ## Blocked on Dave
-1. **Freeze commands** (printed by the PM 2026-10-20): tag, push, make the repo public, runbook phase C, `bun scripts/plan/issues.ts --run`.
+1. **Switch-on, after U-118 lands** (runbook phase D): relax the agent prompts for this project (D1, Option 1 recommended), watch the PM's dry run (D2), then the two hard-line edits in `CLAUDE.md` and `ramble-pm.md` (D3).
 2. **Method Layer 0** (open decision 3). Not needed until P6.
-3. **Merge desk App, before the freeze** (`docs/plan/merge-desk-runbook.md`, phase A): create the GitHub App with the minimum permissions, keep its key in `~/.config/ramble-agents/`, install it on `ramble` only, record the IDs in `app.conf` (A1 to A4). About 20 minutes. Phases C and D (repo settings, rulesets, the permission relaxation, the hard-line edits) come at and after the freeze, once the repo is public.
 
 Resolved: Figma tools in a new session (2026-10-18, working in the P3 session). Workbook order (2026-10-18: plan Ramble first, extract the templates from its artifacts afterward). The Perf Lab spec conflict: the signed PRD's `PRD-68` is the requirement the detail-page fixes trace to; the router question went to ADR 0001.
 
@@ -78,17 +77,17 @@ Open item from the ADR 0007 measurement amendment (2026-10-18): what New York an
 Legal and vendor questions for the real job, logged, not blocking the demo: Ramble holding host money and the New York gift law (counsel, Q-16); card refund age limit at 12 months (ask Stripe); Stripe's Connect review time.
 
 ## Next
-The plan is frozen and committed (2026-10-20). Dave runs, in order:
-1. `git tag plan-frozen-2026-10-20` and the push of `main` and the tag.
-2. Make the repo public, then turn on secret scanning and push protection.
-3. Runbook phase A (the GitHub App), then phase C (merge settings, the `integration` branch, the rulesets).
-4. `bun scripts/plan/issues.ts --run`: 133 issues, each added to board #19 with its fields.
+P4 is closed: the plan is frozen, the repo is public, the board is filled, and the merge desk's GitHub side (App, rulesets) is in place. P5 starts Mon Oct 26.
 
-After the tag, the plan files are read-only and reality goes in `delta-log.md`. P5 starts Oct 26 with U-118, the merge desk, which Dave builds.
+1. **U-118, the merge desk** (Dave leads; the PM writes the runbook's phase B files on `unit/U-118`). The token script is the first real test that the App install works.
+2. **Dave merges U-118 with his bypass** (runbook B2, `--admin`), since the rulesets already require the checks U-118 creates.
+3. **Switch-on** (runbook phase D), then U-001 is the first unit an agent merges itself.
+
+Since the freeze, plan files are read-only; departures go in `delta-log.md` (three lines so far, all before the build).
 
 ## Next chat
 
-**Before you start:** if the freeze is committed and tagged, do runbook phase A (the App) and phase C (rulesets), and run the printed issue commands. If not, finish the freeze in this chat first.
+**Before you start:** nothing; the freeze steps and the App are done. Have about an hour for U-118's review and its `--admin` merge.
 
 **Run:** `/ramble-pm` in a new desktop chat (terminal: `claude --agent ramble-pm`), then paste the prompt. **Model and effort:** Sonnet, medium (U-118 is setup work from a written runbook). No workflow.
 

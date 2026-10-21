@@ -78,10 +78,16 @@ The PM cannot read `*.pem` files (your deny rules), and it never asks for the ke
 2. Choose **Only select repositories**, pick `ramble`, and click **Install**.
 3. The browser lands on `github.com/settings/installations/<number>`. That number is the **installation ID**.
 
-**A4 [Dave] Record the two IDs** where the token script reads them. The file is not named `.env`, so the secret guard leaves it alone, and it holds no secret:
+**A4 [Dave] Record the IDs** where the token script reads them. You need three:
+
+- **The App ID** (a number, top of the App page). The rulesets in C3 use it.
+- **The Client ID** (starts `Iv`, shown under the App ID). The token script signs with it, as GitHub now recommends.
+- **The installation ID** (from A3). It names which install to issue tokens for.
+
+The file is not named `.env`, so the secret guard leaves it alone, and it holds no secret:
 
 ```bash
-printf 'RAMBLE_APP_ID=%s\nRAMBLE_APP_INSTALLATION_ID=%s\nRAMBLE_APP_KEY=%s\n' "<App ID>" "<installation ID>" "$HOME/.config/ramble-agents/app-key.pem" > ~/.config/ramble-agents/app.conf
+printf 'RAMBLE_APP_ID=%s\nRAMBLE_APP_CLIENT_ID=%s\nRAMBLE_APP_INSTALLATION_ID=%s\nRAMBLE_APP_KEY=%s\n' "<App ID>" "<Client ID>" "<installation ID>" "$HOME/.config/ramble-agents/app-key.pem" > ~/.config/ramble-agents/app.conf
 ```
 
 ## B. The files (U-118's PR)
@@ -91,7 +97,7 @@ printf 'RAMBLE_APP_ID=%s\nRAMBLE_APP_INSTALLATION_ID=%s\nRAMBLE_APP_KEY=%s\n' "<
 **`scripts/merge-desk/app-token.ts`** mints a one-hour installation token for the App.
 
 - It reads `~/.config/ramble-agents/app.conf`.
-- It signs an RS256 JWT with the key (`iat` 60 s back, `exp` 9 min ahead, `iss` the App ID).
+- It signs an RS256 JWT with the key (`iat` 60 s back, `exp` 9 min ahead, `iss` the Client ID, or the App ID if no Client ID is recorded).
 - It calls `POST /app/installations/{id}/access_tokens` and prints only the token.
 - It checks `response.ok` and exits 1 with the status on failure.
 - It never logs the key or the JWT.
@@ -231,10 +237,10 @@ jobs:
 
 The PM tests the three TypeScript scripts with unit tests: token minting against a mocked endpoint, every scope-check rule, and every refusal in `agent-git.ts`. It runs `actionlint` on both workflows if it is installed, and opens the PR with your login, as today.
 
-**B2 [Dave] Review and merge U-118's PR yourself.** The rulesets do not exist yet, so this is an ordinary merge:
+**B2 [Dave] Review and merge U-118's PR yourself.** Phase C ran at the freeze (2026-10-20), before U-118 existed. The rulesets already require checks that only U-118 creates, so this one merge goes through your bypass. U-118 is critical tier, but it merges straight to `main`, since the merge rule it sets up does not exist until it lands:
 
 ```bash
-gh pr merge <U-118 PR number> --squash --delete-branch
+gh pr merge <U-118 PR number> --admin --squash --delete-branch
 ```
 
 ## C. Repo settings and rulesets (after the repo goes public at the freeze)

@@ -1,0 +1,45 @@
+name: nightly-smoke
+on:
+  schedule:
+    - cron: "0 7 * * *" # 03:00 New York in summer time, 02:00 in winter
+  workflow_dispatch:
+permissions:
+  contents: read
+  statuses: write
+jobs:
+  smoke:
+    name: nightly-smoke (${{ matrix.branch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        branch: [main, integration]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.branch }}
+      - uses: actions/setup-node@v4
+        if: hashFiles('package.json') != ''
+        with:
+          node-version: 24
+      - name: Install
+        if: hashFiles('package-lock.json') != ''
+        run: npm ci
+      - name: Smoke
+        if: hashFiles('package.json') != ''
+        run: npm run smoke --if-present
+      - name: Race and access tests
+        if: matrix.branch == 'integration' && hashFiles('package.json') != ''
+        env:
+          DATABASE_URL: ${{ secrets.NIGHTLY_DATABASE_URL }}
+        run: npm run test:race --if-present
+      - name: Post the nightly-smoke status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STATE: ${{ job.status == 'success' && 'success' || 'failure' }}
+        run: >
+          gh api "repos/${{ github.repository }}/statuses/$(git rev-parse HEAD)"
+          -f state="$STATE" -f context=nightly-smoke
+          -f description="Nightly smoke on ${{ matrix.branch }}"
+          -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

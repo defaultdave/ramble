@@ -1,6 +1,6 @@
 # Status
 
-**Updated:** 2026-10-21
+**Updated:** 2026-10-21 (phase B written)
 **Phase:** P1 ✅, P2 ✅, and the P3 gate ✅ (all 2026-10-18; the mobile flow and States page are signed off). P3 is complete, including the desktop revision. **P4 Plan started 2026-10-18:** artifacts 1 to 7 done; Dave adopted the recommendations on 2026-10-20 (tiered merge plus levers 2, 3, 4a; December 1 moves). Applied to every plan file. **Plan frozen 2026-10-20:** tag `plan-frozen-2026-10-20` on `8715c42` (history rewritten first to drop personal notes; see `delta-log.md`). Repo public with secret scanning and push protection; GitHub App created (phase A); merge settings, `integration`, and rulesets live (phase C); 133 unit issues on board #19. **P5 started early, 2026-10-20,** with U-118 (in progress; phases A and C done; see `delta-log.md`). From here the plan files are read-only; reality goes in `delta-log.md`.
 
 ## Done
@@ -24,7 +24,7 @@
 
 ## In flight
 - **Forecast refit 2026-10-21** (delta log): from Oct 21 with U-118 half done and a 20-hour first week, Prototype P50 Nov 16 (P90 Nov 20), launch-ready P50 Feb 24 (P90 Mar 16); the frozen plan stays Nov 30 and Mar 8. Roadmap page and board dates show the current forecast.
-- **U-118 Merge desk and agent identity, in progress since 2026-10-20** (Dave decided to start ahead of the planned Oct 26). Done: the GitHub App (phase A); merge settings, `integration`, rulesets (phase C). Next: phase B (the PM writes `scripts/merge-desk/` and the two workflows on `unit/U-118`), then Dave's `--admin` merge (B2) and the switch-on (phase D). Board #19 now carries Start date, Target date, and Sprint fields from the forecast (`scripts/plan/board-dates.ts`).
+- **U-118 Merge desk and agent identity, in progress since 2026-10-20** (Dave decided to start ahead of the planned Oct 26). Done: the GitHub App (phase A); merge settings, `integration`, rulesets (phase C). Phase B is written on branch `unit/U-118` (scripts in `scripts/merge-desk/`, two workflows; 58 unit tests pass; a real token minted against the App and read the installation's repo list). Next: Dave's review and `--admin` merge (B2), then the switch-on (phase D). Board #19 now carries Start date, Target date, and Sprint fields from the forecast (`scripts/plan/board-dates.ts`).
 - **Freeze decisions applied 2026-10-20, not committed:** levers 2 and 4a moved U-093, U-096, U-002, U-003, U-116, U-011, U-005, U-024 to agents in `units.yaml` (U-002, U-003, U-024 to the critical tier; U-093 and U-096 carry a results-read people check); lever 3 set `DAVE_SHARE` to 0.35 / 0.5 / 0.65 in `graph.ts`; `execution-model.ts` now reports the tiered merge rule (old rule as a comparison column, 18 weeks); `forecast.ts` runs the record as the plan, with "before the levers" and "lever 4" as comparisons. 02, 04, 05, 06, 07 regenerated; 05 and 04 carry dated notes; 06 and 07 prose updated (07 rewritten as the decided plan). The plan at 12.5 h: Prototype P50 2026-11-30 (P90 12-07), launch-ready P50 2027-03-08 (P90 03-26); Dave leads 9 of 116 units, about 180 h. Roadmap republished.
 - **Project board #19 set up 2026-10-20** by the PM (Dave's call): linked to `defaultdave/ramble`, fields Unit ID, Section, Complexity, Uncertainty, Spike, Execution, Review tier, Depends on, the three estimate fields, Actual days, Dave minutes, Tokens. No items yet; issues come at the freeze.
 - **P4 artifacts 6 and 7 drafted 2026-10-20, not committed:** `docs/plan/06-estimate.md`, `docs/plan/07-resourcing.md`. Record: `estimate_days` on all 132 open units in `units.yaml`; every lens's figures and the solo estimates in `docs/plan/estimate-panel.json`. New script `scripts/plan/forecast.ts` (Monte Carlo over the graph; Dave as a capacity-limited resource; levers and WIP as scenarios). Dave's minutes moved from `execution-model.ts` into `scripts/plan/dave-time.ts` (report output unchanged, checked by diff).
@@ -81,24 +81,23 @@ Legal and vendor questions for the real job, logged, not blocking the demo: Ramb
 ## Next
 P4 is closed and P5 has started early: U-118 is in progress since 2026-10-20.
 
-1. **U-118 phase B, now.** The PM writes the merge desk files on `unit/U-118`, with tests, and stops before push.
-2. **Dave reviews and merges U-118 with his bypass** (runbook B2, `--admin`).
-3. **Switch-on (runbook phase D):**
+1. **Dave reviews and merges U-118 with his bypass** (runbook B2). Push the branch, open the PR, read it, merge `--admin`. Commands below.
+2. **Switch-on (runbook phase D):**
    - Dave relaxes the agent prompts for this project (D1, option 1);
    - the PM runs the dry run (D2);
    - Dave makes the two hard-line edits (D3).
-4. **U-001**, the first unit an agent builds and merges itself; its CI checks then go into both rulesets.
+3. **U-001**, the first unit an agent builds and merges itself; its CI checks then go into both rulesets.
 
 Since the freeze, plan files are read-only; departures go in `delta-log.md`.
 
 ## Next chat
 
-**Before you start:** nothing. The App's IDs are in `~/.config/ramble-agents/app.conf` (App ID and installation ID; no Client ID, so the token script falls back to the App ID). Allow about an hour later for U-118's review and its `--admin` merge.
+**Before you start:** push and merge U-118 (runbook B2), then do D1 (the allow rules in `.claude/settings.local.json`). About 30 minutes.
 
-**Run:** `/ramble-pm` in a new desktop chat (terminal: `claude --agent ramble-pm`), then paste the prompt. **Model and effort:** Sonnet, medium. U-118 is setup work from a written runbook. No workflow.
+**Run:** `/ramble-pm` in a new desktop chat (terminal: `claude --agent ramble-pm`). **Model and effort:** Sonnet, medium. The dry run follows a written runbook. No workflow.
 
 **Prompt:**
 
 ```
-Read docs/plan/STATUS.md and docs/plan/merge-desk-runbook.md. U-118 (merge desk) is in progress since 2026-10-20; runbook phases A and C are done. Do runbook phase B (the [PM] steps) on branch unit/U-118: scripts/merge-desk/app-token.ts, post-check.ts, agent-git.ts, scope-check.ts, revert.sh, .github/workflows/scope-manifest.yml, and .github/workflows/nightly-smoke.yml, as the runbook specifies. The repo has no package.json yet (that is U-001), so the scripts run under Bun with no dependencies; write unit tests for the three TypeScript scripts (bun test). Test app-token.ts once for real against the App: it should mint a token, and print nothing secret. Do not run any step marked [Dave] or change any GitHub setting. Update U-118 in units.yaml, the board, and the roadmap. Done looks like: the branch ready for my review, tests passing, the real token check passing, and the list of [Dave] steps left. Commit on the branch; stop before push and print the push and PR commands.
+Read docs/plan/STATUS.md and docs/plan/merge-desk-runbook.md. U-118 is merged and I have done D1. Run D2, the dry run, through scripts/merge-desk/ and report each of the four results. Do not edit CLAUDE.md or ramble-pm.md (D3 is mine) and do not change GitHub settings. Then close U-118 in units.yaml (actual days, dave minutes), refresh the roadmap, and prepare U-001. Don't commit.
 ```

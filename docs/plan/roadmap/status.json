@@ -43,7 +43,7 @@
       "name": "Build",
       "state": "now",
       "when": "From Oct 20",
-      "note": "U-118, the merge desk, in progress"
+      "note": "U-118, the merge desk: files written and tested, awaiting your review"
     },
     {
       "id": "P6",
@@ -110,14 +110,14 @@
   "actionsForDave": [
     {
       "title": "Review and merge U-118 (the merge desk)",
-      "detail": "The PM writes the files in a fresh session (STATUS, Next chat); you merge with your bypass (runbook B2, --admin).",
+      "detail": "The files are written and tested on branch unit/U-118 (58 tests pass; a real token minted against the App). Push the branch, open the PR, read it, and merge with your bypass (runbook B2, --admin).",
       "where": "docs/plan/merge-desk-runbook.md"
     }
   ],
   "heldUp": [
     {
       "what": "Agents merging their own work",
-      "waitingOn": "U-118, then the switch-on (runbook phase D)",
+      "waitingOn": "Your review and merge of U-118, then the switch-on (runbook phase D)",
       "owner": "Dave"
     },
     {
@@ -127,6 +127,10 @@
     }
   ],
   "decisionsMade": [
+    {
+      "when": "Oct 21",
+      "what": "Merge desk files (runbook phase B) written and tested on unit/U-118; a sync PR must add nothing beyond main (a tightening of runbook rule 2)"
+    },
     {
       "when": "Oct 21",
       "what": "Start the build now instead of Oct 26, with a push this week; the forecast is refit from today (frozen plan unchanged)"

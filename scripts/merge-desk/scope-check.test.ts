@@ -26,6 +26,19 @@ test("parseUnits reads ids and tiers", () => {
   expect([...units]).toEqual([["U-001", "standard"], ["U-002", "critical"], ["U-064a", "standard"]]);
 });
 
+test.each(['review: "critical"', "review: critical # unchanged", "review: 'critical'", "review: {x: 1}"])(
+  "parseUnits reads the tier from parsed YAML, so %s is critical",
+  (line) => {
+    expect(parseUnits(`units:\n  - id: U-009\n    ${line}\n`).get("U-009")).toBe("critical");
+  },
+);
+
+test("a formatting-only edit of a critical tier leaves the tier critical for later PRs", () => {
+  const edited = UNITS_YAML.replace("review: critical", 'review: "critical"');
+  expect(unitsYamlViolations(UNITS_YAML, edited)).toEqual([]);
+  expect(parseUnits(edited).get("U-001")).toBe("critical");
+});
+
 test("a standard unit into main passes", () => {
   expect(check({}).ok).toBe(true);
 });

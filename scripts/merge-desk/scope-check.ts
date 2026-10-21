@@ -25,19 +25,11 @@ export interface ScopeInput {
   unitsYaml?: { base: string; head: string };
 }
 
-/** Reads each unit's id and review tier without a YAML library. A unit with no review line is standard. */
+/** Reads each unit's id and review tier from the parsed YAML. No review field means standard; anything other than "standard" is treated as critical. */
 export function parseUnits(yaml: string): Map<string, Tier> {
   const units = new Map<string, Tier>();
-  let current: string | null = null;
-  for (const line of yaml.split("\n")) {
-    const id = line.match(/^ {2}- id: (\S+)\s*$/);
-    if (id) {
-      current = id[1];
-      units.set(current, "standard");
-      continue;
-    }
-    const review = line.match(/^ {4}review: (standard|critical)\s*$/);
-    if (review && current) units.set(current, review[1] as Tier);
+  for (const unit of parseUnitsFile(yaml).units ?? []) {
+    units.set(String(unit.id), unit.review === undefined || unit.review === "standard" ? "standard" : "critical");
   }
   return units;
 }

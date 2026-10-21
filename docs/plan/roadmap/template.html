@@ -240,7 +240,7 @@ footer code { font-size: 12px; }
   </section>
 
   <footer>
-    <p><b>How to read the dates.</b> "Likely" is the middle outcome of 2,000 simulated builds (P50). "Late case" is the date only 1 in 10 runs miss (P90). Dates assume the build starts Oct 26 and Dave works 12.5 hours a week.</p>
+    <p><b>How to read the dates.</b> "Likely" is the middle outcome of 2,000 simulated builds (P50). "Late case" is the date only 1 in 10 runs miss (P90). <span id="forecast-note"></span> The frozen plan (tag <code>plan-frozen-2026-10-20</code>) does not move; the dates above are the current forecast, and each refit is a line in <code>delta-log.md</code>.</p>
     <p>Source: <code>docs/plan/units.yaml</code> through <code>scripts/plan/forecast.ts</code>; status from <code>docs/plan/STATUS.md</code> and <code>DECISIONS.md</code>. Detail: <code>06-estimate.md</code>, <code>07-resourcing.md</code>. Rebuilt with <code>bun scripts/plan/roadmap.ts</code>.</p>
   </footer>
 </div>
@@ -264,6 +264,8 @@ footer code { font-size: 12px; }
   // Static parts: header, phases, decisions, held up, made, watch, artifacts.
   document.getElementById("asof").textContent = `Ramble · project roadmap · as of ${fmt(T.asOf, true)}`;
   document.getElementById("headline").textContent = T.headline;
+  document.getElementById("forecast-note").textContent = T.forecastNote;
+  for (const i of [0, 1]) document.getElementById(`sc-${i}`).textContent = T.scenarioLabels[i];
   const phases = document.getElementById("phases");
   for (const p of T.phases) {
     const d = el("div", "phase"); d.dataset.state = p.state;
@@ -313,21 +315,20 @@ footer code { font-size: 12px; }
     const units = new Map(sc.units.map((u) => [u.id, u]));
     document.getElementById("sc-0").setAttribute("aria-pressed", String(current === 0));
     document.getElementById("sc-1").setAttribute("aria-pressed", String(current === 1));
-    document.getElementById("sc-note").textContent = current === 0
-      ? "Decided Oct 20: agents merge their own work, carry half of each unit Dave leads, and build six pattern-setting units. Dave keeps holds, payments, and the ledger."
-      : "For comparison: agents merge their own work, but Dave builds all 17 units he led before the Oct 20 decisions.";
+    document.getElementById("sc-note").textContent = T.scenarioNotes[current];
 
-    // Key dates
+    // Key dates: the current forecast, with the frozen plan's dates beside it.
     const ms = (unitId) => units.get(unitId);
     const dates = document.getElementById("dates"); dates.replaceChildren();
-    const tile = (label, likely, late, note, key) => {
+    const tile = (label, likely, late, note, key, frozen) => {
       const d = el("div", "date" + (key ? " key" : ""));
       d.append(el("span", "eyebrow", label), el("span", "big", fmt(likely, true)), el("span", "late", `Late case ${fmt(late, true)}`));
       if (note) d.append(el("span", "late", note));
+      if (frozen) d.append(el("span", "late", `Frozen plan: ${fmt(frozen.likely)} (late case ${fmt(frozen.late)})`));
       dates.append(d);
     };
-    tile("Prototype", sc.prototype.dates.p50, sc.prototype.dates.p90, "Clickable guest flow on seed data", true);
-    tile("Launch-ready", sc.finish.dates.p50, sc.finish.dates.p90, `Full build, about ${Math.round(sc.finish.weeks.p50)} weeks`, true);
+    tile("Prototype", sc.prototype.dates.p50, sc.prototype.dates.p90, "Clickable guest flow on seed data", true, T.frozen.prototype);
+    tile("Launch-ready", sc.finish.dates.p50, sc.finish.dates.p90, `Full build, about ${Math.round(sc.finish.weeks.p50)} weeks from ${fmt(S.start)}`, true, T.frozen.launch);
     tile("Fastest possible", S.floor.dates.p50, S.floor.dates.p90, "Unlimited people; nobody waits");
     const c = document.getElementById("client"); c.replaceChildren();
     c.append("The client asked for ", el("b", null, "Dec 1"), `. The full build cannot make it under any staffing; the Prototype lands ${fmt(sc.prototype.dates.p50)} (late case ${fmt(sc.prototype.dates.p90)}).`);

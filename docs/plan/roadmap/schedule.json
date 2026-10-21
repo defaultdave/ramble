@@ -1,6 +1,6 @@
 {
- "generated": "bun scripts/plan/forecast.ts --report schedule --runs 2000 --seed 6 --start 2026-10-26",
- "start": "2026-10-26",
+ "generated": "bun scripts/plan/forecast.ts --report schedule --runs 2000 --seed 6 --start 2026-10-21 --remaining U-118=0.5 --scenarios \"Push: 20 h this week, then 12.5 h|Plan, Dave 12.5 h\" --out docs/plan/roadmap/schedule.json",
+ "start": "2026-10-21",
  "deadline": "2026-12-01",
  "runs": 2000,
  "sprints": [
@@ -8,151 +8,116 @@
    "sprint": 1,
    "startDay": 0,
    "endDay": 10,
-   "startDate": "2026-10-26",
-   "endDate": "2026-11-06"
+   "startDate": "2026-10-21",
+   "endDate": "2026-11-03"
   },
   {
    "sprint": 2,
    "startDay": 10,
    "endDay": 20,
-   "startDate": "2026-11-09",
-   "endDate": "2026-11-20"
+   "startDate": "2026-11-04",
+   "endDate": "2026-11-17"
   },
   {
    "sprint": 3,
    "startDay": 20,
    "endDay": 30,
-   "startDate": "2026-11-23",
-   "endDate": "2026-12-08"
+   "startDate": "2026-11-18",
+   "endDate": "2026-12-03"
   },
   {
    "sprint": 4,
    "startDay": 30,
    "endDay": 40,
-   "startDate": "2026-12-09",
-   "endDate": "2026-12-22"
+   "startDate": "2026-12-04",
+   "endDate": "2026-12-17"
   },
   {
    "sprint": 5,
    "startDay": 40,
    "endDay": 50,
-   "startDate": "2026-12-23",
-   "endDate": "2027-01-11"
+   "startDate": "2026-12-18",
+   "endDate": "2027-01-06"
   },
   {
    "sprint": 6,
    "startDay": 50,
    "endDay": 60,
-   "startDate": "2027-01-12",
-   "endDate": "2027-01-25"
+   "startDate": "2027-01-07",
+   "endDate": "2027-01-20"
   },
   {
    "sprint": 7,
    "startDay": 60,
    "endDay": 70,
-   "startDate": "2027-01-26",
-   "endDate": "2027-02-08"
+   "startDate": "2027-01-21",
+   "endDate": "2027-02-03"
   },
   {
    "sprint": 8,
    "startDay": 70,
    "endDay": 80,
-   "startDate": "2027-02-09",
-   "endDate": "2027-02-22"
+   "startDate": "2027-02-04",
+   "endDate": "2027-02-17"
   },
   {
    "sprint": 9,
    "startDay": 80,
    "endDay": 90,
-   "startDate": "2027-02-23",
-   "endDate": "2027-03-08"
+   "startDate": "2027-02-18",
+   "endDate": "2027-03-03"
   },
   {
    "sprint": 10,
    "startDay": 90,
    "endDay": 100,
-   "startDate": "2027-03-09",
-   "endDate": "2027-03-22"
+   "startDate": "2027-03-04",
+   "endDate": "2027-03-17"
   },
   {
    "sprint": 11,
    "startDay": 100,
    "endDay": 110,
-   "startDate": "2027-03-23",
-   "endDate": "2027-04-05"
+   "startDate": "2027-03-18",
+   "endDate": "2027-03-31"
   },
   {
    "sprint": 12,
    "startDay": 110,
    "endDay": 120,
-   "startDate": "2027-04-06",
-   "endDate": "2027-04-19"
+   "startDate": "2027-04-01",
+   "endDate": "2027-04-14"
   },
   {
    "sprint": 13,
    "startDay": 120,
    "endDay": 130,
-   "startDate": "2027-04-20",
-   "endDate": "2027-05-03"
-  },
-  {
-   "sprint": 14,
-   "startDay": 130,
-   "endDay": 140,
-   "startDate": "2027-05-04",
-   "endDate": "2027-05-17"
-  },
-  {
-   "sprint": 15,
-   "startDay": 140,
-   "endDay": 150,
-   "startDate": "2027-05-18",
-   "endDate": "2027-05-31"
-  },
-  {
-   "sprint": 16,
-   "startDay": 150,
-   "endDay": 160,
-   "startDate": "2027-06-01",
-   "endDate": "2027-06-14"
-  },
-  {
-   "sprint": 17,
-   "startDay": 160,
-   "endDay": 170,
-   "startDate": "2027-06-15",
-   "endDate": "2027-06-28"
-  },
-  {
-   "sprint": 18,
-   "startDay": 170,
-   "endDay": 180,
-   "startDate": "2027-06-29",
-   "endDate": "2027-07-12"
+   "startDate": "2027-04-15",
+   "endDate": "2027-04-28"
   }
  ],
  "floor": {
   "weeks": {
-   "p10": 6.4,
-   "p50": 7.5,
-   "p90": 8.8
+   "p10": 6.1,
+   "p50": 7.1,
+   "p90": 8.4
   },
   "dates": {
-   "p10": "2026-12-14",
-   "p50": "2026-12-21",
-   "p90": "2027-01-05"
+   "p10": "2026-12-07",
+   "p50": "2026-12-14",
+   "p90": "2026-12-22"
   }
  },
  "prototypeFloor": {
   "weeks": {
-   "p10": 2.8,
-   "p50": 3.3,
-   "p90": 4
+   "p10": 2.5,
+   "p50": 3,
+   "p90": 3.6
   },
   "dates": {
-   "p10": "2026-11-13",
-   "p50": "2026-11-18",
-   "p90": "2026-11-24"
+   "p10": "2026-11-09",
+   "p50": "2026-11-11",
+   "p90": "2026-11-16"
   }
  },
  "units": [
@@ -2497,45 +2462,44 @@
  ],
  "scenarios": [
   {
-   "name": "Plan, Dave 12.5 h",
+   "name": "Push: 20 h this week, then 12.5 h",
    "hoursPerWeek": 12.5,
    "prototype": {
     "weeks": {
-     "p10": 3.9,
-     "p50": 4.6,
-     "p90": 5.5
+     "p10": 3.2,
+     "p50": 3.6,
+     "p90": 4.3
     },
     "dates": {
-     "p10": "2026-11-23",
-     "p50": "2026-11-30",
-     "p90": "2026-12-07"
+     "p10": "2026-11-13",
+     "p50": "2026-11-16",
+     "p90": "2026-11-20"
     }
    },
    "finish": {
     "weeks": {
-     "p10": 15.3,
-     "p50": 17.7,
-     "p90": 20.6
+     "p10": 14.4,
+     "p50": 16.7,
+     "p90": 19.5
     },
     "dates": {
-     "p10": "2027-02-18",
-     "p50": "2027-03-08",
-     "p90": "2027-03-26"
+     "p10": "2027-02-08",
+     "p50": "2027-02-24",
+     "p90": "2027-03-16"
     }
    },
    "peopleHoursByWeek": [
-    12.5,
-    3.8,
-    2.2,
-    11.3,
-    12.5,
+    10.7,
+    1.9,
+    10.7,
     12.5,
     12.5,
     12.5,
     12.5,
     12.5,
     12.5,
-    11.4,
+    12.5,
+    10.3,
     12.5,
     12.5,
     12.5,
@@ -2555,990 +2519,979 @@
     {
      "id": "U-001",
      "builtBy": "agents",
-     "start": 8.4,
-     "end": 9.8,
-     "startDate": "2026-11-06",
-     "endDate": "2026-11-09"
+     "start": 3.7,
+     "end": 5,
+     "startDate": "2026-10-27",
+     "endDate": "2026-10-28"
     },
     {
      "id": "U-118",
      "builtBy": "Dave",
-     "start": 1.9,
-     "end": 8.3,
-     "startDate": "2026-10-28",
-     "endDate": "2026-11-06"
+     "start": 1.2,
+     "end": 3.6,
+     "startDate": "2026-10-23",
+     "endDate": "2026-10-27"
     },
     {
      "id": "U-002",
      "builtBy": "agents",
-     "start": 9.9,
-     "end": 11.2,
-     "startDate": "2026-11-09",
-     "endDate": "2026-11-11"
+     "start": 5.1,
+     "end": 6.4,
+     "startDate": "2026-10-29",
+     "endDate": "2026-10-30"
     },
     {
      "id": "U-003",
      "builtBy": "agents",
-     "start": 9.9,
-     "end": 12.4,
-     "startDate": "2026-11-09",
-     "endDate": "2026-11-12"
+     "start": 5.1,
+     "end": 7.5,
+     "startDate": "2026-10-29",
+     "endDate": "2026-11-02"
     },
     {
      "id": "U-004a",
      "builtBy": "agents",
-     "start": 15.9,
-     "end": 18.4,
-     "startDate": "2026-11-17",
-     "endDate": "2026-11-20"
+     "start": 11.1,
+     "end": 13.6,
+     "startDate": "2026-11-06",
+     "endDate": "2026-11-10"
     },
     {
      "id": "U-004b",
      "builtBy": "agents",
-     "start": 18.5,
-     "end": 22.2,
-     "startDate": "2026-11-20",
-     "endDate": "2026-11-30"
+     "start": 13.8,
+     "end": 17.4,
+     "startDate": "2026-11-10",
+     "endDate": "2026-11-16"
     },
     {
      "id": "U-116",
      "builtBy": "agents",
-     "start": 9.9,
-     "end": 10.5,
-     "startDate": "2026-11-09",
-     "endDate": "2026-11-10"
+     "start": 5.1,
+     "end": 5.7,
+     "startDate": "2026-10-29",
+     "endDate": "2026-10-29"
     },
     {
      "id": "U-117",
      "builtBy": "agents",
-     "start": 11.3,
-     "end": 12.2,
-     "startDate": "2026-11-11",
-     "endDate": "2026-11-12"
+     "start": 6.5,
+     "end": 7.4,
+     "startDate": "2026-10-30",
+     "endDate": "2026-11-02"
     },
     {
      "id": "U-005",
      "builtBy": "agents",
-     "start": 12.5,
-     "end": 16.8,
-     "startDate": "2026-11-12",
-     "endDate": "2026-11-18"
+     "start": 7.6,
+     "end": 11.8,
+     "startDate": "2026-11-02",
+     "endDate": "2026-11-06"
     },
     {
      "id": "U-006",
      "builtBy": "agents",
-     "start": 12.6,
-     "end": 14.6,
-     "startDate": "2026-11-12",
-     "endDate": "2026-11-16"
+     "start": 7.8,
+     "end": 9.7,
+     "startDate": "2026-11-02",
+     "endDate": "2026-11-04"
     },
     {
      "id": "U-007",
      "builtBy": "agents",
-     "start": 11.3,
-     "end": 12.9,
-     "startDate": "2026-11-11",
-     "endDate": "2026-11-12"
+     "start": 6.5,
+     "end": 8.2,
+     "startDate": "2026-10-30",
+     "endDate": "2026-11-03"
     },
     {
      "id": "U-008a",
      "builtBy": "agents",
-     "start": 11.3,
-     "end": 12.8,
-     "startDate": "2026-11-11",
-     "endDate": "2026-11-12"
+     "start": 6.5,
+     "end": 7.9,
+     "startDate": "2026-10-30",
+     "endDate": "2026-11-02"
     },
     {
      "id": "U-008b",
      "builtBy": "agents",
-     "start": 12.8,
-     "end": 14.7,
-     "startDate": "2026-11-12",
-     "endDate": "2026-11-16"
+     "start": 8,
+     "end": 9.9,
+     "startDate": "2026-11-02",
+     "endDate": "2026-11-04"
     },
     {
      "id": "U-009",
      "builtBy": "agents",
-     "start": 11.3,
-     "end": 12.7,
-     "startDate": "2026-11-11",
-     "endDate": "2026-11-12"
+     "start": 6.5,
+     "end": 7.9,
+     "startDate": "2026-10-30",
+     "endDate": "2026-11-02"
     },
     {
      "id": "U-010",
      "builtBy": "agents",
-     "start": 15.2,
-     "end": 16.9,
-     "startDate": "2026-11-17",
-     "endDate": "2026-11-18"
+     "start": 10.6,
+     "end": 12.3,
+     "startDate": "2026-11-05",
+     "endDate": "2026-11-09"
     },
     {
      "id": "U-011",
      "builtBy": "agents",
-     "start": 12.5,
-     "end": 14.7,
-     "startDate": "2026-11-12",
-     "endDate": "2026-11-16"
+     "start": 7.6,
+     "end": 9.9,
+     "startDate": "2026-11-02",
+     "endDate": "2026-11-04"
     },
     {
      "id": "U-012",
      "builtBy": "agents",
-     "start": 14.8,
-     "end": 17,
-     "startDate": "2026-11-16",
-     "endDate": "2026-11-18"
+     "start": 10,
+     "end": 12.1,
+     "startDate": "2026-11-04",
+     "endDate": "2026-11-09"
     },
     {
      "id": "U-111",
      "builtBy": "agents",
-     "start": 14.9,
-     "end": 16.2,
-     "startDate": "2026-11-16",
-     "endDate": "2026-11-18"
+     "start": 10.1,
+     "end": 11.4,
+     "startDate": "2026-11-05",
+     "endDate": "2026-11-06"
     },
     {
      "id": "U-014a",
      "builtBy": "Dave",
-     "start": 17.6,
-     "end": 30.9,
-     "startDate": "2026-11-19",
-     "endDate": "2026-12-10"
+     "start": 12.5,
+     "end": 26,
+     "startDate": "2026-11-09",
+     "endDate": "2026-11-30"
     },
     {
      "id": "U-014b",
      "builtBy": "agents",
-     "start": 31.2,
-     "end": 33.8,
-     "startDate": "2026-12-11",
-     "endDate": "2026-12-15"
+     "start": 26.2,
+     "end": 28.8,
+     "startDate": "2026-12-01",
+     "endDate": "2026-12-03"
     },
     {
      "id": "U-015",
      "builtBy": "agents",
-     "start": 18.1,
-     "end": 21.5,
-     "startDate": "2026-11-20",
-     "endDate": "2026-11-25"
+     "start": 13.1,
+     "end": 16.7,
+     "startDate": "2026-11-10",
+     "endDate": "2026-11-13"
     },
     {
      "id": "U-016",
      "builtBy": "Dave",
-     "start": 29.1,
-     "end": 38.6,
-     "startDate": "2026-12-09",
-     "endDate": "2026-12-22"
+     "start": 24.1,
+     "end": 33.6,
+     "startDate": "2026-11-25",
+     "endDate": "2026-12-10"
     },
     {
      "id": "U-017",
      "builtBy": "agents",
-     "start": 21.8,
-     "end": 23.5,
-     "startDate": "2026-11-25",
-     "endDate": "2026-12-01"
+     "start": 16.9,
+     "end": 18.6,
+     "startDate": "2026-11-13",
+     "endDate": "2026-11-17"
     },
     {
      "id": "U-018",
      "builtBy": "agents",
-     "start": 14.9,
-     "end": 16.4,
-     "startDate": "2026-11-16",
-     "endDate": "2026-11-18"
+     "start": 10,
+     "end": 11.6,
+     "startDate": "2026-11-04",
+     "endDate": "2026-11-06"
     },
     {
      "id": "U-019",
      "builtBy": "agents",
-     "start": 16,
-     "end": 17.9,
-     "startDate": "2026-11-17",
-     "endDate": "2026-11-19"
+     "start": 11.1,
+     "end": 13,
+     "startDate": "2026-11-06",
+     "endDate": "2026-11-09"
     },
     {
      "id": "U-020",
      "builtBy": "agents",
-     "start": 17.1,
-     "end": 18.2,
-     "startDate": "2026-11-19",
-     "endDate": "2026-11-20"
-    },
-    {
-     "id": "U-021a",
-     "builtBy": "agents",
-     "start": 17.3,
-     "end": 19.5,
-     "startDate": "2026-11-19",
-     "endDate": "2026-11-23"
-    },
-    {
-     "id": "U-021b",
-     "builtBy": "agents",
-     "start": 20.6,
-     "end": 27.7,
-     "startDate": "2026-11-24",
-     "endDate": "2026-12-07"
-    },
-    {
-     "id": "U-022",
-     "builtBy": "agents",
-     "start": 22.7,
-     "end": 24.5,
-     "startDate": "2026-11-30",
-     "endDate": "2026-12-02"
-    },
-    {
-     "id": "U-023",
-     "builtBy": "agents",
-     "start": 9.9,
-     "end": 11.7,
-     "startDate": "2026-11-09",
-     "endDate": "2026-11-11"
-    },
-    {
-     "id": "U-024",
-     "builtBy": "agents",
-     "start": 11.8,
-     "end": 15.4,
-     "startDate": "2026-11-11",
-     "endDate": "2026-11-17"
-    },
-    {
-     "id": "U-025",
-     "builtBy": "agents",
-     "start": 15.5,
-     "end": 17.5,
-     "startDate": "2026-11-17",
-     "endDate": "2026-11-19"
-    },
-    {
-     "id": "U-026",
-     "builtBy": "agents",
-     "start": 15.9,
-     "end": 18.4,
-     "startDate": "2026-11-17",
-     "endDate": "2026-11-20"
-    },
-    {
-     "id": "U-027",
-     "builtBy": "agents",
-     "start": 18.5,
-     "end": 19.9,
-     "startDate": "2026-11-20",
-     "endDate": "2026-11-23"
-    },
-    {
-     "id": "U-029",
-     "builtBy": "agents",
-     "start": 22.9,
-     "end": 26.3,
-     "startDate": "2026-11-30",
-     "endDate": "2026-12-04"
-    },
-    {
-     "id": "U-030",
-     "builtBy": "agents",
-     "start": 19.1,
-     "end": 21.6,
-     "startDate": "2026-11-23",
-     "endDate": "2026-11-25"
-    },
-    {
-     "id": "U-031",
-     "builtBy": "agents",
-     "start": 18.8,
-     "end": 22.6,
-     "startDate": "2026-11-20",
-     "endDate": "2026-11-30"
-    },
-    {
-     "id": "U-032",
-     "builtBy": "agents",
-     "start": 27.1,
-     "end": 28.3,
-     "startDate": "2026-12-07",
-     "endDate": "2026-12-08"
-    },
-    {
-     "id": "U-035",
-     "builtBy": "agents",
-     "start": 22.7,
-     "end": 23.8,
-     "startDate": "2026-11-30",
-     "endDate": "2026-12-01"
-    },
-    {
-     "id": "U-036",
-     "builtBy": "agents",
-     "start": 23.4,
-     "end": 24.9,
-     "startDate": "2026-12-01",
-     "endDate": "2026-12-02"
-    },
-    {
-     "id": "U-037",
-     "builtBy": "agents",
-     "start": 18.7,
-     "end": 19.5,
-     "startDate": "2026-11-20",
-     "endDate": "2026-11-23"
-    },
-    {
-     "id": "U-038",
-     "builtBy": "agents",
-     "start": 18.3,
-     "end": 21.7,
-     "startDate": "2026-11-20",
-     "endDate": "2026-11-25"
-    },
-    {
-     "id": "U-039",
-     "builtBy": "agents",
-     "start": 18,
-     "end": 20.6,
-     "startDate": "2026-11-19",
-     "endDate": "2026-11-24"
-    },
-    {
-     "id": "U-040",
-     "builtBy": "agents",
-     "start": 33.9,
-     "end": 35.7,
-     "startDate": "2026-12-15",
-     "endDate": "2026-12-17"
-    },
-    {
-     "id": "U-041",
-     "builtBy": "agents",
-     "start": 35.8,
-     "end": 39.4,
-     "startDate": "2026-12-17",
-     "endDate": "2026-12-23"
-    },
-    {
-     "id": "U-045a",
-     "builtBy": "agents",
-     "start": 12.5,
-     "end": 15.6,
-     "startDate": "2026-11-12",
-     "endDate": "2026-11-17"
-    },
-    {
-     "id": "U-045b",
-     "builtBy": "agents",
-     "start": 16,
-     "end": 17.9,
-     "startDate": "2026-11-17",
-     "endDate": "2026-11-19"
-    },
-    {
-     "id": "U-047a",
-     "builtBy": "Dave",
-     "start": 41.8,
-     "end": 50.7,
-     "startDate": "2026-12-29",
-     "endDate": "2027-01-13"
-    },
-    {
-     "id": "U-047b",
-     "builtBy": "agents",
-     "start": 50.8,
-     "end": 54.6,
-     "startDate": "2027-01-13",
-     "endDate": "2027-01-19"
-    },
-    {
-     "id": "U-048",
-     "builtBy": "Dave",
-     "start": 36.8,
-     "end": 43.6,
-     "startDate": "2026-12-18",
-     "endDate": "2027-01-04"
-    },
-    {
-     "id": "U-049",
-     "builtBy": "Dave",
-     "start": 48.3,
-     "end": 59,
-     "startDate": "2027-01-11",
-     "endDate": "2027-01-25"
-    },
-    {
-     "id": "U-109",
-     "builtBy": "agents",
-     "start": 59.1,
-     "end": 61.9,
-     "startDate": "2027-01-26",
-     "endDate": "2027-01-28"
-    },
-    {
-     "id": "U-106",
-     "builtBy": "agents",
-     "start": 43.7,
-     "end": 45.6,
-     "startDate": "2027-01-04",
-     "endDate": "2027-01-06"
-    },
-    {
-     "id": "U-050",
-     "builtBy": "agents",
-     "start": 59.1,
-     "end": 61.1,
-     "startDate": "2027-01-26",
-     "endDate": "2027-01-28"
-    },
-    {
-     "id": "U-051",
-     "builtBy": "agents",
-     "start": 61.2,
-     "end": 63.1,
-     "startDate": "2027-01-28",
-     "endDate": "2027-02-01"
-    },
-    {
-     "id": "U-052",
-     "builtBy": "agents",
-     "start": 63.9,
-     "end": 69,
-     "startDate": "2027-02-01",
-     "endDate": "2027-02-08"
-    },
-    {
-     "id": "U-053",
-     "builtBy": "agents",
-     "start": 54.8,
-     "end": 56.3,
-     "startDate": "2027-01-19",
-     "endDate": "2027-01-21"
-    },
-    {
-     "id": "U-054",
-     "builtBy": "agents",
-     "start": 21.7,
-     "end": 23.5,
-     "startDate": "2026-11-25",
-     "endDate": "2026-12-01"
-    },
-    {
-     "id": "U-055",
-     "builtBy": "agents",
-     "start": 59.1,
-     "end": 62.8,
-     "startDate": "2027-01-26",
-     "endDate": "2027-01-29"
-    },
-    {
-     "id": "U-056",
-     "builtBy": "agents",
-     "start": 43.8,
-     "end": 47.4,
-     "startDate": "2027-01-04",
-     "endDate": "2027-01-08"
-    },
-    {
-     "id": "U-058",
-     "builtBy": "agents",
-     "start": 26.3,
-     "end": 28.1,
-     "startDate": "2026-12-04",
-     "endDate": "2026-12-08"
-    },
-    {
-     "id": "U-059",
-     "builtBy": "agents",
-     "start": 47.5,
-     "end": 51.3,
-     "startDate": "2027-01-08",
-     "endDate": "2027-01-14"
-    },
-    {
-     "id": "U-060",
-     "builtBy": "agents",
-     "start": 23.7,
-     "end": 26.5,
-     "startDate": "2026-12-01",
-     "endDate": "2026-12-04"
-    },
-    {
-     "id": "U-062a",
-     "builtBy": "agents",
-     "start": 59.2,
-     "end": 62.5,
-     "startDate": "2027-01-26",
-     "endDate": "2027-01-29"
-    },
-    {
-     "id": "U-062b",
-     "builtBy": "agents",
-     "start": 65,
-     "end": 69.6,
-     "startDate": "2027-02-02",
-     "endDate": "2027-02-09"
-    },
-    {
-     "id": "U-063",
-     "builtBy": "agents",
-     "start": 23.6,
-     "end": 26.5,
-     "startDate": "2026-12-01",
-     "endDate": "2026-12-04"
-    },
-    {
-     "id": "U-064a",
-     "builtBy": "agents",
-     "start": 59.1,
-     "end": 62.5,
-     "startDate": "2027-01-26",
-     "endDate": "2027-01-29"
-    },
-    {
-     "id": "U-064b",
-     "builtBy": "agents",
-     "start": 63.6,
-     "end": 67.8,
-     "startDate": "2027-02-01",
-     "endDate": "2027-02-05"
-    },
-    {
-     "id": "U-065a",
-     "builtBy": "agents",
-     "start": 62.6,
-     "end": 67.9,
-     "startDate": "2027-01-29",
-     "endDate": "2027-02-05"
-    },
-    {
-     "id": "U-065b",
-     "builtBy": "agents",
-     "start": 68.6,
-     "end": 72.7,
-     "startDate": "2027-02-08",
-     "endDate": "2027-02-12"
-    },
-    {
-     "id": "U-066a",
-     "builtBy": "agents",
-     "start": 63.1,
-     "end": 66.8,
-     "startDate": "2027-02-01",
-     "endDate": "2027-02-04"
-    },
-    {
-     "id": "U-066b",
-     "builtBy": "agents",
-     "start": 64.4,
-     "end": 69.3,
-     "startDate": "2027-02-02",
-     "endDate": "2027-02-09"
-    },
-    {
-     "id": "U-067",
-     "builtBy": "agents",
-     "start": 19.2,
-     "end": 21.6,
-     "startDate": "2026-11-23",
-     "endDate": "2026-11-25"
-    },
-    {
-     "id": "U-068",
-     "builtBy": "agents",
-     "start": 31.2,
-     "end": 34.2,
-     "startDate": "2026-12-11",
-     "endDate": "2026-12-16"
-    },
-    {
-     "id": "U-069",
-     "builtBy": "agents",
-     "start": 60.1,
-     "end": 61.4,
-     "startDate": "2027-01-27",
-     "endDate": "2027-01-28"
-    },
-    {
-     "id": "U-070",
-     "builtBy": "agents",
-     "start": 51.4,
-     "end": 53.4,
-     "startDate": "2027-01-14",
-     "endDate": "2027-01-18"
-    },
-    {
-     "id": "U-071",
-     "builtBy": "agents",
-     "start": 66.4,
-     "end": 69.6,
-     "startDate": "2027-02-04",
-     "endDate": "2027-02-09"
-    },
-    {
-     "id": "U-073",
-     "builtBy": "agents",
-     "start": 22.4,
-     "end": 25.9,
-     "startDate": "2026-11-30",
-     "endDate": "2026-12-03"
-    },
-    {
-     "id": "U-112",
-     "builtBy": "agents",
-     "start": 26.7,
-     "end": 29.2,
-     "startDate": "2026-12-04",
-     "endDate": "2026-12-09"
-    },
-    {
-     "id": "U-074a",
-     "builtBy": "agents",
-     "start": 26,
-     "end": 27.6,
-     "startDate": "2026-12-03",
-     "endDate": "2026-12-07"
-    },
-    {
-     "id": "U-074b",
-     "builtBy": "agents",
-     "start": 27.7,
-     "end": 31.7,
-     "startDate": "2026-12-07",
-     "endDate": "2026-12-11"
-    },
-    {
-     "id": "U-074c",
-     "builtBy": "agents",
-     "start": 31.8,
-     "end": 36.2,
-     "startDate": "2026-12-11",
-     "endDate": "2026-12-18"
-    },
-    {
-     "id": "U-075",
-     "builtBy": "agents",
-     "start": 31.9,
-     "end": 33.7,
-     "startDate": "2026-12-11",
-     "endDate": "2026-12-15"
-    },
-    {
-     "id": "U-076a",
-     "builtBy": "agents",
-     "start": 26.4,
-     "end": 28.2,
-     "startDate": "2026-12-04",
-     "endDate": "2026-12-08"
-    },
-    {
-     "id": "U-076b",
-     "builtBy": "agents",
-     "start": 29,
-     "end": 31.3,
-     "startDate": "2026-12-08",
-     "endDate": "2026-12-11"
-    },
-    {
-     "id": "U-076c",
-     "builtBy": "agents",
-     "start": 28.8,
-     "end": 31.2,
-     "startDate": "2026-12-08",
-     "endDate": "2026-12-11"
-    },
-    {
-     "id": "U-077",
-     "builtBy": "agents",
-     "start": 63.9,
-     "end": 69,
-     "startDate": "2027-02-01",
-     "endDate": "2027-02-08"
-    },
-    {
-     "id": "U-113",
-     "builtBy": "agents",
-     "start": 68.2,
-     "end": 72.5,
-     "startDate": "2027-02-08",
-     "endDate": "2027-02-12"
-    },
-    {
-     "id": "U-108",
-     "builtBy": "agents",
-     "start": 51.4,
-     "end": 54.7,
-     "startDate": "2027-01-14",
-     "endDate": "2027-01-19"
-    },
-    {
-     "id": "U-078",
-     "builtBy": "agents",
-     "start": 27.6,
-     "end": 29.6,
-     "startDate": "2026-12-07",
-     "endDate": "2026-12-09"
-    },
-    {
-     "id": "U-079a",
-     "builtBy": "agents",
-     "start": 59.1,
-     "end": 62.7,
-     "startDate": "2027-01-26",
-     "endDate": "2027-01-29"
-    },
-    {
-     "id": "U-079b",
-     "builtBy": "agents",
-     "start": 43.8,
-     "end": 47.3,
-     "startDate": "2027-01-04",
-     "endDate": "2027-01-08"
-    },
-    {
-     "id": "U-080",
-     "builtBy": "agents",
-     "start": 68.5,
-     "end": 72.3,
-     "startDate": "2027-02-08",
-     "endDate": "2027-02-12"
-    },
-    {
-     "id": "U-083a",
-     "builtBy": "agents",
-     "start": 28.6,
-     "end": 29.4,
-     "startDate": "2026-12-08",
-     "endDate": "2026-12-09"
-    },
-    {
-     "id": "U-084",
-     "builtBy": "agents",
-     "start": 27.2,
-     "end": 29.4,
-     "startDate": "2026-12-07",
-     "endDate": "2026-12-09"
-    },
-    {
-     "id": "U-085",
-     "builtBy": "agents",
-     "start": 27.1,
-     "end": 29.7,
-     "startDate": "2026-12-07",
-     "endDate": "2026-12-09"
-    },
-    {
-     "id": "U-086",
-     "builtBy": "agents",
-     "start": 59.1,
-     "end": 61.5,
-     "startDate": "2027-01-26",
-     "endDate": "2027-01-28"
-    },
-    {
-     "id": "U-087",
-     "builtBy": "agents",
-     "start": 61.8,
-     "end": 63.3,
-     "startDate": "2027-01-28",
-     "endDate": "2027-02-01"
-    },
-    {
-     "id": "U-088",
-     "builtBy": "agents",
-     "start": 66.1,
-     "end": 69.5,
-     "startDate": "2027-02-04",
-     "endDate": "2027-02-09"
-    },
-    {
-     "id": "U-089",
-     "builtBy": "agents",
-     "start": 64.6,
-     "end": 66.9,
-     "startDate": "2027-02-02",
-     "endDate": "2027-02-04"
-    },
-    {
-     "id": "U-091",
-     "builtBy": "agents",
-     "start": 16.8,
-     "end": 18.4,
-     "startDate": "2026-11-18",
-     "endDate": "2026-11-20"
-    },
-    {
-     "id": "U-092",
-     "builtBy": "agents",
-     "start": 23.9,
-     "end": 26.2,
-     "startDate": "2026-12-01",
-     "endDate": "2026-12-04"
-    },
-    {
-     "id": "U-093",
-     "builtBy": "agents",
-     "start": 19.9,
-     "end": 23.8,
-     "startDate": "2026-11-23",
-     "endDate": "2026-12-01"
-    },
-    {
-     "id": "U-095",
-     "builtBy": "agents",
-     "start": 24,
-     "end": 27.9,
-     "startDate": "2026-12-01",
-     "endDate": "2026-12-07"
-    },
-    {
-     "id": "U-096",
-     "builtBy": "agents",
-     "start": 63.2,
-     "end": 69.5,
-     "startDate": "2027-02-01",
-     "endDate": "2027-02-09"
-    },
-    {
-     "id": "U-097",
-     "builtBy": "agents",
-     "start": 68.5,
-     "end": 73.2,
-     "startDate": "2027-02-08",
-     "endDate": "2027-02-15"
-    },
-    {
-     "id": "U-114",
-     "builtBy": "agents",
-     "start": 62.9,
-     "end": 68,
-     "startDate": "2027-01-29",
-     "endDate": "2027-02-05"
-    },
-    {
-     "id": "U-098",
-     "builtBy": "agents",
-     "start": 19,
-     "end": 22.1,
-     "startDate": "2026-11-20",
-     "endDate": "2026-11-30"
-    },
-    {
-     "id": "U-099",
-     "builtBy": "agents",
-     "start": 68.9,
-     "end": 74.1,
-     "startDate": "2027-02-08",
-     "endDate": "2027-02-16"
-    },
-    {
-     "id": "U-115",
-     "builtBy": "agents",
-     "start": 69.8,
-     "end": 75.8,
-     "startDate": "2027-02-09",
-     "endDate": "2027-02-17"
-    },
-    {
-     "id": "U-100",
-     "builtBy": "Dave",
-     "start": 63.8,
-     "end": 79.9,
-     "startDate": "2027-02-01",
-     "endDate": "2027-02-23"
-    },
-    {
-     "id": "U-101",
-     "builtBy": "Dave",
-     "start": 78.1,
-     "end": 83.9,
-     "startDate": "2027-02-22",
-     "endDate": "2027-03-01"
-    },
-    {
-     "id": "U-102",
-     "builtBy": "agents",
-     "start": 9.9,
-     "end": 10.6,
+     "start": 12.2,
+     "end": 13.2,
      "startDate": "2026-11-09",
      "endDate": "2026-11-10"
     },
     {
+     "id": "U-021a",
+     "builtBy": "agents",
+     "start": 12.4,
+     "end": 14.6,
+     "startDate": "2026-11-09",
+     "endDate": "2026-11-11"
+    },
+    {
+     "id": "U-021b",
+     "builtBy": "agents",
+     "start": 15.9,
+     "end": 22.9,
+     "startDate": "2026-11-12",
+     "endDate": "2026-11-23"
+    },
+    {
+     "id": "U-022",
+     "builtBy": "agents",
+     "start": 17.8,
+     "end": 19.5,
+     "startDate": "2026-11-16",
+     "endDate": "2026-11-18"
+    },
+    {
+     "id": "U-023",
+     "builtBy": "agents",
+     "start": 5.1,
+     "end": 7,
+     "startDate": "2026-10-29",
+     "endDate": "2026-10-30"
+    },
+    {
+     "id": "U-024",
+     "builtBy": "agents",
+     "start": 7.1,
+     "end": 10.6,
+     "startDate": "2026-11-02",
+     "endDate": "2026-11-05"
+    },
+    {
+     "id": "U-025",
+     "builtBy": "agents",
+     "start": 10.7,
+     "end": 12.7,
+     "startDate": "2026-11-05",
+     "endDate": "2026-11-09"
+    },
+    {
+     "id": "U-026",
+     "builtBy": "agents",
+     "start": 11.1,
+     "end": 13.5,
+     "startDate": "2026-11-06",
+     "endDate": "2026-11-10"
+    },
+    {
+     "id": "U-027",
+     "builtBy": "agents",
+     "start": 13.7,
+     "end": 15,
+     "startDate": "2026-11-10",
+     "endDate": "2026-11-11"
+    },
+    {
+     "id": "U-029",
+     "builtBy": "agents",
+     "start": 18.1,
+     "end": 21.4,
+     "startDate": "2026-11-17",
+     "endDate": "2026-11-20"
+    },
+    {
+     "id": "U-030",
+     "builtBy": "agents",
+     "start": 14.3,
+     "end": 16.7,
+     "startDate": "2026-11-11",
+     "endDate": "2026-11-13"
+    },
+    {
+     "id": "U-031",
+     "builtBy": "agents",
+     "start": 14,
+     "end": 17.7,
+     "startDate": "2026-11-10",
+     "endDate": "2026-11-16"
+    },
+    {
+     "id": "U-032",
+     "builtBy": "agents",
+     "start": 22.2,
+     "end": 23.4,
+     "startDate": "2026-11-23",
+     "endDate": "2026-11-24"
+    },
+    {
+     "id": "U-035",
+     "builtBy": "agents",
+     "start": 17.8,
+     "end": 18.9,
+     "startDate": "2026-11-16",
+     "endDate": "2026-11-17"
+    },
+    {
+     "id": "U-036",
+     "builtBy": "agents",
+     "start": 18.4,
+     "end": 19.8,
+     "startDate": "2026-11-17",
+     "endDate": "2026-11-18"
+    },
+    {
+     "id": "U-037",
+     "builtBy": "agents",
+     "start": 13.8,
+     "end": 14.5,
+     "startDate": "2026-11-10",
+     "endDate": "2026-11-11"
+    },
+    {
+     "id": "U-038",
+     "builtBy": "agents",
+     "start": 13.4,
+     "end": 16.8,
+     "startDate": "2026-11-10",
+     "endDate": "2026-11-13"
+    },
+    {
+     "id": "U-039",
+     "builtBy": "agents",
+     "start": 13.2,
+     "end": 15.7,
+     "startDate": "2026-11-10",
+     "endDate": "2026-11-12"
+    },
+    {
+     "id": "U-040",
+     "builtBy": "agents",
+     "start": 28.9,
+     "end": 30.7,
+     "startDate": "2026-12-03",
+     "endDate": "2026-12-07"
+    },
+    {
+     "id": "U-041",
+     "builtBy": "agents",
+     "start": 30.8,
+     "end": 34.3,
+     "startDate": "2026-12-07",
+     "endDate": "2026-12-11"
+    },
+    {
+     "id": "U-045a",
+     "builtBy": "agents",
+     "start": 7.6,
+     "end": 10.8,
+     "startDate": "2026-11-02",
+     "endDate": "2026-11-05"
+    },
+    {
+     "id": "U-045b",
+     "builtBy": "agents",
+     "start": 11.2,
+     "end": 13,
+     "startDate": "2026-11-06",
+     "endDate": "2026-11-09"
+    },
+    {
+     "id": "U-047a",
+     "builtBy": "Dave",
+     "start": 36.9,
+     "end": 45.7,
+     "startDate": "2026-12-15",
+     "endDate": "2026-12-30"
+    },
+    {
+     "id": "U-047b",
+     "builtBy": "agents",
+     "start": 45.8,
+     "end": 49.6,
+     "startDate": "2026-12-30",
+     "endDate": "2027-01-07"
+    },
+    {
+     "id": "U-048",
+     "builtBy": "Dave",
+     "start": 31.8,
+     "end": 38.7,
+     "startDate": "2026-12-08",
+     "endDate": "2026-12-17"
+    },
+    {
+     "id": "U-049",
+     "builtBy": "Dave",
+     "start": 43.2,
+     "end": 54.1,
+     "startDate": "2026-12-28",
+     "endDate": "2027-01-14"
+    },
+    {
+     "id": "U-109",
+     "builtBy": "agents",
+     "start": 54.2,
+     "end": 57,
+     "startDate": "2027-01-14",
+     "endDate": "2027-01-18"
+    },
+    {
+     "id": "U-106",
+     "builtBy": "agents",
+     "start": 38.8,
+     "end": 40.7,
+     "startDate": "2026-12-17",
+     "endDate": "2026-12-21"
+    },
+    {
+     "id": "U-050",
+     "builtBy": "agents",
+     "start": 54.2,
+     "end": 56.1,
+     "startDate": "2027-01-14",
+     "endDate": "2027-01-18"
+    },
+    {
+     "id": "U-051",
+     "builtBy": "agents",
+     "start": 56.2,
+     "end": 58.1,
+     "startDate": "2027-01-18",
+     "endDate": "2027-01-20"
+    },
+    {
+     "id": "U-052",
+     "builtBy": "agents",
+     "start": 58.9,
+     "end": 64,
+     "startDate": "2027-01-20",
+     "endDate": "2027-01-27"
+    },
+    {
+     "id": "U-053",
+     "builtBy": "agents",
+     "start": 49.9,
+     "end": 51.4,
+     "startDate": "2027-01-07",
+     "endDate": "2027-01-11"
+    },
+    {
+     "id": "U-054",
+     "builtBy": "agents",
+     "start": 16.8,
+     "end": 18.7,
+     "startDate": "2026-11-13",
+     "endDate": "2026-11-17"
+    },
+    {
+     "id": "U-055",
+     "builtBy": "agents",
+     "start": 54.2,
+     "end": 57.8,
+     "startDate": "2027-01-14",
+     "endDate": "2027-01-19"
+    },
+    {
+     "id": "U-056",
+     "builtBy": "agents",
+     "start": 38.8,
+     "end": 42.4,
+     "startDate": "2026-12-17",
+     "endDate": "2026-12-23"
+    },
+    {
+     "id": "U-058",
+     "builtBy": "agents",
+     "start": 21.3,
+     "end": 23.3,
+     "startDate": "2026-11-20",
+     "endDate": "2026-11-24"
+    },
+    {
+     "id": "U-059",
+     "builtBy": "agents",
+     "start": 42.5,
+     "end": 46.3,
+     "startDate": "2026-12-23",
+     "endDate": "2027-01-04"
+    },
+    {
+     "id": "U-060",
+     "builtBy": "agents",
+     "start": 18.8,
+     "end": 21.6,
+     "startDate": "2026-11-17",
+     "endDate": "2026-11-20"
+    },
+    {
+     "id": "U-062a",
+     "builtBy": "agents",
+     "start": 54.2,
+     "end": 57.5,
+     "startDate": "2027-01-14",
+     "endDate": "2027-01-19"
+    },
+    {
+     "id": "U-062b",
+     "builtBy": "agents",
+     "start": 59.9,
+     "end": 64.5,
+     "startDate": "2027-01-21",
+     "endDate": "2027-01-28"
+    },
+    {
+     "id": "U-063",
+     "builtBy": "agents",
+     "start": 18.7,
+     "end": 21.5,
+     "startDate": "2026-11-17",
+     "endDate": "2026-11-20"
+    },
+    {
+     "id": "U-064a",
+     "builtBy": "agents",
+     "start": 54.2,
+     "end": 57.4,
+     "startDate": "2027-01-14",
+     "endDate": "2027-01-19"
+    },
+    {
+     "id": "U-064b",
+     "builtBy": "agents",
+     "start": 58.7,
+     "end": 62.7,
+     "startDate": "2027-01-20",
+     "endDate": "2027-01-26"
+    },
+    {
+     "id": "U-065a",
+     "builtBy": "agents",
+     "start": 57.5,
+     "end": 62.9,
+     "startDate": "2027-01-19",
+     "endDate": "2027-01-26"
+    },
+    {
+     "id": "U-065b",
+     "builtBy": "agents",
+     "start": 63.6,
+     "end": 67.6,
+     "startDate": "2027-01-27",
+     "endDate": "2027-02-02"
+    },
+    {
+     "id": "U-066a",
+     "builtBy": "agents",
+     "start": 58,
+     "end": 61.6,
+     "startDate": "2027-01-19",
+     "endDate": "2027-01-25"
+    },
+    {
+     "id": "U-066b",
+     "builtBy": "agents",
+     "start": 59.5,
+     "end": 64.2,
+     "startDate": "2027-01-21",
+     "endDate": "2027-01-28"
+    },
+    {
+     "id": "U-067",
+     "builtBy": "agents",
+     "start": 14.4,
+     "end": 16.9,
+     "startDate": "2026-11-11",
+     "endDate": "2026-11-13"
+    },
+    {
+     "id": "U-068",
+     "builtBy": "agents",
+     "start": 26.3,
+     "end": 29.3,
+     "startDate": "2026-12-01",
+     "endDate": "2026-12-04"
+    },
+    {
+     "id": "U-069",
+     "builtBy": "agents",
+     "start": 55.1,
+     "end": 56.2,
+     "startDate": "2027-01-15",
+     "endDate": "2027-01-18"
+    },
+    {
+     "id": "U-070",
+     "builtBy": "agents",
+     "start": 46.4,
+     "end": 48.4,
+     "startDate": "2027-01-04",
+     "endDate": "2027-01-06"
+    },
+    {
+     "id": "U-071",
+     "builtBy": "agents",
+     "start": 61.4,
+     "end": 64.5,
+     "startDate": "2027-01-25",
+     "endDate": "2027-01-28"
+    },
+    {
+     "id": "U-073",
+     "builtBy": "agents",
+     "start": 17.5,
+     "end": 21,
+     "startDate": "2026-11-16",
+     "endDate": "2026-11-19"
+    },
+    {
+     "id": "U-112",
+     "builtBy": "agents",
+     "start": 21.7,
+     "end": 24.3,
+     "startDate": "2026-11-20",
+     "endDate": "2026-11-25"
+    },
+    {
+     "id": "U-074a",
+     "builtBy": "agents",
+     "start": 21.1,
+     "end": 22.7,
+     "startDate": "2026-11-20",
+     "endDate": "2026-11-23"
+    },
+    {
+     "id": "U-074b",
+     "builtBy": "agents",
+     "start": 22.8,
+     "end": 26.8,
+     "startDate": "2026-11-23",
+     "endDate": "2026-12-01"
+    },
+    {
+     "id": "U-074c",
+     "builtBy": "agents",
+     "start": 26.9,
+     "end": 31.2,
+     "startDate": "2026-12-01",
+     "endDate": "2026-12-08"
+    },
+    {
+     "id": "U-075",
+     "builtBy": "agents",
+     "start": 26.9,
+     "end": 28.8,
+     "startDate": "2026-12-01",
+     "endDate": "2026-12-03"
+    },
+    {
+     "id": "U-076a",
+     "builtBy": "agents",
+     "start": 21.4,
+     "end": 23.2,
+     "startDate": "2026-11-20",
+     "endDate": "2026-11-24"
+    },
+    {
+     "id": "U-076b",
+     "builtBy": "agents",
+     "start": 24.1,
+     "end": 26.4,
+     "startDate": "2026-11-25",
+     "endDate": "2026-12-01"
+    },
+    {
+     "id": "U-076c",
+     "builtBy": "agents",
+     "start": 23.9,
+     "end": 26.3,
+     "startDate": "2026-11-24",
+     "endDate": "2026-12-01"
+    },
+    {
+     "id": "U-077",
+     "builtBy": "agents",
+     "start": 58.8,
+     "end": 64,
+     "startDate": "2027-01-20",
+     "endDate": "2027-01-27"
+    },
+    {
+     "id": "U-113",
+     "builtBy": "agents",
+     "start": 63.2,
+     "end": 67.5,
+     "startDate": "2027-01-27",
+     "endDate": "2027-02-02"
+    },
+    {
+     "id": "U-108",
+     "builtBy": "agents",
+     "start": 46.4,
+     "end": 49.6,
+     "startDate": "2027-01-04",
+     "endDate": "2027-01-07"
+    },
+    {
+     "id": "U-078",
+     "builtBy": "agents",
+     "start": 22.7,
+     "end": 24.7,
+     "startDate": "2026-11-23",
+     "endDate": "2026-11-25"
+    },
+    {
+     "id": "U-079a",
+     "builtBy": "agents",
+     "start": 54.2,
+     "end": 57.7,
+     "startDate": "2027-01-14",
+     "endDate": "2027-01-19"
+    },
+    {
+     "id": "U-079b",
+     "builtBy": "agents",
+     "start": 38.8,
+     "end": 42.4,
+     "startDate": "2026-12-17",
+     "endDate": "2026-12-23"
+    },
+    {
+     "id": "U-080",
+     "builtBy": "agents",
+     "start": 63.5,
+     "end": 67.3,
+     "startDate": "2027-01-27",
+     "endDate": "2027-02-02"
+    },
+    {
+     "id": "U-083a",
+     "builtBy": "agents",
+     "start": 23.8,
+     "end": 24.5,
+     "startDate": "2026-11-24",
+     "endDate": "2026-11-25"
+    },
+    {
+     "id": "U-084",
+     "builtBy": "agents",
+     "start": 22.3,
+     "end": 24.5,
+     "startDate": "2026-11-23",
+     "endDate": "2026-11-25"
+    },
+    {
+     "id": "U-085",
+     "builtBy": "agents",
+     "start": 22.2,
+     "end": 24.7,
+     "startDate": "2026-11-23",
+     "endDate": "2026-11-25"
+    },
+    {
+     "id": "U-086",
+     "builtBy": "agents",
+     "start": 54.2,
+     "end": 56.4,
+     "startDate": "2027-01-14",
+     "endDate": "2027-01-18"
+    },
+    {
+     "id": "U-087",
+     "builtBy": "agents",
+     "start": 56.7,
+     "end": 58.3,
+     "startDate": "2027-01-18",
+     "endDate": "2027-01-20"
+    },
+    {
+     "id": "U-088",
+     "builtBy": "agents",
+     "start": 61.6,
+     "end": 64.6,
+     "startDate": "2027-01-25",
+     "endDate": "2027-01-28"
+    },
+    {
+     "id": "U-089",
+     "builtBy": "agents",
+     "start": 59.4,
+     "end": 61.9,
+     "startDate": "2027-01-21",
+     "endDate": "2027-01-25"
+    },
+    {
+     "id": "U-091",
+     "builtBy": "agents",
+     "start": 11.9,
+     "end": 13.6,
+     "startDate": "2026-11-06",
+     "endDate": "2026-11-10"
+    },
+    {
+     "id": "U-092",
+     "builtBy": "agents",
+     "start": 19,
+     "end": 21.3,
+     "startDate": "2026-11-17",
+     "endDate": "2026-11-20"
+    },
+    {
+     "id": "U-093",
+     "builtBy": "agents",
+     "start": 15,
+     "end": 18.9,
+     "startDate": "2026-11-11",
+     "endDate": "2026-11-17"
+    },
+    {
+     "id": "U-095",
+     "builtBy": "agents",
+     "start": 19.1,
+     "end": 22.9,
+     "startDate": "2026-11-18",
+     "endDate": "2026-11-23"
+    },
+    {
+     "id": "U-096",
+     "builtBy": "agents",
+     "start": 58.2,
+     "end": 64.5,
+     "startDate": "2027-01-20",
+     "endDate": "2027-01-28"
+    },
+    {
+     "id": "U-097",
+     "builtBy": "agents",
+     "start": 63.5,
+     "end": 68.1,
+     "startDate": "2027-01-27",
+     "endDate": "2027-02-03"
+    },
+    {
+     "id": "U-114",
+     "builtBy": "agents",
+     "start": 57.9,
+     "end": 63,
+     "startDate": "2027-01-19",
+     "endDate": "2027-01-26"
+    },
+    {
+     "id": "U-098",
+     "builtBy": "agents",
+     "start": 14.2,
+     "end": 17.2,
+     "startDate": "2026-11-11",
+     "endDate": "2026-11-16"
+    },
+    {
+     "id": "U-099",
+     "builtBy": "agents",
+     "start": 64,
+     "end": 69,
+     "startDate": "2027-01-27",
+     "endDate": "2027-02-03"
+    },
+    {
+     "id": "U-115",
+     "builtBy": "agents",
+     "start": 64.7,
+     "end": 69.9,
+     "startDate": "2027-01-28",
+     "endDate": "2027-02-04"
+    },
+    {
+     "id": "U-100",
+     "builtBy": "Dave",
+     "start": 58.9,
+     "end": 74.8,
+     "startDate": "2027-01-20",
+     "endDate": "2027-02-11"
+    },
+    {
+     "id": "U-101",
+     "builtBy": "Dave",
+     "start": 73.1,
+     "end": 78.9,
+     "startDate": "2027-02-10",
+     "endDate": "2027-02-17"
+    },
+    {
+     "id": "U-102",
+     "builtBy": "agents",
+     "start": 5.1,
+     "end": 5.8,
+     "startDate": "2026-10-29",
+     "endDate": "2026-10-29"
+    },
+    {
      "id": "U-103",
      "builtBy": "agents",
-     "start": 63.8,
-     "end": 68.5,
-     "startDate": "2027-02-01",
-     "endDate": "2027-02-08"
+     "start": 58.9,
+     "end": 63.6,
+     "startDate": "2027-01-20",
+     "endDate": "2027-01-27"
     },
     {
      "id": "U-104",
      "builtBy": "Dave",
-     "start": 83.9,
-     "end": 88.6,
-     "startDate": "2027-03-01",
-     "endDate": "2027-03-08"
+     "start": 78.9,
+     "end": 83.6,
+     "startDate": "2027-02-17",
+     "endDate": "2027-02-24"
     },
     {
      "id": "U-105",
      "builtBy": "agents",
-     "start": 61.3,
-     "end": 63.7,
-     "startDate": "2027-01-28",
-     "endDate": "2027-02-01"
+     "start": 56.3,
+     "end": 58.8,
+     "startDate": "2027-01-18",
+     "endDate": "2027-01-20"
     }
    ]
   },
   {
-   "name": "Tiered, before the levers, Dave 12.5 h",
+   "name": "Plan, Dave 12.5 h",
    "hoursPerWeek": 12.5,
    "prototype": {
     "weeks": {
-     "p10": 6.3,
-     "p50": 7.5,
-     "p90": 9.1
+     "p10": 3.4,
+     "p50": 4,
+     "p90": 4.6
     },
     "dates": {
-     "p10": "2026-12-11",
-     "p50": "2026-12-21",
-     "p90": "2027-01-06"
+     "p10": "2026-11-16",
+     "p50": "2026-11-18",
+     "p90": "2026-11-23"
     }
    },
    "finish": {
     "weeks": {
-     "p10": 21.1,
-     "p50": 24.7,
-     "p90": 28.8
+     "p10": 14.7,
+     "p50": 17,
+     "p90": 19.8
     },
     "dates": {
-     "p10": "2027-03-31",
-     "p50": "2027-04-26",
-     "p90": "2027-05-25"
+     "p10": "2027-02-10",
+     "p50": "2027-02-25",
+     "p90": "2027-03-17"
     }
    },
    "peopleHoursByWeek": [
-    12.5,
-    8,
-    11.5,
-    12.5,
-    12.5,
-    12.5,
-    12.5,
-    12.5,
-    12.5,
-    12.5,
-    12.5,
-    12.5,
-    12.5,
-    12.5,
-    12.5,
-    12.5,
-    12.5,
-    12.5,
-    12.5,
-    12.5,
-    12.5,
-    12.5,
-    12.5,
     10.5,
-    6.3,
-    0,
-    0,
-    0,
-    0,
+    1.6,
+    6.4,
+    12.5,
+    12.5,
+    12.5,
+    12.5,
+    12.5,
+    12.5,
+    12.5,
+    11.7,
+    11.4,
+    12.5,
+    12.5,
+    12.5,
+    10.3,
+    7.6,
+    0.3,
     0,
     0,
     0,
@@ -3551,930 +3504,930 @@
     {
      "id": "U-001",
      "builtBy": "agents",
-     "start": 9.2,
-     "end": 10.5,
-     "startDate": "2026-11-09",
-     "endDate": "2026-11-10"
+     "start": 5.2,
+     "end": 6.6,
+     "startDate": "2026-10-29",
+     "endDate": "2026-10-30"
     },
     {
      "id": "U-118",
      "builtBy": "Dave",
      "start": 1.9,
-     "end": 9.1,
-     "startDate": "2026-10-28",
-     "endDate": "2026-11-09"
+     "end": 5.1,
+     "startDate": "2026-10-23",
+     "endDate": "2026-10-29"
     },
     {
      "id": "U-002",
-     "builtBy": "Dave",
-     "start": 15.6,
-     "end": 18,
-     "startDate": "2026-11-17",
-     "endDate": "2026-11-19"
+     "builtBy": "agents",
+     "start": 6.7,
+     "end": 8,
+     "startDate": "2026-10-30",
+     "endDate": "2026-11-02"
     },
     {
      "id": "U-003",
-     "builtBy": "Dave",
-     "start": 10.5,
-     "end": 15.4,
-     "startDate": "2026-11-10",
-     "endDate": "2026-11-17"
+     "builtBy": "agents",
+     "start": 6.7,
+     "end": 9.2,
+     "startDate": "2026-10-30",
+     "endDate": "2026-11-04"
     },
     {
      "id": "U-004a",
      "builtBy": "agents",
-     "start": 20.7,
-     "end": 23.1,
-     "startDate": "2026-11-24",
-     "endDate": "2026-12-01"
+     "start": 12.1,
+     "end": 14.9,
+     "startDate": "2026-11-09",
+     "endDate": "2026-11-11"
     },
     {
      "id": "U-004b",
      "builtBy": "agents",
-     "start": 23.2,
-     "end": 26.3,
-     "startDate": "2026-12-01",
-     "endDate": "2026-12-04"
+     "start": 15.9,
+     "end": 18.9,
+     "startDate": "2026-11-12",
+     "endDate": "2026-11-17"
     },
     {
      "id": "U-116",
-     "builtBy": "Dave",
-     "start": 14.5,
-     "end": 15.8,
-     "startDate": "2026-11-16",
-     "endDate": "2026-11-17"
+     "builtBy": "agents",
+     "start": 6.7,
+     "end": 7.3,
+     "startDate": "2026-10-30",
+     "endDate": "2026-11-02"
     },
     {
      "id": "U-117",
      "builtBy": "agents",
-     "start": 18.1,
-     "end": 19.1,
-     "startDate": "2026-11-20",
-     "endDate": "2026-11-23"
+     "start": 8.1,
+     "end": 9,
+     "startDate": "2026-11-03",
+     "endDate": "2026-11-03"
     },
     {
      "id": "U-005",
-     "builtBy": "Dave",
-     "start": 29.4,
-     "end": 40.2,
-     "startDate": "2026-12-09",
-     "endDate": "2026-12-28"
+     "builtBy": "agents",
+     "start": 9.3,
+     "end": 13.1,
+     "startDate": "2026-11-04",
+     "endDate": "2026-11-10"
     },
     {
      "id": "U-006",
      "builtBy": "agents",
-     "start": 15.5,
-     "end": 17.5,
-     "startDate": "2026-11-17",
-     "endDate": "2026-11-19"
+     "start": 9.4,
+     "end": 11.5,
+     "startDate": "2026-11-04",
+     "endDate": "2026-11-06"
     },
     {
      "id": "U-007",
      "builtBy": "agents",
-     "start": 18.1,
-     "end": 19.9,
-     "startDate": "2026-11-20",
-     "endDate": "2026-11-23"
+     "start": 8.1,
+     "end": 9.8,
+     "startDate": "2026-11-03",
+     "endDate": "2026-11-04"
     },
     {
      "id": "U-008a",
      "builtBy": "agents",
-     "start": 18.1,
-     "end": 19.6,
-     "startDate": "2026-11-20",
-     "endDate": "2026-11-23"
+     "start": 8.1,
+     "end": 9.5,
+     "startDate": "2026-11-03",
+     "endDate": "2026-11-04"
     },
     {
      "id": "U-008b",
      "builtBy": "agents",
-     "start": 18.1,
-     "end": 20.6,
-     "startDate": "2026-11-20",
-     "endDate": "2026-11-24"
+     "start": 9.6,
+     "end": 11.6,
+     "startDate": "2026-11-04",
+     "endDate": "2026-11-06"
     },
     {
      "id": "U-009",
      "builtBy": "agents",
-     "start": 18.1,
-     "end": 19.6,
-     "startDate": "2026-11-20",
-     "endDate": "2026-11-23"
+     "start": 8.1,
+     "end": 9.5,
+     "startDate": "2026-11-03",
+     "endDate": "2026-11-04"
     },
     {
      "id": "U-010",
      "builtBy": "agents",
-     "start": 23.2,
-     "end": 25,
-     "startDate": "2026-12-01",
-     "endDate": "2026-12-02"
+     "start": 11.9,
+     "end": 13.7,
+     "startDate": "2026-11-06",
+     "endDate": "2026-11-10"
     },
     {
      "id": "U-011",
-     "builtBy": "Dave",
-     "start": 17.6,
-     "end": 23.1,
-     "startDate": "2026-11-19",
-     "endDate": "2026-12-01"
+     "builtBy": "agents",
+     "start": 9.3,
+     "end": 11.6,
+     "startDate": "2026-11-04",
+     "endDate": "2026-11-06"
     },
     {
      "id": "U-012",
      "builtBy": "agents",
-     "start": 23.2,
-     "end": 25.4,
-     "startDate": "2026-12-01",
-     "endDate": "2026-12-03"
+     "start": 11.7,
+     "end": 13.8,
+     "startDate": "2026-11-06",
+     "endDate": "2026-11-10"
     },
     {
      "id": "U-111",
      "builtBy": "agents",
-     "start": 23.2,
-     "end": 24.5,
-     "startDate": "2026-12-01",
-     "endDate": "2026-12-02"
+     "start": 11.7,
+     "end": 13,
+     "startDate": "2026-11-06",
+     "endDate": "2026-11-09"
     },
     {
      "id": "U-014a",
      "builtBy": "Dave",
-     "start": 38.9,
-     "end": 48.2,
-     "startDate": "2026-12-22",
-     "endDate": "2027-01-11"
+     "start": 13.9,
+     "end": 28.4,
+     "startDate": "2026-11-10",
+     "endDate": "2026-12-03"
     },
     {
      "id": "U-014b",
      "builtBy": "agents",
-     "start": 48.3,
-     "end": 51.1,
-     "startDate": "2027-01-11",
-     "endDate": "2027-01-14"
+     "start": 28.5,
+     "end": 31.3,
+     "startDate": "2026-12-03",
+     "endDate": "2026-12-08"
     },
     {
      "id": "U-015",
      "builtBy": "agents",
-     "start": 25.7,
-     "end": 27.8,
-     "startDate": "2026-12-03",
-     "endDate": "2026-12-07"
+     "start": 14.5,
+     "end": 17.5,
+     "startDate": "2026-11-11",
+     "endDate": "2026-11-16"
     },
     {
      "id": "U-016",
      "builtBy": "Dave",
-     "start": 46.9,
-     "end": 55.9,
-     "startDate": "2027-01-07",
-     "endDate": "2027-01-20"
+     "start": 26.8,
+     "end": 35.1,
+     "startDate": "2026-12-01",
+     "endDate": "2026-12-14"
     },
     {
      "id": "U-017",
      "builtBy": "agents",
-     "start": 27.9,
-     "end": 29.7,
-     "startDate": "2026-12-07",
-     "endDate": "2026-12-09"
+     "start": 17.8,
+     "end": 19.7,
+     "startDate": "2026-11-16",
+     "endDate": "2026-11-18"
     },
     {
      "id": "U-018",
      "builtBy": "agents",
-     "start": 23.2,
-     "end": 24.7,
-     "startDate": "2026-12-01",
-     "endDate": "2026-12-02"
+     "start": 11.7,
+     "end": 13.2,
+     "startDate": "2026-11-06",
+     "endDate": "2026-11-10"
     },
     {
      "id": "U-019",
      "builtBy": "agents",
-     "start": 23.2,
-     "end": 25.6,
-     "startDate": "2026-12-01",
-     "endDate": "2026-12-03"
+     "start": 12.4,
+     "end": 14.3,
+     "startDate": "2026-11-09",
+     "endDate": "2026-11-11"
     },
     {
      "id": "U-020",
      "builtBy": "agents",
-     "start": 40.3,
-     "end": 41.4,
-     "startDate": "2026-12-28",
-     "endDate": "2026-12-29"
-    },
-    {
-     "id": "U-021a",
-     "builtBy": "agents",
-     "start": 25.5,
-     "end": 27.7,
-     "startDate": "2026-12-03",
-     "endDate": "2026-12-07"
-    },
-    {
-     "id": "U-021b",
-     "builtBy": "agents",
-     "start": 27.8,
-     "end": 33.2,
-     "startDate": "2026-12-07",
-     "endDate": "2026-12-15"
-    },
-    {
-     "id": "U-022",
-     "builtBy": "agents",
-     "start": 26.4,
-     "end": 28.1,
-     "startDate": "2026-12-04",
-     "endDate": "2026-12-08"
-    },
-    {
-     "id": "U-023",
-     "builtBy": "agents",
-     "start": 10.6,
-     "end": 12.5,
-     "startDate": "2026-11-10",
-     "endDate": "2026-11-12"
-    },
-    {
-     "id": "U-024",
-     "builtBy": "Dave",
-     "start": 22.3,
-     "end": 30.7,
-     "startDate": "2026-11-30",
-     "endDate": "2026-12-10"
-    },
-    {
-     "id": "U-025",
-     "builtBy": "agents",
-     "start": 30.8,
-     "end": 32.8,
-     "startDate": "2026-12-10",
-     "endDate": "2026-12-14"
-    },
-    {
-     "id": "U-026",
-     "builtBy": "agents",
-     "start": 30.8,
-     "end": 33.4,
-     "startDate": "2026-12-10",
-     "endDate": "2026-12-15"
-    },
-    {
-     "id": "U-027",
-     "builtBy": "agents",
-     "start": 33.5,
-     "end": 34.9,
-     "startDate": "2026-12-15",
-     "endDate": "2026-12-16"
-    },
-    {
-     "id": "U-029",
-     "builtBy": "agents",
-     "start": 35,
-     "end": 36.9,
-     "startDate": "2026-12-16",
-     "endDate": "2026-12-18"
-    },
-    {
-     "id": "U-030",
-     "builtBy": "agents",
-     "start": 33.5,
-     "end": 36.2,
-     "startDate": "2026-12-15",
-     "endDate": "2026-12-18"
-    },
-    {
-     "id": "U-031",
-     "builtBy": "agents",
-     "start": 33.5,
-     "end": 37.5,
-     "startDate": "2026-12-15",
-     "endDate": "2026-12-21"
-    },
-    {
-     "id": "U-032",
-     "builtBy": "agents",
-     "start": 37.6,
-     "end": 38.3,
-     "startDate": "2026-12-21",
-     "endDate": "2026-12-22"
-    },
-    {
-     "id": "U-035",
-     "builtBy": "agents",
-     "start": 37.6,
-     "end": 38.7,
-     "startDate": "2026-12-21",
-     "endDate": "2026-12-22"
-    },
-    {
-     "id": "U-036",
-     "builtBy": "agents",
-     "start": 37.6,
-     "end": 38.5,
-     "startDate": "2026-12-21",
-     "endDate": "2026-12-22"
-    },
-    {
-     "id": "U-037",
-     "builtBy": "agents",
-     "start": 32.9,
-     "end": 33.6,
-     "startDate": "2026-12-14",
-     "endDate": "2026-12-15"
-    },
-    {
-     "id": "U-038",
-     "builtBy": "agents",
-     "start": 24.8,
-     "end": 26.8,
-     "startDate": "2026-12-02",
-     "endDate": "2026-12-04"
-    },
-    {
-     "id": "U-039",
-     "builtBy": "agents",
-     "start": 32.9,
-     "end": 35.5,
-     "startDate": "2026-12-14",
-     "endDate": "2026-12-17"
-    },
-    {
-     "id": "U-040",
-     "builtBy": "agents",
-     "start": 51.2,
-     "end": 52.5,
-     "startDate": "2027-01-14",
-     "endDate": "2027-01-15"
-    },
-    {
-     "id": "U-041",
-     "builtBy": "agents",
-     "start": 52.6,
-     "end": 56.3,
-     "startDate": "2027-01-15",
-     "endDate": "2027-01-21"
-    },
-    {
-     "id": "U-045a",
-     "builtBy": "agents",
-     "start": 15.5,
-     "end": 18,
-     "startDate": "2026-11-17",
-     "endDate": "2026-11-19"
-    },
-    {
-     "id": "U-045b",
-     "builtBy": "agents",
-     "start": 18.1,
-     "end": 19.9,
-     "startDate": "2026-11-20",
-     "endDate": "2026-11-23"
-    },
-    {
-     "id": "U-047a",
-     "builtBy": "Dave",
-     "start": 61.4,
-     "end": 72.1,
-     "startDate": "2027-01-28",
-     "endDate": "2027-02-12"
-    },
-    {
-     "id": "U-047b",
-     "builtBy": "agents",
-     "start": 72.2,
-     "end": 76.1,
-     "startDate": "2027-02-12",
-     "endDate": "2027-02-18"
-    },
-    {
-     "id": "U-048",
-     "builtBy": "Dave",
-     "start": 54.6,
-     "end": 62.8,
-     "startDate": "2027-01-19",
-     "endDate": "2027-01-29"
-    },
-    {
-     "id": "U-049",
-     "builtBy": "Dave",
-     "start": 69.9,
-     "end": 81.5,
-     "startDate": "2027-02-09",
-     "endDate": "2027-02-25"
-    },
-    {
-     "id": "U-109",
-     "builtBy": "agents",
-     "start": 81.6,
-     "end": 84.4,
-     "startDate": "2027-02-25",
-     "endDate": "2027-03-02"
-    },
-    {
-     "id": "U-106",
-     "builtBy": "agents",
-     "start": 62.9,
-     "end": 64.9,
-     "startDate": "2027-01-29",
-     "endDate": "2027-02-02"
-    },
-    {
-     "id": "U-050",
-     "builtBy": "agents",
-     "start": 81.6,
-     "end": 83.6,
-     "startDate": "2027-02-25",
-     "endDate": "2027-03-01"
-    },
-    {
-     "id": "U-051",
-     "builtBy": "agents",
-     "start": 83.7,
-     "end": 86.4,
-     "startDate": "2027-03-01",
-     "endDate": "2027-03-04"
-    },
-    {
-     "id": "U-052",
-     "builtBy": "agents",
-     "start": 86.8,
-     "end": 92.7,
-     "startDate": "2027-03-04",
-     "endDate": "2027-03-12"
-    },
-    {
-     "id": "U-053",
-     "builtBy": "agents",
-     "start": 76.3,
-     "end": 77.3,
-     "startDate": "2027-02-18",
-     "endDate": "2027-02-19"
-    },
-    {
-     "id": "U-054",
-     "builtBy": "agents",
-     "start": 40.3,
-     "end": 42.3,
-     "startDate": "2026-12-28",
-     "endDate": "2026-12-30"
-    },
-    {
-     "id": "U-055",
-     "builtBy": "agents",
-     "start": 81.6,
-     "end": 86.2,
-     "startDate": "2027-02-25",
-     "endDate": "2027-03-04"
-    },
-    {
-     "id": "U-056",
-     "builtBy": "agents",
-     "start": 62.9,
-     "end": 66.5,
-     "startDate": "2027-01-29",
-     "endDate": "2027-02-04"
-    },
-    {
-     "id": "U-058",
-     "builtBy": "agents",
-     "start": 42.4,
-     "end": 43.4,
-     "startDate": "2026-12-30",
-     "endDate": "2027-01-04"
-    },
-    {
-     "id": "U-059",
-     "builtBy": "agents",
-     "start": 66.6,
-     "end": 69.9,
-     "startDate": "2027-02-04",
-     "endDate": "2027-02-09"
-    },
-    {
-     "id": "U-060",
-     "builtBy": "agents",
-     "start": 42.4,
-     "end": 44.2,
-     "startDate": "2026-12-30",
-     "endDate": "2027-01-05"
-    },
-    {
-     "id": "U-062a",
-     "builtBy": "agents",
-     "start": 81.6,
-     "end": 85.6,
-     "startDate": "2027-02-25",
-     "endDate": "2027-03-03"
-    },
-    {
-     "id": "U-062b",
-     "builtBy": "agents",
-     "start": 87.8,
-     "end": 92.7,
-     "startDate": "2027-03-05",
-     "endDate": "2027-03-12"
-    },
-    {
-     "id": "U-063",
-     "builtBy": "agents",
-     "start": 40.3,
-     "end": 42.3,
-     "startDate": "2026-12-28",
-     "endDate": "2026-12-30"
-    },
-    {
-     "id": "U-064a",
-     "builtBy": "agents",
-     "start": 81.6,
-     "end": 85.7,
-     "startDate": "2027-02-25",
-     "endDate": "2027-03-03"
-    },
-    {
-     "id": "U-064b",
-     "builtBy": "agents",
-     "start": 86.8,
-     "end": 89,
-     "startDate": "2027-03-04",
-     "endDate": "2027-03-08"
-    },
-    {
-     "id": "U-065a",
-     "builtBy": "agents",
-     "start": 85.8,
-     "end": 89.8,
-     "startDate": "2027-03-03",
-     "endDate": "2027-03-09"
-    },
-    {
-     "id": "U-065b",
-     "builtBy": "agents",
-     "start": 91.7,
-     "end": 94.6,
-     "startDate": "2027-03-11",
-     "endDate": "2027-03-16"
-    },
-    {
-     "id": "U-066a",
-     "builtBy": "agents",
-     "start": 86.3,
-     "end": 88.7,
-     "startDate": "2027-03-04",
-     "endDate": "2027-03-08"
-    },
-    {
-     "id": "U-066b",
-     "builtBy": "agents",
-     "start": 87.8,
-     "end": 92.7,
-     "startDate": "2027-03-05",
-     "endDate": "2027-03-12"
-    },
-    {
-     "id": "U-067",
-     "builtBy": "agents",
-     "start": 32.9,
-     "end": 33.9,
-     "startDate": "2026-12-14",
-     "endDate": "2026-12-15"
-    },
-    {
-     "id": "U-068",
-     "builtBy": "agents",
-     "start": 48.3,
-     "end": 51.8,
-     "startDate": "2027-01-11",
-     "endDate": "2027-01-14"
-    },
-    {
-     "id": "U-069",
-     "builtBy": "agents",
-     "start": 81.8,
-     "end": 82.8,
-     "startDate": "2027-02-25",
-     "endDate": "2027-02-26"
-    },
-    {
-     "id": "U-070",
-     "builtBy": "agents",
-     "start": 70,
-     "end": 72.4,
-     "startDate": "2027-02-09",
-     "endDate": "2027-02-12"
-    },
-    {
-     "id": "U-071",
-     "builtBy": "agents",
-     "start": 88.3,
-     "end": 92.7,
-     "startDate": "2027-03-08",
-     "endDate": "2027-03-12"
-    },
-    {
-     "id": "U-073",
-     "builtBy": "agents",
-     "start": 41.5,
-     "end": 44,
-     "startDate": "2026-12-29",
-     "endDate": "2027-01-04"
-    },
-    {
-     "id": "U-112",
-     "builtBy": "agents",
-     "start": 44.1,
-     "end": 46.9,
-     "startDate": "2027-01-05",
-     "endDate": "2027-01-07"
-    },
-    {
-     "id": "U-074a",
-     "builtBy": "agents",
-     "start": 44.1,
-     "end": 46.3,
-     "startDate": "2027-01-05",
-     "endDate": "2027-01-07"
-    },
-    {
-     "id": "U-074b",
-     "builtBy": "agents",
-     "start": 46.4,
-     "end": 51,
-     "startDate": "2027-01-07",
-     "endDate": "2027-01-13"
-    },
-    {
-     "id": "U-074c",
-     "builtBy": "agents",
-     "start": 51.1,
-     "end": 54.6,
-     "startDate": "2027-01-14",
-     "endDate": "2027-01-19"
-    },
-    {
-     "id": "U-075",
-     "builtBy": "agents",
-     "start": 51.1,
-     "end": 52.8,
-     "startDate": "2027-01-14",
-     "endDate": "2027-01-15"
-    },
-    {
-     "id": "U-076a",
-     "builtBy": "agents",
-     "start": 44.1,
-     "end": 46.6,
-     "startDate": "2027-01-05",
-     "endDate": "2027-01-07"
-    },
-    {
-     "id": "U-076b",
-     "builtBy": "agents",
-     "start": 46.7,
-     "end": 48.3,
-     "startDate": "2027-01-07",
-     "endDate": "2027-01-11"
-    },
-    {
-     "id": "U-076c",
-     "builtBy": "agents",
-     "start": 46.7,
-     "end": 48.4,
-     "startDate": "2027-01-07",
-     "endDate": "2027-01-11"
-    },
-    {
-     "id": "U-077",
-     "builtBy": "agents",
-     "start": 87.2,
-     "end": 92.7,
-     "startDate": "2027-03-05",
-     "endDate": "2027-03-12"
-    },
-    {
-     "id": "U-113",
-     "builtBy": "agents",
-     "start": 89.1,
-     "end": 93.5,
-     "startDate": "2027-03-09",
-     "endDate": "2027-03-15"
-    },
-    {
-     "id": "U-108",
-     "builtBy": "agents",
-     "start": 70,
-     "end": 73.8,
-     "startDate": "2027-02-09",
-     "endDate": "2027-02-15"
-    },
-    {
-     "id": "U-078",
-     "builtBy": "agents",
-     "start": 44.1,
-     "end": 46.6,
-     "startDate": "2027-01-05",
-     "endDate": "2027-01-07"
-    },
-    {
-     "id": "U-079a",
-     "builtBy": "agents",
-     "start": 81.6,
-     "end": 86.1,
-     "startDate": "2027-02-25",
-     "endDate": "2027-03-04"
-    },
-    {
-     "id": "U-079b",
-     "builtBy": "agents",
-     "start": 62.9,
-     "end": 66.6,
-     "startDate": "2027-01-29",
-     "endDate": "2027-02-04"
-    },
-    {
-     "id": "U-080",
-     "builtBy": "agents",
-     "start": 89.5,
-     "end": 93.7,
-     "startDate": "2027-03-09",
-     "endDate": "2027-03-15"
-    },
-    {
-     "id": "U-083a",
-     "builtBy": "agents",
-     "start": 44.3,
-     "end": 45.8,
-     "startDate": "2027-01-05",
-     "endDate": "2027-01-06"
-    },
-    {
-     "id": "U-084",
-     "builtBy": "agents",
-     "start": 44.1,
-     "end": 46.7,
-     "startDate": "2027-01-05",
-     "endDate": "2027-01-07"
-    },
-    {
-     "id": "U-085",
-     "builtBy": "agents",
-     "start": 44.7,
-     "end": 47.3,
-     "startDate": "2027-01-05",
-     "endDate": "2027-01-08"
-    },
-    {
-     "id": "U-086",
-     "builtBy": "agents",
-     "start": 81.6,
-     "end": 83.9,
-     "startDate": "2027-02-25",
-     "endDate": "2027-03-01"
-    },
-    {
-     "id": "U-087",
-     "builtBy": "agents",
-     "start": 84.1,
-     "end": 86.3,
-     "startDate": "2027-03-02",
-     "endDate": "2027-03-04"
-    },
-    {
-     "id": "U-088",
-     "builtBy": "agents",
-     "start": 88,
-     "end": 92.2,
-     "startDate": "2027-03-05",
-     "endDate": "2027-03-12"
-    },
-    {
-     "id": "U-089",
-     "builtBy": "agents",
-     "start": 86.9,
-     "end": 88,
-     "startDate": "2027-03-04",
-     "endDate": "2027-03-05"
-    },
-    {
-     "id": "U-091",
-     "builtBy": "agents",
-     "start": 23.2,
-     "end": 24.9,
-     "startDate": "2026-12-01",
-     "endDate": "2026-12-02"
-    },
-    {
-     "id": "U-092",
-     "builtBy": "agents",
-     "start": 38.8,
-     "end": 40.4,
-     "startDate": "2026-12-22",
-     "endDate": "2026-12-28"
-    },
-    {
-     "id": "U-093",
-     "builtBy": "Dave",
-     "start": 79.7,
-     "end": 87.1,
-     "startDate": "2027-02-23",
-     "endDate": "2027-03-05"
-    },
-    {
-     "id": "U-095",
-     "builtBy": "agents",
-     "start": 37.7,
-     "end": 39.8,
-     "startDate": "2026-12-21",
-     "endDate": "2026-12-23"
-    },
-    {
-     "id": "U-096",
-     "builtBy": "Dave",
-     "start": 87.8,
-     "end": 108.2,
-     "startDate": "2027-03-05",
-     "endDate": "2027-04-05"
-    },
-    {
-     "id": "U-097",
-     "builtBy": "agents",
-     "start": 89.8,
-     "end": 94.5,
-     "startDate": "2027-03-09",
-     "endDate": "2027-03-16"
-    },
-    {
-     "id": "U-114",
-     "builtBy": "agents",
-     "start": 86.3,
-     "end": 89.6,
-     "startDate": "2027-03-04",
-     "endDate": "2027-03-09"
-    },
-    {
-     "id": "U-098",
-     "builtBy": "agents",
-     "start": 40.4,
-     "end": 42.1,
-     "startDate": "2026-12-28",
-     "endDate": "2026-12-30"
-    },
-    {
-     "id": "U-099",
-     "builtBy": "agents",
-     "start": 91.7,
-     "end": 97.3,
-     "startDate": "2027-03-11",
-     "endDate": "2027-03-19"
-    },
-    {
-     "id": "U-115",
-     "builtBy": "agents",
-     "start": 93.1,
-     "end": 98.5,
-     "startDate": "2027-03-15",
-     "endDate": "2027-03-22"
-    },
-    {
-     "id": "U-100",
-     "builtBy": "Dave",
-     "start": 106.2,
-     "end": 113.3,
-     "startDate": "2027-04-01",
-     "endDate": "2027-04-12"
-    },
-    {
-     "id": "U-101",
-     "builtBy": "Dave",
-     "start": 112.1,
-     "end": 118.2,
-     "startDate": "2027-04-09",
-     "endDate": "2027-04-19"
-    },
-    {
-     "id": "U-102",
-     "builtBy": "agents",
-     "start": 10.6,
-     "end": 11.3,
+     "start": 13.5,
+     "end": 14.5,
      "startDate": "2026-11-10",
      "endDate": "2026-11-11"
     },
     {
+     "id": "U-021a",
+     "builtBy": "agents",
+     "start": 14,
+     "end": 16.2,
+     "startDate": "2026-11-10",
+     "endDate": "2026-11-13"
+    },
+    {
+     "id": "U-021b",
+     "builtBy": "agents",
+     "start": 17.9,
+     "end": 23.8,
+     "startDate": "2026-11-16",
+     "endDate": "2026-11-24"
+    },
+    {
+     "id": "U-022",
+     "builtBy": "agents",
+     "start": 19.4,
+     "end": 21.9,
+     "startDate": "2026-11-18",
+     "endDate": "2026-11-20"
+    },
+    {
+     "id": "U-023",
+     "builtBy": "agents",
+     "start": 6.7,
+     "end": 8.6,
+     "startDate": "2026-10-30",
+     "endDate": "2026-11-03"
+    },
+    {
+     "id": "U-024",
+     "builtBy": "agents",
+     "start": 8.7,
+     "end": 12.2,
+     "startDate": "2026-11-03",
+     "endDate": "2026-11-09"
+    },
+    {
+     "id": "U-025",
+     "builtBy": "agents",
+     "start": 12.3,
+     "end": 14.3,
+     "startDate": "2026-11-09",
+     "endDate": "2026-11-11"
+    },
+    {
+     "id": "U-026",
+     "builtBy": "agents",
+     "start": 12.5,
+     "end": 15.1,
+     "startDate": "2026-11-09",
+     "endDate": "2026-11-12"
+    },
+    {
+     "id": "U-027",
+     "builtBy": "agents",
+     "start": 15.2,
+     "end": 16.6,
+     "startDate": "2026-11-12",
+     "endDate": "2026-11-13"
+    },
+    {
+     "id": "U-029",
+     "builtBy": "agents",
+     "start": 19.3,
+     "end": 22.8,
+     "startDate": "2026-11-18",
+     "endDate": "2026-11-23"
+    },
+    {
+     "id": "U-030",
+     "builtBy": "agents",
+     "start": 16.7,
+     "end": 19,
+     "startDate": "2026-11-13",
+     "endDate": "2026-11-17"
+    },
+    {
+     "id": "U-031",
+     "builtBy": "agents",
+     "start": 16,
+     "end": 19.5,
+     "startDate": "2026-11-12",
+     "endDate": "2026-11-18"
+    },
+    {
+     "id": "U-032",
+     "builtBy": "agents",
+     "start": 23.6,
+     "end": 24.7,
+     "startDate": "2026-11-24",
+     "endDate": "2026-11-25"
+    },
+    {
+     "id": "U-035",
+     "builtBy": "agents",
+     "start": 19.6,
+     "end": 21.5,
+     "startDate": "2026-11-18",
+     "endDate": "2026-11-20"
+    },
+    {
+     "id": "U-036",
+     "builtBy": "agents",
+     "start": 20.3,
+     "end": 22.7,
+     "startDate": "2026-11-19",
+     "endDate": "2026-11-23"
+    },
+    {
+     "id": "U-037",
+     "builtBy": "agents",
+     "start": 15.9,
+     "end": 17.6,
+     "startDate": "2026-11-12",
+     "endDate": "2026-11-16"
+    },
+    {
+     "id": "U-038",
+     "builtBy": "agents",
+     "start": 14.7,
+     "end": 17.7,
+     "startDate": "2026-11-11",
+     "endDate": "2026-11-16"
+    },
+    {
+     "id": "U-039",
+     "builtBy": "agents",
+     "start": 14.7,
+     "end": 17.2,
+     "startDate": "2026-11-11",
+     "endDate": "2026-11-16"
+    },
+    {
+     "id": "U-040",
+     "builtBy": "agents",
+     "start": 31.4,
+     "end": 32.7,
+     "startDate": "2026-12-08",
+     "endDate": "2026-12-09"
+    },
+    {
+     "id": "U-041",
+     "builtBy": "agents",
+     "start": 32.8,
+     "end": 36.3,
+     "startDate": "2026-12-09",
+     "endDate": "2026-12-15"
+    },
+    {
+     "id": "U-045a",
+     "builtBy": "agents",
+     "start": 9.3,
+     "end": 11.8,
+     "startDate": "2026-11-04",
+     "endDate": "2026-11-06"
+    },
+    {
+     "id": "U-045b",
+     "builtBy": "agents",
+     "start": 12.4,
+     "end": 14.2,
+     "startDate": "2026-11-09",
+     "endDate": "2026-11-11"
+    },
+    {
+     "id": "U-047a",
+     "builtBy": "Dave",
+     "start": 38.5,
+     "end": 47.4,
+     "startDate": "2026-12-17",
+     "endDate": "2027-01-05"
+    },
+    {
+     "id": "U-047b",
+     "builtBy": "agents",
+     "start": 47.5,
+     "end": 51.5,
+     "startDate": "2027-01-05",
+     "endDate": "2027-01-11"
+    },
+    {
+     "id": "U-048",
+     "builtBy": "Dave",
+     "start": 33.2,
+     "end": 40.4,
+     "startDate": "2026-12-10",
+     "endDate": "2026-12-21"
+    },
+    {
+     "id": "U-049",
+     "builtBy": "Dave",
+     "start": 44.7,
+     "end": 55.5,
+     "startDate": "2026-12-29",
+     "endDate": "2027-01-15"
+    },
+    {
+     "id": "U-109",
+     "builtBy": "agents",
+     "start": 55.6,
+     "end": 58.4,
+     "startDate": "2027-01-15",
+     "endDate": "2027-01-20"
+    },
+    {
+     "id": "U-106",
+     "builtBy": "agents",
+     "start": 40.5,
+     "end": 42.4,
+     "startDate": "2026-12-21",
+     "endDate": "2026-12-23"
+    },
+    {
+     "id": "U-050",
+     "builtBy": "agents",
+     "start": 55.6,
+     "end": 57.4,
+     "startDate": "2027-01-15",
+     "endDate": "2027-01-19"
+    },
+    {
+     "id": "U-051",
+     "builtBy": "agents",
+     "start": 57.6,
+     "end": 59.4,
+     "startDate": "2027-01-19",
+     "endDate": "2027-01-21"
+    },
+    {
+     "id": "U-052",
+     "builtBy": "agents",
+     "start": 61.5,
+     "end": 66.9,
+     "startDate": "2027-01-25",
+     "endDate": "2027-02-01"
+    },
+    {
+     "id": "U-053",
+     "builtBy": "agents",
+     "start": 51.8,
+     "end": 53,
+     "startDate": "2027-01-11",
+     "endDate": "2027-01-12"
+    },
+    {
+     "id": "U-054",
+     "builtBy": "agents",
+     "start": 17.6,
+     "end": 19.7,
+     "startDate": "2026-11-16",
+     "endDate": "2026-11-18"
+    },
+    {
+     "id": "U-055",
+     "builtBy": "agents",
+     "start": 55.6,
+     "end": 59.2,
+     "startDate": "2027-01-15",
+     "endDate": "2027-01-21"
+    },
+    {
+     "id": "U-056",
+     "builtBy": "agents",
+     "start": 40.5,
+     "end": 44.2,
+     "startDate": "2026-12-21",
+     "endDate": "2026-12-29"
+    },
+    {
+     "id": "U-058",
+     "builtBy": "agents",
+     "start": 23,
+     "end": 24.4,
+     "startDate": "2026-11-23",
+     "endDate": "2026-11-25"
+    },
+    {
+     "id": "U-059",
+     "builtBy": "agents",
+     "start": 44.3,
+     "end": 47.5,
+     "startDate": "2026-12-29",
+     "endDate": "2027-01-05"
+    },
+    {
+     "id": "U-060",
+     "builtBy": "agents",
+     "start": 19.8,
+     "end": 22.5,
+     "startDate": "2026-11-18",
+     "endDate": "2026-11-23"
+    },
+    {
+     "id": "U-062a",
+     "builtBy": "agents",
+     "start": 55.8,
+     "end": 59,
+     "startDate": "2027-01-15",
+     "endDate": "2027-01-20"
+    },
+    {
+     "id": "U-062b",
+     "builtBy": "agents",
+     "start": 62.9,
+     "end": 67.4,
+     "startDate": "2027-01-26",
+     "endDate": "2027-02-02"
+    },
+    {
+     "id": "U-063",
+     "builtBy": "agents",
+     "start": 19.8,
+     "end": 22.2,
+     "startDate": "2026-11-18",
+     "endDate": "2026-11-23"
+    },
+    {
+     "id": "U-064a",
+     "builtBy": "agents",
+     "start": 55.6,
+     "end": 58.9,
+     "startDate": "2027-01-15",
+     "endDate": "2027-01-20"
+    },
+    {
+     "id": "U-064b",
+     "builtBy": "agents",
+     "start": 61.2,
+     "end": 63.7,
+     "startDate": "2027-01-25",
+     "endDate": "2027-01-27"
+    },
+    {
+     "id": "U-065a",
+     "builtBy": "agents",
+     "start": 59,
+     "end": 63.9,
+     "startDate": "2027-01-20",
+     "endDate": "2027-01-27"
+    },
+    {
+     "id": "U-065b",
+     "builtBy": "agents",
+     "start": 64.6,
+     "end": 68.7,
+     "startDate": "2027-01-28",
+     "endDate": "2027-02-03"
+    },
+    {
+     "id": "U-066a",
+     "builtBy": "agents",
+     "start": 59.5,
+     "end": 63.1,
+     "startDate": "2027-01-21",
+     "endDate": "2027-01-27"
+    },
+    {
+     "id": "U-066b",
+     "builtBy": "agents",
+     "start": 62.6,
+     "end": 67.3,
+     "startDate": "2027-01-26",
+     "endDate": "2027-02-02"
+    },
+    {
+     "id": "U-067",
+     "builtBy": "agents",
+     "start": 17,
+     "end": 18.1,
+     "startDate": "2026-11-13",
+     "endDate": "2026-11-17"
+    },
+    {
+     "id": "U-068",
+     "builtBy": "agents",
+     "start": 28.6,
+     "end": 31.8,
+     "startDate": "2026-12-03",
+     "endDate": "2026-12-08"
+    },
+    {
+     "id": "U-069",
+     "builtBy": "agents",
+     "start": 56.7,
+     "end": 57.7,
+     "startDate": "2027-01-18",
+     "endDate": "2027-01-19"
+    },
+    {
+     "id": "U-070",
+     "builtBy": "agents",
+     "start": 47.8,
+     "end": 49.8,
+     "startDate": "2027-01-05",
+     "endDate": "2027-01-07"
+    },
+    {
+     "id": "U-071",
+     "builtBy": "agents",
+     "start": 63.4,
+     "end": 67.6,
+     "startDate": "2027-01-27",
+     "endDate": "2027-02-02"
+    },
+    {
+     "id": "U-073",
+     "builtBy": "agents",
+     "start": 19,
+     "end": 21.9,
+     "startDate": "2026-11-17",
+     "endDate": "2026-11-20"
+    },
+    {
+     "id": "U-112",
+     "builtBy": "agents",
+     "start": 23,
+     "end": 26.5,
+     "startDate": "2026-11-23",
+     "endDate": "2026-12-01"
+    },
+    {
+     "id": "U-074a",
+     "builtBy": "agents",
+     "start": 22,
+     "end": 23.9,
+     "startDate": "2026-11-20",
+     "endDate": "2026-11-24"
+    },
+    {
+     "id": "U-074b",
+     "builtBy": "agents",
+     "start": 24,
+     "end": 27.9,
+     "startDate": "2026-11-24",
+     "endDate": "2026-12-02"
+    },
+    {
+     "id": "U-074c",
+     "builtBy": "agents",
+     "start": 28,
+     "end": 32.3,
+     "startDate": "2026-12-02",
+     "endDate": "2026-12-09"
+    },
+    {
+     "id": "U-075",
+     "builtBy": "agents",
+     "start": 28.1,
+     "end": 30.4,
+     "startDate": "2026-12-03",
+     "endDate": "2026-12-07"
+    },
+    {
+     "id": "U-076a",
+     "builtBy": "agents",
+     "start": 22.3,
+     "end": 24.5,
+     "startDate": "2026-11-23",
+     "endDate": "2026-11-25"
+    },
+    {
+     "id": "U-076b",
+     "builtBy": "agents",
+     "start": 26.2,
+     "end": 27.7,
+     "startDate": "2026-12-01",
+     "endDate": "2026-12-02"
+    },
+    {
+     "id": "U-076c",
+     "builtBy": "agents",
+     "start": 25,
+     "end": 27.5,
+     "startDate": "2026-11-25",
+     "endDate": "2026-12-02"
+    },
+    {
+     "id": "U-077",
+     "builtBy": "agents",
+     "start": 61.7,
+     "end": 66.8,
+     "startDate": "2027-01-25",
+     "endDate": "2027-02-01"
+    },
+    {
+     "id": "U-113",
+     "builtBy": "agents",
+     "start": 64.1,
+     "end": 68.5,
+     "startDate": "2027-01-28",
+     "endDate": "2027-02-03"
+    },
+    {
+     "id": "U-108",
+     "builtBy": "agents",
+     "start": 47.7,
+     "end": 51.4,
+     "startDate": "2027-01-05",
+     "endDate": "2027-01-11"
+    },
+    {
+     "id": "U-078",
+     "builtBy": "agents",
+     "start": 23.9,
+     "end": 26.7,
+     "startDate": "2026-11-24",
+     "endDate": "2026-12-01"
+    },
+    {
+     "id": "U-079a",
+     "builtBy": "agents",
+     "start": 55.6,
+     "end": 59.2,
+     "startDate": "2027-01-15",
+     "endDate": "2027-01-21"
+    },
+    {
+     "id": "U-079b",
+     "builtBy": "agents",
+     "start": 40.5,
+     "end": 44,
+     "startDate": "2026-12-21",
+     "endDate": "2026-12-28"
+    },
+    {
+     "id": "U-080",
+     "builtBy": "agents",
+     "start": 64.7,
+     "end": 68.8,
+     "startDate": "2027-01-28",
+     "endDate": "2027-02-03"
+    },
+    {
+     "id": "U-083a",
+     "builtBy": "agents",
+     "start": 24.9,
+     "end": 26.9,
+     "startDate": "2026-11-25",
+     "endDate": "2026-12-01"
+    },
+    {
+     "id": "U-084",
+     "builtBy": "agents",
+     "start": 23.6,
+     "end": 26.6,
+     "startDate": "2026-11-24",
+     "endDate": "2026-12-01"
+    },
+    {
+     "id": "U-085",
+     "builtBy": "agents",
+     "start": 23.5,
+     "end": 26.7,
+     "startDate": "2026-11-24",
+     "endDate": "2026-12-01"
+    },
+    {
+     "id": "U-086",
+     "builtBy": "agents",
+     "start": 55.6,
+     "end": 57.9,
+     "startDate": "2027-01-15",
+     "endDate": "2027-01-19"
+    },
+    {
+     "id": "U-087",
+     "builtBy": "agents",
+     "start": 58.2,
+     "end": 59.5,
+     "startDate": "2027-01-20",
+     "endDate": "2027-01-21"
+    },
+    {
+     "id": "U-088",
+     "builtBy": "agents",
+     "start": 63.3,
+     "end": 67.8,
+     "startDate": "2027-01-27",
+     "endDate": "2027-02-02"
+    },
+    {
+     "id": "U-089",
+     "builtBy": "agents",
+     "start": 62,
+     "end": 63,
+     "startDate": "2027-01-25",
+     "endDate": "2027-01-26"
+    },
+    {
+     "id": "U-091",
+     "builtBy": "agents",
+     "start": 13.4,
+     "end": 16.7,
+     "startDate": "2026-11-10",
+     "endDate": "2026-11-13"
+    },
+    {
+     "id": "U-092",
+     "builtBy": "agents",
+     "start": 21.6,
+     "end": 22.8,
+     "startDate": "2026-11-20",
+     "endDate": "2026-11-23"
+    },
+    {
+     "id": "U-093",
+     "builtBy": "agents",
+     "start": 17.8,
+     "end": 21.8,
+     "startDate": "2026-11-16",
+     "endDate": "2026-11-20"
+    },
+    {
+     "id": "U-095",
+     "builtBy": "agents",
+     "start": 21.7,
+     "end": 24.2,
+     "startDate": "2026-11-20",
+     "endDate": "2026-11-25"
+    },
+    {
+     "id": "U-096",
+     "builtBy": "agents",
+     "start": 59.5,
+     "end": 67.8,
+     "startDate": "2027-01-21",
+     "endDate": "2027-02-02"
+    },
+    {
+     "id": "U-097",
+     "builtBy": "agents",
+     "start": 64.5,
+     "end": 69,
+     "startDate": "2027-01-28",
+     "endDate": "2027-02-03"
+    },
+    {
+     "id": "U-114",
+     "builtBy": "agents",
+     "start": 59.3,
+     "end": 63.9,
+     "startDate": "2027-01-21",
+     "endDate": "2027-01-27"
+    },
+    {
+     "id": "U-098",
+     "builtBy": "agents",
+     "start": 16.1,
+     "end": 18.3,
+     "startDate": "2026-11-13",
+     "endDate": "2026-11-17"
+    },
+    {
+     "id": "U-099",
+     "builtBy": "agents",
+     "start": 64.9,
+     "end": 71.2,
+     "startDate": "2027-01-28",
+     "endDate": "2027-02-08"
+    },
+    {
+     "id": "U-115",
+     "builtBy": "agents",
+     "start": 67.6,
+     "end": 73,
+     "startDate": "2027-02-02",
+     "endDate": "2027-02-09"
+    },
+    {
+     "id": "U-100",
+     "builtBy": "Dave",
+     "start": 61.6,
+     "end": 76.2,
+     "startDate": "2027-01-25",
+     "endDate": "2027-02-15"
+    },
+    {
+     "id": "U-101",
+     "builtBy": "Dave",
+     "start": 74.5,
+     "end": 80.5,
+     "startDate": "2027-02-11",
+     "endDate": "2027-02-19"
+    },
+    {
+     "id": "U-102",
+     "builtBy": "agents",
+     "start": 6.7,
+     "end": 7.4,
+     "startDate": "2026-10-30",
+     "endDate": "2026-11-02"
+    },
+    {
      "id": "U-103",
      "builtBy": "agents",
-     "start": 87.2,
-     "end": 91.3,
-     "startDate": "2027-03-05",
-     "endDate": "2027-03-11"
+     "start": 61.4,
+     "end": 64.6,
+     "startDate": "2027-01-25",
+     "endDate": "2027-01-28"
     },
     {
      "id": "U-104",
      "builtBy": "Dave",
-     "start": 118.2,
-     "end": 123.3,
-     "startDate": "2027-04-19",
-     "endDate": "2027-04-26"
+     "start": 80.6,
+     "end": 85,
+     "startDate": "2027-02-19",
+     "endDate": "2027-02-25"
     },
     {
      "id": "U-105",
      "builtBy": "agents",
-     "start": 83.7,
-     "end": 87.1,
-     "startDate": "2027-03-01",
-     "endDate": "2027-03-05"
+     "start": 57.6,
+     "end": 61.3,
+     "startDate": "2027-01-19",
+     "endDate": "2027-01-25"
     }
    ]
   }

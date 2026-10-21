@@ -47,8 +47,8 @@ units:
     actual_days: null
     dave_minutes: null
     tokens: null
-    status: todo
-    note: "Added 2026-10-20 after the estimate panel; PM estimate (solo 2 / 4 / 8 in estimate-panel.json)"
+    status: in progress
+    note: "Added 2026-10-20 after the estimate panel; PM estimate (solo 2 / 4 / 8 in estimate-panel.json). Started 2026-10-20, ahead of the planned Oct 26 P5 start: runbook phases A (the App) and C (merge settings, integration, rulesets) done that day; phase B (scripts and workflows) and D (switch-on) remain. 2026-10-21: phase B written and tested on branch unit/U-118 (58 unit tests; a real token minted against the App); waiting on Dave's review and `--admin` merge (B2), then phase D"
   - id: U-002
     title: "Walking skeleton"
     section: platform

@@ -1,3 +1,4 @@
 .claude/settings.local.json
 .vercel
 .env*
+.claude/agent-memory-local/

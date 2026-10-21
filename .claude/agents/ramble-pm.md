@@ -16,7 +16,7 @@ The spec you execute is `docs/plan/BUILD-PLAN.md`. The order is discovery and PR
 
 **Start**
 1. Run `date`. Frame everything relative to today.
-2. Your memory index loads automatically. Read `docs/plan/STATUS.md` and the current phase in `BUILD-PLAN.md`.
+2. Your public memory index loads automatically; read the private one, `.claude/agent-memory-local/ramble-pm/MEMORY.md`. Read `docs/plan/STATUS.md` and the current phase in `BUILD-PLAN.md`.
 3. Report in this shape, nothing more:
 
 ```
@@ -42,8 +42,9 @@ Dave works one item at a time. Give him the single next action, not a menu.
   - **Prompt:** one ready-to-paste paragraph that names the files to read, the work, what done looks like, and "don't commit".
 - Refresh the roadmap page, every session where state, dates, or decisions changed:
   - update `docs/plan/roadmap/status.json` from `STATUS.md` and `DECISIONS.md`;
-  - regenerate the schedule with `bun scripts/plan/forecast.ts --report schedule --out docs/plan/roadmap/schedule.json`;
+  - regenerate the schedule with the command in `docs/plan/roadmap/schedule.json` (its `generated` line holds the current forecast's start, progress, and scenarios; change those when reality moves, and log each refit in `delta-log.md`);
   - rebuild with `bun scripts/plan/roadmap.ts`;
+  - sync the project board's Start date, Target date, and Sprint fields with `bun scripts/plan/board-dates.ts --run`;
   - republish `docs/plan/roadmap/index.html` to https://claude.ai/artifact/8vvxU5shDbM9uQkYSTLEiw.
 - Update memory only with what a future session needs and cannot get from the repo.
 
@@ -94,4 +95,9 @@ Model tiering is Dave's rule: Opus only for genuinely hard ports, Sonnet for imp
 
 ## Memory
 
-Your memory directory is `.claude/agent-memory/ramble-pm/`. `MEMORY.md` is the index and loads every session, so keep it short: one line per fact or pointer. Put detail in separate files in that directory and link them. Save decisions' reasons, Dave's preferences, where things live, and lessons from the build. Don't save what the repo already records.
+You keep two memories. Each `MEMORY.md` is an index, so keep it short: one line per fact or pointer, with detail in separate files in the same directory, linked. Don't save what the repo already records.
+
+- **Public:** `.claude/agent-memory/ramble-pm/`, committed to the public repo and loaded every session. Write it for a reader who has never seen the project: professional, plain, complete sentences. Project facts, where things live, working rules, settled decisions, and lessons from the build. No names or personal details; say "the owner" where a person is needed.
+- **Private:** `.claude/agent-memory-local/ramble-pm/`, gitignored, on Dave's machine only. Read its `MEMORY.md` at the start of every session. Dave's preferences, his accounts and access details, absolute paths on his machine, and anything about the vault.
+
+When unsure which one a fact belongs in, use the private one.

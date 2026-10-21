@@ -1,7 +1,7 @@
 # Status
 
-**Updated:** 2026-10-20
-**Phase:** P1 ✅, P2 ✅, and the P3 gate ✅ (all 2026-10-18; the mobile flow and States page are signed off). P3 is complete, including the desktop revision. **P4 Plan started 2026-10-18:** artifacts 1 to 7 done; Dave adopted the recommendations on 2026-10-20 (tiered merge plus levers 2, 3, 4a; December 1 moves). Applied to every plan file. **Plan frozen 2026-10-20** (Dave approved; committed on `main`; tag `plan-frozen-2026-10-20` is Dave's to run). From here the plan files are read-only; reality goes in `delta-log.md`.
+**Updated:** 2026-10-21 (phase B written)
+**Phase:** P1 ✅, P2 ✅, and the P3 gate ✅ (all 2026-10-18; the mobile flow and States page are signed off). P3 is complete, including the desktop revision. **P4 Plan started 2026-10-18:** artifacts 1 to 7 done; Dave adopted the recommendations on 2026-10-20 (tiered merge plus levers 2, 3, 4a; December 1 moves). Applied to every plan file. **Plan frozen 2026-10-20:** tag `plan-frozen-2026-10-20` on `8715c42` (history rewritten first to drop personal notes; see `delta-log.md`). Repo public with secret scanning and push protection; GitHub App created (phase A); merge settings, `integration`, and rulesets live (phase C); 133 unit issues on board #19. **P5 started early, 2026-10-20,** with U-118 (in progress; phases A and C done; see `delta-log.md`). From here the plan files are read-only; reality goes in `delta-log.md`.
 
 ## Done
 - P0: desktop wireframes v0 in Figma (6 screens, notes, click-through); repo, PM agent, project memory, build plan spec; discovery kit.
@@ -23,6 +23,8 @@
   - P3 step 6 done (2026-10-18): PRD-77 tone checklist, `docs/design/tone-checklist.md` (voice, look, usability; with a PM pre-check). Pre-check: all items pass except B3, which needs a waiver (stand-in wordmark and illustrations), and B4, deferred (photos are placeholders until the seed photos). One copy note: use "From" pricing only when session prices differ. Design notes in three state frames moved into their labels.
 
 ## In flight
+- **Forecast refit 2026-10-21** (delta log): from Oct 21 with U-118 half done and a 20-hour first week, Prototype P50 Nov 16 (P90 Nov 20), launch-ready P50 Feb 24 (P90 Mar 16); the frozen plan stays Nov 30 and Mar 8. Roadmap page and board dates show the current forecast.
+- **U-118 Merge desk and agent identity, in progress since 2026-10-20** (Dave decided to start ahead of the planned Oct 26). Done: the GitHub App (phase A); merge settings, `integration`, rulesets (phase C). Phase B is written on branch `unit/U-118` (scripts in `scripts/merge-desk/`, two workflows; 58 unit tests pass; a real token minted against the App and read the installation's repo list). Next: Dave's review and `--admin` merge (B2), then the switch-on (phase D). Board #19 now carries Start date, Target date, and Sprint fields from the forecast (`scripts/plan/board-dates.ts`).
 - **Freeze decisions applied 2026-10-20, not committed:** levers 2 and 4a moved U-093, U-096, U-002, U-003, U-116, U-011, U-005, U-024 to agents in `units.yaml` (U-002, U-003, U-024 to the critical tier; U-093 and U-096 carry a results-read people check); lever 3 set `DAVE_SHARE` to 0.35 / 0.5 / 0.65 in `graph.ts`; `execution-model.ts` now reports the tiered merge rule (old rule as a comparison column, 18 weeks); `forecast.ts` runs the record as the plan, with "before the levers" and "lever 4" as comparisons. 02, 04, 05, 06, 07 regenerated; 05 and 04 carry dated notes; 06 and 07 prose updated (07 rewritten as the decided plan). The plan at 12.5 h: Prototype P50 2026-11-30 (P90 12-07), launch-ready P50 2027-03-08 (P90 03-26); Dave leads 9 of 116 units, about 180 h. Roadmap republished.
 - **Project board #19 set up 2026-10-20** by the PM (Dave's call): linked to `defaultdave/ramble`, fields Unit ID, Section, Complexity, Uncertainty, Spike, Execution, Review tier, Depends on, the three estimate fields, Actual days, Dave minutes, Tokens. No items yet; issues come at the freeze.
 - **P4 artifacts 6 and 7 drafted 2026-10-20, not committed:** `docs/plan/06-estimate.md`, `docs/plan/07-resourcing.md`. Record: `estimate_days` on all 132 open units in `units.yaml`; every lens's figures and the solo estimates in `docs/plan/estimate-panel.json`. New script `scripts/plan/forecast.ts` (Monte Carlo over the graph; Dave as a capacity-limited resource; levers and WIP as scenarios). Dave's minutes moved from `execution-model.ts` into `scripts/plan/dave-time.ts` (report output unchanged, checked by diff).
@@ -67,9 +69,14 @@
 In this demo, the client facts have no one to ask. Where a fact blocks a decision, the PM proposes a working assumption and logs it as one.
 
 ## Blocked on Dave
-1. **Freeze commands** (printed by the PM 2026-10-20): tag, push, make the repo public, runbook phase C, `bun scripts/plan/issues.ts --run`.
-2. **Method Layer 0** (open decision 3). Not needed until P6.
-3. **Merge desk App, before the freeze** (`docs/plan/merge-desk-runbook.md`, phase A): create the GitHub App with the minimum permissions, keep its key in `~/.config/ramble-agents/`, install it on `ramble` only, record the IDs in `app.conf` (A1 to A4). About 20 minutes. Phases C and D (repo settings, rulesets, the permission relaxation, the hard-line edits) come at and after the freeze, once the repo is public.
+1. **Switch-on, after U-118 lands** (runbook phase D): relax the agent prompts for this project (D1, Option 1 recommended), watch the PM's dry run (D2), then the two hard-line edits in `CLAUDE.md` and `ramble-pm.md` (D3).
+2. **Architecture guardrails, before U-001 starts** (PM roundup 2026-10-21). The rules are written (ADRs, design doc 4.1 and 4.2, stack decisions), but four gaps let an agent drift without a check failing:
+   - no Ramble `.claude/standards/architecture.md`, so `architecture-audit` audits against the global default (data in `lib/`), not the design doc's `src/server/` with `server-only`;
+   - `architecture-audit` is not a required check (only `review-agent`, `qa-agent`, `spec-compliance`, `scope-manifest`);
+   - U-001's manifest says "ESLint" with no import-boundary rules, so layer rules never become a failing CI check; and after U-001, lint and TypeScript config are not on `scope-check.ts`'s protected list;
+   - the global standards edits (Next.js 16.4.1 baseline, `senior` and `review-pr` skills) are uncommitted in vig.
+   Also open: the six pattern notes (U-002, U-003, U-116, U-011, U-005, U-024) are not written; the blank stack-decision cells (package manager, React Compiler, lint set) fall to defaults unless decided.
+3. **Method Layer 0** (open decision 3). Not needed until P6.
 
 Resolved: Figma tools in a new session (2026-10-18, working in the P3 session). Workbook order (2026-10-18: plan Ramble first, extract the templates from its artifacts afterward). The Perf Lab spec conflict: the signed PRD's `PRD-68` is the requirement the detail-page fixes trace to; the router question went to ADR 0001.
 
@@ -78,22 +85,33 @@ Open item from the ADR 0007 measurement amendment (2026-10-18): what New York an
 Legal and vendor questions for the real job, logged, not blocking the demo: Ramble holding host money and the New York gift law (counsel, Q-16); card refund age limit at 12 months (ask Stripe); Stripe's Connect review time.
 
 ## Next
-The plan is frozen and committed (2026-10-20). Dave runs, in order:
-1. `git tag plan-frozen-2026-10-20` and the push of `main` and the tag.
-2. Make the repo public, then turn on secret scanning and push protection.
-3. Runbook phase A (the GitHub App), then phase C (merge settings, the `integration` branch, the rulesets).
-4. `bun scripts/plan/issues.ts --run`: 133 issues, each added to board #19 with its fields.
+P4 is closed and P5 has started early: U-118 is in progress since 2026-10-20.
 
-After the tag, the plan files are read-only and reality goes in `delta-log.md`. P5 starts Oct 26 with U-118, the merge desk, which Dave builds.
+1. **Dave reviews and merges U-118 with his bypass** (runbook B2). Push the branch, open the PR, read it, merge `--admin`. Commands below.
+2. **Bootstrap `integration`** (Dave, bypass; added 2026-10-21 on review of PR 134). `integration` was cut before U-118, so it lacks the scope workflow and script, and a PR into it cannot get a passing `scope-manifest`. After the B2 merge, bring `main` into it:
+   ```bash
+   gh pr create --repo defaultdave/ramble --base integration --head main --title "Bootstrap integration with the merge desk" --body "Brings main (U-118) into integration."
+   ```
+   ```bash
+   gh pr merge <PR number> --repo defaultdave/ramble --admin --merge
+   ```
+3. **Switch-on (runbook phase D):**
+   - Dave relaxes the agent prompts for this project (D1, option 1);
+   - the PM runs the dry run (D2);
+   - Dave makes the two hard-line edits (D3).
+3. **Close the architecture guardrail gaps** (Blocked on Dave, item 2) before U-001's agent starts.
+4. **U-001**, the first unit an agent builds and merges itself; its CI checks then go into both rulesets.
+
+Since the freeze, plan files are read-only; departures go in `delta-log.md`.
 
 ## Next chat
 
-**Before you start:** if the freeze is committed and tagged, do runbook phase A (the App) and phase C (rulesets), and run the printed issue commands. If not, finish the freeze in this chat first.
+**Before you start:** push and merge U-118 (runbook B2), bootstrap `integration` (Next, step 2), then do D1 (the allow rules in `.claude/settings.local.json`). About 30 minutes.
 
-**Run:** `/ramble-pm` in a new desktop chat (terminal: `claude --agent ramble-pm`), then paste the prompt. **Model and effort:** Sonnet, medium (U-118 is setup work from a written runbook). No workflow.
+**Run:** `/ramble-pm` in a new desktop chat (terminal: `claude --agent ramble-pm`). **Model and effort:** Sonnet, medium. The dry run follows a written runbook. No workflow.
 
 **Prompt:**
 
 ```
-Read docs/plan/STATUS.md and docs/plan/merge-desk-runbook.md. The plan is frozen (tag plan-frozen-2026-10-20). Start P5 with U-118, the merge desk: do the [PM] steps of runbook phase B on branch unit/U-118 (scripts/merge-desk/app-token.ts, post-check.ts, agent-git.ts, scope-check.ts, revert.sh, and the two workflows), with unit tests for the three TypeScript scripts. Do not run any step marked [Dave] or change any GitHub setting. Log U-118's start in units.yaml and refresh the roadmap. Done looks like: the branch ready for my review, tests passing, a list of the [Dave] steps left. Don't commit to main; stop before push and print the push and PR commands.
+Read docs/plan/STATUS.md and docs/plan/merge-desk-runbook.md. U-118 is merged, integration is bootstrapped, and I have done D1. Run D2, the dry run, through scripts/merge-desk/ and report each of the four results. Do not edit CLAUDE.md or ramble-pm.md (D3 is mine) and do not change GitHub settings. Then close U-118 in units.yaml (actual days, dave minutes), refresh the roadmap, and prepare U-001. Don't commit.
 ```

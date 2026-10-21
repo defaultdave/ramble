@@ -1,0 +1,25 @@
+name: scope-manifest
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+    branches: [main, integration]
+permissions:
+  contents: read
+jobs:
+  scope-manifest:
+    name: scope-manifest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fetch the PR head (metadata only; nothing from it runs)
+        run: git fetch origin "pull/${{ github.event.pull_request.number }}/head:pr-head"
+      - uses: oven-sh/setup-bun@v2
+      - name: Check the PR against the merge rule
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+          PR_HEAD: pr-head
+        run: bun scripts/merge-desk/scope-check.ts

@@ -53,8 +53,20 @@ function must(result: RunResult, what: string): RunResult {
   return result;
 }
 
+const HTTPS_REMOTE = new RegExp(`^https://github\\.com/${REPO}(\\.git)?$`);
+
+/** The App token rides an HTTPS header, so a push URL that is SSH (or another repo) would use Dave's own login. */
+export function assertHttpsRemote(deps: Deps): void {
+  const result = deps.run(["git", "remote", "get-url", "--push", "--all", "origin"], {});
+  const urls = result.stdout.split("\n").map((line) => line.trim()).filter(Boolean);
+  if (result.code !== 0 || urls.length === 0 || !urls.every((url) => HTTPS_REMOTE.test(url))) {
+    throw new Refused(`refused: every push URL of origin must be https://github.com/${REPO}`);
+  }
+}
+
 export async function push(branch: string, deps: Deps): Promise<void> {
   assertPushable(branch);
+  assertHttpsRemote(deps);
   must(
     deps.run(["git", "push", "origin", `refs/heads/${branch}:refs/heads/${branch}`], gitAuthEnv(await deps.token())),
     "git push",
@@ -72,6 +84,10 @@ export async function pr(base: string, title: string, bodyFile: string, deps: De
   must(deps.run(command, { GH_TOKEN: await deps.token() }), "gh pr create");
 }
 
+export function isSync(head: string, base: string): boolean {
+  return base === "integration" && (head === "main" || head.startsWith("sync/"));
+}
+
 export async function automerge(target: string, deps: Deps): Promise<void> {
   if (target.startsWith("-")) throw new Refused(`refused: ${target} is not a PR number or branch`);
   const token = await deps.token();
@@ -79,9 +95,11 @@ export async function automerge(target: string, deps: Deps): Promise<void> {
     deps.run(["gh", "pr", "view", target, "--repo", REPO, "--json", "headRefName,baseRefName"], { GH_TOKEN: token }),
     "gh pr view",
   );
-  const { headRefName } = JSON.parse(view.stdout) as { headRefName: string; baseRefName: string };
+  const { headRefName, baseRefName } = JSON.parse(view.stdout) as { headRefName: string; baseRefName: string };
   assertNotPromotion(headRefName);
-  must(deps.run(["gh", "pr", "merge", target, "--repo", REPO, "--auto", "--squash"], { GH_TOKEN: token }), "gh pr merge");
+  // A sync PR keeps main's commits as ancestors (merge commit); squashing would make the next sync conflict.
+  const method = isSync(headRefName, baseRefName) ? "--merge" : "--squash";
+  must(deps.run(["gh", "pr", "merge", target, "--repo", REPO, "--auto", method], { GH_TOKEN: token }), "gh pr merge");
 }
 
 function realDeps(): Deps {

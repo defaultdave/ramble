@@ -70,7 +70,13 @@ In this demo, the client facts have no one to ask. Where a fact blocks a decisio
 
 ## Blocked on Dave
 1. **Switch-on, after U-118 lands** (runbook phase D): relax the agent prompts for this project (D1, Option 1 recommended), watch the PM's dry run (D2), then the two hard-line edits in `CLAUDE.md` and `ramble-pm.md` (D3).
-2. **Method Layer 0** (open decision 3). Not needed until P6.
+2. **Architecture guardrails, before U-001 starts** (PM roundup 2026-10-21). The rules are written (ADRs, design doc 4.1 and 4.2, stack decisions), but four gaps let an agent drift without a check failing:
+   - no Ramble `.claude/standards/architecture.md`, so `architecture-audit` audits against the global default (data in `lib/`), not the design doc's `src/server/` with `server-only`;
+   - `architecture-audit` is not a required check (only `review-agent`, `qa-agent`, `spec-compliance`, `scope-manifest`);
+   - U-001's manifest says "ESLint" with no import-boundary rules, so layer rules never become a failing CI check; and after U-001, lint and TypeScript config are not on `scope-check.ts`'s protected list;
+   - the global standards edits (Next.js 16.4.1 baseline, `senior` and `review-pr` skills) are uncommitted in vig.
+   Also open: the six pattern notes (U-002, U-003, U-116, U-011, U-005, U-024) are not written; the blank stack-decision cells (package manager, React Compiler, lint set) fall to defaults unless decided.
+3. **Method Layer 0** (open decision 3). Not needed until P6.
 
 Resolved: Figma tools in a new session (2026-10-18, working in the P3 session). Workbook order (2026-10-18: plan Ramble first, extract the templates from its artifacts afterward). The Perf Lab spec conflict: the signed PRD's `PRD-68` is the requirement the detail-page fixes trace to; the router question went to ADR 0001.
 
@@ -82,22 +88,30 @@ Legal and vendor questions for the real job, logged, not blocking the demo: Ramb
 P4 is closed and P5 has started early: U-118 is in progress since 2026-10-20.
 
 1. **Dave reviews and merges U-118 with his bypass** (runbook B2). Push the branch, open the PR, read it, merge `--admin`. Commands below.
-2. **Switch-on (runbook phase D):**
+2. **Bootstrap `integration`** (Dave, bypass; added 2026-10-21 on review of PR 134). `integration` was cut before U-118, so it lacks the scope workflow and script, and a PR into it cannot get a passing `scope-manifest`. After the B2 merge, bring `main` into it:
+   ```bash
+   gh pr create --repo defaultdave/ramble --base integration --head main --title "Bootstrap integration with the merge desk" --body "Brings main (U-118) into integration."
+   ```
+   ```bash
+   gh pr merge <PR number> --repo defaultdave/ramble --admin --merge
+   ```
+3. **Switch-on (runbook phase D):**
    - Dave relaxes the agent prompts for this project (D1, option 1);
    - the PM runs the dry run (D2);
    - Dave makes the two hard-line edits (D3).
-3. **U-001**, the first unit an agent builds and merges itself; its CI checks then go into both rulesets.
+3. **Close the architecture guardrail gaps** (Blocked on Dave, item 2) before U-001's agent starts.
+4. **U-001**, the first unit an agent builds and merges itself; its CI checks then go into both rulesets.
 
 Since the freeze, plan files are read-only; departures go in `delta-log.md`.
 
 ## Next chat
 
-**Before you start:** push and merge U-118 (runbook B2), then do D1 (the allow rules in `.claude/settings.local.json`). About 30 minutes.
+**Before you start:** push and merge U-118 (runbook B2), bootstrap `integration` (Next, step 2), then do D1 (the allow rules in `.claude/settings.local.json`). About 30 minutes.
 
 **Run:** `/ramble-pm` in a new desktop chat (terminal: `claude --agent ramble-pm`). **Model and effort:** Sonnet, medium. The dry run follows a written runbook. No workflow.
 
 **Prompt:**
 
 ```
-Read docs/plan/STATUS.md and docs/plan/merge-desk-runbook.md. U-118 is merged and I have done D1. Run D2, the dry run, through scripts/merge-desk/ and report each of the four results. Do not edit CLAUDE.md or ramble-pm.md (D3 is mine) and do not change GitHub settings. Then close U-118 in units.yaml (actual days, dave minutes), refresh the roadmap, and prepare U-001. Don't commit.
+Read docs/plan/STATUS.md and docs/plan/merge-desk-runbook.md. U-118 is merged, integration is bootstrapped, and I have done D1. Run D2, the dry run, through scripts/merge-desk/ and report each of the four results. Do not edit CLAUDE.md or ramble-pm.md (D3 is mine) and do not change GitHub settings. Then close U-118 in units.yaml (actual days, dave minutes), refresh the roadmap, and prepare U-001. Don't commit.
 ```

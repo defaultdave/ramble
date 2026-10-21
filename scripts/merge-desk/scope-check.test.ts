@@ -55,7 +55,7 @@ test.each([
   expect(check({ title }).ok).toBe(false);
 });
 
-test.each(["U-064a: gift chain", "Revert: U-001: Repo and CI"])("rule 3: %s passes", (title) => {
+test.each(["U-064a: gift chain", "Revert: U-001: Repo and CI", "Revert: Revert: U-001: Repo and CI"])("rule 3: %s passes", (title) => {
   expect(check({ title }).ok).toBe(true);
 });
 

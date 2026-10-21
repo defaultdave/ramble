@@ -57,7 +57,7 @@ export function checkScope(input: ScopeInput): Verdict {
   }
 
   // 3. The title names a unit, or is PM bookkeeping.
-  const title = input.title.replace(/^Revert: /, "");
+  const title = input.title.replace(/^(Revert: )+/, "");
   const bookkeeping = title.startsWith("PM bookkeeping:");
   const unitId = title.match(/^(U-[0-9]+[a-z]*)(?![0-9A-Za-z])/)?.[1];
   if (!bookkeeping && (!unitId || !units.has(unitId))) {
@@ -114,7 +114,7 @@ if (import.meta.main) {
       title: PR_TITLE,
       base: BASE_REF,
       head: HEAD_REF,
-      changedFiles: lines(git(["diff", "--name-only", `${base}...${PR_HEAD}`])),
+      changedFiles: git(["diff", "--name-only", "-z", "--no-renames", `${base}...${PR_HEAD}`]).split("\0").filter(Boolean),
       units: parseUnits(readFileSync("docs/plan/units.yaml", "utf8")),
       carriesIntegrationCommits: onIntegration.some((sha) => onMain.has(sha)),
       aheadOfMain: onMain.size > 0,

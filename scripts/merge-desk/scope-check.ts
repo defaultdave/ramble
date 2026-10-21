@@ -48,48 +48,37 @@ const pass = (reason: string): Verdict => ({ ok: true, reason });
 /** Unit fields a bookkeeping PR may change (Dave's rule): progress and actuals, never the plan. */
 export const BOOKKEEPING_FIELDS = ["status", "actual_days", "dave_minutes", "tokens", "note"];
 
-/** Splits units.yaml into its header and, per unit, the text of each 4-space-indented field. */
-function unitFields(yaml: string): { header: string; order: string[]; fields: Map<string, Map<string, string>> } {
-  const fields = new Map<string, Map<string, string>>();
-  const order: string[] = [];
-  const header: string[] = [];
-  let unit: Map<string, string> | null = null;
-  let key: string | null = null;
-  for (const line of yaml.split("\n")) {
-    const id = line.match(/^ {2}- id: (\S+)\s*$/);
-    if (id) {
-      unit = new Map([["id", line]]);
-      fields.set(id[1], unit);
-      order.push(id[1]);
-      key = "id";
-      continue;
-    }
-    if (!unit) {
-      header.push(line);
-      continue;
-    }
-    const field = line.match(/^ {4}([A-Za-z_]+):/);
-    if (field) key = field[1];
-    unit.set(key!, `${unit.get(key!) ?? ""}${unit.has(key!) ? "\n" : ""}${line}`);
+type UnitRecord = Record<string, unknown>;
+type UnitsFile = Record<string, unknown> & { units?: UnitRecord[] };
+
+/** Parses the YAML itself, so flow-style or otherwise unusual entries cannot hide inside a line-based reading. */
+function parseUnitsFile(yaml: string): UnitsFile {
+  const parsed: unknown = Bun.YAML.parse(yaml);
+  if (typeof parsed !== "object" || parsed === null || !Array.isArray((parsed as UnitsFile).units)) {
+    throw new Error("units.yaml must be a mapping with a units list");
   }
-  return { header: header.join("\n"), order, fields };
+  return parsed as UnitsFile;
 }
+
+const same = (x: unknown, y: unknown) => JSON.stringify(x) === JSON.stringify(y);
 
 /** Lists what a bookkeeping edit of units.yaml changed beyond BOOKKEEPING_FIELDS. Empty means allowed. */
 export function unitsYamlViolations(before: string, after: string): string[] {
-  const a = unitFields(before);
-  const b = unitFields(after);
+  const a = parseUnitsFile(before);
+  const b = parseUnitsFile(after);
   const problems: string[] = [];
-  if (a.header !== b.header) problems.push("the file header changed");
-  if (a.order.join(",") !== b.order.join(",")) problems.push("units were added, removed, or reordered");
-  for (const id of a.order) {
-    const x = a.fields.get(id);
-    const y = b.fields.get(id);
-    if (!x || !y) continue;
-    for (const field of new Set([...x.keys(), ...y.keys()])) {
-      if (BOOKKEEPING_FIELDS.includes(field)) continue;
-      if (x.get(field) !== y.get(field)) problems.push(`${id}.${field}`);
-    }
+  for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    if (key !== "units" && !same(a[key], b[key])) problems.push(`top-level ${key}`);
+  }
+  const x = a.units ?? [];
+  const y = b.units ?? [];
+  if (!same(x.map((unit) => unit.id), y.map((unit) => unit.id))) problems.push("units were added, removed, or reordered");
+  else {
+    x.forEach((unit, index) => {
+      for (const field of new Set([...Object.keys(unit), ...Object.keys(y[index])])) {
+        if (!BOOKKEEPING_FIELDS.includes(field) && !same(unit[field], y[index][field])) problems.push(`${unit.id}.${field}`);
+      }
+    });
   }
   return problems;
 }

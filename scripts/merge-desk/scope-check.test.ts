@@ -180,11 +180,26 @@ test.each([
   ["dependencies", "[U-118]", "[]", "U-001.depends_on"],
   ["estimate", "m: 2", "m: 1", "U-001.estimate_days"],
   ["title", 'title: "x"', 'title: "y"', "U-001.title"],
-  ["header", "# header", "# changed", "the file header changed"],
+  ["a top-level key", "units:\n", "version: 2\nunits:\n", "top-level version"],
 ])("bookkeeping cannot change %s", (_label, from, to, expected) => {
   const after = UNITS_YAML.replace(from, to);
   expect(unitsYamlViolations(UNITS_YAML, after)).toContain(expected);
   expect(bookkeeping(after).ok).toBe(false);
+});
+
+test("bookkeeping cannot smuggle a unit in as a flow-style entry after the last field", () => {
+  const after = `${UNITS_YAML}  - {id: U-999, review: standard, status: todo}\n`;
+  expect(unitsYamlViolations(UNITS_YAML, after)).toContain("units were added, removed, or reordered");
+  expect(bookkeeping(after).ok).toBe(false);
+});
+
+test("bookkeeping cannot hide a changed field behind flow-style syntax", () => {
+  const after = UNITS_YAML.replace("    review: standard\n", "    {review: critical}\n");
+  expect(() => unitsYamlViolations(UNITS_YAML, after)).toThrow();
+});
+
+test("a comment-only change is harmless", () => {
+  expect(unitsYamlViolations(UNITS_YAML, UNITS_YAML.replace("# header", "# changed"))).toEqual([]);
 });
 
 test("bookkeeping cannot add, remove, or reorder units", () => {

@@ -1,6 +1,6 @@
 {
-  "asOf": "2026-10-20",
-  "headline": "The plan is frozen and the repo is public. The build starts Mon Oct 26 with the merge desk (U-118), which Dave leads.",
+  "asOf": "2026-10-21",
+  "headline": "The build started early, Oct 20, with the merge desk (U-118) half done on day one. The current forecast puts the Prototype at Nov 16 and launch at Feb 24, about two weeks ahead of the frozen plan.",
   "recommended": "Plan, Dave 12.5 h",
   "phases": [
     {
@@ -41,9 +41,9 @@
     {
       "id": "P5",
       "name": "Build",
-      "state": "next",
-      "when": "From Oct 26",
-      "note": "Prototype first, then the full build"
+      "state": "now",
+      "when": "From Oct 20",
+      "note": "U-118, the merge desk, in progress"
     },
     {
       "id": "P6",
@@ -110,7 +110,7 @@
   "actionsForDave": [
     {
       "title": "Review and merge U-118 (the merge desk)",
-      "detail": "The PM writes the files; you merge with your bypass (runbook B2, --admin). About an hour, first week of the build.",
+      "detail": "The PM writes the files in a fresh session (STATUS, Next chat); you merge with your bypass (runbook B2, --admin).",
       "where": "docs/plan/merge-desk-runbook.md"
     }
   ],
@@ -127,6 +127,10 @@
     }
   ],
   "decisionsMade": [
+    {
+      "when": "Oct 21",
+      "what": "Start the build now instead of Oct 26, with a push this week; the forecast is refit from today (frozen plan unchanged)"
+    },
     {
       "when": "Oct 20",
       "what": "Plan frozen (tag plan-frozen-2026-10-20); repo public with secret scanning; 133 unit issues on the board; merge rules live"
@@ -229,5 +233,24 @@
     "measurement": "Measurement",
     "seo": "SEO and old-site move",
     "launch": "Launch readiness"
+  },
+  "scenarioLabels": [
+    "20 h this week, then 12.5 h",
+    "Steady 12.5 h"
+  ],
+  "scenarioNotes": [
+    "Current forecast (Oct 21): started Oct 21 with U-118 half done; Dave puts in about 20 hours this week, then 12.5 a week. Agents merge their own work once U-118 lands.",
+    "The same start and progress, with Dave at a steady 12.5 hours a week from today."
+  ],
+  "forecastNote": "Forecast from Oct 21, with U-118 half done; the switch above sets this week’s hours.",
+  "frozen": {
+    "prototype": {
+      "likely": "2026-11-30",
+      "late": "2026-12-07"
+    },
+    "launch": {
+      "likely": "2027-03-08",
+      "late": "2027-03-26"
+    }
   }
 }

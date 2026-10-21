@@ -52,7 +52,12 @@ const wanted = [
   { name: "Sprint", type: "SINGLE_SELECT", options: sprints.map(sprintLabel) },
 ];
 for (const w of wanted) {
-  if (fields.some((f) => f.name === w.name)) continue;
+  const have = fields.find((f) => f.name === w.name);
+  // A refit moves the sprint calendar; the Sprint field is rebuilt with the new labels, since every unit's value is reset below.
+  const stale = have && w.options && (have.options ?? []).map((o) => o.name).join("|") !== w.options.join("|");
+  if (have && !stale) continue;
+  if (have && stale && !run) console.log(`would rebuild field "${w.name}" with new options`);
+  if (have && stale && run) gh(["project", "field-delete", "--id", have.id]);
   if (!run) {
     console.log(`would create field "${w.name}" (${w.type}${w.options ? `: ${w.options.join(", ")}` : ""})`);
     continue;

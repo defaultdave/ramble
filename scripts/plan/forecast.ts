@@ -15,6 +15,7 @@
 //   --seed N             random seed (default 6), so the generated blocks are reproducible
 //   --start YYYY-MM-DD   first P5 working day (default 2026-10-26)
 //   --deadline YYYY-MM-DD  the client's date, for the chance of making it (default 2026-12-01, PRD Q-07)
+//   --remaining U=S,...  work already done before the start: each listed unit keeps share S (0 to 1) of its days
 //   --systemic O,M,P     one factor per run on every unit's days and Dave's gate minutes (default SYSTEMIC); 1,1,1 turns it off
 //   --write FILE         replace the generated block in FILE: <!-- forecast:BLOCK:start --> ... <!-- forecast:BLOCK:end -->,
 //                        where BLOCK is the report name, plus "-real-job" with --scope real-job and "+should" with --should
@@ -96,6 +97,8 @@ interface Scenario {
   merge?: "dave" | "tiered";
   /** Agents and Dave take the Prototype units before anything else. */
   prototypeFirst?: boolean;
+  /** A push at the start: these hours a week for each person, for the first `weeks` weeks. */
+  push?: { weeks: number; hours: number };
 }
 
 /** The units the 2026-10-20 freeze decisions moved to agents: lever 2 (U-093, U-096) and lever 4a (the pattern-setters). */
@@ -115,6 +118,9 @@ const SCENARIOS: Scenario[] = [
   { name: "Plan, Dave 10 h", people: [10], agents: true, ...TIERED },
   { name: "Plan, Dave 12.5 h", people: [12.5], agents: true, ...TIERED },
   { name: "Plan, Dave 15 h", people: [15], agents: true, ...TIERED },
+  // The current forecast after an early start (delta log, 2026-10-21): a push in the first week, then the usual hours.
+  { name: "Push: 20 h this week, then 12.5 h", people: [12.5], agents: true, ...TIERED, push: { weeks: 1, hours: 20 } },
+  { name: "Push: 30 h this week, then 12.5 h", people: [12.5], agents: true, ...TIERED, push: { weeks: 1, hours: 30 } },
   { name: "Plan, Dave 12.5 h, WIP 4", people: [12.5], agents: true, ...TIERED, wip: 4 },
   { name: "Plan, Dave 12.5 h, Prototype not first", people: [12.5], agents: true, ...TIERED, prototypeFirst: false },
   // Comparisons.
@@ -143,6 +149,18 @@ const systemicArg = option("systemic", "").split(",").map(Number);
 if (systemicArg.length > 1 && (systemicArg.length !== 3 || !(systemicArg[0] <= systemicArg[1] && systemicArg[1] <= systemicArg[2])))
   throw new Error("--systemic takes three ascending numbers, O,M,P");
 const systemicOf: Three = systemicArg.length === 3 ? { o: systemicArg[0], m: systemicArg[1], p: systemicArg[2] } : SYSTEMIC;
+/** Work already done before the start, as each unit's share still to do: --remaining U-118=0.5,U-001=0.8 */
+const remaining = new Map(
+  option("remaining", "")
+    .split(",")
+    .filter(Boolean)
+    .map((x) => {
+      const [id, share] = x.split("=");
+      const n = Number(share);
+      if (!id || !(n >= 0 && n <= 1)) throw new Error(`--remaining takes UNIT=share pairs with share 0 to 1; got "${x}"`);
+      return [id, n] as const;
+    }),
+);
 
 const all = await loadUnits();
 const picked = selectScope(all, scope satisfies ScopeName, withShould);
@@ -256,8 +274,9 @@ function drawRun(r: () => number): Draw {
   const solo = new Map<string, number>();
   const uniform = new Map<string, number>();
   for (const u of units) {
-    routed.set(u.id, k * pert(points3(u) as Three, r));
-    solo.set(u.id, k * pert(soloOf(u), r));
+    const left = remaining.get(u.id) ?? 1;
+    routed.set(u.id, left * k * pert(points3(u) as Three, r));
+    solo.set(u.id, left * k * pert(soloOf(u), r));
     uniform.set(u.id, r());
   }
   const tasks = sum(DAVE_TASKS.filter((t) => t.scope === "demo" && t.phase === "P5").map((t) => t.minutes));
@@ -447,7 +466,7 @@ function simulate(sc: Scenario, draw: Draw): Outcome {
   for (const u of units) if (lookup(waiting, u.id) === 0) release(u);
 
   let week = 0;
-  const cap = sc.people.map((h) => (h / 5) * DT);
+  const capAt = (p: number) => ((sc.push && t < sc.push.weeks * 5 ? sc.push.hours : sc.people[p]) / 5) * DT;
   while (open > 0) {
     if (t > 2000) throw new Error(`${sc.name}: no finish after 2000 working days`);
     if (Math.floor(t / 5 + 1e-9) > week) {
@@ -463,7 +482,7 @@ function simulate(sc: Scenario, draw: Draw): Outcome {
         b.then();
       }
     for (let p = 0; p < sc.people.length; p++) {
-      let left = cap[p];
+      let left = capAt(p);
       while (left > 1e-9) {
         let job: Job | null = null;
         let isGate = false;
@@ -621,7 +640,7 @@ if (report === "schedule") {
     };
   });
   const json = {
-    generated: `bun scripts/plan/forecast.ts --report schedule --runs ${runs} --seed ${seed} --start ${start}`,
+    generated: `bun scripts/plan/forecast.ts --report schedule --runs ${runs} --seed ${seed} --start ${start}${remaining.size ? ` --remaining ${[...remaining].map(([id, s]) => `${id}=${s}`).join(",")}` : ""} --scenarios "${names.join("|")}" --out docs/plan/roadmap/schedule.json`,
     start,
     deadline,
     runs,

@@ -44,6 +44,7 @@ Dave works one item at a time. Give him the single next action, not a menu.
   - update `docs/plan/roadmap/status.json` from `STATUS.md` and `DECISIONS.md`;
   - regenerate the schedule with `bun scripts/plan/forecast.ts --report schedule --out docs/plan/roadmap/schedule.json`;
   - rebuild with `bun scripts/plan/roadmap.ts`;
+  - sync the project board's Start date, Target date, and Sprint fields with `bun scripts/plan/board-dates.ts --run`;
   - republish `docs/plan/roadmap/index.html` to https://claude.ai/artifact/8vvxU5shDbM9uQkYSTLEiw.
 - Update memory only with what a future session needs and cannot get from the repo.
 

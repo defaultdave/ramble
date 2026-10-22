@@ -1,6 +1,6 @@
 {
   "asOf": "2026-10-21",
-  "headline": "The build started early, Oct 20, with the merge desk (U-118) half done on day one. The current forecast puts the Prototype at Nov 16 and launch at Feb 24, about two weeks ahead of the frozen plan.",
+  "headline": "The merge desk (U-118) closed Oct 21, two days after the early start, and agents can now merge their own work, starting with your approval on each PR. The forecast puts the Prototype at Nov 13 and launch at Feb 23, about two weeks ahead of the frozen plan.",
   "recommended": "Plan, Dave 12.5 h",
   "phases": [
     {
@@ -43,7 +43,7 @@
       "name": "Build",
       "state": "now",
       "when": "From Oct 20",
-      "note": "Agent auto-merge is on (Oct 21). Next: the architecture guardrails, then U-001"
+      "note": "U-118 done Oct 21 (2 days against 3); agent auto-merge is on. Next: the architecture guardrails, then U-001"
     },
     {
       "id": "P6",
@@ -110,7 +110,7 @@
   "actionsForDave": [
     {
       "title": "Open the approval window",
-      "detail": "Push the new review command and approval-window.sh, then run scripts/merge-desk/approval-window.sh on. Every agent PR then waits for your approval until you run it with off. U-118 closes once the PM has your minutes.",
+      "detail": "Push the new review command and approval-window.sh, then run scripts/merge-desk/approval-window.sh on. Every agent PR then waits for your approval until you run it with off. Also close issue #2: U-118 is done.",
       "where": "docs/plan/STATUS.md"
     }
   ],
@@ -259,10 +259,10 @@
     "Steady 12.5 h"
   ],
   "scenarioNotes": [
-    "Current forecast (Oct 21): started Oct 21 with U-118 half done; Dave puts in about 20 hours this week, then 12.5 a week. Agents merge their own work once U-118 lands.",
+    "Current forecast (Oct 21, refit): from Oct 22 with U-118 done; Dave puts in about 20 hours this week, then 12.5 a week. Agents merge their own work, with Dave approving each PR at first.",
     "The same start and progress, with Dave at a steady 12.5 hours a week from today."
   ],
-  "forecastNote": "Forecast from Oct 21, with U-118 half done; the switch above sets this week’s hours.",
+  "forecastNote": "Forecast from Oct 22, with U-118 done; the switch above sets this week’s hours.",
   "frozen": {
     "prototype": {
       "likely": "2026-11-30",

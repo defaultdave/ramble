@@ -23,10 +23,11 @@ units:
     execution: agent-fan-out
     review: standard
     estimate_days: { o: 0.5, m: 1, p: 2 }
-    actual_days: null
+    actual_days: 1
     dave_minutes: null
     tokens: null
-    status: todo
+    status: done
+    note: "Done 2026-10-21 (PR 143, main ab66611), built by an agent in one calendar day against 1 likely. Copilot review caught the vendor-SDK wrapper mapping and inline type imports; the stack-decisions cells were uncommitted when the agent branched, so U-002 carried strict-type-checked."
   - id: U-118
     title: "Merge desk and agent identity"
     section: platform
@@ -65,11 +66,11 @@ units:
     execution: agent-fan-out
     review: critical
     estimate_days: { o: 0.5, m: 1, p: 2 }
-    actual_days: null
+    actual_days: 1
     dave_minutes: null
     tokens: null
-    status: todo
-    note: "Pattern-setter built by agents (lever 4a, DECISIONS 2026-10-20): Dave writes the pattern note into its scope manifest, and it is on the critical tier so he reads it in the promotion batch"
+    status: done
+    note: "Pattern-setter built by agents (lever 4a, DECISIONS 2026-10-20): Dave writes the pattern note into its scope manifest, and it is on the critical tier so he reads it in the promotion batch Done 2026-10-21 (PR 145 into integration, 383235a; reaches main at the next promotion). Added cacheComponents, strict-type-checked, the route table smoke, and the Vercel preview (Dave)."
   - id: U-003
     title: "Database wiring and migrations"
     section: platform

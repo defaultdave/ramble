@@ -1,6 +1,6 @@
 {
-  "asOf": "2026-10-21",
-  "headline": "The merge desk (U-118) closed Oct 21, two days after the early start, and agents can now merge their own work, starting with your approval on each PR. The forecast puts the Prototype at Nov 13 and launch at Feb 23, about two weeks ahead of the frozen plan.",
+  "asOf": "2026-10-22",
+  "headline": "U-001 and U-002 merged Oct 21, and Vercel now builds every push from GitHub; production deploys wait for your promote. Eight units are ready, U-003 first. The forecast still puts the Prototype at Nov 13 and launch at Feb 23.",
   "recommended": "Plan, Dave 12.5 h",
   "phases": [
     {
@@ -109,8 +109,8 @@
   ],
   "actionsForDave": [
     {
-      "title": "Start U-001 and approve its PR",
-      "detail": "Run /senior #1 in a new chat in the ramble folder (prompt in STATUS). Its PR will ask for your review; approving it merges it.",
+      "title": "Write U-003's pattern note, then start it",
+      "detail": "Add the note to issue #4's scope manifest, then run /senior #4 in a new chat in the ramble folder (prompt in STATUS).",
       "where": "docs/plan/STATUS.md"
     }
   ],
@@ -122,6 +122,14 @@
     }
   ],
   "decisionsMade": [
+    {
+      "when": "Oct 22",
+      "what": "Vercel Web Analytics and Speed Insights added as U-119 (half a day, agent-built), guest pages only, never checkout"
+    },
+    {
+      "when": "Oct 22",
+      "what": "Vercel connected to GitHub: a preview for every push; production builds from main are staged until you promote them"
+    },
     {
       "when": "Oct 21",
       "what": "Approval window is on. App stack for U-001: pnpm, React Compiler on, strict type-checked lint"

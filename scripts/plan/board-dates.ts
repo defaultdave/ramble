@@ -1,14 +1,15 @@
 #!/usr/bin/env bun
 // Puts the forecast's dates on the "Ramble" project board, so GitHub's roadmap view can draw the plan: each unit's
 // likely (P50) start and finish under the plan of record, and the sprint it finishes in. Read from
-// docs/plan/roadmap/schedule.json (bun scripts/plan/forecast.ts --report schedule ...), the same data as the roadmap page.
+// roadmap/schedule.json in the ramble-pm repo (bun scripts/plan/forecast.ts --report schedule ...), the same data as the
+// roadmap page.
 //
 // Run: bun scripts/plan/board-dates.ts          print what it would set
 //      bun scripts/plan/board-dates.ts --run    create the fields if missing, then set every scheduled unit's values
-// A unit already started keeps the real Start date set on the board.
+// A unit already started (board Status other than Todo) keeps the real Start date set on the board.
 // Units the schedule leaves out (the Shoulds, the real-job adapter, the post-launch tail) keep empty dates.
 
-import { flag, loadUnits, lookup, option } from "./units";
+import { flag, option, siteDir } from "./units";
 
 const OWNER = "defaultdave";
 const BOARD = 19;
@@ -29,8 +30,7 @@ type Planned = { id: string; start: number; end: number; startDate: string; endD
 type Schedule = { sprints: Sprint[]; scenarios: { name: string; units: Planned[] }[] };
 type Field = { id: string; name: string; type: string; options?: { id: string; name: string }[] };
 
-const schedule: Schedule = await Bun.file(new URL("../../docs/plan/roadmap/schedule.json", import.meta.url)).json();
-const statusOf = new Map((await loadUnits()).map((u) => [u.id, u.status]));
+const schedule: Schedule = await Bun.file(`${siteDir()}/roadmap/schedule.json`).json();
 const scenarioName = option("scenario", schedule.scenarios[0].name);
 const scenario = schedule.scenarios.find((s) => s.name === scenarioName);
 if (!scenario) throw new Error(`schedule.json has no scenario "${scenarioName}"`);
@@ -79,19 +79,20 @@ if (run) fields = listFields();
 const field = (name: string) => fields.find((f) => f.name === name);
 
 // Board items carry the unit ID in the "Unit ID" field, which gh's JSON names "unit ID".
+type Item = { id: string; "unit ID"?: string; status?: string };
 const items = (
   JSON.parse(gh(["project", "item-list", String(BOARD), "--owner", OWNER, "--limit", "500", "--format", "json"])) as {
-    items: { id: string; "unit ID"?: string }[];
+    items: Item[];
   }
 ).items;
-const itemOf = new Map(items.filter((i) => i["unit ID"]).map((i) => [i["unit ID"] as string, i.id]));
+const itemOf = new Map(items.filter((i) => i["unit ID"]).map((i) => [i["unit ID"] as string, i]));
 const missing = scenario.units.filter((u) => !itemOf.has(u.id)).map((u) => u.id);
 if (missing.length) console.error(`no board item for ${missing.join(", ")}`);
 
 let set = 0;
 for (const u of scenario.units) {
-  const itemId = itemOf.get(u.id);
-  if (!itemId) continue;
+  const item = itemOf.get(u.id);
+  if (!item) continue;
   const sp = sprintLabel(sprintOf(u));
   if (!run) {
     console.log(`${u.id}: ${u.startDate} to ${u.endDate}, ${sp}`);
@@ -100,10 +101,10 @@ for (const u of scenario.units) {
   const edit = (name: string, flagName: string, value: string) => {
     const f = field(name);
     if (!f) throw new Error(`board has no field "${name}"`);
-    gh(["project", "item-edit", "--id", itemId, "--project-id", projectId, "--field-id", f.id, flagName, value]);
+    gh(["project", "item-edit", "--id", item.id, "--project-id", projectId, "--field-id", f.id, flagName, value]);
   };
   // A unit already under way keeps its real start date on the board; the forecast only knows the planned one.
-  if (lookup(statusOf, u.id) === "todo") edit("Start date", "--date", u.startDate);
+  if ((item.status ?? "Todo") === "Todo") edit("Start date", "--date", u.startDate);
   edit("Target date", "--date", u.endDate);
   const opt = field("Sprint")?.options?.find((o) => o.name === sp);
   if (!opt) throw new Error(`Sprint field has no option "${sp}"; delete the field and rerun to rebuild its options`);

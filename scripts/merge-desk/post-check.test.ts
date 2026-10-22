@@ -19,7 +19,7 @@ test("cuts the summary to 65,000 characters", () => {
   expect(run.output.summary.length).toBe(SUMMARY_LIMIT);
 });
 
-test("rejects a check name that is not one of the three agent checks", () => {
+test("rejects a check name that is not one of the four agent checks", () => {
   expect(() => buildCheckRun({ ...input, name: "scope-manifest" })).toThrow("--name");
 });
 

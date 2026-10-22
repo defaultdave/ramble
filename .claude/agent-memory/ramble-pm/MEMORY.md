@@ -40,7 +40,7 @@ Full list with reasons in `DECISIONS.md`.
 - The PM never runs a step that changes GitHub settings or Claude permission config.
 - User-level `ask` rules (git push, gh pr create/merge) take precedence over project `allow` rules. The runbook's answer is a narrow wrapper, `scripts/merge-desk/agent-git.ts`, allowed per project.
 - Call the merge desk scripts as bare commands from the main checkout. The allow rule matches the whole command line, so a `cd … &&` prefix falls through to auto mode, which refuses `automerge`. `revert.sh` switches branches, so run it in a clean worktree (D2 dry run, 2026-10-21).
-- A sync PR (`main` into `integration`) needs the three agent checks posted as well as `scope-manifest`; the PM posts them once `scope-manifest` passes (first sync, PR 141).
+- A sync PR (`main` into `integration`) needs the four agent checks posted (`architecture-audit` joined them on 2026-10-22) as well as `scope-manifest`; the PM posts them once `scope-manifest` passes (first sync, PR 141).
 
 - Parallel work: when three or more agent-built units are ready with disjoint file scopes, propose running them together, up to 8 open at once. The owner's review time is the real limit. Workflows run only on the owner's opt-in.
 

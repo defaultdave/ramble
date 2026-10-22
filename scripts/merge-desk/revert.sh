@@ -20,6 +20,6 @@ printf 'Reverts #%s (merge commit %s).\n' "$pr" "$sha" > "$body"
 bun scripts/merge-desk/agent-git.ts push "$branch"
 bun scripts/merge-desk/agent-git.ts pr "$base" "Revert: $title" "$body"
 bun scripts/merge-desk/agent-git.ts automerge "$branch"
-# Auto-merge is only queued. The revert merges after review-agent, qa-agent, and spec-compliance are posted
+# Auto-merge is only queued. The revert merges after review-agent, qa-agent, spec-compliance, and architecture-audit are posted
 # for this head sha (post-check.ts); this script does not run those reviewers.
-echo "Revert PR queued on $(git rev-parse HEAD). Post the three agent checks for that sha to let it merge." >&2
+echo "Revert PR queued on $(git rev-parse HEAD). Post the four agent checks for that sha to let it merge." >&2

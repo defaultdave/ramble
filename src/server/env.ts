@@ -18,5 +18,4 @@ function readEnv() {
   return result.data;
 }
 
-/** The only reader of `process.env` (SET-19). Importing this module validates it. */
 export const env = readEnv();

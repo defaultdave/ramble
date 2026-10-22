@@ -9,7 +9,6 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  # One job per gate (SET-17), so a failure names the gate that broke.
   gate:
     name: ${{ matrix.script }}
     runs-on: ubuntu-latest

@@ -1,9 +1,5 @@
-// Import-boundary lint (ARCH-7, architecture.md "Layers"). Kept apart from eslint.config.mjs so the
-// config reads as: framework presets, then these boundaries, then prettier.
-
 const root = import.meta.dirname;
 
-// Vendor SDKs, each allowed only inside its wrapper folder (architecture.md, "Imports point one way").
 const vendorSdkPatterns = [
   'drizzle-orm',
   'drizzle-orm/*',
@@ -20,7 +16,6 @@ const vendorSdkPatterns = [
   'web-vitals/*',
 ];
 
-// Wrapper folders where vendor SDKs may be imported.
 const vendorWrapperFiles = [
   'src/server/db/**',
   'src/server/auth/**',
@@ -32,7 +27,6 @@ const vendorWrapperFiles = [
 const vendorMessage =
   'Vendor SDKs are imported only inside their wrapper folder (src/server/db, auth, ports/<port>, analytics, monitoring).';
 
-// `src/lib` is browser-safe plain functions: no framework, no server-only, no SDK.
 const libPackagePatterns = [
   'react',
   'react/*',
@@ -45,7 +39,6 @@ const libPackagePatterns = [
 
 const boundaryMessage = (text) => ({ message: text });
 
-/** The import-boundary configs. Rule names are spelled out so a weakened config is easy to spot. */
 export const boundaryConfigs = [
   {
     name: 'ramble/boundaries/layers',
@@ -145,9 +138,8 @@ export const boundaryConfigs = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// Type-only imports are allowed across layers (architecture.md). eslint-plugin-import's
-// no-restricted-paths has no such option, so wrap the rule and drop reports on `import type`.
+// eslint-plugin-import's no-restricted-paths cannot allow type-only imports, so the rule is
+// wrapped to drop reports on them.
 
 function isTypeOnly(sourceNode) {
   const declaration = sourceNode?.parent;

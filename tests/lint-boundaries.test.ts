@@ -2,9 +2,6 @@ import path from 'node:path';
 import { ESLint } from 'eslint';
 import { describe, expect, it } from 'vitest';
 
-// One bad fixture per boundary rule, linted with the real config. If someone weakens a rule,
-// its fixture stops failing and this test fails CI.
-
 const root = path.resolve(import.meta.dirname, '..');
 const eslint = new ESLint({ cwd: root });
 

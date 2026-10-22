@@ -31,7 +31,7 @@ Full list with reasons in `DECISIONS.md`.
 - Mobile first from the design phase on; the desktop v0 is a content inventory (2026-09-28).
 - Discovery interviews were skipped on 2026-10-18. The PRD is drafted from `docs/product/discovery/sealed/client-brief.md`, which the PM may read. `ramble-client` stays available for follow-up questions.
 - Prior client work is evidence, never a template.
-- Build workflow (2026-10-20, ADR 0010): one person plus an agent team. Tiered auto-merge, with standard-tier units merging to `main` and critical-tier units to `integration`, promoted weekly. A Prototype milestone comes first. Switched on 2026-10-21 after the dry run (PRs 137 to 140).
+- Build workflow (2026-10-20, ADR 0010): one person plus an agent team. Tiered auto-merge, with standard-tier units merging to `main` and critical-tier units to `integration`, promoted weekly. A Prototype milestone comes first. Switched on 2026-10-21 after the dry run (PRs 137 to 140). It starts with an approval window: the rulesets require 1 approval from the owner until the owner closes it (`approval-window.sh`), and agents request the owner's review on every PR with `agent-git.ts review`.
 
 ## Working rules
 - Research agents read pages only: never pickers, carts, checkouts, forms, sign-ins, or Playwright on live sites. An agent once clicked into a live checkout.
@@ -39,6 +39,7 @@ Full list with reasons in `DECISIONS.md`.
 - The PM never runs a step that changes GitHub settings or Claude permission config.
 - User-level `ask` rules (git push, gh pr create/merge) take precedence over project `allow` rules. The runbook's answer is a narrow wrapper, `scripts/merge-desk/agent-git.ts`, allowed per project.
 - Call the merge desk scripts as bare commands from the main checkout. The allow rule matches the whole command line, so a `cd … &&` prefix falls through to auto mode, which refuses `automerge`. `revert.sh` switches branches, so run it in a clean worktree (D2 dry run, 2026-10-21).
+- A sync PR (`main` into `integration`) needs the three agent checks posted as well as `scope-manifest`; the PM posts them once `scope-manifest` passes (first sync, PR 141).
 
 ## Lessons from the P4 spikes (2026-10-19)
 - Figma Code Connect publishing is refused on the Professional plan (Organization or Enterprise only), although Figma's help pages suggested otherwise. See `docs/adr/research/u-028-code-connect-spike.md`.

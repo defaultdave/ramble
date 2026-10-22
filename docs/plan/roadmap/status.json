@@ -109,8 +109,8 @@
   ],
   "actionsForDave": [
     {
-      "title": "Commit today's plan changes and give U-118's minutes",
-      "detail": "The switch-on edits and the dry-run records are uncommitted on main. U-118 closes once the PM has your minutes.",
+      "title": "Open the approval window",
+      "detail": "Push the new review command and approval-window.sh, then run scripts/merge-desk/approval-window.sh on. Every agent PR then waits for your approval until you run it with off. U-118 closes once the PM has your minutes.",
       "where": "docs/plan/STATUS.md"
     }
   ],
@@ -127,6 +127,10 @@
     }
   ],
   "decisionsMade": [
+    {
+      "when": "Oct 21",
+      "what": "You approve the first agent PRs yourself (rulesets require 1 approval) until you say automated checks alone may merge"
+    },
     {
       "when": "Oct 21",
       "what": "Agent auto-merge switched on: standard-tier units merge to main and critical-tier units to integration when every check passes"

@@ -100,26 +100,21 @@
   ],
   "decisionsNeeded": [
     {
-      "title": "Close the architecture guardrails before U-001",
-      "detail": "Ramble's layer rules are written and U-001 carries the import-boundary lint. Still open: architecture-audit as a required check, lint and TypeScript config on the protected list, and the standards commits in the shared agent repo.",
-      "impact": "U-001 is the first unit an agent builds and merges itself; without these, a layer break can merge with every check green.",
-      "recommendation": "Close them in the next session, before U-001 starts",
-      "blocks": "U-001"
+      "title": "Make architecture-audit a required check",
+      "detail": "Ramble's layer rules are written, U-001 carries the import-boundary lint, and the stack settings are decided. architecture-audit is still not required on either branch.",
+      "impact": "Does not move any date. Each PR then needs one more posted check; without it a layer break relies on the lint alone.",
+      "recommendation": "Add it once U-001 has merged and the lint exists",
+      "blocks": "Nothing"
     }
   ],
   "actionsForDave": [
     {
-      "title": "Open the approval window",
-      "detail": "Push the new review command and approval-window.sh, then run scripts/merge-desk/approval-window.sh on. Every agent PR then waits for your approval until you run it with off. Also close issue #2: U-118 is done.",
+      "title": "Start U-001 and approve its PR",
+      "detail": "Run /senior #1 in a new chat in the ramble folder (prompt in STATUS). Its PR will ask for your review; approving it merges it.",
       "where": "docs/plan/STATUS.md"
     }
   ],
   "heldUp": [
-    {
-      "what": "U-001, the first agent-built unit",
-      "waitingOn": "The architecture guardrail gaps",
-      "owner": "Dave"
-    },
     {
       "what": "Real-job only: legal review, sponsor terms, Stripe review",
       "waitingOn": "Client facts with no one to ask in this demo; logged, not blocking",
@@ -127,6 +122,10 @@
     }
   ],
   "decisionsMade": [
+    {
+      "when": "Oct 21",
+      "what": "Approval window is on. App stack for U-001: pnpm, React Compiler on, strict type-checked lint"
+    },
     {
       "when": "Oct 21",
       "what": "You approve the first agent PRs yourself (rulesets require 1 approval) until you say automated checks alone may merge"

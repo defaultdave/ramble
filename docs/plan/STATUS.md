@@ -1,6 +1,6 @@
 # Status
 
-**Updated:** 2026-10-21 (U-118 done; approval window)
+**Updated:** 2026-10-21 (approval window on; U-001 ready)
 **Phase:** P1 ✅, P2 ✅, and the P3 gate ✅ (all 2026-10-18; the mobile flow and States page are signed off). P3 is complete, including the desktop revision. **P4 Plan started 2026-10-18:** artifacts 1 to 7 done; Dave adopted the recommendations on 2026-10-20 (tiered merge plus levers 2, 3, 4a; December 1 moves). Applied to every plan file. **Plan frozen 2026-10-20:** tag `plan-frozen-2026-10-20` on `8715c42` (history rewritten first to drop personal notes; see `delta-log.md`). Repo public with secret scanning and push protection; GitHub App created (phase A); merge settings, `integration`, and rulesets live (phase C); 133 unit issues on board #19. **P5 started early, 2026-10-20,** with U-118 (in progress; phases A and C done; see `delta-log.md`). From here the plan files are read-only; reality goes in `delta-log.md`.
 
 ## Done
@@ -24,7 +24,7 @@
 
 ## In flight
 - **Forecast refit 2026-10-21, second** (delta log): from Oct 22 with U-118 done and a 20-hour first week, Prototype P50 Nov 13 (P90 Nov 18), launch-ready P50 Feb 23 (P90 Mar 12); the frozen plan stays Nov 30 and Mar 8. The approval window's review time is not modelled. Roadmap page and board dates show the current forecast.
-- **U-118 Merge desk and agent identity, done 2026-10-21** (2 elapsed days against 3 likely; about 120 Dave minutes on Oct 21; delta log) (Dave decided to start ahead of the planned Oct 26). Done: the GitHub App (phase A); merge settings, `integration`, rulesets (phase C); phase B merged to `main` (PRs 134, 135) and brought into `integration` (PR 136); D1, the project allow rules in `.claude/settings.local.json`. **D2 dry run passed 2026-10-21, all four tests:** (1) PR 137, `U-118: dry run` into `integration`, opened, checked, and merged by the App; (2) PR 138, one check failing, stayed open (`BLOCKED`), closed unmerged; (3) `revert.sh 137` opened PR 139, which merged itself once the three checks were posted; (4) `agent-git.ts automerge` refused promotion PR 140 (exit 2) and `scope-manifest` failed it; closed unmerged. Two lessons, in the delta log: call the merge desk scripts as bare commands, and run `revert.sh` in a clean checkout. **D3 done 2026-10-21: tiered auto-merge is on** (the PM made the four runbook edits in `CLAUDE.md` and `ramble-pm.md` on Dave's word; DECISIONS). First sync PR 141 merged itself. **Approval window decided 2026-10-21** (DECISIONS): `agent-git.ts review` written (102 tests pass; not yet run against a real PR) and `approval-window.sh on|off` for Dave; pushed in `8e35d26`. Left: Dave runs `approval-window.sh on`; close issue #2. Board #19 now carries Start date, Target date, and Sprint fields from the forecast (`scripts/plan/board-dates.ts`).
+- **U-118 Merge desk and agent identity, done 2026-10-21** (2 elapsed days against 3 likely; about 120 Dave minutes on Oct 21; delta log) (Dave decided to start ahead of the planned Oct 26). Done: the GitHub App (phase A); merge settings, `integration`, rulesets (phase C); phase B merged to `main` (PRs 134, 135) and brought into `integration` (PR 136); D1, the project allow rules in `.claude/settings.local.json`. **D2 dry run passed 2026-10-21, all four tests:** (1) PR 137, `U-118: dry run` into `integration`, opened, checked, and merged by the App; (2) PR 138, one check failing, stayed open (`BLOCKED`), closed unmerged; (3) `revert.sh 137` opened PR 139, which merged itself once the three checks were posted; (4) `agent-git.ts automerge` refused promotion PR 140 (exit 2) and `scope-manifest` failed it; closed unmerged. Two lessons, in the delta log: call the merge desk scripts as bare commands, and run `revert.sh` in a clean checkout. **D3 done 2026-10-21: tiered auto-merge is on** (the PM made the four runbook edits in `CLAUDE.md` and `ramble-pm.md` on Dave's word; DECISIONS). First sync PR 141 merged itself. **Approval window decided 2026-10-21** (DECISIONS): `agent-git.ts review` written (102 tests pass; not yet run against a real PR) and `approval-window.sh on|off` for Dave; pushed in `8e35d26`; close-out pushed in `3135a99`; issue #2 closed. Left: Dave runs `approval-window.sh on` (checked 20:30 Oct 21: both rulesets still require 0 approvals). Board #19 now carries Start date, Target date, and Sprint fields from the forecast (`scripts/plan/board-dates.ts`).
 - **Freeze decisions applied 2026-10-20, not committed:** levers 2 and 4a moved U-093, U-096, U-002, U-003, U-116, U-011, U-005, U-024 to agents in `units.yaml` (U-002, U-003, U-024 to the critical tier; U-093 and U-096 carry a results-read people check); lever 3 set `DAVE_SHARE` to 0.35 / 0.5 / 0.65 in `graph.ts`; `execution-model.ts` now reports the tiered merge rule (old rule as a comparison column, 18 weeks); `forecast.ts` runs the record as the plan, with "before the levers" and "lever 4" as comparisons. 02, 04, 05, 06, 07 regenerated; 05 and 04 carry dated notes; 06 and 07 prose updated (07 rewritten as the decided plan). The plan at 12.5 h: Prototype P50 2026-11-30 (P90 12-07), launch-ready P50 2027-03-08 (P90 03-26); Dave leads 9 of 116 units, about 180 h. Roadmap republished.
 - **Project board #19 set up 2026-10-20** by the PM (Dave's call): linked to `defaultdave/ramble`, fields Unit ID, Section, Complexity, Uncertainty, Spike, Execution, Review tier, Depends on, the three estimate fields, Actual days, Dave minutes, Tokens. No items yet; issues come at the freeze.
 - **P4 artifacts 6 and 7 drafted 2026-10-20, not committed:** `docs/plan/06-estimate.md`, `docs/plan/07-resourcing.md`. Record: `estimate_days` on all 132 open units in `units.yaml`; every lens's figures and the solo estimates in `docs/plan/estimate-panel.json`. New script `scripts/plan/forecast.ts` (Monte Carlo over the graph; Dave as a capacity-limited resource; levers and WIP as scenarios). Dave's minutes moved from `execution-model.ts` into `scripts/plan/dave-time.ts` (report output unchanged, checked by diff).
@@ -69,13 +69,12 @@
 In this demo, the client facts have no one to ask. Where a fact blocks a decision, the PM proposes a working assumption and logs it as one.
 
 ## Blocked on Dave
-1. **Open the approval window:** push the `review` command and `approval-window.sh` (protected paths, so Dave's bypass push), then run `scripts/merge-desk/approval-window.sh on`. Later, `off` when automated checks alone may merge.
-2. **Architecture guardrails, before U-001 starts** (PM roundup 2026-10-21). The rules are written (ADRs, design doc 4.1 and 4.2, stack decisions), but four gaps let an agent drift without a check failing:
-   - ~~no Ramble `.claude/standards/architecture.md`~~ written 2026-10-21 (DECISIONS, delta log), not committed; U-001's issue carries the import-boundary lint as an ADDED line;
-   - `architecture-audit` is not a required check (only `review-agent`, `qa-agent`, `spec-compliance`, `scope-manifest`);
-   - ~~U-001's manifest says "ESLint" with no import-boundary rules~~ (fixed by the ADDED line); still open: after U-001, lint and TypeScript config are not on `scope-check.ts`'s protected list;
-   - the global standards edits (Next.js 16.4.1 baseline, `senior` and `review-pr` skills) are uncommitted in vig.
-   Also open: the six pattern notes (U-002, U-003, U-116, U-011, U-005, U-024) are not written; the blank stack-decision cells (package manager, React Compiler, lint set) fall to defaults unless decided.
+1. Approval window is on (checked 2026-10-21). Later, `scripts/merge-desk/approval-window.sh off` when automated checks alone may merge.
+2. **Architecture guardrails** (PM roundup 2026-10-21). Done: `architecture.md` committed; U-001's ADDED line carries the import-boundary lint; blank stack settings filled (pnpm, React Compiler on, `strict-type-checked`; DECISIONS). Still Dave's, none blocks U-001:
+   - make `architecture-audit` a required check in both rulesets (adds a post-check step for every PR; your call);
+   - after U-001 merges, add the lint and TypeScript config files to `PROTECTED` in `scripts/merge-desk/scope-check.ts` (adding them now would fail U-001 itself);
+   - commit the vig standards edits (Next.js 16.4.1 baseline, `senior` and `review-pr`), still uncommitted in vig;
+   - the six pattern notes (U-002, U-003, U-116, U-011, U-005, U-024) go in those units' manifests before each starts, not before U-001.
 3. **Method Layer 0** (open decision 3). Not needed until P6.
 
 Resolved: Figma tools in a new session (2026-10-18, working in the P3 session). Workbook order (2026-10-18: plan Ramble first, extract the templates from its artifacts afterward). The Perf Lab spec conflict: the signed PRD's `PRD-68` is the requirement the detail-page fixes trace to; the router question went to ADR 0001.
@@ -87,24 +86,22 @@ Legal and vendor questions for the real job, logged, not blocking the demo: Ramb
 ## Next
 P4 is closed and P5 has started early. **U-118 is done (2026-10-21) and tiered auto-merge is on**, starting with the approval window.
 
-1. **Dave runs `scripts/merge-desk/approval-window.sh on`** and closes issue #2 (U-118):
-   ```bash
-   gh issue close 2 --repo defaultdave/ramble --comment "Done 2026-10-21: merge desk merged, dry run passed, auto-merge on with an approval window."
-   ```
-2. Push the U-118 close-out (units.yaml, delta log, STATUS, roadmap); protected paths, so Dave's bypass push.
-3. **Close the architecture guardrail gaps** (Blocked on Dave, item 2) before U-001's agent starts. Commit the uncommitted `.claude/standards/architecture.md` with its DECISIONS and delta-log lines.
-4. **U-001**, the first unit an agent builds and merges itself; its CI checks then go into both rulesets.
+1. Approval window is on (both rulesets require 1 approval, checked 2026-10-21).
+2. **Start U-001** (below). Its PR gets your review request; that is the first real run of `agent-git.ts review`. Approve it to merge.
+3. After U-001 merges: add its CI job names to both rulesets (runbook C3), then the `PROTECTED` addition above.
+
+**Swarms (Dave, 2026-10-21):** run several ready agent units at once when the graph allows. The PM proposes a swarm when 3 or more fan-out units are ready with disjoint scopes; first likely after U-001 to U-003 merge. Dave opts into any Workflow.
 
 Since the freeze, plan files are read-only; departures go in `delta-log.md`.
 
 ## Next chat
 
-**Before you start:** push the U-118 close-out if it is not in yet, run `scripts/merge-desk/approval-window.sh on`, and close issue #2 (Next, step 1). About 5 minutes.
+**Before you start:** nothing. The approval window is on and the stack settings are decided.
 
-**Run:** `/ramble-pm` in a new desktop chat (terminal: `claude --agent ramble-pm`). **Model and effort:** Sonnet, medium. Bookkeeping, then setup for the first agent unit. No workflow.
+**Run:** `/senior #1` in a new desktop chat opened in the ramble folder (terminal: `claude`, then `/senior #1`). **Model and effort:** Sonnet, medium. No workflow.
 
 **Prompt:**
 
 ```
-Read docs/plan/STATUS.md and docs/plan/merge-desk-runbook.md. Tiered auto-merge is on since 2026-10-21 and U-118 is closed. Work the architecture guardrail gaps in Blocked on Dave item 2: list which are yours and which are mine, do yours, and print the commands for mine. Then prepare U-001 for the agent pipeline (scope manifest from issue #1 including its ADDED line) and tell me the exact command to start it. The approval window is open: its PR gets my review request with agent-git.ts review, and that is the first real test of the command. Refresh the roadmap. Don't commit.
+Read docs/plan/STATUS.md, issue #1 (U-001, scope manifest with its ADDED line), .claude/standards/architecture.md and stack-decisions.md (pnpm, React Compiler on, strict-type-checked). Build U-001 in a worktree off main and stop before push. When done, check the touched files against the manifest, then (as the PM) open the PR with scripts/merge-desk/agent-git.ts, post the checks, request Dave's review with agent-git.ts review, and queue auto-merge. Don't commit plan files.
 ```

@@ -41,6 +41,8 @@ Full list with reasons in `DECISIONS.md`.
 - Call the merge desk scripts as bare commands from the main checkout. The allow rule matches the whole command line, so a `cd … &&` prefix falls through to auto mode, which refuses `automerge`. `revert.sh` switches branches, so run it in a clean worktree (D2 dry run, 2026-10-21).
 - A sync PR (`main` into `integration`) needs the three agent checks posted as well as `scope-manifest`; the PM posts them once `scope-manifest` passes (first sync, PR 141).
 
+- Parallel work: when three or more agent-built units are ready with disjoint file scopes, propose running them together, up to 8 open at once. The owner's review time is the real limit. Workflows run only on the owner's opt-in.
+
 ## Lessons from the P4 spikes (2026-10-19)
 - Figma Code Connect publishing is refused on the Professional plan (Organization or Enterprise only), although Figma's help pages suggested otherwise. See `docs/adr/research/u-028-code-connect-spike.md`.
 - A nonce-based CSP needs fully dynamic routes (`instant = false`); never read the nonce in a shared layout. See `docs/adr/research/u-008a-u-009-cache-components-spike.md`.

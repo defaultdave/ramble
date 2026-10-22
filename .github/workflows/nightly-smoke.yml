@@ -39,21 +39,27 @@ jobs:
         with:
           ref: ${{ fromJSON(needs.resolve.outputs.shas)[matrix.branch] }}
           persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        if: hashFiles('pnpm-lock.yaml') != ''
       - uses: actions/setup-node@v4
         if: hashFiles('package.json') != ''
         with:
-          node-version: 24
+          node-version-file: .nvmrc
+          cache: ${{ hashFiles('pnpm-lock.yaml') != '' && 'pnpm' || '' }}
       - name: Install
-        if: hashFiles('package-lock.json') != ''
-        run: npm ci
+        if: hashFiles('pnpm-lock.yaml') != ''
+        run: pnpm install --frozen-lockfile
+      - name: Install browser
+        if: hashFiles('pnpm-lock.yaml') != ''
+        run: pnpm exec playwright install --with-deps chromium
       - name: Smoke
         if: hashFiles('package.json') != ''
-        run: npm run smoke --if-present
+        run: pnpm run --if-present smoke
       - name: Race and access tests
         if: matrix.branch == 'integration' && hashFiles('package.json') != ''
         env:
           DATABASE_URL: ${{ secrets.NIGHTLY_DATABASE_URL }}
-        run: npm run test:race --if-present
+        run: pnpm run --if-present test:race
 
   # Runs no repo code. It reads each smoke job's conclusion from the Actions API (set by the runner,
   # so test code cannot forge it) and posts the nightly-smoke status on the tested sha.

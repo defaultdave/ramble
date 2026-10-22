@@ -2768,3 +2768,24 @@ units:
     dave_minutes: null
     tokens: null
     status: todo
+  - id: U-119
+    title: "Vercel Analytics and Speed Insights"
+    section: measurement
+    slice: "Reports"
+    priority: Should
+    prd: [68, 61]
+    scope: "Vercel Web Analytics (`@vercel/analytics`, its `next` entry) and Speed Insights (`@vercel/speed-insights`) installed with pnpm and rendered by one wrapper component, the only file that imports either package; both packages added to the lint's vendor-SDK list so an import anywhere else fails; the wrapper is mounted in the `(guest)` root layout only, never in `(checkout)`, `(host)`, or `(ops)`, with a test that fails if the checkout layout renders it; page views only, no custom events (funnel and attribution stay in U-086 to U-088); turning both on in the Vercel project is Dave's"
+    depends_on: [U-002]
+    spike: false
+    mode: both
+    phase: P5
+    complexity: 1
+    uncertainty: 1
+    execution: agent-fan-out
+    review: standard
+    estimate_days: { o: 0.25, m: 0.5, p: 1 }
+    actual_days: null
+    dave_minutes: null
+    tokens: null
+    status: todo
+    note: "Added 2026-10-22 after the freeze at Dave's request (DECISIONS, delta log); PM estimate, not panelled. Overrides ADR 0007's no-third-party-analytics line for the guest pages only"

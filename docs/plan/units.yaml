@@ -642,10 +642,11 @@ units:
     execution: agent-fan-out
     review: standard
     estimate_days: { o: 0.75, m: 1.5, p: 3 }
-    actual_days: null
+    actual_days: 0.25
     dave_minutes: null
     tokens: null
-    status: todo
+    status: done
+    note: "Done 2026-10-22 (PR 154 into main, b919ec8): first commit 04:12 UTC, merged 04:28 UTC, so about 0.25 days against 1.5 likely (delta log). Live in production since Dave promoted ramble-cnnl6tc97 the same night."
   - id: U-024
     title: "Primitives: controls and feedback"
     section: design-system

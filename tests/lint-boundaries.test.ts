@@ -60,6 +60,16 @@ describe('import/no-restricted-paths', () => {
       "import { type env as Env, env } from '@/server/env';\nexport const a: typeof Env = env;\n",
     ],
     [
+      'components import only an inline type specifier from server',
+      'src/components/Bad.tsx',
+      "import { type env } from '@/server/env';\nexport type A = typeof env;\n",
+    ],
+    [
+      'components re-export an inline type specifier from server',
+      'src/components/Bad.tsx',
+      "export { type env } from '@/server/env';\n",
+    ],
+    [
       'server imports app',
       'src/server/bad.ts',
       "import RootLayout from '@/app/layout';\nexport const a = RootLayout;\n",
@@ -77,10 +87,6 @@ describe('import/no-restricted-paths', () => {
     [
       'import type',
       "import type { env } from '@/server/env';\nexport type A = typeof env;\n",
-    ],
-    [
-      'inline type specifier',
-      "import { type env } from '@/server/env';\nexport type A = typeof env;\n",
     ],
     ['export type from', "export type { env } from '@/server/env';\n"],
   ])('allows a type-only import across layers: %s', async (_name, code) => {
@@ -130,19 +136,42 @@ describe('no-restricted-imports', () => {
     },
   );
 
-  it.each([
-    'src/server/db/ok.ts',
-    'src/server/auth/ok.ts',
-    'src/server/ports/payments/ok.ts',
-    'src/server/analytics/ok.ts',
-    'src/server/monitoring/ok.ts',
-  ])('allows vendor SDKs inside the wrapper folder %s', async (filePath) => {
+  const wrapperOf = [
+    ['src/server/db/ok.ts', 'drizzle-orm'],
+    ['src/server/db/ok.ts', '@neondatabase/serverless'],
+    ['src/server/auth/ok.ts', 'better-auth'],
+    ['src/server/ports/payments/ok.ts', 'stripe'],
+    ['src/server/ports/email/ok.ts', 'resend'],
+    ['src/server/ports/storage/ok.ts', '@vercel/blob'],
+    ['src/server/ports/rate-limit/ok.ts', 'botid'],
+    ['src/server/monitoring/ok.ts', '@sentry/nextjs'],
+    ['src/server/analytics/ok.ts', 'web-vitals'],
+  ] as const;
+
+  it.each(wrapperOf)('allows %s to import %s', async (filePath, sdk) => {
     expect(
       await ruleIds(
         filePath,
-        "import * as x from 'stripe';\nexport const a = x;\n",
+        `import * as x from '${sdk}';\nexport const a = x;\n`,
       ),
     ).not.toContain(IMPORTS);
+  });
+
+  it.each([
+    ['src/server/auth/bad.ts', 'stripe'],
+    ['src/server/db/bad.ts', 'stripe'],
+    ['src/server/ports/payments/bad.ts', 'drizzle-orm'],
+    ['src/server/ports/email/bad.ts', 'stripe'],
+    ['src/server/monitoring/bad.ts', 'web-vitals'],
+    ['src/server/analytics/bad.ts', '@sentry/nextjs'],
+    ['src/server/ports/clock/bad.ts', 'stripe'],
+  ])('rejects %s importing %s from another wrapper', async (filePath, sdk) => {
+    expect(
+      await ruleIds(
+        filePath,
+        `import * as x from '${sdk}';\nexport const a = x;\n`,
+      ),
+    ).toContain(IMPORTS);
   });
 });
 

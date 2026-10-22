@@ -1,31 +1,46 @@
 const root = import.meta.dirname;
 
-const vendorSdkPatterns = [
-  'drizzle-orm',
-  'drizzle-orm/*',
-  '@neondatabase/*',
-  'better-auth',
-  'better-auth/*',
-  'stripe',
-  'resend',
-  '@vercel/blob',
-  '@sentry/*',
-  'botid',
-  'botid/*',
-  'web-vitals',
-  'web-vitals/*',
+const vendorWrappers = [
+  {
+    folder: 'src/server/db',
+    patterns: ['drizzle-orm', 'drizzle-orm/*', '@neondatabase/*'],
+  },
+  { folder: 'src/server/auth', patterns: ['better-auth', 'better-auth/*'] },
+  { folder: 'src/server/ports/payments', patterns: ['stripe'] },
+  { folder: 'src/server/ports/email', patterns: ['resend'] },
+  { folder: 'src/server/ports/storage', patterns: ['@vercel/blob'] },
+  { folder: 'src/server/ports/rate-limit', patterns: ['botid', 'botid/*'] },
+  { folder: 'src/server/monitoring', patterns: ['@sentry/*'] },
+  { folder: 'src/server/analytics', patterns: ['web-vitals', 'web-vitals/*'] },
 ];
 
-const vendorWrapperFiles = [
-  'src/server/db/**',
-  'src/server/auth/**',
-  'src/server/ports/**',
-  'src/server/analytics/**',
-  'src/server/monitoring/**',
-];
+const vendorSdkPatterns = vendorWrappers.flatMap(({ patterns }) => patterns);
 
 const vendorMessage =
-  'Vendor SDKs are imported only inside their wrapper folder (src/server/db, auth, ports/<port>, analytics, monitoring).';
+  'Each vendor SDK is imported only inside its own wrapper folder (src/server/db, auth, ports/<port>, analytics, monitoring).';
+
+const vendorImportRule = (patterns) => [
+  'error',
+  { patterns: [{ group: patterns, message: vendorMessage }] },
+];
+
+const vendorSdkConfigs = [
+  {
+    name: 'ramble/boundaries/vendor-sdks',
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: vendorWrappers.map(({ folder }) => `${folder}/**`),
+    rules: { 'no-restricted-imports': vendorImportRule(vendorSdkPatterns) },
+  },
+  ...vendorWrappers.map(({ folder, patterns }) => ({
+    name: `ramble/boundaries/vendor-sdks/${folder}`,
+    files: [`${folder}/**/*.{ts,tsx}`],
+    rules: {
+      'no-restricted-imports': vendorImportRule(
+        vendorSdkPatterns.filter((pattern) => !patterns.includes(pattern)),
+      ),
+    },
+  })),
+];
 
 const libPackagePatterns = [
   'react',
@@ -81,17 +96,7 @@ export const boundaryConfigs = [
       ],
     },
   },
-  {
-    name: 'ramble/boundaries/vendor-sdks',
-    files: ['src/**/*.{ts,tsx}'],
-    ignores: vendorWrapperFiles,
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        { patterns: [{ group: vendorSdkPatterns, message: vendorMessage }] },
-      ],
-    },
-  },
+  ...vendorSdkConfigs,
   {
     name: 'ramble/boundaries/lib-packages',
     files: ['src/lib/**/*.{ts,tsx}'],
@@ -139,24 +144,17 @@ export const boundaryConfigs = [
 ];
 
 // eslint-plugin-import's no-restricted-paths cannot allow type-only imports, so the rule is
-// wrapped to drop reports on them.
+// wrapped to drop reports on declaration-level `import type` and `export type`. An inline
+// `{ type x }` specifier is still reported: under verbatimModuleSyntax it keeps an empty runtime import.
 
 function isTypeOnly(sourceNode) {
   const declaration = sourceNode?.parent;
-  if (!declaration) return false;
-  if (declaration.type === 'ImportDeclaration') {
-    if (declaration.importKind === 'type') return true;
-    const { specifiers } = declaration;
-    return (
-      specifiers.length > 0 &&
-      specifiers.every(
-        (s) => s.type === 'ImportSpecifier' && s.importKind === 'type',
-      )
-    );
+  if (declaration?.type === 'ImportDeclaration') {
+    return declaration.importKind === 'type';
   }
   return (
-    (declaration.type === 'ExportNamedDeclaration' ||
-      declaration.type === 'ExportAllDeclaration') &&
+    (declaration?.type === 'ExportNamedDeclaration' ||
+      declaration?.type === 'ExportAllDeclaration') &&
     declaration.exportKind === 'type'
   );
 }

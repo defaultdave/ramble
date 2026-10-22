@@ -58,6 +58,11 @@ describe('import/no-restricted-paths', () => {
       "import { env } from '../server/env';\nexport const a = env;\n",
     ],
     [
+      'components import a type specifier and a value from server',
+      'src/components/Bad.tsx',
+      "import { type env as Env, env } from '@/server/env';\nexport const a: typeof Env = env;\n",
+    ],
+    [
       'server imports app',
       'src/server/bad.ts',
       "import RootLayout from '@/app/layout';\nexport const a = RootLayout;\n",

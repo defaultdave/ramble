@@ -1,9 +1,13 @@
 import path from 'node:path';
 import { ESLint } from 'eslint';
+import tseslint from 'typescript-eslint';
 import { describe, expect, it } from 'vitest';
 
 const root = path.resolve(import.meta.dirname, '..');
-const eslint = new ESLint({ cwd: root });
+const eslint = new ESLint({
+  cwd: root,
+  overrideConfig: tseslint.configs.disableTypeChecked,
+});
 
 async function ruleIds(filePath: string, code: string) {
   const [result] = await eslint.lintText(code, {

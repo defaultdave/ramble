@@ -109,8 +109,8 @@
   ],
   "actionsForDave": [
     {
-      "title": "Write U-003's pattern note, then start it",
-      "detail": "Add the note to issue #4's scope manifest, then run /senior #4 in a new chat in the ramble folder (prompt in STATUS).",
+      "title": "Start U-003",
+      "detail": "Its pattern note is in issue #4. Run /senior #4 in a new chat in the ramble folder (prompt in STATUS), then approve its PR.",
       "where": "docs/plan/STATUS.md"
     }
   ],
@@ -122,6 +122,10 @@
     }
   ],
   "decisionsMade": [
+    {
+      "when": "Oct 22",
+      "what": "U-003 pattern note set: one database folder, a pooled handle for transactions and a read-only one, committed migrations checked in CI, production migrated only with your approval"
+    },
     {
       "when": "Oct 22",
       "what": "Vercel Web Analytics and Speed Insights added as U-119 (half a day, agent-built), guest pages only, never checkout"

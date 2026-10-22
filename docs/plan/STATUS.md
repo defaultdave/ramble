@@ -77,7 +77,7 @@ In this demo, the client facts have no one to ask. Where a fact blocks a decisio
    - make `architecture-audit` a required check in both rulesets (adds a post-check step for every PR; your call);
    - after U-001 merges, add the lint and TypeScript config files to `PROTECTED` in `scripts/merge-desk/scope-check.ts` (adding them now would fail U-001 itself);
    - commit the vig standards edits (Next.js 16.4.1 baseline, `senior` and `review-pr`), still uncommitted in vig;
-   - the six pattern notes (U-002, U-003, U-116, U-011, U-005, U-024) go in those units' manifests before each starts, not before U-001.
+   - the six pattern notes (U-002, U-003, U-116, U-011, U-005, U-024) go in those units' manifests before each starts, not before U-001. U-003's is in issue #4 (2026-10-22, drafted by the PM, approved by Dave).
 3. **Method Layer 0** (open decision 3). Not needed until P6.
 
 Resolved: Figma tools in a new session (2026-10-18, working in the P3 session). Workbook order (2026-10-18: plan Ramble first, extract the templates from its artifacts afterward). The Perf Lab spec conflict: the signed PRD's `PRD-68` is the requirement the detail-page fixes trace to; the router question went to ADR 0001.
@@ -89,7 +89,7 @@ Legal and vendor questions for the real job, logged, not blocking the demo: Ramb
 ## Next
 P5 under way: U-118, U-001, U-002 done; tiered auto-merge on with the approval window; Vercel builds every push since 2026-10-22.
 
-1. **Start U-003** (issue #4, database wiring; critical tier, on the critical path). Dave writes its pattern note into issue #4 first (lever 4a; Blocked item 2). Neon credentials for the preview branches are Dave's to add as secrets when the agent names them.
+1. **Start U-003** (issue #4, database wiring; critical tier, on the critical path). Its pattern note is in issue #4 (2026-10-22): `src/server/db/`, a pooled `db` and a read-only `dbRead`, committed migrations with a `db` CI job, a Neon branch per preview, production migrated only by a workflow Dave approves. Neon credentials for the preview branches are Dave's to add as secrets when the agent names them.
 2. Eight units are ready (U-003, U-116, U-117, U-007, U-008a, U-009, U-023, U-102). U-003, U-116, U-023, and U-102 have disjoint scopes and suit a swarm, on Dave's opt-in.
 
 **Swarms (Dave, 2026-10-21):** run several ready agent units at once when the graph allows. The PM proposes a swarm when 3 or more fan-out units are ready with disjoint scopes; first likely after U-001 to U-003 merge. Dave opts into any Workflow.
@@ -98,7 +98,7 @@ Since the freeze, plan files are read-only; departures go in `delta-log.md`.
 
 ## Next chat
 
-**Before you start:** write U-003's pattern note into issue #4's scope manifest (yours under lever 4a). Production deploys are staged now; promote one only when you want it live.
+**Before you start:** nothing; U-003's pattern note is in issue #4. Production deploys are staged now; promote one only when you want it live.
 
 **Run:** `/senior #4` in a new desktop chat opened in the ramble folder (terminal: `claude`, then `/senior #4`). **Model and effort:** Sonnet, medium. No workflow, unless you opt into a swarm of U-003, U-116, U-023, U-102.
 

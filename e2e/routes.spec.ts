@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
+  expectedTitle,
   notFoundHeading,
   routes,
   unknownPaths,
@@ -24,6 +25,7 @@ for (const { path, heading, noindex } of routes) {
       page.getByRole('heading', { level: 1, name: heading, exact: true }),
     ).toBeVisible();
     await expect(page.getByRole('main')).toBeVisible();
+    await expect(page).toHaveTitle(expectedTitle(heading));
 
     const robots = page.locator('meta[name="robots"]');
     if (noindex) {

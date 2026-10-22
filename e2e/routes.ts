@@ -99,3 +99,7 @@ export const unknownPaths: Record<RouteGroup, string> = {
 export const notFoundHeading = "We can't find that page";
 
 export const unprerenderedParamPath = '/picks/not-prerendered';
+
+export function expectedTitle(heading: string): string {
+  return heading === 'Ramble' ? heading : `${heading} | Ramble`;
+}

@@ -1,4 +1,13 @@
 .claude/settings.local.json
 .vercel
 .env*
+!.env.example
 .claude/agent-memory-local/
+node_modules/
+.next/
+next-env.d.ts
+out/
+coverage/
+test-results/
+playwright-report/
+*.tsbuildinfo

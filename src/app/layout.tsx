@@ -1,5 +1,23 @@
 import type { Metadata } from 'next';
+import localFont from 'next/font/local';
 import type { ReactNode } from 'react';
+import '@/styles/tokens.css';
+
+const fraunces = localFont({
+  src: '../fonts/fraunces-latin-wght-normal.woff2',
+  variable: '--font-face-fraunces',
+  weight: '100 900',
+  display: 'swap',
+  fallback: ['Georgia', 'serif'],
+});
+
+const inter = localFont({
+  src: '../fonts/inter-latin-wght-normal.woff2',
+  variable: '--font-face-inter',
+  weight: '100 900',
+  display: 'swap',
+  fallback: ['system-ui', 'sans-serif'],
+});
 
 export const metadata: Metadata = {
   title: 'Ramble',
@@ -8,7 +26,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${fraunces.variable} ${inter.variable}`}>
       <body>{children}</body>
     </html>
   );

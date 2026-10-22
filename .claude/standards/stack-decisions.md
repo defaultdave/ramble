@@ -8,7 +8,7 @@ Ramble's answers to every rule that [`react-nextjs.md`](~/.claude/standards/reac
 |---|---|
 | Framework and version | Next.js 16.4.1 or later, App Router (ADR 0001) |
 | React version | 19.3 (ADR 0001) |
-| Package manager (SET-14, SET-16) | |
+| Package manager (SET-14, SET-16) | pnpm for the app (Dave, 2026-10-21); Bun stays the runtime for `scripts/` only |
 | Node version (`engines`) | Current active LTS, pinned in `engines` at the walking skeleton |
 | Hosting and deploy target | Vercel, US East. Demo on Hobby (checkout states no payment is taken); one 30-minute pulse from GitHub Actions once the repo is public; real job on Pro with per-minute cron. Staged production deployments promoted by Dave (ADR 0007) |
 | Backend contract (REST, GraphQL, RPC) and who owns it | No separate API. Server Components read the server-only data layer; mutations are Server Actions; Route Handlers only for payment webhooks and scheduled jobs. Ramble owns it (ADR 0001, 0002, 0003) |
@@ -23,7 +23,7 @@ Ramble's answers to every rule that [`react-nextjs.md`](~/.claude/standards/reac
 | SET-1 | Where project files live: outside `app/`, colocated in route folders, or split by feature | Outside `app/`, under `src/` | |
 | SET-2 | The feature count past which code is grouped by feature | A handful | |
 | SET-6 | `exactOptionalPropertyTypes` on or off | Decide at setup | |
-| SET-8 | typescript-eslint set: `recommended`, `strict`, or a type-checked set | `recommended` | |
+| SET-8 | typescript-eslint set: `recommended`, `strict`, or a type-checked set | `recommended` | `strict-type-checked` (Dave, 2026-10-21) |
 | SET-11 | Formatter | Prettier | |
 | SET-21 | Unused-code tool | Knip | |
 | SET-22 | Route and page-prop types from `next typegen` | On | |
@@ -33,13 +33,13 @@ Ramble's answers to every rule that [`react-nextjs.md`](~/.claude/standards/reac
 | FORM-6 | Which interactions get optimistic UI | Decide per interaction | |
 | FORM-8 | Which requests can be retried, and so carry an idempotency key | Decide per write endpoint | Every order write has a unique idempotency key created before any provider call; every call to the payment provider carries a key derived from Ramble's own record ID (ADR 0002, 0003) |
 | STATE-11 | Reducers for state that handlers update together | On | |
-| STATE-14 | React Compiler on or off | Decide at setup | |
+| STATE-14 | React Compiler on or off | Decide at setup | Off for now; decide with the first stateful island (Dave, 2026-10-22) |
 | TEST-2 | Unit and component test runner | Vitest (Jest stays in a repo that already has it) | Vitest (ADR 0006) |
 | TEST-5 | Network mocking: MSW or stubbed `fetch` | Decide at setup | MSW (ADR 0006) |
 | TEST-16 | Mutation check on agent-written tests: by hand or with a tool | By hand | By hand (ADR 0006) |
 | UI-2 | Styling system: CSS Modules or Tailwind | CSS Modules beside the component | CSS Modules, with Figma-sourced tokens as CSS custom properties (ADR 0005) |
 | PERF-6 | Bundle analyzer | Decide before the first dependency review | |
-| PERF-7 | Hand memoization | Follows STATE-14: none in new code when the compiler is on | |
+| PERF-7 | Hand memoization | Follows STATE-14: none in new code when the compiler is on | Allowed in new code while the compiler is off (follows STATE-14) |
 | SEC-10 | Content Security Policy | Report-only first | Report-only first. Checkout carries no third-party tags, and its script inventory lists the payment scripts and Ramble's first-party web-vitals and events reporter, for PCI SAQ A (ADR 0003, ADR 0007) |
 
 ## Departures

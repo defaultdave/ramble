@@ -6,6 +6,10 @@
     "e2e/**/*.spec.ts",
     "tests/stubs/*.ts"
   ],
+  "ignoreDependencies": [
+    "@fontsource-variable/fraunces",
+    "@fontsource-variable/inter"
+  ],
   "project": [
     "src/**/*.{ts,tsx}",
     "tests/**/*.ts",

@@ -49,7 +49,7 @@ The frozen forecast, as ranges rather than single dates:
 | Prototype: a clickable guest flow on seed data | 2026-12-01 | 2026-12-07 |
 | Launch scope from the PRD | 2027-03-08 | 2027-03-29 |
 
-There is no application code yet. The walking skeleton (U-001) follows the merge desk. Live status is in [`docs/plan/STATUS.md`](docs/plan/STATUS.md).
+The walking skeleton (U-002) is in place: four route groups with placeholder pages. Real pages replace them unit by unit. Live status is in [`docs/plan/STATUS.md`](docs/plan/STATUS.md).
 
 ## The planning method
 
@@ -116,7 +116,7 @@ cp .env.example .env.local   # optional: every variable has a default
 pnpm dev
 ```
 
-The gates CI runs on every PR (`.github/workflows/ci.yml`), each a script you can run locally: `pnpm format:check`, `lint`, `typecheck`, `test`, `build`, `knip`, and `e2e` (Playwright; run `pnpm exec playwright install chromium` once). Environment variables are read and validated in one place, `src/server/env.ts`. Import boundaries between `src/app`, `src/components`, `src/lib`, and `src/server` are enforced by `pnpm lint`; `tests/lint-boundaries.test.ts` fails if a rule is weakened.
+The gates CI runs on every PR (`.github/workflows/ci.yml`), each a script you can run locally: `pnpm format:check`, `lint`, `typecheck`, `test`, `build`, `knip`, and `e2e` (Playwright; run `pnpm exec playwright install chromium` once). `pnpm smoke` runs the same Playwright smoke of every route against the built app; the route list is `e2e/routes.ts`, one row per route. Environment variables are read and validated in one place, `src/server/env.ts`. Import boundaries between `src/app`, `src/components`, `src/lib`, and `src/server` are enforced by `pnpm lint`; `tests/lint-boundaries.test.ts` fails if a rule is weakened.
 
 ## Running the planning scripts
 

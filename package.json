@@ -12,11 +12,12 @@
     "start": "next start",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "eslint . --max-warnings 0 --report-unused-disable-directives",
+    "lint": "next typegen && eslint . --max-warnings 0 --report-unused-disable-directives",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "knip": "knip",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "smoke": "playwright test"
   },
   "dependencies": {
     "next": "^16.4.2",
@@ -40,6 +41,7 @@
     "msw": "^3.0.3",
     "prettier": "^3.9.10",
     "typescript": "~5.9.3",
+    "typescript-eslint": "^8.72.0",
     "vitest": "^5.0.5"
   }
 }

@@ -1,9 +1,13 @@
 import path from 'node:path';
 import { ESLint } from 'eslint';
+import tseslint from 'typescript-eslint';
 import { describe, expect, it } from 'vitest';
 
 const root = path.resolve(import.meta.dirname, '..');
-const eslint = new ESLint({ cwd: root });
+const eslint = new ESLint({
+  cwd: root,
+  overrideConfig: tseslint.configs.disableTypeChecked,
+});
 
 async function ruleIds(filePath: string, code: string) {
   const [result] = await eslint.lintText(code, {
@@ -37,12 +41,12 @@ describe('import/no-restricted-paths', () => {
     [
       'lib imports app',
       'src/lib/bad.ts',
-      "import RootLayout from '@/app/layout';\nexport const a = RootLayout;\n",
+      "import RootLayout from '@/app/(guest)/layout';\nexport const a = RootLayout;\n",
     ],
     [
       'components import app',
       'src/components/Bad.tsx',
-      "import RootLayout from '@/app/layout';\nexport const a = RootLayout;\n",
+      "import RootLayout from '@/app/(guest)/layout';\nexport const a = RootLayout;\n",
     ],
     [
       'components import server outside actions',
@@ -72,7 +76,7 @@ describe('import/no-restricted-paths', () => {
     [
       'server imports app',
       'src/server/bad.ts',
-      "import RootLayout from '@/app/layout';\nexport const a = RootLayout;\n",
+      "import RootLayout from '@/app/(guest)/layout';\nexport const a = RootLayout;\n",
     ],
     [
       'server imports components',

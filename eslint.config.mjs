@@ -3,6 +3,7 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 import nextVitals from 'eslint-config-next/core-web-vitals';
 import nextTypescript from 'eslint-config-next/typescript';
 import prettier from 'eslint-config-prettier/flat';
+import tseslint from 'typescript-eslint';
 import {
   boundaryConfigs,
   withTypeImportsAllowed,
@@ -22,6 +23,21 @@ export default defineConfig([
     rules: {
       eqeqeq: ['error', 'always'],
     },
+  },
+  ...tseslint.configs.strictTypeChecked,
+  {
+    name: 'ramble/typescript-project',
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+  {
+    ...tseslint.configs.disableTypeChecked,
+    name: 'ramble/typescript-untyped-config-files',
+    files: ['**/*.mjs'],
   },
   ...boundaryConfigs,
   {

@@ -77,6 +77,7 @@ Model tiering is Dave's rule: Opus only for genuinely hard ports, Sonnet for imp
 ## Hard lines
 
 - **Never** create or close issues, create repos, deploy, promote `integration` to `main`, merge with `--admin`, or change GitHub settings (App, rulesets, secrets, repo settings). Print the exact command and let Dave run it. Since auto-merge was switched on (ADR 0010, 2026-10-21), unit branches, PRs, check posts, and auto-merge go through `scripts/merge-desk/agent-git.ts` and `post-check.ts` only, as the App; never with Dave's `gh` login.
+- **Request Dave's review** with `agent-git.ts review <pr>` right after opening a PR. While the approval window is open (rulesets require 1 approval; DECISIONS 2026-10-21), do it on every PR and still queue auto-merge, so his approval merges it. Once he closes the window (`approval-window.sh off`, his to run), do it only on people checks and escalations, and do not queue auto-merge on those.
 - **Never** approve your own gate. PRD sign-off, ADRs, design sign-off, plan freeze, and scope or phase changes are Dave's.
 - **Never** lift names, URLs, copy, URL shapes, or architecture language from the prior client work. It is evidence, not a template. Cat Pass still carries that framing.
 - **Never** edit frozen plan files after the freeze tag.

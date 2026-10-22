@@ -2,9 +2,12 @@
 //   bun scripts/merge-desk/agent-git.ts push <branch>
 //   bun scripts/merge-desk/agent-git.ts pr <base> <title> <body-file>
 //   bun scripts/merge-desk/agent-git.ts automerge <pr number or branch>
+//   bun scripts/merge-desk/agent-git.ts review <pr number or branch>
 import { mintToken } from "./app-token.ts";
 
 export const REPO = "defaultdave/ramble";
+/** The owner's login. An approval from it counts because agents author PRs as the App, not as the owner. */
+export const REVIEWER = "defaultdave";
 const BRANCH_PATTERN = /^(unit\/U-[0-9A-Za-z][0-9A-Za-z._-]*|(pm|revert|sync)\/[0-9A-Za-z][0-9A-Za-z._/-]*)$/;
 
 export class Refused extends Error {}
@@ -102,6 +105,15 @@ export async function automerge(target: string, deps: Deps): Promise<void> {
   must(deps.run(["gh", "pr", "merge", target, "--repo", REPO, "--auto", method], { GH_TOKEN: token }), "gh pr merge");
 }
 
+/** Requests the owner's review as the App: every PR while approvals are required, and people checks and escalations after. */
+export async function review(target: string, deps: Deps): Promise<void> {
+  if (target.startsWith("-")) throw new Refused(`refused: ${target} is not a PR number or branch`);
+  must(
+    deps.run(["gh", "pr", "edit", target, "--repo", REPO, "--add-reviewer", REVIEWER], { GH_TOKEN: await deps.token() }),
+    "gh pr edit",
+  );
+}
+
 function realDeps(): Deps {
   let cached: Promise<string> | null = null;
   const spawn = (command: string[], env: Record<string, string>): RunResult => {
@@ -122,13 +134,16 @@ function realDeps(): Deps {
 if (import.meta.main) {
   const [command, ...args] = process.argv.slice(2);
   const usage = () => {
-    throw new Error("usage: agent-git.ts push <branch> | pr <base> <title> <body-file> | automerge <pr or branch>");
+    throw new Error(
+      "usage: agent-git.ts push <branch> | pr <base> <title> <body-file> | automerge <pr or branch> | review <pr or branch>",
+    );
   };
   try {
     const deps = realDeps();
     if (command === "push" && args.length === 1) await push(args[0], deps);
     else if (command === "pr" && args.length === 3) await pr(args[0], args[1], args[2], deps);
     else if (command === "automerge" && args.length === 1) await automerge(args[0], deps);
+    else if (command === "review" && args.length === 1) await review(args[0], deps);
     else usage();
   } catch (error) {
     console.error((error as Error).message);

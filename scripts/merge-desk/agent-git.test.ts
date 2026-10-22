@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { automerge, type Deps, gitAuthEnv, pr, push, Refused, type RunResult } from "./agent-git.ts";
+import { automerge, type Deps, gitAuthEnv, pr, push, Refused, review, type RunResult } from "./agent-git.ts";
 
 const VIEW_OK = '{"headRefName":"unit/U-001","baseRefName":"main"}';
 
@@ -108,6 +108,20 @@ test("automerge refuses a promotion PR and does not merge", async () => {
 test("automerge refuses an argument that looks like a flag", async () => {
   const { deps, calls } = fakeDeps();
   await expect(automerge("--admin", deps)).rejects.toBeInstanceOf(Refused);
+  expect(calls).toHaveLength(0);
+});
+
+test("review requests the owner as reviewer with the App token", async () => {
+  const { deps, calls } = fakeDeps();
+  await review("42", deps);
+  expect(calls).toHaveLength(1);
+  expect(calls[0].command).toEqual(["gh", "pr", "edit", "42", "--repo", "defaultdave/ramble", "--add-reviewer", "defaultdave"]);
+  expect(calls[0].env.GH_TOKEN).toBe("ghs_fake");
+});
+
+test("review refuses an argument that looks like a flag", async () => {
+  const { deps, calls } = fakeDeps();
+  await expect(review("--remove-reviewer", deps)).rejects.toBeInstanceOf(Refused);
   expect(calls).toHaveLength(0);
 });
 

@@ -106,6 +106,18 @@ scripts/plan/  Bun scripts that compute the plan from units.yaml
 .claude/       the PM agent, its skill, and its project memory
 ```
 
+## Setup
+
+Needs Node 24 (`.nvmrc`) and pnpm 10. Node 25 no longer bundles Corepack, so install it once with `npm install -g corepack` and then run `corepack enable`; it reads the pinned version from `packageManager` in `package.json`.
+
+```
+pnpm install
+cp .env.example .env.local   # optional: every variable has a default
+pnpm dev
+```
+
+The gates CI runs on every PR (`.github/workflows/ci.yml`), each a script you can run locally: `pnpm format:check`, `lint`, `typecheck`, `test`, `build`, `knip`, and `e2e` (Playwright; run `pnpm exec playwright install chromium` once). Environment variables are read and validated in one place, `src/server/env.ts`. Import boundaries between `src/app`, `src/components`, `src/lib`, and `src/server` are enforced by `pnpm lint`; `tests/lint-boundaries.test.ts` fails if a rule is weakened.
+
 ## Running the planning scripts
 
 The scripts need [Bun](https://bun.sh) and have no other dependencies.

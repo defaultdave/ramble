@@ -1,0 +1,14 @@
+.next
+node_modules
+coverage
+test-results
+playwright-report
+pnpm-lock.yaml
+next-env.d.ts
+# Owned by other units and the planning method, not by this setup
+.claude
+.github/workflows/nightly-smoke.yml
+.github/workflows/scope-manifest.yml
+docs
+scripts
+*.md

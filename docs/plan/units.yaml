@@ -44,11 +44,11 @@ units:
     execution_reason: "Creates the GitHub App, rulesets, and secrets, which only Dave may do (ADR 0010); sets the merge rule every unit runs through, so it lands before the first fan-out unit merges"
     review: critical
     estimate_days: { o: 1.5, m: 3, p: 7 }
-    actual_days: null
-    dave_minutes: null
+    actual_days: 2
+    dave_minutes: 120
     tokens: null
-    status: in progress
-    note: "Added 2026-10-20 after the estimate panel; PM estimate (solo 2 / 4 / 8 in estimate-panel.json). Started 2026-10-20, ahead of the planned Oct 26 P5 start: runbook phases A (the App) and C (merge settings, integration, rulesets) done that day; phase B (scripts and workflows) and D (switch-on) remain. 2026-10-21: phase B written and tested on branch unit/U-118 (58 unit tests; a real token minted against the App); merged (PRs 134, 135; `integration` bootstrapped by PR 136). D1 done; D2 dry run passed 2026-10-21 (PRs 137 to 140, delta log). Closes with D3, the switch-on edits"
+    status: done
+    note: "Added 2026-10-20 after the estimate panel; PM estimate (solo 2 / 4 / 8 in estimate-panel.json). Started 2026-10-20, ahead of the planned Oct 26 P5 start: runbook phases A (the App) and C (merge settings, integration, rulesets) done that day; phase B (scripts and workflows) and D (switch-on) remain. 2026-10-21: phase B written and tested on branch unit/U-118 (58 unit tests; a real token minted against the App); merged (PRs 134, 135; `integration` bootstrapped by PR 136). D1 done; D2 dry run passed 2026-10-21 (PRs 137 to 140, delta log). D3 done 2026-10-21: tiered auto-merge on; review command and approval window added the same day. Closed 2026-10-21: 2 elapsed days (Oct 20 to 21) against 3 likely; dave_minutes is Dave's estimate for Oct 21 only (Oct 20, the App and settings, not logged); tokens not separable, since the Oct 20 sessions mixed the plan freeze with U-118 setup"
   - id: U-002
     title: "Walking skeleton"
     section: platform

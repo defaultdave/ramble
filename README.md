@@ -49,7 +49,7 @@ The frozen forecast, as ranges rather than single dates:
 | Prototype: a clickable guest flow on seed data | 2026-12-01 | 2026-12-07 |
 | Launch scope from the PRD | 2027-03-08 | 2027-03-29 |
 
-There is no application code yet. The walking skeleton (U-001) follows the merge desk. Live status is in [`docs/plan/STATUS.md`](docs/plan/STATUS.md).
+There is no application code yet. The walking skeleton (U-001) follows the merge desk. Live status, decisions, and the roadmap are in [ramble-pm](https://github.com/defaultdave/ramble-pm).
 
 ## The planning method
 
@@ -66,7 +66,7 @@ The plan is seven artifacts, each built on the one before it:
 Three rules keep it honest:
 
 - **Estimates are ranges.** Never a single date.
-- **Freeze before build.** After the freeze tag, plan files are read-only. Reality goes in [`docs/plan/delta-log.md`](docs/plan/delta-log.md).
+- **Freeze before build.** After the freeze tag, plan files are read-only. Reality goes in the [delta log](https://github.com/defaultdave/ramble-pm/blob/main/delta-log.md).
 - **Log actuals as units close.** Anything off by more than 25% gets a one-line reason.
 
 ## How the work runs

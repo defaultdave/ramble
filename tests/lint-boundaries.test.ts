@@ -41,12 +41,12 @@ describe('import/no-restricted-paths', () => {
     [
       'lib imports app',
       'src/lib/bad.ts',
-      "import RootLayout from '@/app/layout';\nexport const a = RootLayout;\n",
+      "import RootLayout from '@/app/(guest)/layout';\nexport const a = RootLayout;\n",
     ],
     [
       'components import app',
       'src/components/Bad.tsx',
-      "import RootLayout from '@/app/layout';\nexport const a = RootLayout;\n",
+      "import RootLayout from '@/app/(guest)/layout';\nexport const a = RootLayout;\n",
     ],
     [
       'components import server outside actions',
@@ -76,7 +76,7 @@ describe('import/no-restricted-paths', () => {
     [
       'server imports app',
       'src/server/bad.ts',
-      "import RootLayout from '@/app/layout';\nexport const a = RootLayout;\n",
+      "import RootLayout from '@/app/(guest)/layout';\nexport const a = RootLayout;\n",
     ],
     [
       'server imports components',

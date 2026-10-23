@@ -112,11 +112,17 @@ Needs Node 24 (`.nvmrc`) and pnpm 10. Node 25 no longer bundles Corepack, so ins
 
 ```
 pnpm install
-cp .env.example .env.local   # optional: every variable has a default
+docker compose up -d --wait  # local Postgres 17
+cp .env.example .env.local   # APP_URL has a default; the two database URLs do not
+pnpm db:migrate
 pnpm dev
 ```
 
 The gates CI runs on every PR (`.github/workflows/ci.yml`), each a script you can run locally: `pnpm format:check`, `lint`, `typecheck`, `test`, `build`, `knip`, and `e2e` (Playwright; run `pnpm exec playwright install chromium` once). Environment variables are read and validated in one place, `src/server/env.ts`. Import boundaries between `src/app`, `src/components`, `src/lib`, and `src/server` are enforced by `pnpm lint`; `tests/lint-boundaries.test.ts` fails if a rule is weakened.
+
+## Database
+
+Postgres on Neon through Drizzle, all under `src/server/db/`. `db` (pooled host, `pg` Pool) is the only handle that opens a transaction; `dbRead` (Neon HTTP) is for single reads and never runs a capacity or balance check. Migrations are committed SQL in `src/server/db/migrations/`: change the schema in `src/server/db/schema/`, run `pnpm db:generate`, commit the result, and never `drizzle-kit push` a shared database. A PR never drops or renames a column the deployed code still reads (expand, then contract in a later PR). `pnpm db:migrate` uses the direct host, `pnpm db:check` checks the history, and `pnpm test:db` runs the `*.db.test.ts` files against the local Postgres, each in its own schema (`createFreshDatabase` in `src/server/db/testing.ts`). Previews migrate before the build; production is migrated only by the `db-migrate-production` workflow, run by hand.
 
 ## Running the planning scripts
 

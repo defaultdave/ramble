@@ -13,8 +13,26 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['src/**/*.test.{ts,tsx}', 'tests/**/*.test.{ts,tsx}'],
     setupFiles: ['./tests/setup.ts'],
-    environment: 'node',
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          include: ['src/**/*.test.ts', 'tests/**/*.test.{ts,tsx}'],
+          environment: 'node',
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'components',
+          include: ['src/**/*.test.tsx'],
+          environment: 'jsdom',
+          // Testing Library registers its automatic cleanup only when afterEach is global.
+          globals: true,
+        },
+      },
+    ],
   },
 });

@@ -1,0 +1,136 @@
+.skeleton {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.image,
+.tag,
+.title,
+.meta,
+.price,
+.line {
+  display: block;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-sunken);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.card,
+.horizontalCard {
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Vertical card: 3:2 image, then tag, title, meta, and price bars. */
+.card {
+  display: flex;
+  flex-direction: column;
+  overflow: clip;
+}
+
+.card .image {
+  aspect-ratio: 3 / 2;
+  border-radius: 0;
+}
+
+.card .content {
+  padding: var(--space-4);
+}
+
+.card .tag {
+  width: 25%;
+  height: var(--space-6);
+}
+
+.card .title {
+  width: 70%;
+  height: var(--space-6);
+}
+
+.card .meta {
+  width: 45%;
+  height: var(--space-5);
+}
+
+.card .price {
+  width: 32%;
+  height: var(--space-6);
+}
+
+/* Horizontal card: 96px image beside title, meta, and price bars. */
+.horizontalCard {
+  display: flex;
+  gap: var(--space-3);
+  height: calc(var(--space-8) * 3 + var(--space-6) + var(--space-1));
+  padding: var(--space-3);
+}
+
+.horizontalCard .image {
+  flex: none;
+  width: calc(var(--space-8) * 3);
+  height: calc(var(--space-8) * 3);
+  border-radius: var(--radius-md);
+}
+
+.horizontalCard .content {
+  flex: 1;
+  padding-top: var(--space-1);
+}
+
+.horizontalCard .title {
+  width: 60%;
+  height: var(--space-4);
+}
+
+.horizontalCard .meta {
+  width: 40%;
+  height: var(--space-3);
+}
+
+.horizontalCard .price {
+  width: 30%;
+  height: var(--space-4);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* 14px bars, the body-s size, matching the Figma text skeleton. */
+.line {
+  height: var(--font-size-body-s);
+}
+
+.line:nth-child(2) {
+  width: 88%;
+}
+
+.line:nth-child(3) {
+  width: 58%;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image,
+  .tag,
+  .title,
+  .meta,
+  .price,
+  .line {
+    animation: none;
+  }
+}

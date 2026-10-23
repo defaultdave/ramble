@@ -8,7 +8,7 @@ Most secrets below do not exist yet. They arrive with the unit that needs them; 
 
 1. Make the new value first, put it where the app reads it, deploy, confirm, and only then revoke the old one. The exception is a leak: revoke first and accept the outage.
 2. Secrets live in three places only: Vercel environment variables of type Secret (ADR 0007, Secrets), GitHub Actions secrets for workflows, and GitHub environment secrets for the `production-database` environment. Never in the repo, a chat, or a command line. Paste at the prompt: `gh secret set NAME --repo defaultdave/ramble` (add `--env production-database` for an environment secret).
-3. `src/server/env.ts` validates every variable at start-up (SET-18, SET-19). A missing or malformed value fails the deploy, not a customer.
+3. `src/server/env.ts` validates every variable when server code first loads (SET-18, SET-19), but it skips the required database URLs while `next build` runs, so a successful build proves nothing about a rotated credential. Before promoting a deployment, and for a routine rotation before revoking the old value, exercise the affected path: open a page that reads the database, run the migrate check, send a test webhook, and so on.
 4. After any rotation, note in your own records the date and why. Do not paste the value.
 
 ## If a scanner finds a secret
@@ -44,7 +44,7 @@ The same applies to a secret pasted into a chat or an agent session: revoke it, 
 - **Source:** ADR 0003: the demo runs on the fake gateway only. There is no Stripe account, sandbox, or key in the demo, so nothing here needs rotating today.
 - **Real job:** a live key is a serious secret and the webhook signing secret goes with it (webhook route verifies the signature on the raw body, design doc 4.2.3). Variable names are not fixed in the plan; record them here when the payments unit picks them. Keep them in Vercel, Secret type, server-only, and out of agent sessions. Rotate on staff changes and after any suspected leak.
 - **How (real job):** in the Stripe dashboard roll the secret key, choosing an expiry for the old key if offered; update Vercel; deploy. For the webhook, roll the endpoint's signing secret with the overlap Stripe offers, update Vercel, deploy, then let the old secret expire.
-- **What breaks (real job):** payments fail from the moment the old key dies. Webhooks fail signature checks if only one side changed; the `provider_events` retry and the daily reconciliation pick up what was missed.
+- **What breaks (real job):** payments fail from the moment the old key dies. Webhooks fail signature checks if only one side changed. The intake verifies the signature before it inserts into `provider_events`, so a rejected delivery is not stored and no internal retry recovers it, and the daily reconciliation only compares balances. After the secrets match, check Stripe's event log and resend every delivery that failed.
 
 ### Cron and pulse trigger secret
 
@@ -78,7 +78,7 @@ The same applies to a secret pasted into a chat or an agent session: revoke it, 
 - **Lives in:** GitHub Actions secrets (dump workflow) and Vercel (audit export job), when those units land.
 - **Rotated by:** Dave.
 - **How:** create a new R2 API token with the same bucket scope, update both places, run the dump once by hand, then delete the old token.
-- **What breaks:** dumps and audit exports fail until updated. A missed hour is within the PRD-75 one-hour loss limit, so do not let it run past an hour.
+- **What breaks:** dumps and audit exports fail until updated. PRD-75's one-hour loss limit is measured from the last successful recoverable backup, not from the start of the outage: if the 09:00 dump succeeds and rotation blocks the 10:00 one, a region loss at 10:30 loses 90 minutes. Run a fresh dump by hand as soon as the new token works, and confirm it landed in the bucket.
 
 ### Monitoring tokens: Sentry, Better Stack, Axiom
 

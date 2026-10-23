@@ -14,12 +14,18 @@ test("builds a completed check run with the title and summary", () => {
   });
 });
 
+test("accepts architecture-audit and keeps its name", () => {
+  const run = buildCheckRun({ ...input, name: "architecture-audit" });
+  expect(run.name).toBe("architecture-audit");
+  expect(run.output.title).toBe("architecture-audit: success");
+});
+
 test("cuts the summary to 65,000 characters", () => {
   const run = buildCheckRun({ ...input, summary: "x".repeat(SUMMARY_LIMIT + 500) });
   expect(run.output.summary.length).toBe(SUMMARY_LIMIT);
 });
 
-test("rejects a check name that is not one of the three agent checks", () => {
+test("rejects a check name that is not one of the four agent checks", () => {
   expect(() => buildCheckRun({ ...input, name: "scope-manifest" })).toThrow("--name");
 });
 

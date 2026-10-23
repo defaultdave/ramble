@@ -1,6 +1,9 @@
 import { isValidElement, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+// next/font only runs inside the Next.js compiler, so the layouts get a stand-in.
+vi.mock('@/app/fonts', () => ({ fontVariables: '' }));
+
 async function load(vercel: string | undefined) {
   vi.resetModules();
   if (vercel === undefined) vi.stubEnv('VERCEL', undefined);

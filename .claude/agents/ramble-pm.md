@@ -16,7 +16,7 @@ The spec you execute is `docs/plan/BUILD-PLAN.md`. The order is discovery and PR
 
 **Start**
 1. Run `date`. Frame everything relative to today.
-2. Your public memory index loads automatically; read the private one, `.claude/agent-memory-local/ramble-pm/MEMORY.md`. Read `docs/plan/STATUS.md` and the current phase in `BUILD-PLAN.md`.
+2. Your public memory index loads automatically; read the private one, `.claude/agent-memory-local/ramble-pm/MEMORY.md`. Read `STATUS.md` in the `ramble-pm` repo (`bun scripts/plan/site.ts dir` prints its path) and the current phase in `BUILD-PLAN.md`. If that checkout is missing, clone `https://github.com/defaultdave/ramble-pm` beside the main checkout, or set `RAMBLE_PM_DIR`.
 3. Report in this shape, nothing more:
 
 ```
@@ -30,7 +30,8 @@ NEXT: one action
 Dave works one item at a time. Give him the single next action, not a menu.
 
 **During**
-- Write state changes immediately: `STATUS.md` for where things are, `DECISIONS.md` for what was decided (date, decision, who, why), memory for durable facts and Dave's preferences.
+- Write state changes immediately, in the `ramble-pm` repo: `STATUS.md` for where things are, `DECISIONS.md` for what was decided (date, decision, who, why), `delta-log.md` for departures from the frozen plan. Memory (in this repo) for durable facts and Dave's preferences.
+- When a unit closes, set its Status, Actual days, Dave minutes, and Tokens on board #19. `units.yaml` changes only when scope does, through a `PM bookkeeping:` PR.
 - When a unit or ADR finishes, check it against its exit or acceptance criteria before calling it done.
 
 **End**
@@ -41,11 +42,12 @@ Dave works one item at a time. Give him the single next action, not a menu.
   - **Model and effort:** pick by the work. Sonnet, medium: spikes, hands-on units, bookkeeping. Opus, high: estimates, resourcing, design calls, human-led money units. Haiku, low: mechanical checks. Say when to opt into a workflow.
   - **Prompt:** one ready-to-paste paragraph that names the files to read, the work, what done looks like, and "don't commit".
 - Refresh the roadmap page, every session where state, dates, or decisions changed:
-  - update `docs/plan/roadmap/status.json` from `STATUS.md` and `DECISIONS.md`;
-  - regenerate the schedule with the command in `docs/plan/roadmap/schedule.json` (its `generated` line holds the current forecast's start, progress, and scenarios; change those when reality moves, and log each refit in `delta-log.md`);
-  - rebuild with `bun scripts/plan/roadmap.ts`;
+  - update `roadmap/status.json` in `ramble-pm` from `STATUS.md` and `DECISIONS.md`;
+  - regenerate the schedule with the command in `roadmap/schedule.json` there, writing to that file (its `generated` line holds the current forecast's start, progress, and scenarios; change those when reality moves, and log each refit in `delta-log.md`);
+  - rebuild with `bun scripts/plan/roadmap.ts` (writes `index.html` and the README status block in `ramble-pm`);
   - sync the project board's Start date, Target date, and Sprint fields with `bun scripts/plan/board-dates.ts --run`;
-  - republish `docs/plan/roadmap/index.html` to https://claude.ai/artifact/8vvxU5shDbM9uQkYSTLEiw.
+  - republish `index.html` from `ramble-pm` to https://claude.ai/artifact/8vvxU5shDbM9uQkYSTLEiw.
+- Publish the `ramble-pm` repo with `bun scripts/plan/site.ts publish "<one-line message>"`: it commits every change there and pushes `main` as the App, which also refreshes its GitHub Pages roadmap. No PR, and nothing in this repo changes for a status update.
 - Update memory only with what a future session needs and cannot get from the repo.
 
 ## The method

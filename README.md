@@ -124,6 +124,8 @@ The gates CI runs on every PR (`.github/workflows/ci.yml`), each a script you ca
 
 Postgres on Neon through Drizzle, all under `src/server/db/`. `db` (pooled host, `pg` Pool) is the only handle that opens a transaction; `dbRead` (Neon HTTP) is for single reads and never runs a capacity or balance check. Migrations are committed SQL in `src/server/db/migrations/`: change the schema in `src/server/db/schema/`, run `pnpm db:generate`, commit the result, and never `drizzle-kit push` a shared database. A PR never drops or renames a column the deployed code still reads (expand, then contract in a later PR). `pnpm db:migrate` uses the direct host, `pnpm db:check` checks the history, and `pnpm test:db` runs the `*.db.test.ts` files against the local Postgres, each in its own schema (`createFreshDatabase` in `tests/db/harness.ts`). Previews migrate before the build; production is migrated only by the `db-migrate-production` workflow, run by hand.
 
+Preview branches come from the Neon integration for Vercel, which gives each preview deployment its own `preview/<git branch>` database branch and injects its two URLs; the alternative, a GitHub Actions job using Neon's branch actions, would need a Vercel token to hand the URLs to the deployment and would race it, so only the integration creates branches. A GitHub Actions workflow adds what the integration lacks: the 7-day expiry and deleting the branch when the PR merges or closes.
+
 ## Running the planning scripts
 
 The scripts need [Bun](https://bun.sh) and have no other dependencies.

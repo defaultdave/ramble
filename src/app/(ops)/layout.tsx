@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { SiteShell } from '@/components/SiteShell';
+import '@/styles/tokens.css';
+import { fontVariables } from '../fonts';
 
 export const metadata: Metadata = {
   title: { default: 'Ramble', template: '%s | Ramble' },
@@ -12,7 +14,7 @@ export const instant = false;
 
 export default function OpsLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={fontVariables}>
       <body>
         <SiteShell areaName="Operations">{children}</SiteShell>
       </body>

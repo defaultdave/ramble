@@ -11,6 +11,7 @@ const schema = z
     APP_URL: z.url().default('http://localhost:3000'),
     DATABASE_URL: postgresUrl.optional(),
     DATABASE_URL_UNPOOLED: postgresUrl.optional(),
+    VERCEL: z.string().optional(),
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV === 'test') return;

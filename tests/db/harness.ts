@@ -9,7 +9,7 @@ import path from 'node:path';
 import { neonConfig } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { Pool, type CustomTypesConfig } from 'pg';
+import { Pool } from 'pg';
 
 export type FreshDatabase = {
   /** Connection string whose sessions resolve unqualified names in the file's own schema. */
@@ -70,7 +70,9 @@ function readBody(request: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     request.on('data', (chunk: Buffer) => chunks.push(chunk));
-    request.on('end', () => resolve(Buffer.concat(chunks).toString()));
+    request.on('end', () => {
+      resolve(Buffer.concat(chunks).toString());
+    });
     request.on('error', reject);
   });
 }
@@ -91,7 +93,7 @@ async function answer(
     // The client asked for raw text output (Neon-Raw-Text-Output), so skip type parsing.
     types: {
       getTypeParser: () => (value: string) => value,
-    } as unknown as CustomTypesConfig,
+    },
   });
   response.setHeader('content-type', 'application/json');
   response.end(
@@ -125,10 +127,13 @@ export async function serveNeonHttp(url: string) {
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const { port } = server.address() as AddressInfo;
-  neonConfig.fetchEndpoint = `http://127.0.0.1:${port}/sql`;
+  neonConfig.fetchEndpoint = `http://127.0.0.1:${String(port)}/sql`;
   return async () => {
     await new Promise<void>((resolve, reject) => {
-      server.close((error) => (error ? reject(error) : resolve()));
+      server.close((error) => {
+        if (error) reject(error);
+        else resolve();
+      });
       server.closeAllConnections();
     });
     await pool.end();

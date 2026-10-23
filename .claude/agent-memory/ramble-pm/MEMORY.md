@@ -1,6 +1,6 @@
 # ramble-pm memory
 
-Working memory for `ramble-pm`, the agent that runs this project's plan. It holds durable facts a new session needs that the rest of the repo does not make obvious. The spec is `docs/plan/BUILD-PLAN.md`, current state is `docs/plan/STATUS.md`, and decisions with their reasons are in `docs/plan/DECISIONS.md`.
+Working memory for `ramble-pm`, the agent that runs this project's plan. It holds durable facts a new session needs that the rest of the repo does not make obvious. The spec is `docs/plan/BUILD-PLAN.md`, current state is `STATUS.md` and decisions with their reasons are `DECISIONS.md`, both in the `ramble-pm` repo.
 
 The project owner keeps a second, private memory on their own machine for personal preferences and account details. It is not part of this repository.
 
@@ -21,7 +21,8 @@ The project owner keeps a second, private memory on their own machine for person
 - `bun scripts/plan/breakdown.ts --write` regenerates `02-work-breakdown.md` in full; its fixed prose lives in the script.
 - `bun scripts/plan/critical-path.ts` (artifact 4) and `bun scripts/plan/execution-model.ts` (artifact 5) each take `--write` to refresh the generated block in their document.
 - `bun scripts/plan/forecast.ts --report estimate|resourcing|schedule` simulates the graph with the owner as a capacity-limited reviewer. Scenarios and levers are constants in the script; the owner's review minutes are in `scripts/plan/dave-time.ts`, shared with `execution-model.ts`.
-- Roadmap page: `docs/plan/roadmap/status.json` (a hand digest of STATUS and DECISIONS) plus the schedule report, built by `bun scripts/plan/roadmap.ts`.
+- Roadmap page: `roadmap/status.json` in `ramble-pm` (a hand digest of STATUS and DECISIONS) plus the schedule report, built by `bun scripts/plan/roadmap.ts` into that repo's `index.html` and README.
+- `ramble-pm` (since 2026-10-22) is the project's viewable state: status, decisions, delta log, roadmap. `scripts/plan/site.ts` finds its checkout (beside the main checkout, or `RAMBLE_PM_DIR`) and publishes it straight to `main` as the App. Unit status and actuals live on board #19.
 
 ## Settled decisions (do not reopen)
 Full list with reasons in `DECISIONS.md`.
@@ -39,7 +40,7 @@ Full list with reasons in `DECISIONS.md`.
 - The PM never runs a step that changes GitHub settings or Claude permission config.
 - User-level `ask` rules (git push, gh pr create/merge) take precedence over project `allow` rules. The runbook's answer is a narrow wrapper, `scripts/merge-desk/agent-git.ts`, allowed per project.
 - Call the merge desk scripts as bare commands from the main checkout. The allow rule matches the whole command line, so a `cd … &&` prefix falls through to auto mode, which refuses `automerge`. `revert.sh` switches branches, so run it in a clean worktree (D2 dry run, 2026-10-21).
-- A sync PR (`main` into `integration`) needs the three agent checks posted as well as `scope-manifest`; the PM posts them once `scope-manifest` passes (first sync, PR 141).
+- A sync PR (`main` into `integration`) needs the four agent checks posted (`architecture-audit` joined them on 2026-10-22) as well as `scope-manifest`; the PM posts them once `scope-manifest` passes (first sync, PR 141).
 
 - Parallel work: when three or more agent-built units are ready with disjoint file scopes, propose running them together, up to 8 open at once. The owner's review time is the real limit. Workflows run only on the owner's opt-in.
 
@@ -56,7 +57,7 @@ Full list with reasons in `DECISIONS.md`.
 - The first resourcing draft put the demo in spring 2027 because of review time (about 108 h). That led to the tiered auto-merge change. A December 1 build was out of reach either way (build floor 2026-12-09 to 12-23).
 
 ## Freeze and repository (2026-10-20)
-- Plan frozen at tag `plan-frozen-2026-10-20` on `8715c42`. Plan files are read-only from then on; reality goes in `docs/plan/delta-log.md`.
+- Plan frozen at tag `plan-frozen-2026-10-20` on `8715c42`. Plan files are read-only from then on; reality goes in `delta-log.md` in `ramble-pm`.
 - The repository is public, with secret scanning and push protection on.
 - Rulesets on `main` and `integration` are live (ids 25513279, 25513280).
 - U-118 (merge desk) is the root of the dependency graph; U-001 depends on it.

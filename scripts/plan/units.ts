@@ -42,6 +42,23 @@ export const UNITS_PATH = process.env.UNITS_FILE
   ? new URL(`file://${process.env.UNITS_FILE}`)
   : new URL("../../docs/plan/units.yaml", import.meta.url);
 
+/**
+ * The ramble-pm checkout, which holds the status, decisions, delta log, and roadmap page. `RAMBLE_PM_DIR` points
+ * elsewhere; the default sits beside the main checkout, so it resolves the same from any worktree.
+ * @throws when git cannot find this repository
+ */
+export function siteDir(): string {
+  if (process.env.RAMBLE_PM_DIR) return process.env.RAMBLE_PM_DIR;
+  const p = Bun.spawnSync(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], {
+    cwd: new URL(".", import.meta.url).pathname,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  if (p.exitCode !== 0) throw new Error(`git rev-parse failed: ${p.stderr.toString().trim()}`);
+  const commonDir = p.stdout.toString().trim();
+  return `${commonDir.replace(/\/\.git\/?$/, "").replace(/\/[^/]+$/, "")}/ramble-pm`;
+}
+
 /** True when a parsed entry has the fields the plan scripts read. */
 function isUnit(x: unknown): x is Unit {
   if (typeof x !== "object" || x === null) return false;

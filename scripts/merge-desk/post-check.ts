@@ -5,7 +5,7 @@ import { parseArgs } from "node:util";
 import { mintToken } from "./app-token.ts";
 
 export const REPO = "defaultdave/ramble";
-export const CHECK_NAMES = ["review-agent", "qa-agent", "spec-compliance"] as const;
+export const CHECK_NAMES = ["review-agent", "qa-agent", "spec-compliance", "architecture-audit"] as const;
 export const CONCLUSIONS = ["success", "failure"] as const;
 export const SUMMARY_LIMIT = 65_000;
 

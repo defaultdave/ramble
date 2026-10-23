@@ -6,6 +6,7 @@ const schema = z.object({
     .enum(['development', 'test', 'production'])
     .default('development'),
   APP_URL: z.url().default('http://localhost:3000'),
+  VERCEL: z.string().optional(),
 });
 
 function readEnv() {

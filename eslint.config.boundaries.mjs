@@ -11,7 +11,17 @@ const vendorWrappers = [
   { folder: 'src/server/ports/storage', patterns: ['@vercel/blob'] },
   { folder: 'src/server/ports/rate-limit', patterns: ['botid', 'botid/*'] },
   { folder: 'src/server/monitoring', patterns: ['@sentry/*'] },
-  { folder: 'src/server/analytics', patterns: ['web-vitals', 'web-vitals/*'] },
+  {
+    folder: 'src/server/analytics',
+    patterns: [
+      'web-vitals',
+      'web-vitals/*',
+      '@vercel/analytics',
+      '@vercel/analytics/*',
+      '@vercel/speed-insights',
+      '@vercel/speed-insights/*',
+    ],
+  },
 ];
 
 const vendorSdkPatterns = vendorWrappers.flatMap(({ patterns }) => patterns);

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { SiteShell } from '@/components/SiteShell';
+import { VercelMeasurement } from '@/server/analytics/VercelMeasurement';
 import '@/styles/tokens.css';
 import { fontVariables } from '../fonts';
 
@@ -14,6 +15,7 @@ export default function GuestLayout({ children }: { children: ReactNode }) {
     <html lang="en" className={fontVariables}>
       <body>
         <SiteShell>{children}</SiteShell>
+        <VercelMeasurement />
       </body>
     </html>
   );

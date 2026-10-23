@@ -126,6 +126,8 @@ Postgres on Neon through Drizzle, all under `src/server/db/`. `db` (pooled host,
 
 Preview branches come from the Neon integration for Vercel, which gives each preview deployment its own `preview/<git branch>` database branch and injects its two URLs; the alternative, a GitHub Actions job using Neon's branch actions, would need a Vercel token to hand the URLs to the deployment and would race it, so only the integration creates branches. A GitHub Actions workflow adds what the integration lacks: the 7-day expiry and deleting the branch when the PR merges or closes.
 
+The integration makes a branch's database and URLs only when a deployment is redeployed, so the first build of a new branch has no `DATABASE_URL_UNPOOLED`. The preview build then skips `db:migrate` with a warning instead of failing; redeploy once and it migrates.
+
 ## Running the planning scripts
 
 The scripts need [Bun](https://bun.sh) and have no other dependencies.

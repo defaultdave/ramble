@@ -18,28 +18,29 @@ export type FreshDatabase = {
   dispose: () => Promise<void>;
 };
 
-const migrationsFolder = path.resolve(import.meta.dirname, 'migrations');
-
-function adminUrl(): string {
-  const url = process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error(
-      'Database tests need DATABASE_URL_UNPOOLED. Run `docker compose up -d --wait`.',
-    );
-  }
-  return url;
-}
+const migrationsFolder = path.resolve(
+  import.meta.dirname,
+  '../../src/server/db/migrations',
+);
 
 /**
  * Creates a schema private to the calling test file, applies every committed migration into it,
  * and returns a URL that points at it, so test files run in parallel without sharing rows.
  */
-export async function createFreshDatabase(): Promise<FreshDatabase> {
+export async function createFreshDatabase(
+  adminUrl: string,
+): Promise<FreshDatabase> {
+  const { hostname } = new URL(adminUrl);
+  if (!['localhost', '127.0.0.1', '[::1]', 'postgres'].includes(hostname)) {
+    throw new Error(
+      `Refusing to run database tests against ${hostname}: they create and drop schemas. Use the docker-compose database.`,
+    );
+  }
   const schema = `t_${randomBytes(6).toString('hex')}`;
-  const admin = new Pool({ connectionString: adminUrl(), max: 1 });
+  const admin = new Pool({ connectionString: adminUrl, max: 1 });
   await admin.query(`CREATE SCHEMA ${schema}`);
 
-  const url = new URL(adminUrl());
+  const url = new URL(adminUrl);
   url.searchParams.set('options', `-c search_path=${schema}`);
 
   const migrator = new Pool({ connectionString: url.toString(), max: 1 });
@@ -126,7 +127,10 @@ export async function serveNeonHttp(url: string) {
   const { port } = server.address() as AddressInfo;
   neonConfig.fetchEndpoint = `http://127.0.0.1:${port}/sql`;
   return async () => {
-    server.close();
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+      server.closeAllConnections();
+    });
     await pool.end();
   };
 }

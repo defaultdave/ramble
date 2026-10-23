@@ -4,17 +4,17 @@ import {
   createFreshDatabase,
   serveNeonHttp,
   type FreshDatabase,
-} from './testing';
+} from './harness';
 
 let fresh: FreshDatabase;
 let stopHttp: () => Promise<void>;
-let client: typeof import('./client');
+let client: typeof import('@/server/db/client');
 
 beforeAll(async () => {
-  fresh = await createFreshDatabase();
+  fresh = await createFreshDatabase(process.env.DATABASE_URL_UNPOOLED ?? '');
   stopHttp = await serveNeonHttp(fresh.url);
   vi.stubEnv('DATABASE_URL', fresh.url);
-  client = await import('./client');
+  client = await import('@/server/db/client');
 });
 
 afterAll(async () => {

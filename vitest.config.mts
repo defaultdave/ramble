@@ -1,6 +1,8 @@
 import path from 'node:path';
 import { defineConfig } from 'vitest/config';
 
+const composeUrl = 'postgres://ramble:ramble@localhost:5432/ramble';
+
 const resolve = {
   alias: {
     '@': path.resolve(import.meta.dirname, 'src'),
@@ -29,13 +31,12 @@ export default defineConfig({
         resolve,
         test: {
           name: 'db',
-          include: ['src/**/*.db.test.ts'],
+          include: ['src/**/*.db.test.ts', 'tests/**/*.db.test.ts'],
           environment: 'node',
-          // The docker-compose database, unless the environment already points elsewhere.
+          // The harness refuses any host that is not local.
           env: {
             DATABASE_URL_UNPOOLED:
-              process.env.DATABASE_URL_UNPOOLED ??
-              'postgres://ramble:ramble@localhost:5432/ramble',
+              process.env.DATABASE_URL_UNPOOLED ?? composeUrl,
           },
         },
       },

@@ -15,9 +15,10 @@ function requireUrl(): string {
 }
 
 const pool = new Pool({ connectionString: requireUrl() });
-// Without a listener, an error on an idle pooled client would crash the process.
+// Without a listener, an error on an idle pooled client would crash the process. Only the
+// message is logged: the error object can carry the connection string.
 pool.on('error', (error) => {
-  console.error('Idle database client failed', error);
+  console.error(`Idle database client failed: ${error.message}`);
 });
 attachDatabasePool(pool);
 
@@ -30,5 +31,5 @@ export const db = drizzlePool(pool, { schema, casing: 'snake_case' });
  */
 export const dbRead: Omit<
   ReturnType<typeof drizzleHttp<typeof schema>>,
-  'transaction'
+  'transaction' | 'batch'
 > = drizzleHttp(neon(requireUrl()), { schema, casing: 'snake_case' });

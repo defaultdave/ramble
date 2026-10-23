@@ -15,6 +15,8 @@ const schema = z
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV === 'test') return;
+    // next build evaluates layouts that import this module; CI builds with no database.
+    if (process.env.NEXT_PHASE === 'phase-production-build') return;
     for (const name of ['DATABASE_URL', 'DATABASE_URL_UNPOOLED'] as const) {
       if (!value[name]) {
         ctx.addIssue({

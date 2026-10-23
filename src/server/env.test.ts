@@ -74,6 +74,17 @@ describe('environment', () => {
       },
     );
 
+    it('are not required while next build runs', async () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('NEXT_PHASE', 'phase-production-build');
+      vi.stubEnv('DATABASE_URL', undefined);
+      vi.stubEnv('DATABASE_URL_UNPOOLED', undefined);
+
+      const env = await loadEnv();
+
+      expect(env.DATABASE_URL).toBeUndefined();
+    });
+
     it('must be Postgres URLs', async () => {
       vi.stubEnv('DATABASE_URL', 'https://example.com/db');
 

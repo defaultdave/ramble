@@ -108,7 +108,7 @@ printf 'RAMBLE_APP_ID=%s\nRAMBLE_APP_CLIENT_ID=%s\nRAMBLE_APP_INSTALLATION_ID=%s
 bun scripts/merge-desk/post-check.ts --name review-agent --sha <head sha> --conclusion success --summary-file <path>
 ```
 
-- `--name` is one of `review-agent`, `qa-agent`, `spec-compliance`.
+- `--name` is one of `review-agent`, `qa-agent`, `spec-compliance`, `architecture-audit` (added 2026-10-22; see the note under C3).
 - `--conclusion` is `success` or `failure`.
 - It calls `POST /repos/defaultdave/ramble/check-runs` with `status: completed`, the conclusion, and `output.title` plus `output.summary` (cut to 65,000 characters).
 
@@ -296,6 +296,20 @@ done
 
 - **Up-to-date branches are not required** (`strict` off), to keep rebase churn down. The nightly smoke catches semantic conflicts between units that merged the same day.
 - **Once U-001 merges,** add its CI job names to both rulesets with `integration_id` 15368. This was already your U-001 task in artifact 5. To find the IDs, run `gh api repos/defaultdave/ramble/rulesets`. Then run `gh api -X PUT repos/defaultdave/ramble/rulesets/<id> --input -` with the same JSON plus the new checks.
+- **`architecture-audit` is the fifth required check** (DECISIONS 2026-10-22), pinned to the App like the other agent checks. It is added to both rulesets only after `post-check.ts` accepts the name, or no PR could pass. The command keeps every other rule as it is, the approval window included:
+
+```bash
+source ~/.config/ramble-agents/app.conf
+for id in 25513279 25513280; do
+  gh api "repos/defaultdave/ramble/rulesets/$id" |
+    jq --argjson app "$RAMBLE_APP_ID" '{name, target, enforcement, conditions, bypass_actors,
+      rules: [.rules[] | if .type == "required_status_checks"
+        then .parameters.required_status_checks |= (map(select(.context != "architecture-audit")) + [{context: "architecture-audit", integration_id: $app}])
+        else . end]}' |
+    gh api -X PUT "repos/defaultdave/ramble/rulesets/$id" --input - \
+      -q '.name + ": " + ([.rules[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context] | join(", "))'
+done
+```
 
 **C4 [Dave] The nightly smoke secret,** when U-014a lands (a Neon branch kept for the overnight race tests). Paste the URL at the prompt; it never goes on the command line:
 

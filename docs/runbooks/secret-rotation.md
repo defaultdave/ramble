@@ -25,7 +25,7 @@ The same applies to a secret pasted into a chat or an agent session: revoke it, 
 - **What it does:** HMAC key behind every manage, gift, and order link. Whoever holds it can cancel any booking or redeem any gift.
 - **Lives in:** Vercel, Secret type, all environments.
 - **Rotated by:** Dave.
-- **How:** generate 32 random bytes (`openssl rand -base64 32 | pbcopy`, so the value goes to the clipboard and not into a chat), set it in Vercel, deploy, then run the re-hash of stored hashes (built in U-015 and U-017), then resend links to upcoming bookings and to delivered, unredeemed gifts. The step-by-step version with a rehearsal is owned by the operations runbooks unit (U-099); follow that page when it exists.
+- **How:** generate 32 random bytes straight into Vercel without displaying or copying them (`openssl rand -base64 32 | vercel env add CAPABILITY_TOKEN_SECRET production`, repeated for each environment; the Vercel CLI reads the value from stdin), deploy, then run the re-hash of stored hashes (built in U-015 and U-017), then resend links to upcoming bookings and to delivered, unredeemed gifts. The step-by-step version with a rehearsal is owned by the operations runbooks unit (U-099); follow that page when it exists.
 - **What breaks:** every link already emailed stops working until the re-hash and resend finish. Do it at a quiet hour, not during the newsletter send.
 
 ### Neon database URLs
@@ -33,10 +33,11 @@ The same applies to a secret pasted into a chat or an agent session: revoke it, 
 - **Source:** ADR 0002, Data operations (pooled host for the app, direct host for migrations and dumps); ADR 0007 (a Neon branch per preview).
 - **Lives in:** the Neon-managed integration injects `DATABASE_URL` and `DATABASE_URL_UNPOOLED` into Vercel (Production and Development; Preview per branch, created on a redeploy). Do not hand-edit those. Two copies are yours: the `DATABASE_URL` and `DATABASE_URL_UNPOOLED` pair set for the `integration` Preview branch (it points at the `staging` Neon branch), and the `DATABASE_URL_UNPOOLED` secret in the GitHub `production-database` environment, which `db-migrate-production.yml` reads.
 - **Rotated by:** Dave.
-- **How:** in the Neon console reset the password of the app role. Then, in Neon (Integrations, Manage), check that the integration pushed the new URLs to Vercel; if it did not, reconnect the project. Update the two copies above by hand: the `integration` Preview pair in Vercel (copy the pooled and direct strings from the `staging` branch) and the `production-database` environment secret (`gh secret set DATABASE_URL_UNPOOLED --repo defaultdave/ramble --env production-database`). Redeploy production, and redeploy a preview to confirm it migrates.
-- **What breaks:** the moment the password resets, running connections fail and every existing preview branch's URLs are stale until redeployed. Do it at a quiet hour.
+- **How:** in the Neon console reset the password of the app role. Then, in Neon (Integrations, Manage), check that the integration pushed the new URLs to Vercel; if it did not, reconnect the project. Update the three copies by hand (the two above, and `NIGHTLY_DATABASE_URL`): the `integration` Preview pair in Vercel (copy the pooled and direct strings from the `staging` branch) and the `production-database` environment secret (`gh secret set DATABASE_URL_UNPOOLED --repo defaultdave/ramble --env production-database`). Redeploy production, then redeploy a preview and confirm its Vercel check goes green.
+- **What breaks:** the moment the password resets, running connections fail, every existing preview branch's URLs are stale until redeployed, and the nightly race tests fail until `NIGHTLY_DATABASE_URL` is updated. Do it at a quiet hour.
 - **Other Neon credentials:** `NEON_API_KEY` is a GitHub Actions secret read by `neon-preview-branch.yml`; it can create and delete branches on the project. Rotate it by creating a new key in the Neon console (account Settings, API keys), running `gh secret set NEON_API_KEY --repo defaultdave/ramble`, re-running a preview workflow, then revoking the old key. `NEON_PROJECT_ID` is a GitHub Actions variable, not a secret; it needs no rotation and must not be stored with the secrets.
-- **Not built yet:** an hourly `pg_dump` workflow, and `NIGHTLY_DATABASE_URL` for the overnight race tests (merge-desk runbook C4, wanted when U-014a lands). Only `nightly-smoke.yml` exists today. Add their entries here when they land.
+- **`NIGHTLY_DATABASE_URL`:** a GitHub Actions secret that `nightly-smoke.yml` reads as `DATABASE_URL` for the overnight race tests (merge-desk runbook C4). It holds a copy of a Neon connection string, so it goes stale when the role password resets. Confirm which Neon branch it points at when you next set it, and record that here.
+- **Not built yet:** an hourly `pg_dump` workflow. Add its entry here when it lands.
 
 ### Stripe keys (real job only)
 
@@ -101,7 +102,7 @@ The same applies to a secret pasted into a chat or an agent session: revoke it, 
 - **Source:** `docs/plan/merge-desk-runbook.md`, steps A2 and A4 (the key file is outside the repo at `~/.config/ramble-agents/app-key.pem`; App ID, Client ID, and installation ID in `app.conf`).
 - **Lives in:** your laptop only. It is not a repo secret and not in Vercel.
 - **Rotated by:** Dave.
-- **How:** on the App page, Generate a private key, move the new `.pem` over `app-key.pem` with mode 600 as in A2, confirm `scripts/merge-desk/app-token.ts` still mints a token, update `RAMBLE_APP_KEY` in `app.conf` only if you changed the path, and delete the old key on the App page only after a token mints.
+- **How:** on the App page, Generate a private key, move the new `.pem` over `app-key.pem` with mode 600 as in A2 (delete the copy the browser left in Downloads), confirm `scripts/merge-desk/app-token.ts` still mints a token, update `RAMBLE_APP_KEY` in `app.conf` only if you changed the path, and delete the old key on the App page only after a token mints.
 - **What breaks:** agents cannot push, open PRs, or post checks while the key is wrong. Humans can still merge with bypass.
 
 ## Checklist for Dave

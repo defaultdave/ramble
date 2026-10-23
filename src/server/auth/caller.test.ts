@@ -44,9 +44,9 @@ describe('requireRole', () => {
       { roles: [Role.Guest, Role.HostOwner], hostIds: [TEST_HOST_ID] },
     ],
   ])('allows %s', (_name, role, resource, overrides) => {
-    expect(() =>
-      requireRole(testCaller(overrides), role, resource),
-    ).not.toThrow();
+    expect(() => {
+      requireRole(testCaller(overrides), role, resource);
+    }).not.toThrow();
   });
 
   it.each<[string, Role, Resource, Partial<Parameters<typeof testCaller>[0]>]>([
@@ -80,8 +80,8 @@ describe('requireRole', () => {
     ],
     ['ops standing in for admin', Role.Admin, ownHost, { roles: [Role.Ops] }],
   ])('denies %s', (_name, role, resource, overrides) => {
-    expect(() => requireRole(testCaller(overrides), role, resource)).toThrow(
-      ForbiddenError,
-    );
+    expect(() => {
+      requireRole(testCaller(overrides), role, resource);
+    }).toThrow(ForbiddenError);
   });
 });

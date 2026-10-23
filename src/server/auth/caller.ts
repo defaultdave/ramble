@@ -39,8 +39,8 @@ export const anonymousCaller: Caller = {
 };
 
 // TODO(U-004a): read the Better Auth session and role grants.
-export async function getCaller(): Promise<Caller> {
-  return anonymousCaller;
+export function getCaller(): Promise<Caller> {
+  return Promise.resolve(anonymousCaller);
 }
 
 /**

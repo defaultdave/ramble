@@ -1,0 +1,110 @@
+.field {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.box {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--size-touch-target);
+  height: var(--size-touch-target);
+}
+
+/* The input fills the 44px target; the visible 24px box is drawn on its pseudo-element. */
+.input {
+  appearance: none;
+  grid-area: 1 / 1;
+  width: var(--size-touch-target);
+  height: var(--size-touch-target);
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.input::before {
+  content: '';
+  display: block;
+  box-sizing: border-box;
+  width: var(--space-6);
+  height: var(--space-6);
+  margin: auto;
+  border: 2px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface);
+}
+
+.input:checked::before {
+  border-color: var(--color-action-primary-bg);
+  background: var(--color-action-primary-bg);
+}
+
+.input:focus-visible {
+  outline: 2px solid transparent;
+}
+
+.input:focus-visible::before {
+  box-shadow:
+    0 0 0 2px var(--color-bg-canvas),
+    0 0 0 4px var(--color-focus-ring);
+}
+
+.input[aria-invalid='true']::before {
+  border-color: var(--color-status-danger-text);
+}
+
+.input:disabled {
+  cursor: not-allowed;
+}
+
+.input:disabled::before {
+  border-color: var(--color-border-default);
+  background: var(--color-bg-disabled);
+}
+
+.input:disabled:checked::before {
+  background: var(--color-text-disabled);
+}
+
+.mark {
+  grid-area: 1 / 1;
+  width: var(--space-4);
+  height: var(--space-4);
+  color: var(--color-action-primary-text);
+  stroke-width: 3;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.input:checked + .mark {
+  opacity: 1;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: var(--size-touch-target);
+  justify-content: center;
+}
+
+.label {
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.field[data-disabled] .label {
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+}
+
+.description {
+  margin: 0;
+  font-size: var(--font-size-body-s);
+  line-height: var(--font-line-height-body-s);
+  color: var(--color-text-secondary);
+}

@@ -1,7 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, expectTypeOf } from 'vitest';
+import type { ComponentProps } from 'react';
 import { Button } from './Button';
 
 describe('Button', () => {
@@ -52,5 +53,15 @@ describe('Button', () => {
       'name',
       'book',
     );
+  });
+});
+
+describe('Button props', () => {
+  it('rejects className and style', () => {
+    // Primitives own their styling; callers cannot override it.
+    expectTypeOf<ComponentProps<typeof Button>>().not.toHaveProperty(
+      'className',
+    );
+    expectTypeOf<ComponentProps<typeof Button>>().not.toHaveProperty('style');
   });
 });

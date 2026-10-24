@@ -5,7 +5,7 @@ import styles from './Checkbox.module.css';
 
 export type CheckboxProps = Omit<
   ComponentPropsWithoutRef<'input'>,
-  'type' | 'checked' | 'onChange' | 'size'
+  'type' | 'checked' | 'onChange' | 'size' | 'className' | 'style'
 > & {
   checked: boolean;
   onChange: ChangeEventHandler<HTMLInputElement>;

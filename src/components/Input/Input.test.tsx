@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, expectTypeOf } from 'vitest';
+import type { ComponentProps } from 'react';
 import { Input } from './Input';
 
 describe('Input', () => {
@@ -68,5 +69,15 @@ describe('Input', () => {
   it('keeps a caller id on the input', () => {
     render(<Input label="Email" id="email" />);
     expect(screen.getByLabelText('Email')).toHaveAttribute('id', 'email');
+  });
+});
+
+describe('Input props', () => {
+  it('rejects className and style', () => {
+    // Primitives own their styling; callers cannot override it.
+    expectTypeOf<ComponentProps<typeof Input>>().not.toHaveProperty(
+      'className',
+    );
+    expectTypeOf<ComponentProps<typeof Input>>().not.toHaveProperty('style');
   });
 });

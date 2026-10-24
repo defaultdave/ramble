@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { render } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, expectTypeOf } from 'vitest';
+import type { ComponentProps } from 'react';
 import { Skeleton, type SkeletonKind } from './Skeleton';
 
 describe('Skeleton', () => {
@@ -14,4 +15,14 @@ describe('Skeleton', () => {
       );
     },
   );
+});
+
+describe('Skeleton props', () => {
+  it('rejects className and style', () => {
+    // Primitives own their styling; callers cannot override it.
+    expectTypeOf<ComponentProps<typeof Skeleton>>().not.toHaveProperty(
+      'className',
+    );
+    expectTypeOf<ComponentProps<typeof Skeleton>>().not.toHaveProperty('style');
+  });
 });

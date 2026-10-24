@@ -6,7 +6,7 @@ import styles from './Stepper.module.css';
 
 export type StepperProps = Omit<
   ComponentPropsWithoutRef<'div'>,
-  'onChange' | 'children' | 'role'
+  'onChange' | 'children' | 'role' | 'className' | 'style'
 > & {
   label: string;
   value: number;

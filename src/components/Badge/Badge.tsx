@@ -3,7 +3,10 @@ import { classNames } from '@/lib/classNames';
 import { resolveBadgeTone, type BadgeTone } from '@/lib/badge';
 import styles from './Badge.module.css';
 
-export type BadgeProps = Omit<ComponentPropsWithoutRef<'span'>, 'children'> & {
+export type BadgeProps = Omit<
+  ComponentPropsWithoutRef<'span'>,
+  'children' | 'className' | 'style'
+> & {
   tone?: BadgeTone;
   label: string;
   icon?: ReactNode;

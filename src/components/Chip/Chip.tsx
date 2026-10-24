@@ -3,7 +3,7 @@ import styles from './Chip.module.css';
 
 export type ChipProps = Omit<
   ComponentPropsWithoutRef<'button'>,
-  'children' | 'onClick' | 'aria-pressed'
+  'children' | 'onClick' | 'aria-pressed' | 'className' | 'style'
 > & {
   selected: boolean;
   label: string;

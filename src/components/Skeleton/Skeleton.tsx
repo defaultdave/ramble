@@ -6,7 +6,7 @@ export type SkeletonKind = 'card' | 'horizontal-card' | 'text';
 
 export type SkeletonProps = Omit<
   ComponentPropsWithoutRef<'div'>,
-  'children' | 'aria-hidden'
+  'children' | 'aria-hidden' | 'className' | 'style'
 > & {
   kind: SkeletonKind;
 };

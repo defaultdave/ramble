@@ -3,7 +3,10 @@ import type { ComponentPropsWithoutRef } from 'react';
 import { useId } from 'react';
 import styles from './Input.module.css';
 
-export type InputProps = Omit<ComponentPropsWithoutRef<'input'>, 'size'> & {
+export type InputProps = Omit<
+  ComponentPropsWithoutRef<'input'>,
+  'size' | 'className' | 'style'
+> & {
   label: string;
   hint?: string;
   errorText?: string;

@@ -7,7 +7,7 @@ export type AlertTone = 'info' | 'success' | 'warning' | 'danger';
 
 export type AlertProps = Omit<
   ComponentPropsWithoutRef<'div'>,
-  'title' | 'children' | 'role'
+  'title' | 'children' | 'role' | 'className' | 'style'
 > & {
   tone: AlertTone;
   title: string;

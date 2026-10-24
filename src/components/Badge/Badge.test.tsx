@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, expectTypeOf } from 'vitest';
+import type { ComponentProps } from 'react';
 import { Badge } from './Badge';
 
 describe('Badge', () => {
@@ -21,5 +22,15 @@ describe('Badge', () => {
       'aria-hidden',
       'true',
     );
+  });
+});
+
+describe('Badge props', () => {
+  it('rejects className and style', () => {
+    // Primitives own their styling; callers cannot override it.
+    expectTypeOf<ComponentProps<typeof Badge>>().not.toHaveProperty(
+      'className',
+    );
+    expectTypeOf<ComponentProps<typeof Badge>>().not.toHaveProperty('style');
   });
 });

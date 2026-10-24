@@ -12,10 +12,20 @@ function declarations(block: string): string {
     .join('\n');
 }
 
-const light = declarations(tokensCss.slice(0, tokensCss.indexOf('@media')));
+function indexOfOrThrow(marker: string): number {
+  const index = tokensCss.indexOf(marker);
+  if (index === -1) {
+    throw new Error(
+      `color-schemes: "${marker}" not found in tokens.css; the token build layout changed, update the slicing here.`,
+    );
+  }
+  return index;
+}
+
+const light = declarations(tokensCss.slice(0, indexOfOrThrow('@media')));
 const darkBlock = tokensCss.slice(
-  tokensCss.indexOf('prefers-color-scheme: dark'),
-  tokensCss.indexOf('min-width: 768px'),
+  indexOfOrThrow('prefers-color-scheme: dark'),
+  indexOfOrThrow('min-width: 768px'),
 );
 const dark = `${light}\n${declarations(darkBlock)}`;
 

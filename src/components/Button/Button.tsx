@@ -6,7 +6,10 @@ import styles from './Button.module.css';
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost';
 export type ButtonSize = 'md' | 'lg';
 
-export type ButtonProps = ComponentPropsWithoutRef<'button'> & {
+export type ButtonProps = Omit<
+  ComponentPropsWithoutRef<'button'>,
+  'className' | 'style'
+> & {
   variant?: ButtonVariant;
   size?: ButtonSize;
   loading?: boolean;

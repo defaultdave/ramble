@@ -1,7 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, expectTypeOf } from 'vitest';
+import type { ComponentProps } from 'react';
 import { Chip } from './Chip';
 
 describe('Chip', () => {
@@ -30,5 +31,13 @@ describe('Chip', () => {
     render(<Chip disabled selected={false} label="Kids" onToggle={onToggle} />);
     await userEvent.click(screen.getByRole('button'));
     expect(onToggle).not.toHaveBeenCalled();
+  });
+});
+
+describe('Chip props', () => {
+  it('rejects className and style', () => {
+    // Primitives own their styling; callers cannot override it.
+    expectTypeOf<ComponentProps<typeof Chip>>().not.toHaveProperty('className');
+    expectTypeOf<ComponentProps<typeof Chip>>().not.toHaveProperty('style');
   });
 });

@@ -1,7 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, expectTypeOf } from 'vitest';
+import type { ComponentProps } from 'react';
 import { Stepper } from './Stepper';
 
 function setup(value: number, min = 0, max = 4) {
@@ -103,5 +104,15 @@ describe('Stepper', () => {
     for (const button of screen.getAllByRole('button')) {
       expect(button).toBeDisabled();
     }
+  });
+});
+
+describe('Stepper props', () => {
+  it('rejects className and style', () => {
+    // Primitives own their styling; callers cannot override it.
+    expectTypeOf<ComponentProps<typeof Stepper>>().not.toHaveProperty(
+      'className',
+    );
+    expectTypeOf<ComponentProps<typeof Stepper>>().not.toHaveProperty('style');
   });
 });

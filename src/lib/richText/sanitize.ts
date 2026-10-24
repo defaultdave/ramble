@@ -15,7 +15,7 @@ const MAX_DEPTH = 8;
 
 // Bounds work. An object that appears several times in the input (a shared reference,
 // which JSON cannot hold but a Server Action argument can) is walked once per appearance,
-// so the cost is charged per node, mark, attribute key, and stretch of link address.
+// so the cost is charged per node, mark, attribute key, and stretch of text or link address.
 // Real copy is a few hundred nodes.
 const MAX_VISITS = 100_000;
 
@@ -291,6 +291,8 @@ function sanitizeInlineNode(
     }
     // Editors leave empty text behind; there is nothing in it to lose.
     if (node.text === '') return;
+    // Every appearance of a long text is stored and rendered again in full.
+    if (!spend(report, path, Math.ceil(node.text.length / 100))) return;
     const marks = sanitizeMarks(node.marks, path, report);
     out.push(
       marks.length > 0
@@ -319,6 +321,7 @@ function inlineChildren(
 ) {
   const children = childNodes(node, path, report);
   for (let index = 0; index < children.length; index += 1) {
+    if (report.visits > MAX_VISITS) break;
     sanitizeInlineNode(
       children[index],
       childPath(path, index),
@@ -616,7 +619,7 @@ function sanitizeBlocks(
  * renderer decides itself.
  *
  * Work is bounded by a budget of 100,000 visits. A node, a mark, an attribute key, and each
- * hundred characters of a link address cost one visit each, however many times the same
+ * hundred characters of text or of a link address cost one visit each, however many times the same
  * object is shared. Past the budget the walk stops with a `too-large` problem and the
  * result holds what was read so far. Reading a single object's keys still costs time
  * in proportion to its size, which the input already paid for.

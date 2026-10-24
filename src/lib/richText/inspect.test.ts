@@ -15,7 +15,7 @@ const many = <T>(count: number, make: () => T) =>
 const link = (href: string) => ({ type: 'link', attrs: { href } });
 
 // Under the visit budget, so the whole document comes back.
-const WIDE = 10_000;
+const WIDE = 5_000;
 // Over it, and over the roughly 130,000 arguments a spread can pass before the stack gives out.
 const TOO_WIDE = 250_000;
 
@@ -152,6 +152,7 @@ describe('sanitizeRichText on wide input', () => {
         ),
       }),
     ],
+    ['text', () => paragraph(text('a'.repeat(1_000_000)))],
     [
       'link addresses',
       () =>
@@ -182,6 +183,21 @@ describe('sanitizeRichText on wide input', () => {
     const result = richTextSchema.safeParse(docOf(many(99_000, () => shared)));
     expect(performance.now() - started).toBeLessThan(2_000);
     expect(result.success).toBe(false);
+  });
+
+  it('fails the write for a long text shared many times', () => {
+    const shared = paragraph(text('a'.repeat(1_000_000)));
+    const result = richTextSchema.safeParse(docOf(many(20_000, () => shared)));
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map(({ message }) => message)).toContain(
+      'The document is too large',
+    );
+  });
+
+  it('keeps a long text that appears once', () => {
+    const long = 'a'.repeat(1_000_000);
+    const result = inspectRichText(doc(paragraph(text(long))));
+    expect(result.problems).toEqual([]);
   });
 
   it('is not slowed by a node that contains itself', () => {

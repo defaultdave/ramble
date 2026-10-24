@@ -39,7 +39,12 @@ export type ListItemNode = {
 
 type BulletListNode = { type: 'bulletList'; content: ListItemNode[] };
 
-type OrderedListNode = { type: 'orderedList'; content: ListItemNode[] };
+type OrderedListNode = {
+  type: 'orderedList';
+  // Present only when the list does not start at 1.
+  attrs?: { start: number };
+  content: ListItemNode[];
+};
 
 // What a list item or a blockquote may hold.
 export type NestedBlockNode = ParagraphNode | BulletListNode | OrderedListNode;

@@ -82,6 +82,15 @@ describe('richTextSchema accepts', () => {
     );
   });
 
+  it('a list that starts past 1', () => {
+    const input = doc({
+      type: 'orderedList',
+      attrs: { start: 4 },
+      content: [{ type: 'listItem', content: [paragraph(text('Four'))] }],
+    });
+    expect(richTextSchema.parse(input)).toEqual(input);
+  });
+
   it('an empty document', () => {
     expect(richTextSchema.parse(doc())).toEqual(doc());
   });
@@ -205,6 +214,61 @@ describe('richTextSchema rejects, and says where and why', () => {
       'a list nested past the depth limit',
       doc(nested(30)),
       [{ message: 'Nested too deeply', path: expect.any(Array) as unknown }],
+    ],
+  ])('%s', (_label, input, expected) => {
+    expect(issuesFor(input)).toEqual(expected);
+  });
+
+  it.each([
+    [
+      'content that is not a list',
+      doc({ type: 'paragraph', content: 'hello' }),
+      [{ message: 'Content must be a list', path: ['content', 0, 'content'] }],
+    ],
+    [
+      'two different links on one text',
+      doc(
+        paragraph(
+          text('Hi', [
+            { type: 'link', attrs: { href: '/a' } },
+            { type: 'link', attrs: { href: '/b' } },
+          ]),
+        ),
+      ),
+      [
+        {
+          message: 'A text can carry only one link',
+          path: ['content', 0, 'content', 0, 'marks', 1],
+        },
+      ],
+    ],
+    [
+      'a list that starts at zero',
+      doc({
+        type: 'orderedList',
+        attrs: { start: 0 },
+        content: [{ type: 'listItem', content: [paragraph(text('A'))] }],
+      }),
+      [
+        {
+          message: 'A list must start at a positive whole number',
+          path: ['content', 0, 'attrs', 'start'],
+        },
+      ],
+    ],
+    [
+      'text alignment, which the format does not have',
+      doc({
+        type: 'paragraph',
+        attrs: { textAlign: 'center' },
+        content: [text('Hi')],
+      }),
+      [
+        {
+          message: 'The attribute "textAlign" is not part of the format',
+          path: ['content', 0, 'attrs', 'textAlign'],
+        },
+      ],
     ],
   ])('%s', (_label, input, expected) => {
     expect(issuesFor(input)).toEqual(expected);

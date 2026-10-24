@@ -33,7 +33,11 @@ const nodeMapping = {
     return <Heading>{children}</Heading>;
   },
   bulletList: ({ children }: NodeProps) => <ul>{children}</ul>,
-  orderedList: ({ children }: NodeProps) => <ol>{children}</ol>,
+  orderedList: ({ node, children }: NodeProps) => (
+    <ol start={node.type === 'orderedList' ? node.attrs?.start : undefined}>
+      {children}
+    </ol>
+  ),
   listItem: ({ children }: NodeProps) => <li>{children}</li>,
   blockquote: ({ children }: NodeProps) => <blockquote>{children}</blockquote>,
   horizontalRule: () => <hr />,
@@ -57,6 +61,7 @@ const markMapping = {
 
 export type RichTextProps = { content: RichTextDoc };
 
+// TODO(U-038): first caller, for help articles and versioned legal pages.
 export function RichText({ content }: RichTextProps) {
   const doc = sanitizeRichText(content);
   if (doc.content.length === 0) return null;

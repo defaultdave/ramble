@@ -58,6 +58,23 @@ describe('RichText', () => {
     expect(screen.getByRole('separator')).toBeInTheDocument();
   });
 
+  it.each([
+    [4, '4'],
+    [undefined, null],
+  ])('renders a list that starts at %j with start=%j', (start, expected) => {
+    const { container } = renderDoc({
+      type: 'doc',
+      content: [
+        {
+          type: 'orderedList',
+          ...(start && { attrs: { start } }),
+          content: [{ type: 'listItem', content: [paragraph('Step')] }],
+        },
+      ],
+    });
+    expect(container.querySelector('ol')?.getAttribute('start')).toBe(expected);
+  });
+
   it('renders bold and italic text', () => {
     const { container } = renderDoc({
       type: 'doc',

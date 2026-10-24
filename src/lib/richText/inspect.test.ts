@@ -8,61 +8,136 @@ const text = (value: string, marks?: unknown[]) => ({
 });
 const paragraph = (...content: unknown[]) => ({ type: 'paragraph', content });
 const doc = (...content: unknown[]) => ({ type: 'doc', content });
+const docOf = (content: unknown[]) => ({ type: 'doc', content });
 const many = <T>(count: number, make: () => T) =>
   Array.from({ length: count }, make);
+const link = (href: string) => ({ type: 'link', attrs: { href } });
 
-// More than the roughly 130,000 arguments a spread can pass before the call stack gives out.
-const BREADTH = 200_000;
+// Under the visit budget, so the whole document comes back.
+const WIDE = 30_000;
+// Over it, and over the roughly 130,000 arguments a spread can pass before the stack gives out.
+const TOO_WIDE = 250_000;
 
-describe('sanitizeRichText stays total on wide input', () => {
-  it('handles an unknown block wrapper with a very long child list', () => {
+function codes(input: unknown) {
+  return inspectRichText(input).problems.map(({ code }) => code);
+}
+
+describe('sanitizeRichText on wide input', () => {
+  it('keeps a long child list under an unknown block wrapper', () => {
     const result = sanitizeRichText(
       doc({
         type: 'callout',
-        content: many(BREADTH, () => paragraph(text('x'))),
+        content: many(WIDE, () => paragraph(text('x'))),
       }),
     );
-    expect(result.content).toHaveLength(BREADTH);
+    expect(result.content).toHaveLength(WIDE);
   });
 
-  it('handles an unknown inline wrapper with a very long child list', () => {
+  it('keeps a long child list under an unknown inline wrapper', () => {
     const result = sanitizeRichText(
-      doc(
-        paragraph({ type: 'mention', content: many(BREADTH, () => text('x')) }),
-      ),
+      doc(paragraph({ type: 'mention', content: many(WIDE, () => text('x')) })),
     );
-    expect(result.content[0]).toHaveProperty('content.length', BREADTH);
+    expect(result.content[0]).toHaveProperty('content.length', WIDE);
   });
 
-  it('handles very many loose text nodes, list items, and marks', () => {
-    const loose = sanitizeRichText({
-      type: 'doc',
-      content: many(BREADTH, () => text('x')),
-    });
-    expect(loose.content).toHaveLength(1);
+  it('keeps many loose text nodes, list items, and marks', () => {
+    expect(
+      sanitizeRichText(docOf(many(WIDE, () => text('x')))).content,
+    ).toHaveLength(1);
 
     const items = sanitizeRichText(
       doc({
         type: 'bulletList',
-        content: many(BREADTH, () => ({
+        content: many(WIDE, () => ({
           type: 'listItem',
           content: [paragraph(text('x'))],
         })),
       }),
     );
-    expect(items.content[0]).toHaveProperty('content.length', BREADTH);
+    expect(items.content[0]).toHaveProperty('content.length', WIDE);
 
     const marked = sanitizeRichText(
       doc(
         paragraph(
           text(
             'x',
-            many(BREADTH, () => ({ type: 'bold' })),
+            many(WIDE, () => ({ type: 'bold' })),
           ),
         ),
       ),
     );
     expect(marked.content[0]).toHaveProperty('content.0.marks.length', 1);
+  });
+
+  it.each([
+    [
+      'an unknown block wrapper',
+      () =>
+        doc({
+          type: 'callout',
+          content: many(TOO_WIDE, () => paragraph(text('x'))),
+        }),
+    ],
+    [
+      'an unknown inline wrapper',
+      () =>
+        doc(
+          paragraph({
+            type: 'mention',
+            content: many(TOO_WIDE, () => text('x')),
+          }),
+        ),
+    ],
+    ['loose text', () => docOf(many(TOO_WIDE, () => text('x')))],
+    [
+      'a list',
+      () =>
+        doc({
+          type: 'bulletList',
+          content: many(TOO_WIDE, () => ({
+            type: 'listItem',
+            content: [paragraph(text('x'))],
+          })),
+        }),
+    ],
+    [
+      'marks',
+      () =>
+        doc(
+          paragraph(
+            text(
+              'x',
+              many(TOO_WIDE, () => ({ type: 'bold' })),
+            ),
+          ),
+        ),
+    ],
+  ])('stops reading %s past the budget and reports it', (_label, build) => {
+    const { doc: repaired, problems } = inspectRichText(build());
+    expect(problems.map(({ code }) => code)).toContain('too-large');
+    expect(repaired.type).toBe('doc');
+  });
+
+  it('is not slowed by a node that appears in its own content many times', () => {
+    // 50 references at each of 7 levels would be 50^7 visits without a budget.
+    let shared: unknown = paragraph(text('x'));
+    for (let level = 0; level < 7; level += 1) {
+      shared = { type: 'callout', content: many(50, () => shared) };
+    }
+    const started = performance.now();
+    const { problems } = inspectRichText(doc(shared));
+    expect(performance.now() - started).toBeLessThan(2_000);
+    expect(problems.map(({ code }) => code)).toContain('too-large');
+  });
+
+  it('is not slowed by a node that contains itself', () => {
+    const loop: { type: string; content: unknown[] } = {
+      type: 'callout',
+      content: [],
+    };
+    loop.content.push(loop, loop, loop);
+    const { problems } = inspectRichText(doc(loop));
+    expect(problems.map(({ code }) => code)).toContain('too-deep');
   });
 });
 
@@ -90,11 +165,7 @@ describe('inspectRichText', () => {
     ],
     [
       'unsafe-href',
-      doc(
-        paragraph(
-          text('a', [{ type: 'link', attrs: { href: '//example.com' } }]),
-        ),
-      ),
+      doc(paragraph(text('a', [link('//example.com')]))),
       ['content', 0, 'content', 0, 'marks', 0, 'attrs', 'href'],
     ],
     [
@@ -123,6 +194,158 @@ describe('inspectRichText', () => {
     expect(JSON.stringify(repaired)).not.toContain('Deep');
   });
 
+  it('reports problems in document order and stops at twenty', () => {
+    const { problems } = inspectRichText(
+      docOf(
+        Array.from({ length: 30 }, (_, index) => ({
+          type: `n${String(index)}`,
+        })),
+      ),
+    );
+    expect(problems.map(({ message }) => message)).toEqual(
+      Array.from(
+        { length: 20 },
+        (_, index) => `Unknown node "n${String(index)}"`,
+      ),
+    );
+  });
+});
+
+describe('content that is not a list', () => {
+  it.each([
+    [
+      'a paragraph',
+      doc({ type: 'paragraph', content: 'hello' }),
+      ['content', 0, 'content'],
+    ],
+    ['a document', { type: 'doc', content: 'x' }, ['content']],
+    [
+      'a list',
+      doc({ type: 'bulletList', content: { 0: 'x' } }),
+      ['content', 0, 'content'],
+    ],
+    [
+      'a list item',
+      doc({
+        type: 'bulletList',
+        content: [{ type: 'listItem', content: 'x' }],
+      }),
+      ['content', 0, 'content', 0, 'content'],
+    ],
+    [
+      'a quote',
+      doc({ type: 'blockquote', content: 5 }),
+      ['content', 0, 'content'],
+    ],
+  ])('flags the content of %s', (_label, input, path) => {
+    expect(inspectRichText(input).problems).toEqual([
+      expect.objectContaining({ code: 'malformed-node', path }),
+    ]);
+  });
+});
+
+describe('what an author could lose', () => {
+  it('flags a second link with a different address, and not one with the same', () => {
+    expect(codes(doc(paragraph(text('a', [link('/a'), link('/b')]))))).toEqual([
+      'conflicting-mark',
+    ]);
+    expect(codes(doc(paragraph(text('a', [link('/a'), link('/a')]))))).toEqual(
+      [],
+    );
+  });
+
+  it.each([
+    [4, { attrs: { start: 4 } }],
+    [1, {}],
+    [null, {}],
+    [undefined, {}],
+  ])('keeps a list start of %j as %j', (start, expected) => {
+    const result = inspectRichText(
+      doc({
+        type: 'orderedList',
+        attrs: { start, type: null },
+        content: [{ type: 'listItem', content: [paragraph(text('a'))] }],
+      }),
+    );
+    expect(result.problems).toEqual([]);
+    expect(result.doc.content[0]).toMatchObject(expected);
+    if (!('attrs' in expected)) {
+      expect(result.doc.content[0]).not.toHaveProperty('attrs');
+    }
+  });
+
+  it.each([0, -1, 2.5, '4', Infinity, 2 ** 60])(
+    'flags an unusable list start of %j',
+    (start) => {
+      const { problems } = inspectRichText(
+        doc({
+          type: 'orderedList',
+          attrs: { start },
+          content: [{ type: 'listItem', content: [paragraph(text('a'))] }],
+        }),
+      );
+      expect(problems).toEqual([
+        expect.objectContaining({
+          code: 'invalid-attribute',
+          path: ['content', 0, 'attrs', 'start'],
+        }),
+      ]);
+    },
+  );
+
+  it.each([
+    [
+      'textAlign other than left',
+      { textAlign: 'center' },
+      ['content', 0, 'attrs', 'textAlign'],
+    ],
+    ['a class', { class: 'x' }, ['content', 0, 'attrs', 'class']],
+    ['a style', { style: 'color:red' }, ['content', 0, 'attrs', 'style']],
+  ])('flags %s on a paragraph', (_label, attrs, path) => {
+    expect(
+      inspectRichText(doc({ type: 'paragraph', attrs, content: [text('a')] }))
+        .problems,
+    ).toEqual([
+      expect.objectContaining({ code: 'attribute-not-allowed', path }),
+    ]);
+  });
+
+  it('flags a key on a node that Tiptap JSON does not have', () => {
+    expect(
+      codes(
+        doc({ type: 'paragraph', style: 'color:red', content: [text('a')] }),
+      ),
+    ).toEqual(['attribute-not-allowed']);
+  });
+
+  it('flags a link title, which the author wrote, but not its target or rel', () => {
+    expect(
+      codes(
+        doc(
+          paragraph(
+            text('a', [
+              {
+                type: 'link',
+                attrs: { href: '/a', target: '_blank', rel: 'x' },
+              },
+            ]),
+          ),
+        ),
+      ),
+    ).toEqual([]);
+    expect(
+      codes(
+        doc(
+          paragraph(
+            text('a', [
+              { type: 'link', attrs: { href: '/a', title: 'Hover' } },
+            ]),
+          ),
+        ),
+      ),
+    ).toEqual(['attribute-not-allowed']);
+  });
+
   it.each([
     ['a blank paragraph', doc({ type: 'paragraph' })],
     ['empty text', doc(paragraph(text('')))],
@@ -131,22 +354,15 @@ describe('inspectRichText', () => {
       doc(paragraph(text('a', [{ type: 'bold' }, { type: 'bold' }]))),
     ],
     [
-      'attributes outside the format',
-      doc({ type: 'paragraph', attrs: { class: 'x' }, content: [text('a')] }),
+      'attributes at their default',
+      doc({
+        type: 'paragraph',
+        attrs: { textAlign: 'left', class: null, id: null },
+        content: [text('a')],
+      }),
     ],
     ['an empty list', doc({ type: 'bulletList', content: [] })],
-  ])(
-    'does not flag %s, which loses nothing the author wrote',
-    (_label, input) => {
-      expect(inspectRichText(input).problems).toEqual([]);
-    },
-  );
-
-  it('keeps at most twenty problems', () => {
-    const { problems } = inspectRichText({
-      type: 'doc',
-      content: many(BREADTH, () => ({ type: 'image' })),
-    });
-    expect(problems).toHaveLength(20);
+  ])('tidies %s without a problem', (_label, input) => {
+    expect(inspectRichText(input).problems).toEqual([]);
   });
 });

@@ -1,0 +1,63 @@
+name: neon-preview-branch
+# The Vercel and Neon integration creates and wires the preview branch (named preview/<git branch>).
+# This workflow does what the integration does not: it sets the 7-day expiry, and it deletes the
+# branch when the pull request merges or closes.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
+permissions: {}
+concurrency:
+  group: neon-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+env:
+  NEON_API: https://console.neon.tech/api/v2
+  NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+  NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+  BRANCH_NAME: preview/${{ github.head_ref }}
+jobs:
+  expire:
+    name: expire preview branch
+    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set the branch to expire in 7 days
+        run: |
+          set -euo pipefail
+          expires_at=$(date -u -d '+7 days' +%Y-%m-%dT%H:%M:%SZ)
+          # The integration makes the branch when the preview deployment starts, so wait for it.
+          for _ in $(seq 1 30); do
+            branch_id=$(curl -fsS -H "Authorization: Bearer $NEON_API_KEY" \
+              --get --data-urlencode "search=$BRANCH_NAME" \
+              "$NEON_API/projects/$NEON_PROJECT_ID/branches" \
+              | jq -r --arg name "$BRANCH_NAME" '.branches[] | select(.name == $name) | .id' | head -n 1)
+            [ -n "$branch_id" ] && break
+            sleep 10
+          done
+          if [ -z "$branch_id" ]; then
+            echo "::error::No Neon branch named $BRANCH_NAME after 5 minutes. Is the Vercel integration's preview branching on?"
+            exit 1
+          fi
+          curl -fsS -X PATCH -H "Authorization: Bearer $NEON_API_KEY" -H 'Content-Type: application/json' \
+            -d "{\"branch\":{\"expires_at\":\"$expires_at\"}}" \
+            "$NEON_API/projects/$NEON_PROJECT_ID/branches/$branch_id" > /dev/null
+          echo "Branch $BRANCH_NAME expires at $expires_at"
+
+  delete:
+    name: delete preview branch
+    if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete the pull request's branch
+        run: |
+          set -euo pipefail
+          branch_id=$(curl -fsS -H "Authorization: Bearer $NEON_API_KEY" \
+            --get --data-urlencode "search=$BRANCH_NAME" \
+            "$NEON_API/projects/$NEON_PROJECT_ID/branches" \
+            | jq -r --arg name "$BRANCH_NAME" '.branches[] | select(.name == $name) | .id' | head -n 1)
+          if [ -z "$branch_id" ]; then
+            echo "No Neon branch named $BRANCH_NAME; nothing to delete."
+            exit 0
+          fi
+          curl -fsS -X DELETE -H "Authorization: Bearer $NEON_API_KEY" \
+            "$NEON_API/projects/$NEON_PROJECT_ID/branches/$branch_id" > /dev/null
+          echo "Deleted $BRANCH_NAME"

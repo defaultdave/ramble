@@ -49,7 +49,7 @@ The frozen forecast, as ranges rather than single dates:
 | Prototype: a clickable guest flow on seed data | 2026-12-01 | 2026-12-07 |
 | Launch scope from the PRD | 2027-03-08 | 2027-03-29 |
 
-There is no application code yet. The walking skeleton (U-001) follows the merge desk. Live status, decisions, and the roadmap are in [ramble-pm](https://github.com/defaultdave/ramble-pm).
+The walking skeleton (U-002) is in place: four route groups with placeholder pages. Real pages replace them unit by unit. Live status, decisions, and the roadmap are in [ramble-pm](https://github.com/defaultdave/ramble-pm).
 
 ## The planning method
 
@@ -112,11 +112,21 @@ Needs Node 24 (`.nvmrc`) and pnpm 10. Node 25 no longer bundles Corepack, so ins
 
 ```
 pnpm install
-cp .env.example .env.local   # optional: every variable has a default
+docker compose up -d --wait  # local Postgres 17
+cp .env.example .env.local   # APP_URL has a default; the two database URLs do not
+pnpm db:migrate
 pnpm dev
 ```
 
-The gates CI runs on every PR (`.github/workflows/ci.yml`), each a script you can run locally: `pnpm format:check`, `lint`, `typecheck`, `test`, `build`, `knip`, and `e2e` (Playwright; run `pnpm exec playwright install chromium` once). Environment variables are read and validated in one place, `src/server/env.ts`. Import boundaries between `src/app`, `src/components`, `src/lib`, and `src/server` are enforced by `pnpm lint`; `tests/lint-boundaries.test.ts` fails if a rule is weakened.
+The gates CI runs on every PR (`.github/workflows/ci.yml`), each a script you can run locally: `pnpm format:check`, `lint`, `typecheck`, `test`, `build`, `knip`, and `e2e` (Playwright; run `pnpm exec playwright install chromium` once). `pnpm smoke` runs the same Playwright smoke of every route against the built app; the route list is `e2e/routes.ts`, one row per route. Environment variables are read and validated in one place, `src/server/env.ts`. Import boundaries between `src/app`, `src/components`, `src/lib`, and `src/server` are enforced by `pnpm lint`; `tests/lint-boundaries.test.ts` fails if a rule is weakened. Secrets, and how to rotate them, are in [`docs/runbooks/secret-rotation.md`](docs/runbooks/secret-rotation.md).
+
+## Database
+
+Postgres on Neon through Drizzle, all under `src/server/db/`. `db` (pooled host, `pg` Pool) is the only handle that opens a transaction; `dbRead` (Neon HTTP) is for single reads and never runs a capacity or balance check. Migrations are committed SQL in `src/server/db/migrations/`: change the schema in `src/server/db/schema/`, run `pnpm db:generate`, commit the result, and never `drizzle-kit push` a shared database. A PR never drops or renames a column the deployed code still reads (expand, then contract in a later PR). `pnpm db:migrate` uses the direct host, `pnpm db:check` checks the history, and `pnpm test:db` runs the `*.db.test.ts` files against the local Postgres, each in its own schema (`createFreshDatabase` in `tests/db/harness.ts`). Previews migrate before the build; production is migrated only by the `db-migrate-production` workflow, run by hand.
+
+Preview branches come from the Neon integration for Vercel, which gives each preview deployment its own `preview/<git branch>` database branch and injects its two URLs; the alternative, a GitHub Actions job using Neon's branch actions, would need a Vercel token to hand the URLs to the deployment and would race it, so only the integration creates branches. A GitHub Actions workflow adds what the integration lacks: the 7-day expiry and deleting the branch when the PR merges or closes.
+
+The integration makes a branch's database and URLs only when a deployment is redeployed, so the first build of a new branch has no `DATABASE_URL_UNPOOLED`. The preview build then skips `db:migrate` with a warning instead of failing; redeploy once and it migrates.
 
 ## Running the planning scripts
 

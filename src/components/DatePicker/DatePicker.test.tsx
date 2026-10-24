@@ -122,6 +122,22 @@ describe('DatePicker today and labels', () => {
     );
   });
 
+  it.each([
+    [
+      'a date before today',
+      /Friday, October 16, 2026/,
+      'Friday, October 16, 2026, unavailable',
+    ],
+    [
+      'the chosen date',
+      /Saturday, October 24, 2026/,
+      'Saturday, October 24, 2026 selected',
+    ],
+  ])('words %s', (_name, match, expected) => {
+    setup();
+    expect(day(match)).toHaveAccessibleName(expected);
+  });
+
   it('keeps the chosen date marked and announced when disabled', () => {
     setup('2026-10-24', true);
     const chosen = day(/Saturday, October 24, 2026/);

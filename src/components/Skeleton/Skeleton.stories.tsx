@@ -1,12 +1,13 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Skeleton } from '@/components/Skeleton';
+import styles from './Skeleton.stories.module.css';
 
 const meta = {
   title: 'Primitives/Skeleton',
   component: Skeleton,
   decorators: [
     (Story) => (
-      <div style={{ maxWidth: '342px' }}>
+      <div className={styles.frame}>
         <Story />
       </div>
     ),

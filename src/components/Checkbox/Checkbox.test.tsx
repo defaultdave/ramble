@@ -31,6 +31,46 @@ describe('Checkbox', () => {
     );
   });
 
+  it('keeps the caller aria-describedby after the description', () => {
+    render(
+      <>
+        <p id="extra">Extra</p>
+        <Checkbox
+          checked={false}
+          onChange={vi.fn()}
+          label="Email me"
+          description="Once a week"
+          aria-describedby="extra"
+        />
+      </>,
+    );
+    expect(screen.getByRole('checkbox')).toHaveAccessibleDescription(
+      'Once a week Extra',
+    );
+  });
+
+  it.each<[boolean | 'true' | 'false' | undefined, boolean]>([
+    [true, true],
+    ['true', true],
+    [false, false],
+    [undefined, false],
+  ])(
+    'aria-invalid=%s marks the description as invalid: %s',
+    (invalid, marked) => {
+      render(
+        <Checkbox
+          checked={false}
+          onChange={vi.fn()}
+          label="Email me"
+          description="Once a week"
+          aria-invalid={invalid}
+        />,
+      );
+      const field = screen.getByText('Once a week').closest('[data-invalid]');
+      expect(field !== null).toBe(marked);
+    },
+  );
+
   it('does not toggle when disabled', async () => {
     const onChange = vi.fn();
     render(

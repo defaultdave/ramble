@@ -12,7 +12,7 @@ describe('Badge', () => {
   it('renders with an unknown tone at runtime', () => {
     // @ts-expect-error content data can carry a tone the type does not know
     render(<Badge tone="purple" label="Mystery" />);
-    expect(screen.getByText('Mystery')).toBeVisible();
+    expect(screen.getByText('Mystery')).toHaveClass(/neutral/);
   });
 
   it('hides the icon from assistive technology', () => {

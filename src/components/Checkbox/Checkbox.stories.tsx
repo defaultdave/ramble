@@ -20,7 +20,12 @@ export const Checked: Story = { args: { checked: true } };
 export const WithDescription: Story = {
   args: { description: 'One short email a week. Unsubscribe any time.' },
 };
-export const Error: Story = { args: { 'aria-invalid': true } };
+export const Error: Story = {
+  args: {
+    'aria-invalid': true,
+    description: 'One short email a week. Unsubscribe any time.',
+  },
+};
 export const Disabled: Story = { args: { disabled: true } };
 export const DisabledChecked: Story = {
   args: { disabled: true, checked: true },

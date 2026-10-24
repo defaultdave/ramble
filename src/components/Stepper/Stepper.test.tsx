@@ -68,6 +68,26 @@ describe('Stepper', () => {
     );
   });
 
+  it('merges the caller aria-describedby with the hint', () => {
+    render(
+      <>
+        <p id="extra">Extra</p>
+        <Stepper
+          label="Children"
+          hint="Ages 3 to 12"
+          aria-describedby="extra"
+          value={1}
+          min={0}
+          max={4}
+          onChange={vi.fn()}
+        />
+      </>,
+    );
+    expect(screen.getByRole('group')).toHaveAccessibleDescription(
+      'Ages 3 to 12 Extra',
+    );
+  });
+
   it('disables both buttons when disabled', () => {
     render(
       <Stepper

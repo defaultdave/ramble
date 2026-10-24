@@ -20,3 +20,6 @@ export const SelectedWithCount: Story = {
   args: { selected: true, count: 24 },
 };
 export const Disabled: Story = { args: { disabled: true } };
+export const DisabledWithCount: Story = {
+  args: { disabled: true, count: 24 },
+};

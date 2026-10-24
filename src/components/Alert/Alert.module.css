@@ -2,35 +2,40 @@
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: var(--space-4);
+  padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
   font-family: var(--font-family-body);
 }
 
 .info {
+  --alert-tone: var(--color-status-info-text);
+
   background: var(--color-status-info-bg);
-  color: var(--color-status-info-text);
 }
 
 .success {
+  --alert-tone: var(--color-status-success-text);
+
   background: var(--color-status-success-bg);
-  color: var(--color-status-success-text);
 }
 
 .warning {
+  --alert-tone: var(--color-status-warning-text);
+
   background: var(--color-status-warning-bg);
-  color: var(--color-status-warning-text);
 }
 
 .danger {
+  --alert-tone: var(--color-status-danger-text);
+
   background: var(--color-status-danger-bg);
-  color: var(--color-status-danger-text);
 }
 
 .icon {
   flex: none;
-  width: var(--space-6);
-  height: var(--space-6);
+  width: var(--space-5);
+  height: var(--space-5);
+  color: var(--alert-tone);
 }
 
 .content {
@@ -46,15 +51,37 @@
   font-size: var(--font-size-body-m);
   line-height: var(--font-line-height-body-m);
   font-weight: var(--font-weight-semibold);
+  color: var(--alert-tone);
 }
 
 .body {
   font-size: var(--font-size-body-s);
   line-height: var(--font-line-height-body-s);
+  color: var(--color-text-primary);
 }
 
-.action {
-  margin-top: var(--space-2);
+/* A text link look for whatever the caller passes; the padding keeps a 44px target without growing the row. */
+.action :is(a, button) {
+  display: inline-flex;
+  align-items: center;
+  margin: calc(-1 * var(--space-3)) 0;
+  padding: var(--space-3) 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: var(--font-size-body-s);
+  line-height: var(--font-line-height-body-s);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.action :is(a, button):focus-visible {
+  outline: 2px solid transparent;
+  box-shadow:
+    0 0 0 2px var(--color-bg-canvas),
+    0 0 0 4px var(--color-focus-ring);
 }
 
 @media (min-width: 768px) {

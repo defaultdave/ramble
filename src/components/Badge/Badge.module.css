@@ -3,7 +3,7 @@
   align-items: center;
   gap: var(--space-1);
   padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill);
   font-family: var(--font-family-body);
   font-size: var(--font-size-caption);
   line-height: var(--font-line-height-caption);
@@ -15,8 +15,8 @@
 }
 
 .icon svg {
-  width: var(--space-3);
-  height: var(--space-3);
+  width: calc(var(--space-4) - var(--space-1) / 2);
+  height: calc(var(--space-4) - var(--space-1) / 2);
 }
 
 .green {

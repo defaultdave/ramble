@@ -37,6 +37,24 @@ describe('Input', () => {
     ).toMatch(/-hint .*-error extra$/);
   });
 
+  it('keeps the caller aria-invalid when there is no error text', () => {
+    render(<Input label="Email" aria-invalid="true" />);
+    expect(screen.getByLabelText('Email')).toBeInvalid();
+  });
+
+  it('puts the hint above the error message after the input', () => {
+    render(<Input label="Email" hint="Hint" errorText="Error" />);
+    const input = screen.getByLabelText('Email');
+    const hint = screen.getByText('Hint');
+    const error = screen.getByText('Error');
+    expect(
+      input.compareDocumentPosition(hint) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      hint.compareDocumentPosition(error) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it('is valid when there is no error text', () => {
     render(<Input label="Email" />);
     expect(screen.getByLabelText('Email')).toBeValid();

@@ -39,24 +39,32 @@ export function Stepper({
     if (!atLimit) onChange(steppedValue(value, delta, min, max));
   };
 
+  const describedByIds = [hint ? hintId : undefined, rest['aria-describedby']]
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <div className={styles.field}>
-      <span className={styles.label} id={labelId}>
-        {label}
-      </span>
-      {hint ? (
-        <p className={styles.hint} id={hintId}>
-          {hint}
-        </p>
-      ) : null}
-      <div
-        {...rest}
-        id={baseId}
-        role="group"
-        className={styles.control}
-        aria-labelledby={labelId}
-        aria-describedby={hint ? hintId : rest['aria-describedby']}
-      >
+    <div
+      {...rest}
+      id={baseId}
+      role="group"
+      className={styles.field}
+      data-disabled={disabled || undefined}
+      aria-disabled={disabled || undefined}
+      aria-labelledby={labelId}
+      aria-describedby={describedByIds || undefined}
+    >
+      <div className={styles.text}>
+        <span className={styles.label} id={labelId}>
+          {label}
+        </span>
+        {hint ? (
+          <p className={styles.hint} id={hintId}>
+            {hint}
+          </p>
+        ) : null}
+      </div>
+      <div className={styles.control}>
         <button
           type="button"
           className={styles.button}

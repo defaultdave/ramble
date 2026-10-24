@@ -29,8 +29,15 @@ export function Checkbox({
     .filter(Boolean)
     .join(' ');
 
+  const invalid =
+    rest['aria-invalid'] === true || rest['aria-invalid'] === 'true';
+
   return (
-    <div className={styles.field} data-disabled={rest.disabled || undefined}>
+    <div
+      className={styles.field}
+      data-disabled={rest.disabled || undefined}
+      data-invalid={invalid || undefined}
+    >
       <span className={styles.box}>
         <input
           {...rest}

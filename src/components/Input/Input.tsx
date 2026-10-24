@@ -1,4 +1,4 @@
-import { CircleAlert } from 'lucide-react';
+import { TriangleAlert } from 'lucide-react';
 import type { ComponentPropsWithoutRef } from 'react';
 import { useId } from 'react';
 import styles from './Input.module.css';
@@ -37,21 +37,21 @@ export function Input({
         {label}
         {optional ? <span className={styles.optional}> (optional)</span> : null}
       </label>
+      <input
+        {...rest}
+        id={inputId}
+        className={styles.input}
+        aria-invalid={errorText ? true : rest['aria-invalid']}
+        aria-describedby={describedByIds || undefined}
+      />
       {hint ? (
         <p className={styles.hint} id={hintId}>
           {hint}
         </p>
       ) : null}
-      <input
-        {...rest}
-        id={inputId}
-        className={styles.input}
-        aria-invalid={errorText ? true : undefined}
-        aria-describedby={describedByIds || undefined}
-      />
       {errorText ? (
         <p className={styles.error} id={errorId}>
-          <CircleAlert className={styles.errorIcon} aria-hidden="true" />
+          <TriangleAlert className={styles.errorIcon} aria-hidden="true" />
           {errorText}
         </p>
       ) : null}

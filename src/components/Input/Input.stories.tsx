@@ -4,19 +4,30 @@ import { Input } from '@/components/Input';
 const meta = {
   title: 'Primitives/Input',
   component: Input,
-  args: { label: 'Email', type: 'email' },
+  args: {
+    label: 'Email',
+    type: 'email',
+    defaultValue: 'alex@example.com',
+  },
 } satisfies Meta<typeof Input>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
-export const WithHint: Story = {
-  args: { hint: 'We send your tickets here' },
+const hint = 'We send your booking here.';
+
+export const Default: Story = { args: { hint } };
+export const WithoutHint: Story = {};
+export const Focus: Story = {
+  args: { hint },
+  play: async ({ userEvent }) => {
+    await userEvent.tab();
+  },
 };
-export const Optional: Story = { args: { label: 'Notes', optional: true } };
-export const Filled: Story = { args: { defaultValue: 'sam@example.com' } };
+export const Optional: Story = {
+  args: { label: 'Notes', optional: true, type: 'text', defaultValue: '' },
+};
 export const Error: Story = {
-  args: { defaultValue: 'sam@', errorText: 'Enter a valid email address' },
+  args: { hint, errorText: 'Enter an email like name@example.com.' },
 };
-export const Disabled: Story = { args: { disabled: true } };
+export const Disabled: Story = { args: { hint, disabled: true } };

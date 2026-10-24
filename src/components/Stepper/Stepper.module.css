@@ -1,15 +1,27 @@
 .field {
   display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.text {
+  display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: var(--space-1);
+  min-width: 0;
 }
 
 .label {
   font-family: var(--font-family-body);
-  font-size: var(--font-size-label);
-  line-height: var(--font-line-height-label);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
+}
+
+.field[data-disabled] .label,
+.field[data-disabled] .value {
+  color: var(--color-text-disabled);
 }
 
 .hint {
@@ -20,10 +32,10 @@
 }
 
 .control {
-  display: inline-flex;
+  display: flex;
+  flex: none;
   align-items: center;
-  align-self: flex-start;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
 .button {
@@ -33,7 +45,7 @@
   height: var(--size-touch-target);
   padding: 0;
   border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-md);
   background: var(--color-bg-surface);
   color: var(--color-text-primary);
   cursor: pointer;
@@ -67,11 +79,11 @@
 }
 
 .value {
-  min-width: var(--space-8);
+  width: calc(var(--space-6) + var(--space-1));
   text-align: center;
   font-family: var(--font-family-body);
-  font-size: var(--font-size-body-l);
-  line-height: var(--font-line-height-body-l);
+  font-size: var(--font-size-heading-s);
+  line-height: var(--font-line-height-heading-s);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
   font-variant-numeric: tabular-nums;

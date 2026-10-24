@@ -64,7 +64,7 @@
   height: var(--space-6);
 }
 
-/* Horizontal card: 96px image beside title, meta, and price bars. */
+/* Horizontal card: 96px image beside title, meta, and price bars (180, 120, and 90px of the 208px column in a 342px card). */
 .horizontalCard {
   display: flex;
   gap: var(--space-3);
@@ -85,17 +85,17 @@
 }
 
 .horizontalCard .title {
-  width: 60%;
-  height: var(--space-4);
+  width: 87%;
+  height: calc(var(--space-4) + var(--space-1) / 2);
 }
 
 .horizontalCard .meta {
-  width: 40%;
-  height: var(--space-3);
+  width: 58%;
+  height: var(--font-size-body-s);
 }
 
 .horizontalCard .price {
-  width: 30%;
+  width: 43%;
   height: var(--space-4);
 }
 

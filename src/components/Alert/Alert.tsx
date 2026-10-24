@@ -1,10 +1,4 @@
-import {
-  CircleCheck,
-  Info,
-  OctagonAlert,
-  TriangleAlert,
-  type LucideIcon,
-} from 'lucide-react';
+import { Check, Info, TriangleAlert, type LucideIcon } from 'lucide-react';
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import { classNames } from '@/lib/classNames';
 import styles from './Alert.module.css';
@@ -30,9 +24,9 @@ const toneClass = {
 
 const toneIcon = {
   info: Info,
-  success: CircleCheck,
+  success: Check,
   warning: TriangleAlert,
-  danger: OctagonAlert,
+  danger: TriangleAlert,
 } satisfies Record<AlertTone, LucideIcon>;
 
 // Warnings and errors interrupt; confirmations and notes wait their turn.

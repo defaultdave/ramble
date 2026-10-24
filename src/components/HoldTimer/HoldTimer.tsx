@@ -13,7 +13,8 @@ export type HoldTimerProps = Omit<
   ComponentPropsWithoutRef<'div'>,
   'children' | 'role' | 'className' | 'style'
 > & {
-  secondsRemaining: number;
+  now: Date;
+  expiresAt: Date;
 };
 
 const stateClass = {
@@ -22,8 +23,9 @@ const stateClass = {
   expired: styles.expired,
 } satisfies Record<HoldTimerState, string | undefined>;
 
-export function HoldTimer({ secondsRemaining, ...rest }: HoldTimerProps) {
-  const state = holdTimerState(secondsRemaining);
+// TODO(U-047b): first caller, the checkout page, which passes it to the checkout Header.
+export function HoldTimer({ now, expiresAt, ...rest }: HoldTimerProps) {
+  const state = holdTimerState(now, expiresAt);
 
   return (
     <>
@@ -33,10 +35,10 @@ export function HoldTimer({ secondsRemaining, ...rest }: HoldTimerProps) {
         className={classNames(styles.timer, stateClass[state])}
       >
         <Timer className={styles.icon} aria-hidden="true" />
-        {holdTimerText(secondsRemaining)}
+        {holdTimerText(now, expiresAt)}
       </div>
       <span role="status" className={styles.announcement}>
-        {holdAnnouncement(secondsRemaining)}
+        {holdAnnouncement(now, expiresAt)}
       </span>
     </>
   );

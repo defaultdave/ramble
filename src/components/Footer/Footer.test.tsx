@@ -35,6 +35,7 @@ describe('Footer', () => {
 
   it('is the page footer landmark with the tagline and copyright', () => {
     render(<Footer {...props} />);
+    expect(screen.getAllByRole('contentinfo')).toHaveLength(1);
     const footer = screen.getByRole('contentinfo');
     expect(footer).toHaveTextContent(props.tagline);
     expect(footer).toHaveTextContent(props.copyright);

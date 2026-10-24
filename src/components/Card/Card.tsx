@@ -3,7 +3,7 @@ import Link from 'next/link';
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import { Badge, type BadgeProps } from '@/components/Badge';
 import { classNames } from '@/lib/classNames';
-import { ratingLabel, type Rating } from '@/lib/rating';
+import { ratingDescription, ratingLabel, type Rating } from '@/lib/rating';
 import styles from './Card.module.css';
 
 export type CardLayout = 'vertical' | 'horizontal';
@@ -51,6 +51,7 @@ const headingTag = {
   5: 'h5',
 } satisfies Record<CardHeadingLevel, 'h2' | 'h3' | 'h4' | 'h5'>;
 
+// TODO(U-031): first caller, the browse results grid.
 export function Card({
   layout = 'vertical',
   title,
@@ -69,6 +70,7 @@ export function Card({
   const Heading = headingTag[headingLevel];
   const vertical = layout === 'vertical';
   const ratingText = rating ? ratingLabel(rating) : null;
+  const ratingSpoken = rating ? ratingDescription(rating) : null;
 
   return (
     <article
@@ -121,7 +123,8 @@ export function Card({
               {ratingText ? (
                 <p className={styles.rating}>
                   <Star className={styles.ratingIcon} aria-hidden="true" />
-                  {ratingText}
+                  <span aria-hidden="true">{ratingText}</span>
+                  <span className={styles.visuallyHidden}>{ratingSpoken}</span>
                 </p>
               ) : null}
             </>

@@ -1,7 +1,6 @@
-import { Gift, Menu, Search } from 'lucide-react';
+import { Gift, Search } from 'lucide-react';
 import Link from 'next/link';
-import type { ComponentPropsWithoutRef } from 'react';
-import { HoldTimer } from '@/components/HoldTimer';
+import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import { Logo } from '@/components/Logo';
 import styles from './Header.module.css';
 
@@ -19,17 +18,17 @@ export type DefaultHeaderProps = HeaderBaseProps & {
   giftsHref: string;
   searchLabel: string;
   searchHref: string;
-  menuExpanded?: boolean;
-  onMenuClick: () => void;
+  menu: ReactNode;
 };
 
 export type CheckoutHeaderProps = HeaderBaseProps & {
   variant: 'checkout';
-  secondsRemaining: number;
+  holdTimer: ReactNode;
 };
 
 export type HeaderProps = DefaultHeaderProps | CheckoutHeaderProps;
 
+// TODO(U-030): first caller, the guest layout; the checkout variant follows in U-047b.
 export function Header(props: HeaderProps) {
   return props.variant === 'checkout' ? (
     <CheckoutHeader {...props} />
@@ -53,8 +52,7 @@ function DefaultHeader({
   giftsHref,
   searchLabel,
   searchHref,
-  menuExpanded,
-  onMenuClick,
+  menu,
   ...rest
 }: DefaultHeaderProps) {
   return (
@@ -74,13 +72,13 @@ function DefaultHeader({
             </ul>
           </nav>
         </div>
-        <a className={styles.search} href={searchHref}>
+        <Link className={styles.search} href={searchHref}>
           <span className={styles.visuallyHidden}>Search:</span>{' '}
           <span className={styles.searchLabel}>{searchLabel}</span>
           <span className={styles.searchGo} aria-hidden="true">
             <Search className={styles.searchIcon} />
           </span>
-        </a>
+        </Link>
         <div className={styles.actions}>
           {showGifts ? (
             <Link href={giftsHref} className={styles.gifts}>
@@ -88,26 +86,14 @@ function DefaultHeader({
               Gifts
             </Link>
           ) : null}
-          <button
-            type="button"
-            className={styles.menu}
-            aria-label="Menu"
-            aria-expanded={menuExpanded}
-            onClick={onMenuClick}
-          >
-            <Menu className={styles.menuIcon} aria-hidden="true" />
-          </button>
+          <div className={styles.menu}>{menu}</div>
         </div>
       </div>
     </header>
   );
 }
 
-function CheckoutHeader({
-  variant,
-  secondsRemaining,
-  ...rest
-}: CheckoutHeaderProps) {
+function CheckoutHeader({ variant, holdTimer, ...rest }: CheckoutHeaderProps) {
   return (
     <header {...rest} className={styles.header} data-variant={variant}>
       <div className={styles.inner}>
@@ -115,7 +101,7 @@ function CheckoutHeader({
           <HomeLink />
           <p className={styles.secure}>Secure checkout</p>
         </div>
-        <HoldTimer secondsRemaining={secondsRemaining} />
+        {holdTimer}
       </div>
     </header>
   );

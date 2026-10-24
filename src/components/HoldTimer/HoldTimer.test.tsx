@@ -4,37 +4,53 @@ import { describe, expect, it, expectTypeOf } from 'vitest';
 import type { ComponentProps } from 'react';
 import { HoldTimer } from './HoldTimer';
 
+const now = new Date('2026-11-02T15:00:00.000Z');
+
+function timer(secondsLeft: number) {
+  return (
+    <HoldTimer
+      now={now}
+      expiresAt={new Date(now.getTime() + secondsLeft * 1000)}
+    />
+  );
+}
+
 describe('HoldTimer', () => {
   it.each([
-    { secondsRemaining: 582, text: 'Spaces held for 9:42' },
-    { secondsRemaining: 72, text: 'Spaces held for 1:12' },
-    { secondsRemaining: 0, text: 'Hold expired' },
-  ])(
-    '$secondsRemaining seconds reads "$text"',
-    ({ secondsRemaining, text }) => {
-      render(<HoldTimer secondsRemaining={secondsRemaining} />);
-      expect(screen.getByRole('timer')).toHaveTextContent(text);
-    },
-  );
+    { secondsLeft: 582, text: 'Spaces held for 9:42' },
+    { secondsLeft: 72, text: 'Spaces held for 1:12' },
+    { secondsLeft: 0, text: 'Hold expired' },
+  ])('$secondsLeft seconds reads "$text"', ({ secondsLeft, text }) => {
+    render(timer(secondsLeft));
+    expect(screen.getByRole('timer')).toHaveTextContent(text);
+  });
 
   it('keeps its announcement empty while the hold is long', () => {
-    render(<HoldTimer secondsRemaining={582} />);
+    render(timer(582));
     expect(screen.getByRole('status')).toBeEmptyDOMElement();
   });
 
   it('announces at the five minute mark, not on every tick', () => {
-    const { rerender } = render(<HoldTimer secondsRemaining={300} />);
+    const { rerender } = render(timer(300));
     expect(screen.getByRole('status')).toHaveTextContent(
       'Your hold ends in 5 minutes.',
     );
-    rerender(<HoldTimer secondsRemaining={299} />);
+    rerender(timer(299));
     expect(screen.getByRole('status')).toHaveTextContent(
       'Your hold ends in 5 minutes.',
     );
   });
 
   it('announces expiry', () => {
-    render(<HoldTimer secondsRemaining={0} />);
+    render(timer(0));
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Your hold has expired.',
+    );
+  });
+
+  it('reads as expired, with no time left, for an invalid expiry', () => {
+    render(<HoldTimer now={now} expiresAt={new Date(Number.NaN)} />);
+    expect(screen.getByRole('timer')).toHaveTextContent('Hold expired');
     expect(screen.getByRole('status')).toHaveTextContent(
       'Your hold has expired.',
     );

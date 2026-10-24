@@ -58,6 +58,18 @@ describe('Card bookable', () => {
   ])('rating with $count reviews shown: $shown', ({ count, shown }) => {
     render(<Card {...bookable} rating={{ average: 4.9, count }} />);
     expect(screen.queryByText(`4.9 (${String(count)})`) !== null).toBe(shown);
+    expect(
+      screen.queryByText(`Rated 4.9 out of 5 from ${String(count)} reviews`) !==
+        null,
+    ).toBe(shown);
+  });
+
+  it('reads the rating in words and hides the compact form from screen readers', () => {
+    render(<Card {...bookable} rating={{ average: 4.9, count: 12 }} />);
+    expect(screen.getByText('4.9 (12)')).toHaveAttribute('aria-hidden', 'true');
+    expect(
+      screen.getByText('Rated 4.9 out of 5 from 12 reviews'),
+    ).not.toHaveAttribute('aria-hidden');
   });
 
   it('shows no rating unless one is given', () => {

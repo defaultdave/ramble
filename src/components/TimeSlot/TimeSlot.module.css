@@ -59,10 +59,6 @@
   cursor: not-allowed;
 }
 
-.soldOut .time {
-  text-decoration: line-through;
-}
-
 .slot:focus-visible {
   outline: 2px solid transparent;
   box-shadow:

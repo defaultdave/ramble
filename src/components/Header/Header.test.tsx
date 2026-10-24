@@ -1,7 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, expect, it, expectTypeOf, vi } from 'vitest';
+import { describe, expect, it, expectTypeOf } from 'vitest';
 import type { ComponentProps } from 'react';
 import { Header } from './Header';
 
@@ -15,7 +14,7 @@ const defaults = {
   giftsHref: '/gifts',
   searchLabel: 'Anywhere · This weekend · 2 guests',
   searchHref: '/new-york/browse',
-  onMenuClick: vi.fn(),
+  menu: <button type="button">Menu</button>,
 };
 
 describe('Header default', () => {
@@ -46,13 +45,14 @@ describe('Header default', () => {
     ).toHaveAttribute('href', '/new-york/browse');
   });
 
-  it('calls onMenuClick from the menu button', async () => {
-    const onMenuClick = vi.fn();
-    render(<Header {...defaults} onMenuClick={onMenuClick} menuExpanded />);
-    const menu = screen.getByRole('button', { name: 'Menu' });
-    expect(menu).toHaveAttribute('aria-expanded', 'true');
-    await userEvent.click(menu);
-    expect(onMenuClick).toHaveBeenCalledTimes(1);
+  it('renders the menu slot', () => {
+    render(<Header {...defaults} />);
+    expect(screen.getByRole('button', { name: 'Menu' })).toBeVisible();
+  });
+
+  it('is one banner landmark', () => {
+    render(<Header {...defaults} />);
+    expect(screen.getAllByRole('banner')).toHaveLength(1);
   });
 
   it('shows the Gifts action by default', () => {
@@ -72,11 +72,23 @@ describe('Header default', () => {
 });
 
 describe('Header checkout', () => {
-  it('shows the hold timer and leaves out navigation and the menu', () => {
-    render(<Header variant="checkout" secondsRemaining={582} />);
+  const checkout = (
+    <Header
+      variant="checkout"
+      holdTimer={<div role="timer">Spaces held for 9:42</div>}
+    />
+  );
+
+  it('renders the hold timer slot and leaves out navigation and the menu', () => {
+    render(checkout);
     expect(screen.getByRole('timer')).toHaveTextContent('Spaces held for 9:42');
     expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('is one banner landmark', () => {
+    render(checkout);
+    expect(screen.getAllByRole('banner')).toHaveLength(1);
   });
 });
 

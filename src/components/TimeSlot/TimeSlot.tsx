@@ -27,6 +27,7 @@ const stateClass = {
   selected: styles.selected,
 } satisfies Record<TimeSlotState, string | undefined>;
 
+// TODO(U-041): first caller, the booking sheet and panel.
 export function TimeSlot({
   time,
   spacesLeft,

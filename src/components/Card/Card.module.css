@@ -20,6 +20,11 @@
   text-decoration: none;
 }
 
+/* The card draws the focus ring for its stretched link, so the link draws none of its own. */
+.titleLink:focus-visible {
+  outline: none;
+}
+
 .card:hover .titleLink {
   text-decoration: underline;
 }
@@ -67,9 +72,11 @@
 
 .footer {
   display: flex;
+  flex-wrap: wrap;
   width: 100%;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
 }
 
 .price {

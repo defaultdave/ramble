@@ -17,7 +17,7 @@ describe('network mocking', () => {
 
   it('fails a request that no handler covers', async () => {
     const failure = await fetch('https://example.test/unhandled').catch(
-      (error: Error) => error,
+      (error: unknown) => error,
     );
 
     expect(String((failure as Error).cause)).toMatch(
@@ -27,7 +27,7 @@ describe('network mocking', () => {
 
   it('drops per-test handlers after each test', async () => {
     const failure = await fetch('https://example.test/ping').catch(
-      (error: Error) => error,
+      (error: unknown) => error,
     );
 
     expect(failure).toBeInstanceOf(Error);

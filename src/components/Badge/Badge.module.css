@@ -1,0 +1,45 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-caption);
+  line-height: var(--font-line-height-caption);
+  font-weight: var(--font-weight-semibold);
+}
+
+.icon {
+  display: inline-flex;
+}
+
+.icon svg {
+  width: calc(var(--space-4) - var(--space-1) / 2);
+  height: calc(var(--space-4) - var(--space-1) / 2);
+}
+
+.green {
+  background: var(--color-tag-green-bg);
+  color: var(--color-tag-green-text);
+}
+
+.yellow {
+  background: var(--color-tag-yellow-bg);
+  color: var(--color-tag-yellow-text);
+}
+
+.blue {
+  background: var(--color-tag-blue-bg);
+  color: var(--color-tag-blue-text);
+}
+
+.pink {
+  background: var(--color-tag-pink-bg);
+  color: var(--color-tag-pink-text);
+}
+
+.neutral {
+  background: var(--color-bg-sunken);
+  color: var(--color-text-secondary);
+}

@@ -1,0 +1,29 @@
+name: db-migrate-production
+# Production is never migrated by a merge. Dave runs this before promoting a deployment that needs
+# a migration. The GitHub environment below holds the approval gate and the production URL.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: db-migrate-production
+  cancel-in-progress: false
+jobs:
+  migrate:
+    name: migrate production
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production-database
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
+        env:
+          DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}

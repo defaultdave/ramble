@@ -1,0 +1,1 @@
+-- Opens the migration journal so later units generate against it. Creates no objects.

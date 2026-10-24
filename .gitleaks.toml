@@ -1,0 +1,7 @@
+# Default rules, plus one allowlisted value.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Figma file key of the public Ramble design file; it is a document id, not a credential"
+regexes = ['''^tGNKJSWGHyx4UVmpnd5LUp$''']

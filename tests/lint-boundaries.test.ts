@@ -1,9 +1,13 @@
 import path from 'node:path';
 import { ESLint } from 'eslint';
+import tseslint from 'typescript-eslint';
 import { describe, expect, it } from 'vitest';
 
 const root = path.resolve(import.meta.dirname, '..');
-const eslint = new ESLint({ cwd: root });
+const eslint = new ESLint({
+  cwd: root,
+  overrideConfig: tseslint.configs.disableTypeChecked,
+});
 
 async function ruleIds(filePath: string, code: string) {
   const [result] = await eslint.lintText(code, {
@@ -37,12 +41,12 @@ describe('import/no-restricted-paths', () => {
     [
       'lib imports app',
       'src/lib/bad.ts',
-      "import RootLayout from '@/app/layout';\nexport const a = RootLayout;\n",
+      "import RootLayout from '@/app/(guest)/layout';\nexport const a = RootLayout;\n",
     ],
     [
       'components import app',
       'src/components/Bad.tsx',
-      "import RootLayout from '@/app/layout';\nexport const a = RootLayout;\n",
+      "import RootLayout from '@/app/(guest)/layout';\nexport const a = RootLayout;\n",
     ],
     [
       'components import server outside actions',
@@ -72,7 +76,7 @@ describe('import/no-restricted-paths', () => {
     [
       'server imports app',
       'src/server/bad.ts',
-      "import RootLayout from '@/app/layout';\nexport const a = RootLayout;\n",
+      "import RootLayout from '@/app/(guest)/layout';\nexport const a = RootLayout;\n",
     ],
     [
       'server imports components',
@@ -124,15 +128,20 @@ describe('no-restricted-imports', () => {
     '@sentry/nextjs',
     'botid',
     'web-vitals',
+    '@vercel/analytics',
+    '@vercel/analytics/next',
+    '@vercel/speed-insights',
+    '@vercel/speed-insights/next',
   ];
 
   it.each(sdks)(
-    'rejects vendor SDK %s in src/lib, src/components, and src/server outside wrappers',
+    'rejects vendor SDK %s in src/lib, src/components, src/app, and src/server outside wrappers',
     async (sdk) => {
       const code = `import * as x from '${sdk}';\nexport const a = x;\n`;
       expect(await ruleIds('src/lib/bad.ts', code)).toContain(IMPORTS);
       expect(await ruleIds('src/components/Bad.tsx', code)).toContain(IMPORTS);
       expect(await ruleIds('src/server/bad.ts', code)).toContain(IMPORTS);
+      expect(await ruleIds('src/app/bad.tsx', code)).toContain(IMPORTS);
     },
   );
 
@@ -146,6 +155,8 @@ describe('no-restricted-imports', () => {
     ['src/server/ports/rate-limit/ok.ts', 'botid'],
     ['src/server/monitoring/ok.ts', '@sentry/nextjs'],
     ['src/server/analytics/ok.ts', 'web-vitals'],
+    ['src/server/analytics/ok.ts', '@vercel/analytics/next'],
+    ['src/server/analytics/ok.ts', '@vercel/speed-insights/next'],
   ] as const;
 
   it.each(wrapperOf)('allows %s to import %s', async (filePath, sdk) => {
@@ -164,6 +175,7 @@ describe('no-restricted-imports', () => {
     ['src/server/ports/email/bad.ts', 'stripe'],
     ['src/server/monitoring/bad.ts', 'web-vitals'],
     ['src/server/analytics/bad.ts', '@sentry/nextjs'],
+    ['src/server/monitoring/bad.ts', '@vercel/analytics/next'],
     ['src/server/ports/clock/bad.ts', 'stripe'],
   ])('rejects %s importing %s from another wrapper', async (filePath, sdk) => {
     expect(

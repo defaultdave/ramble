@@ -1,0 +1,117 @@
+.calendar {
+  inline-size: 100%;
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-body);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-block-end: var(--space-2);
+}
+
+.month {
+  margin: 0;
+  font-size: var(--font-size-heading-s);
+  line-height: var(--font-line-height-heading-s);
+  font-weight: var(--font-weight-semibold);
+}
+
+.navButton {
+  display: grid;
+  place-items: center;
+  inline-size: var(--size-touch-target);
+  block-size: var(--size-touch-target);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.navButton svg {
+  inline-size: var(--space-5);
+  block-size: var(--space-5);
+}
+
+.navButton[data-hovered] {
+  background: var(--color-bg-sunken);
+}
+
+.navButton[data-disabled] {
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+}
+
+.navButton[data-focus-visible],
+.cell[data-focus-visible] {
+  outline: 2px solid transparent;
+  box-shadow:
+    0 0 0 2px var(--color-bg-surface),
+    0 0 0 4px var(--color-focus-ring);
+}
+
+.grid {
+  inline-size: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0 var(--space-2);
+}
+
+.grid td {
+  padding: 0;
+  text-align: center;
+}
+
+.weekday {
+  padding: 0;
+  font-size: var(--font-size-caption);
+  line-height: var(--font-line-height-caption);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.cell {
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  inline-size: var(--size-touch-target);
+  block-size: var(--size-touch-target);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  outline: none;
+}
+
+.cell[data-hovered]:not([data-selected], [data-unavailable], [data-disabled]) {
+  background: var(--color-bg-sunken);
+}
+
+.today {
+  border-color: var(--color-border-strong);
+}
+
+.cell[data-unavailable],
+.cell[data-disabled] {
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-disabled);
+  cursor: default;
+}
+
+.cell[data-selected] {
+  border-color: transparent;
+  background: var(--color-action-primary-bg);
+  color: var(--color-action-primary-text);
+}
+
+.cell[data-outside-month] {
+  display: none;
+}

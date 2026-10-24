@@ -1,4 +1,6 @@
 import type { Decorator } from '@storybook/nextjs-vite';
+import { useEffect } from 'react';
+import type { ReactNode } from 'react';
 import tokensCss from '../src/styles/tokens.css?raw';
 
 // tokens.css switches to dark with a media query, which a story cannot toggle.
@@ -42,16 +44,45 @@ const scopedCss = `
 @media (min-width: 768px) { .scheme-row { grid-template-columns: 1fr 1fr; } }
 `;
 
-export const withColorSchemes: Decorator = (Story) => (
-  <>
-    <style>{scopedCss}</style>
-    <div className="scheme-row">
-      <div data-scheme="light">
-        <Story />
-      </div>
-      <div data-scheme="dark">
-        <Story />
-      </div>
-    </div>
-  </>
-);
+type Scheme = 'light' | 'dark';
+
+// An overlay renders in a portal under <body>, outside any wrapper div, so a
+// story that opens one sets the scheme on <body> and shows one scheme at a time.
+function SingleScheme({
+  scheme,
+  children,
+}: {
+  scheme: Scheme;
+  children: ReactNode;
+}) {
+  useEffect(() => {
+    document.body.dataset.scheme = scheme;
+    return () => {
+      delete document.body.dataset.scheme;
+    };
+  }, [scheme]);
+  return <div data-scheme={scheme}>{children}</div>;
+}
+
+export const withColorSchemes: Decorator = (Story, context) => {
+  const only = context.parameters.colorScheme as Scheme | undefined;
+  return (
+    <>
+      <style>{scopedCss}</style>
+      {only ? (
+        <SingleScheme scheme={only}>
+          <Story />
+        </SingleScheme>
+      ) : (
+        <div className="scheme-row">
+          <div data-scheme="light">
+            <Story />
+          </div>
+          <div data-scheme="dark">
+            <Story />
+          </div>
+        </div>
+      )}
+    </>
+  );
+};

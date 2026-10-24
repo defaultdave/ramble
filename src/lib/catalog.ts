@@ -34,7 +34,8 @@ export const slugEntityKinds = [
   'host',
 ] as const;
 
-export const EntityIdSchema = z.uuid();
+// A guid, not a strict RFC uuid: the column accepts any uuid, and a seeded id outside the RFC variants must still read.
+export const EntityIdSchema = z.guid();
 
 /** Lower-case words joined by single hyphens. The database CHECK on every slug column spells the same pattern. */
 export const SlugSchema = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/);

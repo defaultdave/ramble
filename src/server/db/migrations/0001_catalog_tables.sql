@@ -9,7 +9,8 @@ CREATE TABLE "categories" (
 	"slug" text NOT NULL,
 	"name" text NOT NULL,
 	CONSTRAINT "categories_slug_unique" UNIQUE("slug"),
-	CONSTRAINT "categories_slug_kebab" CHECK ("categories"."slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$')
+	CONSTRAINT "categories_slug_kebab" CHECK ("categories"."slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+	CONSTRAINT "categories_name_not_blank" CHECK ("categories"."name" ~ '[^[:space:]]')
 );
 --> statement-breakpoint
 CREATE TABLE "experiences" (
@@ -39,6 +40,7 @@ CREATE TABLE "experiences" (
 	"affiliate_url" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "experiences_slug_kebab" CHECK ("experiences"."slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+	CONSTRAINT "experiences_name_not_blank" CHECK ("experiences"."name" ~ '[^[:space:]]'),
 	CONSTRAINT "experiences_duration_positive" CHECK ("experiences"."duration_minutes" > 0),
 	CONSTRAINT "experiences_age_rule_limits" CHECK ((
         "experiences"."age_rule" IN ('all_ages', 'twenty_one_plus')
@@ -57,8 +59,8 @@ CREATE TABLE "experiences" (
         = ("experiences"."weather_decision_hours" IS NOT NULL)
         AND coalesce("experiences"."weather_decision_hours" > 0, true)),
 	CONSTRAINT "experiences_guide_only_has_link" CHECK ("experiences"."status" <> 'guide_only' OR "experiences"."link_out_url" IS NOT NULL),
-	CONSTRAINT "experiences_urls_are_http" CHECK (("experiences"."link_out_url" IS NULL OR "experiences"."link_out_url" ~* '^https?://')
-        AND ("experiences"."affiliate_url" IS NULL OR "experiences"."affiliate_url" ~* '^https?://'))
+	CONSTRAINT "experiences_link_out_url_http" CHECK ("experiences"."link_out_url" IS NULL OR "experiences"."link_out_url" ~* '^https?://([A-Za-z0-9-]+\.)*[A-Za-z][A-Za-z0-9-]*(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[0-9]{1,4}))?([/?#][^[:space:]]*)?$'),
+	CONSTRAINT "experiences_affiliate_url_http" CHECK ("experiences"."affiliate_url" IS NULL OR "experiences"."affiliate_url" ~* '^https?://([A-Za-z0-9-]+\.)*[A-Za-z][A-Za-z0-9-]*(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[0-9]{1,4}))?([/?#][^[:space:]]*)?$')
 );
 --> statement-breakpoint
 CREATE TABLE "hosts" (
@@ -68,7 +70,9 @@ CREATE TABLE "hosts" (
 	"description" text,
 	"time_zone" text NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "hosts_slug_kebab" CHECK ("hosts"."slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$')
+	CONSTRAINT "hosts_slug_kebab" CHECK ("hosts"."slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+	CONSTRAINT "hosts_name_not_blank" CHECK ("hosts"."name" ~ '[^[:space:]]'),
+	CONSTRAINT "hosts_time_zone_not_blank" CHECK ("hosts"."time_zone" ~ '[^[:space:]]')
 );
 --> statement-breakpoint
 CREATE TABLE "neighborhoods" (
@@ -76,7 +80,8 @@ CREATE TABLE "neighborhoods" (
 	"slug" text NOT NULL,
 	"name" text NOT NULL,
 	CONSTRAINT "neighborhoods_slug_unique" UNIQUE("slug"),
-	CONSTRAINT "neighborhoods_slug_kebab" CHECK ("neighborhoods"."slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$')
+	CONSTRAINT "neighborhoods_slug_kebab" CHECK ("neighborhoods"."slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+	CONSTRAINT "neighborhoods_name_not_blank" CHECK ("neighborhoods"."name" ~ '[^[:space:]]')
 );
 --> statement-breakpoint
 CREATE TABLE "price_options" (
@@ -103,6 +108,8 @@ CREATE TABLE "cancellation_tiers" (
 	"full_refund_hours_before" integer NOT NULL,
 	"is_default" boolean DEFAULT false NOT NULL,
 	CONSTRAINT "cancellation_tiers_key_unique" UNIQUE("key"),
+	CONSTRAINT "cancellation_tiers_key_not_blank" CHECK ("cancellation_tiers"."key" ~ '[^[:space:]]'),
+	CONSTRAINT "cancellation_tiers_name_not_blank" CHECK ("cancellation_tiers"."name" ~ '[^[:space:]]'),
 	CONSTRAINT "cancellation_tiers_hours_not_negative" CHECK ("cancellation_tiers"."full_refund_hours_before" >= 0)
 );
 --> statement-breakpoint
@@ -115,5 +122,6 @@ CREATE INDEX "experiences_host_id_idx" ON "experiences" USING btree ("host_id");
 CREATE INDEX "experiences_category_id_idx" ON "experiences" USING btree ("category_id");--> statement-breakpoint
 CREATE INDEX "experiences_neighborhood_id_idx" ON "experiences" USING btree ("neighborhood_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "price_options_experience_kind_unique" ON "price_options" USING btree ("experience_id","kind");--> statement-breakpoint
-CREATE UNIQUE INDEX "slug_history_kind_slug_unique" ON "slug_history" USING btree ("entity_kind","slug");--> statement-breakpoint
+CREATE UNIQUE INDEX "slug_history_unique_slug_per_kind" ON "slug_history" USING btree ("entity_kind","slug") WHERE "slug_history"."entity_kind" IN ('category', 'neighborhood');--> statement-breakpoint
+CREATE UNIQUE INDEX "slug_history_entity_slug_unique" ON "slug_history" USING btree ("entity_kind","entity_id","slug");--> statement-breakpoint
 CREATE UNIQUE INDEX "cancellation_tiers_one_default" ON "cancellation_tiers" USING btree ("is_default") WHERE "cancellation_tiers"."is_default";

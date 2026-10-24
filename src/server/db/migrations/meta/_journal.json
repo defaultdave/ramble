@@ -12,14 +12,14 @@
     {
       "idx": 1,
       "version": "7",
-      "when": 1792869152816,
+      "when": 1792870035431,
       "tag": "0001_catalog_tables",
       "breakpoints": true
     },
     {
       "idx": 2,
       "version": "7",
-      "when": 1792869153553,
+      "when": 1792870035859,
       "tag": "0002_slug_history_and_cancellation_tiers",
       "breakpoints": true
     }

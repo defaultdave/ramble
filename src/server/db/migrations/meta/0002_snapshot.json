@@ -1,6 +1,6 @@
 {
-  "id": "63d1674e-deed-4557-a4ae-e1c0203c2338",
-  "prevId": "7de0ed24-b503-4664-a58c-ce60abb884e2",
+  "id": "9b4a6ac7-94dd-4b42-a961-69437338debb",
+  "prevId": "22f7e01c-b6d8-40eb-8aa2-4759fa64b265",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -45,6 +45,10 @@
         "categories_slug_kebab": {
           "name": "categories_slug_kebab",
           "value": "\"categories\".\"slug\" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'"
+        },
+        "categories_name_not_blank": {
+          "name": "categories_name_not_blank",
+          "value": "\"categories\".\"name\" ~ '[^[:space:]]'"
         }
       },
       "isRLSEnabled": false
@@ -324,6 +328,10 @@
           "name": "experiences_slug_kebab",
           "value": "\"experiences\".\"slug\" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'"
         },
+        "experiences_name_not_blank": {
+          "name": "experiences_name_not_blank",
+          "value": "\"experiences\".\"name\" ~ '[^[:space:]]'"
+        },
         "experiences_duration_positive": {
           "name": "experiences_duration_positive",
           "value": "\"experiences\".\"duration_minutes\" > 0"
@@ -344,9 +352,13 @@
           "name": "experiences_guide_only_has_link",
           "value": "\"experiences\".\"status\" <> 'guide_only' OR \"experiences\".\"link_out_url\" IS NOT NULL"
         },
-        "experiences_urls_are_http": {
-          "name": "experiences_urls_are_http",
-          "value": "(\"experiences\".\"link_out_url\" IS NULL OR \"experiences\".\"link_out_url\" ~* '^https?://')\n        AND (\"experiences\".\"affiliate_url\" IS NULL OR \"experiences\".\"affiliate_url\" ~* '^https?://')"
+        "experiences_link_out_url_http": {
+          "name": "experiences_link_out_url_http",
+          "value": "\"experiences\".\"link_out_url\" IS NULL OR \"experiences\".\"link_out_url\" ~* '^https?://([A-Za-z0-9-]+\\.)*[A-Za-z][A-Za-z0-9-]*(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[0-9]{1,4}))?([/?#][^[:space:]]*)?$'"
+        },
+        "experiences_affiliate_url_http": {
+          "name": "experiences_affiliate_url_http",
+          "value": "\"experiences\".\"affiliate_url\" IS NULL OR \"experiences\".\"affiliate_url\" ~* '^https?://([A-Za-z0-9-]+\\.)*[A-Za-z][A-Za-z0-9-]*(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[0-9]{1,4}))?([/?#][^[:space:]]*)?$'"
         }
       },
       "isRLSEnabled": false
@@ -403,6 +415,14 @@
         "hosts_slug_kebab": {
           "name": "hosts_slug_kebab",
           "value": "\"hosts\".\"slug\" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'"
+        },
+        "hosts_name_not_blank": {
+          "name": "hosts_name_not_blank",
+          "value": "\"hosts\".\"name\" ~ '[^[:space:]]'"
+        },
+        "hosts_time_zone_not_blank": {
+          "name": "hosts_time_zone_not_blank",
+          "value": "\"hosts\".\"time_zone\" ~ '[^[:space:]]'"
         }
       },
       "isRLSEnabled": false
@@ -448,6 +468,10 @@
         "neighborhoods_slug_kebab": {
           "name": "neighborhoods_slug_kebab",
           "value": "\"neighborhoods\".\"slug\" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'"
+        },
+        "neighborhoods_name_not_blank": {
+          "name": "neighborhoods_name_not_blank",
+          "value": "\"neighborhoods\".\"name\" ~ '[^[:space:]]'"
         }
       },
       "isRLSEnabled": false
@@ -578,11 +602,39 @@
         }
       },
       "indexes": {
-        "slug_history_kind_slug_unique": {
-          "name": "slug_history_kind_slug_unique",
+        "slug_history_unique_slug_per_kind": {
+          "name": "slug_history_unique_slug_per_kind",
           "columns": [
             {
               "expression": "entity_kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "slug",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "with": {},
+          "method": "btree",
+          "where": "\"slug_history\".\"entity_kind\" IN ('category', 'neighborhood')",
+          "concurrently": false
+        },
+        "slug_history_entity_slug_unique": {
+          "name": "slug_history_entity_slug_unique",
+          "columns": [
+            {
+              "expression": "entity_kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "entity_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -675,6 +727,14 @@
       },
       "policies": {},
       "checkConstraints": {
+        "cancellation_tiers_key_not_blank": {
+          "name": "cancellation_tiers_key_not_blank",
+          "value": "\"cancellation_tiers\".\"key\" ~ '[^[:space:]]'"
+        },
+        "cancellation_tiers_name_not_blank": {
+          "name": "cancellation_tiers_name_not_blank",
+          "value": "\"cancellation_tiers\".\"name\" ~ '[^[:space:]]'"
+        },
         "cancellation_tiers_hours_not_negative": {
           "name": "cancellation_tiers_hours_not_negative",
           "value": "\"cancellation_tiers\".\"full_refund_hours_before\" >= 0"

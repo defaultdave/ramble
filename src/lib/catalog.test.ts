@@ -222,6 +222,13 @@ describe('identifiers', () => {
     },
   );
 
+  it.each([
+    '11111111-1111-1111-1111-111111111111',
+    '00000000-0000-0000-0000-000000000000',
+  ])('accepts the uuid %s even outside the RFC variants', (value) => {
+    expect(EntityIdSchema.safeParse(value).success).toBe(true);
+  });
+
   it.each(['host-test', '', '123'])('refuses the id %j', (value) => {
     expect(EntityIdSchema.safeParse(value).success).toBe(false);
   });

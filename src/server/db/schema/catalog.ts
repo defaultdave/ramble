@@ -1,5 +1,6 @@
 import { relations, sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   boolean,
   check,
   index,
@@ -33,6 +34,19 @@ export const slugEntityKindEnum = pgEnum('slug_entity_kind', slugEntityKinds);
 
 const timestampTz = () => timestamp({ withTimezone: true });
 
+// Every CHECK here is at least as strict as the Zod schema in src/lib/catalog.ts that reads the
+// column, because a row the schema refuses would make a whole list read throw.
+const notBlank = (column: AnyPgColumn) => sql`${column} ~ '[^[:space:]]'`;
+
+// Narrower than what Zod's URL parse accepts: a plain ASCII host whose last label starts with a letter
+// (a numeric last label is parsed as an IPv4 address and can be refused), no credentials, and a port
+// in range. An internationalised host is stored in its punycode form.
+const httpUrlPattern = sql.raw(
+  `'^https?://([A-Za-z0-9-]+\\.)*[A-Za-z][A-Za-z0-9-]*(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[0-9]{1,4}))?([/?#][^[:space:]]*)?$'`,
+);
+const isHttpUrlOrNull = (column: AnyPgColumn) =>
+  sql`${column} IS NULL OR ${column} ~* ${httpUrlPattern}`;
+
 export const hosts = pgTable(
   'hosts',
   {
@@ -45,6 +59,8 @@ export const hosts = pgTable(
   },
   (table) => [
     check('hosts_slug_kebab', sql`${table.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
+    check('hosts_name_not_blank', notBlank(table.name)),
+    check('hosts_time_zone_not_blank', notBlank(table.timeZone)),
   ],
 );
 
@@ -60,6 +76,7 @@ export const categories = pgTable(
       'categories_slug_kebab',
       sql`${table.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`,
     ),
+    check('categories_name_not_blank', notBlank(table.name)),
   ],
 );
 
@@ -75,6 +92,7 @@ export const neighborhoods = pgTable(
       'neighborhoods_slug_kebab',
       sql`${table.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`,
     ),
+    check('neighborhoods_name_not_blank', notBlank(table.name)),
   ],
 );
 
@@ -124,6 +142,7 @@ export const experiences = pgTable(
       'experiences_slug_kebab',
       sql`${table.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`,
     ),
+    check('experiences_name_not_blank', notBlank(table.name)),
     check('experiences_duration_positive', sql`${table.durationMinutes} > 0`),
     check(
       'experiences_age_rule_limits',
@@ -155,10 +174,10 @@ export const experiences = pgTable(
       'experiences_guide_only_has_link',
       sql`${table.status} <> 'guide_only' OR ${table.linkOutUrl} IS NOT NULL`,
     ),
+    check('experiences_link_out_url_http', isHttpUrlOrNull(table.linkOutUrl)),
     check(
-      'experiences_urls_are_http',
-      sql`(${table.linkOutUrl} IS NULL OR ${table.linkOutUrl} ~* '^https?://')
-        AND (${table.affiliateUrl} IS NULL OR ${table.affiliateUrl} ~* '^https?://')`,
+      'experiences_affiliate_url_http',
+      isHttpUrlOrNull(table.affiliateUrl),
     ),
   ],
 );
@@ -198,8 +217,14 @@ export const slugHistory = pgTable(
     retiredAt: timestampTz().notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex('slug_history_kind_slug_unique').on(
+    // Category and neighborhood slugs are unique while live, so a retired one names one entity.
+    uniqueIndex('slug_history_unique_slug_per_kind')
+      .on(table.entityKind, table.slug)
+      .where(sql`${table.entityKind} IN ('category', 'neighborhood')`),
+    // Experience and host slugs repeat across entities; each entity retires a given slug once.
+    uniqueIndex('slug_history_entity_slug_unique').on(
       table.entityKind,
+      table.entityId,
       table.slug,
     ),
   ],

@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import { z } from 'zod';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   anonymousCaller,
@@ -14,6 +15,7 @@ import {
   neighborhoods,
   priceOptions,
   cancellationTiers,
+  slugHistory,
 } from '@/server/db/schema';
 import {
   createFreshDatabase,
@@ -71,32 +73,45 @@ async function defaultTierId() {
   return tier.id;
 }
 
-async function insertHost(name = unique('Host')) {
+async function insertHost(overrides: Partial<typeof hosts.$inferInsert> = {}) {
   const [row] = await client.db
     .insert(hosts)
     .values({
       slug: unique('host'),
-      name,
+      name: unique('Host'),
       timeZone: 'America/New_York',
+      ...overrides,
     })
     .returning();
   if (!row) throw new Error('insert returned no host');
   return row;
 }
 
-async function insertCategory(name = unique('Category')) {
+async function insertCategory(
+  overrides: Partial<typeof categories.$inferInsert> = {},
+) {
   const [row] = await client.db
     .insert(categories)
-    .values({ slug: unique('category'), name })
+    .values({
+      slug: unique('category'),
+      name: unique('Category'),
+      ...overrides,
+    })
     .returning();
   if (!row) throw new Error('insert returned no category');
   return row;
 }
 
-async function insertNeighborhood(name = unique('Neighborhood')) {
+async function insertNeighborhood(
+  overrides: Partial<typeof neighborhoods.$inferInsert> = {},
+) {
   const [row] = await client.db
     .insert(neighborhoods)
-    .values({ slug: unique('neighborhood'), name })
+    .values({
+      slug: unique('neighborhood'),
+      name: unique('Neighborhood'),
+      ...overrides,
+    })
     .returning();
   if (!row) throw new Error('insert returned no neighborhood');
   return row;
@@ -247,9 +262,9 @@ describe('guest reads', () => {
 
 describe('categories and neighborhoods', () => {
   it('list by name and look up by slug', async () => {
-    const zeta = await insertCategory('ZZ Zeta');
-    const alpha = await insertCategory('ZZ Alpha');
-    const hill = await insertNeighborhood('ZZ Hill');
+    const zeta = await insertCategory({ name: 'ZZ Zeta' });
+    const alpha = await insertCategory({ name: 'ZZ Alpha' });
+    const hill = await insertNeighborhood({ name: 'ZZ Hill' });
 
     const names = (await catalog.listCategories())
       .map((category) => category.name)
@@ -274,49 +289,175 @@ describe('categories and neighborhoods', () => {
 });
 
 describe('slug history', () => {
-  it('resolves a retired slug to its entity', async () => {
-    const category = await insertCategory();
-    const renamed = unique('renamed');
-    await client.db
-      .update(categories)
-      .set({ slug: renamed })
-      .where(eq(categories.id, category.id));
+  // Category and neighborhood slugs are unique while live; experience and host slugs repeat.
+  const uniqueKinds = [
+    {
+      kind: 'category',
+      insert: async (slug: string) => (await insertCategory({ slug })).id,
+      rename: (id: string, slug: string) =>
+        client.db.update(categories).set({ slug }).where(eq(categories.id, id)),
+    },
+    {
+      kind: 'neighborhood',
+      insert: async (slug: string) => (await insertNeighborhood({ slug })).id,
+      rename: (id: string, slug: string) =>
+        client.db
+          .update(neighborhoods)
+          .set({ slug })
+          .where(eq(neighborhoods.id, id)),
+    },
+  ] as const;
 
-    const retired = await catalog.findRetiredSlug('category', category.slug);
+  const repeatingKinds = [
+    {
+      kind: 'experience',
+      insert: async (slug: string) =>
+        (await insertExperience(await parents(), { slug })).id,
+      rename: (id: string, slug: string) =>
+        client.db
+          .update(experiences)
+          .set({ slug })
+          .where(eq(experiences.id, id)),
+    },
+    {
+      kind: 'host',
+      insert: async (slug: string) => (await insertHost({ slug })).id,
+      rename: (id: string, slug: string) =>
+        client.db.update(hosts).set({ slug }).where(eq(hosts.id, id)),
+    },
+  ] as const;
 
-    expect(retired).toMatchObject({
-      entityKind: 'category',
-      entityId: category.id,
-      slug: category.slug,
+  describe.each(uniqueKinds)('$kind', ({ kind, insert, rename }) => {
+    it('resolves a retired slug to its entity', async () => {
+      const old = unique('old');
+      const renamed = unique('renamed');
+      const id = await insert(old);
+      await rename(id, renamed);
+
+      expect(await catalog.findRetiredSlug(kind, old)).toMatchObject({
+        entityKind: kind,
+        entityId: id,
+        slug: old,
+      });
+      expect(await catalog.findRetiredSlug(kind, renamed)).toBeNull();
     });
-    expect(await catalog.findRetiredSlug('category', renamed)).toBeNull();
+
+    it('is not retired again once its own entity takes the slug back', async () => {
+      const old = unique('old');
+      const id = await insert(old);
+      await rename(id, unique('away'));
+      await rename(id, old);
+
+      expect(await catalog.findRetiredSlug(kind, old)).toBeNull();
+    });
+
+    it('drops a retired slug when another entity is inserted with it', async () => {
+      const old = unique('old');
+      const id = await insert(old);
+      await rename(id, unique('away'));
+      await insert(old);
+
+      expect(await catalog.findRetiredSlug(kind, old)).toBeNull();
+    });
+
+    it('drops a retired slug when another entity is renamed to it', async () => {
+      const old = unique('old');
+      const id = await insert(old);
+      await rename(id, unique('away'));
+      await rename(await insert(unique('other')), old);
+
+      expect(await catalog.findRetiredSlug(kind, old)).toBeNull();
+    });
+
+    it('does not record a slug that never changed', async () => {
+      const slug = unique('steady');
+      await insert(slug);
+
+      expect(await catalog.findRetiredSlug(kind, slug)).toBeNull();
+    });
   });
 
-  it('records a renamed experience under its own kind', async () => {
-    const experience = await insertExperience(await parents());
-    await client.db
-      .update(experiences)
-      .set({ slug: unique('new-name') })
-      .where(eq(experiences.id, experience.id));
+  describe.each(repeatingKinds)('$kind', ({ kind, insert, rename }) => {
+    it('resolves a retired slug to its entity', async () => {
+      const old = unique('old');
+      const id = await insert(old);
+      await rename(id, unique('renamed'));
 
-    expect(
-      await catalog.findRetiredSlug('experience', experience.slug),
-    ).toMatchObject({ entityId: experience.id });
-    expect(await catalog.findRetiredSlug('host', experience.slug)).toBeNull();
+      expect(await catalog.findRetiredSlug(kind, old)).toMatchObject({
+        entityKind: kind,
+        entityId: id,
+        slug: old,
+      });
+    });
+
+    it('keeps each entity’s own history when two retire the same slug', async () => {
+      const shared = unique('shared');
+      const first = await insert(shared);
+      const second = await insert(shared);
+      await rename(first, unique('first-new'));
+      await rename(second, unique('second-new'));
+
+      const rows = await client.db
+        .select()
+        .from(slugHistory)
+        .where(eq(slugHistory.slug, shared));
+
+      expect(rows.map((row) => row.entityId).sort()).toEqual(
+        [first, second].sort(),
+      );
+      expect(rows.every((row) => row.entityKind === kind)).toBe(true);
+      expect(await catalog.findRetiredSlug(kind, shared)).toMatchObject({
+        entityId: second,
+      });
+    });
+
+    it('leaves another entity’s history alone when a new entity is inserted with the slug', async () => {
+      const old = unique('old');
+      const id = await insert(old);
+      await rename(id, unique('away'));
+      await insert(old);
+
+      expect(await catalog.findRetiredSlug(kind, old)).toMatchObject({
+        entityId: id,
+      });
+    });
+
+    it('leaves another entity’s history alone when one is renamed to the slug', async () => {
+      const old = unique('old');
+      const id = await insert(old);
+      await rename(id, unique('away'));
+      await rename(await insert(unique('other')), old);
+
+      expect(await catalog.findRetiredSlug(kind, old)).toMatchObject({
+        entityId: id,
+      });
+    });
+
+    it('drops a retired slug only when the same entity takes it back', async () => {
+      const shared = unique('shared');
+      const first = await insert(shared);
+      const second = await insert(shared);
+      await rename(first, unique('first-new'));
+      await rename(second, unique('second-new'));
+      await rename(first, shared);
+
+      expect(await catalog.findRetiredSlug(kind, shared)).toMatchObject({
+        entityId: second,
+      });
+    });
   });
 
-  it('stops treating a slug as retired once it is live again', async () => {
-    const category = await insertCategory();
+  it('keeps the kinds apart', async () => {
+    const old = unique('old');
+    const id = await insertHost({ slug: old }).then((host) => host.id);
     await client.db
-      .update(categories)
+      .update(hosts)
       .set({ slug: unique('away') })
-      .where(eq(categories.id, category.id));
-    await client.db
-      .update(categories)
-      .set({ slug: category.slug })
-      .where(eq(categories.id, category.id));
+      .where(eq(hosts.id, id));
 
-    expect(await catalog.findRetiredSlug('category', category.slug)).toBeNull();
+    expect(await catalog.findRetiredSlug('host', old)).not.toBeNull();
+    expect(await catalog.findRetiredSlug('experience', old)).toBeNull();
+    expect(await catalog.findRetiredSlug('category', old)).toBeNull();
   });
 
   it.each([
@@ -474,7 +615,7 @@ describe('constraints', () => {
     ],
     [
       'a link that is not http',
-      'experiences_urls_are_http',
+      'experiences_affiliate_url_http',
       (ids: Parents) =>
         insertExperience(ids, { affiliateUrl: 'javascript:alert(1)' }),
     ],
@@ -494,10 +635,155 @@ describe('constraints', () => {
           isDefault: true,
         }),
     ],
+    [
+      'a weather deadline on a rain-or-shine policy',
+      'experiences_weather_decision_hours',
+      (ids: Parents) =>
+        insertExperience(ids, {
+          outdoor: true,
+          weatherPolicy: 'rain_or_shine',
+          weatherDecisionHours: 3,
+        }),
+    ],
+    [
+      'a weather deadline with no policy',
+      'experiences_weather_decision_hours',
+      (ids: Parents) => insertExperience(ids, { weatherDecisionHours: 3 }),
+    ],
+    [
+      'a weather deadline of zero hours',
+      'experiences_weather_decision_hours',
+      (ids: Parents) =>
+        insertExperience(ids, {
+          outdoor: true,
+          weatherPolicy: 'decided_before_start',
+          weatherDecisionHours: 0,
+        }),
+    ],
+    [
+      'a zero-minute duration',
+      'experiences_duration_positive',
+      (ids: Parents) => insertExperience(ids, { durationMinutes: 0 }),
+    ],
+    [
+      'a negative minimum age',
+      'experiences_age_rule_limits',
+      (ids: Parents) =>
+        insertExperience(ids, { ageRule: 'minimum_age', minAge: -1 }),
+    ],
+    [
+      'a blank host name',
+      'hosts_name_not_blank',
+      () => insertHost({ name: '  ' }),
+    ],
+    [
+      'a blank host time zone',
+      'hosts_time_zone_not_blank',
+      () => insertHost({ timeZone: '' }),
+    ],
+    [
+      'a blank category name',
+      'categories_name_not_blank',
+      () => insertCategory({ name: '' }),
+    ],
+    [
+      'a blank neighborhood name',
+      'neighborhoods_name_not_blank',
+      () => insertNeighborhood({ name: ' \t' }),
+    ],
+    [
+      'a blank experience name',
+      'experiences_name_not_blank',
+      (ids: Parents) => insertExperience(ids, { name: ' ' }),
+    ],
+    [
+      'a blank cancellation tier name',
+      'cancellation_tiers_name_not_blank',
+      () =>
+        client.db.insert(cancellationTiers).values({
+          key: unique('blank'),
+          name: ' ',
+          fullRefundHoursBefore: 1,
+        }),
+    ],
+    [
+      'a blank cancellation tier key',
+      'cancellation_tiers_key_not_blank',
+      () =>
+        client.db
+          .insert(cancellationTiers)
+          .values({ key: '', name: 'Blank', fullRefundHoursBefore: 1 }),
+    ],
+    [
+      'a link-out with no host',
+      'experiences_link_out_url_http',
+      (ids: Parents) => insertExperience(ids, { linkOutUrl: 'http://' }),
+    ],
+    [
+      'an affiliate link with no host',
+      'experiences_affiliate_url_http',
+      (ids: Parents) => insertExperience(ids, { affiliateUrl: 'https://' }),
+    ],
   ])('refuse %s', async (_name, constraint, attempt) => {
     await expect(attempt(await parents())).rejects.toMatchObject({
       cause: { constraint },
     });
+  });
+
+  // The read schema parses every stored URL, so the CHECK may never accept what Zod refuses.
+  it.each([
+    'https://example.com',
+    'HTTP://EXAMPLE.COM/Path?q=1#frag',
+    'http://localhost:3000/a',
+    'https://shop.example.co.uk:65535/x',
+    'http://',
+    'https://',
+    'https:///path',
+    'http://:80',
+    'http://@/',
+    'http://user@example.com',
+    'http://a b.com',
+    'http://999.1.1.1',
+    'http://1.2.3.4.5',
+    'http://example.com:99999',
+    'http://[::1]/x',
+    'http://-.-',
+    'https://example.com/a b',
+    ' https://example.com',
+    'ftp://example.com',
+    'javascript:alert(1)',
+    '//example.com',
+    'example.com',
+  ])('never stores the URL %j when the schema would refuse it', async (url) => {
+    const storedAsLinkOut = await insertExperience(await parents(), {
+      linkOutUrl: url,
+    }).then(
+      () => true,
+      () => false,
+    );
+    const storedAsAffiliate = await insertExperience(await parents(), {
+      affiliateUrl: url,
+    }).then(
+      () => true,
+      () => false,
+    );
+
+    const schemaAccepts = z
+      .url({ protocol: /^https?$/ })
+      .safeParse(url).success;
+    expect(storedAsLinkOut).toBe(storedAsAffiliate);
+    if (storedAsLinkOut) expect(schemaAccepts).toBe(true);
+  });
+
+  it.each([
+    'https://example.com',
+    'HTTP://EXAMPLE.COM/Path?q=1#frag',
+    'http://localhost:3000/a',
+    'https://shop.example.co.uk:65535/x',
+  ])('stores the URL %s', async (url) => {
+    await expect(
+      insertExperience(await parents(), { linkOutUrl: url, affiliateUrl: url }),
+    ).resolves.toBeDefined();
   });
 
   it.each([

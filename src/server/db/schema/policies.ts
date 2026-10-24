@@ -21,6 +21,14 @@ export const cancellationTiers = pgTable(
   },
   (table) => [
     check(
+      'cancellation_tiers_key_not_blank',
+      sql`${table.key} ~ '[^[:space:]]'`,
+    ),
+    check(
+      'cancellation_tiers_name_not_blank',
+      sql`${table.name} ~ '[^[:space:]]'`,
+    ),
+    check(
       'cancellation_tiers_hours_not_negative',
       sql`${table.fullRefundHoursBefore} >= 0`,
     ),

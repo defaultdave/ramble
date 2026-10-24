@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   CategorySchema,
@@ -117,7 +117,10 @@ export async function getNeighborhoodBySlug(
 }
 
 // TODO(U-091): first caller
-/** Which entity used to hold this slug. The caller checks the live slug first and redirects only on a miss. */
+/**
+ * Which entity used to hold this slug. Experience and host slugs repeat across entities, so for
+ * those kinds this returns the most recent retirement; their addresses carry the ID and resolve by it.
+ */
 export async function findRetiredSlug(
   kind: RetiredSlug['entityKind'],
   slug: string,
@@ -132,7 +135,9 @@ export async function findRetiredSlug(
         eq(slugHistory.entityKind, query.data.kind),
         eq(slugHistory.slug, query.data.slug),
       ),
-    );
+    )
+    .orderBy(desc(slugHistory.retiredAt), asc(slugHistory.entityId))
+    .limit(1);
   return row ? RetiredSlugSchema.parse(row) : null;
 }
 

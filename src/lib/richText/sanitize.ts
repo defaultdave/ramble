@@ -13,9 +13,10 @@ import { safeLinkHref } from './href';
 // Bounds recursion on hostile input. Real copy nests a list or two.
 const MAX_DEPTH = 8;
 
-// Bounds work. A node object that appears in its own content several times (a shared
-// reference, which JSON cannot hold but a Server Action argument can) multiplies the
-// walk at every level. Real copy is a few hundred nodes.
+// Bounds work. An object that appears several times in the input (a shared reference,
+// which JSON cannot hold but a Server Action argument can) is walked once per appearance,
+// so the cost is charged per node, mark, attribute key, and stretch of link address.
+// Real copy is a few hundred nodes.
 const MAX_VISITS = 100_000;
 
 // A document built to be rejected can have a problem per node. Twenty is enough to fix.
@@ -92,11 +93,11 @@ function note(
   }
 }
 
-// Counts a node and says whether the walk may go on. Once the budget is spent it stays
-// spent, so every caller unwinds.
-function canVisit(report: Report, path: Path): boolean {
+// Charges work to the budget and says whether the walk may go on. Once the budget is
+// spent it stays spent, so every caller unwinds.
+function spend(report: Report, path: Path, cost = 1): boolean {
   if (report.visits > MAX_VISITS) return false;
-  report.visits += 1;
+  report.visits += cost;
   if (report.visits > MAX_VISITS) {
     // Always recorded, even past the cap: it is the one problem that cuts the result short.
     report.problems.push({
@@ -109,9 +110,13 @@ function canVisit(report: Report, path: Path): boolean {
   return true;
 }
 
+function shorten(value: string): string {
+  return value.length > 40 ? `${value.slice(0, 40)}...` : value;
+}
+
 function describeType(value: unknown): string {
   if (typeof value !== 'string') return 'with no type';
-  return `"${value.length > 40 ? `${value.slice(0, 40)}...` : value}"`;
+  return `"${shorten(value)}"`;
 }
 
 function childNodes(
@@ -138,13 +143,16 @@ function checkAttributes(
   path: Path,
   report: Report,
 ) {
-  for (const key of Object.keys(node)) {
+  const keys = Object.keys(node);
+  // Each key costs a visit, so a wide object shared many times runs the budget out.
+  if (!spend(report, path, keys.length)) return;
+  for (const key of keys) {
     if (!NODE_KEYS.has(key)) {
       note(
         report,
-        [...path, key],
+        [...path, shorten(key)],
         'attribute-not-allowed',
-        `"${key}" is not part of the format`,
+        `"${shorten(key)}" is not part of the format`,
       );
     }
   }
@@ -159,13 +167,18 @@ function checkAttributes(
     return;
   }
   const allowed = ALLOWED_ATTRIBUTES.get(kind) ?? [];
-  for (const [name, value] of Object.entries(node.attrs)) {
-    if (allowed.includes(name) || isDefaultAttribute(name, value)) continue;
+  const attrs = node.attrs;
+  const names = Object.keys(attrs);
+  if (!spend(report, path, names.length)) return;
+  for (const name of names) {
+    if (allowed.includes(name) || isDefaultAttribute(name, attrs[name])) {
+      continue;
+    }
     note(
       report,
-      [...path, 'attrs', name],
+      [...path, 'attrs', shorten(name)],
       'attribute-not-allowed',
-      `The attribute "${name}" is not part of the format`,
+      `The attribute "${shorten(name)}" is not part of the format`,
     );
   }
 }
@@ -182,9 +195,14 @@ function sanitizeMark(
       return { type: mark.type };
     case 'link': {
       checkAttributes(mark, 'link', path, report);
-      const href = safeLinkHref(
-        isObject(mark.attrs) ? mark.attrs.href : undefined,
-      );
+      const address = isObject(mark.attrs) ? mark.attrs.href : undefined;
+      if (
+        typeof address === 'string' &&
+        !spend(report, path, Math.ceil(address.length / 100))
+      ) {
+        return null;
+      }
+      const href = safeLinkHref(address);
       if (href === null) {
         note(
           report,
@@ -226,7 +244,7 @@ function sanitizeMarks(
   const candidates = value as unknown[];
   for (let index = 0; index < candidates.length; index += 1) {
     const path = [...nodePath, 'marks', index];
-    if (!canVisit(report, path)) break;
+    if (!spend(report, path)) break;
     const candidate = candidates[index];
     if (!isObject(candidate)) {
       note(report, path, 'malformed-node', 'A mark must be an object');
@@ -256,7 +274,7 @@ function sanitizeInlineNode(
   report: Report,
   out: InlineNode[],
 ) {
-  if (!canVisit(report, path)) return;
+  if (!spend(report, path)) return;
   if (depth > MAX_DEPTH) {
     note(report, path, 'too-deep', 'Nested too deeply');
     return;
@@ -383,7 +401,7 @@ function sanitizeList(
   const children = childNodes(node, path, report);
   for (let index = 0; index < children.length; index += 1) {
     const itemPath = childPath(path, index);
-    if (!canVisit(report, itemPath)) break;
+    if (!spend(report, itemPath)) break;
     const child = children[index];
     if (!isObject(child)) {
       note(report, itemPath, 'malformed-node', 'A node must be an object');
@@ -571,7 +589,7 @@ function sanitizeBlocks(
   for (let index = 0; index < nodes.length; index += 1) {
     const node = nodes[index];
     const path = pathOf(index);
-    if (!canVisit(report, path)) break;
+    if (!spend(report, path)) break;
     if (!isObject(node)) {
       note(report, path, 'malformed-node', 'A node must be an object');
     } else if (node.type === 'text' || node.type === 'hardBreak') {
@@ -597,9 +615,11 @@ function sanitizeBlocks(
  * `textAlign: 'left'`, a list `start` of 1); and a link's `target` and `rel`, which the
  * renderer decides itself.
  *
- * Work is bounded by a visit budget, so a document with shared nodes cannot stall it.
- * Past the budget the walk stops with a `too-large` problem and the result holds what was
- * read so far.
+ * Work is bounded by a budget of 100,000 visits. A node, a mark, an attribute key, and each
+ * hundred characters of a link address cost one visit each, however many times the same
+ * object is shared. Past the budget the walk stops with a `too-large` problem and the
+ * result holds what was read so far. Reading a single object's keys still costs time
+ * in proportion to its size, which the input already paid for.
  */
 export function inspectRichText(input: unknown): {
   doc: RichTextDoc;

@@ -18,8 +18,10 @@ const UNSAFE_CHARACTERS = /[\p{Cc}\s\\]/u;
  */
 export function safeLinkHref(value: unknown): string | null {
   if (typeof value !== 'string') return null;
+  // Checked before trimming, so a huge string is turned away without being copied.
+  if (value.length > MAX_HREF_LENGTH) return null;
   const href = value.trim();
-  if (href === '' || href.length > MAX_HREF_LENGTH) return null;
+  if (href === '') return null;
   if (UNSAFE_CHARACTERS.test(href)) return null;
 
   if (href.startsWith('#')) return href;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { inspectRichText, sanitizeRichText } from './sanitize';
+import { richTextSchema } from './schema';
 
 const text = (value: string, marks?: unknown[]) => ({
   type: 'text',
@@ -14,7 +15,7 @@ const many = <T>(count: number, make: () => T) =>
 const link = (href: string) => ({ type: 'link', attrs: { href } });
 
 // Under the visit budget, so the whole document comes back.
-const WIDE = 30_000;
+const WIDE = 10_000;
 // Over it, and over the roughly 130,000 arguments a spread can pass before the stack gives out.
 const TOO_WIDE = 250_000;
 
@@ -128,6 +129,59 @@ describe('sanitizeRichText on wide input', () => {
     const { problems } = inspectRichText(doc(shared));
     expect(performance.now() - started).toBeLessThan(2_000);
     expect(problems.map(({ code }) => code)).toContain('too-large');
+  });
+
+  it.each([
+    [
+      'attributes',
+      () => ({
+        type: 'paragraph',
+        attrs: Object.fromEntries(
+          Array.from({ length: 20_000 }, (_, i) => [`a${String(i)}`, 'x']),
+        ),
+        content: [text('x')],
+      }),
+    ],
+    [
+      'node keys',
+      () => ({
+        type: 'paragraph',
+        content: [text('x')],
+        ...Object.fromEntries(
+          Array.from({ length: 20_000 }, (_, i) => [`k${String(i)}`, 'x']),
+        ),
+      }),
+    ],
+    [
+      'link addresses',
+      () =>
+        paragraph(
+          text('x', [link(`https://example.com/${'a'.repeat(1_900)}`)]),
+        ),
+    ],
+  ])(
+    'is not slowed by one node with many %s shared 99,000 times',
+    (_label, build) => {
+      const shared = build();
+      const started = performance.now();
+      const { problems } = inspectRichText(docOf(many(99_000, () => shared)));
+      expect(performance.now() - started).toBeLessThan(2_000);
+      expect(problems.map(({ code }) => code)).toContain('too-large');
+    },
+  );
+
+  it('fails the write for one wide node shared many times', () => {
+    const shared = {
+      type: 'paragraph',
+      attrs: Object.fromEntries(
+        Array.from({ length: 20_000 }, (_, i) => [`a${String(i)}`, 'x']),
+      ),
+      content: [text('x')],
+    };
+    const started = performance.now();
+    const result = richTextSchema.safeParse(docOf(many(99_000, () => shared)));
+    expect(performance.now() - started).toBeLessThan(2_000);
+    expect(result.success).toBe(false);
   });
 
   it('is not slowed by a node that contains itself', () => {

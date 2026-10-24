@@ -32,6 +32,7 @@ export default defineConfig({
         test: {
           name: 'components',
           include: ['src/**/*.test.tsx'],
+          exclude: ['**/*.db.test.*', '**/node_modules/**'],
           setupFiles: ['./tests/setup.ts'],
           environment: 'jsdom',
           // Testing Library registers its automatic cleanup only when afterEach is global.

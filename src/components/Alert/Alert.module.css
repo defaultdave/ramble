@@ -1,0 +1,91 @@
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  font-family: var(--font-family-body);
+}
+
+.info {
+  --alert-tone: var(--color-status-info-text);
+
+  background: var(--color-status-info-bg);
+}
+
+.success {
+  --alert-tone: var(--color-status-success-text);
+
+  background: var(--color-status-success-bg);
+}
+
+.warning {
+  --alert-tone: var(--color-status-warning-text);
+
+  background: var(--color-status-warning-bg);
+}
+
+.danger {
+  --alert-tone: var(--color-status-danger-text);
+
+  background: var(--color-status-danger-bg);
+}
+
+.icon {
+  flex: none;
+  width: var(--space-5);
+  height: var(--space-5);
+  color: var(--alert-tone);
+}
+
+.content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  font-weight: var(--font-weight-semibold);
+  color: var(--alert-tone);
+}
+
+.body {
+  font-size: var(--font-size-body-s);
+  line-height: var(--font-line-height-body-s);
+  color: var(--color-text-primary);
+}
+
+/* A text link look for whatever the caller passes; the padding keeps a 44px target without growing the row. */
+.action :is(a, button) {
+  display: inline-flex;
+  align-items: center;
+  margin: calc(-1 * var(--space-3)) 0;
+  padding: var(--space-3) 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: var(--font-size-body-s);
+  line-height: var(--font-line-height-body-s);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.action :is(a, button):focus-visible {
+  outline: 2px solid transparent;
+  box-shadow:
+    0 0 0 2px var(--color-bg-canvas),
+    0 0 0 4px var(--color-focus-ring);
+}
+
+@media (min-width: 768px) {
+  .alert {
+    padding: var(--space-4) var(--space-5);
+  }
+}

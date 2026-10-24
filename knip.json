@@ -4,11 +4,8 @@
     "tests/**/*.test.ts",
     "src/**/*.test.{ts,tsx}",
     "e2e/**/*.spec.ts",
-    "tests/stubs/*.ts"
-  ],
-  "ignoreDependencies": [
-    "@fontsource-variable/fraunces",
-    "@fontsource-variable/inter"
+    "tests/stubs/*.ts",
+    "src/components/*/index.ts"
   ],
   "project": [
     "src/**/*.{ts,tsx}",

@@ -1,0 +1,21 @@
+# Local Postgres, the same major version CI and Neon run (ADR 0007).
+# `docker compose up -d --wait`, then copy the URLs from .env.example into your local env file.
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ramble
+      POSTGRES_PASSWORD: ramble
+      POSTGRES_DB: ramble
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ramble -d ramble']
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  postgres-data:

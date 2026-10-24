@@ -28,6 +28,51 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm ${{ matrix.script }}
 
+  # Needs the Postgres service, so it is not in the gate matrix above, which runs with no database.
+  db:
+    name: db
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: ramble
+          POSTGRES_PASSWORD: ramble
+          POSTGRES_DB: ramble
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ramble -d ramble"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://ramble:ramble@localhost:5432/ramble
+      DATABASE_URL_UNPOOLED: postgres://ramble:ramble@localhost:5432/ramble
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply every migration to an empty database
+        run: pnpm db:migrate
+      - name: Check the migration history
+        run: pnpm db:check
+      - name: Fail if the schema changed without a migration
+        run: |
+          pnpm db:generate
+          if [ -n "$(git status --porcelain -- src/server/db/migrations)" ]; then
+            echo "::error::drizzle-kit generate wrote a file: the schema changed without a committed migration."
+            git status --porcelain -- src/server/db/migrations
+            exit 1
+          fi
+      - run: pnpm test:db
+
   e2e:
     name: e2e
     runs-on: ubuntu-latest
@@ -49,3 +94,21 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  storybook:
+    name: storybook
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm storybook:build
+      - run: pnpm exec playwright install --with-deps chromium
+      # Every story runs in Chromium with axe; a violation fails the job.
+      - run: pnpm storybook:test

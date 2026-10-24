@@ -167,6 +167,15 @@ describe('HostExperienceSchema', () => {
     ],
     ['a guide-only row with no link-out', { status: 'guide_only' }],
     ['a link-out that is not http', { linkOutUrl: 'javascript:alert(1)' }],
+    ['a link-out with no host', { linkOutUrl: 'http://' }],
+    [
+      'a link-out with an invalid punycode label',
+      { linkOutUrl: 'http://xn--a.com' },
+    ],
+    [
+      'an affiliate link with an xn-- label',
+      { affiliateUrl: 'https://a.xn--zz' },
+    ],
   ])('refuses %s', (_name, change) => {
     expect(() =>
       HostExperienceSchema.parse({ ...experienceRow, ...change }),
@@ -189,6 +198,7 @@ describe('HostExperienceSchema', () => {
       'a guide-only row with a link-out',
       { status: 'guide_only', linkOutUrl: 'https://example.com/class' },
     ],
+    ['an affiliate link', { affiliateUrl: 'http://localhost:3000/a?b=1#c' }],
   ])('accepts %s', (_name, change) => {
     expect(() =>
       HostExperienceSchema.parse({ ...experienceRow, ...change }),

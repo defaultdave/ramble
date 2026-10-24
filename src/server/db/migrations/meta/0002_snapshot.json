@@ -1,6 +1,6 @@
 {
-  "id": "9b4a6ac7-94dd-4b42-a961-69437338debb",
-  "prevId": "22f7e01c-b6d8-40eb-8aa2-4759fa64b265",
+  "id": "155c1df7-ce7c-44f9-b141-a3f87fa709b6",
+  "prevId": "f4b055d4-1df0-499e-9e5f-ed366bca2602",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -332,6 +332,10 @@
           "name": "experiences_name_not_blank",
           "value": "\"experiences\".\"name\" ~ '[^[:space:]]'"
         },
+        "experiences_created_at_finite": {
+          "name": "experiences_created_at_finite",
+          "value": "isfinite(\"experiences\".\"created_at\")"
+        },
         "experiences_duration_positive": {
           "name": "experiences_duration_positive",
           "value": "\"experiences\".\"duration_minutes\" > 0"
@@ -354,11 +358,11 @@
         },
         "experiences_link_out_url_http": {
           "name": "experiences_link_out_url_http",
-          "value": "\"experiences\".\"link_out_url\" IS NULL OR \"experiences\".\"link_out_url\" ~* '^https?://([A-Za-z0-9-]+\\.)*[A-Za-z][A-Za-z0-9-]*(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[0-9]{1,4}))?([/?#][^[:space:]]*)?$'"
+          "value": "\"experiences\".\"link_out_url\" IS NULL OR \"experiences\".\"link_out_url\" ~ '^[Hh][Tt][Tt][Pp][Ss]?://((?![Xx][Nn]--)[A-Za-z0-9-]+\\.)*(?![Xx][Nn]--)[A-Za-z][A-Za-z0-9-]*(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[0-9]{1,4}))?([/?#][!-~]*)?$'"
         },
         "experiences_affiliate_url_http": {
           "name": "experiences_affiliate_url_http",
-          "value": "\"experiences\".\"affiliate_url\" IS NULL OR \"experiences\".\"affiliate_url\" ~* '^https?://([A-Za-z0-9-]+\\.)*[A-Za-z][A-Za-z0-9-]*(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[0-9]{1,4}))?([/?#][^[:space:]]*)?$'"
+          "value": "\"experiences\".\"affiliate_url\" IS NULL OR \"experiences\".\"affiliate_url\" ~ '^[Hh][Tt][Tt][Pp][Ss]?://((?![Xx][Nn]--)[A-Za-z0-9-]+\\.)*(?![Xx][Nn]--)[A-Za-z][A-Za-z0-9-]*(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[0-9]{1,4}))?([/?#][!-~]*)?$'"
         }
       },
       "isRLSEnabled": false
@@ -419,6 +423,10 @@
         "hosts_name_not_blank": {
           "name": "hosts_name_not_blank",
           "value": "\"hosts\".\"name\" ~ '[^[:space:]]'"
+        },
+        "hosts_created_at_finite": {
+          "name": "hosts_created_at_finite",
+          "value": "isfinite(\"hosts\".\"created_at\")"
         },
         "hosts_time_zone_not_blank": {
           "name": "hosts_time_zone_not_blank",
@@ -656,7 +664,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "slug_history_retired_at_finite": {
+          "name": "slug_history_retired_at_finite",
+          "value": "isfinite(\"slug_history\".\"retired_at\")"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.cancellation_tiers": {

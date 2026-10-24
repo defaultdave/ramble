@@ -1,5 +1,4 @@
-import { eq } from 'drizzle-orm';
-import { z } from 'zod';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   anonymousCaller,
@@ -7,6 +6,7 @@ import {
   Role,
   type Caller,
 } from '@/server/auth/caller';
+import { httpUrlPattern } from '@/lib/catalog';
 import { testCaller } from '@/server/auth/test-caller';
 import {
   categories,
@@ -730,12 +730,17 @@ describe('constraints', () => {
     });
   });
 
-  // The read schema parses every stored URL, so the CHECK may never accept what Zod refuses.
+  // The read schemas and the CHECKs share httpUrlPattern, and this pins that the database applies it
+  // the way JavaScript does. A stored link must also be one `new URL()` can parse.
+  const urlPattern = new RegExp(httpUrlPattern);
   it.each([
     'https://example.com',
     'HTTP://EXAMPLE.COM/Path?q=1#frag',
+    'HtTp://Example.com',
     'http://localhost:3000/a',
     'https://shop.example.co.uk:65535/x',
+    'http://a-b.example.com',
+    'http://xn-a.com',
     'http://',
     'https://',
     'https:///path',
@@ -749,42 +754,77 @@ describe('constraints', () => {
     'http://[::1]/x',
     'http://-.-',
     'https://example.com/a b',
+    'https://example.com/é',
+    'https://example.com/\u00a0',
+    'https://example.com\n',
     ' https://example.com',
+    'http://xn--a.com',
+    'http://a.xn--zz',
+    'http://XN--a.com',
+    'http://a.Xn--b.com',
+    'https://xn--nxasmq6b.com',
     'ftp://example.com',
     'javascript:alert(1)',
     '//example.com',
     'example.com',
-  ])('never stores the URL %j when the schema would refuse it', async (url) => {
-    const storedAsLinkOut = await insertExperience(await parents(), {
-      linkOutUrl: url,
-    }).then(
-      () => true,
-      () => false,
-    );
-    const storedAsAffiliate = await insertExperience(await parents(), {
-      affiliateUrl: url,
-    }).then(
-      () => true,
-      () => false,
-    );
+  ])(
+    'stores the URL %j exactly when the shared pattern accepts it',
+    async (url) => {
+      const asLinkOut = await insertExperience(await parents(), {
+        linkOutUrl: url,
+      }).then(
+        () => true,
+        () => false,
+      );
+      const asAffiliate = await insertExperience(await parents(), {
+        affiliateUrl: url,
+      }).then(
+        () => true,
+        () => false,
+      );
 
-    const schemaAccepts = z
-      .url({ protocol: /^https?$/ })
-      .safeParse(url).success;
-    expect(storedAsLinkOut).toBe(storedAsAffiliate);
-    if (storedAsLinkOut) expect(schemaAccepts).toBe(true);
-  });
+      expect([asLinkOut, asAffiliate]).toEqual([
+        urlPattern.test(url),
+        urlPattern.test(url),
+      ]);
+      if (asLinkOut) expect(() => new URL(url)).not.toThrow();
+    },
+  );
 
-  it.each([
-    'https://example.com',
-    'HTTP://EXAMPLE.COM/Path?q=1#frag',
-    'http://localhost:3000/a',
-    'https://shop.example.co.uk:65535/x',
-  ])('stores the URL %s', async (url) => {
-    await expect(
-      insertExperience(await parents(), { linkOutUrl: url, affiliateUrl: url }),
-    ).resolves.toBeDefined();
-  });
+  it.each(['infinity', '-infinity'])(
+    'refuse a timestamp of %s',
+    async (instant) => {
+      const ids = await parents();
+      const insertions = [
+        [
+          'hosts_created_at_finite',
+          () =>
+            client.db.execute(
+              sql`INSERT INTO hosts (slug, name, time_zone, created_at) VALUES (${unique('inf-host')}, 'Host', 'UTC', ${instant}::timestamptz)`,
+            ),
+        ],
+        [
+          'experiences_created_at_finite',
+          () =>
+            client.db.execute(
+              sql`INSERT INTO experiences (host_id, category_id, neighborhood_id, cancellation_tier_id, slug, name, created_at) VALUES (${ids.hostId}, ${ids.categoryId}, ${ids.neighborhoodId}, ${ids.cancellationTierId}, ${unique('inf-exp')}, 'Experience', ${instant}::timestamptz)`,
+            ),
+        ],
+        [
+          'slug_history_retired_at_finite',
+          () =>
+            client.db.execute(
+              sql`INSERT INTO slug_history (entity_kind, entity_id, slug, retired_at) VALUES ('category', ${ids.categoryId}, ${unique('inf-slug')}, ${instant}::timestamptz)`,
+            ),
+        ],
+      ] as const;
+      for (const [constraint, attempt] of insertions) {
+        await expect(attempt()).rejects.toMatchObject({
+          cause: { constraint },
+        });
+      }
+    },
+  );
 
   it.each([
     [

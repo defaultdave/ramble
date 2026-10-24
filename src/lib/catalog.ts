@@ -40,7 +40,17 @@ export const EntityIdSchema = z.guid();
 /** Lower-case words joined by single hyphens. The database CHECK on every slug column spells the same pattern. */
 export const SlugSchema = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/);
 
-const HttpUrlSchema = z.url({ protocol: /^https?$/ });
+/**
+ * The one rule for a stored link, used by the read schemas and by the database CHECKs on
+ * `link_out_url` and `affiliate_url` (a migration holds this exact text). An ASCII host whose last
+ * label starts with a letter, no `xn--` label, no credentials, a port up to 65535, and a path of
+ * printable ASCII. It avoids `new URL()` on purpose: that parse throws on some hosts a looser
+ * pattern lets through. An internationalised link is not stored, and a path escapes non-ASCII.
+ * It is written to mean the same in JavaScript and in Postgres, case-sensitively.
+ */
+export const httpUrlPattern = String.raw`^[Hh][Tt][Tt][Pp][Ss]?://((?![Xx][Nn]--)[A-Za-z0-9-]+\.)*(?![Xx][Nn]--)[A-Za-z][A-Za-z0-9-]*(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[0-9]{1,4}))?([/?#][!-~]*)?$`;
+
+const HttpUrlSchema = z.string().regex(new RegExp(httpUrlPattern));
 
 const MinorUnitsSchema = z.int().nonnegative();
 

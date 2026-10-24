@@ -41,6 +41,7 @@ CREATE TABLE "experiences" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "experiences_slug_kebab" CHECK ("experiences"."slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
 	CONSTRAINT "experiences_name_not_blank" CHECK ("experiences"."name" ~ '[^[:space:]]'),
+	CONSTRAINT "experiences_created_at_finite" CHECK (isfinite("experiences"."created_at")),
 	CONSTRAINT "experiences_duration_positive" CHECK ("experiences"."duration_minutes" > 0),
 	CONSTRAINT "experiences_age_rule_limits" CHECK ((
         "experiences"."age_rule" IN ('all_ages', 'twenty_one_plus')
@@ -59,8 +60,8 @@ CREATE TABLE "experiences" (
         = ("experiences"."weather_decision_hours" IS NOT NULL)
         AND coalesce("experiences"."weather_decision_hours" > 0, true)),
 	CONSTRAINT "experiences_guide_only_has_link" CHECK ("experiences"."status" <> 'guide_only' OR "experiences"."link_out_url" IS NOT NULL),
-	CONSTRAINT "experiences_link_out_url_http" CHECK ("experiences"."link_out_url" IS NULL OR "experiences"."link_out_url" ~* '^https?://([A-Za-z0-9-]+\.)*[A-Za-z][A-Za-z0-9-]*(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[0-9]{1,4}))?([/?#][^[:space:]]*)?$'),
-	CONSTRAINT "experiences_affiliate_url_http" CHECK ("experiences"."affiliate_url" IS NULL OR "experiences"."affiliate_url" ~* '^https?://([A-Za-z0-9-]+\.)*[A-Za-z][A-Za-z0-9-]*(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[0-9]{1,4}))?([/?#][^[:space:]]*)?$')
+	CONSTRAINT "experiences_link_out_url_http" CHECK ("experiences"."link_out_url" IS NULL OR "experiences"."link_out_url" ~ '^[Hh][Tt][Tt][Pp][Ss]?://((?![Xx][Nn]--)[A-Za-z0-9-]+\.)*(?![Xx][Nn]--)[A-Za-z][A-Za-z0-9-]*(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[0-9]{1,4}))?([/?#][!-~]*)?$'),
+	CONSTRAINT "experiences_affiliate_url_http" CHECK ("experiences"."affiliate_url" IS NULL OR "experiences"."affiliate_url" ~ '^[Hh][Tt][Tt][Pp][Ss]?://((?![Xx][Nn]--)[A-Za-z0-9-]+\.)*(?![Xx][Nn]--)[A-Za-z][A-Za-z0-9-]*(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[0-9]{1,4}))?([/?#][!-~]*)?$')
 );
 --> statement-breakpoint
 CREATE TABLE "hosts" (
@@ -72,6 +73,7 @@ CREATE TABLE "hosts" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "hosts_slug_kebab" CHECK ("hosts"."slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
 	CONSTRAINT "hosts_name_not_blank" CHECK ("hosts"."name" ~ '[^[:space:]]'),
+	CONSTRAINT "hosts_created_at_finite" CHECK (isfinite("hosts"."created_at")),
 	CONSTRAINT "hosts_time_zone_not_blank" CHECK ("hosts"."time_zone" ~ '[^[:space:]]')
 );
 --> statement-breakpoint
@@ -98,7 +100,8 @@ CREATE TABLE "slug_history" (
 	"entity_kind" "slug_entity_kind" NOT NULL,
 	"entity_id" uuid NOT NULL,
 	"slug" text NOT NULL,
-	"retired_at" timestamp with time zone DEFAULT now() NOT NULL
+	"retired_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "slug_history_retired_at_finite" CHECK (isfinite("slug_history"."retired_at"))
 );
 --> statement-breakpoint
 CREATE TABLE "cancellation_tiers" (

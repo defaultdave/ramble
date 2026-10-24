@@ -82,3 +82,8 @@ function tagsFor(change: CacheChange): string[] {
 export function tagsForChange(change: CacheChange): string[] {
   return [...new Set(tagsFor(change))].sort();
 }
+
+/** The tags a set of changes invalidates together, without repeats and in a stable order. */
+export function tagsForChanges(changes: readonly CacheChange[]): string[] {
+  return [...new Set(changes.flatMap(tagsFor))].sort();
+}

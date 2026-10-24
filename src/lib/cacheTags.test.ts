@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { type CacheChange, tagsForChange, tags } from './cacheTags';
+import {
+  type CacheChange,
+  tagsForChange,
+  tagsForChanges,
+  tags,
+} from './cacheTags';
 
 describe('tags', () => {
   it.each([
@@ -97,5 +102,21 @@ describe('tagsForChange', () => {
     const result = tagsForChange({ ...listing, categorySlugs: [] });
 
     expect(result.some((tag) => tag.startsWith('category:'))).toBe(false);
+  });
+});
+
+describe('tagsForChanges', () => {
+  it('joins the tags of several changes, once each and in order', () => {
+    expect(
+      tagsForChanges([
+        { kind: 'pick', slug: 'summer' },
+        { kind: 'giftGuide' },
+        { kind: 'homeModules' },
+      ]),
+    ).toEqual(['gift-guide', 'home', 'pick:summer']);
+  });
+
+  it('is empty for no changes', () => {
+    expect(tagsForChanges([])).toEqual([]);
   });
 });

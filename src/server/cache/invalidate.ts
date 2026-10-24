@@ -1,10 +1,6 @@
 import 'server-only';
 import { revalidateTag, updateTag } from 'next/cache';
-import { type CacheChange, tagsForChange } from '@/lib/cacheTags';
-
-function uniqueTags(changes: readonly CacheChange[]): string[] {
-  return [...new Set(changes.flatMap(tagsForChange))].sort();
-}
+import { type CacheChange, tagsForChanges } from '@/lib/cacheTags';
 
 // TODO(U-076a): first caller, the editorial publish action.
 /**
@@ -12,7 +8,7 @@ function uniqueTags(changes: readonly CacheChange[]): string[] {
  * `updateTag` throws anywhere else.
  */
 export function updateTagsForChanges(changes: readonly CacheChange[]): void {
-  for (const tag of uniqueTags(changes)) updateTag(tag);
+  for (const tag of tagsForChanges(changes)) updateTag(tag);
 }
 
 // TODO(U-014b): first caller, the hold cleanup job that releases spaces.
@@ -23,5 +19,5 @@ export function updateTagsForChanges(changes: readonly CacheChange[]): void {
 export function revalidateTagsForChanges(
   changes: readonly CacheChange[],
 ): void {
-  for (const tag of uniqueTags(changes)) revalidateTag(tag, 'max');
+  for (const tag of tagsForChanges(changes)) revalidateTag(tag, 'max');
 }

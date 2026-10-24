@@ -1,0 +1,18 @@
+.illustration {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.sky {
+  fill: var(--color-bg-accent-subtle);
+}
+
+.sun {
+  fill: var(--color-bg-highlight);
+}
+
+.hill {
+  fill: var(--color-text-link);
+  opacity: 0.85;
+}

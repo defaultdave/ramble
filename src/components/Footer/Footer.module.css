@@ -1,0 +1,120 @@
+.footer {
+  --logo-color: var(--color-text-inverse);
+
+  padding: var(--space-8) var(--space-4);
+  background: var(--color-bg-inverse);
+  color: var(--color-text-inverse);
+  font-family: var(--font-family-body);
+}
+
+.inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  max-width: var(--size-content-max);
+  margin-inline: auto;
+}
+
+.top {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.tagline {
+  display: none;
+  margin: 0;
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+}
+
+.groups {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(calc(var(--space-12) * 3), 1fr)
+  );
+  gap: var(--space-6);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.groupTitle {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  line-height: var(--font-line-height-caption);
+  font-weight: var(--font-weight-semibold);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The block padding lifts each link to a 24px target without moving the rows apart. */
+.link {
+  display: inline-block;
+  padding: calc(var(--space-1) / 2) 0;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-body-s);
+  line-height: var(--font-line-height-body-s);
+  color: inherit;
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.link:focus-visible {
+  outline: 2px solid transparent;
+  box-shadow:
+    0 0 0 2px var(--color-bg-inverse),
+    0 0 0 4px var(--color-focus-ring);
+}
+
+.copyright {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  line-height: var(--font-line-height-caption);
+}
+
+@media (min-width: 768px) {
+  .footer {
+    padding: var(--space-16) var(--space-6) var(--space-12);
+  }
+
+  .inner {
+    gap: var(--space-10);
+  }
+
+  .top {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-8);
+  }
+
+  .tagline {
+    display: block;
+  }
+
+  .groups {
+    display: flex;
+    gap: var(--space-16);
+  }
+}

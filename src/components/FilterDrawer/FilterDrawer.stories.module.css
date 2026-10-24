@@ -1,0 +1,19 @@
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-block-end: var(--space-6);
+}
+
+.groupTitle {
+  margin: 0;
+  font-size: var(--font-size-heading-s);
+  line-height: var(--font-line-height-heading-s);
+  font-weight: var(--font-weight-semibold);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

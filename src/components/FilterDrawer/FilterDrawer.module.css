@@ -1,0 +1,14 @@
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.apply {
+  display: flex;
+  flex: 1;
+}
+
+.apply > * {
+  flex: 1;
+}

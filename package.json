@@ -34,6 +34,7 @@
     "storybook:test": "vitest run --config .storybook/vitest.config.mts"
   },
   "dependencies": {
+    "@internationalized/date": "^3.12.4",
     "@neondatabase/serverless": "^1.2.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/functions": "^3.10.3",
@@ -43,6 +44,7 @@
     "next": "^16.4.2",
     "pg": "^8.23.1",
     "react": "^19.3.1",
+    "react-aria-components": "^1.22.1",
     "react-dom": "^19.3.1",
     "server-only": "^0.0.1",
     "zod": "^4.6.7"

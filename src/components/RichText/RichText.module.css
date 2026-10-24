@@ -1,0 +1,86 @@
+.richText {
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.richText > * {
+  margin: 0;
+}
+
+.richText > * + * {
+  margin-top: var(--space-4);
+}
+
+.richText :is(h2, h3, h4) {
+  font-family: var(--font-family-display);
+  font-weight: var(--font-weight-semibold);
+}
+
+.richText h2 {
+  font-size: var(--font-size-heading-l);
+  line-height: var(--font-line-height-heading-l);
+}
+
+.richText h3 {
+  font-size: var(--font-size-heading-m);
+  line-height: var(--font-line-height-heading-m);
+}
+
+.richText h4 {
+  font-size: var(--font-size-heading-s);
+  line-height: var(--font-line-height-heading-s);
+}
+
+.richText > :is(h2, h3, h4) + * {
+  margin-top: var(--space-2);
+}
+
+.richText :is(ul, ol) {
+  padding-left: var(--space-6);
+}
+
+.richText :is(ul, ol) :is(ul, ol) {
+  margin-top: var(--space-2);
+}
+
+.richText li + li {
+  margin-top: var(--space-2);
+}
+
+.richText li > p {
+  margin: 0;
+}
+
+.richText blockquote {
+  padding-left: var(--space-4);
+  border-left: 2px solid var(--color-border-strong);
+  color: var(--color-text-secondary);
+}
+
+.richText blockquote > * {
+  margin: 0;
+}
+
+.richText blockquote > * + * {
+  margin-top: var(--space-2);
+}
+
+.richText hr {
+  border: 0;
+  border-top: 1px solid var(--color-border-default);
+}
+
+.richText a {
+  color: var(--color-text-link);
+  text-decoration: underline;
+}
+
+.richText a:focus-visible {
+  outline: 2px solid transparent;
+  box-shadow:
+    0 0 0 2px var(--color-bg-canvas),
+    0 0 0 4px var(--color-focus-ring);
+}

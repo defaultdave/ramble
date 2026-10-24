@@ -21,10 +21,22 @@ export default defineConfig({
         resolve,
         test: {
           name: 'unit',
-          include: ['src/**/*.test.{ts,tsx}', 'tests/**/*.test.{ts,tsx}'],
+          include: ['src/**/*.test.ts', 'tests/**/*.test.{ts,tsx}'],
           exclude: ['**/*.db.test.ts', '**/node_modules/**'],
           setupFiles: ['./tests/setup.ts'],
           environment: 'node',
+        },
+      },
+      {
+        resolve,
+        test: {
+          name: 'components',
+          include: ['src/**/*.test.tsx'],
+          exclude: ['**/*.db.test.*', '**/node_modules/**'],
+          setupFiles: ['./tests/setup.ts'],
+          environment: 'jsdom',
+          // Testing Library registers its automatic cleanup only when afterEach is global.
+          globals: true,
         },
       },
       {

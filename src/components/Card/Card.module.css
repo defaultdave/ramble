@@ -1,0 +1,231 @@
+.card {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+  font-family: var(--font-family-body);
+}
+
+/* The title link stretches over the whole card; the host link sits above it. */
+.titleLink::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.titleLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* The card draws the focus ring for its stretched link, so the link draws none of its own. */
+.titleLink:focus-visible {
+  outline: none;
+}
+
+.card:hover .titleLink {
+  text-decoration: underline;
+}
+
+.card:has(.titleLink:focus-visible) {
+  outline: 2px solid transparent;
+  box-shadow:
+    0 0 0 2px var(--color-bg-canvas),
+    0 0 0 4px var(--color-focus-ring);
+}
+
+.image {
+  position: relative;
+  flex: none;
+  overflow: hidden;
+  background: var(--color-bg-sunken);
+}
+
+.image > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.content {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.title {
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.meta {
+  margin: 0;
+  font-size: var(--font-size-body-s);
+  line-height: var(--font-line-height-body-s);
+  color: var(--color-text-secondary);
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+}
+
+.price {
+  display: flex;
+  margin: 0;
+  gap: var(--space-1);
+  align-items: baseline;
+  white-space: nowrap;
+}
+
+.priceAmount {
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.priceUnit {
+  font-size: var(--font-size-body-s);
+  line-height: var(--font-line-height-body-s);
+  color: var(--color-text-secondary);
+}
+
+.rating {
+  display: flex;
+  margin: 0;
+  gap: var(--space-1);
+  align-items: center;
+  font-size: var(--font-size-caption);
+  line-height: var(--font-line-height-caption);
+  color: var(--color-text-secondary);
+}
+
+.ratingIcon {
+  flex: none;
+  width: calc(var(--space-4) - var(--space-1) / 2);
+  height: calc(var(--space-4) - var(--space-1) / 2);
+}
+
+.guide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.guideNote {
+  margin: 0;
+  font-size: var(--font-size-body-s);
+  line-height: var(--font-line-height-body-s);
+  color: var(--color-text-secondary);
+}
+
+/* The padding makes a 44px target; the negative margin keeps the row as tall as the text. */
+.hostLink {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--space-1);
+  margin: calc(-1 * var(--space-3)) 0;
+  padding: var(--space-3) 0;
+  font-size: var(--font-size-label);
+  line-height: var(--font-line-height-label);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-link);
+  text-decoration: none;
+}
+
+.hostLink:focus-visible {
+  outline: 2px solid transparent;
+  box-shadow:
+    0 0 0 2px var(--color-bg-canvas),
+    0 0 0 4px var(--color-focus-ring);
+}
+
+.hostIcon {
+  flex: none;
+  width: var(--space-4);
+  height: var(--space-4);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Ramble pick: Badge has no highlight tone yet, so the card draws its own. */
+.pick {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-highlight);
+  font-size: var(--font-size-caption);
+  line-height: var(--font-line-height-caption);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-on-highlight);
+}
+
+.pickIcon {
+  width: calc(var(--space-4) - var(--space-1) / 2);
+  height: calc(var(--space-4) - var(--space-1) / 2);
+}
+
+.vertical {
+  flex-direction: column;
+}
+
+.vertical .image {
+  aspect-ratio: 3 / 2;
+}
+
+.vertical .content {
+  gap: var(--space-2);
+  padding: var(--space-4);
+}
+
+.vertical .title {
+  font-size: var(--font-size-heading-s);
+  line-height: var(--font-line-height-heading-s);
+}
+
+.horizontal {
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.horizontal .image {
+  width: calc(var(--space-10) * 2 + var(--space-4));
+  height: calc(var(--space-10) * 2 + var(--space-4));
+  border-radius: var(--radius-md);
+}
+
+.horizontal .content {
+  flex: 1;
+  gap: var(--space-1);
+}
+
+.horizontal .title {
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+}

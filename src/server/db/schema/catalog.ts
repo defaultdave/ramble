@@ -43,8 +43,11 @@ const notBlank = (column: AnyPgColumn) => sql`${column} ~ '[^[:space:]]'`;
 const isHttpUrlOrNull = (column: AnyPgColumn) =>
   sql`${column} IS NULL OR ${column} ~ ${sql.raw(`'${httpUrlPattern}'`)}`;
 
-// A row Zod reads as a date must be a finite one: 'infinity' parses to an invalid Date.
-const isFinite = (column: AnyPgColumn) => sql`isfinite(${column})`;
+// Zod reads these columns as a JavaScript Date. Postgres also stores 'infinity', BC dates and years
+// past 275760, which become an Invalid Date and fail the parse. The driver builds the Date from the
+// text with new Date(), which reads a year below 100 as 19xx or 20xx, so the range is years 1000 to 9999.
+const isReadableDate = (column: AnyPgColumn) =>
+  sql`${column} >= '1000-01-01 00:00:00+00' AND ${column} < '10000-01-01 00:00:00+00'`;
 
 export const hosts = pgTable(
   'hosts',
@@ -59,7 +62,7 @@ export const hosts = pgTable(
   (table) => [
     check('hosts_slug_kebab', sql`${table.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
     check('hosts_name_not_blank', notBlank(table.name)),
-    check('hosts_created_at_finite', isFinite(table.createdAt)),
+    check('hosts_created_at_in_range', isReadableDate(table.createdAt)),
     check('hosts_time_zone_not_blank', notBlank(table.timeZone)),
   ],
 );
@@ -143,7 +146,7 @@ export const experiences = pgTable(
       sql`${table.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`,
     ),
     check('experiences_name_not_blank', notBlank(table.name)),
-    check('experiences_created_at_finite', isFinite(table.createdAt)),
+    check('experiences_created_at_in_range', isReadableDate(table.createdAt)),
     check('experiences_duration_positive', sql`${table.durationMinutes} > 0`),
     check(
       'experiences_age_rule_limits',
@@ -218,7 +221,7 @@ export const slugHistory = pgTable(
     retiredAt: timestampTz().notNull().defaultNow(),
   },
   (table) => [
-    check('slug_history_retired_at_finite', isFinite(table.retiredAt)),
+    check('slug_history_retired_at_in_range', isReadableDate(table.retiredAt)),
     // Category and neighborhood slugs are unique while live, so a retired one names one entity.
     uniqueIndex('slug_history_unique_slug_per_kind')
       .on(table.entityKind, table.slug)

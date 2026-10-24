@@ -41,7 +41,7 @@ CREATE TABLE "experiences" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "experiences_slug_kebab" CHECK ("experiences"."slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
 	CONSTRAINT "experiences_name_not_blank" CHECK ("experiences"."name" ~ '[^[:space:]]'),
-	CONSTRAINT "experiences_created_at_finite" CHECK (isfinite("experiences"."created_at")),
+	CONSTRAINT "experiences_created_at_in_range" CHECK ("experiences"."created_at" >= '1000-01-01 00:00:00+00' AND "experiences"."created_at" < '10000-01-01 00:00:00+00'),
 	CONSTRAINT "experiences_duration_positive" CHECK ("experiences"."duration_minutes" > 0),
 	CONSTRAINT "experiences_age_rule_limits" CHECK ((
         "experiences"."age_rule" IN ('all_ages', 'twenty_one_plus')
@@ -73,7 +73,7 @@ CREATE TABLE "hosts" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "hosts_slug_kebab" CHECK ("hosts"."slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
 	CONSTRAINT "hosts_name_not_blank" CHECK ("hosts"."name" ~ '[^[:space:]]'),
-	CONSTRAINT "hosts_created_at_finite" CHECK (isfinite("hosts"."created_at")),
+	CONSTRAINT "hosts_created_at_in_range" CHECK ("hosts"."created_at" >= '1000-01-01 00:00:00+00' AND "hosts"."created_at" < '10000-01-01 00:00:00+00'),
 	CONSTRAINT "hosts_time_zone_not_blank" CHECK ("hosts"."time_zone" ~ '[^[:space:]]')
 );
 --> statement-breakpoint
@@ -101,7 +101,7 @@ CREATE TABLE "slug_history" (
 	"entity_id" uuid NOT NULL,
 	"slug" text NOT NULL,
 	"retired_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "slug_history_retired_at_finite" CHECK (isfinite("slug_history"."retired_at"))
+	CONSTRAINT "slug_history_retired_at_in_range" CHECK ("slug_history"."retired_at" >= '1000-01-01 00:00:00+00' AND "slug_history"."retired_at" < '10000-01-01 00:00:00+00')
 );
 --> statement-breakpoint
 CREATE TABLE "cancellation_tiers" (

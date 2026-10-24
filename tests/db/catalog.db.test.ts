@@ -791,38 +791,63 @@ describe('constraints', () => {
     },
   );
 
-  it.each(['infinity', '-infinity'])(
-    'refuse a timestamp of %s',
-    async (instant) => {
+  // Zod reads these columns as a JavaScript Date, which cannot hold these instants.
+  it.each([
+    'infinity',
+    '-infinity',
+    '0044-03-15 00:00:00+00 BC',
+    '0001-01-01 BC',
+    '0099-12-31 23:59:59+00',
+    '0999-12-31 23:59:59+00',
+    '10000-01-01 00:00:00+00',
+    '275761-01-01 00:00:00+00',
+  ])('refuse a timestamp of %s', async (instant) => {
+    const ids = await parents();
+    const insertions = [
+      [
+        'hosts_created_at_in_range',
+        () =>
+          client.db.execute(
+            sql`INSERT INTO hosts (slug, name, time_zone, created_at) VALUES (${unique('range-host')}, 'Host', 'UTC', ${instant}::timestamptz)`,
+          ),
+      ],
+      [
+        'experiences_created_at_in_range',
+        () =>
+          client.db.execute(
+            sql`INSERT INTO experiences (host_id, category_id, neighborhood_id, cancellation_tier_id, slug, name, created_at) VALUES (${ids.hostId}, ${ids.categoryId}, ${ids.neighborhoodId}, ${ids.cancellationTierId}, ${unique('range-exp')}, 'Experience', ${instant}::timestamptz)`,
+          ),
+      ],
+      [
+        'slug_history_retired_at_in_range',
+        () =>
+          client.db.execute(
+            sql`INSERT INTO slug_history (entity_kind, entity_id, slug, retired_at) VALUES ('category', ${ids.categoryId}, ${unique('range-slug')}, ${instant}::timestamptz)`,
+          ),
+      ],
+    ] as const;
+    for (const [constraint, attempt] of insertions) {
+      await expect(attempt()).rejects.toMatchObject({
+        cause: { constraint },
+      });
+    }
+  });
+
+  it.each([
+    ['1000-01-01 00:00:00+00', '1000-01-01T00:00:00.000Z'],
+    ['9999-12-31 23:59:59.999+00', '9999-12-31T23:59:59.999Z'],
+  ])(
+    'keeps the bound %s readable through findRetiredSlug',
+    async (instant, iso) => {
       const ids = await parents();
-      const insertions = [
-        [
-          'hosts_created_at_finite',
-          () =>
-            client.db.execute(
-              sql`INSERT INTO hosts (slug, name, time_zone, created_at) VALUES (${unique('inf-host')}, 'Host', 'UTC', ${instant}::timestamptz)`,
-            ),
-        ],
-        [
-          'experiences_created_at_finite',
-          () =>
-            client.db.execute(
-              sql`INSERT INTO experiences (host_id, category_id, neighborhood_id, cancellation_tier_id, slug, name, created_at) VALUES (${ids.hostId}, ${ids.categoryId}, ${ids.neighborhoodId}, ${ids.cancellationTierId}, ${unique('inf-exp')}, 'Experience', ${instant}::timestamptz)`,
-            ),
-        ],
-        [
-          'slug_history_retired_at_finite',
-          () =>
-            client.db.execute(
-              sql`INSERT INTO slug_history (entity_kind, entity_id, slug, retired_at) VALUES ('category', ${ids.categoryId}, ${unique('inf-slug')}, ${instant}::timestamptz)`,
-            ),
-        ],
-      ] as const;
-      for (const [constraint, attempt] of insertions) {
-        await expect(attempt()).rejects.toMatchObject({
-          cause: { constraint },
-        });
-      }
+      const slug = unique('bound-slug');
+      await client.db.execute(
+        sql`INSERT INTO slug_history (entity_kind, entity_id, slug, retired_at) VALUES ('category', ${ids.categoryId}, ${slug}, ${instant}::timestamptz)`,
+      );
+
+      const retired = await catalog.findRetiredSlug('category', slug);
+
+      expect(retired?.retiredAt.toISOString()).toBe(iso);
     },
   );
 

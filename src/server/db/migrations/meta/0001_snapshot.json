@@ -1,5 +1,5 @@
 {
-  "id": "f4b055d4-1df0-499e-9e5f-ed366bca2602",
+  "id": "7839e87d-3af8-40aa-bed0-d340470b3499",
   "prevId": "797f1c1e-0e76-4ea3-b0b4-ce6d3282e14f",
   "version": "7",
   "dialect": "postgresql",
@@ -332,9 +332,9 @@
           "name": "experiences_name_not_blank",
           "value": "\"experiences\".\"name\" ~ '[^[:space:]]'"
         },
-        "experiences_created_at_finite": {
-          "name": "experiences_created_at_finite",
-          "value": "isfinite(\"experiences\".\"created_at\")"
+        "experiences_created_at_in_range": {
+          "name": "experiences_created_at_in_range",
+          "value": "\"experiences\".\"created_at\" >= '1000-01-01 00:00:00+00' AND \"experiences\".\"created_at\" < '10000-01-01 00:00:00+00'"
         },
         "experiences_duration_positive": {
           "name": "experiences_duration_positive",
@@ -424,9 +424,9 @@
           "name": "hosts_name_not_blank",
           "value": "\"hosts\".\"name\" ~ '[^[:space:]]'"
         },
-        "hosts_created_at_finite": {
-          "name": "hosts_created_at_finite",
-          "value": "isfinite(\"hosts\".\"created_at\")"
+        "hosts_created_at_in_range": {
+          "name": "hosts_created_at_in_range",
+          "value": "\"hosts\".\"created_at\" >= '1000-01-01 00:00:00+00' AND \"hosts\".\"created_at\" < '10000-01-01 00:00:00+00'"
         },
         "hosts_time_zone_not_blank": {
           "name": "hosts_time_zone_not_blank",
@@ -665,9 +665,9 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "slug_history_retired_at_finite": {
-          "name": "slug_history_retired_at_finite",
-          "value": "isfinite(\"slug_history\".\"retired_at\")"
+        "slug_history_retired_at_in_range": {
+          "name": "slug_history_retired_at_in_range",
+          "value": "\"slug_history\".\"retired_at\" >= '1000-01-01 00:00:00+00' AND \"slug_history\".\"retired_at\" < '10000-01-01 00:00:00+00'"
         }
       },
       "isRLSEnabled": false

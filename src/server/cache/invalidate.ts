@@ -6,6 +6,7 @@ function uniqueTags(changes: readonly CacheChange[]): string[] {
   return [...new Set(changes.flatMap(tagsForChange))].sort();
 }
 
+// TODO(U-076a): first caller, the editorial publish action.
 /**
  * For Server Actions (the ops publish flow): the next request after the action sees fresh data.
  * `updateTag` throws anywhere else.
@@ -14,6 +15,7 @@ export function updateTagsForChanges(changes: readonly CacheChange[]): void {
   for (const tag of uniqueTags(changes)) updateTag(tag);
 }
 
+// TODO(U-014b): first caller, the hold cleanup job that releases spaces.
 /**
  * For webhooks and jobs, which cannot call `updateTag`: stale-while-revalidate, so one response
  * after the call may still be the old page. No correctness rule may depend on `expire: 0`.

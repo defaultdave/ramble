@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readRemoteOrFallback } from './remote';
 
@@ -26,7 +26,7 @@ describe('readRemoteOrFallback', () => {
 
     expect(value).toBe(3);
     expect(log).toHaveBeenCalledWith(
-      'Runtime cache read failed, reading Postgres instead: simulated remote cache outage: get',
+      '[readRemoteOrFallback] Runtime cache read failed, reading Postgres instead: simulated remote cache outage: get',
     );
   });
 
@@ -40,7 +40,7 @@ describe('readRemoteOrFallback', () => {
     );
 
     expect(log).toHaveBeenLastCalledWith(
-      'Runtime cache read failed, reading Postgres instead: plain text',
+      '[readRemoteOrFallback] Runtime cache read failed, reading Postgres instead: plain text',
     );
   });
 
@@ -55,14 +55,30 @@ describe('readRemoteOrFallback', () => {
     ).rejects.toThrow('database down');
   });
 
-  it('does not swallow the errors Next.js uses to end a render', async () => {
-    const fallback = vi.fn(() => Promise.resolve(0));
-
-    await expect(
-      readRemoteOrFallback(() => {
+  it.each([
+    [
+      'notFound',
+      () => {
         notFound();
-      }, fallback),
-    ).rejects.toThrow('NEXT_HTTP_ERROR_FALLBACK;404');
-    expect(fallback).not.toHaveBeenCalled();
-  });
+      },
+      'NEXT_HTTP_ERROR_FALLBACK;404',
+    ],
+    [
+      'redirect',
+      () => {
+        redirect('/somewhere');
+      },
+      'NEXT_REDIRECT',
+    ],
+  ])(
+    'does not swallow the %s that Next.js uses to end a render',
+    async (_name, remote, message) => {
+      const fallback = vi.fn(() => Promise.resolve(0));
+
+      await expect(readRemoteOrFallback(remote, fallback)).rejects.toThrow(
+        message,
+      );
+      expect(fallback).not.toHaveBeenCalled();
+    },
+  );
 });

@@ -25,7 +25,7 @@ Do not build a correctness rule on `revalidateTag(tag, { expire: 0 })` serving f
 
 ## Runtime cache reads
 
-`'use cache: remote'` is for short-lived shared reads such as spaces left. Keep the remote function private to its file and export a function that calls it through `readRemoteOrFallback(remote, fallback)` from `src/server/cache/remote.ts`. The convention test rejects an exported remote function and a remote function in a file that does not import the wrapper. The fallback is a direct Postgres read, which is authoritative at reserve (ADR 0002).
+`'use cache: remote'` is for short-lived shared reads such as spaces left. Keep the remote function private to its file and export a function that calls it through `readRemoteOrFallback(remote, fallback)` from `src/server/cache/remote.ts`. The convention test rejects an exported, default-exported, or method remote function, and any use of a remote function outside the first argument of `readRemoteOrFallback`. The fallback is a direct Postgres read, which is authoritative at reserve (ADR 0002).
 
 ## Degraded modes
 

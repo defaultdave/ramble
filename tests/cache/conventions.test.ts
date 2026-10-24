@@ -47,6 +47,20 @@ describe('cacheConventionViolations', () => {
       export const readSpacesLeft = (id: string) =>
         readRemoteOrFallback(() => spacesLeft(id), () => Promise.resolve(3));`,
     ],
+    [
+      'an inline remote function handed straight to the wrapper',
+      `${wrapperImport}
+      export const readSpacesLeft = (id: string) =>
+        readRemoteOrFallback(
+          async () => {
+            'use cache: remote';
+            cacheLife('spacesLeft');
+            cacheTag(tags.session(id));
+            return 3;
+          },
+          () => Promise.resolve(3),
+        );`,
+    ],
   ])('accepts %s', (_name, source) => {
     expect(check(source)).toEqual([]);
   });
@@ -108,7 +122,72 @@ describe('cacheConventionViolations', () => {
       `${wrapperImport}
       async function f() { 'use cache: remote'; cacheLife('spacesLeft'); cacheTag(tags.home); }
       export { f };`,
+      'read it only inside the first argument',
+    ],
+    [
+      'a remote function exported by default',
+      `${wrapperImport}
+      async function f() { 'use cache: remote'; cacheLife('spacesLeft'); cacheTag(tags.home); }
+      export default f;`,
+      'read it only inside the first argument',
+    ],
+    [
+      'a default-exported remote declaration',
+      `${wrapperImport}
+      export default async function f() { 'use cache: remote'; cacheLife('spacesLeft'); cacheTag(tags.home); }`,
       'stays private',
+    ],
+    [
+      'an anonymous default-exported remote function',
+      `${wrapperImport}
+      export default async () => { 'use cache: remote'; cacheLife('spacesLeft'); cacheTag(tags.home); };`,
+      'stays private',
+    ],
+    [
+      'a remote method on an exported object',
+      `${wrapperImport}
+      export const reads = {
+        async spaces() { 'use cache: remote'; cacheLife('spacesLeft'); cacheTag(tags.home); },
+      };`,
+      'not a method or object property',
+    ],
+    [
+      'a remote arrow assigned to an object property',
+      `${wrapperImport}
+      export const reads = {
+        spaces: async () => { 'use cache: remote'; cacheLife('spacesLeft'); cacheTag(tags.home); },
+      };`,
+      'not a method or object property',
+    ],
+    [
+      'an unnamed remote function that is not handed to the wrapper',
+      `${wrapperImport}
+      void [async () => { 'use cache: remote'; cacheLife('spacesLeft'); cacheTag(tags.home); }];`,
+      'has a name',
+    ],
+    [
+      'a remote function called directly in a file that imports the wrapper',
+      `${wrapperImport}
+      async function f() { 'use cache: remote'; cacheLife('spacesLeft'); cacheTag(tags.home); }
+      export const read = () => f();`,
+      'read it only inside the first argument',
+    ],
+    [
+      'a remote function called from the fallback instead of the remote argument',
+      `${wrapperImport}
+      async function f() { 'use cache: remote'; cacheLife('spacesLeft'); cacheTag(tags.home); }
+      export const read = () => readRemoteOrFallback(() => Promise.resolve(1), () => f());`,
+      'read it only inside the first argument',
+    ],
+    [
+      'a remote function called beside a wrapped call',
+      `${wrapperImport}
+      async function f() { 'use cache: remote'; cacheLife('spacesLeft'); cacheTag(tags.home); }
+      export const read = async () => {
+        await readRemoteOrFallback(() => f(), () => Promise.resolve(1));
+        return f();
+      };`,
+      'read it only inside the first argument',
     ],
     [
       'a remote function without the wrapper',

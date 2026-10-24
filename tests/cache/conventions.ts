@@ -2,6 +2,7 @@ import ts from 'typescript';
 
 const CACHE_DIRECTIVE = /^use cache(?:: (\w+))?$/;
 const REMOTE_WRAPPER_MODULE = '@/server/cache/remote';
+const WRAPPER_FUNCTION = 'readRemoteOrFallback';
 
 type FunctionNode =
   | ts.FunctionDeclaration
@@ -54,23 +55,6 @@ function isLiteralText(node: ts.Node): boolean {
   return ts.isStringLiteralLike(node) || ts.isTemplateExpression(node);
 }
 
-function exportedNames(file: ts.SourceFile): Set<string> {
-  const names = new Set<string>();
-  for (const statement of file.statements) {
-    if (
-      ts.isExportDeclaration(statement) &&
-      !statement.moduleSpecifier &&
-      statement.exportClause &&
-      ts.isNamedExports(statement.exportClause)
-    ) {
-      for (const element of statement.exportClause.elements) {
-        names.add((element.propertyName ?? element.name).text);
-      }
-    }
-  }
-  return names;
-}
-
 function declaredName(fn: FunctionNode): string | undefined {
   if (fn.name && ts.isIdentifier(fn.name)) return fn.name.text;
   const parent = fn.parent;
@@ -80,7 +64,8 @@ function declaredName(fn: FunctionNode): string | undefined {
   return undefined;
 }
 
-function hasExportModifier(fn: FunctionNode): boolean {
+function isExportedHere(fn: FunctionNode): boolean {
+  if (ts.isExportAssignment(fn.parent)) return true;
   const owner = ts.isVariableDeclaration(fn.parent)
     ? fn.parent.parent.parent
     : fn;
@@ -90,6 +75,47 @@ function hasExportModifier(fn: FunctionNode): boolean {
       ({ kind }) => kind === ts.SyntaxKind.ExportKeyword,
     )
   );
+}
+
+function isWrapperCall(node: ts.Node): node is ts.CallExpression {
+  return (
+    ts.isCallExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    node.expression.text === WRAPPER_FUNCTION
+  );
+}
+
+/** True when `node` sits inside the first argument (the remote read) of a wrapper call. */
+function isInsideWrappedRead(node: ts.Node): boolean {
+  let child = node;
+  while (!ts.isSourceFile(child)) {
+    const parent = child.parent;
+    if (isWrapperCall(parent) && parent.arguments[0] === child) return true;
+    child = parent;
+  }
+  return false;
+}
+
+function referencesTo(file: ts.SourceFile, name: string): ts.Identifier[] {
+  const found: ts.Identifier[] = [];
+  const visit = (node: ts.Node) => {
+    if (ts.isIdentifier(node) && node.text === name) {
+      const parent = node.parent;
+      const isDeclaration =
+        (ts.isFunctionDeclaration(parent) ||
+          ts.isFunctionExpression(parent) ||
+          ts.isVariableDeclaration(parent)) &&
+        parent.name === node;
+      // `{ f: 1 }` and `x.f` use the same text for something else.
+      const isOtherName =
+        (ts.isPropertyAccessExpression(parent) && parent.name === node) ||
+        (ts.isPropertyAssignment(parent) && parent.name === node);
+      if (!isDeclaration && !isOtherName) found.push(node);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return found;
 }
 
 /**
@@ -123,7 +149,6 @@ export function cacheConventionViolations(
     );
   }
 
-  const exported = exportedNames(file);
   const importsWrapper = file.statements.some(
     (statement) =>
       ts.isImportDeclaration(statement) &&
@@ -177,18 +202,49 @@ export function cacheConventionViolations(
       }
     }
 
-    if (variant === 'remote') {
-      const name = declaredName(fn);
-      if (name && (exported.has(name) || hasExportModifier(fn))) {
+    if (variant === 'remote') checkRemoteFunction(fn);
+  };
+
+  const checkRemoteFunction = (fn: FunctionNode) => {
+    if (!importsWrapper) {
+      report(
+        fn,
+        `a 'use cache: remote' function is read through ${WRAPPER_FUNCTION} from ${REMOTE_WRAPPER_MODULE}`,
+      );
+    }
+    if (
+      ts.isMethodDeclaration(fn) ||
+      ts.isPropertyAssignment(fn.parent) ||
+      ts.isPropertyDeclaration(fn.parent)
+    ) {
+      report(
+        fn,
+        "a 'use cache: remote' function is a plain function in its file, not a method or object property",
+      );
+      return;
+    }
+    if (isExportedHere(fn)) {
+      report(
+        fn,
+        `a 'use cache: remote' function stays private to its file; export a function that calls it through ${WRAPPER_FUNCTION}`,
+      );
+    }
+    const name = declaredName(fn);
+    if (!name) {
+      // An inline function handed straight to the wrapper cannot be called any other way.
+      if (!isInsideWrappedRead(fn)) {
         report(
           fn,
-          "a 'use cache: remote' function stays private to its file; export a function that calls it through readRemoteOrFallback",
+          `a 'use cache: remote' function has a name and is read only through ${WRAPPER_FUNCTION}`,
         );
       }
-      if (!importsWrapper) {
+      return;
+    }
+    for (const reference of referencesTo(file, name)) {
+      if (!isInsideWrappedRead(reference)) {
         report(
-          fn,
-          `a 'use cache: remote' function is read through readRemoteOrFallback from ${REMOTE_WRAPPER_MODULE}`,
+          reference,
+          `'${name}' is a 'use cache: remote' function; read it only inside the first argument of ${WRAPPER_FUNCTION}`,
         );
       }
     }

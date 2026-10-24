@@ -1,0 +1,754 @@
+{
+  "id": "63d1674e-deed-4557-a4ae-e1c0203c2338",
+  "prevId": "7de0ed24-b503-4664-a58c-ce60abb884e2",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.categories": {
+      "name": "categories",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "categories_slug_unique": {
+          "name": "categories_slug_unique",
+          "columns": [
+            "slug"
+          ],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "categories_slug_kebab": {
+          "name": "categories_slug_kebab",
+          "value": "\"categories\".\"slug\" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.experiences": {
+      "name": "experiences",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "host_id": {
+          "name": "host_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category_id": {
+          "name": "category_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "neighborhood_id": {
+          "name": "neighborhood_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cancellation_tier_id": {
+          "name": "cancellation_tier_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "meeting_point": {
+          "name": "meeting_point",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "included": {
+          "name": "included",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "duration_minutes": {
+          "name": "duration_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "accessibility_notes": {
+          "name": "accessibility_notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "experience_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'draft'"
+        },
+        "outdoor": {
+          "name": "outdoor",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "weather_policy": {
+          "name": "weather_policy",
+          "type": "weather_policy",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "weather_decision_hours": {
+          "name": "weather_decision_hours",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "age_rule": {
+          "name": "age_rule",
+          "type": "age_rule",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'all_ages'"
+        },
+        "min_age": {
+          "name": "min_age",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "max_age": {
+          "name": "max_age",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tax_treatment": {
+          "name": "tax_treatment",
+          "type": "tax_treatment",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'unknown'"
+        },
+        "waiver_required": {
+          "name": "waiver_required",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "waiver_document_id": {
+          "name": "waiver_document_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "link_out_url": {
+          "name": "link_out_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "affiliate_url": {
+          "name": "affiliate_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "experiences_host_id_idx": {
+          "name": "experiences_host_id_idx",
+          "columns": [
+            {
+              "expression": "host_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        },
+        "experiences_category_id_idx": {
+          "name": "experiences_category_id_idx",
+          "columns": [
+            {
+              "expression": "category_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        },
+        "experiences_neighborhood_id_idx": {
+          "name": "experiences_neighborhood_id_idx",
+          "columns": [
+            {
+              "expression": "neighborhood_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "experiences_host_id_hosts_id_fk": {
+          "name": "experiences_host_id_hosts_id_fk",
+          "tableFrom": "experiences",
+          "columnsFrom": [
+            "host_id"
+          ],
+          "tableTo": "hosts",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "restrict"
+        },
+        "experiences_category_id_categories_id_fk": {
+          "name": "experiences_category_id_categories_id_fk",
+          "tableFrom": "experiences",
+          "columnsFrom": [
+            "category_id"
+          ],
+          "tableTo": "categories",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "restrict"
+        },
+        "experiences_neighborhood_id_neighborhoods_id_fk": {
+          "name": "experiences_neighborhood_id_neighborhoods_id_fk",
+          "tableFrom": "experiences",
+          "columnsFrom": [
+            "neighborhood_id"
+          ],
+          "tableTo": "neighborhoods",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "restrict"
+        },
+        "experiences_cancellation_tier_id_cancellation_tiers_id_fk": {
+          "name": "experiences_cancellation_tier_id_cancellation_tiers_id_fk",
+          "tableFrom": "experiences",
+          "columnsFrom": [
+            "cancellation_tier_id"
+          ],
+          "tableTo": "cancellation_tiers",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "experiences_slug_kebab": {
+          "name": "experiences_slug_kebab",
+          "value": "\"experiences\".\"slug\" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'"
+        },
+        "experiences_duration_positive": {
+          "name": "experiences_duration_positive",
+          "value": "\"experiences\".\"duration_minutes\" > 0"
+        },
+        "experiences_age_rule_limits": {
+          "name": "experiences_age_rule_limits",
+          "value": "(\n        \"experiences\".\"age_rule\" IN ('all_ages', 'twenty_one_plus')\n          AND \"experiences\".\"min_age\" IS NULL AND \"experiences\".\"max_age\" IS NULL\n      ) OR (\n        \"experiences\".\"age_rule\" = 'minimum_age'\n          AND \"experiences\".\"min_age\" IS NOT NULL AND \"experiences\".\"min_age\" >= 0\n          AND \"experiences\".\"max_age\" IS NULL\n      ) OR (\n        \"experiences\".\"age_rule\" = 'age_range'\n          AND \"experiences\".\"min_age\" IS NOT NULL AND \"experiences\".\"min_age\" >= 0\n          AND \"experiences\".\"max_age\" IS NOT NULL AND \"experiences\".\"max_age\" >= \"experiences\".\"min_age\"\n      )"
+        },
+        "experiences_outdoor_has_weather_policy": {
+          "name": "experiences_outdoor_has_weather_policy",
+          "value": "NOT \"experiences\".\"outdoor\" OR \"experiences\".\"weather_policy\" IS NOT NULL"
+        },
+        "experiences_weather_decision_hours": {
+          "name": "experiences_weather_decision_hours",
+          "value": "coalesce(\"experiences\".\"weather_policy\" = 'decided_before_start', false)\n        = (\"experiences\".\"weather_decision_hours\" IS NOT NULL)\n        AND coalesce(\"experiences\".\"weather_decision_hours\" > 0, true)"
+        },
+        "experiences_guide_only_has_link": {
+          "name": "experiences_guide_only_has_link",
+          "value": "\"experiences\".\"status\" <> 'guide_only' OR \"experiences\".\"link_out_url\" IS NOT NULL"
+        },
+        "experiences_urls_are_http": {
+          "name": "experiences_urls_are_http",
+          "value": "(\"experiences\".\"link_out_url\" IS NULL OR \"experiences\".\"link_out_url\" ~* '^https?://')\n        AND (\"experiences\".\"affiliate_url\" IS NULL OR \"experiences\".\"affiliate_url\" ~* '^https?://')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.hosts": {
+      "name": "hosts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "time_zone": {
+          "name": "time_zone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "hosts_slug_kebab": {
+          "name": "hosts_slug_kebab",
+          "value": "\"hosts\".\"slug\" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.neighborhoods": {
+      "name": "neighborhoods",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "neighborhoods_slug_unique": {
+          "name": "neighborhoods_slug_unique",
+          "columns": [
+            "slug"
+          ],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "neighborhoods_slug_kebab": {
+          "name": "neighborhoods_slug_kebab",
+          "value": "\"neighborhoods\".\"slug\" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.price_options": {
+      "name": "price_options",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "experience_id": {
+          "name": "experience_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "price_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "price_minor": {
+          "name": "price_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "uses_space": {
+          "name": "uses_space",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        }
+      },
+      "indexes": {
+        "price_options_experience_kind_unique": {
+          "name": "price_options_experience_kind_unique",
+          "columns": [
+            {
+              "expression": "experience_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "price_options_experience_id_experiences_id_fk": {
+          "name": "price_options_experience_id_experiences_id_fk",
+          "tableFrom": "price_options",
+          "columnsFrom": [
+            "experience_id"
+          ],
+          "tableTo": "experiences",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "price_options_price_not_negative": {
+          "name": "price_options_price_not_negative",
+          "value": "\"price_options\".\"price_minor\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.slug_history": {
+      "name": "slug_history",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "entity_kind": {
+          "name": "entity_kind",
+          "type": "slug_entity_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entity_id": {
+          "name": "entity_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "retired_at": {
+          "name": "retired_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "slug_history_kind_slug_unique": {
+          "name": "slug_history_kind_slug_unique",
+          "columns": [
+            {
+              "expression": "entity_kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "slug",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.cancellation_tiers": {
+      "name": "cancellation_tiers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "full_refund_hours_before": {
+          "name": "full_refund_hours_before",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_default": {
+          "name": "is_default",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        }
+      },
+      "indexes": {
+        "cancellation_tiers_one_default": {
+          "name": "cancellation_tiers_one_default",
+          "columns": [
+            {
+              "expression": "is_default",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "with": {},
+          "method": "btree",
+          "where": "\"cancellation_tiers\".\"is_default\"",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "cancellation_tiers_key_unique": {
+          "name": "cancellation_tiers_key_unique",
+          "columns": [
+            "key"
+          ],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "cancellation_tiers_hours_not_negative": {
+          "name": "cancellation_tiers_hours_not_negative",
+          "value": "\"cancellation_tiers\".\"full_refund_hours_before\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.age_rule": {
+      "name": "age_rule",
+      "schema": "public",
+      "values": [
+        "all_ages",
+        "minimum_age",
+        "age_range",
+        "twenty_one_plus"
+      ]
+    },
+    "public.experience_status": {
+      "name": "experience_status",
+      "schema": "public",
+      "values": [
+        "draft",
+        "in_review",
+        "live",
+        "paused",
+        "guide_only"
+      ]
+    },
+    "public.price_kind": {
+      "name": "price_kind",
+      "schema": "public",
+      "values": [
+        "adult",
+        "child"
+      ]
+    },
+    "public.slug_entity_kind": {
+      "name": "slug_entity_kind",
+      "schema": "public",
+      "values": [
+        "category",
+        "neighborhood",
+        "experience",
+        "host"
+      ]
+    },
+    "public.tax_treatment": {
+      "name": "tax_treatment",
+      "schema": "public",
+      "values": [
+        "taxable",
+        "not_taxable",
+        "unknown"
+      ]
+    },
+    "public.weather_policy": {
+      "name": "weather_policy",
+      "schema": "public",
+      "values": [
+        "rain_or_shine",
+        "decided_before_start"
+      ]
+    }
+  },
+  "schemas": {},
+  "views": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

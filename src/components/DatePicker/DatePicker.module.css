@@ -112,6 +112,13 @@
   color: var(--color-action-primary-text);
 }
 
+/* A disabled calendar keeps the chosen day visible, muted. */
+.cell[data-selected][data-disabled] {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-disabled);
+  color: var(--color-text-secondary);
+}
+
 .cell[data-outside-month] {
   display: none;
 }

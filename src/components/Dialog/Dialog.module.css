@@ -8,7 +8,10 @@
   justify-content: center;
   inline-size: 100vw;
   block-size: var(--visual-viewport-height);
-  background: color-mix(in srgb, var(--color-bg-inverse) 40%, transparent);
+  /* Stand-in until Figma and tokens.css gain color/bg/scrim: the page dims in both schemes. */
+  --color-bg-scrim: color-mix(in srgb, black 40%, transparent);
+
+  background: var(--color-bg-scrim);
 }
 
 .modal {

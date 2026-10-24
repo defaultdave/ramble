@@ -35,11 +35,11 @@ const scopedCss = `
 [data-scheme='light'] { ${light} color-scheme: light; }
 [data-scheme='dark'] { ${dark} color-scheme: dark; }
 [data-scheme] {
-  padding: var(--space-4);
   background: var(--color-bg-canvas);
   color: var(--color-text-primary);
   font-family: var(--font-family-body);
 }
+div[data-scheme] { padding: var(--space-4); }
 .scheme-row { display: grid; gap: 0; grid-template-columns: 1fr; }
 @media (min-width: 768px) { .scheme-row { grid-template-columns: 1fr 1fr; } }
 `;

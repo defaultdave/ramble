@@ -67,6 +67,19 @@ describe('Dialog', () => {
     expect(screen.getByRole('button', { name: 'Continue' })).toBeVisible();
   });
 
+  it('asks to close when the scrim is clicked', async () => {
+    const onClose = vi.fn();
+    render(
+      <Dialog variant="sheet" open title="Filters" onClose={onClose}>
+        <button type="button">First</button>
+      </Dialog>,
+    );
+    const scrim = screen.getByRole('dialog').parentElement?.parentElement;
+    if (!scrim) throw new Error('No scrim');
+    await userEvent.click(scrim);
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
   it('asks to close on Escape and stays open until the caller closes it', async () => {
     const onClose = vi.fn();
     render(

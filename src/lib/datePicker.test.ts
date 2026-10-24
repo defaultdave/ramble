@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { dayFlags, isDateAvailable } from './datePicker';
+import { dayFlags, dayLabel, isDateAvailable } from './datePicker';
 
 const today = '2026-10-18';
 const available = ['2026-10-18', '2026-10-22', '2026-10-25', '2026-10-10'];
+const context = { today, value: '2026-10-22', availableDates: available };
 
 describe('isDateAvailable', () => {
   it.each([
@@ -22,18 +23,59 @@ describe('isDateAvailable', () => {
 
 describe('dayFlags', () => {
   it.each([
-    ['today, listed', '2026-10-18', { today: true, unavailable: false }],
-    ['a listed date', '2026-10-22', { today: false, unavailable: false }],
-    ['an unlisted date', '2026-10-23', { today: false, unavailable: true }],
-    ['a past date', '2026-10-10', { today: false, unavailable: true }],
+    [
+      'today, listed',
+      '2026-10-18',
+      { today: true, selected: false, unavailable: false },
+    ],
+    [
+      'the chosen date',
+      '2026-10-22',
+      { today: false, selected: true, unavailable: false },
+    ],
+    [
+      'an unlisted date',
+      '2026-10-23',
+      { today: false, selected: false, unavailable: true },
+    ],
+    [
+      'a past date',
+      '2026-10-10',
+      { today: false, selected: false, unavailable: true },
+    ],
   ])('%s', (_name, date, expected) => {
-    expect(dayFlags(date, today, available)).toEqual(expected);
+    expect(dayFlags(date, context)).toEqual(expected);
   });
 
   it('marks today even when it has no sessions', () => {
-    expect(dayFlags(today, today, [])).toEqual({
-      today: true,
-      unavailable: true,
-    });
+    expect(dayFlags(today, { today, value: null, availableDates: [] })).toEqual(
+      { today: true, selected: false, unavailable: true },
+    );
+  });
+});
+
+describe('dayLabel', () => {
+  const plain = { today: false, selected: false, unavailable: false };
+
+  it.each([
+    ['a plain date', plain, 'Thursday, October 22, 2026'],
+    ['today', { ...plain, today: true }, 'Today, Thursday, October 22, 2026'],
+    [
+      'the chosen date',
+      { ...plain, selected: true },
+      'Thursday, October 22, 2026 selected',
+    ],
+    [
+      'an unavailable date',
+      { ...plain, unavailable: true },
+      'Thursday, October 22, 2026, unavailable',
+    ],
+    [
+      'today, chosen, and unavailable',
+      { today: true, selected: true, unavailable: true },
+      'Today, Thursday, October 22, 2026 selected, unavailable',
+    ],
+  ])('words %s', (_name, flags, expected) => {
+    expect(dayLabel('2026-10-22', flags)).toBe(expected);
   });
 });

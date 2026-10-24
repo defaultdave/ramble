@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
-import { describe, expect, it, vi, expectTypeOf } from 'vitest';
+import { afterEach, describe, expect, it, vi, expectTypeOf } from 'vitest';
 import { DatePicker } from './DatePicker';
 
 const today = '2026-10-18';
@@ -91,6 +91,42 @@ describe('DatePicker', () => {
     const onChange = setup('2026-10-24', true);
     await userEvent.click(day(/Thursday, October 22, 2026/));
     expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
+describe('DatePicker today and labels', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('follows the today prop, not the system clock', () => {
+    // The system date is the 24th; the venue's today is the 18th.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-24T12:00:00Z'));
+    setup();
+    const venueToday = day(/Sunday, October 18, 2026/);
+    expect(venueToday).toHaveAccessibleName('Today, Sunday, October 18, 2026');
+    expect(venueToday).toHaveAttribute('data-today', 'true');
+    const systemToday = day(/Saturday, October 24, 2026/);
+    expect(systemToday).not.toHaveAccessibleName(/Today/);
+    expect(systemToday).not.toHaveAttribute('data-today');
+  });
+
+  it('says why a date cannot be chosen', () => {
+    setup();
+    expect(day(/Friday, October 23, 2026/)).toHaveAccessibleName(
+      'Friday, October 23, 2026, unavailable',
+    );
+    expect(day(/Thursday, October 22, 2026/)).toHaveAccessibleName(
+      'Thursday, October 22, 2026',
+    );
+  });
+
+  it('keeps the chosen date marked and announced when disabled', () => {
+    setup('2026-10-24', true);
+    const chosen = day(/Saturday, October 24, 2026/);
+    expect(chosen).toHaveAttribute('data-selected', 'true');
+    expect(chosen).toHaveAccessibleName('Saturday, October 24, 2026 selected');
   });
 });
 

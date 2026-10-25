@@ -61,3 +61,11 @@ Full list with reasons in `DECISIONS.md`.
 - The repository is public, with secret scanning and push protection on.
 - Rulesets on `main` and `integration` are live (ids 25513279, 25513280).
 - U-118 (merge desk) is the root of the dependency graph; U-001 depends on it.
+
+## Lessons from Prototype wave 1 (2026-10-24)
+- Builders run in parallel worktrees, commit, and stop. The PM pushes with `agent-git.ts push` from the main checkout, but must run `agent-git.ts pr` from the unit's worktree, because it takes the current branch as the head.
+- `agent-git.ts` cannot force-push or edit a PR body. Never rebase a pushed branch (merge `main` into it instead, or build a merge commit with the rebased tree), and carry each review round's notes in the posted check summaries.
+- A promotion PR whose head is `integration` deletes `integration` when it merges: the repo deletes head branches on merge, and a merge under the owner's login bypasses the ruleset's deletion rule.
+- Standard-tier units that depend on a critical-tier unit cannot start until that unit is promoted to `main`.
+- Adversarial re-reviews keep finding the same class of defect (unbounded work, the database accepting what Zod rejects). Ask each round to sweep the whole class, not only the reported instance.
+- UI units get an independent Figma-vs-Storybook check (a general-purpose agent with the Figma read tools), beside the a11y audit.

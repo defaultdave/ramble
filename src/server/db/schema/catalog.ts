@@ -21,6 +21,11 @@ import {
   taxTreatments,
   weatherPolicies,
 } from '@/lib/catalog';
+import {
+  blurDataUrlPattern,
+  photoLimits,
+  photoRightsBases,
+} from '@/lib/photos';
 import { cancellationTiers } from './policies';
 
 export const experienceStatusEnum = pgEnum(
@@ -32,6 +37,10 @@ export const weatherPolicyEnum = pgEnum('weather_policy', weatherPolicies);
 export const taxTreatmentEnum = pgEnum('tax_treatment', taxTreatments);
 export const priceKindEnum = pgEnum('price_kind', priceKinds);
 export const slugEntityKindEnum = pgEnum('slug_entity_kind', slugEntityKinds);
+export const photoRightsBasisEnum = pgEnum(
+  'photo_rights_basis',
+  photoRightsBases,
+);
 
 const timestampTz = () => timestamp({ withTimezone: true });
 
@@ -208,6 +217,103 @@ export const priceOptions = pgTable(
 );
 
 /**
+ * One stored photo of an experience (ADR 0002). The file is the re-encoded copy ingest produced, in the
+ * public store under `storage_key`; the row holds what a page needs to render it (size, blur
+ * placeholder, alt text or the decorative flag) and the rights record of PRD-52.
+ */
+export const photos = pgTable(
+  'photos',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    experienceId: uuid()
+      .notNull()
+      .references(() => experiences.id, { onDelete: 'restrict' }),
+    position: integer().notNull(),
+    storageKey: text().notNull(),
+    url: text().notNull(),
+    width: integer().notNull(),
+    height: integer().notNull(),
+    byteSize: integer().notNull(),
+    decorative: boolean().notNull().default(false),
+    altText: text(),
+    blurDataUrl: text().notNull(),
+    rightsBasis: photoRightsBasisEnum().notNull(),
+    rightsHolder: text(),
+    rightsLicense: text(),
+    rightsSourceUrl: text(),
+    createdAt: timestampTz().notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('photos_experience_position_unique').on(
+      table.experienceId,
+      table.position,
+    ),
+    uniqueIndex('photos_storage_key_unique').on(table.storageKey),
+    check(
+      'photos_position_in_range',
+      sql`${table.position} >= 0 AND ${table.position} < ${sql.raw(String(photoLimits.maxPerExperience))}`,
+    ),
+    // The key is built from the two ids, so a row can never point at another photo's file.
+    check(
+      'photos_storage_key_from_ids',
+      sql`${table.storageKey} = 'public/photos/' || ${table.experienceId}::text || '/' || ${table.id}::text || '.jpg'`,
+    ),
+    check(
+      'photos_url_http',
+      sql`${table.url} ~ ${sql.raw(`'${httpUrlPattern}'`)} AND char_length(${table.url}) <= ${sql.raw(String(photoLimits.maxUrlLength))}`,
+    ),
+    check(
+      'photos_dimensions_in_range',
+      sql`${table.width} BETWEEN 1 AND ${sql.raw(String(photoLimits.storedEdge))} AND ${table.height} BETWEEN 1 AND ${sql.raw(String(photoLimits.storedEdge))}`,
+    ),
+    check(
+      'photos_byte_size_in_range',
+      sql`${table.byteSize} BETWEEN 1 AND ${sql.raw(String(photoLimits.maxStoredBytes))}`,
+    ),
+    // Alt text is required unless the photo is marked decorative, and a decorative photo carries none.
+    check(
+      'photos_alt_or_decorative',
+      sql`(${table.decorative} AND ${table.altText} IS NULL) OR (
+        NOT ${table.decorative}
+          AND ${table.altText} IS NOT NULL
+          AND char_length(${table.altText}) BETWEEN 1 AND ${sql.raw(String(photoLimits.maxAltLength))}
+          AND ${notBlank(table.altText)}
+      )`,
+    ),
+    check(
+      'photos_blur_data_url',
+      sql`${table.blurDataUrl} ~ ${sql.raw(`'${blurDataUrlPattern}'`)} AND char_length(${table.blurDataUrl}) <= ${sql.raw(String(photoLimits.maxBlurLength))}`,
+    ),
+    check(
+      'photos_rights_holder',
+      sql`${table.rightsHolder} IS NULL OR (char_length(${table.rightsHolder}) BETWEEN 1 AND ${sql.raw(String(photoLimits.maxRightsTextLength))} AND ${notBlank(table.rightsHolder)})`,
+    ),
+    check(
+      'photos_rights_license',
+      sql`${table.rightsLicense} IS NULL OR (char_length(${table.rightsLicense}) BETWEEN 1 AND ${sql.raw(String(photoLimits.maxRightsTextLength))} AND ${notBlank(table.rightsLicense)})`,
+    ),
+    check(
+      'photos_rights_source_url',
+      sql`${table.rightsSourceUrl} IS NULL OR (${table.rightsSourceUrl} ~ ${sql.raw(`'${httpUrlPattern}'`)} AND char_length(${table.rightsSourceUrl}) <= ${sql.raw(String(photoLimits.maxUrlLength))})`,
+    ),
+    // A licensed photo names holder, licence, and source; any other basis carries no licence or source.
+    check(
+      'photos_rights_licensed_complete',
+      sql`${table.rightsBasis} <> 'licensed' OR (
+        ${table.rightsHolder} IS NOT NULL
+          AND ${table.rightsLicense} IS NOT NULL
+          AND ${table.rightsSourceUrl} IS NOT NULL
+      )`,
+    ),
+    check(
+      'photos_rights_unlicensed_bare',
+      sql`${table.rightsBasis} = 'licensed' OR (${table.rightsLicense} IS NULL AND ${table.rightsSourceUrl} IS NULL)`,
+    ),
+    check('photos_created_at_in_range', isReadableDate(table.createdAt)),
+  ],
+);
+
+/**
  * Slugs an entity used to have. Triggers write a row when a slug changes, so no code path can
  * rename without recording it. `entityId` is not a foreign key because it points at one of four tables.
  */
@@ -235,6 +341,13 @@ export const slugHistory = pgTable(
   ],
 );
 
+export const photosRelations = relations(photos, ({ one }) => ({
+  experience: one(experiences, {
+    fields: [photos.experienceId],
+    references: [experiences.id],
+  }),
+}));
+
 export const hostsRelations = relations(hosts, ({ many }) => ({
   experiences: many(experiences),
 }));
@@ -254,6 +367,7 @@ export const experiencesRelations = relations(experiences, ({ one, many }) => ({
     references: [cancellationTiers.id],
   }),
   priceOptions: many(priceOptions),
+  photos: many(photos),
 }));
 
 export const priceOptionsRelations = relations(priceOptions, ({ one }) => ({

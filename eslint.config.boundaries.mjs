@@ -9,6 +9,7 @@ const vendorWrappers = [
   { folder: 'src/server/ports/payments', patterns: ['stripe'] },
   { folder: 'src/server/ports/email', patterns: ['resend'] },
   { folder: 'src/server/ports/storage', patterns: ['@vercel/blob'] },
+  { folder: 'src/server/photos', patterns: ['sharp'] },
   { folder: 'src/server/ports/rate-limit', patterns: ['botid', 'botid/*'] },
   { folder: 'src/server/monitoring', patterns: ['@sentry/*'] },
   {
@@ -27,7 +28,7 @@ const vendorWrappers = [
 const vendorSdkPatterns = vendorWrappers.flatMap(({ patterns }) => patterns);
 
 const vendorMessage =
-  'Each vendor SDK is imported only inside its own wrapper folder (src/server/db, auth, ports/<port>, analytics, monitoring).';
+  'Each vendor SDK is imported only inside its own wrapper folder (src/server/db, auth, ports/<port>, photos, analytics, monitoring).';
 
 const vendorImportRule = (patterns) => [
   'error',

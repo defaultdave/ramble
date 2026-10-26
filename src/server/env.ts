@@ -8,6 +8,7 @@ import {
 import { emailAdapterNames } from '@/lib/email/message';
 import { emailModes } from '@/lib/email/route';
 import { emailSettingIssues } from '@/lib/email/settings';
+import { storageProviderNames, storageSettingIssues } from '@/lib/storage';
 
 const postgresUrl = z.url({ protocol: /^postgres(ql)?$/ });
 
@@ -45,6 +46,9 @@ const schema = z
     POSTMARK_SERVER_TOKEN: apiCredential.optional(),
     EMAIL_WEBHOOK_SECRET: sharedSecret.optional(),
     DEV_MAILBOX_SECRET: sharedSecret.optional(),
+    STORAGE_PROVIDER: z.enum(storageProviderNames).default('fake'),
+    BLOB_PUBLIC_READ_WRITE_TOKEN: optional(apiCredential),
+    BLOB_PRIVATE_READ_WRITE_TOKEN: optional(apiCredential),
     SENTRY_DSN: optional(httpsUrl),
     SENTRY_BROWSER_DSN: optional(httpsUrl),
     AXIOM_TOKEN: optional(z.string().min(8).max(256).regex(/^\S+$/)),
@@ -54,6 +58,11 @@ const schema = z
   })
   .superRefine((value, ctx) => {
     for (const { name, message } of emailSettingIssues(value)) {
+      ctx.addIssue({ code: 'custom', path: [name], message });
+    }
+  })
+  .superRefine((value, ctx) => {
+    for (const { name, message } of storageSettingIssues(value)) {
       ctx.addIssue({ code: 'custom', path: [name], message });
     }
   })

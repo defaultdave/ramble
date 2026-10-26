@@ -83,15 +83,38 @@ function nonceOf(policy: string): string {
   return nonce ?? '';
 }
 
+// HTML is case-insensitive and tolerates whitespace around `=`, so every pattern over the
+// served markup must be too, or a `<SCRIPT NONCE = "...">` would slip past the check.
 function scriptTags(html: string): string[] {
-  return html.match(/<script\b[^>]*>/g) ?? [];
+  return html.match(/<script(?=[\s/>])[^>]*>/gi) ?? [];
+}
+
+function attribute(tag: string, name: string): string | undefined {
+  const pattern = new RegExp(
+    `[\\s"']${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s"'>]+))`,
+    'i',
+  );
+  const match = pattern.exec(tag);
+  return match?.[2] ?? match?.[3] ?? match?.[4];
+}
+
+function hasAttribute(tag: string, name: string): boolean {
+  return new RegExp(`[\\s"']${name}(?=[\\s=/>])`, 'i').test(tag);
+}
+
+function expectEveryScriptNonced(html: string, nonce: string): void {
+  const tags = scriptTags(html);
+  expect(tags.length).toBeGreaterThan(0);
+  for (const tag of tags) {
+    expect(attribute(tag, 'nonce'), tag).toBe(nonce);
+  }
 }
 
 /** External scripts the browser will fetch: a `noModule` script is skipped by any browser that runs modules. */
 function scriptSources(html: string): string[] {
   return scriptTags(html).flatMap((tag) => {
-    if (/\bnoModule\b/i.test(tag)) return [];
-    const src = /\bsrc="([^"]+)"/.exec(tag)?.[1];
+    if (hasAttribute(tag, 'nomodule')) return [];
+    const src = attribute(tag, 'src');
     return src ? [new URL(src, 'http://localhost').pathname] : [];
   });
 }
@@ -164,11 +187,7 @@ for (const { path, dynamic, status, heading } of paths) {
       const nonce = nonceOf(policy ?? '');
 
       const html = (await response?.text()) ?? '';
-      const tags = scriptTags(html);
-      expect(tags.length).toBeGreaterThan(0);
-      for (const tag of tags) {
-        expect(tag).toContain(`nonce="${nonce}"`);
-      }
+      expectEveryScriptNonced(html, nonce);
 
       await expect(page.getByRole('main')).toBeVisible();
       if (heading) {
@@ -247,9 +266,7 @@ test.describe('a client-supplied policy header', () => {
     const nonce = nonceOf(response.headers()[enforced] ?? '');
     const html = await response.text();
     expect(html).not.toContain('ATTACKER');
-    for (const tag of scriptTags(html)) {
-      expect(tag).toContain(`nonce="${nonce}"`);
-    }
+    expectEveryScriptNonced(html, nonce);
   });
 
   test('never reaches the scripts of a cached page', async ({ request }) => {
@@ -273,11 +290,7 @@ test.describe('a client-supplied policy header', () => {
     const nonce = nonceOf(response.headers()[enforced] ?? '');
     const html = await response.text();
     expect(html).not.toContain('ATTACKER');
-    const tags = scriptTags(html);
-    expect(tags.length).toBeGreaterThan(0);
-    for (const tag of tags) {
-      expect(tag).toContain(`nonce="${nonce}"`);
-    }
+    expectEveryScriptNonced(html, nonce);
   });
 });
 

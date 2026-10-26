@@ -1,8 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import {
   contentSecurityPolicyHeader,
+  contentSecurityPolicyHeaderNames,
   enforcedHeaderName,
+  isPrefetchRequest,
 } from '@/lib/securityHeaders';
+import { env } from '@/server/env';
 
 function freshNonce(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -10,35 +13,31 @@ function freshNonce(): string {
 }
 
 export function proxy(request: NextRequest) {
+  // Next.js reads the nonce from the request's policy header and puts it on every script it
+  // renders, so a client must never get to supply one. The policy travels on the request only
+  // when this proxy wrote it.
+  const requestHeaders = new Headers(request.headers);
+  for (const name of contentSecurityPolicyHeaderNames) {
+    requestHeaders.delete(name);
+  }
+
+  if (isPrefetchRequest(request.headers)) {
+    return NextResponse.next({ request: { headers: requestHeaders } });
+  }
+
   const header = contentSecurityPolicyHeader(
     request.nextUrl.pathname,
     freshNonce(),
+    { development: env.NODE_ENV === 'development' },
   );
-
-  if (header.key !== enforcedHeaderName) {
-    const response = NextResponse.next();
-    response.headers.set(header.key, header.value);
-    return response;
+  if (header.key === enforcedHeaderName) {
+    requestHeaders.set(header.key, header.value);
   }
-
-  // Next.js reads the nonce from the request's policy header and puts it on every script it
-  // renders, which is why the policy travels on the request as well as the response.
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set(header.key, header.value);
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set(header.key, header.value);
   return response;
 }
 
 export const config = {
-  matcher: [
-    {
-      source: '/((?!api|_next/static|_next/image|favicon.ico).*)',
-      // A prefetch carries no document, so it needs no policy and must not spend a nonce.
-      missing: [
-        { type: 'header', key: 'next-router-prefetch' },
-        { type: 'header', key: 'purpose', value: 'prefetch' },
-      ],
-    },
-  ],
+  matcher: ['/((?!api(?:/|$)|_next/static|_next/image|favicon\\.ico$).*)'],
 };

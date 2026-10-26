@@ -46,11 +46,23 @@ function serialize(directives: readonly string[]): string {
   return directives.join('; ');
 }
 
+export type PolicyOptions = {
+  /** React's development build evaluates code at runtime; production never gets `'unsafe-eval'`. */
+  development: boolean;
+};
+
+function scriptSources(sources: string[], { development }: PolicyOptions) {
+  return `script-src ${[...sources, ...(development ? ["'unsafe-eval'"] : [])].join(' ')}`;
+}
+
 /** The enforcing policy for a dynamic route. Only scripts carrying `nonce` (and what they load) run. */
-export function enforcedContentSecurityPolicy(nonce: string): string {
+export function enforcedContentSecurityPolicy(
+  nonce: string,
+  options: PolicyOptions,
+): string {
   return serialize([
     ...sharedDirectives,
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    scriptSources(["'self'", `'nonce-${nonce}'`, "'strict-dynamic'"], options),
   ]);
 }
 
@@ -59,24 +71,49 @@ export function enforcedContentSecurityPolicy(nonce: string): string {
  * have no nonce, so `'unsafe-inline'` keeps them out of the reports; violations show in the
  * browser console only, since no report endpoint exists yet.
  */
-export function reportOnlyContentSecurityPolicy(): string {
+export function reportOnlyContentSecurityPolicy(
+  options: PolicyOptions,
+): string {
   return serialize([
     ...sharedDirectives,
-    `script-src 'self' 'unsafe-inline' ${vercelScriptHost}`,
+    scriptSources(["'self'", "'unsafe-inline'", vercelScriptHost], options),
   ]);
 }
 
 export const enforcedHeaderName = 'Content-Security-Policy';
 export const reportOnlyHeaderName = 'Content-Security-Policy-Report-Only';
 
+/** Both names, because Next.js takes a nonce from either request header. */
+export const contentSecurityPolicyHeaderNames = [
+  enforcedHeaderName,
+  reportOnlyHeaderName,
+] as const;
+
 /** The CSP header one page response carries, chosen by its path. */
 export function contentSecurityPolicyHeader(
   pathname: string,
   nonce: string,
+  options: PolicyOptions,
 ): Header {
   return isDynamicRoutePath(pathname)
-    ? { key: enforcedHeaderName, value: enforcedContentSecurityPolicy(nonce) }
-    : { key: reportOnlyHeaderName, value: reportOnlyContentSecurityPolicy() };
+    ? {
+        key: enforcedHeaderName,
+        value: enforcedContentSecurityPolicy(nonce, options),
+      }
+    : {
+        key: reportOnlyHeaderName,
+        value: reportOnlyContentSecurityPolicy(options),
+      };
+}
+
+/** A prefetch carries no document, so it gets no policy and spends no nonce. */
+export function isPrefetchRequest(headers: {
+  get(name: string): string | null;
+}): boolean {
+  return (
+    headers.get('next-router-prefetch') !== null ||
+    headers.get('purpose')?.toLowerCase() === 'prefetch'
+  );
 }
 
 /**

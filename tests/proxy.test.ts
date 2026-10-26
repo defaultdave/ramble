@@ -1,0 +1,116 @@
+import { NextRequest } from 'next/server';
+import { describe, expect, it } from 'vitest';
+import { config, proxy } from '@/proxy';
+
+const attacker = "script-src 'nonce-ATTACKER'";
+const enforced = 'content-security-policy';
+const reportOnly = 'content-security-policy-report-only';
+
+function run(path: string, headers: Record<string, string> = {}) {
+  const response = proxy(
+    new NextRequest(`http://localhost${path}`, { headers }),
+  );
+  // NextResponse.next() encodes the request headers it forwards as these two fields.
+  const forwarded = (
+    response.headers.get('x-middleware-override-headers') ?? ''
+  )
+    .split(',')
+    .filter(Boolean);
+  return {
+    response,
+    forwarded,
+    forwardedPolicy: response.headers.get(`x-middleware-request-${enforced}`),
+  };
+}
+
+describe('proxy', () => {
+  it('enforces its own policy on a dynamic path and forwards the same policy to the renderer', () => {
+    const { response, forwardedPolicy } = run('/ops');
+    const policy = response.headers.get(enforced);
+    expect(policy).toMatch(/'nonce-[A-Za-z0-9+/=]{24}'/);
+    expect(forwardedPolicy).toBe(policy);
+    expect(response.headers.get(reportOnly)).toBeNull();
+  });
+
+  it('reports only on a cached path and forwards no policy', () => {
+    const { response, forwarded, forwardedPolicy } = run('/');
+    expect(response.headers.get(reportOnly)).not.toContain('nonce-');
+    expect(response.headers.get(enforced)).toBeNull();
+    expect(forwardedPolicy).toBeNull();
+    expect(forwarded).not.toContain(enforced);
+  });
+
+  it('never allows eval in production', () => {
+    expect(run('/ops').response.headers.get(enforced)).not.toContain(
+      "'unsafe-eval'",
+    );
+  });
+
+  it.each(['/ops', '/', '/checkout/sample'])(
+    'drops a client-supplied policy header on %s',
+    (path) => {
+      const { response, forwardedPolicy, forwarded } = run(path, {
+        [enforced]: attacker,
+        [reportOnly]: attacker,
+      });
+      expect(forwardedPolicy ?? '').not.toContain('ATTACKER');
+      expect(forwarded).not.toContain(reportOnly);
+      expect(
+        response.headers.get(`x-middleware-request-${reportOnly}`),
+      ).toBeNull();
+      expect(response.headers.get(enforced) ?? '').not.toContain('ATTACKER');
+    },
+  );
+
+  it.each([
+    ['next-router-prefetch', '1'],
+    ['purpose', 'prefetch'],
+  ])(
+    'passes a prefetch (%s) through with no policy, no nonce, and no client header',
+    (name, value) => {
+      const { response, forwarded, forwardedPolicy } = run('/ops', {
+        [name]: value,
+        [enforced]: attacker,
+      });
+      expect(response.headers.get(enforced)).toBeNull();
+      expect(response.headers.get(reportOnly)).toBeNull();
+      expect(forwardedPolicy).toBeNull();
+      expect(forwarded).not.toContain(enforced);
+      expect(forwarded).toContain(name);
+    },
+  );
+
+  it('issues a different nonce per request', () => {
+    const nonces = new Set(
+      [1, 2, 3].map((n) =>
+        run(`/ops?n=${String(n)}`).response.headers.get(enforced),
+      ),
+    );
+    expect(nonces.size).toBe(3);
+  });
+
+  it('matches every page path and skips only the api, build asset, and favicon paths', () => {
+    expect(config.matcher).toEqual([
+      '/((?!api(?:/|$)|_next/static|_next/image|favicon\\.ico$).*)',
+    ]);
+    const pattern = new RegExp(`^${config.matcher[0] ?? ''}$`);
+    for (const path of [
+      '/',
+      '/apiary',
+      '/ops',
+      '/favicon.ico.bak',
+      '/.well-known/security.txt',
+    ]) {
+      expect(pattern.test(path), path).toBe(true);
+    }
+    for (const path of [
+      '/api',
+      '/api/pulse',
+      '/_next/static/x.js',
+      '/_next/image',
+      '/favicon.ico',
+    ]) {
+      expect(pattern.test(path), path).toBe(false);
+    }
+  });
+});

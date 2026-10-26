@@ -1,16 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
   contentSecurityPolicyHeader,
+  contentSecurityPolicyHeaderNames,
   dynamicRoutePrefixes,
   enforcedContentSecurityPolicy,
   enforcedHeaderName,
   isDynamicRoutePath,
+  isPrefetchRequest,
   reportOnlyContentSecurityPolicy,
   reportOnlyHeaderName,
   securityHeaders,
 } from './securityHeaders';
 
 const nonce = 'dGVzdC1ub25jZQ==';
+const production = { development: false };
+const development = { development: true };
 
 function directive(policy: string, name: string): string | undefined {
   return policy
@@ -35,7 +39,7 @@ describe('isDynamicRoutePath', () => {
 });
 
 describe('enforcedContentSecurityPolicy', () => {
-  const policy = enforcedContentSecurityPolicy(nonce);
+  const policy = enforcedContentSecurityPolicy(nonce, production);
 
   it('allows only scripts that carry the nonce and what they load', () => {
     expect(directive(policy, 'script-src')).toBe(
@@ -46,10 +50,20 @@ describe('enforcedContentSecurityPolicy', () => {
   it('never allows inline scripts', () => {
     expect(directive(policy, 'script-src')).not.toContain("'unsafe-inline'");
   });
+
+  it('allows eval only for the development build', () => {
+    expect(policy).not.toContain("'unsafe-eval'");
+    expect(
+      directive(
+        enforcedContentSecurityPolicy(nonce, development),
+        'script-src',
+      ),
+    ).toBe(`script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval'`);
+  });
 });
 
 describe('reportOnlyContentSecurityPolicy', () => {
-  const policy = reportOnlyContentSecurityPolicy();
+  const policy = reportOnlyContentSecurityPolicy(production);
 
   it('carries no nonce, so a prerendered shell can serve it', () => {
     expect(policy).not.toContain('nonce-');
@@ -58,6 +72,13 @@ describe('reportOnlyContentSecurityPolicy', () => {
   it("allows the shell's inline bootstrap and the Vercel measurement scripts", () => {
     expect(directive(policy, 'script-src')).toBe(
       "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com",
+    );
+  });
+
+  it('allows eval only for the development build', () => {
+    expect(policy).not.toContain("'unsafe-eval'");
+    expect(reportOnlyContentSecurityPolicy(development)).toContain(
+      "'unsafe-eval'",
     );
   });
 });
@@ -75,26 +96,49 @@ describe('both policies', () => {
     ["frame-ancestors 'none'"],
   ])('share %s', (expected) => {
     const name = expected.split(' ')[0] ?? '';
-    expect(directive(enforcedContentSecurityPolicy(nonce), name)).toBe(
+    expect(
+      directive(enforcedContentSecurityPolicy(nonce, production), name),
+    ).toBe(expected);
+    expect(directive(reportOnlyContentSecurityPolicy(production), name)).toBe(
       expected,
     );
-    expect(directive(reportOnlyContentSecurityPolicy(), name)).toBe(expected);
   });
 });
 
 describe('contentSecurityPolicyHeader', () => {
   it('enforces on a dynamic path', () => {
-    expect(contentSecurityPolicyHeader('/checkout/sample', nonce)).toEqual({
+    expect(
+      contentSecurityPolicyHeader('/checkout/sample', nonce, production),
+    ).toEqual({
       key: enforcedHeaderName,
-      value: enforcedContentSecurityPolicy(nonce),
+      value: enforcedContentSecurityPolicy(nonce, production),
     });
   });
 
   it('reports only on a cached path', () => {
-    expect(contentSecurityPolicyHeader('/', nonce)).toEqual({
+    expect(contentSecurityPolicyHeader('/', nonce, production)).toEqual({
       key: reportOnlyHeaderName,
-      value: reportOnlyContentSecurityPolicy(),
+      value: reportOnlyContentSecurityPolicy(production),
     });
+  });
+
+  it('names both headers Next.js reads a nonce from', () => {
+    expect(contentSecurityPolicyHeaderNames).toEqual([
+      'Content-Security-Policy',
+      'Content-Security-Policy-Report-Only',
+    ]);
+  });
+});
+
+describe('isPrefetchRequest', () => {
+  it.each([
+    [{ 'next-router-prefetch': '1' }, true],
+    [{ purpose: 'prefetch' }, true],
+    [{ Purpose: 'Prefetch' }, true],
+    [{ purpose: 'navigation' }, false],
+    [{}, false],
+  ])('%j is a prefetch: %s', (headers, expected) => {
+    expect(isPrefetchRequest(new Headers(headers))).toBe(expected);
   });
 });
 

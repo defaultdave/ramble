@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
+  notFoundHeading,
+  perRequestFallbackPaths,
   perRequestGroups,
   routes,
   unknownPaths,
@@ -10,7 +12,12 @@ import {
 
 type HeaderRow = { name: string; value: string };
 
-type PathRow = { path: string; dynamic: boolean; status: number };
+type PathRow = {
+  path: string;
+  dynamic: boolean;
+  status: number;
+  heading?: string;
+};
 
 const paths: readonly PathRow[] = [
   ...routes.map(({ path, group }) => ({
@@ -25,6 +32,12 @@ const paths: readonly PathRow[] = [
       status: unknownPathStatus(group),
     }),
   ),
+  ...perRequestFallbackPaths.map((path) => ({
+    path,
+    dynamic: true,
+    status: 200,
+    heading: notFoundHeading,
+  })),
   { path: unprerenderedParamPath, dynamic: false, status: 200 },
 ];
 
@@ -120,7 +133,7 @@ async function watchViolations(page: Page, status: number): Promise<string[]> {
   return consoleErrors;
 }
 
-for (const { path, dynamic, status } of paths) {
+for (const { path, dynamic, status, heading } of paths) {
   test(`${path} carries the security header set`, async ({ page }) => {
     const response = await page.goto(path);
     expect(response?.status()).toBe(status);
@@ -157,6 +170,11 @@ for (const { path, dynamic, status } of paths) {
       }
 
       await expect(page.getByRole('main')).toBeVisible();
+      if (heading) {
+        await expect(
+          page.getByRole('heading', { level: 1, name: heading }),
+        ).toBeVisible();
+      }
       await page.waitForLoadState('networkidle');
 
       // A blocked script never issues a request, so every external script in the
@@ -216,6 +234,64 @@ test('every dynamic response gets its own nonce', async ({ request }) => {
     nonces.add(nonceOf(response.headers()[enforced] ?? ''));
   }
   expect(nonces.size).toBe(3);
+});
+
+const attackerPolicy = "script-src 'nonce-ATTACKER'";
+
+test.describe('a client-supplied policy header', () => {
+  test('never reaches the scripts of a dynamic page', async ({ request }) => {
+    const response = await request.get('/ops', {
+      headers: { [enforced]: attackerPolicy },
+    });
+    const nonce = nonceOf(response.headers()[enforced] ?? '');
+    const html = await response.text();
+    expect(html).not.toContain('ATTACKER');
+    for (const tag of scriptTags(html)) {
+      expect(tag).toContain(`nonce="${nonce}"`);
+    }
+  });
+
+  test('never reaches the scripts of a cached page', async ({ request }) => {
+    const response = await request.get('/', {
+      headers: {
+        [enforced]: attackerPolicy,
+        [reportOnly]: attackerPolicy,
+      },
+    });
+    expect(response.headers()[enforced]).toBeUndefined();
+    expect(await response.text()).not.toContain('ATTACKER');
+  });
+
+  test('never reaches a prefetch response, which carries no policy', async ({
+    request,
+  }) => {
+    const response = await request.get('/ops', {
+      headers: { [enforced]: attackerPolicy, purpose: 'prefetch' },
+    });
+    expect(response.status()).toBe(200);
+    expect(response.headers()[enforced]).toBeUndefined();
+    expect(response.headers()[reportOnly]).toBeUndefined();
+    expect(response.headers()['cache-control']).toContain('no-store');
+    const tags = scriptTags(await response.text());
+    expect(tags.length).toBeGreaterThan(0);
+    for (const tag of tags) {
+      expect(tag).not.toContain('nonce=');
+    }
+  });
+});
+
+test.describe('the proxy matcher', () => {
+  test('covers a path that only starts with "api"', async ({ request }) => {
+    const response = await request.get('/apiary');
+    expect(response.headers()[reportOnly]).toBeDefined();
+  });
+
+  test('skips the favicon path alone', async ({ request }) => {
+    const response = await request.get('/favicon.ico');
+    expect(response.headers()[enforced]).toBeUndefined();
+    expect(response.headers()[reportOnly]).toBeUndefined();
+    expect(response.headers()['x-content-type-options']).toBe('nosniff');
+  });
 });
 
 test('/.well-known/security.txt is served as text', async ({ request }) => {

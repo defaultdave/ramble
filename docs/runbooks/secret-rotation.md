@@ -86,10 +86,10 @@ The same applies to a secret pasted into a chat or an agent session: revoke it, 
 ### Monitoring tokens: Sentry, Better Stack, Axiom
 
 - **Source:** ADR 0007, Measurement and monitoring and the amendment's monitoring stack (each behind a wrapper).
-- **Variable names:** not fixed in the plan.
-- **Lives in:** Vercel, Secret type; Better Stack heartbeat URLs also live in the pulse workflow (GitHub Actions) if the pulse reports to them.
+- **Variable names:** `SENTRY_DSN` (server project), `SENTRY_BROWSER_DSN` (browser project, public by design), `AXIOM_TOKEN` and `AXIOM_DATASET` (set both or neither), all from U-007; see `alerting.md`. Better Stack's are not fixed in the plan.
+- **Lives in:** Vercel, Secret type for `AXIOM_TOKEN`; Better Stack heartbeat URLs also live in the pulse workflow (GitHub Actions) if the pulse reports to them.
 - **Rotated by:** Dave.
-- **How:** create a new token or DSN in the vendor, update Vercel (and GitHub where used), deploy, revoke the old one. A Sentry DSN is not a strong secret but rotate it if it is abused.
+- **How:** create a new token or DSN in the vendor, update Vercel (and GitHub where used), deploy, revoke the old one. For Axiom make the new token ingest-only and scoped to the one dataset. A Sentry DSN is not a strong secret but rotate it if it is abused; a rotated browser DSN also changes the loader script address, which the guest layout derives from it, so deploy after changing it.
 - **What breaks:** errors, logs, or heartbeats go missing until updated. A missing heartbeat raises an alert, which is a false alarm if you caused it; pause the monitor first.
 
 ### Better Auth secret

@@ -24,6 +24,11 @@ export default defineConfig({
       DATABASE_URL: databaseUrl,
       DATABASE_URL_UNPOOLED: databaseUrl,
       DEV_MAILBOX_SECRET: 'e2e-mailbox-secret-xxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      // Read when the guest pages are built, so it reaches the build step of the command above.
+      // Fake: e2e/fixtures.ts answers the loader request locally, and checkout-no-sentry.spec.ts
+      // uses it to show the loader is on for guests and absent from checkout.
+      SENTRY_BROWSER_DSN:
+        'https://0123456789abcdef0123456789abcdef@o0.ingest.sentry.io/1',
     },
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,

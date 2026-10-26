@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { e2eMailboxSecret, e2eWebhookSecret } from './e2e/secrets';
 
 const port = 3100;
 
@@ -20,7 +21,12 @@ export default defineConfig({
   webServer: {
     command: `pnpm build && pnpm start --port ${String(port)}`,
     url: `http://localhost:${String(port)}`,
-    env: { DATABASE_URL: databaseUrl, DATABASE_URL_UNPOOLED: databaseUrl },
+    env: {
+      DATABASE_URL: databaseUrl,
+      DATABASE_URL_UNPOOLED: databaseUrl,
+      DEV_MAILBOX_SECRET: e2eMailboxSecret,
+      EMAIL_WEBHOOK_SECRET: e2eWebhookSecret,
+    },
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
   },

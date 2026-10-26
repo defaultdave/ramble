@@ -1,7 +1,19 @@
 import 'server-only';
 import { z } from 'zod';
+import {
+  EmailAddressSchema,
+  EmailAllowlistSchema,
+  EmailSenderSchema,
+} from '@/lib/email/address';
+import { emailAdapterNames } from '@/lib/email/message';
+import { emailModes } from '@/lib/email/route';
+import { emailSettingIssues } from '@/lib/email/settings';
 
 const postgresUrl = z.url({ protocol: /^postgres(ql)?$/ });
+
+const apiCredential = z.string().min(1).max(256);
+// Long enough that guessing it is out of reach, since no rate limit stands in front of it yet.
+const sharedSecret = z.string().min(32).max(256);
 
 const schema = z
   .object({
@@ -12,6 +24,21 @@ const schema = z
     DATABASE_URL: postgresUrl.optional(),
     DATABASE_URL_UNPOOLED: postgresUrl.optional(),
     VERCEL: z.string().optional(),
+    VERCEL_ENV: z.enum(['production', 'preview', 'development']).optional(),
+    EMAIL_MODE: z.enum(emailModes).default('sink'),
+    EMAIL_PROVIDER: z.enum(emailAdapterNames).default('fake'),
+    EMAIL_ALLOWLIST: EmailAllowlistSchema.default([]),
+    EMAIL_FROM: EmailSenderSchema.optional(),
+    EMAIL_REPLY_TO: EmailAddressSchema.optional(),
+    RESEND_API_KEY: apiCredential.optional(),
+    POSTMARK_SERVER_TOKEN: apiCredential.optional(),
+    EMAIL_WEBHOOK_SECRET: sharedSecret.optional(),
+    DEV_MAILBOX_SECRET: sharedSecret.optional(),
+  })
+  .superRefine((value, ctx) => {
+    for (const { name, message } of emailSettingIssues(value)) {
+      ctx.addIssue({ code: 'custom', path: [name], message });
+    }
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV === 'test') return;

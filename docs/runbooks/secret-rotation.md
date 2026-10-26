@@ -55,22 +55,25 @@ The same applies to a secret pasted into a chat or an agent session: revoke it, 
 - **How:** make a new random value, set it in both places, deploy. Do the Vercel side first and the GitHub side second, within a few minutes.
 - **What breaks:** pulses are rejected in the gap between the two updates. The next 30-minute pulse catches up; use the manual trigger if you cannot wait.
 
-### Dev mailbox shared secret and email webhook secret
+### Dev mailbox secret and email webhook secret
 
 - **Source:** units.yaml U-006 (dev mailbox page and `/api/webhooks/email` refuse unauthenticated requests; shared secret checked on the server; webhook checks its signature or secret); U-073 later moves the mailbox behind the ops role.
-- **Variable names:** not fixed in the plan.
-- **Lives in:** Vercel, Secret type. The webhook secret also lives in the email vendor's dashboard.
+- **Variable names:** `DEV_MAILBOX_SECRET` and `EMAIL_WEBHOOK_SECRET`, each at least 32 characters, both read in `src/server/env.ts`.
+- **`DEV_MAILBOX_SECRET`:** opens `/ops/mailbox`, which shows every captured email with its links. It is off in `live` mode and while unset. Generate it with `openssl rand -hex 32`, straight into Vercel (Secret type). Rotating it signs every open mailbox session out, because the session cookie is derived from the secret. Wrong guesses are counted per source address and slowed after 10 in 10 minutes; a correct secret is never refused, so its length is the real protection.
+- **`EMAIL_WEBHOOK_SECRET`:** what the provider's delivery webhook proves itself with. With Resend it is the `whsec_` signing secret shown on the webhook in the Resend dashboard, so you copy it from there into Vercel rather than generating it. With Postmark it is the password you put in the webhook URL's basic-auth credentials in Postmark's webhook settings (generate it yourself). With the fake adapter it is the Bearer token for hand-sent events.
+- **Lives in:** Vercel, Secret type, and for the webhook secret also the email vendor's dashboard.
 - **Rotated by:** Dave.
-- **How:** new value in Vercel, deploy; for the webhook, change it in the vendor dashboard at the same time.
-- **What breaks:** the mailbox page locks you out until you use the new secret; delivery webhooks fail until both sides match.
+- **How:** put the new value in Vercel and deploy; for the webhook secret change it in the vendor dashboard at the same moment, then send a test event.
+- **What breaks:** the mailbox asks you to unlock again with the new secret. Delivery webhooks return 401 until both sides match; a provider retries, and a refused bounce or complaint that is never retried leaves that address unsuppressed, so check the vendor's event log after the change.
 
-### Resend API key (real job only)
+### Resend API key and Postmark server token (real job only)
 
-- **Source:** design doc ports table (EmailPort: fake with dev mailbox in the demo, Resend in the real job); ADR 0007 Tier B.
+- **Source:** design doc ports table (EmailPort: fake with dev mailbox in the demo, Resend in the real job, Postmark as the spare); ADR 0007 Tier B.
+- **Variable names:** `RESEND_API_KEY` (when `EMAIL_PROVIDER=resend`) and `POSTMARK_SERVER_TOKEN` (when `EMAIL_PROVIDER=postmark`). The app refuses to start with a real provider and no key.
 - **Lives in:** Vercel, Secret type.
 - **Rotated by:** the account owner (Dave in the demo, the client later).
-- **How:** create a second API key in the Resend dashboard, update Vercel, deploy, delete the old key.
-- **What breaks:** email sends fail between revoking and deploying. The demo does not use it.
+- **How:** create a second key (Resend) or a new server token (Postmark) in the vendor dashboard, update Vercel, deploy, send a test email, then delete the old one.
+- **What breaks:** email sends fail between revoking and deploying; a failed send is logged and retried by its caller under the same idempotency key. The demo does not use either.
 
 ### Cloudflare R2 credentials
 

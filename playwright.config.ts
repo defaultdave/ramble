@@ -23,6 +23,7 @@ export default defineConfig({
     env: {
       DATABASE_URL: databaseUrl,
       DATABASE_URL_UNPOOLED: databaseUrl,
+      DEV_MAILBOX_SECRET: 'e2e-mailbox-secret-xxxxxxxxxxxxxxxxxxxxxxxxxxxx',
       // Read when the guest pages are built, so it reaches the build step of the command above.
       // Fake: e2e/fixtures.ts answers the loader request locally, and checkout-no-sentry.spec.ts
       // uses it to show the loader is on for guests and absent from checkout.

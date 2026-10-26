@@ -6,6 +6,9 @@ export const rateLimitSurfaces = [
   'payment_tries',
   'manage',
   'forms',
+  'email_webhook',
+  'email_webhook_failed',
+  'mailbox_unlock_failed',
 ] as const;
 
 export type RateLimitSurface = (typeof rateLimitSurfaces)[number];
@@ -39,6 +42,23 @@ export const rateLimitPolicies = {
   },
   manage: { limit: 30, windowSeconds: 10 * 60, normalizeSubject: trimmed },
   forms: { limit: 5, windowSeconds: 60 * 60, normalizeSubject: trimmed },
+  // Verified webhook traffic only, on one shared counter: it bounds the database writes a flood of
+  // genuine events could cause. A request is counted here only after its signature or secret
+  // checked out, so nobody without the secret can use this budget up.
+  email_webhook: { limit: 600, windowSeconds: 60, normalizeSubject: trimmed },
+  // Failed webhook verifications, per source address. Kept apart from the counter above so a flood
+  // of bad requests can never refuse a real bounce or complaint.
+  email_webhook_failed: {
+    limit: 20,
+    windowSeconds: 10 * 60,
+    normalizeSubject: trimmed,
+  },
+  // Wrong dev-mailbox secrets, per source address. A correct secret is never counted or refused.
+  mailbox_unlock_failed: {
+    limit: 10,
+    windowSeconds: 10 * 60,
+    normalizeSubject: trimmed,
+  },
 } as const satisfies Record<RateLimitSurface, RateLimitPolicy>;
 
 export const maxSubjectLength = 512;

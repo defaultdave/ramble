@@ -94,7 +94,14 @@
 }
 
 .privateLink {
+  /* A 44px target (PRD-69) whose extra height is cancelled by the negative margin, so the layout keeps the 20px text line from Figma. */
+  display: inline-flex;
+  align-items: center;
   align-self: flex-start;
+  min-block-size: var(--size-touch-target);
+  margin-block: calc(
+    (var(--font-line-height-label) - var(--size-touch-target)) / 2
+  );
   color: var(--color-text-link);
   font-size: var(--font-size-label);
   line-height: var(--font-line-height-label);

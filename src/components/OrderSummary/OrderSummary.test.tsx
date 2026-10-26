@@ -1,13 +1,17 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi, expectTypeOf } from 'vitest';
+import { afterEach, describe, expect, it, vi, expectTypeOf } from 'vitest';
 import type { ComponentProps } from 'react';
 import {
   OrderSummary,
   type BookingOrderSummaryProps,
   type GiftOrderSummaryProps,
 } from './OrderSummary';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const booking = {
   title: 'Hand-rolled pasta class',
@@ -117,7 +121,6 @@ describe('OrderSummary expanded', () => {
     );
     expect(screen.getAllByText('$45 × 1 guest')).toHaveLength(2);
     expect(error).not.toHaveBeenCalled();
-    vi.restoreAllMocks();
   });
 
   it('shows the experience photo in the thumbnail frame', () => {
@@ -164,7 +167,6 @@ describe('OrderSummary tax line (PRD-78)', () => {
     expect(() =>
       render(<OrderSummary {...booking} totalMinor={17001} />),
     ).toThrow(RangeError);
-    vi.restoreAllMocks();
   });
 });
 

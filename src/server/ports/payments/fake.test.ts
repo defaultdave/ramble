@@ -1,24 +1,28 @@
-import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
+import { describePaymentsPortContract } from '../../../../tests/contracts/payments-port';
 import { PaymentsError, type ProviderEvent } from './index';
-import { describePaymentsPortContract } from './contract';
 import {
   createFakePaymentsAdapter,
   createFakePaymentsState,
   type FakePaymentsAdapter,
+  type FakePaymentsOptions,
 } from './fake';
 
 const webhookSecret = 'whsec_fake_0123456789abcdef';
 const fixedNow = new Date('2026-10-25T12:00:00.000Z');
 const toleranceSeconds = 300;
-const maxDeclines = 10;
+const defaultMaxDeclines = 5;
+const maxChallenges = 3;
 
-function makeFake(now: () => Date = () => fixedNow): FakePaymentsAdapter {
-  return createFakePaymentsAdapter({ webhookSecret, now });
+function makeFake(
+  overrides: Partial<FakePaymentsOptions> = {},
+): FakePaymentsAdapter {
+  return createFakePaymentsAdapter({
+    webhookSecret,
+    now: () => fixedNow,
+    ...overrides,
+  });
 }
-
-const uuid = (n: number) =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
 function firstEvent(fake: FakePaymentsAdapter): ProviderEvent {
   const [event] = fake.emittedEvents();
@@ -26,23 +30,72 @@ function firstEvent(fake: FakePaymentsAdapter): ProviderEvent {
   return event;
 }
 
+const uuid = (n: number) =>
+  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+
+const metadata = (order: number, record: number) => ({
+  orderId: uuid(order),
+  recordId: uuid(record),
+});
+
 const paymentInput = (n: number, amountMinor = 14_950) => ({
   idempotencyKey: `pay:${uuid(n)}:1`,
   amountMinor,
   currency: 'USD' as const,
-  metadata: { orderId: uuid(n), recordId: uuid(n * 10) },
+  metadata: metadata(n, n * 10),
 });
+
+const refundInput = (paymentId: string, n: number, amountMinor = 1_000) => ({
+  idempotencyKey: `refund:${uuid(n)}`,
+  paymentId,
+  amountMinor,
+  metadata: metadata(1, n),
+});
+
+const transferInput = (n: number, amountMinor = 1_000) => ({
+  idempotencyKey: `transfer:${uuid(n)}`,
+  destinationAccountId: 'acct_fake_host',
+  amountMinor,
+  currency: 'USD' as const,
+  metadata: metadata(1, n),
+});
+
+const reversalInput = (transferId: string, n: number, amountMinor = 100) => ({
+  idempotencyKey: `reversal:${uuid(n)}`,
+  transferId,
+  amountMinor,
+  metadata: metadata(1, n),
+});
+
+async function paid(fake: FakePaymentsAdapter, n = 1) {
+  const payment = await fake.createPayment(paymentInput(n));
+  return fake.confirm(payment.id, { outcome: 'succeeded' });
+}
 
 describePaymentsPortContract('fake adapter', () => {
   const fake = makeFake();
+  const signedAt = (offsetSeconds: number) =>
+    new Date(fixedNow.getTime() + offsetSeconds * 1_000);
   return {
     port: fake,
     destinationAccountId: 'acct_fake_host',
+    signatureToleranceSeconds: toleranceSeconds,
     settle: async (paymentId, outcome) => {
       await fake.confirm(paymentId, { outcome });
     },
     events: () => Promise.resolve(fake.emittedEvents()),
-    deliver: (event) => Promise.resolve(fake.signWebhook(event)),
+    deliver: (event, offsetSeconds = 0) =>
+      Promise.resolve(fake.signWebhook(event, signedAt(offsetSeconds))),
+    ignoredDelivery: () =>
+      Promise.resolve(
+        fake.signBody(
+          JSON.stringify({
+            id: 'evt_ignored',
+            provider: 'fake',
+            type: 'charge.updated',
+          }),
+        ),
+      ),
   };
 });
 
@@ -54,12 +107,7 @@ describe('fake adapter', () => {
       outcome: 'succeeded',
       method: 'apple_pay',
     });
-    const refund = await fake.refund({
-      idempotencyKey: `refund:${uuid(2)}`,
-      paymentId: payment.id,
-      amountMinor: 1_000,
-      metadata: { orderId: uuid(1), recordId: uuid(2) },
-    });
+    const refund = await fake.refund(refundInput(payment.id, 2));
     return { payment, refund, events: fake.emittedEvents() };
   }
 
@@ -70,19 +118,15 @@ describe('fake adapter', () => {
     expect(second).toEqual(first);
     expect(first.payment.id).toMatch(/^pay_[0-9a-f]{24}$/);
     expect(first.refund.id).toMatch(/^re_[0-9a-f]{24}$/);
-    expect(first.events.map((event) => event.id)).toEqual(
-      second.events.map((event) => event.id),
-    );
   });
 
   it('charges the US card list rate and reports it on the payment and its event', async () => {
     const fake = makeFake();
-    const created = await fake.createPayment(paymentInput(1, 14_950));
 
-    const payment = await fake.confirm(created.id, { outcome: 'succeeded' });
+    const payment = await paid(fake);
 
     expect(payment.feeMinor).toBe(464);
-    expect(fake.emittedEvents()[0]).toMatchObject({
+    expect(firstEvent(fake)).toMatchObject({
       type: 'payment.succeeded',
       amountMinor: 14_950,
       feeMinor: 464,
@@ -110,33 +154,6 @@ describe('fake adapter', () => {
     });
   });
 
-  it.each([toleranceSeconds + 1, -(toleranceSeconds + 1)])(
-    'refuses a delivery signed %i seconds away from now',
-    async (offsetSeconds) => {
-      let now = fixedNow;
-      const fake = makeFake(() => now);
-      const payment = await fake.createPayment(paymentInput(1));
-      await fake.confirm(payment.id, { outcome: 'succeeded' });
-      const delivery = fake.signWebhook(firstEvent(fake));
-      now = new Date(fixedNow.getTime() + offsetSeconds * 1_000);
-
-      await expect(fake.verifyWebhook(delivery)).rejects.toMatchObject({
-        code: 'invalid_signature',
-      });
-    },
-  );
-
-  it('accepts a delivery signed within the tolerance', async () => {
-    let now = fixedNow;
-    const fake = makeFake(() => now);
-    const payment = await fake.createPayment(paymentInput(1));
-    await fake.confirm(payment.id, { outcome: 'succeeded' });
-    const event = firstEvent(fake);
-    now = new Date(fixedNow.getTime() + (toleranceSeconds - 1) * 1_000);
-
-    expect(await fake.verifyWebhook(fake.signWebhook(event))).toEqual(event);
-  });
-
   it.each([
     ['not JSON', 'not json'],
     ['not an event', JSON.stringify({ id: 'evt_1' })],
@@ -145,66 +162,209 @@ describe('fake adapter', () => {
       JSON.stringify({
         id: 'evt_1',
         provider: 'stripe',
+        type: 'charge.updated',
+      }),
+    ],
+    [
+      'a known type with a malformed body',
+      JSON.stringify({
+        id: 'evt_1',
+        provider: 'fake',
         type: 'payment.succeeded',
-        objectId: 'pi_1',
-        metadata: null,
-        amountMinor: 100,
-        currency: 'USD',
-        feeMinor: 33,
-        failureCode: null,
-        method: 'card',
-        occurredAt: fixedNow.toISOString(),
       }),
     ],
   ])('refuses a correctly signed body that is %s', async (_, rawBody) => {
     const fake = makeFake();
-    const timestamp = String(Math.floor(fixedNow.getTime() / 1_000));
-    const digest = createHmac('sha256', webhookSecret)
-      .update(`${timestamp}.${rawBody}`)
-      .digest('hex');
 
     await expect(
-      fake.verifyWebhook({ rawBody, signature: `t=${timestamp},v1=${digest}` }),
+      fake.verifyWebhook(fake.signBody(rawBody)),
     ).rejects.toMatchObject({ code: 'invalid_input' });
   });
 
-  it('refuses a secret shorter than 16 characters', () => {
-    expect(() =>
-      createFakePaymentsAdapter({
-        webhookSecret: 'short',
-        now: () => fixedNow,
-      }),
-    ).toThrow(PaymentsError);
-  });
-
-  it('refuses to hold more than maxObjects', async () => {
-    const fake = createFakePaymentsAdapter({
-      webhookSecret,
-      now: () => fixedNow,
-      maxObjects: 2,
-    });
-    await fake.createPayment(paymentInput(1));
-    await fake.createPayment(paymentInput(2));
-
-    await expect(fake.createPayment(paymentInput(3))).rejects.toMatchObject({
-      code: 'provider_unavailable',
-    });
-    expect(await fake.createPayment(paymentInput(1))).toMatchObject({
-      status: 'created',
-    });
-  });
-
-  it(`refuses a try after ${String(maxDeclines)} declines`, async () => {
+  it('refuses a second success with invalid_state', async () => {
     const fake = makeFake();
-    const payment = await fake.createPayment(paymentInput(1));
-    for (let i = 0; i < maxDeclines; i += 1) {
-      await fake.confirm(payment.id, { outcome: 'declined' });
-    }
+    const payment = await paid(fake);
 
     await expect(
       fake.confirm(payment.id, { outcome: 'succeeded' }),
     ).rejects.toMatchObject({ code: 'invalid_state' });
-    expect(fake.emittedEvents()).toHaveLength(maxDeclines);
+  });
+
+  it('refuses a secret shorter than 16 characters', () => {
+    expect(() => makeFake({ webhookSecret: 'short' })).toThrow(PaymentsError);
+  });
+
+  describe('object cap', () => {
+    it('refuses a new payment at the cap and still replays an earlier key', async () => {
+      const fake = makeFake({ maxObjects: 2 });
+      const first = await fake.createPayment(paymentInput(1));
+      await fake.createPayment(paymentInput(2));
+
+      await expect(fake.createPayment(paymentInput(3))).rejects.toMatchObject({
+        code: 'provider_unavailable',
+      });
+      expect(await fake.createPayment(paymentInput(1))).toEqual(first);
+    });
+
+    it('refuses a new refund at the cap, changes nothing, and still replays an earlier key', async () => {
+      const fake = makeFake({ maxObjects: 2 });
+      const payment = await paid(fake);
+      const refund = await fake.refund(refundInput(payment.id, 2));
+      const before = await fake.getBalance();
+
+      await expect(
+        fake.refund(refundInput(payment.id, 3)),
+      ).rejects.toMatchObject({ code: 'provider_unavailable' });
+
+      expect(await fake.getBalance()).toEqual(before);
+      expect(
+        (await fake.retrieve({ kind: 'payment', id: payment.id }))
+          ?.refundedMinor,
+      ).toBe(1_000);
+      expect(await fake.refund(refundInput(payment.id, 2))).toEqual(refund);
+    });
+
+    it('refuses a new transfer at the cap, changes nothing, and still replays an earlier key', async () => {
+      const fake = makeFake({ maxObjects: 2 });
+      await paid(fake);
+      const transfer = await fake.transfer(transferInput(2));
+      const before = await fake.getBalance();
+
+      await expect(fake.transfer(transferInput(3))).rejects.toMatchObject({
+        code: 'provider_unavailable',
+      });
+
+      expect(await fake.getBalance()).toEqual(before);
+      expect(await fake.transfer(transferInput(2))).toEqual(transfer);
+    });
+
+    it('refuses a new reversal at the cap, changes nothing, and still replays an earlier key', async () => {
+      const fake = makeFake({ maxObjects: 3 });
+      await paid(fake);
+      const transfer = await fake.transfer(transferInput(2));
+      const reversal = await fake.reverseTransfer(
+        reversalInput(transfer.id, 3),
+      );
+      const before = await fake.getBalance();
+
+      await expect(
+        fake.reverseTransfer(reversalInput(transfer.id, 4)),
+      ).rejects.toMatchObject({ code: 'provider_unavailable' });
+
+      expect(await fake.getBalance()).toEqual(before);
+      expect(
+        (await fake.retrieve({ kind: 'transfer', id: transfer.id }))
+          ?.reversedMinor,
+      ).toBe(100);
+      expect(await fake.reverseTransfer(reversalInput(transfer.id, 3))).toEqual(
+        reversal,
+      );
+    });
+  });
+
+  describe('event cap', () => {
+    it('refuses a confirmation that would emit past the cap and leaves the payment as it was', async () => {
+      const fake = makeFake({ maxEvents: 1 });
+      const payment = await fake.createPayment(paymentInput(1));
+      await fake.confirm(payment.id, { outcome: 'declined' });
+
+      await expect(
+        fake.confirm(payment.id, { outcome: 'succeeded' }),
+      ).rejects.toMatchObject({ code: 'provider_unavailable' });
+
+      expect(fake.emittedEvents()).toHaveLength(1);
+      expect(
+        await fake.retrieve({ kind: 'payment', id: payment.id }),
+      ).toMatchObject({ status: 'failed_try', feeMinor: null });
+      expect(await fake.getBalance()).toEqual({
+        availableMinor: 0,
+        currency: 'USD',
+      });
+    });
+
+    it('refuses a cancel that would emit past the cap and still replays an earlier cancel', async () => {
+      const fake = makeFake({ maxEvents: 1 });
+      const first = await fake.createPayment(paymentInput(1));
+      const second = await fake.createPayment(paymentInput(2));
+      const canceled = await fake.cancelPayment({
+        idempotencyKey: `cancel:${uuid(1)}`,
+        paymentId: first.id,
+      });
+
+      await expect(
+        fake.cancelPayment({
+          idempotencyKey: `cancel:${uuid(2)}`,
+          paymentId: second.id,
+        }),
+      ).rejects.toMatchObject({ code: 'provider_unavailable' });
+
+      expect(
+        (await fake.retrieve({ kind: 'payment', id: second.id }))?.status,
+      ).toBe('created');
+      expect(
+        await fake.cancelPayment({
+          idempotencyKey: `cancel:${uuid(1)}`,
+          paymentId: first.id,
+        }),
+      ).toEqual(canceled);
+    });
+
+    it('refuses a refund that would emit past the cap', async () => {
+      const fake = makeFake({ maxEvents: 1 });
+      const payment = await paid(fake);
+
+      await expect(
+        fake.refund(refundInput(payment.id, 2)),
+      ).rejects.toMatchObject({ code: 'provider_unavailable' });
+      expect(
+        (await fake.retrieve({ kind: 'payment', id: payment.id }))
+          ?.refundedMinor,
+      ).toBe(0);
+    });
+  });
+
+  describe('try caps', () => {
+    it(`refuses a try after ${String(defaultMaxDeclines)} declines by default`, async () => {
+      const fake = makeFake();
+      const payment = await fake.createPayment(paymentInput(1));
+      for (let i = 0; i < defaultMaxDeclines; i += 1) {
+        await fake.confirm(payment.id, { outcome: 'declined' });
+      }
+
+      await expect(
+        fake.confirm(payment.id, { outcome: 'succeeded' }),
+      ).rejects.toMatchObject({ code: 'invalid_state' });
+      expect(fake.emittedEvents()).toHaveLength(defaultMaxDeclines);
+    });
+
+    it('takes the decline cap from its options', async () => {
+      const fake = makeFake({ maxFailedTries: 2 });
+      const payment = await fake.createPayment(paymentInput(1));
+      await fake.confirm(payment.id, { outcome: 'declined' });
+      await fake.confirm(payment.id, { outcome: 'declined' });
+
+      await expect(
+        fake.confirm(payment.id, { outcome: 'declined' }),
+      ).rejects.toMatchObject({ code: 'invalid_state' });
+      expect(fake.emittedEvents()).toHaveLength(2);
+    });
+
+    it(`refuses a fourth authentication challenge after ${String(maxChallenges)} and emits nothing for it`, async () => {
+      const fake = makeFake();
+      const payment = await fake.createPayment(paymentInput(1));
+      for (let i = 0; i < maxChallenges; i += 1) {
+        await fake.confirm(payment.id, { outcome: 'requires_action' });
+      }
+
+      await expect(
+        fake.confirm(payment.id, { outcome: 'requires_action' }),
+      ).rejects.toMatchObject({ code: 'invalid_state' });
+
+      expect(fake.emittedEvents()).toHaveLength(maxChallenges);
+      expect(
+        await fake.confirm(payment.id, { outcome: 'succeeded' }),
+      ).toMatchObject({ status: 'succeeded' });
+    });
   });
 
   it('refuses a confirmation outside the known outcomes', async () => {
@@ -216,18 +376,31 @@ describe('fake adapter', () => {
     ).rejects.toMatchObject({ code: 'invalid_input' });
   });
 
+  it('treats a processing payment as neither settleable, cancelable, nor refundable', async () => {
+    const state = createFakePaymentsState();
+    const fake = makeFake({ state });
+    const payment = await fake.createPayment(paymentInput(1));
+    const held = state.payments.get(payment.id);
+    if (!held) throw new Error('Expected the payment in state');
+    held.status = 'processing';
+
+    for (const work of [
+      fake.confirm(payment.id, { outcome: 'succeeded' }),
+      fake.cancelPayment({
+        idempotencyKey: `cancel:${uuid(1)}`,
+        paymentId: payment.id,
+      }),
+      fake.refund(refundInput(payment.id, 2)),
+    ]) {
+      await expect(work).rejects.toMatchObject({ code: 'invalid_state' });
+    }
+    expect(fake.emittedEvents()).toHaveLength(0);
+  });
+
   it('shares objects between adapters built on one state', async () => {
     const state = createFakePaymentsState();
-    const writer = createFakePaymentsAdapter({
-      webhookSecret,
-      now: () => fixedNow,
-      state,
-    });
-    const reader = createFakePaymentsAdapter({
-      webhookSecret,
-      now: () => fixedNow,
-      state,
-    });
+    const writer = makeFake({ state });
+    const reader = makeFake({ state });
     const payment = await writer.createPayment(paymentInput(1));
 
     expect(await reader.retrieve({ kind: 'payment', id: payment.id })).toEqual(
@@ -235,7 +408,7 @@ describe('fake adapter', () => {
     );
   });
 
-  it('keeps the first object created with a given metadata for lookups', async () => {
+  it('keeps the first object of a kind created with a given metadata for lookups', async () => {
     const fake = makeFake();
     const first = await fake.createPayment(paymentInput(1));
     await fake.createPayment({

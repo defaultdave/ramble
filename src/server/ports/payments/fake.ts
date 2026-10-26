@@ -14,6 +14,7 @@ import {
   WebhookDeliverySchema,
   currency,
   paymentMethods,
+  providerEventTypes,
   type ObjectKind,
   type Payment,
   type PaymentsPort,
@@ -25,20 +26,26 @@ import {
   type RetrieveQuery,
   type Transfer,
   type TransferReversal,
+  type VerifiedWebhook,
   type WebhookDelivery,
 } from './index';
 
 const provider = 'fake';
 
-/** Declines one payment takes before the fake refuses further tries. */
-const maxFailedTries = 10;
+/** Design doc 4.2.3 and ADR 0002: the fifth failed try cancels the attempt. */
+const defaultMaxFailedTries = 5;
+/** Authentication challenges one payment may raise before the fake refuses another. */
+const maxActionRounds = 3;
 /** A delivery signed further than this from now is refused as a replay. */
 const signatureToleranceSeconds = 300;
 const defaultMaxObjects = 10_000;
+const defaultMaxEvents = 100_000;
 
 const FakeOptionsSchema = z.object({
   webhookSecret: z.string().min(16).max(256),
   maxObjects: z.int().positive().max(1_000_000).default(defaultMaxObjects),
+  maxEvents: z.int().positive().max(10_000_000).default(defaultMaxEvents),
+  maxFailedTries: z.int().positive().max(100).default(defaultMaxFailedTries),
 });
 
 export type FakePaymentsOptions = {
@@ -48,6 +55,10 @@ export type FakePaymentsOptions = {
   now: () => Date;
   /** Payments, refunds, transfers, and reversals held before the fake refuses more. */
   maxObjects?: number;
+  /** Events held before the fake refuses any operation that would emit one. */
+  maxEvents?: number;
+  /** Declines one payment takes before the fake refuses further tries. */
+  maxFailedTries?: number;
   /** Pass one to share or persist a fake's objects; a fresh in-memory state otherwise. */
   state?: FakePaymentsState;
 };
@@ -75,9 +86,12 @@ export type FakePaymentsState = {
   refunds: Map<string, Refund>;
   transfers: Map<string, Transfer>;
   reversals: Map<string, TransferReversal>;
-  idempotency: Map<string, { fingerprint: string; objectId: string }>;
-  /** `${orderId}:${recordId}` to the first object created with that metadata. */
-  byMetadata: Map<string, { kind: ObjectKind; id: string }>;
+  /** The response each key produced the first time, replayed on a repeat. */
+  idempotency: Map<string, { fingerprint: string; response: Keyed }>;
+  /** `${kind}:${orderId}:${recordId}` to the first object of that kind with that metadata. */
+  byMetadata: Map<string, string>;
+  /** Authentication challenges raised per payment id. */
+  actionRounds: Map<string, number>;
   events: ProviderEvent[];
   balanceMinor: number;
 };
@@ -91,6 +105,7 @@ export function createFakePaymentsState(): FakePaymentsState {
     reversals: new Map(),
     idempotency: new Map(),
     byMetadata: new Map(),
+    actionRounds: new Map(),
     events: [],
     balanceMinor: 0,
   };
@@ -102,8 +117,10 @@ export type FakePaymentsAdapter = PaymentsPort & {
   confirm(paymentId: string, input: ConfirmInput): Promise<Payment>;
   /** Every event emitted so far, oldest first. */
   emittedEvents(): ProviderEvent[];
-  /** Signs an event as a delivery timestamped now, so a late delivery is signed fresh. */
-  signWebhook(event: ProviderEvent): WebhookDelivery;
+  /** Signs an event as a delivery timestamped `signedAt` (now by default), so a late delivery is signed fresh. */
+  signWebhook(event: ProviderEvent, signedAt?: Date): WebhookDelivery;
+  /** Signs any body, for deliveries the fake would never emit itself. */
+  signBody(rawBody: string, signedAt?: Date): WebhookDelivery;
 };
 
 type EventFields = {
@@ -118,6 +135,22 @@ type EventFields = {
 
 const signaturePattern = /^t=(\d{1,12}),v1=([0-9a-f]{64})$/;
 
+const EnvelopeSchema = z
+  .object({
+    id: z.string().min(1).max(255),
+    provider: z.string().min(1).max(32),
+    type: z.string().min(1).max(64),
+  })
+  .loose();
+
+const knownEventTypes: ReadonlySet<string> = new Set(providerEventTypes);
+
+const settleableStatuses: ReadonlySet<Payment['status']> = new Set([
+  'created',
+  'requires_action',
+  'failed_try',
+]);
+
 function fakeId(prefix: string, seed: string): string {
   const digest = createHash('sha256').update(seed).digest('hex');
   return `${prefix}_${digest.slice(0, 24)}`;
@@ -127,8 +160,8 @@ function hmacHex(secret: string, message: string): string {
   return createHmac('sha256', secret).update(message).digest('hex');
 }
 
-function metadataKey(metadata: RambleMetadata): string {
-  return `${metadata.orderId}:${metadata.recordId}`;
+function metadataKey(kind: ObjectKind, metadata: RambleMetadata): string {
+  return `${kind}:${metadata.orderId}:${metadata.recordId}`;
 }
 
 function parseOrThrow<T>(schema: z.ZodType<T>, input: unknown): T {
@@ -165,25 +198,38 @@ function invalidState(payment: Payment): PaymentsError {
 export function createFakePaymentsAdapter(
   options: FakePaymentsOptions,
 ): FakePaymentsAdapter {
-  const { webhookSecret, maxObjects } = parseOrThrow(FakeOptionsSchema, {
-    webhookSecret: options.webhookSecret,
-    maxObjects: options.maxObjects,
-  });
+  const { webhookSecret, maxObjects, maxEvents, maxFailedTries } = parseOrThrow(
+    FakeOptionsSchema,
+    {
+      webhookSecret: options.webhookSecret,
+      maxObjects: options.maxObjects,
+      maxEvents: options.maxEvents,
+      maxFailedTries: options.maxFailedTries,
+    },
+  );
   const { now } = options;
   const state = options.state ?? createFakePaymentsState();
   const stores: { [Kind in ObjectKind]: Map<string, ProviderObject<Kind>> } = {
     payment: state.payments,
     refund: state.refunds,
     transfer: state.transfers,
+    reversal: state.reversals,
   };
 
-  function ensureCapacity(): void {
+  /** Every write emits an event, and a create also holds an object; both are refused at their cap before anything changes. */
+  function ensureCapacity(creating: boolean): void {
+    if (state.events.length >= maxEvents) {
+      throw new PaymentsError(
+        'provider_unavailable',
+        `The fake gateway holds its limit of ${String(maxEvents)} events`,
+      );
+    }
     const held =
       state.payments.size +
       state.refunds.size +
       state.transfers.size +
       state.reversals.size;
-    if (held >= maxObjects) {
+    if (creating && held >= maxObjects) {
       throw new PaymentsError(
         'provider_unavailable',
         `The fake gateway holds its limit of ${String(maxObjects)} objects`,
@@ -207,10 +253,14 @@ export function createFakePaymentsAdapter(
     return found;
   }
 
-  function remember(kind: ObjectKind, object: Keyed): void {
-    const key = metadataKey(object.metadata);
+  function store<K extends ObjectKind>(
+    kind: K,
+    object: ProviderObject<K>,
+  ): void {
+    stores[kind].set(object.id, object);
+    const key = metadataKey(kind, object.metadata);
     if (!state.byMetadata.has(key)) {
-      state.byMetadata.set(key, { kind, id: object.id });
+      state.byMetadata.set(key, object.id);
     }
   }
 
@@ -235,48 +285,48 @@ export function createFakePaymentsAdapter(
   }
 
   /**
-   * Replays the object a key already made when the input matches, refuses the key when
-   * it does not, and otherwise runs `create` and records its object against the key.
+   * Replays the first response a key produced when the input matches, refuses the key
+   * when it does not, and otherwise runs `create` and records its response.
    */
   function idempotent<T extends Keyed>(
     idempotencyKey: string,
     fingerprintParts: readonly unknown[],
-    store: Map<string, T>,
     create: () => T,
   ): T {
     const fingerprint = JSON.stringify(fingerprintParts);
     const seen = state.idempotency.get(idempotencyKey);
     if (seen) {
-      const object =
-        seen.fingerprint === fingerprint ? store.get(seen.objectId) : undefined;
-      if (!object) {
+      if (seen.fingerprint !== fingerprint) {
         throw new PaymentsError(
           'idempotency_conflict',
           `Key ${idempotencyKey} was used with different input`,
         );
       }
-      return copy(object);
+      return copy(seen.response as T);
     }
-    const created = create();
-    state.idempotency.set(idempotencyKey, {
-      fingerprint,
-      objectId: created.id,
-    });
-    return copy(created);
+    const response = copy(create());
+    state.idempotency.set(idempotencyKey, { fingerprint, response });
+    return copy(response);
   }
 
   function confirm(paymentId: string, rawInput: ConfirmInput): Payment {
     const input = parseOrThrow(ConfirmInputSchema, rawInput);
     const payment = mustFind('payment', paymentId);
-    if (payment.status === 'succeeded' || payment.status === 'canceled') {
-      throw invalidState(payment);
-    }
+    if (!settleableStatuses.has(payment.status)) throw invalidState(payment);
     if (payment.failedTries >= maxFailedTries) {
       throw new PaymentsError(
         'invalid_state',
         `Payment ${payment.id} has had ${String(maxFailedTries)} failed tries`,
       );
     }
+    const rounds = state.actionRounds.get(payment.id) ?? 0;
+    if (input.outcome === 'requires_action' && rounds >= maxActionRounds) {
+      throw new PaymentsError(
+        'invalid_state',
+        `Payment ${payment.id} has had ${String(maxActionRounds)} authentication challenges`,
+      );
+    }
+    ensureCapacity(false);
     switch (input.outcome) {
       case 'succeeded': {
         const feeMinor = fakeCardFeeMinor(payment.amountMinor);
@@ -309,6 +359,7 @@ export function createFakePaymentsAdapter(
       }
       case 'requires_action': {
         payment.status = 'requires_action';
+        state.actionRounds.set(payment.id, rounds + 1);
         emit({
           type: 'payment.requires_action',
           objectId: payment.id,
@@ -326,9 +377,8 @@ export function createFakePaymentsAdapter(
     return idempotent(
       input.idempotencyKey,
       ['createPayment', input.amountMinor, input.currency, input.metadata],
-      state.payments,
       () => {
-        ensureCapacity();
+        ensureCapacity(true);
         const id = fakeId('pay', input.idempotencyKey);
         const secret = hmacHex(webhookSecret, `client_secret:${id}`);
         const payment: Payment = {
@@ -345,8 +395,7 @@ export function createFakePaymentsAdapter(
           clientSecret: `${id}_secret_${secret.slice(0, 24)}`,
           metadata: input.metadata,
         };
-        state.payments.set(id, payment);
-        remember('payment', payment);
+        store('payment', payment);
         return payment;
       },
     );
@@ -357,12 +406,11 @@ export function createFakePaymentsAdapter(
     return idempotent(
       input.idempotencyKey,
       ['cancelPayment', input.paymentId],
-      state.payments,
       () => {
         const payment = mustFind('payment', input.paymentId);
-        if (payment.status === 'succeeded' || payment.status === 'canceled') {
+        if (!settleableStatuses.has(payment.status))
           throw invalidState(payment);
-        }
+        ensureCapacity(false);
         payment.status = 'canceled';
         emit({
           type: 'payment.canceled',
@@ -380,13 +428,11 @@ export function createFakePaymentsAdapter(
   ): ProviderObject<K> | null {
     const query = parseOrThrow(RetrieveQuerySchema, rawQuery);
     const { kind } = rawQuery;
-    if ('id' in query) {
-      const found = find(kind, query.id);
-      return found ? copy(found) : null;
-    }
-    const indexed = state.byMetadata.get(metadataKey(query.metadata));
-    if (!indexed || indexed.kind !== kind) return null;
-    const found = find(kind, indexed.id);
+    const id =
+      'id' in query
+        ? query.id
+        : state.byMetadata.get(metadataKey(kind, query.metadata));
+    const found = id === undefined ? undefined : find(kind, id);
     return found ? copy(found) : null;
   }
 
@@ -395,7 +441,6 @@ export function createFakePaymentsAdapter(
     return idempotent(
       input.idempotencyKey,
       ['refund', input.paymentId, input.amountMinor, input.metadata],
-      state.refunds,
       () => {
         const payment = mustFind('payment', input.paymentId);
         if (payment.status !== 'succeeded') throw invalidState(payment);
@@ -406,7 +451,7 @@ export function createFakePaymentsAdapter(
             `${String(input.amountMinor)} exceeds the ${String(refundable)} left on ${payment.id}`,
           );
         }
-        ensureCapacity();
+        ensureCapacity(true);
         const created: Refund = {
           id: fakeId('re', input.idempotencyKey),
           paymentId: payment.id,
@@ -418,8 +463,7 @@ export function createFakePaymentsAdapter(
         };
         payment.refundedMinor += input.amountMinor;
         state.balanceMinor -= input.amountMinor;
-        state.refunds.set(created.id, created);
-        remember('refund', created);
+        store('refund', created);
         emit({
           type: 'refund.succeeded',
           objectId: created.id,
@@ -442,7 +486,6 @@ export function createFakePaymentsAdapter(
         input.currency,
         input.metadata,
       ],
-      state.transfers,
       () => {
         if (input.amountMinor > state.balanceMinor) {
           throw new PaymentsError(
@@ -450,7 +493,7 @@ export function createFakePaymentsAdapter(
             `${String(input.amountMinor)} exceeds the available ${String(state.balanceMinor)}`,
           );
         }
-        ensureCapacity();
+        ensureCapacity(true);
         const created: Transfer = {
           id: fakeId('tr', input.idempotencyKey),
           destinationAccountId: input.destinationAccountId,
@@ -461,8 +504,7 @@ export function createFakePaymentsAdapter(
           metadata: input.metadata,
         };
         state.balanceMinor -= input.amountMinor;
-        state.transfers.set(created.id, created);
-        remember('transfer', created);
+        store('transfer', created);
         emit({
           type: 'transfer.paid',
           objectId: created.id,
@@ -479,7 +521,6 @@ export function createFakePaymentsAdapter(
     return idempotent(
       input.idempotencyKey,
       ['reverseTransfer', input.transferId, input.amountMinor, input.metadata],
-      state.reversals,
       () => {
         const target = mustFind('transfer', input.transferId);
         const reversible = target.amountMinor - target.reversedMinor;
@@ -489,7 +530,7 @@ export function createFakePaymentsAdapter(
             `${String(input.amountMinor)} exceeds the ${String(reversible)} left on ${target.id}`,
           );
         }
-        ensureCapacity();
+        ensureCapacity(true);
         const created: TransferReversal = {
           id: fakeId('trr', input.idempotencyKey),
           transferId: target.id,
@@ -502,7 +543,7 @@ export function createFakePaymentsAdapter(
           target.status = 'reversed';
         }
         state.balanceMinor += input.amountMinor;
-        state.reversals.set(created.id, created);
+        store('reversal', created);
         emit({
           type: 'transfer.reversed',
           objectId: target.id,
@@ -514,14 +555,13 @@ export function createFakePaymentsAdapter(
     );
   }
 
-  function signWebhook(event: ProviderEvent): WebhookDelivery {
-    const rawBody = JSON.stringify(event);
-    const timestamp = String(Math.floor(now().getTime() / 1_000));
+  function signBody(rawBody: string, signedAt = now()): WebhookDelivery {
+    const timestamp = String(Math.floor(signedAt.getTime() / 1_000));
     const digest = hmacHex(webhookSecret, `${timestamp}.${rawBody}`);
     return { rawBody, signature: `t=${timestamp},v1=${digest}` };
   }
 
-  function verifyWebhook(rawDelivery: unknown): ProviderEvent {
+  function verifyWebhook(rawDelivery: unknown): VerifiedWebhook {
     const delivery = parseOrThrow(WebhookDeliverySchema, rawDelivery);
     const match = signaturePattern.exec(delivery.signature);
     if (!match) {
@@ -549,14 +589,21 @@ export function createFakePaymentsAdapter(
     } catch (error) {
       throw new PaymentsError('invalid_input', 'Body is not JSON', error);
     }
-    const event = parseOrThrow(ProviderEventSchema, body);
-    if (event.provider !== provider) {
+    const envelope = parseOrThrow(EnvelopeSchema, body);
+    if (envelope.provider !== provider) {
       throw new PaymentsError(
         'invalid_input',
-        `Event is from ${event.provider}, not the fake provider`,
+        `Event is from ${envelope.provider}, not the fake provider`,
       );
     }
-    return event;
+    if (!knownEventTypes.has(envelope.type)) {
+      return {
+        status: 'ignored',
+        eventId: envelope.id,
+        eventType: envelope.type,
+      };
+    }
+    return { status: 'event', event: parseOrThrow(ProviderEventSchema, body) };
   }
 
   return {
@@ -572,6 +619,7 @@ export function createFakePaymentsAdapter(
       Promise.resolve({ availableMinor: state.balanceMinor, currency }),
     confirm: (paymentId, input) => settled(() => confirm(paymentId, input)),
     emittedEvents: () => state.events.map(copy),
-    signWebhook,
+    signWebhook: (event, signedAt) => signBody(JSON.stringify(event), signedAt),
+    signBody,
   };
 }

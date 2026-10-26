@@ -8,6 +8,9 @@ export const currency = 'USD';
 const CurrencySchema = z.literal(currency);
 type Currency = typeof currency;
 
+/** The smallest charge the provider accepts, in cents (Stripe's USD minimum). */
+// TODO(U-047a): first caller
+export const minAmountMinor = 50;
 /** The largest single amount the provider accepts, in cents. */
 // TODO(U-047a): first caller
 export const maxAmountMinor = 99_999_999;
@@ -20,6 +23,7 @@ export const maxWebhookBodyLength = 65_536;
 const IdempotencyKeySchema = z.string().min(1).max(maxKeyLength);
 const ProviderIdSchema = z.string().min(1).max(maxKeyLength);
 const AmountMinorSchema = z.int().positive().max(maxAmountMinor);
+const ChargeAmountSchema = z.int().min(minAmountMinor).max(maxAmountMinor);
 
 /** Ramble's IDs on every provider object (design doc 4.2.3 rule 6). */
 const RambleMetadataSchema = z.object({
@@ -32,7 +36,12 @@ export const paymentMethods = ['card', 'apple_pay', 'google_pay'] as const;
 type PaymentMethod = (typeof paymentMethods)[number];
 
 type PaymentStatus =
-  'created' | 'requires_action' | 'failed_try' | 'succeeded' | 'canceled';
+  | 'created'
+  | 'requires_action'
+  | 'processing'
+  | 'failed_try'
+  | 'succeeded'
+  | 'canceled';
 
 export type Payment = {
   id: string;
@@ -89,7 +98,7 @@ type Balance = {
 
 export const CreatePaymentInputSchema = z.object({
   idempotencyKey: IdempotencyKeySchema,
-  amountMinor: AmountMinorSchema,
+  amountMinor: ChargeAmountSchema,
   currency: CurrencySchema,
   metadata: RambleMetadataSchema,
 });
@@ -126,7 +135,7 @@ export const ReverseTransferInputSchema = z.object({
 });
 type ReverseTransferInput = z.infer<typeof ReverseTransferInputSchema>;
 
-const objectKinds = ['payment', 'refund', 'transfer'] as const;
+const objectKinds = ['payment', 'refund', 'transfer', 'reversal'] as const;
 export type ObjectKind = (typeof objectKinds)[number];
 
 export const RetrieveQuerySchema = z
@@ -145,7 +154,9 @@ export type ProviderObject<K extends ObjectKind> = K extends 'payment'
   ? Payment
   : K extends 'refund'
     ? Refund
-    : Transfer;
+    : K extends 'transfer'
+      ? Transfer
+      : TransferReversal;
 
 /** The raw request body and its signature header, as the webhook route receives them. */
 export const WebhookDeliverySchema = z.object({
@@ -155,7 +166,7 @@ export const WebhookDeliverySchema = z.object({
 export type WebhookDelivery = z.infer<typeof WebhookDeliverySchema>;
 
 /** The normalized event types of design doc 4.2.3. */
-const providerEventTypes = [
+export const providerEventTypes = [
   'payment.succeeded',
   'payment.failed',
   'payment.requires_action',
@@ -193,6 +204,15 @@ export const ProviderEventSchema = z.object({
 });
 export type ProviderEvent = z.output<typeof ProviderEventSchema>;
 
+/**
+ * What a genuine delivery carried. `ignored` is a correctly signed event of a type Ramble
+ * does not handle: the webhook route answers 2xx and stores nothing, so the provider does
+ * not retry it.
+ */
+export type VerifiedWebhook =
+  | { status: 'event'; event: ProviderEvent }
+  | { status: 'ignored'; eventId: string; eventType: string };
+
 export type PaymentsErrorCode =
   /** The input failed the port's schema; nothing was sent. */
   | 'invalid_input'
@@ -228,7 +248,11 @@ export class PaymentsError extends Error {
 // TODO(U-047a): first caller
 export type PaymentsPort = {
   readonly provider: PaymentProvider;
-  /** A new payment awaiting the guest's confirmation, or the same payment on a repeated key. */
+  /**
+   * A new payment awaiting the guest's confirmation. A repeated key with the same input
+   * returns the response of the first execution, as the provider recorded it then, not
+   * the payment's current state; `retrieve` is the read.
+   */
   createPayment(input: CreatePaymentInput): Promise<Payment>;
   /** Cancels a payment that has not succeeded. */
   cancelPayment(input: CancelPaymentInput): Promise<Payment>;
@@ -242,8 +266,8 @@ export type PaymentsPort = {
   transfer(input: TransferInput): Promise<Transfer>;
   /** Pulls part or all of a transfer back to the platform balance. */
   reverseTransfer(input: ReverseTransferInput): Promise<TransferReversal>;
-  /** Checks the signature on the raw body and returns the normalized event. */
-  verifyWebhook(delivery: WebhookDelivery): Promise<ProviderEvent>;
+  /** Checks the signature on the raw body and returns the normalized event, or `ignored`. */
+  verifyWebhook(delivery: WebhookDelivery): Promise<VerifiedWebhook>;
   /** The platform's available balance: charges less fees, refunds, and transfers. */
   getBalance(): Promise<Balance>;
 };

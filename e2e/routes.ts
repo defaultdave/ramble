@@ -96,6 +96,40 @@ export const unknownPaths: Record<RouteGroup, string> = {
   ops: '/ops/unknown',
 };
 
+/**
+ * Route groups that render per request so every script carries the CSP nonce. Their
+ * not-found page renders inside a resumed render, which cannot change the status, so an
+ * unknown path there answers 200; the cached guest group keeps its static 404.
+ */
+export const perRequestGroups: ReadonlySet<RouteGroup> = new Set([
+  'checkout',
+  'host',
+  'ops',
+]);
+
+export function unknownPathStatus(group: RouteGroup): number {
+  return perRequestGroups.has(group) ? 200 : 404;
+}
+
+/**
+ * Under each per-request prefix, the bare path and a path deeper than any page. Each must
+ * render that group's own not-found page per request, never the guest group's prerendered shell.
+ */
+export const perRequestFallbackPaths: readonly string[] = [
+  '/checkout',
+  '/checkout/sample/a/b',
+  '/manage',
+  '/manage/sample/a/b',
+  '/orders',
+  '/orders/sample/a/b',
+  '/gift',
+  '/gift/sample/a/b',
+  '/gifts/checkout',
+  '/gifts/checkout/sample/a/b',
+  '/host/a/b/c',
+  '/ops/a/b/c',
+];
+
 export const notFoundHeading = "We can't find that page";
 
 export const unprerenderedParamPath = '/picks/not-prerendered';

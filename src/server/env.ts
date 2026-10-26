@@ -27,6 +27,8 @@ const schema = z
     SENTRY_BROWSER_DSN: optional(httpsUrl),
     AXIOM_TOKEN: optional(z.string().min(8).max(256).regex(/^\S+$/)),
     AXIOM_DATASET: optional(z.string().regex(/^[A-Za-z0-9_-]{1,128}$/)),
+    // Signs the form-guard token. Read only when a guest form renders or is submitted, which throws if it is unset outside development and test.
+    FORM_GUARD_SECRET: z.string().min(32).optional(),
   })
   .superRefine((value, ctx) => {
     if (!value.AXIOM_TOKEN !== !value.AXIOM_DATASET) {

@@ -1,0 +1,93 @@
+/* Placement is the page's job: the experience page makes this sticky beside the content from 768px and shows the booking bar below that. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  /* The panel's width in Figma (400px), built from space tokens. */
+  inline-size: 100%;
+  max-inline-size: calc(var(--space-16) * 6 + var(--space-4));
+  padding: var(--space-6);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+  box-shadow: var(--elevation-2);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-body);
+}
+
+.price {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.priceAmount {
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-heading-m);
+  line-height: var(--font-line-height-heading-m);
+  font-weight: var(--font-weight-semibold);
+}
+
+.priceUnit {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-body-s);
+  line-height: var(--font-line-height-body-s);
+}
+
+.mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.divider {
+  inline-size: 100%;
+  block-size: 1px;
+  margin: 0;
+  border: 0;
+  background: var(--color-border-default);
+}
+
+.total {
+  margin: 0;
+}
+
+.totalLine {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+}
+
+.totalAmount {
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.note {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: var(--font-line-height-caption);
+}
+
+/* A grid parent stretches the button to the panel's width. */
+.action {
+  display: grid;
+}
+
+.soldOut {
+  display: flex;
+  flex-direction: column;
+}
+
+.soldOutTitle {
+  margin: 0;
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  font-weight: var(--font-weight-semibold);
+}

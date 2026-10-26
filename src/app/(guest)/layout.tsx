@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { SiteShell } from '@/components/SiteShell';
 import { VercelMeasurement } from '@/server/analytics/VercelMeasurement';
+import { SentryBrowserScript } from '@/server/monitoring/SentryBrowserScript';
 import '@/styles/tokens.css';
 import { fontVariables } from '../fonts';
 
@@ -16,6 +17,7 @@ export default function GuestLayout({ children }: { children: ReactNode }) {
       <body>
         <SiteShell>{children}</SiteShell>
         <VercelMeasurement />
+        <SentryBrowserScript />
       </body>
     </html>
   );

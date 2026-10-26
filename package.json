@@ -36,6 +36,7 @@
   "dependencies": {
     "@internationalized/date": "^3.12.4",
     "@neondatabase/serverless": "^1.2.0",
+    "@sentry/nextjs": "^11.9.0",
     "@tiptap/static-renderer": "^3.32.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/functions": "^3.10.3",

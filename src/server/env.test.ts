@@ -91,4 +91,86 @@ describe('environment', () => {
       await expect(loadEnv()).rejects.toThrow(/DATABASE_URL/);
     });
   });
+
+  describe('monitoring', () => {
+    const dsn =
+      'https://0123456789abcdef0123456789abcdef@o1.ingest.sentry.io/2';
+    const names = [
+      'SENTRY_DSN',
+      'SENTRY_BROWSER_DSN',
+      'AXIOM_TOKEN',
+      'AXIOM_DATASET',
+      'VERCEL_ENV',
+      'VERCEL_GIT_COMMIT_SHA',
+    ] as const;
+
+    it('is entirely optional', async () => {
+      for (const name of names) vi.stubEnv(name, undefined);
+
+      const env = await loadEnv();
+
+      for (const name of names) expect(env[name]).toBeUndefined();
+    });
+
+    it.each(names)('reads an empty %s as not set', async (name) => {
+      vi.stubEnv(name, '');
+
+      const env = await loadEnv();
+
+      expect(env[name]).toBeUndefined();
+    });
+
+    it('reads both DSNs and the Axiom pair when set', async () => {
+      vi.stubEnv('SENTRY_DSN', dsn);
+      vi.stubEnv('SENTRY_BROWSER_DSN', dsn);
+      vi.stubEnv('AXIOM_TOKEN', 'xaat-0123456789');
+      vi.stubEnv('AXIOM_DATASET', 'ramble-logs');
+      vi.stubEnv('VERCEL_ENV', 'preview');
+
+      const env = await loadEnv();
+
+      expect(env).toMatchObject({
+        SENTRY_DSN: dsn,
+        SENTRY_BROWSER_DSN: dsn,
+        AXIOM_TOKEN: 'xaat-0123456789',
+        AXIOM_DATASET: 'ramble-logs',
+        VERCEL_ENV: 'preview',
+      });
+    });
+
+    it.each([
+      ['SENTRY_DSN', 'not a url'],
+      ['SENTRY_DSN', 'http://key@o1.ingest.sentry.io/2'],
+      ['SENTRY_BROWSER_DSN', 'ftp://key@host/1'],
+      ['AXIOM_DATASET', 'has space'],
+      ['AXIOM_DATASET', 'a'.repeat(129)],
+      ['AXIOM_TOKEN', 'short'],
+      ['AXIOM_TOKEN', 'has space in it'],
+      ['VERCEL_ENV', 'staging'],
+    ])('fails at import when %s is %j', async (name, value) => {
+      vi.stubEnv('AXIOM_TOKEN', 'xaat-0123456789');
+      vi.stubEnv('AXIOM_DATASET', 'ramble-logs');
+      vi.stubEnv(name, value);
+
+      await expect(loadEnv()).rejects.toThrow(
+        new RegExp(`Invalid environment variables[\\s\\S]*${name}`),
+      );
+    });
+
+    it.each([
+      ['AXIOM_TOKEN', 'AXIOM_DATASET'],
+      ['AXIOM_DATASET', 'AXIOM_TOKEN'],
+    ])('fails when only %s is set, naming %s', async (given, missing) => {
+      vi.stubEnv('AXIOM_TOKEN', undefined);
+      vi.stubEnv('AXIOM_DATASET', undefined);
+      vi.stubEnv(
+        given,
+        given === 'AXIOM_TOKEN' ? 'xaat-0123456789' : 'ramble-logs',
+      );
+
+      await expect(loadEnv()).rejects.toThrow(
+        new RegExp(`Invalid environment variables[\\s\\S]*${missing}`),
+      );
+    });
+  });
 });

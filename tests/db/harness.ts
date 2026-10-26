@@ -1,10 +1,19 @@
 import { randomBytes } from 'node:crypto';
 import {
+  cp,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
+import {
   createServer,
   type IncomingMessage,
   type ServerResponse,
 } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { neonConfig } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -22,6 +31,23 @@ const migrationsFolder = path.resolve(
   import.meta.dirname,
   '../../src/server/db/migrations',
 );
+
+/**
+ * drizzle-kit writes `"public".` before every enum type and foreign key target, which would send
+ * a test file's objects to the shared schema. Copies the migrations with that prefix pointed at the
+ * file's own schema.
+ */
+async function copyMigrationsInto(schema: string): Promise<string> {
+  const folder = await mkdtemp(path.join(tmpdir(), 'ramble-migrations-'));
+  await cp(migrationsFolder, folder, { recursive: true });
+  for (const file of await readdir(folder)) {
+    if (!file.endsWith('.sql')) continue;
+    const target = path.join(folder, file);
+    const sql = await readFile(target, 'utf8');
+    await writeFile(target, sql.replaceAll('"public".', `"${schema}".`));
+  }
+  return folder;
+}
 
 /**
  * Creates a schema private to the calling test file, applies every committed migration into it,
@@ -43,14 +69,16 @@ export async function createFreshDatabase(
   const url = new URL(adminUrl);
   url.searchParams.set('options', `-c search_path=${schema}`);
 
+  const migrations = await copyMigrationsInto(schema);
   const migrator = new Pool({ connectionString: url.toString(), max: 1 });
   try {
     await migrate(drizzle(migrator), {
-      migrationsFolder,
+      migrationsFolder: migrations,
       migrationsSchema: schema,
     });
   } finally {
     await migrator.end();
+    await rm(migrations, { recursive: true, force: true });
   }
 
   return {

@@ -33,6 +33,15 @@ describe('beacon edge rule', () => {
     expect(command.match(/vercel firewall rules add/g)).toHaveLength(1);
   });
 
+  it('ends with the publish step, because adding a rule only stages a draft', () => {
+    const command = beaconEdgeRuleCommand();
+
+    expect(command.trimEnd().endsWith('vercel firewall publish')).toBe(true);
+    expect(command.indexOf('rules add')).toBeLessThan(
+      command.indexOf('firewall publish'),
+    );
+  });
+
   it('stays inside the limits the firewall accepts', () => {
     expect(beaconEdgeRule.windowSeconds).toBeGreaterThanOrEqual(10);
     expect(beaconEdgeRule.windowSeconds).toBeLessThanOrEqual(3600);

@@ -68,4 +68,27 @@ describe('checkBot with the platform', () => {
       expect(checkBotId).toHaveBeenCalledOnce();
     },
   );
+
+  it.each([
+    ['an error body with no isBot', { isHuman: true }],
+    ['an empty body', {}],
+    [
+      'the shape the SDK builds from a 429',
+      { isHuman: true, isBot: undefined, isVerifiedBot: undefined },
+    ],
+  ])('fails closed on %s', async (_name, body) => {
+    vi.stubEnv('VERCEL', '1');
+    checkBotId.mockResolvedValue(body);
+    const { checkBot } = await load();
+
+    await expect(checkBot()).rejects.toThrow();
+  });
+
+  it('fails closed when the lookup throws', async () => {
+    vi.stubEnv('VERCEL', '1');
+    checkBotId.mockRejectedValue(new Error('fetch failed'));
+    const { checkBot } = await load();
+
+    await expect(checkBot()).rejects.toThrow('fetch failed');
+  });
 });

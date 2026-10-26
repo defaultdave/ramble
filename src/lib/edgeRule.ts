@@ -22,7 +22,10 @@ export const beaconEdgeRule = {
   durationMinutes: 5,
 } as const;
 
-/** The `vercel firewall rules add` command that creates the rule. Dave runs it; nothing here does. */
+/**
+ * The commands that create the rule and make it live. `rules add` only stages a draft; nothing
+ * takes effect until `vercel firewall publish`. Dave runs them; nothing here does.
+ */
 export function beaconEdgeRuleCommand(rule = beaconEdgeRule): string {
   const condition = JSON.stringify({
     type: 'path',
@@ -39,5 +42,7 @@ export function beaconEdgeRuleCommand(rule = beaconEdgeRule): string {
     `--rate-limit-keys ${rule.keys}`,
     `--rate-limit-action ${rule.action}`,
     `--duration ${String(rule.durationMinutes)}m`,
-  ].join(' \\\n  ');
+  ]
+    .join(' \\\n  ')
+    .concat('\n\nvercel firewall publish');
 }

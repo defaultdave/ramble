@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import {
   ConsumeInputSchema,
   rateLimitPolicies,
-  SubjectSchema,
+  normalizeSubject,
   type RateLimitDecision,
   type RateLimitSurface,
 } from '@/lib/rateLimits';
@@ -27,9 +27,7 @@ export type RateLimiter = {
 };
 
 function rateLimitKey(surface: RateLimitSurface, subject: string): string {
-  const normalized = rateLimitPolicies[surface].normalizeSubject(
-    SubjectSchema.parse(subject),
-  );
+  const normalized = normalizeSubject(surface, subject);
   const digest = createHash('sha256').update(normalized).digest('hex');
   return `${surface}:${digest}`;
 }

@@ -4,9 +4,12 @@ import {
   FORM_TOKEN_FIELD,
   FormGuardFieldsSchema,
   HONEYPOT_FIELD,
+  DEVELOPMENT_FORM_GUARD_SECRET,
   maxFieldLength,
   MAX_FORM_AGE_MS,
   MIN_FILL_MS,
+  parseFormGuardToken,
+  pickFormGuardSecret,
   type FormGuardResult,
 } from './formGuard';
 
@@ -109,5 +112,58 @@ describe('FormGuardFieldsSchema', () => {
     ],
   ])('refuses %s', (_name, fields) => {
     expect(FormGuardFieldsSchema.safeParse(fields).success).toBe(false);
+  });
+});
+
+describe('parseFormGuardToken', () => {
+  const signature = 'A'.repeat(43);
+
+  it('reads the time and the signature', () => {
+    expect(parseFormGuardToken(`1793534400000.${signature}`)).toEqual({
+      issuedAt: new Date(1793534400000),
+      issuedAtMs: '1793534400000',
+      signature,
+    });
+  });
+
+  it.each([
+    ['empty', ''],
+    ['no signature', '1793534400000'],
+    ['empty signature', '1793534400000.'],
+    ['empty time', `.${signature}`],
+    ['non-numeric time', `soon.${signature}`],
+    ['signed time', `-1.${signature}`],
+    ['time of 16 digits', `${'1'.repeat(16)}.${signature}`],
+    ['short signature', `1.${'A'.repeat(42)}`],
+    ['long signature', `1.${'A'.repeat(44)}`],
+    ['padded signature', `1.${'A'.repeat(43)}=`],
+    ['standard base64 alphabet', `1.${'+'.repeat(43)}`],
+    ['trailing newline', `1.${signature}\n`],
+    ['trailing space', `1.${signature} `],
+    ['leading space', ` 1.${signature}`],
+    ['extra part', `1.${signature}.x`],
+  ])('refuses %s', (_name, token) => {
+    expect(parseFormGuardToken(token)).toBeNull();
+  });
+});
+
+describe('pickFormGuardSecret', () => {
+  it.each([
+    [
+      'a configured secret anywhere',
+      's'.repeat(32),
+      'production',
+      's'.repeat(32),
+    ],
+    [
+      'nothing in development',
+      undefined,
+      'development',
+      DEVELOPMENT_FORM_GUARD_SECRET,
+    ],
+    ['nothing under test', undefined, 'test', DEVELOPMENT_FORM_GUARD_SECRET],
+    ['nothing in production', undefined, 'production', null],
+  ] as const)('picks for %s', (_name, configured, nodeEnv, expected) => {
+    expect(pickFormGuardSecret(configured, nodeEnv)).toBe(expected);
   });
 });

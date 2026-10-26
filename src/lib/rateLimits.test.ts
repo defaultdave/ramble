@@ -8,7 +8,8 @@ import {
   RateLimitKeySchema,
   rateLimitPolicies,
   rateLimitSurfaces,
-  SubjectSchema,
+  decideRateLimit,
+  normalizeSubject,
 } from './rateLimits';
 
 const digest = 'a'.repeat(64);
@@ -96,17 +97,43 @@ describe('ConsumeInputSchema', () => {
   });
 });
 
-describe('SubjectSchema', () => {
-  it.each([
-    ['empty', ''],
-    ['past the length cap', 'x'.repeat(maxSubjectLength + 1)],
-  ])('refuses a subject that is %s', (_name, subject) => {
-    expect(SubjectSchema.safeParse(subject).success).toBe(false);
+describe('normalizeSubject', () => {
+  it.each(rateLimitSurfaces)(
+    '%s refuses a subject that is empty once normalized',
+    (surface) => {
+      expect(() => normalizeSubject(surface, '')).toThrow();
+      expect(() => normalizeSubject(surface, '   ')).toThrow();
+      expect(() => normalizeSubject(surface, '\t\n')).toThrow();
+    },
+  );
+
+  it('bounds the raw subject before normalizing it', () => {
+    expect(() =>
+      normalizeSubject('forms', 'x'.repeat(maxSubjectLength + 1)),
+    ).toThrow();
+    expect(
+      normalizeSubject('forms', 'x'.repeat(maxSubjectLength)),
+    ).toHaveLength(maxSubjectLength);
   });
 
-  it('accepts one at the cap', () => {
-    expect(SubjectSchema.safeParse('x'.repeat(maxSubjectLength)).success).toBe(
-      true,
+  it('returns the policy spelling', () => {
+    expect(normalizeSubject('sign_in_link', ' Guest@Example.COM ')).toBe(
+      'guest@example.com',
+    );
+    expect(normalizeSubject('reserve', ' Device-1 ')).toBe('Device-1');
+  });
+});
+
+describe('decideRateLimit', () => {
+  it.each([
+    [1, 3, { allowed: true, remaining: 2 }],
+    [3, 3, { allowed: true, remaining: 0 }],
+    [4, 3, { allowed: false, retryAfterSeconds: 9 }],
+    [1, 1, { allowed: true, remaining: 0 }],
+    [2, 1, { allowed: false, retryAfterSeconds: 9 }],
+  ])('count %i against limit %i', (count, limit, expected) => {
+    expect(decideRateLimit({ count, limit, retryAfterSeconds: 9 })).toEqual(
+      expected,
     );
   });
 });

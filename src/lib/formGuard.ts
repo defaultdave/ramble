@@ -39,3 +39,34 @@ export function evaluateFormGuard(input: {
   if (elapsed > MAX_FORM_AGE_MS) return { ok: false, reason: 'expired' };
   return { ok: true };
 }
+
+/** HMAC-SHA-256 is 32 bytes, which is exactly 43 base64url characters with no padding. */
+const TOKEN_PATTERN = /^(\d{1,15})\.([A-Za-z0-9_-]{43})$/;
+
+/**
+ * Splits `<issued at, ms>.<signature>` and nothing else: a token with another shape, a signature
+ * of another length or alphabet, or padding or whitespace around either part is refused here, so the
+ * signature the server compares is byte for byte the one it would have issued.
+ */
+export function parseFormGuardToken(
+  token: string,
+): { issuedAt: Date; issuedAtMs: string; signature: string } | null {
+  const match = TOKEN_PATTERN.exec(token);
+  if (!match) return null;
+  const [, issuedAtMs, signature] = match;
+  if (issuedAtMs === undefined || signature === undefined) return null;
+  return { issuedAt: new Date(Number(issuedAtMs)), issuedAtMs, signature };
+}
+
+/** Only where nothing is deployed. */
+export const DEVELOPMENT_FORM_GUARD_SECRET =
+  'development-only-form-guard-secret-0000';
+
+/** The configured secret; else a fixed one outside production; else null, and the caller throws. */
+export function pickFormGuardSecret(
+  configured: string | undefined,
+  nodeEnv: 'development' | 'test' | 'production',
+): string | null {
+  if (configured) return configured;
+  return nodeEnv === 'production' ? null : DEVELOPMENT_FORM_GUARD_SECRET;
+}

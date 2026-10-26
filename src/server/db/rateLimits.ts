@@ -1,6 +1,10 @@
 import 'server-only';
 import { sql } from 'drizzle-orm';
-import { ConsumeInputSchema, type RateLimitDecision } from '@/lib/rateLimits';
+import {
+  ConsumeInputSchema,
+  decideRateLimit,
+  type RateLimitDecision,
+} from '@/lib/rateLimits';
 import { db } from './client';
 import { rateLimits } from './schema';
 
@@ -38,9 +42,7 @@ export async function consumeRateLimitRow(input: {
     });
 
   if (!row) throw new Error('Rate limit upsert returned no row');
-  return row.count <= limit
-    ? { allowed: true, remaining: limit - row.count }
-    : { allowed: false, retryAfterSeconds: row.retryAfterSeconds };
+  return decideRateLimit({ ...row, limit });
 }
 
 const PURGE_BATCH = 1000;
@@ -62,5 +64,8 @@ export async function purgeExpiredRateLimits(): Promise<number> {
       FOR UPDATE SKIP LOCKED
     ) AND ${rateLimits.expiresAt} <= now()
   `);
-  return result.rowCount ?? 0;
+  if (result.rowCount === null) {
+    throw new Error('The driver did not report how many rows were purged');
+  }
+  return result.rowCount;
 }

@@ -57,6 +57,30 @@ describe('checkFormGuard', () => {
     );
   });
 
+  it('refuses the same signature spelled non-canonically', async () => {
+    const { issueFormGuardToken, checkFormGuard } = await load();
+    const token = issueFormGuardToken(issuedAt);
+    // The last of 43 characters carries 2 unused bits, which a lenient decoder ignores.
+    const alphabet =
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    const sibling = alphabet[alphabet.indexOf(token.slice(-1)) ^ 1];
+    const variants = [
+      `${token.slice(0, -1)}${String(sibling)}`,
+      `${token}\n`,
+      `${token} `,
+      `${token}=`,
+    ];
+
+    for (const variant of variants) {
+      expect(
+        checkFormGuard({ [FORM_TOKEN_FIELD]: variant }, after(10_000)),
+      ).toEqual({ ok: false, reason: 'invalid_token' });
+    }
+    expect(
+      checkFormGuard({ [FORM_TOKEN_FIELD]: token }, after(10_000)),
+    ).toEqual({ ok: true });
+  });
+
   it('refuses a token signed with another secret', async () => {
     vi.stubEnv('FORM_GUARD_SECRET', 'a'.repeat(40));
     const issuer = await load();
@@ -107,7 +131,7 @@ describe('the signing secret', () => {
       'FORM_GUARD_SECRET is not set',
     );
     expect(() =>
-      checkFormGuard({ [FORM_TOKEN_FIELD]: '1.AAAA' }, issuedAt),
+      checkFormGuard({ [FORM_TOKEN_FIELD]: `1.${'A'.repeat(43)}` }, issuedAt),
     ).toThrow('FORM_GUARD_SECRET is not set');
   });
 });

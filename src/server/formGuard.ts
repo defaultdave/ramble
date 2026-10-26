@@ -5,21 +5,16 @@ import {
   FORM_TOKEN_FIELD,
   FormGuardFieldsSchema,
   HONEYPOT_FIELD,
+  parseFormGuardToken,
+  pickFormGuardSecret,
   type FormGuardResult,
 } from '@/lib/formGuard';
 import { env } from '@/server/env';
 
-// A fixed value is safe here only because it is used where nothing is deployed.
-const DEVELOPMENT_SECRET = 'development-only-form-guard-secret-0000';
-
-function secret(): string {
-  if (env.FORM_GUARD_SECRET) return env.FORM_GUARD_SECRET;
-  if (env.NODE_ENV !== 'production') return DEVELOPMENT_SECRET;
-  throw new Error('FORM_GUARD_SECRET is not set');
-}
-
-function sign(issuedAtMs: string): Buffer {
-  return createHmac('sha256', secret()).update(issuedAtMs).digest();
+function sign(issuedAtMs: string): string {
+  const secret = pickFormGuardSecret(env.FORM_GUARD_SECRET, env.NODE_ENV);
+  if (secret === null) throw new Error('FORM_GUARD_SECRET is not set');
+  return createHmac('sha256', secret).update(issuedAtMs).digest('base64url');
 }
 
 // TODO(U-038): first caller, the contact form page; U-043 follows. Render it into
@@ -27,19 +22,13 @@ function sign(issuedAtMs: string): Buffer {
 /** `<issued at, ms>.<HMAC-SHA-256, base64url>`: a bot cannot back-date it to skip the minimum fill time. */
 export function issueFormGuardToken(now: Date): string {
   const issuedAtMs = String(now.getTime());
-  return `${issuedAtMs}.${sign(issuedAtMs).toString('base64url')}`;
+  return `${issuedAtMs}.${sign(issuedAtMs)}`;
 }
 
-function readIssuedAt(token: string): Date | null {
-  const [issuedAtMs, signature, ...rest] = token.split('.');
-  if (!issuedAtMs || !signature || rest.length > 0) return null;
-  if (!/^\d{1,15}$/.test(issuedAtMs)) return null;
-  const given = Buffer.from(signature, 'base64url');
-  const expected = sign(issuedAtMs);
-  if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
-    return null;
-  }
-  return new Date(Number(issuedAtMs));
+function signatureMatches(issuedAtMs: string, signature: string): boolean {
+  const given = Buffer.from(signature);
+  const expected = Buffer.from(sign(issuedAtMs));
+  return given.length === expected.length && timingSafeEqual(given, expected);
 }
 
 // TODO(U-038): first caller, `submitSupportRequest`; U-043 (`requestPrivateSession`) follows.
@@ -52,11 +41,13 @@ function readIssuedAt(token: string): Date | null {
 export function checkFormGuard(fields: unknown, now: Date): FormGuardResult {
   const parsed = FormGuardFieldsSchema.safeParse(fields);
   if (!parsed.success) return { ok: false, reason: 'invalid_token' };
-  const issuedAt = readIssuedAt(parsed.data[FORM_TOKEN_FIELD]);
-  if (!issuedAt) return { ok: false, reason: 'invalid_token' };
+  const token = parseFormGuardToken(parsed.data[FORM_TOKEN_FIELD]);
+  if (!token || !signatureMatches(token.issuedAtMs, token.signature)) {
+    return { ok: false, reason: 'invalid_token' };
+  }
   return evaluateFormGuard({
     honeypot: parsed.data[HONEYPOT_FIELD],
-    issuedAt,
+    issuedAt: token.issuedAt,
     now,
   });
 }

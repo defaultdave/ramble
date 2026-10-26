@@ -73,6 +73,7 @@ describe('consumeRateLimit', () => {
 
   it.each([
     ['empty', ''],
+    ['only spaces', '   '],
     ['past the length cap', 'x'.repeat(maxSubjectLength + 1)],
   ])(
     'refuses a subject that is %s without touching the store',

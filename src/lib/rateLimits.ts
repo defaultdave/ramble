@@ -62,8 +62,36 @@ export const ConsumeInputSchema = z.object({
   windowSeconds: z.int().min(1).max(maxWindowSeconds),
 });
 
-export const SubjectSchema = z.string().min(1).max(maxSubjectLength);
+const RawSubjectSchema = z.string().max(maxSubjectLength);
+const NormalizedSubjectSchema = z.string().min(1);
+
+/**
+ * The bound comes first so normalizing never works on an unbounded string; the emptiness check
+ * comes after, because a subject of spaces normalizes to nothing and would otherwise put every
+ * such caller on one shared counter. Throws on either.
+ */
+export function normalizeSubject(
+  surface: RateLimitSurface,
+  subject: string,
+): string {
+  return NormalizedSubjectSchema.parse(
+    rateLimitPolicies[surface].normalizeSubject(
+      RawSubjectSchema.parse(subject),
+    ),
+  );
+}
 
 export type RateLimitDecision =
   | { allowed: true; remaining: number }
   | { allowed: false; retryAfterSeconds: number };
+
+/** `count` is the row's count after this try. It stops at limit + 1, so a refusal reads as limit + 1. */
+export function decideRateLimit(input: {
+  count: number;
+  limit: number;
+  retryAfterSeconds: number;
+}): RateLimitDecision {
+  return input.count <= input.limit
+    ? { allowed: true, remaining: input.limit - input.count }
+    : { allowed: false, retryAfterSeconds: input.retryAfterSeconds };
+}

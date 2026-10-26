@@ -21,7 +21,7 @@ import {
   taxTreatments,
   weatherPolicies,
 } from '@/lib/catalog';
-import { cancellationTiers } from './policies';
+import { cancellationTiers, legalDocuments } from './policies';
 
 export const experienceStatusEnum = pgEnum(
   'experience_status',
@@ -131,8 +131,9 @@ export const experiences = pgTable(
     maxAge: integer(),
     taxTreatment: taxTreatmentEnum().notNull().default('unknown'),
     waiverRequired: boolean().notNull().default(false),
-    // No foreign key: the legal documents table arrives with the policy schema.
-    waiverDocumentId: uuid(),
+    waiverDocumentId: uuid().references(() => legalDocuments.id, {
+      onDelete: 'restrict',
+    }),
     linkOutUrl: text(),
     affiliateUrl: text(),
     createdAt: timestampTz().notNull().defaultNow(),

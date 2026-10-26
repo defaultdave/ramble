@@ -28,7 +28,9 @@ import {
 } from './schema';
 
 // The only place that decides what a guest may see. Every guest read goes through it.
-const guestVisible = inArray(experiences.status, [...guestVisibleStatuses]);
+export const guestVisible = inArray(experiences.status, [
+  ...guestVisibleStatuses,
+]);
 
 const byNameThenId = [asc(experiences.name), asc(experiences.id)];
 

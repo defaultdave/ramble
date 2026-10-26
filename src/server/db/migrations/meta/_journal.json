@@ -36,6 +36,13 @@
       "when": 1792988475404,
       "tag": "0004_email_message_log",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793058320358,
+      "tag": "0005_editorial_and_policy_schema",
+      "breakpoints": true
     }
   ]
 }

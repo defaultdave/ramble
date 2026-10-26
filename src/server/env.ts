@@ -12,6 +12,8 @@ const schema = z
     DATABASE_URL: postgresUrl.optional(),
     DATABASE_URL_UNPOOLED: postgresUrl.optional(),
     VERCEL: z.string().optional(),
+    // Signs the form-guard token. Read only when a guest form renders or is submitted, which throws if it is unset outside development and test.
+    FORM_GUARD_SECRET: z.string().min(32).optional(),
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV === 'test') return;

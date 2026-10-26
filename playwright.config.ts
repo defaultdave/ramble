@@ -20,7 +20,11 @@ export default defineConfig({
   webServer: {
     command: `pnpm build && pnpm start --port ${String(port)}`,
     url: `http://localhost:${String(port)}`,
-    env: { DATABASE_URL: databaseUrl, DATABASE_URL_UNPOOLED: databaseUrl },
+    env: {
+      DATABASE_URL: databaseUrl,
+      DATABASE_URL_UNPOOLED: databaseUrl,
+      DEV_MAILBOX_SECRET: 'e2e-mailbox-secret-xxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+    },
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
   },

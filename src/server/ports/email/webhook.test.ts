@@ -34,7 +34,7 @@ function post(body: string, headers: Record<string, string> = {}) {
 const respond = (request: Request, nowSeconds = 0) =>
   deliveryWebhookResponse(request, nowSeconds);
 
-const signedSecret = `whsec_${Buffer.from('0123456789abcdef0123456789abcdef').toString('base64')}`;
+const signedSecret = `whsec_${Buffer.from('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx').toString('base64')}`;
 
 function svixHeaders(body: string, timestamp: number): Record<string, string> {
   const signature = createHmac(

@@ -125,7 +125,7 @@ describe('environment', () => {
       RESEND_API_KEY: 're_key',
       EMAIL_FROM: 'Ramble <hello@ramble.example>',
       EMAIL_REPLY_TO: 'support@ramble.example',
-      EMAIL_WEBHOOK_SECRET: 'whsec_0123456789abcdef0123456789abcdef',
+      EMAIL_WEBHOOK_SECRET: `whsec_${'x'.repeat(32)}`,
     };
 
     function stub(values: Record<string, string | undefined>) {

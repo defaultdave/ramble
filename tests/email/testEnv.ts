@@ -1,5 +1,5 @@
-export const webhookSecret = 'test-email-webhook-secret-0123456789abcdef';
-export const mailboxSecret = 'test-dev-mailbox-secret-0123456789abcdef';
+export const webhookSecret = 'test-webhook-secret-xxxxxxxxxxxxxxxxxxxxxxxx';
+export const mailboxSecret = 'test-mailbox-secret-xxxxxxxxxxxxxxxxxxxxxxxxx';
 
 /** A valid parsed environment with the email settings at their defaults. */
 function emailEnv(

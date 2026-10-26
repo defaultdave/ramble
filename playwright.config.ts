@@ -23,7 +23,7 @@ export default defineConfig({
     env: {
       DATABASE_URL: databaseUrl,
       DATABASE_URL_UNPOOLED: databaseUrl,
-      DEV_MAILBOX_SECRET: 'e2e-dev-mailbox-secret-0123456789abcdef',
+      DEV_MAILBOX_SECRET: 'e2e-mailbox-secret-xxxxxxxxxxxxxxxxxxxxxxxxxxxx',
     },
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,

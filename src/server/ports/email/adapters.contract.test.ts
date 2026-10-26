@@ -25,11 +25,11 @@ import type { EmailAdapter, OutboundEmail } from './types';
 // - delivered, hard bounce, and complaint events parse to a normalized event
 // - a transient bounce and an unrelated event are ignored; a body that is not that provider's event throws
 
-const webhookKey = '0123456789abcdef0123456789abcdef';
+const webhookKey = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
 const resendSecret = `whsec_${Buffer.from(webhookKey).toString('base64')}`;
-const wrongResendSecret = `whsec_${Buffer.from('f'.repeat(32)).toString('base64')}`;
-const plainSecret = 'plain-webhook-secret-0123456789abcdef';
-const wrongPlainSecret = 'other-webhook-secret-0123456789abcdef';
+const wrongResendSecret = `whsec_${Buffer.from('y'.repeat(32)).toString('base64')}`;
+const plainSecret = 'test-webhook-secret-xxxxxxxxxxxxxxxxxxxxxxxx';
+const wrongPlainSecret = 'wrong-webhook-secret-yyyyyyyyyyyyyyyyyyyyyyyy';
 const now = 1_790_000_000;
 
 const email: OutboundEmail = {

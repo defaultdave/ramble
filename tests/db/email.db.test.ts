@@ -84,7 +84,7 @@ afterAll(async () => {
   vi.unstubAllEnvs();
 });
 
-const signingSecret = `whsec_${Buffer.from('0123456789abcdef0123456789abcdef').toString('base64')}`;
+const signingSecret = `whsec_${Buffer.from('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx').toString('base64')}`;
 const resendSettings = {
   EMAIL_PROVIDER: 'resend',
   RESEND_API_KEY: 're_key',

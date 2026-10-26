@@ -18,7 +18,7 @@ vi.mock('@/server/ports/rate-limit', () => ({ consumeRateLimit: vi.fn() }));
 
 const url = 'http://localhost/api/webhooks/email';
 const event = JSON.stringify({ messageId: 'fake-1', event: 'hard_bounce' });
-const signedSecret = `whsec_${Buffer.from('0123456789abcdef0123456789abcdef').toString('base64')}`;
+const signedSecret = `whsec_${Buffer.from('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx').toString('base64')}`;
 
 function post(body: string, headers: Record<string, string> = {}) {
   return new Request(url, { method: 'POST', body, headers });

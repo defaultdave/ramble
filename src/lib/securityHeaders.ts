@@ -23,9 +23,20 @@ export function isDynamicRoutePath(pathname: string): boolean {
   );
 }
 
-// Vercel Analytics and Speed Insights (guest pages only, U-119) load from the site's own origin
-// on Vercel and from this host in development.
+// Guest pages only. Vercel Analytics and Speed Insights load from the site's own origin on
+// Vercel and from this host in development.
 const vercelScriptHost = 'https://va.vercel-scripts.com';
+
+// Guest pages only. Sentry's loader fetches the browser SDK from the second host and reports
+// to the browser DSN's ingest host (docs/runbooks/alerting.md).
+const sentryScriptHosts = [
+  'https://js.sentry-cdn.com',
+  'https://browser.sentry-cdn.com',
+];
+const sentryIngestHosts = [
+  'https://*.ingest.sentry.io',
+  'https://*.ingest.us.sentry.io',
+];
 
 // Inline `style` attributes are allowed on both tiers: React Aria Components position popovers
 // and modals with them. A style cannot run script, and CSS exfiltration needs a cross-origin
@@ -35,7 +46,6 @@ const sharedDirectives = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' blob: data:",
   "font-src 'self'",
-  "connect-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -55,13 +65,14 @@ function scriptSources(sources: string[], { development }: PolicyOptions) {
   return `script-src ${[...sources, ...(development ? ["'unsafe-eval'"] : [])].join(' ')}`;
 }
 
-/** The enforcing policy for a dynamic route. Only scripts carrying `nonce` (and what they load) run. */
+/** The enforcing policy for a dynamic route. Only scripts carrying `nonce` (and what they load) run; nothing third-party. */
 export function enforcedContentSecurityPolicy(
   nonce: string,
   options: PolicyOptions,
 ): string {
   return serialize([
     ...sharedDirectives,
+    "connect-src 'self'",
     scriptSources(["'self'", `'nonce-${nonce}'`, "'strict-dynamic'"], options),
   ]);
 }
@@ -76,7 +87,11 @@ export function reportOnlyContentSecurityPolicy(
 ): string {
   return serialize([
     ...sharedDirectives,
-    scriptSources(["'self'", "'unsafe-inline'", vercelScriptHost], options),
+    `connect-src 'self' ${sentryIngestHosts.join(' ')}`,
+    scriptSources(
+      ["'self'", "'unsafe-inline'", vercelScriptHost, ...sentryScriptHosts],
+      options,
+    ),
   ]);
 }
 
@@ -104,16 +119,6 @@ export function contentSecurityPolicyHeader(
         key: reportOnlyHeaderName,
         value: reportOnlyContentSecurityPolicy(options),
       };
-}
-
-/** A prefetch carries no document, so it gets no policy and spends no nonce. */
-export function isPrefetchRequest(headers: {
-  get(name: string): string | null;
-}): boolean {
-  return (
-    headers.get('next-router-prefetch') !== null ||
-    headers.get('purpose')?.toLowerCase() === 'prefetch'
-  );
 }
 
 /**

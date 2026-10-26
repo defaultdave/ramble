@@ -6,7 +6,6 @@ import {
   enforcedContentSecurityPolicy,
   enforcedHeaderName,
   isDynamicRoutePath,
-  isPrefetchRequest,
   reportOnlyContentSecurityPolicy,
   reportOnlyHeaderName,
   securityHeaders,
@@ -51,6 +50,12 @@ describe('enforcedContentSecurityPolicy', () => {
     expect(directive(policy, 'script-src')).not.toContain("'unsafe-inline'");
   });
 
+  it('connects to nothing third-party', () => {
+    expect(directive(policy, 'connect-src')).toBe("connect-src 'self'");
+    expect(policy).not.toContain('sentry');
+    expect(policy).not.toContain('vercel-scripts');
+  });
+
   it('allows eval only for the development build', () => {
     expect(policy).not.toContain("'unsafe-eval'");
     expect(
@@ -69,9 +74,15 @@ describe('reportOnlyContentSecurityPolicy', () => {
     expect(policy).not.toContain('nonce-');
   });
 
-  it("allows the shell's inline bootstrap and the Vercel measurement scripts", () => {
+  it("allows the shell's inline bootstrap, the Vercel measurement scripts, and Sentry's loader", () => {
     expect(directive(policy, 'script-src')).toBe(
-      "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com",
+      "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com https://js.sentry-cdn.com https://browser.sentry-cdn.com",
+    );
+  });
+
+  it("allows Sentry's ingest hosts", () => {
+    expect(directive(policy, 'connect-src')).toBe(
+      "connect-src 'self' https://*.ingest.sentry.io https://*.ingest.us.sentry.io",
     );
   });
 
@@ -89,7 +100,6 @@ describe('both policies', () => {
     ["style-src 'self' 'unsafe-inline'"],
     ["img-src 'self' blob: data:"],
     ["font-src 'self'"],
-    ["connect-src 'self'"],
     ["object-src 'none'"],
     ["base-uri 'self'"],
     ["form-action 'self'"],
@@ -127,18 +137,6 @@ describe('contentSecurityPolicyHeader', () => {
       'Content-Security-Policy',
       'Content-Security-Policy-Report-Only',
     ]);
-  });
-});
-
-describe('isPrefetchRequest', () => {
-  it.each([
-    [{ 'next-router-prefetch': '1' }, true],
-    [{ purpose: 'prefetch' }, true],
-    [{ Purpose: 'Prefetch' }, true],
-    [{ purpose: 'navigation' }, false],
-    [{}, false],
-  ])('%j is a prefetch: %s', (headers, expected) => {
-    expect(isPrefetchRequest(new Headers(headers))).toBe(expected);
   });
 });
 

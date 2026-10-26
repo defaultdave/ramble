@@ -66,16 +66,16 @@ describe('proxy', () => {
     ['next-router-prefetch', '1'],
     ['purpose', 'prefetch'],
   ])(
-    'passes a prefetch (%s) through with no policy, no nonce, and no client header',
+    'applies the tier to a prefetch (%s) like any other request',
     (name, value) => {
       const { response, forwarded, forwardedPolicy } = run('/ops', {
         [name]: value,
         [enforced]: attacker,
       });
-      expect(response.headers.get(enforced)).toBeNull();
-      expect(response.headers.get(reportOnly)).toBeNull();
-      expect(forwardedPolicy).toBeNull();
-      expect(forwarded).not.toContain(enforced);
+      const policy = response.headers.get(enforced);
+      expect(policy).toMatch(/'nonce-/);
+      expect(policy).not.toContain('ATTACKER');
+      expect(forwardedPolicy).toBe(policy);
       expect(forwarded).toContain(name);
     },
   );
@@ -91,7 +91,7 @@ describe('proxy', () => {
 
   it('matches every page path and skips only the api, build asset, and favicon paths', () => {
     expect(config.matcher).toEqual([
-      '/((?!api(?:/|$)|_next/static|_next/image|favicon\\.ico$).*)',
+      '/((?!api(?:/|$)|_next/static(?:/|$)|_next/image(?:/|$)|favicon\\.ico$).*)',
     ]);
     const pattern = new RegExp(`^${config.matcher[0] ?? ''}$`);
     for (const path of [
@@ -100,14 +100,18 @@ describe('proxy', () => {
       '/ops',
       '/favicon.ico.bak',
       '/.well-known/security.txt',
+      '/_next/staticx',
+      '/_next/imagex',
     ]) {
       expect(pattern.test(path), path).toBe(true);
     }
     for (const path of [
       '/api',
       '/api/pulse',
+      '/_next/static',
       '/_next/static/x.js',
       '/_next/image',
+      '/_next/image/x',
       '/favicon.ico',
     ]) {
       expect(pattern.test(path), path).toBe(false);

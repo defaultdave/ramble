@@ -3,7 +3,6 @@ import {
   contentSecurityPolicyHeader,
   contentSecurityPolicyHeaderNames,
   enforcedHeaderName,
-  isPrefetchRequest,
 } from '@/lib/securityHeaders';
 import { env } from '@/server/env';
 
@@ -21,10 +20,6 @@ export function proxy(request: NextRequest) {
     requestHeaders.delete(name);
   }
 
-  if (isPrefetchRequest(request.headers)) {
-    return NextResponse.next({ request: { headers: requestHeaders } });
-  }
-
   const header = contentSecurityPolicyHeader(
     request.nextUrl.pathname,
     freshNonce(),
@@ -39,5 +34,7 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api(?:/|$)|_next/static|_next/image|favicon\\.ico$).*)'],
+  matcher: [
+    '/((?!api(?:/|$)|_next/static(?:/|$)|_next/image(?:/|$)|favicon\\.ico$).*)',
+  ],
 };

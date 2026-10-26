@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, test } from './fixtures';
 import {
   notFoundHeading,
   perRequestFallbackPaths,
@@ -262,20 +263,20 @@ test.describe('a client-supplied policy header', () => {
     expect(await response.text()).not.toContain('ATTACKER');
   });
 
-  test('never reaches a prefetch response, which carries no policy', async ({
+  test('never reaches a prefetched document, which still gets its tier', async ({
     request,
   }) => {
     const response = await request.get('/ops', {
       headers: { [enforced]: attackerPolicy, purpose: 'prefetch' },
     });
     expect(response.status()).toBe(200);
-    expect(response.headers()[enforced]).toBeUndefined();
-    expect(response.headers()[reportOnly]).toBeUndefined();
-    expect(response.headers()['cache-control']).toContain('no-store');
-    const tags = scriptTags(await response.text());
+    const nonce = nonceOf(response.headers()[enforced] ?? '');
+    const html = await response.text();
+    expect(html).not.toContain('ATTACKER');
+    const tags = scriptTags(html);
     expect(tags.length).toBeGreaterThan(0);
     for (const tag of tags) {
-      expect(tag).not.toContain('nonce=');
+      expect(tag).toContain(`nonce="${nonce}"`);
     }
   });
 });

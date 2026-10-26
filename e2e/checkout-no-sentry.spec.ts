@@ -1,11 +1,28 @@
-import { expect, test } from '@playwright/test';
+import { expect, sentryLoaderUrl, test } from './fixtures';
 import { routes } from './routes';
 
 // ADR 0007: no Sentry browser script on checkout. The unit tests hold the source; this holds the
-// built output, so a browser SDK bundled in from anywhere is caught too.
+// built output, so a browser SDK bundled in from anywhere is caught too. The server is built with
+// a fake SENTRY_BROWSER_DSN (playwright.config.ts), which is what makes the control below mean
+// something: the loader is on, and only the guest pages get it.
 const checkoutPaths = routes
   .filter(({ group }) => group === 'checkout')
   .map(({ path }) => path);
+
+test('positive control: a guest page loads the Sentry loader', async ({
+  page,
+}) => {
+  const requested: string[] = [];
+  page.on('request', (request) => requested.push(request.url()));
+
+  const response = await page.goto('/', { waitUntil: 'networkidle' });
+
+  expect(response?.status()).toBe(200);
+  expect(await response?.text()).toContain('js.sentry-cdn.com');
+  expect(requested.filter((url) => sentryLoaderUrl.test(url))).toEqual([
+    'https://js.sentry-cdn.com/0123456789abcdef0123456789abcdef.min.js',
+  ]);
+});
 
 for (const path of checkoutPaths) {
   test(`${path} loads no Sentry script`, async ({ page }) => {

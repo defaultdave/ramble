@@ -16,8 +16,8 @@ function usable(candidate: string | null | undefined): string | null {
  */
 export function resolveRequestId(
   incoming: {
-    requestId?: string | null;
-    platformId?: string | null;
+    requestId?: string | null | undefined;
+    platformId?: string | null | undefined;
   },
   generate: () => string,
 ): string {

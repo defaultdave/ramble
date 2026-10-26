@@ -106,14 +106,14 @@ describe('Sentry wrapper', () => {
 
       withRequestContext(new Headers({ 'x-request-id': 'req-77' }), () => {
         captureException(new Error('boom'), {
-          tags: { route: '/experiences/[slug]' },
+          tags: { route: '/manage/[token]' },
         });
       });
 
       const [event] = await events();
       expect(event?.tags).toMatchObject({
         request_id: 'req-77',
-        route: '/experiences/[slug]',
+        route: '/manage/[token]',
       });
       expect(event?.environment).toBe('preview');
       expect(event?.release).toBe('abc123');

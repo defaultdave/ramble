@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { UNREDACTABLE } from './redact';
 import {
   buildLogRecord,
   maxLogLineBytes,
@@ -115,5 +116,52 @@ describe('serializeLogRecord', () => {
     expect(
       new TextEncoder().encode(serializeLogRecord(record)).byteLength,
     ).toBeLessThanOrEqual(maxLogLineBytes);
+  });
+});
+
+describe('buildLogRecord never throws', () => {
+  const revoked = (() => {
+    const { proxy, revoke } = Proxy.revocable({}, {});
+    revoke();
+    return proxy;
+  })();
+
+  it.each([
+    ['an object', { to: 'a@b.co' }, '{"to":"[redacted:email]"}'],
+    ['a number', 42, '42'],
+    ['null', null, 'null'],
+    ['undefined', undefined, 'undefined'],
+    ['an error', new Error('boom a@b.co'), undefined],
+    ['a revoked proxy', revoked, UNREDACTABLE],
+  ])('writes a message given as %s', (_name, message, expected) => {
+    const record = buildLogRecord({ level: 'error', message });
+
+    expect(typeof record.message).toBe('string');
+    expect(record.message).not.toContain('a@b.co');
+    if (expected !== undefined) expect(record.message).toBe(expected);
+  });
+
+  it('writes a placeholder for fields it cannot read', () => {
+    expect(
+      buildLogRecord({ level: 'info', message: 'm', fields: revoked }),
+    ).toMatchObject({
+      fields: UNREDACTABLE,
+    });
+  });
+
+  it('writes a placeholder for a field that throws and keeps the others', () => {
+    const fields = {
+      ok: 1,
+      get bad(): string {
+        throw new Error('getter');
+      },
+    };
+
+    expect(
+      buildLogRecord({ level: 'info', message: 'm', fields }).fields,
+    ).toEqual({
+      ok: 1,
+      bad: UNREDACTABLE,
+    });
   });
 });

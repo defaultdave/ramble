@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import { routes, unknownPaths, unprerenderedParamPath } from './routes';
 
 // The CDN stores a response only when it carries no cookie and does not vary on one (ADR 0001).

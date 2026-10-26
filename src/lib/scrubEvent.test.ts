@@ -195,6 +195,22 @@ describe('scrubEvent', () => {
   });
 });
 
+describe('scrubEvent and the fingerprint', () => {
+  it('passes the fingerprint through untouched, so unrelated alerts do not merge', () => {
+    const a = 'a1'.repeat(32);
+    const b = 'b2'.repeat(32);
+
+    expect(scrubEvent({ fingerprint: ['kind', a] }).fingerprint).toEqual([
+      'kind',
+      a,
+    ]);
+    expect(scrubEvent({ fingerprint: ['kind', b] }).fingerprint).toEqual([
+      'kind',
+      b,
+    ]);
+  });
+});
+
 describe('scrubBreadcrumb', () => {
   it('redacts the message and data of one breadcrumb', () => {
     const out = scrubBreadcrumb({

@@ -22,22 +22,47 @@ function byteLength(text: string): number {
   return encoder.encode(text).byteLength;
 }
 
+// The message is typed as a string, but a logger is called from catch blocks and from code that
+// passes whatever it has; a non-string is redacted like any other value and written as JSON.
+function messageText(message: unknown): string {
+  if (typeof message === 'string') {
+    return redactString(message, maxMessageLength);
+  }
+  const redacted = redact(message);
+  // JSON.stringify returns undefined for undefined, which its type does not say.
+  const json = JSON.stringify(redacted) as string | undefined;
+  const text =
+    typeof redacted === 'string' ? redacted : (json ?? String(redacted));
+  return redactString(text, maxMessageLength);
+}
+
+function isEmptyObject(value: unknown): boolean {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.keys(value).length === 0
+  );
+}
+
+/** Builds the record for one log call. Never throws, whatever it is given. */
 export function buildLogRecord(input: {
   level: LogLevel;
-  message: string;
-  fields?: Record<string, unknown>;
+  message: unknown;
+  fields?: unknown;
   requestId?: string | undefined;
   environment?: string | undefined;
 }): LogRecord {
   const record: LogRecord = {
     level: input.level,
-    message: redactString(input.message, maxMessageLength),
+    message: messageText(input.message),
     service: 'ramble',
   };
   if (input.environment) record.environment = input.environment;
   if (input.requestId) record.requestId = input.requestId;
-  if (input.fields && Object.keys(input.fields).length > 0) {
-    record.fields = redact(input.fields);
+  if (input.fields !== undefined && input.fields !== null) {
+    const fields = redact(input.fields);
+    if (!isEmptyObject(fields)) record.fields = fields;
   }
   return record;
 }

@@ -105,6 +105,25 @@ describe('Axiom sink', () => {
     );
   });
 
+  it('treats a fetch that throws at once as a failure and frees its slot', async () => {
+    const fetchImpl = vi.fn<typeof fetch>(() => {
+      throw new TypeError('bad request');
+    });
+    const { sink, keepAlive, reportFailure } = setup({
+      maxInFlight: 1,
+      fetchImpl,
+    });
+
+    sink(record('error'));
+    await keepAlive.mock.calls[0]?.[0];
+    sink(record('error'));
+
+    expect(reportFailure).toHaveBeenCalledWith(
+      'axiom ingest failed: TypeError',
+    );
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
   it('drops records past the in-flight cap and resumes when requests finish', async () => {
     const releases: (() => void)[] = [];
     const fetchImpl = vi.fn<typeof fetch>(

@@ -23,7 +23,7 @@ export const onRequestError: Instrumentation.onRequestError = async (
 
   const { logger } = await import('@/server/monitoring/logger');
   const { captureException } = await import('@/server/monitoring/sentry');
-  const { headersFromRecord, withRequestContext } =
+  const { withRequestContext } =
     await import('@/server/monitoring/requestContext');
 
   // The route pattern, never the raw path: a manage or gift path carries a capability token.
@@ -32,7 +32,7 @@ export const onRequestError: Instrumentation.onRequestError = async (
     routeType: context.routeType,
     method: request.method,
   };
-  withRequestContext(headersFromRecord(request.headers), () => {
+  withRequestContext(request.headers, () => {
     logger.error('request failed', { ...where, error });
     captureException(error, {
       tags: {

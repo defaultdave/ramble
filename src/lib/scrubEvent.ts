@@ -111,8 +111,10 @@ export function scrubBreadcrumb<T extends object>(breadcrumb: T): T {
 /**
  * Redacts an error event or a message event before it leaves the process. Sections that hold
  * application data (message, exception text, request, user, extra, tags, custom contexts,
- * breadcrumbs, fingerprint, transaction) are scrubbed; sections the SDK fills itself (event ID,
- * timestamps, SDK info, stack frame locations, trace context) are kept as they are.
+ * breadcrumbs, transaction) are scrubbed; sections the SDK fills itself (event ID,
+ * timestamps, SDK info, stack frame locations, trace context) are kept as they are. So is the
+ * fingerprint, which `prepareAlert` has already refused to build from anything that looks secret;
+ * scrubbing it here would merge unrelated alerts into one issue.
  */
 export function scrubEvent<T extends object>(event: T): T {
   const source = event as Bag;
@@ -137,7 +139,5 @@ export function scrubEvent<T extends object>(event: T): T {
   if ('breadcrumbs' in out) {
     out.breadcrumbs = scrubList(out.breadcrumbs, scrubBreadcrumbValue);
   }
-  if ('fingerprint' in out)
-    out.fingerprint = scrubList(out.fingerprint, scrubText);
   return out as T;
 }

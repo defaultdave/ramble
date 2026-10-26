@@ -60,6 +60,14 @@ describe('the app logger', () => {
     ]);
   });
 
+  it('keeps a route pattern whole, placeholders included', async () => {
+    const { logger, stdout } = await load();
+
+    logger.info('request failed', { route: '/manage/[token]' });
+
+    expect(stdout()[0]?.fields).toEqual({ route: '/manage/[token]' });
+  });
+
   it('stamps the environment', async () => {
     const { logger, stdout } = await load({ VERCEL_ENV: 'preview' });
 

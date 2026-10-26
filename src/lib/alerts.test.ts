@@ -71,6 +71,34 @@ describe('prepareAlert', () => {
     expect(() => prepareAlert(input)).toThrow();
   });
 
+  it.each([
+    ['a 64-character hex digest', 'a1'.repeat(32)],
+    ['a base64url token', 'q7Hk2mVx9RtLw3NfZ8bYc1DsJ6aPe4UoG0iAhXnT5vE'],
+    [
+      'a key prefixed by a token',
+      'order:q7Hk2mVx9RtLw3NfZ8bYc1DsJ6aPe4UoG0iAhXnT5vE',
+    ],
+    ['a Stripe key', 'sk_live_51Habcdefghijklmnop'],
+  ])(
+    'refuses a dedupe key that looks like a secret: %s',
+    (_name, dedupeKey) => {
+      expect(() =>
+        prepareAlert({ kind: 'ab', severity: 'error', dedupeKey }),
+      ).toThrow(/secret/);
+    },
+  );
+
+  it.each([
+    ['a UUID', '9f1c2b7e-4d5a-4e8b-9c3d-1a2b3c4d5e6f'],
+    ['a record key', 'order:ord_123'],
+    ['a date', 'recon:2026-10-25'],
+    ['a long lowercase name', 'daily-balance-reconciliation-mismatch-report'],
+  ])('accepts a dedupe key that is %s', (_name, dedupeKey) => {
+    expect(
+      prepareAlert({ kind: 'ab', severity: 'error', dedupeKey }).fingerprint,
+    ).toEqual(['ab', dedupeKey]);
+  });
+
   it('exposes the tag the Sentry alert rules filter on', () => {
     expect(alertTag).toBe('ramble_alert');
   });

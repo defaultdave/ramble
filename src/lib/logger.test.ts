@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { LogRecord } from './log';
+import { UNREDACTABLE } from './redact';
 import { createLogger } from './logger';
 
 function setup(requestId: () => string | undefined = () => undefined) {
@@ -88,5 +89,58 @@ describe('createLogger', () => {
     }).not.toThrow();
     expect(records).toHaveLength(1);
     expect(onSinkError).toHaveBeenCalledOnce();
+  });
+
+  describe('never throws', () => {
+    const hostileFields = () =>
+      ({
+        ok: 'kept',
+        get bad(): string {
+          throw new Error('getter');
+        },
+      }) as Record<string, unknown>;
+
+    it('keeps the other fields when one top-level field throws on read', () => {
+      const { logger, records } = setup();
+
+      expect(() => {
+        logger.error('failed', hostileFields());
+      }).not.toThrow();
+      expect(records[0]?.fields).toEqual({ ok: 'kept', bad: UNREDACTABLE });
+    });
+
+    it('survives a revoked proxy as the fields', () => {
+      const { logger, records } = setup();
+      const { proxy, revoke } = Proxy.revocable({}, {});
+      revoke();
+
+      expect(() => {
+        logger.warn('failed', proxy);
+      }).not.toThrow();
+      expect(records[0]?.fields).toEqual({ fields: UNREDACTABLE });
+    });
+
+    it('survives hostile fields in a child logger', () => {
+      const { logger, records } = setup();
+
+      expect(() => {
+        logger.child(hostileFields()).info('x');
+      }).not.toThrow();
+      expect(records[0]?.fields).toEqual({ ok: 'kept', bad: UNREDACTABLE });
+    });
+
+    it.each([
+      ['an object', { a: 'a@b.co' }],
+      ['null', null],
+      ['a number', 7],
+      ['an error', new Error('x a@b.co')],
+    ])('survives a message that is %s', (_name, message) => {
+      const { logger, records } = setup();
+
+      expect(() => {
+        logger.info(message as unknown as string);
+      }).not.toThrow();
+      expect(JSON.stringify(records)).not.toContain('a@b.co');
+    });
   });
 });

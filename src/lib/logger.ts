@@ -1,4 +1,5 @@
 import { buildLogRecord, type LogLevel, type LogRecord } from './log';
+import { UNREDACTABLE } from './redact';
 
 export type LogSink = (record: LogRecord) => void;
 
@@ -21,6 +22,29 @@ export type LoggerOptions = {
   bindings?: Record<string, unknown>;
 };
 
+// Reading a field can run caller code (a getter, a proxy). One field that throws becomes a
+// placeholder for that field, and the rest are kept.
+function readFields(
+  source: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  if (!source) return {};
+  let keys: string[];
+  try {
+    keys = Object.keys(source);
+  } catch {
+    return { fields: UNREDACTABLE };
+  }
+  return Object.fromEntries(
+    keys.map((key): [string, unknown] => {
+      try {
+        return [key, source[key]];
+      } catch {
+        return [key, UNREDACTABLE];
+      }
+    }),
+  );
+}
+
 export function createLogger(options: LoggerOptions): Logger {
   const bindings = options.bindings ?? {};
 
@@ -32,7 +56,7 @@ export function createLogger(options: LoggerOptions): Logger {
     const record = buildLogRecord({
       level,
       message,
-      fields: { ...bindings, ...fields },
+      fields: { ...bindings, ...readFields(fields) },
       requestId: options.requestId(),
       environment: options.environment,
     });
@@ -59,6 +83,9 @@ export function createLogger(options: LoggerOptions): Logger {
       write('error', message, fields);
     },
     child: (fields) =>
-      createLogger({ ...options, bindings: { ...bindings, ...fields } }),
+      createLogger({
+        ...options,
+        bindings: { ...bindings, ...readFields(fields) },
+      }),
   };
 }

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { redactString } from './redact';
 
 const alertSeverities = ['warning', 'error', 'critical'] as const;
 export type AlertSeverity = (typeof alertSeverities)[number];
@@ -55,6 +56,13 @@ export function prepareAlert(input: {
   dedupeKey: string;
 }): PreparedAlert {
   const parsed = alertSchema.parse(input);
+  // The fingerprint reaches Sentry as it is, so a key that redaction would change (a hash, a
+  // token, a long mixed-case ID) is refused here instead of being altered on the way out.
+  for (const value of [parsed.kind, parsed.dedupeKey]) {
+    if (redactString(value) !== value) {
+      throw new Error('Alert kind and dedupe key must not look like a secret');
+    }
+  }
   return {
     ...parsed,
     level: sentryLevels[parsed.severity],

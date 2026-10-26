@@ -47,7 +47,11 @@ function importsOf(file: string): string[] {
 function checkoutClosure() {
   const seen = new Set<string>();
   const specifiers = new Set<string>();
-  const queue = listFiles(checkoutGroup).filter((f) => /\.(ts|tsx)$/.test(f));
+  // global-error replaces the root layout for every group, checkout included, when it renders.
+  const queue = [
+    path.join(src, 'app', 'global-error.tsx'),
+    ...listFiles(checkoutGroup).filter((f) => /\.(ts|tsx)$/.test(f)),
+  ];
   while (queue.length > 0) {
     const file = queue.pop();
     if (!file || seen.has(file)) continue;
@@ -67,6 +71,7 @@ describe('the checkout route group', () => {
   it('reaches a meaningful set of modules', () => {
     expect(files.length).toBeGreaterThan(8);
     expect(files.some((f) => f.endsWith('SiteShell.tsx'))).toBe(true);
+    expect(files.some((f) => f.endsWith('global-error.tsx'))).toBe(true);
   });
 
   it('imports no Sentry package and no Sentry browser script', () => {

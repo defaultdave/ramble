@@ -8,7 +8,7 @@ import {
   TRUNCATED,
 } from './redact';
 
-// A 32-byte capability token as base64url, the shape U-015 will mint.
+// A 32-byte capability token as base64url, the shape of an HMAC-SHA256 capability token.
 const capabilityToken = 'q7Hk2mVx9RtLw3NfZ8bYc1DsJ6aPe4UoG0iAhXnT5vE';
 
 describe('redaction behaviours', () => {
@@ -90,14 +90,19 @@ describe('redaction behaviours', () => {
       ['a card number with hyphens', '4242-4242-4242-4242', '[redacted:card]'],
       [
         'a card number run together',
-        'pan=4242424242424242',
-        'pan=[redacted:card]',
+        'ref 4242424242424242',
+        'ref [redacted:card]',
       ],
       ['an amex number', '378282246310005', '[redacted:card]'],
       [
         'a bearer header',
         'Authorization: Bearer abc123def456ghi789',
-        'Authorization: Bearer [redacted]',
+        'Authorization: [redacted]',
+      ],
+      [
+        'a bare bearer value',
+        'sent Bearer abc123def456ghi789 ok',
+        'sent Bearer [redacted] ok',
       ],
       ['a basic header', 'Basic dXNlcjpwYXNzd29yZA==', 'Basic [redacted]'],
       [
@@ -299,7 +304,7 @@ describe('redaction behaviours', () => {
         },
       };
 
-      expect(redact(input)).toEqual({ ok: 1, boom: '[unreadable]' });
+      expect(redact(input)).toEqual({ ok: 1, boom: '[unredactable]' });
     });
   });
 

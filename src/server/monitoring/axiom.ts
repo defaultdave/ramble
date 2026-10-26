@@ -37,14 +37,20 @@ export function createAxiomSink(options: AxiomSinkOptions) {
     if (inFlight >= maxInFlight) return;
     inFlight += 1;
 
-    const sent = fetchImpl(url, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${options.token}`,
-        'Content-Type': 'application/json',
-      },
-      body: `[${serializeLogRecord(record)}]`,
-      signal: AbortSignal.timeout(timeoutMs),
+    // Built inside the promise so a throw while preparing the request is a failure like any other,
+    // and still releases its slot.
+    const sent = new Promise<Response>((resolve) => {
+      resolve(
+        fetchImpl(url, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${options.token}`,
+            'Content-Type': 'application/json',
+          },
+          body: `[${serializeLogRecord(record)}]`,
+          signal: AbortSignal.timeout(timeoutMs),
+        }),
+      );
     })
       .then((response) => {
         if (!response.ok) {

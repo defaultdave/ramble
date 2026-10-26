@@ -29,6 +29,13 @@ export class IdempotencyConflictError extends Error {
   }
 }
 
+export class AdapterChangedError extends Error {
+  constructor() {
+    super('The email settings changed since this message was first tried');
+    this.name = 'AdapterChangedError';
+  }
+}
+
 export class SendAttemptsExhaustedError extends Error {
   constructor() {
     super('Every send attempt for this email has been used');

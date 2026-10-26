@@ -34,7 +34,7 @@ export function MailboxUnlockForm({
         aria-describedby={
           denied || limited ? 'mailbox-secret-error' : undefined
         }
-        aria-invalid={denied || undefined}
+        aria-invalid={denied || limited || undefined}
         className={styles.input}
       />
       {denied || limited ? (

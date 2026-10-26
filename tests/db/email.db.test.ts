@@ -37,6 +37,8 @@ vi.mock('@/server/env', () => ({ env: testEnv }));
 // - a provider failure is logged as failed with a reason, thrown, and a retry under the same key can succeed
 // - the sixth attempt is refused without a provider call
 // - a fresh queued message is left alone, and one a crashed sender abandoned is claimed
+// - a retry after the settings changed is refused with no attempt used and nothing sent, and a settled message stays settled
+// - recording a send, a failure, or a suppression that matches no row throws
 // - an adapter that cannot be built (no key) fails before any row is written
 // delivery webhook
 // - delivered moves a sent message to delivered
@@ -48,7 +50,8 @@ vi.mock('@/server/env', () => ({ env: testEnv }));
 // - they list only captured messages, newest first, capped at 100, and the detail returns the bodies
 // - a message sent through a real provider is not in the mailbox
 // rate limiting
-// - the real limiter lets 600 webhook tries through in a window and refuses the 601st with a retry time
+// - 20 failed verifications from one address are 401 and the 21st is 429 with Retry-After, while other addresses and verified requests still pass
+// - the 601st verified request in a minute is 429, and failed verifications do not use that cap
 // database constraints
 // - each CHECK, the enums, both unique constraints, and the suppression foreign key refuse a bad row
 // - the address pattern means the same in JavaScript and in Postgres
@@ -162,7 +165,7 @@ function resendRefuses(status: number) {
 }
 
 function post(body: string, headers: Record<string, string>) {
-  return webhook.receiveDeliveryWebhook(
+  return webhook.deliveryWebhookResponse(
     new Request('http://localhost/api/webhooks/email', {
       method: 'POST',
       body,
@@ -435,6 +438,46 @@ describe('sending through a provider', () => {
     expect((await rowFor(input.idempotencyKey)).attempts).toBe(2);
   });
 
+  it('refuses a retry after the settings changed, using up no attempt and sending nothing', async () => {
+    setMode(live);
+    const input = request();
+    resendRefuses(503);
+    await expect(email.sendEmail(input)).rejects.toThrow();
+    const calls = resendAccepts();
+
+    setMode({ EMAIL_MODE: 'sink' });
+    await expect(email.sendEmail(input)).rejects.toThrow(
+      errors.AdapterChangedError,
+    );
+    setMode({
+      ...live,
+      EMAIL_PROVIDER: 'postmark',
+      POSTMARK_SERVER_TOKEN: 'pm',
+    });
+    await expect(email.sendEmail(input)).rejects.toThrow(
+      errors.AdapterChangedError,
+    );
+
+    expect(calls).toHaveLength(0);
+    expect(await rowFor(input.idempotencyKey)).toMatchObject({
+      status: 'failed',
+      attempts: 1,
+      adapter: 'resend',
+      html: null,
+    });
+  });
+
+  it('settles a sent message whatever the settings are now', async () => {
+    const input = request();
+    await email.sendEmail(input);
+    setMode(live);
+
+    expect(await email.sendEmail(input)).toMatchObject({
+      status: 'captured',
+      deduplicated: true,
+    });
+  });
+
   it('fails before writing a row when the provider is not configured', async () => {
     setMode({ EMAIL_PROVIDER: 'resend', EMAIL_MODE: 'live' });
     const input = request();
@@ -442,6 +485,23 @@ describe('sending through a provider', () => {
     await expect(email.sendEmail(input)).rejects.toThrow('RESEND_API_KEY');
 
     expect(await rowsFor(input.idempotencyKey)).toHaveLength(0);
+  });
+});
+
+describe('writes that match no row', () => {
+  it('throw, so a lost write is never mistaken for a recorded one', async () => {
+    const { messageId } = await email.sendEmail(request());
+
+    await expect(
+      log.recordSent(messageId, { status: 'sent', providerMessageId: 'x' }),
+    ).rejects.toThrow('expected 1');
+    await expect(log.recordFailed(messageId, 'late')).rejects.toThrow(
+      'expected 1',
+    );
+    await expect(log.recordSuppressed(messageId)).rejects.toThrow('expected 1');
+    await expect(log.recordFailed(randomUUID(), 'gone')).rejects.toThrow(
+      'expected 1',
+    );
   });
 });
 
@@ -856,18 +916,33 @@ describe('webhook rate limiting with the real limiter', () => {
     await client.db.execute(sql`DELETE FROM rate_limits`);
   });
 
-  it('answers 401 to 600 bad tries in a window and 429 to the next', async () => {
-    const tryOnce = () => post('{}', {});
+  const bad = (address: string) => post('{}', { 'x-forwarded-for': address });
+
+  it('answers 401 to 20 failed verifications from one address and 429 to the next, without touching other addresses or verified traffic', async () => {
+    for (let n = 0; n < 20; n += 1) {
+      expect((await bad('203.0.113.9')).status).toBe(401);
+    }
+    const refused = await bad('203.0.113.9');
+
+    expect(refused.status).toBe(429);
+    const retry = Number(refused.headers.get('retry-after'));
+    expect(retry).toBeGreaterThanOrEqual(1);
+    expect(retry).toBeLessThanOrEqual(600);
+    expect((await bad('203.0.113.10')).status).toBe(401);
+    const verified = await fakeEvent('fake-unknown', 'delivered');
+    expect(verified.status).toBe(200);
+  });
+
+  it('refuses the 601st verified request in a minute and counts only verified ones against that cap', async () => {
+    await client.db.execute(sql`DELETE FROM rate_limits`);
 
     for (let n = 0; n < 600; n += 1) {
-      expect((await tryOnce()).status).toBe(401);
+      expect((await fakeEvent('fake-unknown', 'delivered')).status).toBe(200);
     }
-    const refused = await tryOnce();
+    const refused = await fakeEvent('fake-unknown', 'delivered');
 
-    expect(refused).toMatchObject({ status: 429 });
-    const retry =
-      'retryAfterSeconds' in refused ? refused.retryAfterSeconds : 0;
-    expect(retry).toBeGreaterThanOrEqual(1);
-    expect(retry).toBeLessThanOrEqual(60);
+    expect(refused.status).toBe(429);
+    expect(Number(refused.headers.get('retry-after'))).toBeLessThanOrEqual(60);
+    expect((await bad('198.51.100.1')).status).toBe(401);
   });
 });

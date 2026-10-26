@@ -1,6 +1,10 @@
 import 'server-only';
 import type { z } from 'zod';
-import type { EmailAdapterName } from '@/lib/email/message';
+import {
+  isRetryableStatus,
+  summarizeRefusal,
+  type EmailAdapterName,
+} from '@/lib/email/message';
 import { readBodyText } from '@/server/boundedBody';
 import { EmailProviderError, WebhookPayloadError } from './errors';
 
@@ -19,7 +23,7 @@ type PostJson = {
 async function refusalDetail(response: Response): Promise<string> {
   try {
     const { text } = await readBodyText(response, maxErrorDetailLength * 4);
-    const detail = text.slice(0, maxErrorDetailLength).replaceAll(/\s+/g, ' ');
+    const detail = summarizeRefusal(text, maxErrorDetailLength);
     return detail ? `: ${detail}` : '';
   } catch {
     return ' (the body could not be read)';
@@ -58,7 +62,7 @@ export async function postJson({
     throw new EmailProviderError(
       adapter,
       `responded ${String(response.status)}${await refusalDetail(response)}`,
-      { retryable: response.status === 429 || response.status >= 500 },
+      { retryable: isRetryableStatus(response.status) },
     );
   }
   // The provider took the message, so a second send could deliver it twice: nothing below retries.

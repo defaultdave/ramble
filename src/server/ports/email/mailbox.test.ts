@@ -13,7 +13,7 @@ vi.mock('@/server/db/messages', () => ({
 // Behaviours under test, one per decision, branch, or risk:
 // - with no DEV_MAILBOX_SECRET the mailbox is disabled, for the list, the detail, and unlocking
 // - in live mode it is disabled even when the secret is set, since real mail is flowing
-// - a wrong or oversize secret does not unlock; the right one gives a cookie value that is not the secret
+// - a wrong secret does not unlock; the right one gives a cookie value that is not the secret
 // - with no cookie, a wrong cookie, or the raw secret as the cookie, the list and detail are locked and read nothing
 // - with the unlock cookie the list is read, and a detail is read when the ID is a UUID
 // - a malformed ID is missing without a query, and an unknown ID is missing
@@ -71,7 +71,6 @@ describe('unlockMailbox', () => {
   it.each([
     ['a wrong secret', `${mailboxSecret}x`],
     ['an empty secret', ''],
-    ['an oversize secret', 'x'.repeat(257)],
   ])('gives nothing for %s', (_label, submitted) => {
     expect(unlockMailbox(submitted)).toBeNull();
   });

@@ -2,6 +2,8 @@ import 'server-only';
 import { createHmac } from 'node:crypto';
 import { z } from 'zod';
 import {
+  isFreshTimestamp,
+  isPermanentBounce,
   maxProviderMessageIdLength,
   type DeliveryEventKind,
 } from '@/lib/email/message';
@@ -74,7 +76,13 @@ export function createResendAdapter(options: {
       if (!id || !timestamp || !signatures) return false;
       if (signatures.length > maxSignatureHeaderLength) return false;
       if (!/^\d{1,12}$/.test(timestamp)) return false;
-      if (Math.abs(nowSeconds - Number(timestamp)) > timestampToleranceSeconds)
+      if (
+        !isFreshTimestamp(
+          Number(timestamp),
+          nowSeconds,
+          timestampToleranceSeconds,
+        )
+      )
         return false;
 
       const expected = createHmac('sha256', signingKey)
@@ -95,7 +103,10 @@ export function createResendAdapter(options: {
       if (!kind) return null;
       const { data } = parseWebhookBody('resend', EventSchema, rawBody);
       // Only a permanent bounce closes the address; a transient one may still be delivered.
-      if (kind === 'hard_bounce' && data.bounce?.type !== 'Permanent') {
+      if (
+        kind === 'hard_bounce' &&
+        !isPermanentBounce('resend', data.bounce?.type)
+      ) {
         return null;
       }
       return { providerMessageId: data.email_id, kind };

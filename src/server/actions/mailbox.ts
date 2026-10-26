@@ -1,9 +1,10 @@
 'use server';
 
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { consumeRateLimit } from '@/server/ports/rate-limit';
+import { clientAddress } from '@/lib/clientAddress';
 import { env } from '@/server/env';
 import {
   mailboxCookieMaxAgeSeconds,
@@ -15,12 +16,18 @@ import {
 const UnlockFormSchema = z.object({ secret: z.string().max(256) });
 
 export async function unlockDevMailbox(formData: FormData): Promise<void> {
-  const limit = await consumeRateLimit('mailbox_unlock', 'mailbox');
-  if (!limit.allowed) redirect(`${mailboxPath}?limited=1`);
-
   const form = UnlockFormSchema.safeParse({ secret: formData.get('secret') });
   const token = form.success ? unlockMailbox(form.data.secret) : null;
-  if (token === null) redirect(`${mailboxPath}?denied=1`);
+
+  if (token === null) {
+    // Only a wrong secret is counted, and against the caller's own address, so nobody else's
+    // attempts can lock the owner out, and the right secret is never refused.
+    const failures = await consumeRateLimit(
+      'mailbox_unlock_failed',
+      clientAddress((await headers()).get('x-forwarded-for')),
+    );
+    redirect(`${mailboxPath}?${failures.allowed ? 'denied' : 'limited'}=1`);
+  }
 
   (await cookies()).set(mailboxCookieName, token, {
     httpOnly: true,

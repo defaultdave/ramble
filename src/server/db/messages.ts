@@ -23,6 +23,7 @@ export type MessageRecord = {
   status: MessageStatus;
   template: string;
   recipient: string;
+  adapter: EmailAdapterName;
   attempts: number;
 };
 
@@ -31,6 +32,7 @@ const recordColumns = {
   status: messages.status,
   template: messages.template,
   recipient: messages.recipient,
+  adapter: messages.adapter,
   attempts: messages.attempts,
 };
 
@@ -73,7 +75,10 @@ export async function insertMessage(
  * Takes a failed message, or one a crashed sender left queued, for one more provider call. Null
  * when another caller has it in flight, or when the attempts are used up.
  */
-export async function claimRetry(id: string): Promise<MessageRecord | null> {
+export async function claimRetry(
+  id: string,
+  adapter: EmailAdapterName,
+): Promise<MessageRecord | null> {
   const [row] = await db
     .update(messages)
     .set({
@@ -85,6 +90,7 @@ export async function claimRetry(id: string): Promise<MessageRecord | null> {
     .where(
       and(
         eq(messages.id, id),
+        eq(messages.adapter, adapter),
         lt(messages.attempts, maxSendAttempts),
         or(
           eq(messages.status, 'failed'),
@@ -102,6 +108,15 @@ export async function claimRetry(id: string): Promise<MessageRecord | null> {
   return row ?? null;
 }
 
+/** A write that matches no row means the message was not in the state this call assumed, so it throws. */
+function expectOneRow(rows: unknown[], what: string): void {
+  if (rows.length !== 1) {
+    throw new Error(
+      `Recording ${what} changed ${String(rows.length)} rows, expected 1`,
+    );
+  }
+}
+
 export async function recordSent(
   id: string,
   sent: {
@@ -110,7 +125,7 @@ export async function recordSent(
     body?: { html: string; text: string };
   },
 ): Promise<void> {
-  await db
+  const rows = await db
     .update(messages)
     .set({
       status: sent.status,
@@ -119,19 +134,23 @@ export async function recordSent(
       textBody: sent.body?.text ?? null,
       updatedAt: sql`now()`,
     })
-    .where(and(eq(messages.id, id), eq(messages.status, 'queued')));
+    .where(and(eq(messages.id, id), eq(messages.status, 'queued')))
+    .returning({ id: messages.id });
+  expectOneRow(rows, 'a sent message');
 }
 
 export async function recordFailed(id: string, reason: string): Promise<void> {
-  await db
+  const rows = await db
     .update(messages)
     .set({ status: 'failed', failureReason: reason, updatedAt: sql`now()` })
-    .where(and(eq(messages.id, id), eq(messages.status, 'queued')));
+    .where(and(eq(messages.id, id), eq(messages.status, 'queued')))
+    .returning({ id: messages.id });
+  expectOneRow(rows, 'a failed message');
 }
 
 /** For a message that was failed or abandoned and whose address has since been suppressed. */
 export async function recordSuppressed(id: string): Promise<void> {
-  await db
+  const rows = await db
     .update(messages)
     .set({ status: 'suppressed', failureReason: null, updatedAt: sql`now()` })
     .where(
@@ -139,7 +158,9 @@ export async function recordSuppressed(id: string): Promise<void> {
         eq(messages.id, id),
         or(eq(messages.status, 'failed'), eq(messages.status, 'queued')),
       ),
-    );
+    )
+    .returning({ id: messages.id });
+  expectOneRow(rows, 'a suppressed message');
 }
 
 export async function isAddressSuppressed(address: string): Promise<boolean> {

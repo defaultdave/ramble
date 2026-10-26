@@ -138,3 +138,120 @@ const timestampFormat = new Intl.DateTimeFormat('en-US', {
 export function formatMailboxTimestamp(at: Date): string {
   return `${timestampFormat.format(at)} UTC`;
 }
+
+/** What the send path does with a message that already has this idempotency key. */
+export type ExistingMessagePlan =
+  'settled' | 'resume' | 'conflict' | 'adapter_changed';
+
+/**
+ * A key already used for another template or recipient is a conflict, never a second send. A
+ * message past `queued` or `failed` is settled. One that can be resumed is resumed only through
+ * the adapter it started on: a changed configuration between attempts must fail, because the row
+ * (its adapter, and whether it may hold a body) would no longer describe the send.
+ */
+export function planExistingMessage(
+  existing: {
+    status: MessageStatus;
+    template: string;
+    recipient: string;
+    adapter: EmailAdapterName;
+  },
+  request: { template: string; to: string; adapter: EmailAdapterName },
+): ExistingMessagePlan {
+  if (
+    existing.template !== request.template ||
+    existing.recipient !== request.to
+  ) {
+    return 'conflict';
+  }
+  if (existing.status !== 'failed' && existing.status !== 'queued') {
+    return 'settled';
+  }
+  return existing.adapter === request.adapter ? 'resume' : 'adapter_changed';
+}
+
+/** True once a failed message has used every provider call it gets. */
+export function sendAttemptsExhausted(message: {
+  status: MessageStatus;
+  attempts: number;
+}): boolean {
+  return message.status === 'failed' && message.attempts >= maxSendAttempts;
+}
+
+/** The text stored for a failed send: the error's message cut to the column limit, never empty. */
+export function failureReasonFor(error: unknown): string {
+  const message = error instanceof Error ? error.message : '';
+  return message.slice(0, maxFailureReasonLength) || 'Unknown error';
+}
+
+/**
+ * The status a sent message takes, and whether its body is kept. Only the fake adapter (the dev
+ * mailbox) keeps a body: a real send's body can hold a capability link.
+ */
+export function outcomeForAdapter(adapter: EmailAdapterName): {
+  status: 'sent' | 'captured';
+  keepsBody: boolean;
+} {
+  return adapter === 'fake'
+    ? { status: 'captured', keepsBody: true }
+    : { status: 'sent', keepsBody: false };
+}
+
+/**
+ * True when a provider's bounce type means the address will not accept mail, so it should be
+ * suppressed. Resend says `Permanent`; Postmark says `HardBounce` or `BadEmailAddress`. A transient
+ * or unknown type may still be delivered later and suppresses nothing.
+ */
+export function isPermanentBounce(
+  provider: 'resend' | 'postmark',
+  type: string | undefined,
+): boolean {
+  switch (provider) {
+    case 'resend':
+      return type === 'Permanent';
+    case 'postmark':
+      return type === 'HardBounce' || type === 'BadEmailAddress';
+  }
+}
+
+/** True when a provider answer's status says the same request could succeed later. */
+export function isRetryableStatus(status: number): boolean {
+  return status === 429 || status >= 500;
+}
+
+/** The start of a provider's refusal, on one line, short enough for the failure column. */
+export function summarizeRefusal(body: string, maxLength: number): string {
+  return body.slice(0, maxLength).replaceAll(/\s+/g, ' ').trim();
+}
+
+/** True when a Content-Length header declares more than `max` bytes. An absent header declares nothing. */
+export function declaredLengthExceeds(
+  header: string | null,
+  max: number,
+): boolean {
+  return Number(header ?? 0) > max;
+}
+
+/** True when a signed timestamp (unix seconds) is within `toleranceSeconds` of now, either way. */
+export function isFreshTimestamp(
+  timestamp: number,
+  nowSeconds: number,
+  toleranceSeconds: number,
+): boolean {
+  return Math.abs(nowSeconds - timestamp) <= toleranceSeconds;
+}
+
+/**
+ * Whether the dev mailbox may be used and who is let in. It exists only where mail does not really
+ * leave: it is off in live mode and until a secret is set. `cookieMatches` is the constant-time
+ * comparison of the presented cookie with the one the secret yields.
+ */
+export function mailboxAccess(input: {
+  liveMode: boolean;
+  secretConfigured: boolean;
+  hasCookie: boolean;
+  cookieMatches: boolean;
+}): 'disabled' | 'locked' | 'open' {
+  if (input.liveMode || !input.secretConfigured) return 'disabled';
+  return input.hasCookie && input.cookieMatches ? 'open' : 'locked';
+}

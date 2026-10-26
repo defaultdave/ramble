@@ -12,7 +12,8 @@ import { emailSettingIssues } from '@/lib/email/settings';
 const postgresUrl = z.url({ protocol: /^postgres(ql)?$/ });
 
 const apiCredential = z.string().min(1).max(256);
-// Long enough that guessing it is out of reach, since no rate limit stands in front of it yet.
+// Long enough that guessing it is out of reach. The dev mailbox counts wrong guesses per source
+// address, but a right secret is never refused, so length is the real protection.
 const sharedSecret = z.string().min(32).max(256);
 
 const schema = z

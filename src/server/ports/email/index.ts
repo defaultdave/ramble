@@ -1,7 +1,9 @@
 import 'server-only';
 import {
-  maxFailureReasonLength,
-  maxSendAttempts,
+  failureReasonFor,
+  outcomeForAdapter,
+  planExistingMessage,
+  sendAttemptsExhausted,
   type MessageStatus,
 } from '@/lib/email/message';
 import { chooseAdapter } from '@/lib/email/route';
@@ -17,7 +19,11 @@ import {
   type MessageRecord,
 } from '@/server/db/messages';
 import { getAdapter, getEmailConfig } from './config';
-import { IdempotencyConflictError, SendAttemptsExhaustedError } from './errors';
+import {
+  AdapterChangedError,
+  IdempotencyConflictError,
+  SendAttemptsExhaustedError,
+} from './errors';
 import { renderEmail } from './render';
 
 export type SendEmailResult = {
@@ -32,15 +38,6 @@ const settled = (message: MessageRecord): SendEmailResult => ({
   status: message.status,
   deduplicated: true,
 });
-
-/** A failed message, or one a crashed sender left queued, can be sent again. */
-const canResume = (status: MessageStatus) =>
-  status === 'failed' || status === 'queued';
-
-function failureReason(error: unknown): string {
-  const message = error instanceof Error ? error.message : '';
-  return message.slice(0, maxFailureReasonLength) || 'Unknown error';
-}
 
 // TODO(U-004a): first caller, the sign-in link.
 /**
@@ -57,13 +54,14 @@ export async function sendEmail(input: EmailRequest): Promise<SendEmailResult> {
 
   const existing = await findMessageByKey(request.idempotencyKey);
   if (existing) {
-    if (
-      existing.template !== request.template ||
-      existing.recipient !== request.to
-    ) {
-      throw new IdempotencyConflictError();
-    }
-    if (!canResume(existing.status)) return settled(existing);
+    const plan = planExistingMessage(existing, {
+      template: request.template,
+      to: request.to,
+      adapter: adapterName,
+    });
+    if (plan === 'conflict') throw new IdempotencyConflictError();
+    if (plan === 'adapter_changed') throw new AdapterChangedError();
+    if (plan === 'settled') return settled(existing);
   }
 
   const rendered = await renderEmail(request, config.appUrl);
@@ -79,7 +77,7 @@ export async function sendEmail(input: EmailRequest): Promise<SendEmailResult> {
         deduplicated: false,
       };
     }
-    claimed = await claimRetry(existing.id);
+    claimed = await claimRetry(existing.id, adapterName);
   } else {
     claimed = await insertMessage(
       {
@@ -103,7 +101,7 @@ export async function sendEmail(input: EmailRequest): Promise<SendEmailResult> {
   if (!claimed) {
     const current = await findMessageByKey(request.idempotencyKey);
     if (!current) throw new Error('A message row vanished while being sent');
-    if (current.status === 'failed' && current.attempts >= maxSendAttempts) {
+    if (sendAttemptsExhausted(current)) {
       throw new SendAttemptsExhaustedError();
     }
     return settled(current);
@@ -121,17 +119,17 @@ export async function sendEmail(input: EmailRequest): Promise<SendEmailResult> {
       idempotencyKey: request.idempotencyKey,
     }));
   } catch (error) {
-    await recordFailed(claimed.id, failureReason(error));
+    await recordFailed(claimed.id, failureReasonFor(error));
     throw error;
   }
 
-  // Only the dev mailbox keeps a body: a real send's body can hold a capability link.
-  const kept = adapter.name === 'fake';
-  const status = kept ? 'captured' : 'sent';
+  const { status, keepsBody } = outcomeForAdapter(adapter.name);
   await recordSent(claimed.id, {
     status,
     providerMessageId,
-    ...(kept ? { body: { html: rendered.html, text: rendered.text } } : {}),
+    ...(keepsBody
+      ? { body: { html: rendered.html, text: rendered.text } }
+      : {}),
   });
   return { messageId: claimed.id, status, deduplicated: false };
 }

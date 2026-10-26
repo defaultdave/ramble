@@ -7,7 +7,8 @@ export const rateLimitSurfaces = [
   'manage',
   'forms',
   'email_webhook',
-  'mailbox_unlock',
+  'email_webhook_failed',
+  'mailbox_unlock_failed',
 ] as const;
 
 export type RateLimitSurface = (typeof rateLimitSurfaces)[number];
@@ -41,16 +42,19 @@ export const rateLimitPolicies = {
   },
   manage: { limit: 30, windowSeconds: 10 * 60, normalizeSubject: trimmed },
   forms: { limit: 5, windowSeconds: 60 * 60, normalizeSubject: trimmed },
-  // One shared counter for every caller, since a provider's addresses are not ours to list. Generous
-  // enough for a mass mailing's event burst; a provider retries a 429, and the counter runs before
-  // the body is read or any signature is checked, so junk traffic cannot reach the database writes.
-  email_webhook: {
-    limit: 600,
-    windowSeconds: 60,
+  // Verified webhook traffic only, on one shared counter: it bounds the database writes a flood of
+  // genuine events could cause. A request is counted here only after its signature or secret
+  // checked out, so nobody without the secret can use this budget up.
+  email_webhook: { limit: 600, windowSeconds: 60, normalizeSubject: trimmed },
+  // Failed webhook verifications, per source address. Kept apart from the counter above so a flood
+  // of bad requests can never refuse a real bounce or complaint.
+  email_webhook_failed: {
+    limit: 20,
+    windowSeconds: 10 * 60,
     normalizeSubject: trimmed,
   },
-  // Also one shared counter: the dev mailbox has a single secret and a handful of users.
-  mailbox_unlock: {
+  // Wrong dev-mailbox secrets, per source address. A correct secret is never counted or refused.
+  mailbox_unlock_failed: {
     limit: 10,
     windowSeconds: 10 * 60,
     normalizeSubject: trimmed,

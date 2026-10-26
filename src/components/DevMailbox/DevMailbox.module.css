@@ -96,6 +96,11 @@
   background: var(--color-bg-surface);
 }
 
+.frame:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
 .text {
   overflow-x: auto;
   padding: var(--space-3);

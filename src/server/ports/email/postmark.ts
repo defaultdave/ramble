@@ -1,6 +1,9 @@
 import 'server-only';
 import { z } from 'zod';
-import { maxProviderMessageIdLength } from '@/lib/email/message';
+import {
+  isPermanentBounce,
+  maxProviderMessageIdLength,
+} from '@/lib/email/message';
 import { secureEqual } from '@/server/secureEqual';
 import { EmailProviderError } from './errors';
 import type { EmailAdapter } from './types';
@@ -94,7 +97,7 @@ export function createPostmarkAdapter(options: {
           };
         case 'Bounce': {
           const event = parseWebhookBody('postmark', EventSchema, rawBody);
-          return event.Type === 'HardBounce' || event.Type === 'BadEmailAddress'
+          return isPermanentBounce('postmark', event.Type)
             ? { providerMessageId: event.MessageID, kind: 'hard_bounce' }
             : null;
         }

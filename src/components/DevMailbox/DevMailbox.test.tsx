@@ -59,6 +59,7 @@ describe('MailboxUnlockForm when rate limited', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Too many attempts. Try again in a few minutes.',
     );
+    expect(screen.getByLabelText('Dev mailbox secret')).toBeInvalid();
     expect(
       screen.getByLabelText('Dev mailbox secret'),
     ).toHaveAccessibleDescription(

@@ -52,6 +52,21 @@ describe('MailboxUnlockForm', () => {
   });
 });
 
+describe('MailboxUnlockForm when rate limited', () => {
+  it('tells the person to wait, announced and tied to the field', () => {
+    render(<MailboxUnlockForm action={vi.fn()} denied={false} limited />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Too many attempts. Try again in a few minutes.',
+    );
+    expect(
+      screen.getByLabelText('Dev mailbox secret'),
+    ).toHaveAccessibleDescription(
+      'Too many attempts. Try again in a few minutes.',
+    );
+  });
+});
+
 describe('MailboxList', () => {
   it('says so when no email has been captured', () => {
     render(<MailboxList messages={[]} />);

@@ -1,5 +1,5 @@
 {
-  "id": "6d0a641d-c22b-4f87-a09c-b66ff8c4e1fb",
+  "id": "bd4f604c-5080-4045-9eb8-e1ec268a437e",
   "prevId": "28b56d44-29a7-42b3-9b65-ee2a35c62924",
   "version": "7",
   "dialect": "postgresql",
@@ -755,195 +755,44 @@
       },
       "isRLSEnabled": false
     },
-    "public.email_suppressions": {
-      "name": "email_suppressions",
+    "public.rate_limits": {
+      "name": "rate_limits",
       "schema": "",
       "columns": {
-        "address": {
-          "name": "address",
+        "key": {
+          "name": "key",
           "type": "text",
           "primaryKey": true,
           "notNull": true
         },
-        "reason": {
-          "name": "reason",
-          "type": "suppression_reason",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source_message_id": {
-          "name": "source_message_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "email_suppressions_source_message_id_messages_id_fk": {
-          "name": "email_suppressions_source_message_id_messages_id_fk",
-          "tableFrom": "email_suppressions",
-          "tableTo": "messages",
-          "columnsFrom": [
-            "source_message_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "email_suppressions_address_shape": {
-          "name": "email_suppressions_address_shape",
-          "value": "\"email_suppressions\".\"address\" ~ '^[a-z0-9._%+-]+@[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$' AND char_length(\"email_suppressions\".\"address\") <= 254"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.messages": {
-      "name": "messages",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "idempotency_key": {
-          "name": "idempotency_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "template": {
-          "name": "template",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "recipient": {
-          "name": "recipient",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "subject": {
-          "name": "subject",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "message_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "adapter": {
-          "name": "adapter",
-          "type": "email_adapter",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "provider_message_id": {
-          "name": "provider_message_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "html": {
-          "name": "html",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "text_body": {
-          "name": "text_body",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "attempts": {
-          "name": "attempts",
+        "count": {
+          "name": "count",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
-          "default": 0
+          "notNull": true
         },
-        "failure_reason": {
-          "name": "failure_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
+        "window_started_at": {
+          "name": "window_started_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
         },
-        "updated_at": {
-          "name": "updated_at",
+        "expires_at": {
+          "name": "expires_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
+          "notNull": true
         }
       },
       "indexes": {
-        "messages_provider_message_id_unique": {
-          "name": "messages_provider_message_id_unique",
+        "rate_limits_expires_at": {
+          "name": "rate_limits_expires_at",
           "columns": [
             {
-              "expression": "adapter",
+              "expression": "expires_at",
               "isExpression": false,
               "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "provider_message_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"messages\".\"provider_message_id\" IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "messages_created_at_idx": {
-          "name": "messages_created_at_idx",
-          "columns": [
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": false,
-              "nulls": "last"
-            },
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": false,
               "nulls": "last"
             }
           ],
@@ -955,64 +804,20 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "messages_idempotencyKey_unique": {
-          "name": "messages_idempotencyKey_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "idempotency_key"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "messages_idempotency_key_shape": {
-          "name": "messages_idempotency_key_shape",
-          "value": "\"messages\".\"idempotency_key\" ~ '^[!-~]{1,200}$'"
+        "rate_limits_key_shape": {
+          "name": "rate_limits_key_shape",
+          "value": "\"rate_limits\".\"key\" ~ '^[a-z][a-z_]{0,31}:[0-9a-f]{64}$'"
         },
-        "messages_template_shape": {
-          "name": "messages_template_shape",
-          "value": "\"messages\".\"template\" ~ '^[a-z][a-z0-9-]*$' AND char_length(\"messages\".\"template\") <= 64"
+        "rate_limits_count_positive": {
+          "name": "rate_limits_count_positive",
+          "value": "\"rate_limits\".\"count\" >= 1"
         },
-        "messages_recipient_shape": {
-          "name": "messages_recipient_shape",
-          "value": "\"messages\".\"recipient\" ~ '^[a-z0-9._%+-]+@[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$' AND char_length(\"messages\".\"recipient\") <= 254"
-        },
-        "messages_subject_shape": {
-          "name": "messages_subject_shape",
-          "value": "\"messages\".\"subject\" ~ '^[^\\r\\n]+$' AND char_length(\"messages\".\"subject\") <= 200"
-        },
-        "messages_provider_message_id_length": {
-          "name": "messages_provider_message_id_length",
-          "value": "\"messages\".\"provider_message_id\" IS NULL OR char_length(\"messages\".\"provider_message_id\") BETWEEN 1 AND 200"
-        },
-        "messages_provider_message_id_follows_status": {
-          "name": "messages_provider_message_id_follows_status",
-          "value": "(\"messages\".\"status\" IN ('queued', 'failed', 'suppressed')) = (\"messages\".\"provider_message_id\" IS NULL)"
-        },
-        "messages_body_only_for_fake_adapter": {
-          "name": "messages_body_only_for_fake_adapter",
-          "value": "\"messages\".\"adapter\" = 'fake' OR (\"messages\".\"html\" IS NULL AND \"messages\".\"text_body\" IS NULL)"
-        },
-        "messages_body_is_both_or_neither": {
-          "name": "messages_body_is_both_or_neither",
-          "value": "(\"messages\".\"html\" IS NULL) = (\"messages\".\"text_body\" IS NULL)"
-        },
-        "messages_body_length": {
-          "name": "messages_body_length",
-          "value": "(\"messages\".\"html\" IS NULL OR char_length(\"messages\".\"html\") BETWEEN 1 AND 300000) AND (\"messages\".\"text_body\" IS NULL OR char_length(\"messages\".\"text_body\") BETWEEN 1 AND 300000)"
-        },
-        "messages_attempts_capped": {
-          "name": "messages_attempts_capped",
-          "value": "\"messages\".\"attempts\" BETWEEN 0 AND 5"
-        },
-        "messages_failure_reason_iff_failed": {
-          "name": "messages_failure_reason_iff_failed",
-          "value": "(\"messages\".\"status\" = 'failed') = (\"messages\".\"failure_reason\" IS NOT NULL) AND (\"messages\".\"failure_reason\" IS NULL OR char_length(\"messages\".\"failure_reason\") BETWEEN 1 AND 500)"
-        },
-        "messages_created_at_in_range": {
-          "name": "messages_created_at_in_range",
-          "value": "\"messages\".\"created_at\" >= '1000-01-01 00:00:00+00' AND \"messages\".\"created_at\" < '10000-01-01 00:00:00+00'"
+        "rate_limits_window_forward": {
+          "name": "rate_limits_window_forward",
+          "value": "\"rate_limits\".\"expires_at\" > \"rate_limits\".\"window_started_at\""
         }
       },
       "isRLSEnabled": false
@@ -1073,37 +878,6 @@
       "values": [
         "rain_or_shine",
         "decided_before_start"
-      ]
-    },
-    "public.email_adapter": {
-      "name": "email_adapter",
-      "schema": "public",
-      "values": [
-        "fake",
-        "resend",
-        "postmark"
-      ]
-    },
-    "public.message_status": {
-      "name": "message_status",
-      "schema": "public",
-      "values": [
-        "queued",
-        "sent",
-        "captured",
-        "delivered",
-        "bounced",
-        "complained",
-        "failed",
-        "suppressed"
-      ]
-    },
-    "public.suppression_reason": {
-      "name": "suppression_reason",
-      "schema": "public",
-      "values": [
-        "hard_bounce",
-        "complaint"
       ]
     }
   },

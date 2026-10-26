@@ -1,15 +1,18 @@
 import { createHmac } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyDeliveryEvent } from '@/server/db/messages';
+import { consumeRateLimit } from '@/server/ports/rate-limit';
 import { setEnv, webhookSecret } from '../../../../../tests/email/testEnv';
 import { POST } from './route';
 
 const testEnv = vi.hoisted((): Record<string, unknown> => ({}));
 vi.mock('@/server/env', () => ({ env: testEnv }));
 vi.mock('@/server/db/messages', () => ({ applyDeliveryEvent: vi.fn() }));
+vi.mock('@/server/ports/rate-limit', () => ({ consumeRateLimit: vi.fn() }));
 
 // Behaviours under test, one per decision or risk:
 // - an unauthenticated request gets an empty 401 and writes nothing
+// - a request over the rate limit gets 429 with a Retry-After header
 // - an authenticated request gets 200 and is applied
 // - the route passes the current time on, so a signed Resend webhook is judged against it
 
@@ -38,6 +41,9 @@ function svixHeaders(body: string, timestamp: number): Record<string, string> {
 beforeEach(() => {
   setEnv(testEnv, { EMAIL_WEBHOOK_SECRET: webhookSecret });
   vi.mocked(applyDeliveryEvent).mockReset();
+  vi.mocked(consumeRateLimit)
+    .mockReset()
+    .mockResolvedValue({ allowed: true, remaining: 1 });
 });
 
 afterEach(() => {
@@ -51,6 +57,18 @@ describe('POST /api/webhooks/email', () => {
     expect(response.status).toBe(401);
     expect(await response.text()).toBe('');
     expect(applyDeliveryEvent).not.toHaveBeenCalled();
+  });
+
+  it('answers 429 with Retry-After over the limit', async () => {
+    vi.mocked(consumeRateLimit).mockResolvedValue({
+      allowed: false,
+      retryAfterSeconds: 17,
+    });
+
+    const response = await POST(post(event));
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('retry-after')).toBe('17');
   });
 
   it('accepts an authenticated request', async () => {

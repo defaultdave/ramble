@@ -37,6 +37,33 @@ describe('environment', () => {
     );
   });
 
+  describe('FORM_GUARD_SECRET', () => {
+    it('is optional', async () => {
+      vi.stubEnv('FORM_GUARD_SECRET', undefined);
+
+      const env = await loadEnv();
+
+      expect(env.FORM_GUARD_SECRET).toBeUndefined();
+    });
+
+    it('is read when long enough', async () => {
+      vi.stubEnv('FORM_GUARD_SECRET', 's'.repeat(32));
+
+      const env = await loadEnv();
+
+      expect(env.FORM_GUARD_SECRET).toBe('s'.repeat(32));
+    });
+
+    it.each([
+      ['short', 's'.repeat(31)],
+      ['empty', ''],
+    ])('fails at import when %s', async (_name, value) => {
+      vi.stubEnv('FORM_GUARD_SECRET', value);
+
+      await expect(loadEnv()).rejects.toThrow(/FORM_GUARD_SECRET/);
+    });
+  });
+
   describe('database URLs', () => {
     const pooled = 'postgres://u:p@host-pooler.neon.tech/db';
     const direct = 'postgresql://u:p@host.neon.tech/db';

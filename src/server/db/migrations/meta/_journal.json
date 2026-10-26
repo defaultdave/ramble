@@ -26,8 +26,15 @@
     {
       "idx": 3,
       "version": "7",
-      "when": 1792987995408,
-      "tag": "0003_email_message_log",
+      "when": 1792986924672,
+      "tag": "0003_rate_limits",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792988475404,
+      "tag": "0004_email_message_log",
       "breakpoints": true
     }
   ]

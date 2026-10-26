@@ -34,6 +34,8 @@ const schema = z
     POSTMARK_SERVER_TOKEN: apiCredential.optional(),
     EMAIL_WEBHOOK_SECRET: sharedSecret.optional(),
     DEV_MAILBOX_SECRET: sharedSecret.optional(),
+    // Signs the form-guard token. Read only when a guest form renders or is submitted, which throws if it is unset outside development and test.
+    FORM_GUARD_SECRET: z.string().min(32).optional(),
   })
   .superRefine((value, ctx) => {
     for (const { name, message } of emailSettingIssues(value)) {

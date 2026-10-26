@@ -3,3 +3,4 @@
 export * from './catalog';
 export * from './policies';
 export * from './messages';
+export * from './operations';

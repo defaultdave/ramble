@@ -1,5 +1,4 @@
 import { defineConfig, devices } from '@playwright/test';
-import { e2eMailboxSecret, e2eWebhookSecret } from './e2e/secrets';
 
 const port = 3100;
 
@@ -24,8 +23,7 @@ export default defineConfig({
     env: {
       DATABASE_URL: databaseUrl,
       DATABASE_URL_UNPOOLED: databaseUrl,
-      DEV_MAILBOX_SECRET: e2eMailboxSecret,
-      EMAIL_WEBHOOK_SECRET: e2eWebhookSecret,
+      DEV_MAILBOX_SECRET: 'e2e-dev-mailbox-secret-0123456789abcdef',
     },
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,

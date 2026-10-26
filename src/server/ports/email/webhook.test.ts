@@ -1,15 +1,18 @@
 import { createHmac } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyDeliveryEvent } from '@/server/db/messages';
+import { consumeRateLimit } from '@/server/ports/rate-limit';
 import { setEnv, webhookSecret } from '../../../../tests/email/testEnv';
 import { receiveDeliveryWebhook } from './webhook';
 
 const testEnv = vi.hoisted((): Record<string, unknown> => ({}));
 vi.mock('@/server/env', () => ({ env: testEnv }));
 vi.mock('@/server/db/messages', () => ({ applyDeliveryEvent: vi.fn() }));
+vi.mock('@/server/ports/rate-limit', () => ({ consumeRateLimit: vi.fn() }));
 
 // Behaviours under test, one per decision, branch, or risk:
 // - with no webhook secret configured every request gets 503 and nothing is written
+// - a request over the rate limit gets 429 with a retry time, before its body is read, and nothing is written
 // - a request with no credentials, the wrong secret, or the right secret in the wrong scheme gets 401 and nothing is written
 // - a body over 64 KB gets 413, whether the length is declared or only discovered while reading, and nothing is written
 // - an authenticated body that is not an event gets 400
@@ -43,6 +46,9 @@ function svixHeaders(body: string, timestamp: number): Record<string, string> {
 beforeEach(() => {
   setEnv(testEnv, { EMAIL_WEBHOOK_SECRET: webhookSecret });
   vi.mocked(applyDeliveryEvent).mockReset();
+  vi.mocked(consumeRateLimit)
+    .mockReset()
+    .mockResolvedValue({ allowed: true, remaining: 1 });
 });
 
 describe('receiveDeliveryWebhook', () => {
@@ -55,6 +61,39 @@ describe('receiveDeliveryWebhook', () => {
     );
 
     expect(result.status).toBe(503);
+    expect(applyDeliveryEvent).not.toHaveBeenCalled();
+  });
+
+  it('counts the try against the shared webhook counter', async () => {
+    await receiveDeliveryWebhook(post(event, bearer(webhookSecret)), 0);
+
+    expect(consumeRateLimit).toHaveBeenCalledExactlyOnceWith(
+      'email_webhook',
+      'provider',
+    );
+  });
+
+  it('answers 429 with a retry time over the limit, even for a valid credential, and writes nothing', async () => {
+    vi.mocked(consumeRateLimit).mockResolvedValue({
+      allowed: false,
+      retryAfterSeconds: 42,
+    });
+
+    const result = await receiveDeliveryWebhook(
+      post(event, bearer(webhookSecret)),
+      0,
+    );
+
+    expect(result).toEqual({ status: 429, retryAfterSeconds: 42 });
+    expect(applyDeliveryEvent).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the limiter store fails', async () => {
+    vi.mocked(consumeRateLimit).mockRejectedValue(new Error('store down'));
+
+    await expect(
+      receiveDeliveryWebhook(post(event, bearer(webhookSecret)), 0),
+    ).rejects.toThrow('store down');
     expect(applyDeliveryEvent).not.toHaveBeenCalled();
   });
 

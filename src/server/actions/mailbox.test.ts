@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mailboxSecret, setEnv } from '../../../tests/email/testEnv';
+import { consumeRateLimit } from '@/server/ports/rate-limit';
 import { unlockDevMailbox } from './mailbox';
 
 const testEnv = vi.hoisted((): Record<string, unknown> => ({}));
 vi.mock('@/server/env', () => ({ env: testEnv }));
 vi.mock('@/server/db/messages', () => ({}));
+vi.mock('@/server/ports/rate-limit', () => ({ consumeRateLimit: vi.fn() }));
 
 const cookieSet = vi.hoisted(() => vi.fn());
 vi.mock('next/headers', () => ({
@@ -20,6 +22,7 @@ vi.mock('next/navigation', () => ({
 // - a wrong secret, a missing field, and an oversize field each redirect to the denied page and set no cookie
 // - the right secret sets one cookie that is HTTP-only, same-site strict, scoped to the mailbox, and expires in 8 hours
 // - the cookie is Secure in production and not in development
+// - every attempt is counted, and one over the limit redirects to the limited page with no cookie, even with the right secret
 // - when the mailbox is disabled even the right secret is denied
 
 function form(secret?: string) {
@@ -31,6 +34,9 @@ function form(secret?: string) {
 beforeEach(() => {
   setEnv(testEnv, { DEV_MAILBOX_SECRET: mailboxSecret });
   cookieSet.mockReset();
+  vi.mocked(consumeRateLimit)
+    .mockReset()
+    .mockResolvedValue({ allowed: true, remaining: 1 });
 });
 
 describe('unlockDevMailbox', () => {
@@ -76,6 +82,27 @@ describe('unlockDevMailbox', () => {
       expect.any(String),
       expect.objectContaining({ secure: true }),
     );
+  });
+
+  it('counts every attempt on the shared unlock counter', async () => {
+    await expect(unlockDevMailbox(form('wrong'))).rejects.toThrow();
+
+    expect(consumeRateLimit).toHaveBeenCalledExactlyOnceWith(
+      'mailbox_unlock',
+      'mailbox',
+    );
+  });
+
+  it('refuses the right secret over the limit and sets no cookie', async () => {
+    vi.mocked(consumeRateLimit).mockResolvedValue({
+      allowed: false,
+      retryAfterSeconds: 60,
+    });
+
+    await expect(unlockDevMailbox(form(mailboxSecret))).rejects.toThrow(
+      'redirect:/ops/mailbox?limited=1',
+    );
+    expect(cookieSet).not.toHaveBeenCalled();
   });
 
   it('denies the right secret while the mailbox is disabled', async () => {

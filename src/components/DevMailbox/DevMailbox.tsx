@@ -11,9 +11,14 @@ import styles from './DevMailbox.module.css';
 type MailboxUnlockFormProps = {
   action: (formData: FormData) => void | Promise<void>;
   denied: boolean;
+  limited?: boolean;
 };
 
-export function MailboxUnlockForm({ action, denied }: MailboxUnlockFormProps) {
+export function MailboxUnlockForm({
+  action,
+  denied,
+  limited = false,
+}: MailboxUnlockFormProps) {
   return (
     <form action={action} className={styles.form}>
       <label htmlFor="mailbox-secret" className={styles.label}>
@@ -26,13 +31,17 @@ export function MailboxUnlockForm({ action, denied }: MailboxUnlockFormProps) {
         autoComplete="off"
         required
         maxLength={256}
-        aria-describedby={denied ? 'mailbox-secret-error' : undefined}
+        aria-describedby={
+          denied || limited ? 'mailbox-secret-error' : undefined
+        }
         aria-invalid={denied || undefined}
         className={styles.input}
       />
-      {denied ? (
+      {denied || limited ? (
         <p id="mailbox-secret-error" role="alert" className={styles.error}>
-          That secret did not match.
+          {limited
+            ? 'Too many attempts. Try again in a few minutes.'
+            : 'That secret did not match.'}
         </p>
       ) : null}
       <Button type="submit">Open mailbox</Button>

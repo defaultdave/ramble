@@ -22,6 +22,7 @@ export default async function MailboxPage({
         <MailboxUnlockForm
           action={unlockDevMailbox}
           denied={query.denied !== undefined}
+          limited={query.limited !== undefined}
         />
       ) : null}
       {mailbox.status === 'open' ? (

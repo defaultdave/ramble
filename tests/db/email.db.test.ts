@@ -47,6 +47,8 @@ vi.mock('@/server/env', () => ({ env: testEnv }));
 // dev mailbox reads
 // - they list only captured messages, newest first, capped at 100, and the detail returns the bodies
 // - a message sent through a real provider is not in the mailbox
+// rate limiting
+// - the real limiter lets 600 webhook tries through in a window and refuses the 601st with a retry time
 // database constraints
 // - each CHECK, the enums, both unique constraints, and the suppression foreign key refuse a bad row
 // - the address pattern means the same in JavaScript and in Postgres
@@ -845,5 +847,27 @@ describe('the dev mailbox gate over the real log', () => {
 
     expect(open).toMatchObject({ status: 'open', message: { id: messageId } });
     expect(locked).toEqual({ status: 'locked' });
+  });
+});
+
+describe('webhook rate limiting with the real limiter', () => {
+  // Earlier webhook tests in this file have already spent tries in the shared window.
+  beforeAll(async () => {
+    await client.db.execute(sql`DELETE FROM rate_limits`);
+  });
+
+  it('answers 401 to 600 bad tries in a window and 429 to the next', async () => {
+    const tryOnce = () => post('{}', {});
+
+    for (let n = 0; n < 600; n += 1) {
+      expect((await tryOnce()).status).toBe(401);
+    }
+    const refused = await tryOnce();
+
+    expect(refused).toMatchObject({ status: 429 });
+    const retry =
+      'retryAfterSeconds' in refused ? refused.retryAfterSeconds : 0;
+    expect(retry).toBeGreaterThanOrEqual(1);
+    expect(retry).toBeLessThanOrEqual(60);
   });
 });

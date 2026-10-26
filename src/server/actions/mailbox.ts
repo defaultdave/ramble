@@ -3,6 +3,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
+import { consumeRateLimit } from '@/server/ports/rate-limit';
 import { env } from '@/server/env';
 import {
   mailboxCookieMaxAgeSeconds,
@@ -14,6 +15,9 @@ import {
 const UnlockFormSchema = z.object({ secret: z.string().max(256) });
 
 export async function unlockDevMailbox(formData: FormData): Promise<void> {
+  const limit = await consumeRateLimit('mailbox_unlock', 'mailbox');
+  if (!limit.allowed) redirect(`${mailboxPath}?limited=1`);
+
   const form = UnlockFormSchema.safeParse({ secret: formData.get('secret') });
   const token = form.success ? unlockMailbox(form.data.secret) : null;
   if (token === null) redirect(`${mailboxPath}?denied=1`);

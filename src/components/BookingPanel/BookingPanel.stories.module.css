@@ -1,0 +1,16 @@
+.frame {
+  max-width: 448px;
+}
+
+.heading {
+  margin: 0;
+  font-size: var(--font-size-heading-s);
+  line-height: var(--font-line-height-heading-s);
+  font-weight: var(--font-weight-semibold);
+}
+
+.times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

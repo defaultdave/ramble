@@ -1,0 +1,9 @@
+/* The bar is sticky, so each story gives it a page-high frame to sit at the bottom of, as it does on the experience page. */
+.frame {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  max-width: 390px;
+  min-height: 200px;
+  margin: 0 auto;
+}

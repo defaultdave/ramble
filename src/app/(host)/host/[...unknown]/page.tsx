@@ -1,5 +1,5 @@
-import { notFound } from 'next/navigation';
+import { notFoundPerRequest } from '@/app/renderPerRequest';
 
-export default function UnknownPage() {
-  notFound();
+export default async function UnknownPage() {
+  await notFoundPerRequest();
 }

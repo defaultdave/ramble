@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { SiteShell } from '@/components/SiteShell';
 import '@/styles/tokens.css';
 import { fontVariables } from '../fonts';
+import { RenderPerRequest } from '../renderPerRequest';
 
 export const metadata: Metadata = {
   title: { default: 'Ramble', template: '%s | Ramble' },
@@ -17,6 +18,7 @@ export default function HostLayout({ children }: { children: ReactNode }) {
     <html lang="en" className={fontVariables}>
       <body>
         <SiteShell areaName="For hosts">{children}</SiteShell>
+        <RenderPerRequest />
       </body>
     </html>
   );

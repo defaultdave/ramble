@@ -102,18 +102,26 @@ describe('BookingPanel sold out', () => {
         state="sold-out"
         priceMinor={6500}
         similarHref="/browse?like=kayak"
+        privateSessionHref="/private-sessions/kayak"
       />,
     );
   }
 
-  it('says there are no open dates and links to similar experiences', () => {
+  it('explains there are no open dates in an info alert', () => {
     setupSoldOut();
-    expect(screen.getByText('No open dates')).toBeVisible();
-    expect(screen.getByText('New dates are added weekly')).toBeVisible();
-    expect(screen.getByRole('link', { name: 'See similar' })).toHaveAttribute(
-      'href',
-      '/browse?like=kayak',
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'No open dates right nowThe host adds new dates every week. See similar experiences, or ask about a private session.',
     );
+  });
+
+  it('links to similar experiences and to a private session', () => {
+    setupSoldOut();
+    expect(
+      screen.getByRole('link', { name: 'See similar experiences' }),
+    ).toHaveAttribute('href', '/browse?like=kayak');
+    expect(
+      screen.getByRole('link', { name: 'Ask about a private session' }),
+    ).toHaveAttribute('href', '/private-sessions/kayak');
   });
 
   it('keeps the price and offers no booking action', () => {

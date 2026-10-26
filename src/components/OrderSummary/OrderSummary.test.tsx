@@ -74,6 +74,13 @@ describe('OrderSummary collapsed', () => {
 });
 
 describe('OrderSummary expanded', () => {
+  it('names the button from its visible parts, with Hide while it is shown', () => {
+    render(<OrderSummary {...booking} expanded />);
+    expect(screen.getByRole('button')).toHaveAccessibleName(
+      'Hand-rolled pasta class Sat, Oct 24 · 2:00 PM · 2 guests $170.00 Hide',
+    );
+  });
+
   it('announces that it is expanded and offers Hide', () => {
     render(<OrderSummary {...booking} expanded />);
     expect(screen.getByRole('button')).toHaveAttribute('aria-expanded', 'true');
@@ -91,6 +98,26 @@ describe('OrderSummary expanded', () => {
     expect(
       screen.getByText('Carroll Gardens, Brooklyn. Meet at the studio door.'),
     ).toBeVisible();
+  });
+
+  it('renders lines that share a label without a duplicate key warning', () => {
+    const error = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    render(
+      <OrderSummary
+        {...booking}
+        expanded
+        lines={[
+          { label: '$45 × 1 guest', amountMinor: 4500 },
+          { label: '$45 × 1 guest', amountMinor: 4500 },
+        ]}
+        totalMinor={9000}
+      />,
+    );
+    expect(screen.getAllByText('$45 × 1 guest')).toHaveLength(2);
+    expect(error).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
   });
 
   it('shows the experience photo in the thumbnail frame', () => {

@@ -78,7 +78,7 @@ export function BookingBar(props: BookingBarProps) {
           primary="No open dates"
           secondary="New dates are added weekly"
         />
-        <SimilarLink href={similarHref} size="md" />
+        <SimilarLink href={similarHref} size="md" label="See similar" />
       </div>
     );
   }

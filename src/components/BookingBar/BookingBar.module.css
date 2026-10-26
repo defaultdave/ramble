@@ -1,5 +1,6 @@
 /* Sticky, not fixed: it keeps its place in the page flow, so it never covers the last content, and it stays in the viewport while the guest scrolls (PRD-11). */
 .bar {
+  box-sizing: border-box;
   position: sticky;
   inset-block-end: 0;
   z-index: 10;
@@ -25,12 +26,14 @@
 }
 
 .primary {
+  overflow-wrap: anywhere;
   font-size: var(--font-size-body-m);
   line-height: var(--font-line-height-body-m);
   font-weight: var(--font-weight-semibold);
 }
 
 .secondary {
+  overflow-wrap: anywhere;
   color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
   line-height: var(--font-line-height-caption);

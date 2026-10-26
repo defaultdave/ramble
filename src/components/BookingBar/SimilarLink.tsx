@@ -8,16 +8,18 @@ export type SimilarLinkSize = 'md' | 'lg';
 export function SimilarLink({
   href,
   size,
+  label,
 }: {
   href: string;
   size: SimilarLinkSize;
+  label: string;
 }) {
   return (
     <Link
       href={href}
       className={classNames(styles.link, size === 'lg' && styles.lg)}
     >
-      See similar
+      {label}
     </Link>
   );
 }

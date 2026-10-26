@@ -1,4 +1,5 @@
 .summary {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -11,6 +12,7 @@
 }
 
 .toggle {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -41,23 +43,27 @@
 }
 
 .title {
+  overflow-wrap: anywhere;
   font-size: var(--font-size-body-m);
   line-height: var(--font-line-height-body-m);
   font-weight: var(--font-weight-semibold);
 }
 
 .meta {
+  overflow-wrap: anywhere;
   color: var(--color-text-secondary);
   font-size: var(--font-size-body-s);
   line-height: var(--font-line-height-body-s);
 }
 
 .total {
-  flex: none;
+  flex: 0 1 auto;
+  max-inline-size: 50%;
   font-size: var(--font-size-body-m);
   line-height: var(--font-line-height-body-m);
   font-weight: var(--font-weight-semibold);
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  text-align: end;
 }
 
 .chevron {
@@ -91,6 +97,7 @@
 }
 
 .thumbnail {
+  box-sizing: border-box;
   flex: none;
   inline-size: calc(var(--space-12) + var(--space-2));
   block-size: calc(var(--space-12) + var(--space-2));
@@ -109,12 +116,14 @@
   flex: 1 1 0;
   min-inline-size: 0;
   margin: 0;
+  overflow-wrap: anywhere;
   color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
   line-height: var(--font-line-height-caption);
 }
 
 .divider {
+  box-sizing: border-box;
   inline-size: 100%;
   block-size: 1px;
   margin: 0;
@@ -142,14 +151,24 @@
   line-height: var(--font-line-height-body-s);
 }
 
+.lineLabel,
+.totalLabel {
+  flex: 1 1 0;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
 .lineLabel {
   color: var(--color-text-secondary);
 }
 
 .lineAmount,
 .totalAmount {
+  flex: 0 1 auto;
+  max-inline-size: 60%;
   margin: 0;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  text-align: end;
 }
 
 .totalLine {
@@ -160,6 +179,7 @@
 
 .terms {
   margin: 0;
+  overflow-wrap: anywhere;
   color: var(--color-text-secondary);
   font-size: var(--font-size-caption);
   line-height: var(--font-line-height-caption);

@@ -93,7 +93,12 @@ function Shell({
   terms,
   ...rest
 }: ShellProps) {
-  const detailsId = useId();
+  const baseId = useId();
+  const detailsId = `${baseId}-details`;
+  const titleId = `${baseId}-title`;
+  const metaId = `${baseId}-meta`;
+  const totalId = `${baseId}-total`;
+  const hideId = `${baseId}-hide`;
   const amounts = orderSummaryAmounts({
     lines,
     taxTreatment,
@@ -108,15 +113,29 @@ function Shell({
         className={styles.toggle}
         aria-expanded={expanded}
         aria-controls={detailsId}
+        // Named from its visible parts, spelled out so every tool reads a name; "Hide" stays in it while shown (WCAG 2.5.3), and aria-expanded carries the state.
+        aria-labelledby={
+          expanded
+            ? `${titleId} ${metaId} ${totalId} ${hideId}`
+            : `${titleId} ${metaId} ${totalId}`
+        }
         onClick={onToggle}
       >
         <span className={styles.text}>
-          <span className={styles.title}>{title}</span>{' '}
-          <span className={styles.meta}>{meta}</span>
+          <span id={titleId} className={styles.title}>
+            {title}
+          </span>{' '}
+          <span id={metaId} className={styles.meta}>
+            {meta}
+          </span>
         </span>{' '}
-        <span className={styles.total}>{amounts.total}</span>{' '}
+        <span id={totalId} className={styles.total}>
+          {amounts.total}
+        </span>{' '}
         {expanded ? (
-          <span className={styles.hide}>Hide</span>
+          <span id={hideId} className={styles.hide}>
+            Hide
+          </span>
         ) : (
           <ChevronDown className={styles.chevron} aria-hidden="true" />
         )}
@@ -128,8 +147,8 @@ function Shell({
         </div>
         <hr className={styles.divider} />
         <dl className={styles.lines}>
-          {amounts.lines.map((line) => (
-            <div key={line.label} className={styles.line}>
+          {amounts.lines.map((line, index) => (
+            <div key={`${String(index)}-${line.label}`} className={styles.line}>
               <dt className={styles.lineLabel}>{line.label}</dt>
               <dd className={styles.lineAmount}>{line.amount}</dd>
             </div>
@@ -144,7 +163,7 @@ function Shell({
         <hr className={styles.divider} />
         <dl className={styles.lines}>
           <div className={styles.totalLine}>
-            <dt>Total charged</dt>
+            <dt className={styles.totalLabel}>Total charged</dt>
             <dd className={styles.totalAmount}>{amounts.total}</dd>
           </div>
         </dl>

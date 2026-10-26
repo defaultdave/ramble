@@ -51,16 +51,29 @@ const mode = (
 );
 
 // The panel is a slot shell; these choices only fill it for the story.
+function datePicker(value: string | null) {
+  return (
+    <>
+      <h3 className={styles.heading}>Pick a date</h3>
+      <DatePicker
+        label="Choose a date"
+        value={value}
+        today="2026-10-18"
+        availableDates={[
+          '2026-10-22',
+          '2026-10-24',
+          '2026-10-25',
+          '2026-10-29',
+        ]}
+        onChange={fn()}
+      />
+    </>
+  );
+}
+
 const choices = (
   <>
-    <h3 className={styles.heading}>Pick a date</h3>
-    <DatePicker
-      label="Choose a date"
-      value="2026-10-24"
-      today="2026-10-18"
-      availableDates={['2026-10-22', '2026-10-24', '2026-10-25', '2026-10-29']}
-      onChange={fn()}
-    />
+    {datePicker('2026-10-24')}
     <h3 className={styles.heading}>Time on Sat, Oct 24</h3>
     <div className={styles.times}>
       <TimeSlot
@@ -103,7 +116,10 @@ const total = {
 };
 
 export const DateChosen: DefaultStory = { args: { ...defaults, total } };
-export const NothingChosenYet: DefaultStory = { args: defaults };
+// Nothing chosen: no date, so no times or party yet, and Continue stays disabled.
+export const NothingChosenYet: DefaultStory = {
+  args: { ...defaults, children: datePicker(null) },
+};
 export const PlacingHold: DefaultStory = {
   args: { ...defaults, total, loading: true },
 };
@@ -112,5 +128,6 @@ export const SoldOut: SoldOutStory = {
     state: 'sold-out',
     priceMinor: 6500,
     similarHref: '/browse?like=hand-rolled-pasta',
+    privateSessionHref: '/private-sessions/hand-rolled-pasta',
   },
 };

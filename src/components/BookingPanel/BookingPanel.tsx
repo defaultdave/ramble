@@ -1,4 +1,6 @@
+import Link from 'next/link';
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
+import { Alert } from '@/components/Alert';
 import { Button } from '@/components/Button';
 import { SimilarLink } from '@/components/BookingBar/SimilarLink';
 import { continueLabel } from '@/lib/booking';
@@ -38,6 +40,9 @@ export type DefaultBookingPanelProps = BookingPanelBaseProps & {
 export type SoldOutBookingPanelProps = BookingPanelBaseProps & {
   state: 'sold-out';
   similarHref: string;
+  // TODO(U-041): first caller; the private-session request page the link opens comes from its own unit.
+  /** Where "Ask about a private session" goes. */
+  privateSessionHref: string;
 };
 
 export type BookingPanelProps =
@@ -46,16 +51,25 @@ export type BookingPanelProps =
 // TODO(U-041): first caller, the experience page, which shows it from 768px and the bar below that.
 export function BookingPanel(props: BookingPanelProps) {
   if (props.state === 'sold-out') {
-    const { state, priceMinor, similarHref, ...rest } = props;
+    const { state, priceMinor, similarHref, privateSessionHref, ...rest } =
+      props;
     return (
       <Shell {...rest} state={state} priceMinor={priceMinor}>
-        <div className={styles.soldOut}>
-          <p className={styles.soldOutTitle}>No open dates</p>
-          <p className={styles.note}>New dates are added weekly</p>
-        </div>
+        <Alert
+          tone="info"
+          title="No open dates right now"
+          body="The host adds new dates every week. See similar experiences, or ask about a private session."
+        />
         <div className={styles.action}>
-          <SimilarLink href={similarHref} size="lg" />
+          <SimilarLink
+            href={similarHref}
+            size="lg"
+            label="See similar experiences"
+          />
         </div>
+        <Link href={privateSessionHref} className={styles.privateLink}>
+          Ask about a private session
+        </Link>
       </Shell>
     );
   }

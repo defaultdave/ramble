@@ -1,9 +1,10 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import {
   expectedTitle,
   notFoundHeading,
   routes,
   unknownPaths,
+  unknownPathStatus,
   unprerenderedParamPath,
   type RouteGroup,
 } from './routes';
@@ -47,7 +48,7 @@ for (const [group, path] of Object.entries(unknownPaths) as [
   }) => {
     const response = await page.goto(path);
 
-    expect(response?.status()).toBe(404);
+    expect(response?.status()).toBe(unknownPathStatus(group));
     await expect(
       page.getByRole('heading', { level: 1, name: notFoundHeading }),
     ).toBeVisible();

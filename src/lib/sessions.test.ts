@@ -7,7 +7,9 @@ import {
   UpdateSessionAllocationInputSchema,
   checkAllocationChange,
   countAlreadyExisted,
+  checkAllocationEditable,
   generationHorizon,
+  isBeyondHorizon,
   isKnownTimeZone,
   maxAllocation,
   occurrencesBetween,
@@ -318,6 +320,36 @@ describe('generationHorizon', () => {
   );
 });
 
+describe('isBeyondHorizon', () => {
+  const now = new Date('2026-10-26T12:00:00Z');
+
+  it.each([
+    ['the horizon day', '2027-10-27', false],
+    ['the day after the horizon', '2027-10-28', true],
+    ['today', '2026-10-26', false],
+    ['a date in the past', '2020-01-01', false],
+    ['year 9999', '9999-12-31', true],
+  ])('%s (%s): %s', (_name, toDate, expected) => {
+    expect(isBeyondHorizon(toDate, now)).toBe(expected);
+  });
+
+  it.each([
+    ['9999-12-29', false],
+    ['9999-12-30', true],
+    ['9999-12-31', true],
+  ])('with a clock in year 9999, %s: %s', (toDate, expected) => {
+    expect(isBeyondHorizon(toDate, new Date('9999-12-15T00:00:00Z'))).toBe(
+      expected,
+    );
+  });
+
+  it('throws for a clock it cannot trust', () => {
+    expect(() => isBeyondHorizon('2026-10-26', new Date(Number.NaN))).toThrow(
+      RangeError,
+    );
+  });
+});
+
 describe('splitUpcoming', () => {
   const [fifth, twelfth] = occurrencesBetween(
     template,
@@ -536,6 +568,18 @@ describe('UpdateSessionAllocationInputSchema', () => {
   it('accepts a valid edit', () => {
     expect(UpdateSessionAllocationInputSchema.safeParse(valid).success).toBe(
       true,
+    );
+  });
+});
+
+describe('checkAllocationEditable', () => {
+  it.each([
+    ['scheduled', true],
+    ['cancelled', false],
+    ['completed', false],
+  ] as const)('%s: ok is %s', (status, ok) => {
+    expect(checkAllocationEditable(status)).toEqual(
+      ok ? { ok: true } : { ok: false, reason: 'not_scheduled' },
     );
   });
 });

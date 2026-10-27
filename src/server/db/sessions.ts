@@ -8,8 +8,9 @@ import {
   TimeZoneSchema,
   UpdateSessionAllocationInputSchema,
   checkAllocationChange,
+  checkAllocationEditable,
   countAlreadyExisted,
-  generationHorizon,
+  isBeyondHorizon,
   isKnownTimeZone,
   occurrencesBetween,
   requiresStaff,
@@ -36,17 +37,22 @@ function isStaff(caller: Caller): boolean {
 }
 
 /**
- * Called when a row is not there. Staff may learn that; anyone else is refused as if the row were
- * not theirs, so a missing row and another host's row look the same.
+ * Every refusal of a caller who is not staff names the host owner role, whatever the reason, so a
+ * missing row, another host's row and a staff-only row cannot be told apart.
  */
+function refuse(): never {
+  throw new ForbiddenError(Role.HostOwner);
+}
+
+/** Called when a row is not there. Staff may learn that; anyone else is refused. */
 function refuseUnlessStaff(caller: Caller) {
-  if (!isStaff(caller)) throw new ForbiddenError(Role.HostOwner);
+  if (!isStaff(caller)) refuse();
 }
 
 /** Ops and admin may act on any host's sessions. A host owner may act on their own Ramble-sourced capacity. */
 function requireSessionEditor(caller: Caller, hostId: string, source: Source) {
   if (isStaff(caller)) return;
-  if (requiresStaff(source)) throw new ForbiddenError(Role.Ops);
+  if (requiresStaff(source)) refuse();
   requireRole(caller, Role.HostOwner, { hostId });
 }
 
@@ -110,7 +116,7 @@ export type GenerateSessionsResult =
  * and is safe to run again over the same or an overlapping range: a date that already has a session
  * is left as it is, so an edited or cancelled session is never rebuilt. A date whose start is not
  * after `now` is skipped. The range is limited to `maxGenerationDays`, and a `toDate` past
- * `generationHorizon(now)` is refused with nothing written.
+ * `generationHorizon(now)` (see `isBeyondHorizon`) is refused with nothing written.
  */
 export async function generateSessions(
   caller: Caller,
@@ -135,7 +141,7 @@ export async function generateSessions(
   const template = SessionTemplateSchema.parse(row.template);
   requireSessionEditor(caller, row.hostId, template.source);
 
-  if (data.toDate > generationHorizon(now)) {
+  if (isBeyondHorizon(data.toDate, now)) {
     return { ok: false, reason: 'beyond_horizon' };
   }
 
@@ -234,9 +240,8 @@ export async function updateSessionAllocation(
     if (!row) return { ok: false, reason: 'session_not_found' };
     const current = SessionSchema.parse(row.session);
     requireSessionEditor(caller, row.hostId, current.source);
-    if (current.status !== 'scheduled') {
-      return { ok: false, reason: 'not_scheduled' };
-    }
+    const editable = checkAllocationEditable(current.status);
+    if (!editable.ok) return editable;
     if (current.version !== data.expectedVersion) {
       return { ok: false, reason: 'version_conflict' };
     }

@@ -1,4 +1,5 @@
 import { count, eq, sql, type SQL } from 'drizzle-orm';
+import type { PoolClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { maxAllocation, type SessionTemplateInput } from '@/lib/sessions';
 import {
@@ -1343,6 +1344,161 @@ describe('updateSessionAllocation', () => {
       allocation: 8,
       seatsSold: 3,
     });
+  });
+
+  async function waitUntilBlockedBy(pid: number) {
+    for (let attempt = 0; attempt < 500; attempt += 1) {
+      const { rows } = await client.db.$client.query<{ waiting: number }>(
+        'SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))',
+        [pid],
+      );
+      if ((rows[0]?.waiting ?? 0) > 0) return;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    throw new Error('The edit never waited on the row lock');
+  }
+
+  /** Holds the row lock, starts the edit, runs `change` once the edit waits, then commits. */
+  async function editWhileLocked(
+    caller: Caller,
+    sessionId: string,
+    edit: { allocation: number; expectedVersion: number },
+    change: (held: PoolClient) => Promise<unknown>,
+  ) {
+    const held = await client.db.$client.connect();
+    try {
+      await held.query('BEGIN');
+      await held.query('SELECT id FROM sessions WHERE id = $1 FOR UPDATE', [
+        sessionId,
+      ]);
+      const { rows } = await held.query<{ pid: number }>(
+        'SELECT pg_backend_pid() AS pid',
+      );
+      const pending = sessionData
+        .updateSessionAllocation(caller, { sessionId, ...edit })
+        .then(
+          (value) => ({ value }) as const,
+          (error: unknown) => ({ error }) as const,
+        );
+      await waitUntilBlockedBy(rows[0]?.pid ?? 0);
+      await change(held);
+      await held.query('COMMIT');
+      return await pending;
+    } finally {
+      held.release();
+    }
+  }
+
+  it('checks the caller again under the lock, so an owner who waited loses an edit the session no longer allows', async () => {
+    const { session, owner } = await generated();
+
+    const outcome = await editWhileLocked(
+      owner,
+      session.id,
+      { allocation: 12, expectedVersion: 1 },
+      (held) =>
+        held.query("UPDATE sessions SET source = 'allocation' WHERE id = $1", [
+          session.id,
+        ]),
+    );
+
+    expect('error' in outcome && outcome.error).toBeInstanceOf(ForbiddenError);
+    expect(await stored(session.id)).toMatchObject({
+      allocation: 8,
+      version: 1,
+      source: 'allocation',
+    });
+  });
+
+  it('checks status, then version, then seats sold under the lock', async () => {
+    const { session, owner } = await generated();
+    await client.db
+      .update(sessions)
+      .set({ seatsSold: 5, version: 3 })
+      .where(eq(sessions.id, session.id));
+    const staleAndBelowSold = { allocation: 2, expectedVersion: 1 };
+
+    const cancelled = await editWhileLocked(
+      owner,
+      session.id,
+      staleAndBelowSold,
+      (held) =>
+        held.query(
+          "UPDATE sessions SET status = 'cancelled', cancel_reason = 'host' WHERE id = $1",
+          [session.id],
+        ),
+    );
+    await client.db
+      .update(sessions)
+      .set({ status: 'scheduled', cancelReason: null })
+      .where(eq(sessions.id, session.id));
+    const stale = await sessionData.updateSessionAllocation(owner, {
+      sessionId: session.id,
+      ...staleAndBelowSold,
+    });
+
+    expect(cancelled).toEqual({
+      value: { ok: false, reason: 'not_scheduled' },
+    });
+    expect(stale).toEqual({ ok: false, reason: 'version_conflict' });
+    expect(await stored(session.id)).toMatchObject({
+      allocation: 8,
+      seatsSold: 5,
+      version: 3,
+    });
+  });
+
+  it('gives a caller who is not staff the same refusal for a missing row, another host and a staff-only row', async () => {
+    const { session } = await generated('allocation');
+    const other = ownerOf((await setup()).host.id);
+    const missing = '11111111-1111-4111-8111-111111111111';
+    const refusals = await Promise.all(
+      [
+        [other, missing],
+        [other, session.id],
+        [guest, missing],
+        [guest, session.id],
+        [anonymousCaller, session.id],
+      ].map(async ([caller, sessionId]) => {
+        try {
+          await sessionData.updateSessionAllocation(caller as Caller, {
+            sessionId: sessionId as string,
+            allocation: 4,
+            expectedVersion: 1,
+          });
+          return 'not refused';
+        } catch (error) {
+          return error instanceof ForbiddenError
+            ? `${error.name}: ${error.message}`
+            : 'other error';
+        }
+      }),
+    );
+
+    expect(new Set(refusals)).toEqual(
+      new Set([
+        'ForbiddenError: Caller may not act as host_owner on this resource',
+      ]),
+    );
+  });
+
+  it('gives the owner of the host the same refusal on its own staff-only session', async () => {
+    const { session, owner } = await generated('allocation');
+    const other = ownerOf((await setup()).host.id);
+    const message = async (caller: Caller) => {
+      try {
+        await sessionData.updateSessionAllocation(caller, {
+          sessionId: session.id,
+          allocation: 4,
+          expectedVersion: 1,
+        });
+        return 'not refused';
+      } catch (error) {
+        return error instanceof Error ? error.message : 'other error';
+      }
+    };
+
+    expect(await message(owner)).toBe(await message(other));
   });
 
   it.each([

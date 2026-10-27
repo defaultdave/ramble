@@ -20,7 +20,7 @@ export const maxAllocation = 1000;
 export const maxSessionMinutes = 1440;
 /** The longest span one generation call covers, so a call writes at most 53 rows per template. */
 const maxGenerationDays = 366;
-/** How far past `now` a call may generate. A year ahead; U-074c's 12-week rolling job fits well inside. */
+/** How far past `now` a call may generate: a year ahead, which a rolling window of a few months fits well inside. */
 const generationHorizonDays = 366;
 /**
  * The last date generation may reach. With zone offsets of up to 14 hours and a 24-hour session, a
@@ -239,6 +239,18 @@ export function checkAllocationChange(
     : { ok: true };
 }
 
+export type EditableCheck =
+  { ok: true } | { ok: false; reason: 'not_scheduled' };
+
+/** Only a scheduled session takes holds (design doc 4.2.2), so only a scheduled one has its capacity edited. */
+export function checkAllocationEditable(
+  status: (typeof sessionStatuses)[number],
+): EditableCheck {
+  return status === 'scheduled'
+    ? { ok: true }
+    : { ok: false, reason: 'not_scheduled' };
+}
+
 /**
  * An allocation is set up and changed by ops (PRD-42), so a session or template with that source is
  * staff-only. Ramble-sourced capacity belongs to the host (PRD-41), and ops may also edit it.
@@ -263,6 +275,11 @@ export function generationHorizon(now: Date): string {
   const reach = now.getTime() + generationHorizonDays * 86_400_000;
   if (reach >= limit) return lastGenerableDate;
   return new Date(reach).toISOString().slice(0, 10);
+}
+
+/** Whether `toDate` reaches past what a call made at `now` may generate for. */
+export function isBeyondHorizon(toDate: string, now: Date): boolean {
+  return toDate > generationHorizon(now);
 }
 
 export type UpcomingSplit = { upcoming: Occurrence[]; inThePast: number };

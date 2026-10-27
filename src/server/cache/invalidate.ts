@@ -2,7 +2,6 @@ import 'server-only';
 import { revalidateTag, updateTag } from 'next/cache';
 import { type CacheChange, tagsForChanges } from '@/lib/cacheTags';
 
-// TODO(U-076a): first caller, the editorial publish action.
 /**
  * For Server Actions (the ops publish flow): the next request after the action sees fresh data.
  * `updateTag` throws anywhere else.

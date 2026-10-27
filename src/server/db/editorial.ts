@@ -15,8 +15,14 @@ import {
   changesWhenSaved,
   collectionChange,
   editorialLimits,
+  collectionIdsOf,
+  collectionKindsById,
+  experienceIdsOf,
   hasCollectionKindMismatch,
+  hasMissingIds,
+  isSingleCollection,
   pageCopyChange,
+  positioned,
   publishedAtAfter,
   visibleChange,
   withItems,
@@ -316,7 +322,8 @@ export async function saveCollection(
     // Writers of one slug, and of the gift guide, take turns: the loser reads the winner's row
     // after the lock and answers `slug_taken` or `gift_guide_exists` instead of tripping the index.
     await lockFor(tx, `editorial:collection-slug:${parsed.slug}`);
-    if (parsed.kind === 'gift_guide') await lockFor(tx, 'editorial:gift-guide');
+    if (isSingleCollection(parsed.kind))
+      await lockFor(tx, 'editorial:gift-guide');
     const [before] = parsed.id
       ? await tx
           .select()
@@ -338,7 +345,7 @@ export async function saveCollection(
       .where(and(eq(collections.slug, parsed.slug), notThis))
       .limit(1);
     if (slugClash) return { status: 'slug_taken' } as const;
-    if (parsed.kind === 'gift_guide') {
+    if (isSingleCollection(parsed.kind)) {
       const [other] = await tx
         .select({ id: collections.id })
         .from(collections)
@@ -347,13 +354,18 @@ export async function saveCollection(
       if (other) return { status: 'gift_guide_exists' } as const;
     }
 
-    const experienceIds = parsed.items.map((item) => item.experienceId);
+    const experienceIds = experienceIdsOf(parsed.items);
     if (experienceIds.length > 0) {
-      const known = await tx
+      const found = await tx
         .select({ id: experiences.id })
         .from(experiences)
         .where(inArray(experiences.id, experienceIds));
-      if (known.length !== experienceIds.length) {
+      if (
+        hasMissingIds(
+          experienceIds,
+          found.map(({ id }) => id),
+        )
+      ) {
         return { status: 'unknown_experience' } as const;
       }
     }
@@ -383,11 +395,9 @@ export async function saveCollection(
       .where(eq(collectionItems.collectionId, row.id));
     if (parsed.items.length > 0) {
       await tx.insert(collectionItems).values(
-        parsed.items.map((item, position) => ({
+        positioned(parsed.items).map((item) => ({
           collectionId: row.id,
-          experienceId: item.experienceId,
-          note: item.note,
-          position,
+          ...item,
         })),
       );
     }
@@ -424,34 +434,30 @@ export async function saveHomeModules(
 ): Promise<SaveHomeModulesResult> {
   requireStaff(caller);
   const parsed = HomeModulesInputSchema.parse(input);
-  const collectionIds = [
-    ...new Set(
-      parsed.flatMap((module) =>
-        module.collectionId === null ? [] : [module.collectionId],
-      ),
-    ),
-  ];
+  const collectionIds = collectionIdsOf(parsed);
   const outcome = await db.transaction(async (tx) => {
     // Two replacements of the whole list take turns, or both would insert the same positions.
     await lockFor(tx, 'editorial:home-modules');
     if (collectionIds.length > 0) {
-      const known = await tx
+      const found = await tx
         .select({ id: collections.id, kind: collections.kind })
         .from(collections)
         .where(inArray(collections.id, collectionIds));
-      if (known.length !== collectionIds.length) {
+      if (
+        hasMissingIds(
+          collectionIds,
+          found.map(({ id }) => id),
+        )
+      ) {
         return { status: 'unknown_collection' } as const;
       }
-      const kinds = new Map(known.map(({ id, kind }) => [id, kind]));
-      if (hasCollectionKindMismatch(parsed, kinds)) {
+      if (hasCollectionKindMismatch(parsed, collectionKindsById(found))) {
         return { status: 'collection_kind_mismatch' } as const;
       }
     }
     await tx.delete(homeModules);
     if (parsed.length > 0) {
-      await tx
-        .insert(homeModules)
-        .values(parsed.map((module, position) => ({ ...module, position })));
+      await tx.insert(homeModules).values(positioned(parsed));
     }
     const rows = await tx
       .select()

@@ -16,7 +16,8 @@ CREATE TRIGGER settings_keep_table BEFORE TRUNCATE ON settings
 	FOR EACH STATEMENT EXECUTE FUNCTION guard_settings_row();--> statement-breakpoint
 -- A legal version is written as a draft. Once published it is what a guest accepted, so it is final:
 -- no edit, no delete, no change of key. A version publishes only above every version already
--- published for its document, under a lock per document.
+-- published for its document, under a lock per document, and its publication time is taken after
+-- that lock.
 CREATE FUNCTION guard_legal_document() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
 	IF TG_OP = 'INSERT' THEN
@@ -42,6 +43,9 @@ BEGIN
 		) THEN
 			RAISE EXCEPTION 'A newer version of this document is already published' USING ERRCODE = 'restrict_violation';
 		END IF;
+		-- Stamped here, after the lock wait: now() is the start of the transaction, which can be
+		-- earlier than the version published just before this one.
+		NEW.published_at := clock_timestamp();
 	END IF;
 	RETURN NEW;
 END

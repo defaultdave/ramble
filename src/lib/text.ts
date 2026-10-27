@@ -34,16 +34,19 @@ export function isStorableJson(value: unknown): boolean {
 /**
  * Text counted in characters the way Postgres counts them (a code point is one, where
  * `String.length` counts an emoji as two), and refused when it holds something Postgres cannot
- * store. The cheap length check runs first so the code-point walk never sees a huge input.
+ * store. Zod runs every refinement even after `.max()` has failed, so each refinement checks the
+ * length in UTF-16 units first (a code point is at most two) and only then walks the string: a
+ * string over the limit is refused without being walked.
  */
 function boundedText(max: number) {
+  const fits = (value: string) => value.length <= max * 2;
   return z
     .string()
     .max(max * 2)
-    .refine((value) => Array.from(value).length <= max, {
+    .refine((value) => fits(value) && Array.from(value).length <= max, {
       message: `At most ${String(max)} characters`,
     })
-    .refine(isStorable, {
+    .refine((value) => !fits(value) || isStorable(value), {
       message: 'Contains a character that cannot be stored',
     });
 }

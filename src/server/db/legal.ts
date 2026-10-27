@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, desc, eq, gt, sql } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { EntityIdSchema } from '@/lib/catalog';
 import { editorialLimits } from '@/lib/editorial';
 import {
@@ -7,7 +7,9 @@ import {
   LegalDocumentSchema,
   LegalDraftEditSchema,
   LegalDraftInputSchema,
+  isSuperseded,
   legalChange,
+  nextLegalVersion,
   type LegalDocument,
   type LegalDraftEdit,
   type LegalDraftInput,
@@ -100,7 +102,7 @@ export async function createLegalDraft(
       .limit(1);
     const [created] = await tx
       .insert(legalDocuments)
-      .values({ ...parsed, version: (latest?.version ?? 0) + 1 })
+      .values({ ...parsed, version: nextLegalVersion(latest?.version) })
       .returning();
     return created;
   });
@@ -172,21 +174,30 @@ export async function publishLegalDocument(
         ),
       );
     if (!draft) return { status: 'not_a_draft' } as const;
-    const [newer] = await tx
-      .select({ id: legalDocuments.id })
+    const published = await tx
+      .select({ version: legalDocuments.version })
       .from(legalDocuments)
       .where(
         and(
           eq(legalDocuments.doc, draft.doc),
           eq(legalDocuments.status, 'published'),
-          gt(legalDocuments.version, draft.version),
         ),
       )
-      .limit(1);
-    if (newer) return { status: 'superseded' } as const;
+      .orderBy(desc(legalDocuments.version))
+      .limit(editorialLimits.listed);
+    if (
+      isSuperseded(
+        draft.version,
+        published.map(({ version }) => version),
+      )
+    ) {
+      return { status: 'superseded' } as const;
+    }
     const [row] = await tx
       .update(legalDocuments)
-      .set({ status: 'published', publishedAt: sql`now()` })
+      // The trigger stamps `published_at` once it holds the lock, so a higher version never
+      // carries an earlier time than a lower one.
+      .set({ status: 'published' })
       .where(eq(legalDocuments.id, draft.id))
       .returning();
     if (!row) throw new Error('The legal publish returned no row');

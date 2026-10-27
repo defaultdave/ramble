@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   CollectionInputSchema,
   HelpArticleInputSchema,
@@ -148,5 +148,27 @@ describe('every write contract', () => {
     it.each(fields)('refuses it in the %s', (_field, accepts) => {
       expect(accepts(value)).toBe(false);
     });
+  });
+});
+
+describe('a string over the limit', () => {
+  it('is refused without walking it by code point or for storability', () => {
+    const fromSpy = vi.spyOn(Array, 'from');
+    const wellFormedSpy = vi.spyOn(String.prototype, 'isWellFormed');
+    const result = CollectionInputSchema.safeParse({
+      kind: 'pick',
+      slug: 'a-pick',
+      title: 'x'.repeat(10_000),
+      summary: null,
+      intro: null,
+      status: 'draft',
+      items: [],
+    });
+    const walked = fromSpy.mock.calls.length + wellFormedSpy.mock.calls.length;
+    fromSpy.mockRestore();
+    wellFormedSpy.mockRestore();
+
+    expect(result.success).toBe(false);
+    expect(walked).toBe(0);
   });
 });

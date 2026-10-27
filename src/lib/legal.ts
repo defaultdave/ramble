@@ -68,3 +68,16 @@ export const acceptanceSubjectKinds = ['order', 'host'] as const;
 export function legalChange(doc: string): CacheChange {
   return { kind: 'legalDocument', doc };
 }
+
+/** The number of the next version of a document, given the highest version written so far, if any. */
+export function nextLegalVersion(latestVersion: number | undefined): number {
+  return (latestVersion ?? 0) + 1;
+}
+
+/** A draft cannot publish once a higher version of its document is published. */
+export function isSuperseded(
+  draftVersion: number,
+  publishedVersions: readonly number[],
+): boolean {
+  return publishedVersions.some((version) => version > draftVersion);
+}

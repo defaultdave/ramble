@@ -1,5 +1,5 @@
 import { updateTag } from 'next/cache';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import {
   afterAll,
   beforeAll,
@@ -194,6 +194,90 @@ describe('publishing a legal version', () => {
     );
 
     expect(outcome).toEqual({ status: 'not_a_draft' });
+  });
+
+  it('stamps the publication time after the lock wait, so a higher version never carries an earlier time', async () => {
+    const low = await draftOf('waiver-race-clock');
+    const high = await draftOf('waiver-race-clock');
+    let started!: () => void;
+    const hasStarted = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    let go!: () => void;
+    const mayPublish = new Promise<void>((resolve) => {
+      go = resolve;
+    });
+    // This transaction begins first, fixing its start time, then waits behind the other one.
+    const higher = client.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT now()`);
+      started();
+      await mayPublish;
+      await tx
+        .update(legalDocuments)
+        .set({ status: 'published' })
+        .where(eq(legalDocuments.id, high.id));
+    });
+    await hasStarted;
+
+    await raceAgainstOpenTransaction(
+      async (tx) => {
+        await tx
+          .update(legalDocuments)
+          .set({ status: 'published' })
+          .where(eq(legalDocuments.id, low.id));
+      },
+      () => {
+        go();
+        return higher;
+      },
+    );
+
+    const times = await client.db
+      .select({
+        version: legalDocuments.version,
+        publishedAt: legalDocuments.publishedAt,
+      })
+      .from(legalDocuments)
+      .where(eq(legalDocuments.doc, 'waiver-race-clock'))
+      .orderBy(legalDocuments.version);
+    expect(times.map((row) => row.version)).toEqual([1, 2]);
+    const [first, second] = times.map((row) => row.publishedAt?.getTime() ?? 0);
+    expect(first).toBeGreaterThan(0);
+    expect(second).toBeGreaterThanOrEqual(first ?? 0);
+  });
+
+  it('gives the versions that publish among eight concurrent publishes times in version order', async () => {
+    const drafts = [];
+    for (let n = 0; n < 8; n += 1) {
+      drafts.push(await draftOf('waiver-race-eight'));
+    }
+
+    const results = await Promise.all(
+      drafts.map((draft) => legal.publishLegalDocument(ops, draft.id)),
+    );
+
+    const rows = await client.db
+      .select({
+        version: legalDocuments.version,
+        status: legalDocuments.status,
+        publishedAt: legalDocuments.publishedAt,
+      })
+      .from(legalDocuments)
+      .where(eq(legalDocuments.doc, 'waiver-race-eight'))
+      .orderBy(legalDocuments.version);
+    const times = rows.flatMap((row) =>
+      row.status === 'published' && row.publishedAt
+        ? [row.publishedAt.getTime()]
+        : [],
+    );
+    expect(results.filter((r) => r.status === 'published').length).toBe(
+      times.length,
+    );
+    expect(times.length).toBeGreaterThan(0);
+    expect(times).toEqual(times.toSorted((a, b) => a - b));
+    expect(
+      results.every((r) => ['published', 'superseded'].includes(r.status)),
+    ).toBe(true);
   });
 
   it('numbers drafts made at the same moment one above the other', async () => {

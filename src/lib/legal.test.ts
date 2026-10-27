@@ -3,7 +3,9 @@ import {
   LegalDocSchema,
   LegalDraftInputSchema,
   legalChange,
+  isSuperseded,
   legalKindOf,
+  nextLegalVersion,
 } from './legal';
 import { tagsForChanges } from './cacheTags';
 
@@ -83,4 +85,30 @@ describe('publishing a document', () => {
   ])('invalidates only the tag of %s', (doc, tag) => {
     expect(tagsForChanges([legalChange(doc)])).toEqual([tag]);
   });
+});
+
+describe('nextLegalVersion', () => {
+  it.each([
+    ['nothing written yet', undefined, 1],
+    ['version 1 written', 1, 2],
+    ['version 41 written', 41, 42],
+  ])('is the next number after %s', (_name, latest, expected) => {
+    expect(nextLegalVersion(latest)).toBe(expected);
+  });
+});
+
+describe('isSuperseded', () => {
+  it.each([
+    ['no version is published', 3, [], false],
+    ['only lower versions are published', 3, [1, 2], false],
+    ['the same version is published', 3, [3], false],
+    ['a higher version is published', 3, [4], true],
+    ['higher and lower versions are published', 3, [7, 2, 1], true],
+    ['the highest is published, in any order', 1, [2, 9, 4], true],
+  ])(
+    'a draft is superseded when %s: %s',
+    (_name, draft, published, expected) => {
+      expect(isSuperseded(draft, published)).toBe(expected);
+    },
+  );
 });

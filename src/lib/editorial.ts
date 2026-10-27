@@ -329,3 +329,50 @@ export function withItems<R extends { id: string }>(
   }
   return rows.map((row) => ({ ...row, items: byCollection.get(row.id) ?? [] }));
 }
+
+/** Whether any requested ID is missing from the IDs a lookup found. */
+export function hasMissingIds(
+  requested: readonly string[],
+  found: readonly string[],
+): boolean {
+  const known = new Set(found);
+  return requested.some((id) => !known.has(id));
+}
+
+/** The experiences a collection lists, in order. */
+export function experienceIdsOf(items: readonly CollectionItem[]): string[] {
+  return items.map((item) => item.experienceId);
+}
+
+/** The distinct collections a home page points at. */
+export function collectionIdsOf(
+  modules: readonly { collectionId: string | null }[],
+): string[] {
+  return [
+    ...new Set(
+      modules.flatMap(({ collectionId }) =>
+        collectionId === null ? [] : [collectionId],
+      ),
+    ),
+  ];
+}
+
+export function collectionKindsById(
+  rows: readonly { id: string; kind: (typeof collectionKinds)[number] }[],
+): Map<string, (typeof collectionKinds)[number]> {
+  return new Map(rows.map(({ id, kind }) => [id, kind]));
+}
+
+/** An ordered list stored with its place in the list: the position of an entry is its index. */
+export function positioned<T>(
+  list: readonly T[],
+): (T & { position: number })[] {
+  return list.map((entry, position) => ({ ...entry, position }));
+}
+
+/** Only the gift guide is a kind of collection of which there is exactly one. */
+export function isSingleCollection(
+  kind: (typeof collectionKinds)[number],
+): boolean {
+  return kind === 'gift_guide';
+}

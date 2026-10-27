@@ -10,9 +10,15 @@ import {
   RichTextStoredSchema,
   changesWhenSaved,
   collectionChange,
+  collectionIdsOf,
+  collectionKindsById,
   editorialLimits,
+  experienceIdsOf,
   hasCollectionKindMismatch,
+  hasMissingIds,
+  isSingleCollection,
   pageCopyChange,
+  positioned,
   publishedAtAfter,
   visibleChange,
   withItems,
@@ -480,5 +486,79 @@ describe('page copy slug', () => {
 
   it('still refuses a slug that is not a slug', () => {
     expect(PageCopySchema.safeParse(copy('Not A Slug')).success).toBe(false);
+  });
+});
+
+describe('hasMissingIds', () => {
+  it.each([
+    ['all found', ['a', 'b'], ['b', 'a'], false],
+    ['one missing', ['a', 'b'], ['a'], true],
+    ['none found', ['a'], [], true],
+    ['nothing requested', [], ['a'], false],
+    ['more found than requested', ['a'], ['a', 'z'], false],
+    ['a repeated request, all found', ['a', 'a'], ['a'], false],
+  ])('%s: missing is %s', (_name, requested, found, expected) => {
+    expect(hasMissingIds(requested, found)).toBe(expected);
+  });
+});
+
+describe('id lists', () => {
+  it('lists the experiences of a collection in order', () => {
+    expect(
+      experienceIdsOf([
+        { experienceId: 'b', note: null },
+        { experienceId: 'a', note: 'x' },
+      ]),
+    ).toEqual(['b', 'a']);
+  });
+
+  it('lists each collection a home page points at once, leaving out modules with none', () => {
+    expect(
+      collectionIdsOf([
+        { collectionId: 'p' },
+        { collectionId: null },
+        { collectionId: 'g' },
+        { collectionId: 'p' },
+      ]),
+    ).toEqual(['p', 'g']);
+    expect(collectionIdsOf([])).toEqual([]);
+    expect(collectionIdsOf([{ collectionId: null }])).toEqual([]);
+  });
+
+  it('maps collection ids to their kinds', () => {
+    expect(
+      collectionKindsById([
+        { id: 'p', kind: 'pick' },
+        { id: 'g', kind: 'gift_guide' },
+      ]),
+    ).toEqual(
+      new Map([
+        ['p', 'pick'],
+        ['g', 'gift_guide'],
+      ]),
+    );
+  });
+});
+
+describe('positioned', () => {
+  it('numbers entries from zero in the order given and keeps their fields', () => {
+    expect(positioned([{ n: 'x' }, { n: 'y' }, { n: 'z' }])).toEqual([
+      { n: 'x', position: 0 },
+      { n: 'y', position: 1 },
+      { n: 'z', position: 2 },
+    ]);
+  });
+
+  it('numbers nothing for an empty list', () => {
+    expect(positioned([])).toEqual([]);
+  });
+});
+
+describe('isSingleCollection', () => {
+  it.each([
+    ['pick', false],
+    ['gift_guide', true],
+  ] as const)('a %s is a single collection: %s', (kind, expected) => {
+    expect(isSingleCollection(kind)).toBe(expected);
   });
 });

@@ -39,6 +39,13 @@ import {
 // - a capacity edit raises, lowers to exactly the seats sold, and refuses below it; a stale version
 //   is refused; two edits on one version let one win; the seats sold are read under the row lock
 // - an allocation session's capacity is ops only; the same refusals apply to the edit
+// - generation refuses a toDate past the horizon (a year past now) with nothing written, allows the
+//   horizon itself, and near the end of year 9999 stays inside the CHECK ranges in a zone 14 hours ahead
+// - a missing template, experience or session is reported to staff and refused to everyone else,
+//   so it cannot be told from another host's row; the capacity edit refuses a caller without
+//   waiting for the row lock
+// - a capacity edit on a cancelled or completed session is refused, and nothing changes
+// - the created_at, starts_at and local_date range CHECKs refuse both ends
 
 let fresh: FreshDatabase;
 let stopHttp: () => Promise<void>;
@@ -237,6 +244,27 @@ describe('constraints', () => {
     ).rejects.toMatchObject({ cause: { constraint } });
   });
 
+  it.each([
+    ['before year 1000', sql`'0500-01-01 00:00:00+00'::timestamptz`],
+    ['at infinity', sql`'infinity'::timestamptz`],
+    ['in year 10000', sql`'10000-01-01 00:00:00+00'::timestamptz`],
+  ])('refuses a template created %s', async (_name, createdAt) => {
+    const { experience } = await setup();
+
+    await expect(
+      client.db.insert(sessionTemplates).values({
+        experienceId: experience.id,
+        weekday: 6,
+        startTime: '10:00:00',
+        durationMinutes: 60,
+        allocation: 4,
+        createdAt,
+      }),
+    ).rejects.toMatchObject({
+      cause: { constraint: 'session_templates_created_at_in_range' },
+    });
+  });
+
   it('refuses a second template for the same weekday and start time', async () => {
     const { experience } = await setup();
     await createTemplate(experience.id);
@@ -397,15 +425,69 @@ describe('constraints', () => {
       cause: { constraint: 'sessions_template_has_local_date' },
     });
     await expect(
-      insertSession(experience.id, { ...generated, localDate: '0999-01-01' }),
-    ).rejects.toMatchObject({
-      cause: { constraint: 'sessions_local_date_in_range' },
-    });
-    await expect(
       insertSession(experience.id, { ...generated, source: 'external' }),
     ).rejects.toMatchObject({
       cause: { constraint: 'sessions_template_source_generated' },
     });
+  });
+
+  it.each([
+    ['before year 1000', '0999-12-31'],
+    ['in year 10000', '10000-01-01'],
+  ])('refuses a local date %s', async (_name, localDate) => {
+    const { experience } = await setup();
+    const template = await createTemplate(experience.id);
+
+    await expect(
+      insertSession(experience.id, { templateId: template.id, localDate }),
+    ).rejects.toMatchObject({
+      cause: { constraint: 'sessions_local_date_in_range' },
+    });
+  });
+
+  it('accepts local dates at both ends of the range', async () => {
+    const { experience } = await setup();
+    const template = await createTemplate(experience.id);
+
+    await insertSession(experience.id, {
+      templateId: template.id,
+      localDate: '1000-01-01',
+    });
+    await insertSession(experience.id, {
+      templateId: template.id,
+      localDate: '9999-12-31',
+    });
+
+    expect(await countSessions(experience.id)).toBe(2);
+  });
+
+  it.each([
+    ['at the first instant of year 10000', '10000-01-01 00:00:00+00'],
+    ['in year 10000, after a valid end', '10000-06-01 00:00:00+00'],
+  ])('refuses a start %s', async (_name, startsAt) => {
+    const { experience } = await setup();
+
+    await expect(
+      insertSession(experience.id, {
+        startsAt: sql`${startsAt}::timestamptz`,
+        endsAt: sql`'10000-12-01 00:00:00+00'::timestamptz`,
+      }),
+    ).rejects.toMatchObject({ cause: { code: '23514' } });
+  });
+
+  it('accepts a start at the first instant of year 1000 and one just inside year 9999', async () => {
+    const { experience } = await setup();
+
+    await insertSession(experience.id, {
+      startsAt: new Date('1000-01-01T00:00:00Z'),
+      endsAt: new Date('1000-01-01T01:00:00Z'),
+    });
+    await insertSession(experience.id, {
+      startsAt: new Date('9999-12-31T22:00:00Z'),
+      endsAt: new Date('9999-12-31T23:59:59Z'),
+    });
+
+    expect(await countSessions(experience.id)).toBe(2);
   });
 
   it('refuses a second session for one template and date, and a template of another experience', async () => {
@@ -566,7 +648,7 @@ describe('createSessionTemplate', () => {
     expect(stored).toMatchObject({ allocation: 8, durationMinutes: 120 });
   });
 
-  it('reports an experience that does not exist', async () => {
+  it('reports an experience that does not exist to staff', async () => {
     const result = await sessionData.createSessionTemplate(ops, {
       experienceId: '11111111-1111-4111-8111-111111111111',
       ...saturdayTenAm,
@@ -574,6 +656,22 @@ describe('createSessionTemplate', () => {
 
     expect(result).toEqual({ ok: false, reason: 'experience_not_found' });
   });
+
+  it.each([
+    ['a host owner', () => ownerOf('22222222-2222-4222-8222-222222222222')],
+    ['a guest', () => guest],
+    ['an anonymous caller', () => anonymousCaller],
+  ])(
+    'refuses %s for an experience that does not exist',
+    async (_name, getCaller) => {
+      await expect(
+        sessionData.createSessionTemplate(getCaller(), {
+          experienceId: '11111111-1111-4111-8111-111111111111',
+          ...saturdayTenAm,
+        }),
+      ).rejects.toThrow(ForbiddenError);
+    },
+  );
 
   it.each([
     ['a weekday of 7', { weekday: 7 }],
@@ -894,6 +992,158 @@ describe('generateSessions', () => {
   });
 
   it.each([
+    ['a host owner', () => ownerOf('22222222-2222-4222-8222-222222222222')],
+    ['a guest', () => guest],
+    ['an anonymous caller', () => anonymousCaller],
+  ])(
+    'refuses %s for a template that does not exist',
+    async (_name, getCaller) => {
+      await expect(
+        sessionData.generateSessions(
+          getCaller(),
+          { templateId: '11111111-1111-4111-8111-111111111111', ...range },
+          earlyNow,
+        ),
+      ).rejects.toThrow(ForbiddenError);
+    },
+  );
+
+  describe('horizon', () => {
+    const now = new Date('2026-10-26T12:00:00Z');
+
+    it('allows a toDate on the horizon and refuses the day after, writing nothing', async () => {
+      const { experience, owner } = await setup();
+      const template = await createTemplate(experience.id, {}, owner);
+
+      const beyond = await sessionData.generateSessions(
+        owner,
+        {
+          templateId: template.id,
+          fromDate: '2027-10-01',
+          toDate: '2027-10-28',
+        },
+        now,
+      );
+      const refusedCount = await countSessions(experience.id);
+      const onTheHorizon = await sessionData.generateSessions(
+        owner,
+        {
+          templateId: template.id,
+          fromDate: '2027-10-01',
+          toDate: '2027-10-27',
+        },
+        now,
+      );
+
+      expect(beyond).toEqual({ ok: false, reason: 'beyond_horizon' });
+      expect(refusedCount).toBe(0);
+      expect(onTheHorizon.ok && onTheHorizon.created).toHaveLength(4);
+    });
+
+    it('fits a 12-week rolling window with room to spare', async () => {
+      const { experience } = await setup();
+      const template = await createTemplate(experience.id);
+
+      const result = await sessionData.generateSessions(
+        ops,
+        {
+          templateId: template.id,
+          fromDate: '2026-10-26',
+          toDate: '2027-01-17',
+        },
+        now,
+      );
+
+      expect(result.ok && result.created).toHaveLength(12);
+    });
+
+    it.each([
+      ['year 9999', '9999-12-25', '9999-12-31'],
+      ['a year and two days ahead', '2027-10-20', '2027-10-29'],
+    ])(
+      'refuses a range in %s, writing nothing',
+      async (_name, fromDate, toDate) => {
+        const { experience } = await setup();
+        const template = await createTemplate(experience.id);
+
+        const result = await sessionData.generateSessions(
+          ops,
+          { templateId: template.id, fromDate, toDate },
+          now,
+        );
+
+        expect(result).toEqual({ ok: false, reason: 'beyond_horizon' });
+        expect(await countSessions(experience.id)).toBe(0);
+      },
+    );
+
+    it('refuses a caller who may not act before it reports the horizon', async () => {
+      const { experience } = await setup();
+      const template = await createTemplate(experience.id);
+
+      await expect(
+        sessionData.generateSessions(
+          guest,
+          {
+            templateId: template.id,
+            fromDate: '9999-12-25',
+            toDate: '9999-12-31',
+          },
+          now,
+        ),
+      ).rejects.toThrow(ForbiddenError);
+    });
+
+    it('throws for a clock it cannot trust', async () => {
+      const { experience } = await setup();
+      const template = await createTemplate(experience.id);
+
+      await expect(
+        sessionData.generateSessions(
+          ops,
+          { templateId: template.id, ...range },
+          new Date(Number.NaN),
+        ),
+      ).rejects.toThrow(RangeError);
+    });
+
+    it('reaches the last generable day of year 9999 in a zone 14 hours ahead, inside the CHECK ranges', async () => {
+      const { experience } = await setup('Pacific/Kiritimati');
+      const wednesday = await createTemplate(experience.id, {
+        weekday: 3,
+        startTime: '23:59',
+        durationMinutes: 1440,
+      });
+      const friday = await createTemplate(experience.id, { weekday: 5 });
+      const lateNow = new Date('9999-12-01T00:00:00Z');
+
+      const reached = await sessionData.generateSessions(
+        ops,
+        {
+          templateId: wednesday.id,
+          fromDate: '9999-12-22',
+          toDate: '9999-12-29',
+        },
+        lateNow,
+      );
+      const past = await sessionData.generateSessions(
+        ops,
+        { templateId: friday.id, fromDate: '9999-12-25', toDate: '9999-12-31' },
+        lateNow,
+      );
+
+      expect(reached.ok && reached.created.map((row) => row.localDate)).toEqual(
+        ['9999-12-22', '9999-12-29'],
+      );
+      expect(past).toEqual({ ok: false, reason: 'beyond_horizon' });
+      const stored = await sessionsOf(wednesday.id);
+      expect(stored.at(-1)?.endsAt.getTime()).toBeLessThan(
+        Date.UTC(10000, 0, 1),
+      );
+    });
+  });
+
+  it.each([
     ['a range over 366 days', { fromDate: '2028-01-01', toDate: '2029-01-01' }],
     [
       'a range that runs backwards',
@@ -925,7 +1175,7 @@ describe('generateSessions', () => {
     const result = await sessionData.generateSessions(
       ops,
       { templateId: template.id, fromDate: '2028-01-01', toDate: '2028-12-31' },
-      earlyNow,
+      new Date('2027-12-31T00:00:00Z'),
     );
 
     expect(result.ok && result.created).toHaveLength(53);
@@ -1151,6 +1401,72 @@ describe('updateSessionAllocation', () => {
     });
 
     expect(result).toEqual({ ok: false, reason: 'session_not_found' });
+  });
+
+  it.each([
+    ['a host owner', () => ownerOf('22222222-2222-4222-8222-222222222222')],
+    ['a guest', () => guest],
+    ['an anonymous caller', () => anonymousCaller],
+  ])(
+    'refuses %s for a session that does not exist',
+    async (_name, getCaller) => {
+      await expect(
+        sessionData.updateSessionAllocation(getCaller(), {
+          sessionId: '11111111-1111-4111-8111-111111111111',
+          allocation: 4,
+          expectedVersion: 1,
+        }),
+      ).rejects.toThrow(ForbiddenError);
+    },
+  );
+
+  it.each([
+    ['cancelled', { status: 'cancelled', cancelReason: 'weather' }],
+    ['completed', { status: 'completed' }],
+  ] as const)(
+    'refuses an edit on a %s session, and changes nothing',
+    async (_name, change) => {
+      const { session, owner } = await generated();
+      await client.db
+        .update(sessions)
+        .set(change)
+        .where(eq(sessions.id, session.id));
+
+      const result = await sessionData.updateSessionAllocation(owner, {
+        sessionId: session.id,
+        allocation: 4,
+        expectedVersion: 1,
+      });
+
+      expect(result).toEqual({ ok: false, reason: 'not_scheduled' });
+      expect(await stored(session.id)).toMatchObject({
+        allocation: 8,
+        version: 1,
+        status: change.status,
+      });
+    },
+  );
+
+  it('refuses a caller who may not act without waiting for the row lock', async () => {
+    const { session } = await generated();
+    const holder = await client.db.$client.connect();
+    try {
+      await holder.query('BEGIN');
+      await holder.query('SELECT id FROM sessions WHERE id = $1 FOR UPDATE', [
+        session.id,
+      ]);
+
+      await expect(
+        sessionData.updateSessionAllocation(guest, {
+          sessionId: session.id,
+          allocation: 4,
+          expectedVersion: 1,
+        }),
+      ).rejects.toThrow(ForbiddenError);
+      await holder.query('ROLLBACK');
+    } finally {
+      holder.release();
+    }
   });
 
   it.each([

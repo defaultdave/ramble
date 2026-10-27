@@ -20,6 +20,14 @@ export const maxAllocation = 1000;
 export const maxSessionMinutes = 1440;
 /** The longest span one generation call covers, so a call writes at most 53 rows per template. */
 const maxGenerationDays = 366;
+/** How far past `now` a call may generate. A year ahead; U-074c's 12-week rolling job fits well inside. */
+const generationHorizonDays = 366;
+/**
+ * The last date generation may reach. With zone offsets of up to 14 hours and a 24-hour session, a
+ * start or end on this date stays before year 10000, so the CHECKs on `starts_at` and `ends_at` hold.
+ */
+const lastGenerableDate = '9999-12-29';
+const earliestClock = Date.UTC(1001, 0, 1);
 
 /** Area/Location, or UTC. The database CHECK on every time zone column spells the same pattern. */
 export const ianaZonePattern = String.raw`^[A-Za-z_]+(/[A-Za-z0-9_+-]+)+$|^UTC$`;
@@ -166,16 +174,16 @@ export function occurrencesBetween(
     );
   }
   const first = parseLocalDate(fromDate);
-  const last = parseLocalDate(toDate);
   const [hour = 0, minute = 0] = recurrence.startTime.split(':').map(Number);
   const daysToFirst =
     (recurrence.weekday - getDayOfWeek(first, 'en-US') + 7) % 7;
+  // Counted from the range, never by comparing dates: adding days clamps at year 9999, so a loop
+  // that waits for a date to pass the end of the range would not finish there.
+  const weeks =
+    daysToFirst < days ? Math.floor((days - 1 - daysToFirst) / 7) + 1 : 0;
   const occurrences: Occurrence[] = [];
-  for (
-    let date = first.add({ days: daysToFirst });
-    date.compare(last) <= 0;
-    date = date.add({ days: 7 })
-  ) {
+  for (let week = 0; week < weeks; week += 1) {
+    const date = first.add({ days: daysToFirst + 7 * week });
     const start = toZoned(
       new CalendarDateTime(date.year, date.month, date.day, hour, minute),
       timeZone,
@@ -237,4 +245,40 @@ export function checkAllocationChange(
  */
 export function requiresStaff(source: (typeof sessionSources)[number]) {
   return source !== 'ramble';
+}
+
+/**
+ * The latest date a call made at `now` may generate for: `now` plus a year in UTC, never past
+ * `lastGenerableDate`. A zone ahead of UTC can reach one day past it on the host's calendar.
+ * Dates before `now` are skipped, so a start can never fall before year 1000; a `now` before year
+ * 1001 or not a valid date throws, so that guarantee cannot be lost to a bad clock.
+ */
+export function generationHorizon(now: Date): string {
+  if (!(now.getTime() >= earliestClock)) {
+    throw new RangeError(
+      'The clock is outside the years sessions are kept for',
+    );
+  }
+  const limit = Date.UTC(9999, 11, 29);
+  const reach = now.getTime() + generationHorizonDays * 86_400_000;
+  if (reach >= limit) return lastGenerableDate;
+  return new Date(reach).toISOString().slice(0, 10);
+}
+
+export type UpcomingSplit = { upcoming: Occurrence[]; inThePast: number };
+
+/** Occurrences that start after `now`, and how many do not. A start equal to `now` is past. */
+export function splitUpcoming(
+  occurrences: readonly Occurrence[],
+  now: Date,
+): UpcomingSplit {
+  const upcoming = occurrences.filter(
+    (occurrence) => occurrence.startsAt.getTime() > now.getTime(),
+  );
+  return { upcoming, inThePast: occurrences.length - upcoming.length };
+}
+
+/** Of the dates a call tried to write, how many already had a session. */
+export function countAlreadyExisted(attempted: number, inserted: number) {
+  return attempted - inserted;
 }

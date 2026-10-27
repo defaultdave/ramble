@@ -8,9 +8,12 @@ import {
   TimeZoneSchema,
   UpdateSessionAllocationInputSchema,
   checkAllocationChange,
+  countAlreadyExisted,
+  generationHorizon,
   isKnownTimeZone,
   occurrencesBetween,
   requiresStaff,
+  splitUpcoming,
   type GenerateSessionsInput,
   type Session,
   type SessionTemplate,
@@ -28,10 +31,21 @@ import { experiences, hosts, sessionTemplates, sessions } from './schema';
 
 type Source = Session['source'];
 
+function isStaff(caller: Caller): boolean {
+  return caller.roles.includes(Role.Ops) || caller.roles.includes(Role.Admin);
+}
+
+/**
+ * Called when a row is not there. Staff may learn that; anyone else is refused as if the row were
+ * not theirs, so a missing row and another host's row look the same.
+ */
+function refuseUnlessStaff(caller: Caller) {
+  if (!isStaff(caller)) throw new ForbiddenError(Role.HostOwner);
+}
+
 /** Ops and admin may act on any host's sessions. A host owner may act on their own Ramble-sourced capacity. */
 function requireSessionEditor(caller: Caller, hostId: string, source: Source) {
-  if (caller.roles.includes(Role.Ops)) return;
-  if (caller.roles.includes(Role.Admin)) return;
+  if (isStaff(caller)) return;
   if (requiresStaff(source)) throw new ForbiddenError(Role.Ops);
   requireRole(caller, Role.HostOwner, { hostId });
 }
@@ -54,7 +68,10 @@ export async function createSessionTemplate(
     .select({ hostId: experiences.hostId })
     .from(experiences)
     .where(eq(experiences.id, data.experienceId));
-  if (!experience) return { ok: false, reason: 'experience_not_found' };
+  if (!experience) {
+    refuseUnlessStaff(caller);
+    return { ok: false, reason: 'experience_not_found' };
+  }
   requireSessionEditor(caller, experience.hostId, data.source);
   const [row] = await db
     .insert(sessionTemplates)
@@ -82,14 +99,18 @@ export type GenerateSessionsResult =
       /** Dates in the range whose start is not after `now`. */
       inThePast: number;
     }
-  | { ok: false; reason: 'template_not_found' | 'invalid_time_zone' };
+  | {
+      ok: false;
+      reason: 'template_not_found' | 'invalid_time_zone' | 'beyond_horizon';
+    };
 
 // TODO(U-068): first caller
 /**
  * Creates the template's sessions for the dates from `fromDate` to `toDate` in the host's time zone,
  * and is safe to run again over the same or an overlapping range: a date that already has a session
  * is left as it is, so an edited or cancelled session is never rebuilt. A date whose start is not
- * after `now` is skipped. The range is limited to `maxGenerationDays`.
+ * after `now` is skipped. The range is limited to `maxGenerationDays`, and a `toDate` past
+ * `generationHorizon(now)` is refused with nothing written.
  */
 export async function generateSessions(
   caller: Caller,
@@ -107,9 +128,16 @@ export async function generateSessions(
     .innerJoin(experiences, eq(experiences.id, sessionTemplates.experienceId))
     .innerJoin(hosts, eq(hosts.id, experiences.hostId))
     .where(eq(sessionTemplates.id, data.templateId));
-  if (!row) return { ok: false, reason: 'template_not_found' };
+  if (!row) {
+    refuseUnlessStaff(caller);
+    return { ok: false, reason: 'template_not_found' };
+  }
   const template = SessionTemplateSchema.parse(row.template);
   requireSessionEditor(caller, row.hostId, template.source);
+
+  if (data.toDate > generationHorizon(now)) {
+    return { ok: false, reason: 'beyond_horizon' };
+  }
 
   const zone = TimeZoneSchema.safeParse(row.timeZone);
   if (!zone.success || !isKnownTimeZone(zone.data)) {
@@ -122,10 +150,7 @@ export async function generateSessions(
     data.fromDate,
     data.toDate,
   );
-  const upcoming = occurrences.filter(
-    (occurrence) => occurrence.startsAt.getTime() > now.getTime(),
-  );
-  const inThePast = occurrences.length - upcoming.length;
+  const { upcoming, inThePast } = splitUpcoming(occurrences, now);
   if (upcoming.length === 0) {
     return {
       ok: true,
@@ -158,7 +183,7 @@ export async function generateSessions(
     ok: true,
     experienceId: template.experienceId,
     created: SessionSchema.array().parse(inserted),
-    alreadyExisted: upcoming.length - inserted.length,
+    alreadyExisted: countAlreadyExisted(upcoming.length, inserted.length),
     inThePast,
   };
 }
@@ -167,14 +192,19 @@ export type UpdateSessionAllocationResult =
   | { ok: true; session: Session }
   | {
       ok: false;
-      reason: 'session_not_found' | 'version_conflict' | 'below_seats_sold';
+      reason:
+        | 'session_not_found'
+        | 'not_scheduled'
+        | 'version_conflict'
+        | 'below_seats_sold';
       seatsSold?: number;
     };
 
 // TODO(U-068): first caller
 /**
- * Sets a session's capacity. The row is locked while it is read, so a booking that confirms at the
- * same moment is counted, and the database CHECK on `seats_sold` stays the backstop under it.
+ * Sets a scheduled session's capacity. The caller is checked before the row is locked. Under the
+ * lock the row is read again, so a booking that confirms at the same moment is counted, and the
+ * database CHECK on `seats_sold` stays the backstop under it.
  * `expectedVersion` is the version the editor read; a different one means another edit came first.
  * TODO(U-014a): count the open holds as well as the seats sold.
  */
@@ -183,6 +213,17 @@ export async function updateSessionAllocation(
   input: UpdateSessionAllocationInput,
 ): Promise<UpdateSessionAllocationResult> {
   const data = UpdateSessionAllocationInputSchema.parse(input);
+  const [found] = await db
+    .select({ source: sessions.source, hostId: experiences.hostId })
+    .from(sessions)
+    .innerJoin(experiences, eq(experiences.id, sessions.experienceId))
+    .where(eq(sessions.id, data.sessionId));
+  if (!found) {
+    refuseUnlessStaff(caller);
+    return { ok: false, reason: 'session_not_found' };
+  }
+  requireSessionEditor(caller, found.hostId, found.source);
+
   return db.transaction(async (tx) => {
     const [row] = await tx
       .select({ session: sessions, hostId: experiences.hostId })
@@ -193,6 +234,9 @@ export async function updateSessionAllocation(
     if (!row) return { ok: false, reason: 'session_not_found' };
     const current = SessionSchema.parse(row.session);
     requireSessionEditor(caller, row.hostId, current.source);
+    if (current.status !== 'scheduled') {
+      return { ok: false, reason: 'not_scheduled' };
+    }
     if (current.version !== data.expectedVersion) {
       return { ok: false, reason: 'version_conflict' };
     }

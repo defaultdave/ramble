@@ -6,10 +6,13 @@ import {
   TimeZoneSchema,
   UpdateSessionAllocationInputSchema,
   checkAllocationChange,
+  countAlreadyExisted,
+  generationHorizon,
   isKnownTimeZone,
   maxAllocation,
   occurrencesBetween,
   requiresStaff,
+  splitUpcoming,
 } from './sessions';
 
 // Behaviours under test, one per decision, branch or risk:
@@ -25,6 +28,13 @@ import {
 // - template input takes HH:MM, stores seconds as 00, and refuses every out-of-range field
 // - the capacity check refuses a value under the seats sold and allows one equal to it
 // - generation input refuses a range longer than the cap and a range that runs backwards
+// - a range that ends on 9999-12-31, or is that one day, finishes with the right dates (adding
+//   days clamps at year 9999, so a loop that waited for the end date would never stop)
+// - the horizon is a year past now, clamped to 9999-12-29, and refuses a clock it cannot trust
+// - at the clamped horizon, with the widest zone offsets and a 24-hour session, every start and
+//   end stays inside the years the database CHECKs allow
+// - dates are split into upcoming and past with a start equal to now counted as past, also
+//   around a daylight saving gap; the existing count is attempted minus inserted
 // - an allocation source is staff only; a Ramble source is the host's
 
 const template = {
@@ -186,6 +196,203 @@ describe('occurrencesBetween', () => {
       occurrencesBetween(template, 'Nowhere/Land', '2026-06-06', '2026-06-06'),
     ).toThrow(RangeError);
   });
+});
+
+describe('occurrencesBetween at the end of year 9999', () => {
+  const friday = { weekday: 5, startTime: '10:00:00', durationMinutes: 120 };
+
+  it('finishes for a Friday template over a range that ends on 9999-12-31', () => {
+    const dates = occurrencesBetween(
+      friday,
+      newYork,
+      '9999-12-01',
+      '9999-12-31',
+    ).map((occurrence) => occurrence.localDate);
+
+    expect(dates).toEqual([
+      '9999-12-03',
+      '9999-12-10',
+      '9999-12-17',
+      '9999-12-24',
+      '9999-12-31',
+    ]);
+  });
+
+  it('finishes for a one-day range on 9999-12-31, which is a Friday', () => {
+    const [occurrence, ...rest] = occurrencesBetween(
+      friday,
+      newYork,
+      '9999-12-31',
+      '9999-12-31',
+    );
+
+    expect(rest).toEqual([]);
+    expect(occurrence?.localDate).toBe('9999-12-31');
+  });
+
+  it.each([
+    [6, '9999-12-25'],
+    [0, '9999-12-26'],
+    [1, '9999-12-27'],
+    [2, '9999-12-28'],
+    [3, '9999-12-29'],
+    [4, '9999-12-30'],
+  ])(
+    'finishes for weekday %i over a range that ends on 9999-12-31',
+    (weekday, expected) => {
+      const occurrences = occurrencesBetween(
+        { ...friday, weekday },
+        newYork,
+        '9999-12-25',
+        '9999-12-31',
+      );
+
+      expect(occurrences.map((value) => value.localDate)).toEqual([expected]);
+    },
+  );
+
+  it('gives nothing when the only matching weekday falls after the range', () => {
+    expect(
+      occurrencesBetween(friday, newYork, '9999-12-27', '9999-12-30'),
+    ).toEqual([]);
+  });
+});
+
+describe('generationHorizon', () => {
+  it('is a year past now, as a UTC date', () => {
+    expect(generationHorizon(new Date('2026-10-26T12:00:00Z'))).toBe(
+      '2027-10-27',
+    );
+  });
+
+  it('counts a leap day', () => {
+    expect(generationHorizon(new Date('2027-10-26T00:00:00Z'))).toBe(
+      '2028-10-26',
+    );
+  });
+
+  it.each([
+    '9998-12-30T00:00:00Z',
+    '9999-06-01T00:00:00Z',
+    '9999-12-29T00:00:00Z',
+    '9999-12-31T23:59:59Z',
+  ])('stops at 9999-12-29 for a clock of %s', (now) => {
+    expect(generationHorizon(new Date(now))).toBe('9999-12-29');
+  });
+
+  it.each([
+    ['an invalid date', new Date(Number.NaN)],
+    ['a clock before year 1001', new Date('1000-12-31T23:59:59Z')],
+  ])('throws for %s', (_name, now) => {
+    expect(() => generationHorizon(now)).toThrow(RangeError);
+  });
+
+  it('accepts the first day of year 1001', () => {
+    expect(generationHorizon(new Date('1001-01-01T00:00:00Z'))).toBe(
+      '1002-01-02',
+    );
+  });
+
+  it.each([
+    'Pacific/Kiritimati',
+    'Etc/GMT+12',
+    'Pacific/Auckland',
+    'America/New_York',
+    'UTC',
+  ])(
+    'keeps a 23:59 start and a 24-hour session on the last date inside the stored years in %s',
+    (zone) => {
+      const [occurrence] = occurrencesBetween(
+        { weekday: 3, startTime: '23:59:00', durationMinutes: 1440 },
+        zone,
+        '9999-12-29',
+        '9999-12-29',
+      );
+
+      expect(occurrence?.localDate).toBe('9999-12-29');
+      expect(occurrence?.endsAt.getTime()).toBeLessThan(Date.UTC(10000, 0, 1));
+      expect(occurrence?.startsAt.getTime()).toBeGreaterThanOrEqual(
+        Date.UTC(1000, 0, 1),
+      );
+    },
+  );
+});
+
+describe('splitUpcoming', () => {
+  const [fifth, twelfth] = occurrencesBetween(
+    template,
+    newYork,
+    '2026-06-06',
+    '2026-06-13',
+  );
+  const occurrences = [fifth, twelfth].flatMap((value) => value ?? []);
+
+  it('counts a start equal to now as past', () => {
+    const { upcoming, inThePast } = splitUpcoming(
+      occurrences,
+      new Date('2026-06-06T14:00:00Z'),
+    );
+
+    expect(upcoming.map((value) => value.localDate)).toEqual(['2026-06-13']);
+    expect(inThePast).toBe(1);
+  });
+
+  it('counts a start one millisecond after now as upcoming', () => {
+    const { upcoming, inThePast } = splitUpcoming(
+      occurrences,
+      new Date('2026-06-06T13:59:59.999Z'),
+    );
+
+    expect(upcoming).toHaveLength(2);
+    expect(inThePast).toBe(0);
+  });
+
+  it.each([
+    [new Date('2026-06-01T00:00:00Z'), 2, 0],
+    [new Date('2027-01-01T00:00:00Z'), 0, 2],
+  ])('now %s: %i upcoming, %i past', (now, upcomingCount, past) => {
+    const split = splitUpcoming(occurrences, now);
+
+    expect(split.upcoming).toHaveLength(upcomingCount);
+    expect(split.inThePast).toBe(past);
+  });
+
+  it('gives nothing for no occurrences', () => {
+    expect(splitUpcoming([], new Date('2026-06-01T00:00:00Z'))).toEqual({
+      upcoming: [],
+      inThePast: 0,
+    });
+  });
+
+  it('judges a time after a spring-forward gap by its real start', () => {
+    const gap = occurrencesBetween(
+      { weekday: 0, startTime: '02:30:00', durationMinutes: 60 },
+      newYork,
+      '2026-03-08',
+      '2026-03-08',
+    );
+
+    expect(
+      splitUpcoming(gap, new Date('2026-03-08T07:29:59.999Z')).upcoming,
+    ).toHaveLength(1);
+    expect(
+      splitUpcoming(gap, new Date('2026-03-08T07:30:00.000Z')).upcoming,
+    ).toHaveLength(0);
+  });
+});
+
+describe('countAlreadyExisted', () => {
+  it.each([
+    [4, 4, 0],
+    [4, 1, 3],
+    [4, 0, 4],
+    [0, 0, 0],
+  ])(
+    '%i attempted, %i inserted: %i existed',
+    (attempted, inserted, existed) => {
+      expect(countAlreadyExisted(attempted, inserted)).toBe(existed);
+    },
+  );
 });
 
 describe('IsoDateSchema', () => {

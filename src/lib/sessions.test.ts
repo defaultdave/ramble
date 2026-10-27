@@ -8,12 +8,14 @@ import {
   checkAllocationChange,
   countAlreadyExisted,
   checkAllocationEditable,
+  checkExpectedVersion,
   generationHorizon,
   isBeyondHorizon,
   isKnownTimeZone,
   maxAllocation,
   occurrencesBetween,
   requiresStaff,
+  resolveHostZone,
   splitUpcoming,
 } from './sessions';
 
@@ -481,6 +483,30 @@ describe('time zones', () => {
   });
 });
 
+describe('resolveHostZone', () => {
+  it('gives a known zone back', () => {
+    expect(resolveHostZone('America/New_York')).toEqual({
+      ok: true,
+      zone: 'America/New_York',
+    });
+  });
+
+  it.each([
+    ['a name Intl does not know', 'Nowhere/Land'],
+    ['an abbreviation', 'EST'],
+    ['an empty string', ''],
+    ['a non-string', 42],
+    ['null', null],
+    ['undefined', undefined],
+    ['an over-long name', `America/${'a'.repeat(64)}`],
+  ])('refuses %s', (_name, stored) => {
+    expect(resolveHostZone(stored)).toEqual({
+      ok: false,
+      reason: 'invalid_time_zone',
+    });
+  });
+});
+
 describe('SessionTemplateInputSchema', () => {
   const valid = {
     experienceId: '11111111-1111-4111-8111-111111111111',
@@ -568,6 +594,18 @@ describe('UpdateSessionAllocationInputSchema', () => {
   it('accepts a valid edit', () => {
     expect(UpdateSessionAllocationInputSchema.safeParse(valid).success).toBe(
       true,
+    );
+  });
+});
+
+describe('checkExpectedVersion', () => {
+  it.each([
+    ['equal', 3, 3, true],
+    ['one behind', 3, 2, false],
+    ['one ahead', 3, 4, false],
+  ])('%s: current %i, expected %i', (_name, current, expected, ok) => {
+    expect(checkExpectedVersion(current, expected)).toEqual(
+      ok ? { ok: true } : { ok: false, reason: 'version_conflict' },
     );
   });
 });

@@ -71,6 +71,17 @@ export function isKnownTimeZone(zone: string): boolean {
   }
 }
 
+export type HostZone =
+  { ok: true; zone: string } | { ok: false; reason: 'invalid_time_zone' };
+
+/** The zone sessions are generated in, from the host's stored value: well formed and known to Intl. */
+export function resolveHostZone(stored: unknown): HostZone {
+  const parsed = TimeZoneSchema.safeParse(stored);
+  return parsed.success && isKnownTimeZone(parsed.data)
+    ? { ok: true, zone: parsed.data }
+    : { ok: false, reason: 'invalid_time_zone' };
+}
+
 const WallTimePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /** Wall-clock time in the host's zone, as the database stores it: hours, minutes, and zero seconds. */
@@ -249,6 +260,19 @@ export function checkAllocationEditable(
   return status === 'scheduled'
     ? { ok: true }
     : { ok: false, reason: 'not_scheduled' };
+}
+
+export type VersionCheck =
+  { ok: true } | { ok: false; reason: 'version_conflict' };
+
+/** An edit stands only if the editor read the version the row has now. */
+export function checkExpectedVersion(
+  current: number,
+  expected: number,
+): VersionCheck {
+  return current === expected
+    ? { ok: true }
+    : { ok: false, reason: 'version_conflict' };
 }
 
 /**

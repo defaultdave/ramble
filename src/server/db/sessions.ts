@@ -5,15 +5,15 @@ import {
   SessionSchema,
   SessionTemplateInputSchema,
   SessionTemplateSchema,
-  TimeZoneSchema,
   UpdateSessionAllocationInputSchema,
   checkAllocationChange,
   checkAllocationEditable,
+  checkExpectedVersion,
   countAlreadyExisted,
   isBeyondHorizon,
-  isKnownTimeZone,
   occurrencesBetween,
   requiresStaff,
+  resolveHostZone,
   splitUpcoming,
   type GenerateSessionsInput,
   type Session,
@@ -145,14 +145,13 @@ export async function generateSessions(
     return { ok: false, reason: 'beyond_horizon' };
   }
 
-  const zone = TimeZoneSchema.safeParse(row.timeZone);
-  if (!zone.success || !isKnownTimeZone(zone.data)) {
-    return { ok: false, reason: 'invalid_time_zone' };
-  }
+  const hostZone = resolveHostZone(row.timeZone);
+  if (!hostZone.ok) return hostZone;
+  const zone = hostZone.zone;
 
   const occurrences = occurrencesBetween(
     template,
-    zone.data,
+    zone,
     data.fromDate,
     data.toDate,
   );
@@ -176,7 +175,7 @@ export async function generateSessions(
         localDate: occurrence.localDate,
         startsAt: occurrence.startsAt,
         endsAt: occurrence.endsAt,
-        timeZone: zone.data,
+        timeZone: zone,
         allocation: template.allocation,
         source: template.source,
       })),
@@ -242,9 +241,8 @@ export async function updateSessionAllocation(
     requireSessionEditor(caller, row.hostId, current.source);
     const editable = checkAllocationEditable(current.status);
     if (!editable.ok) return editable;
-    if (current.version !== data.expectedVersion) {
-      return { ok: false, reason: 'version_conflict' };
-    }
+    const version = checkExpectedVersion(current.version, data.expectedVersion);
+    if (!version.ok) return version;
     const check = checkAllocationChange(current.seatsSold, data.allocation);
     if (!check.ok) return check;
     const [updated] = await tx

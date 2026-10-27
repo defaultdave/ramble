@@ -1397,9 +1397,10 @@ describe('updateSessionAllocation', () => {
       session.id,
       { allocation: 12, expectedVersion: 1 },
       (held) =>
-        held.query("UPDATE sessions SET source = 'allocation' WHERE id = $1", [
-          session.id,
-        ]),
+        held.query(
+          "UPDATE sessions SET source = 'allocation', status = 'cancelled', cancel_reason = 'host' WHERE id = $1",
+          [session.id],
+        ),
     );
 
     expect('error' in outcome && outcome.error).toBeInstanceOf(ForbiddenError);
@@ -1407,6 +1408,7 @@ describe('updateSessionAllocation', () => {
       allocation: 8,
       version: 1,
       source: 'allocation',
+      status: 'cancelled',
     });
   });
 

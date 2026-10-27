@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { CacheChange } from './cacheTags';
+import { requiredText } from './text';
 import { EntityIdSchema } from './catalog';
 import {
   editorialLimits,
@@ -36,16 +37,7 @@ export function legalKindOf(doc: string): LegalKind | null {
 
 const legalStatuses = ['draft', 'published'] as const;
 
-const titleField = z
-  .string()
-  .max(editorialLimits.title * 2)
-  .refine(
-    (value) =>
-      /\S/.test(value) && Array.from(value).length <= editorialLimits.title,
-    {
-      message: 'A title is 1 to 120 characters',
-    },
-  );
+const titleField = requiredText(editorialLimits.title);
 
 export const LegalDocumentSchema = z.object({
   id: EntityIdSchema,
@@ -70,17 +62,8 @@ export type LegalDraftInput = z.infer<typeof LegalDraftInputSchema>;
 export const LegalDraftEditSchema = LegalDraftInputSchema.omit({ doc: true });
 export type LegalDraftEdit = z.infer<typeof LegalDraftEditSchema>;
 
+// TODO(U-047a): the acceptance input contract and the insert that runs inside the checkout transaction.
 export const acceptanceSubjectKinds = ['order', 'host'] as const;
-
-/** One checkout or onboarding accepts a handful of documents: terms, privacy, a waiver, the agreement. */
-export const maxAcceptancesPerSubmission = 5;
-
-export const LegalAcceptancesInputSchema = z.strictObject({
-  subjectKind: z.enum(acceptanceSubjectKinds),
-  subjectId: EntityIdSchema,
-  documentIds: z.array(EntityIdSchema).min(1).max(maxAcceptancesPerSubmission),
-});
-export type LegalAcceptancesInput = z.infer<typeof LegalAcceptancesInputSchema>;
 
 export function legalChange(doc: string): CacheChange {
   return { kind: 'legalDocument', doc };

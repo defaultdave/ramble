@@ -40,8 +40,15 @@
     {
       "idx": 5,
       "version": "7",
-      "when": 1793058320358,
+      "when": 1793059907223,
       "tag": "0005_editorial_and_policy_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793059907719,
+      "tag": "0006_editorial_policy_guards",
       "breakpoints": true
     }
   ]

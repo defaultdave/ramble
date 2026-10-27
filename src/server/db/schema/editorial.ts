@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   boolean,
   check,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -9,6 +10,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
@@ -59,6 +61,8 @@ export const collections = pgTable(
     updatedAt: timestampTz().notNull().defaultNow(),
   },
   (table) => [
+    // The target of the composite key from home_modules, which pins a module to a collection of the kind it shows.
+    unique('collections_id_kind_unique').on(table.id, table.kind),
     uniqueIndex('collections_one_gift_guide')
       .on(table.kind)
       .where(sql`${table.kind} = 'gift_guide'`),
@@ -132,11 +136,19 @@ export const homeModules = pgTable(
     enabled: boolean().notNull().default(true),
     heading: text(),
     body: jsonb().$type<RichTextDoc>(),
-    collectionId: uuid().references(() => collections.id, {
-      onDelete: 'restrict',
-    }),
+    collectionId: uuid(),
+    // The kind of collection the module shows, or null for a module that shows none. A picks module
+    // shows a pick and a gift_guide module shows the gift guide.
+    collectionKind: collectionKindEnum().generatedAlwaysAs(
+      sql`CASE "kind" WHEN 'picks' THEN 'pick'::collection_kind WHEN 'gift_guide' THEN 'gift_guide'::collection_kind END`,
+    ),
   },
   (table) => [
+    foreignKey({
+      columns: [table.collectionId, table.collectionKind],
+      foreignColumns: [collections.id, collections.kind],
+      name: 'home_modules_collection_kind_fk',
+    }).onDelete('restrict'),
     index('home_modules_collection_id_idx').on(table.collectionId),
     check(
       'home_modules_position_in_range',

@@ -1,22 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
-  LegalAcceptancesInputSchema,
   LegalDocSchema,
   LegalDraftInputSchema,
   legalChange,
   legalKindOf,
-  maxAcceptancesPerSubmission,
 } from './legal';
 import { tagsForChanges } from './cacheTags';
 
 // Behaviours under test, one per decision, branch or risk:
 // - a document key is one of the three fixed keys or waiver- and a slug, and nothing else
 // - the kind of a document follows from its key, and a malformed key has none
-// - an acceptance names one to five distinct-shaped documents and a subject, and nothing else
 // - publishing a document reaches the tag of its page
-
-const id = (n: number) =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
 describe('document keys', () => {
   it.each([
@@ -80,57 +74,13 @@ describe('a new draft', () => {
   });
 });
 
-describe('an acceptance', () => {
-  const acceptance = {
-    subjectKind: 'order',
-    subjectId: id(1),
-    documentIds: [id(2), id(3)],
-  };
-
-  it('accepts an order or a host with one to the limit of documents', () => {
-    expect(LegalAcceptancesInputSchema.safeParse(acceptance).success).toBe(
-      true,
-    );
-    expect(
-      LegalAcceptancesInputSchema.safeParse({
-        ...acceptance,
-        subjectKind: 'host',
-        documentIds: Array.from(
-          { length: maxAcceptancesPerSubmission },
-          (_, n) => id(n + 10),
-        ),
-      }).success,
-    ).toBe(true);
-  });
-
-  it.each([
-    ['no documents', { documentIds: [] }],
-    [
-      'more documents than the limit',
-      {
-        documentIds: Array.from(
-          { length: maxAcceptancesPerSubmission + 1 },
-          (_, n) => id(n + 10),
-        ),
-      },
-    ],
-    ['a malformed document ID', { documentIds: ['nope'] }],
-    ['a subject that is neither an order nor a host', { subjectKind: 'guest' }],
-    ['a malformed subject ID', { subjectId: 'nope' }],
-    [
-      'a field it does not know',
-      { acceptedAt: new Date('2026-10-26T12:00:00Z') },
-    ],
-  ])('refuses %s', (_name, change) => {
-    expect(
-      LegalAcceptancesInputSchema.safeParse({ ...acceptance, ...change })
-        .success,
-    ).toBe(false);
-  });
-});
-
 describe('publishing a document', () => {
-  it('invalidates the tag of its page', () => {
-    expect(tagsForChanges([legalChange('terms')])).toEqual(['legal:terms']);
+  it.each([
+    ['terms', 'legal:terms'],
+    ['privacy', 'legal:privacy'],
+    ['host-agreement', 'legal:host-agreement'],
+    ['waiver-harbor-kayak', 'legal:waiver-harbor-kayak'],
+  ])('invalidates only the tag of %s', (doc, tag) => {
+    expect(tagsForChanges([legalChange(doc)])).toEqual([tag]);
   });
 });

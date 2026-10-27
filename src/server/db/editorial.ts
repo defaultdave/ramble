@@ -15,6 +15,7 @@ import {
   changesWhenSaved,
   collectionChange,
   editorialLimits,
+  hasCollectionKindMismatch,
   pageCopyChange,
   publishedAtAfter,
   visibleChange,
@@ -43,6 +44,7 @@ import {
   neighborhoods,
   pages,
 } from './schema';
+import { lockFor } from './locks';
 import { requireStaff } from './staff';
 
 type PageCopyKind = PageCopy['kind'];
@@ -92,7 +94,7 @@ export function listPublishedPicks(): Promise<Collection[]> {
   );
 }
 
-// TODO(U-030): first caller
+// TODO(U-036): first caller
 /** Null when the slug is malformed, the Pick is missing, or it is still a draft. */
 export async function getPublishedPick(
   slug: string,
@@ -110,7 +112,7 @@ export async function getPublishedPick(
   return pick ?? null;
 }
 
-// TODO(U-030): first caller
+// TODO(U-036): first caller
 export async function getPublishedGiftGuide(): Promise<Collection | null> {
   const [guide] = await readCollections(
     and(publishedCollection, eq(collections.kind, 'gift_guide')),
@@ -311,6 +313,10 @@ export async function saveCollection(
   requireStaff(caller);
   const parsed = CollectionInputSchema.parse(input);
   const outcome = await db.transaction(async (tx) => {
+    // Writers of one slug, and of the gift guide, take turns: the loser reads the winner's row
+    // after the lock and answers `slug_taken` or `gift_guide_exists` instead of tripping the index.
+    await lockFor(tx, `editorial:collection-slug:${parsed.slug}`);
+    if (parsed.kind === 'gift_guide') await lockFor(tx, 'editorial:gift-guide');
     const [before] = parsed.id
       ? await tx
           .select()
@@ -406,7 +412,9 @@ export async function saveCollection(
 }
 
 export type SaveHomeModulesResult =
-  { status: 'saved'; value: HomeModule[] } | { status: 'unknown_collection' };
+  | { status: 'saved'; value: HomeModule[] }
+  | { status: 'unknown_collection' }
+  | { status: 'collection_kind_mismatch' };
 
 // TODO(U-076b): first caller
 /** Replaces the whole home page: the position of a module is its place in the list. */
@@ -424,13 +432,19 @@ export async function saveHomeModules(
     ),
   ];
   const outcome = await db.transaction(async (tx) => {
+    // Two replacements of the whole list take turns, or both would insert the same positions.
+    await lockFor(tx, 'editorial:home-modules');
     if (collectionIds.length > 0) {
       const known = await tx
-        .select({ id: collections.id })
+        .select({ id: collections.id, kind: collections.kind })
         .from(collections)
         .where(inArray(collections.id, collectionIds));
       if (known.length !== collectionIds.length) {
         return { status: 'unknown_collection' } as const;
+      }
+      const kinds = new Map(known.map(({ id, kind }) => [id, kind]));
+      if (hasCollectionKindMismatch(parsed, kinds)) {
+        return { status: 'collection_kind_mismatch' } as const;
       }
     }
     await tx.delete(homeModules);
@@ -465,6 +479,8 @@ export async function savePageCopy(
   const parsed = PageCopyInputSchema.parse(input);
   const isCategory = parsed.kind === 'category';
   const outcome = await db.transaction(async (tx) => {
+    // A first save of the same page by two writers takes turns, so the second one replaces.
+    await lockFor(tx, `editorial:page-copy:${parsed.kind}:${parsed.targetId}`);
     const target = isCategory ? categories : neighborhoods;
     const [owner] = await tx
       .select({ slug: target.slug })
@@ -540,6 +556,7 @@ export async function saveHelpArticle(
   requireStaff(caller);
   const parsed = HelpArticleInputSchema.parse(input);
   const outcome = await db.transaction(async (tx) => {
+    await lockFor(tx, `editorial:help-slug:${parsed.slug}`);
     const [before] = parsed.id
       ? await tx
           .select()

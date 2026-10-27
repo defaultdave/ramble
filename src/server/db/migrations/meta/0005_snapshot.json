@@ -1,5 +1,5 @@
 {
-  "id": "c243818a-3a9b-45b1-8902-7afb5894c4a5",
+  "id": "313a6c7d-eb6f-40b5-acfd-c19d052db7a0",
   "prevId": "39dda0f0-532b-4fee-a97d-8d6760f23787",
   "version": "7",
   "dialect": "postgresql",
@@ -1328,6 +1328,14 @@
           "columns": [
             "slug"
           ]
+        },
+        "collections_id_kind_unique": {
+          "name": "collections_id_kind_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "id",
+            "kind"
+          ]
         }
       },
       "policies": {},
@@ -1523,6 +1531,17 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
+        },
+        "collection_kind": {
+          "name": "collection_kind",
+          "type": "collection_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false,
+          "generated": {
+            "as": "CASE \"kind\" WHEN 'picks' THEN 'pick'::collection_kind WHEN 'gift_guide' THEN 'gift_guide'::collection_kind END",
+            "type": "stored"
+          }
         }
       },
       "indexes": {
@@ -1543,15 +1562,17 @@
         }
       },
       "foreignKeys": {
-        "home_modules_collection_id_collections_id_fk": {
-          "name": "home_modules_collection_id_collections_id_fk",
+        "home_modules_collection_kind_fk": {
+          "name": "home_modules_collection_kind_fk",
           "tableFrom": "home_modules",
           "tableTo": "collections",
           "columnsFrom": [
-            "collection_id"
+            "collection_id",
+            "collection_kind"
           ],
           "columnsTo": [
-            "id"
+            "id",
+            "kind"
           ],
           "onDelete": "restrict",
           "onUpdate": "no action"

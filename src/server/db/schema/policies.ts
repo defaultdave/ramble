@@ -152,7 +152,7 @@ export const settings = pgTable(
     paymentGraceMinutes: integer().notNull().default(5),
     giftValidityMonths: integer().notNull().default(12),
     giftExpiryAction: giftExpiryActionEnum().notNull().default('refund_buyer'),
-    // NYC combined sales tax, 8.875 percent, until counsel answers Q-12.
+    // NYC combined sales tax, 8.875 percent, pending Q-12.
     taxRatePpm: integer().notNull().default(88_750),
     updatedAt: timestampTz().notNull().defaultNow(),
   },

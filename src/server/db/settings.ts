@@ -14,6 +14,10 @@ import { db, dbRead } from './client';
 import { settings } from './schema';
 import { requireStaff } from './staff';
 
+// TODO(U-014a): read the hold length, payment grace, gift validity, gift expiry action, and tax rate
+// inside the hold and payment transactions. That read has no signed-in caller (the guest is a device),
+// so it waits for a rule on how such a read checks the caller, and for the first path that needs it.
+
 /** The migration inserts the one row, so a read that finds none refuses rather than assuming defaults. */
 function onlyRow<T>(rows: T[]): T {
   const [row] = rows;
@@ -22,30 +26,18 @@ function onlyRow<T>(rows: T[]): T {
 }
 
 // TODO(U-030): first caller
-/** The banner and the switches a guest page shows. Never a rate, a window, or a length. */
+/** The banner and the switches a guest page shows. Only these four columns leave the database. */
 export async function getGuestSettings(): Promise<GuestSettings> {
   const rows = await dbRead
-    .select()
+    .select({
+      bannerText: settings.bannerText,
+      bookingsPaused: settings.bookingsPaused,
+      giftsEnabled: settings.giftsEnabled,
+      checkoutMaintenance: settings.checkoutMaintenance,
+    })
     .from(settings)
     .where(eq(settings.id, true));
   return GuestSettingsSchema.parse(onlyRow(rows));
-}
-
-/** Where a read runs: the pool, or the transaction of a path that needs the numbers to hold still. */
-type Selector = Pick<typeof db, 'select'>;
-
-// TODO(U-014a): first caller
-/**
- * Every setting, for the hold and payment paths (hold length, grace, gift validity, tax rate).
- * It holds no personal data and every caller needs it before it knows who is asking, so it takes
- * no caller. Pass a transaction to read inside one.
- */
-export async function getSettings(executor: Selector = db): Promise<Settings> {
-  const rows = await executor
-    .select()
-    .from(settings)
-    .where(eq(settings.id, true));
-  return SettingsSchema.parse(onlyRow(rows));
 }
 
 // TODO(U-078): first caller

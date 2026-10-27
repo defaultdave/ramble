@@ -3,13 +3,11 @@ import { and, desc, eq, gt, sql } from 'drizzle-orm';
 import { EntityIdSchema } from '@/lib/catalog';
 import { editorialLimits } from '@/lib/editorial';
 import {
-  LegalAcceptancesInputSchema,
   LegalDocSchema,
   LegalDocumentSchema,
   LegalDraftEditSchema,
   LegalDraftInputSchema,
   legalChange,
-  type LegalAcceptancesInput,
   type LegalDocument,
   type LegalDraftEdit,
   type LegalDraftInput,
@@ -17,8 +15,13 @@ import {
 import type { Caller } from '@/server/auth/caller';
 import { updateTagsForChanges } from '@/server/cache/invalidate';
 import { db, dbRead } from './client';
-import { legalAcceptances, legalDocuments } from './schema';
+import { lockFor } from './locks';
+import { legalDocuments } from './schema';
 import { requireStaff } from './staff';
+
+// TODO(U-047a): record the acceptances (`legal_acceptances`) inside the checkout transaction, and
+// the host agreement at onboarding. The table and its triggers ship with this unit; the insert
+// waits for a caller and for a rule on how a data-layer write with no signed-in caller checks it.
 
 // TODO(U-038): first caller
 /** The highest published version of a document. Null when the key is malformed or nothing is published. */
@@ -88,9 +91,7 @@ export async function createLegalDraft(
   const parsed = LegalDraftInputSchema.parse(input);
   const row = await db.transaction(async (tx) => {
     // The same per-document lock the publish trigger takes, so two drafts never pick one number.
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtext(${parsed.doc}))`,
-    );
+    await lockFor(tx, parsed.doc);
     const [latest] = await tx
       .select({ version: legalDocuments.version })
       .from(legalDocuments)
@@ -144,7 +145,8 @@ export type PublishLegalResult =
 // TODO(U-076c): first caller
 /**
  * Publishes a draft, which makes it the current version and final. A draft below a version
- * already published is `superseded`: publish a new draft instead.
+ * already published is `superseded`: publish a new draft instead. Everything is read again after
+ * the per-document lock, so a publish that lost a race gets a typed answer, not a database error.
  */
 export async function publishLegalDocument(
   caller: Caller,
@@ -154,6 +156,12 @@ export async function publishLegalDocument(
   const parsedId = EntityIdSchema.safeParse(id);
   if (!parsedId.success) return { status: 'not_a_draft' };
   const outcome = await db.transaction(async (tx) => {
+    const [named] = await tx
+      .select({ doc: legalDocuments.doc })
+      .from(legalDocuments)
+      .where(eq(legalDocuments.id, parsedId.data));
+    if (!named) return { status: 'not_a_draft' } as const;
+    await lockFor(tx, named.doc);
     const [draft] = await tx
       .select()
       .from(legalDocuments)
@@ -164,7 +172,6 @@ export async function publishLegalDocument(
         ),
       );
     if (!draft) return { status: 'not_a_draft' } as const;
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${draft.doc}))`);
     const [newer] = await tx
       .select({ id: legalDocuments.id })
       .from(legalDocuments)
@@ -188,34 +195,4 @@ export async function publishLegalDocument(
   if (outcome.status !== 'published') return outcome;
   updateTagsForChanges([legalChange(outcome.row.doc)]);
   return { status: 'published', value: LegalDocumentSchema.parse(outcome.row) };
-}
-
-/** A transaction handle or the pool: anything that can insert. */
-type Inserter = Pick<typeof db, 'insert'>;
-
-// TODO(U-047a): first caller
-/**
- * Records that an order or a host accepted these published versions, inside the caller's
- * transaction so an acceptance commits with the order or the host it belongs to. The caller has
- * already established who the subject is (the hold's device, the host's owner). A version that is
- * not published makes the database refuse the insert and the transaction fail. Accepting a
- * version twice is a no-op, so a retried checkout writes nothing new.
- */
-export async function recordLegalAcceptances(
-  executor: Inserter,
-  input: LegalAcceptancesInput,
-): Promise<{ recorded: number }> {
-  const parsed = LegalAcceptancesInputSchema.parse(input);
-  const rows = await executor
-    .insert(legalAcceptances)
-    .values(
-      [...new Set(parsed.documentIds)].map((legalDocumentId) => ({
-        legalDocumentId,
-        subjectKind: parsed.subjectKind,
-        subjectId: parsed.subjectId,
-      })),
-    )
-    .onConflictDoNothing()
-    .returning({ id: legalAcceptances.id });
-  return { recorded: rows.length };
 }

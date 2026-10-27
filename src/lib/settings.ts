@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { optionalText } from './text';
 
 export const giftExpiryActions = ['refund_buyer', 'leave_open'] as const;
 
@@ -12,18 +13,7 @@ export const settingsBounds = {
   bannerChars: 280,
 } as const;
 
-const bannerText = z
-  .string()
-  .max(settingsBounds.bannerChars * 2)
-  .refine(
-    (value) =>
-      /\S/.test(value) &&
-      Array.from(value).length <= settingsBounds.bannerChars,
-    {
-      message: `A banner is 1 to ${String(settingsBounds.bannerChars)} characters`,
-    },
-  )
-  .nullable();
+const bannerText = optionalText(settingsBounds.bannerChars);
 
 function intBetween({ min, max }: { min: number; max: number }) {
   return z.int().min(min).max(max);

@@ -5,11 +5,13 @@ import {
   HelpArticleInputSchema,
   HomeModulesInputSchema,
   PageCopyInputSchema,
+  PageCopySchema,
   RichTextInputSchema,
   RichTextStoredSchema,
   changesWhenSaved,
   collectionChange,
   editorialLimits,
+  hasCollectionKindMismatch,
   pageCopyChange,
   publishedAtAfter,
   visibleChange,
@@ -21,6 +23,8 @@ import {
 // - a text field counts characters the way Postgres does, and refuses blank text and text over its limit
 // - a collection refuses a repeated experience, too many entries, an unknown key, and a bad slug
 // - a home page refuses a collection on a module kind that shows none, and too many modules
+// - a picks module may show a Pick and a gift_guide module the gift guide, and nothing else
+// - page copy carries the slug of a category or neighborhood as that table stores it, not the 80-character editorial limit
 // - a save invalidates what guests could see before and after, and nothing for a draft that stays one
 // - the publication time is stamped on the way to published, kept while published, and cleared as a draft
 // - items are grouped under their collection in arrival order
@@ -417,5 +421,64 @@ describe('withItems', () => {
         [{ collectionId: 'z', experienceId: 'x', note: null }],
       ),
     ).toEqual([{ id: 'a', items: [] }]);
+  });
+});
+
+describe('hasCollectionKindMismatch', () => {
+  const kinds = new Map<string, 'pick' | 'gift_guide'>([
+    ['p', 'pick'],
+    ['g', 'gift_guide'],
+  ]);
+
+  it.each([
+    ['a picks module on a Pick', 'picks', 'p', false],
+    ['a gift_guide module on the gift guide', 'gift_guide', 'g', false],
+    ['a picks module on the gift guide', 'picks', 'g', true],
+    ['a gift_guide module on a Pick', 'gift_guide', 'p', true],
+    ['a module on a collection that is not known', 'picks', 'z', true],
+    ['a module with no collection', 'picks', null, false],
+  ] as const)('%s: mismatch is %s', (_name, kind, collectionId, expected) => {
+    expect(hasCollectionKindMismatch([{ kind, collectionId }], kinds)).toBe(
+      expected,
+    );
+  });
+
+  it('finds one bad module among good ones', () => {
+    expect(
+      hasCollectionKindMismatch(
+        [
+          { kind: 'picks', collectionId: 'p' },
+          { kind: 'hero_search', collectionId: null },
+          { kind: 'gift_guide', collectionId: 'p' },
+        ],
+        kinds,
+      ),
+    ).toBe(true);
+  });
+});
+
+describe('page copy slug', () => {
+  const copy = (slug: string) => ({
+    id: '00000000-0000-4000-8000-000000000001',
+    kind: 'category',
+    slug,
+    heading: null,
+    metaDescription: null,
+    status: 'draft',
+    intro: null,
+    body: null,
+    publishedAt: null,
+    updatedAt: new Date('2026-10-26T12:00:00Z'),
+  });
+
+  it('reads a slug longer than the editorial limit, because the category table owns that column', () => {
+    expect(
+      PageCopySchema.safeParse(copy('a'.repeat(editorialLimits.slug + 1)))
+        .success,
+    ).toBe(true);
+  });
+
+  it('still refuses a slug that is not a slug', () => {
+    expect(PageCopySchema.safeParse(copy('Not A Slug')).success).toBe(false);
   });
 });

@@ -76,6 +76,7 @@ CREATE TABLE "collections" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "collections_slug_unique" UNIQUE("slug"),
+	CONSTRAINT "collections_id_kind_unique" UNIQUE("id","kind"),
 	CONSTRAINT "collections_slug_shape" CHECK ("collections"."slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$' AND char_length("collections"."slug") <= 80),
 	CONSTRAINT "collections_title" CHECK ("collections"."title" ~ '[^[:space:]]' AND char_length("collections"."title") <= 120),
 	CONSTRAINT "collections_summary" CHECK ("collections"."summary" IS NULL OR ("collections"."summary" ~ '[^[:space:]]' AND char_length("collections"."summary") <= 300)),
@@ -121,6 +122,7 @@ CREATE TABLE "home_modules" (
 	"heading" text,
 	"body" jsonb,
 	"collection_id" uuid,
+	"collection_kind" "collection_kind" GENERATED ALWAYS AS (CASE "kind" WHEN 'picks' THEN 'pick'::collection_kind WHEN 'gift_guide' THEN 'gift_guide'::collection_kind END) STORED,
 	CONSTRAINT "home_modules_position_unique" UNIQUE("position"),
 	CONSTRAINT "home_modules_position_in_range" CHECK ("home_modules"."position" >= 0 AND "home_modules"."position" < 20),
 	CONSTRAINT "home_modules_heading" CHECK ("home_modules"."heading" IS NULL OR ("home_modules"."heading" ~ '[^[:space:]]' AND char_length("home_modules"."heading") <= 120)),
@@ -161,7 +163,7 @@ CREATE TABLE "pages" (
 ALTER TABLE "legal_acceptances" ADD CONSTRAINT "legal_acceptances_legal_document_id_legal_documents_id_fk" FOREIGN KEY ("legal_document_id") REFERENCES "public"."legal_documents"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "collection_items" ADD CONSTRAINT "collection_items_collection_id_collections_id_fk" FOREIGN KEY ("collection_id") REFERENCES "public"."collections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "collection_items" ADD CONSTRAINT "collection_items_experience_id_experiences_id_fk" FOREIGN KEY ("experience_id") REFERENCES "public"."experiences"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "home_modules" ADD CONSTRAINT "home_modules_collection_id_collections_id_fk" FOREIGN KEY ("collection_id") REFERENCES "public"."collections"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "home_modules" ADD CONSTRAINT "home_modules_collection_kind_fk" FOREIGN KEY ("collection_id","collection_kind") REFERENCES "public"."collections"("id","kind") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "pages" ADD CONSTRAINT "pages_category_id_categories_id_fk" FOREIGN KEY ("category_id") REFERENCES "public"."categories"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "pages" ADD CONSTRAINT "pages_neighborhood_id_neighborhoods_id_fk" FOREIGN KEY ("neighborhood_id") REFERENCES "public"."neighborhoods"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "legal_acceptances_once_per_subject" ON "legal_acceptances" USING btree ("subject_kind","subject_id","legal_document_id");--> statement-breakpoint
@@ -173,51 +175,4 @@ CREATE UNIQUE INDEX "collections_one_gift_guide" ON "collections" USING btree ("
 CREATE INDEX "home_modules_collection_id_idx" ON "home_modules" USING btree ("collection_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "pages_category_unique" ON "pages" USING btree ("category_id") WHERE "pages"."category_id" IS NOT NULL;--> statement-breakpoint
 CREATE UNIQUE INDEX "pages_neighborhood_unique" ON "pages" USING btree ("neighborhood_id") WHERE "pages"."neighborhood_id" IS NOT NULL;--> statement-breakpoint
-ALTER TABLE "experiences" ADD CONSTRAINT "experiences_waiver_document_id_legal_documents_id_fk" FOREIGN KEY ("waiver_document_id") REFERENCES "public"."legal_documents"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
--- The one settings row, at the column defaults. The tax rate is the NYC combined sales tax rate until Q-12 is answered.
-INSERT INTO settings DEFAULT VALUES;--> statement-breakpoint
--- A published version is what a guest accepted, so it is final: no edit, no delete, no change of key.
--- A version publishes only above every version already published for its document, under a lock per document.
-CREATE FUNCTION guard_legal_document() RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
-	IF OLD.status = 'published' THEN
-		RAISE EXCEPTION 'A published legal document version is final' USING ERRCODE = 'restrict_violation';
-	END IF;
-	IF TG_OP = 'DELETE' THEN
-		RETURN OLD;
-	END IF;
-	IF NEW.doc <> OLD.doc OR NEW.version <> OLD.version THEN
-		RAISE EXCEPTION 'A legal document version keeps its document and number' USING ERRCODE = 'restrict_violation';
-	END IF;
-	IF NEW.status = 'published' THEN
-		PERFORM pg_advisory_xact_lock(hashtext(NEW.doc));
-		IF EXISTS (
-			SELECT 1 FROM legal_documents
-			WHERE doc = NEW.doc AND status = 'published' AND version > NEW.version
-		) THEN
-			RAISE EXCEPTION 'A newer version of this document is already published' USING ERRCODE = 'restrict_violation';
-		END IF;
-	END IF;
-	RETURN NEW;
-END
-$$;--> statement-breakpoint
-CREATE TRIGGER legal_documents_guard BEFORE UPDATE OR DELETE ON legal_documents
-	FOR EACH ROW EXECUTE FUNCTION guard_legal_document();--> statement-breakpoint
--- An acceptance is a record: it names a published version when it is written and never changes after.
-CREATE FUNCTION guard_legal_acceptance() RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
-	IF TG_OP = 'INSERT' THEN
-		IF NOT EXISTS (
-			SELECT 1 FROM legal_documents WHERE id = NEW.legal_document_id AND status = 'published'
-		) THEN
-			RAISE EXCEPTION 'Only a published version can be accepted' USING ERRCODE = 'restrict_violation';
-		END IF;
-		RETURN NEW;
-	END IF;
-	RAISE EXCEPTION 'A legal acceptance is a record and never changes' USING ERRCODE = 'restrict_violation';
-END
-$$;--> statement-breakpoint
-CREATE TRIGGER legal_acceptances_guard_insert BEFORE INSERT ON legal_acceptances
-	FOR EACH ROW EXECUTE FUNCTION guard_legal_acceptance();--> statement-breakpoint
-CREATE TRIGGER legal_acceptances_guard_change BEFORE UPDATE OR DELETE ON legal_acceptances
-	FOR EACH ROW EXECUTE FUNCTION guard_legal_acceptance();
+ALTER TABLE "experiences" ADD CONSTRAINT "experiences_waiver_document_id_legal_documents_id_fk" FOREIGN KEY ("waiver_document_id") REFERENCES "public"."legal_documents"("id") ON DELETE restrict ON UPDATE no action;

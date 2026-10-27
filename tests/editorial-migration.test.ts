@@ -1,17 +1,31 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { expect, it } from 'vitest';
 import { editorialLimits } from '@/lib/editorial';
 import { legalDocPattern } from '@/lib/legal';
 import { settingsBounds } from '@/lib/settings';
 
-const migration = readFileSync(
-  path.resolve(
-    import.meta.dirname,
-    '../src/server/db/migrations/0005_editorial_and_policy_schema.sql',
-  ),
-  'utf8',
+const migrations = path.resolve(
+  import.meta.dirname,
+  '../src/server/db/migrations',
 );
+
+// Found by name, not number: the number changes when another unit's migration lands first.
+function migrationNamed(name: string): string {
+  const files = readdirSync(migrations).filter((file) =>
+    new RegExp(`^\\d{4}_${name}\\.sql$`).test(file),
+  );
+  const [file] = files;
+  if (files.length !== 1 || file === undefined) {
+    throw new Error(
+      `Expected one migration named ${name}, found ${String(files.length)}`,
+    );
+  }
+  return readFileSync(path.join(migrations, file), 'utf8');
+}
+
+const migration = migrationNamed('editorial_and_policy_schema');
+const guards = migrationNamed('editorial_policy_guards');
 
 const count = (needle: string) => migration.split(needle).length - 1;
 
@@ -80,4 +94,16 @@ it('holds the banner length', () => {
   expect(migration).toContain(
     `char_length("settings"."banner_text") <= ${String(settingsBounds.bannerChars)}`,
   );
+});
+
+// drizzle-kit regenerates the schema migration from the snapshot and drops anything written by
+// hand, so rows and triggers live in their own custom migration.
+it('keeps the rows and triggers out of the generated schema migration', () => {
+  expect(migration).not.toMatch(/CREATE (FUNCTION|TRIGGER)|INSERT INTO/);
+  expect(guards).toContain('INSERT INTO settings DEFAULT VALUES');
+  expect(guards.match(/CREATE TRIGGER/g)).toHaveLength(5);
+});
+
+it('says the tax default is pending Q-12 wherever it is written', () => {
+  expect(guards).toContain('pending Q-12');
 });

@@ -4,6 +4,7 @@ import { EntityIdSchema, SlugSchema } from './catalog';
 import type { RichTextDoc } from './richText/format';
 import { richTextSchema } from './richText/schema';
 import { sanitizeRichText } from './richText/sanitize';
+import { isStorableJson, optionalText, requiredText } from './text';
 
 export const collectionKinds = ['pick', 'gift_guide'] as const;
 
@@ -45,26 +46,6 @@ export const editorialLimits = {
   listed: 200,
 } as const;
 
-/** Length in characters as Postgres counts them: a code point is one, not two as `String.length` counts an emoji. */
-function text(max: number) {
-  return z
-    .string()
-    .max(max * 2)
-    .refine((value) => Array.from(value).length <= max, {
-      message: `At most ${String(max)} characters`,
-    });
-}
-
-const notBlank = (value: string) => /\S/.test(value);
-
-function requiredText(max: number) {
-  return text(max).refine(notBlank, { message: 'Must not be blank' });
-}
-
-function optionalText(max: number) {
-  return requiredText(max).nullable();
-}
-
 const textEncoder = new TextEncoder();
 
 function byteLength(doc: RichTextDoc): number {
@@ -73,14 +54,15 @@ function byteLength(doc: RichTextDoc): number {
 
 /**
  * The write boundary for a stored document (SEC-6): the format check of `richTextSchema`, then
- * the size limit the database CHECK backs.
+ * the size limit the database CHECK backs, then a refusal of the characters Postgres cannot store.
  */
-export const RichTextInputSchema = richTextSchema.refine(
-  (doc) => byteLength(doc) <= editorialLimits.richTextBytes,
-  {
+export const RichTextInputSchema = richTextSchema
+  .refine((doc) => byteLength(doc) <= editorialLimits.richTextBytes, {
     message: `A document is at most ${String(editorialLimits.richTextBytes)} bytes`,
-  },
-);
+  })
+  .refine(isStorableJson, {
+    message: 'A document holds a character that cannot be stored',
+  });
 
 /**
  * The read side repairs instead of refusing, as the renderer does: one bad stored document must
@@ -165,6 +147,21 @@ function collectionNotAllowed(module: CollectionTarget): boolean {
   );
 }
 
+/**
+ * A picks module shows a Pick and a gift_guide module shows the gift guide. The database holds
+ * the same rule as a composite foreign key from `home_modules` to `collections (id, kind)`.
+ */
+export function hasCollectionKindMismatch(
+  modules: readonly CollectionTarget[],
+  collectionKindById: ReadonlyMap<string, (typeof collectionKinds)[number]>,
+): boolean {
+  return modules.some(({ kind, collectionId }) => {
+    if (collectionId === null) return false;
+    const shown = kind === 'picks' ? 'pick' : 'gift_guide';
+    return collectionKindById.get(collectionId) !== shown;
+  });
+}
+
 const collectionOnlyForCollectionKinds = {
   message: 'Only a picks or gift_guide module points at a collection',
   path: ['collectionId'],
@@ -210,8 +207,8 @@ const pageCopyFields = {
 export const PageCopySchema = z.object({
   id: EntityIdSchema,
   kind: z.enum(pageCopyKinds),
-  /** The slug of the category or neighborhood the copy belongs to. */
-  slug: SlugFieldSchema,
+  /** The slug of the category or neighborhood the copy belongs to, whose column this unit does not own. */
+  slug: SlugSchema,
   ...pageCopyFields,
   intro: RichTextStoredSchema.nullable(),
   body: RichTextStoredSchema.nullable(),

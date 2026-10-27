@@ -1,4 +1,5 @@
 import { updateTag } from 'next/cache';
+import { ZodError } from 'zod';
 import { eq, sql } from 'drizzle-orm';
 import {
   afterAll,
@@ -55,7 +56,7 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 // - a save invalidates the tags of what was and is published, and nothing for a draft that stays a draft
 // - input the Zod schemas refuse writes nothing
 // - a legal version is numbered one above the last, a draft is editable, publishing makes it current and
-//   invalidates its page, a stale draft is superseded; recording acceptances is idempotent and a draft fails
+//   invalidates its page, a stale draft is superseded
 // - a document at the Zod size limit is stored
 // - the settings update changes only the named settings, invalidates the settings tag, and a guest sees no rate
 
@@ -408,7 +409,7 @@ describe('constraints on editorial tables', () => {
       [
         'a collection that does not exist',
         homeModule({ kind: 'picks', collectionId: uuid(9) }),
-        'home_modules_collection_id_collections_id_fk',
+        'home_modules_collection_kind_fk',
       ],
     ])('refuse %s', async (_name, row, constraint) => {
       const values = { ...row } as Record<string, unknown>;
@@ -599,6 +600,26 @@ describe('timestamps in the editorial tables', () => {
   });
 });
 
+/** The only way a published row exists: written as a draft, then published, as the guard requires. */
+async function insertPublishedLegal(values: Record<string, unknown>) {
+  const draft = await insertOne(
+    client.db
+      .insert(legalDocuments)
+      .values({ ...values, status: 'draft', publishedAt: null } as never)
+      .returning(),
+  );
+  return insertOne(
+    client.db
+      .update(legalDocuments)
+      .set({
+        status: 'published',
+        publishedAt: new Date('2026-10-01T00:00:00Z'),
+      })
+      .where(eq(legalDocuments.id, draft.id))
+      .returning(),
+  );
+}
+
 describe('legal documents and acceptances in the database', () => {
   const version = (overrides: Record<string, unknown> = {}) => ({
     doc: 'terms',
@@ -625,8 +646,23 @@ describe('legal documents and acceptances in the database', () => {
       'legal_documents_body_is_rich_text',
     ],
     [
-      'published with no time',
-      { status: 'published' },
+      'a body whose root is not a doc node',
+      { body: { type: 'paragraph', content: [] } },
+      'legal_documents_body_is_rich_text',
+    ],
+    [
+      'a body with no root type',
+      { body: { content: [] } },
+      'legal_documents_body_is_rich_text',
+    ],
+    [
+      'a body with no content',
+      { body: { type: 'doc' } },
+      'legal_documents_body_is_rich_text',
+    ],
+    [
+      'a draft with a publication time',
+      { publishedAt: new Date('2026-10-01T00:00:00Z') },
       'legal_documents_published_at_matches_status',
     ],
   ])('refuse %s', async (_name, change, constraint) => {
@@ -649,24 +685,58 @@ describe('legal documents and acceptances in the database', () => {
     });
   });
 
+  describe('a version written as published', () => {
+    const asPublished = (overrides: Record<string, unknown>) =>
+      client.db.insert(legalDocuments).values(
+        version({
+          status: 'published',
+          publishedAt: new Date('2026-10-01T00:00:00Z'),
+          ...overrides,
+        }) as never,
+      );
+
+    it('is refused when nothing is published yet', async () => {
+      await expect(
+        asPublished({ doc: 'waiver-insert-first' }),
+      ).rejects.toMatchObject({
+        cause: {
+          message: expect.stringContaining('starts as a draft') as string,
+        },
+      });
+    });
+
+    it('is refused below the current version and when back-dated', async () => {
+      await insertPublishedLegal(
+        version({ doc: 'waiver-insert-below', version: 5 }),
+      );
+
+      await expect(
+        asPublished({ doc: 'waiver-insert-below', version: 3 }),
+      ).rejects.toMatchObject({
+        cause: {
+          message: expect.stringContaining('starts as a draft') as string,
+        },
+      });
+      await expect(
+        asPublished({
+          doc: 'waiver-insert-below',
+          version: 6,
+          publishedAt: new Date('2001-01-01T00:00:00Z'),
+        }),
+      ).rejects.toMatchObject({
+        cause: {
+          message: expect.stringContaining('starts as a draft') as string,
+        },
+      });
+    });
+  });
+
   describe('a published version', () => {
     let publishedId: string;
 
     beforeAll(async () => {
       publishedId = (
-        await insertOne(
-          client.db
-            .insert(legalDocuments)
-            .values(
-              version({
-                doc: 'privacy',
-                version: 1,
-                status: 'published',
-                publishedAt: new Date('2026-10-01T00:00:00Z'),
-              }) as never,
-            )
-            .returning(),
-        )
+        await insertPublishedLegal(version({ doc: 'privacy', version: 1 }))
       ).id;
     });
 
@@ -738,14 +808,7 @@ describe('legal documents and acceptances in the database', () => {
           .values(version({ doc: 'waiver-order', version: 1 }) as never)
           .returning(),
       );
-      await client.db.insert(legalDocuments).values(
-        version({
-          doc: 'waiver-order',
-          version: 2,
-          status: 'published',
-          publishedAt: new Date('2026-10-01T00:00:00Z'),
-        }) as never,
-      );
+      await insertPublishedLegal(version({ doc: 'waiver-order', version: 2 }));
 
       await expect(
         client.db
@@ -767,18 +830,7 @@ describe('legal documents and acceptances in the database', () => {
 
     beforeAll(async () => {
       publishedId = (
-        await insertOne(
-          client.db
-            .insert(legalDocuments)
-            .values(
-              version({
-                doc: 'host-agreement',
-                status: 'published',
-                publishedAt: new Date('2026-10-01T00:00:00Z'),
-              }) as never,
-            )
-            .returning(),
-        )
+        await insertPublishedLegal(version({ doc: 'host-agreement' }))
       ).id;
       draftId = (
         await insertOne(
@@ -858,18 +910,7 @@ describe('legal documents and acceptances in the database', () => {
   });
 
   it('can be the waiver of an experience, and an unknown document is refused', async () => {
-    const waiver = await insertOne(
-      client.db
-        .insert(legalDocuments)
-        .values(
-          version({
-            doc: 'waiver-kayak',
-            status: 'published',
-            publishedAt: new Date('2026-10-01T00:00:00Z'),
-          }) as never,
-        )
-        .returning(),
-    );
+    const waiver = await insertPublishedLegal(version({ doc: 'waiver-kayak' }));
 
     const experience = await insertExperience('live', {
       waiverRequired: true,
@@ -888,6 +929,22 @@ describe('legal documents and acceptances in the database', () => {
 });
 
 describe('settings in the database', () => {
+  it('cannot be deleted or truncated', async () => {
+    await expect(client.db.delete(settings)).rejects.toMatchObject({
+      cause: {
+        message: expect.stringContaining('never deleted') as string,
+      },
+    });
+    await expect(
+      client.db.execute(sql`TRUNCATE TABLE settings`),
+    ).rejects.toMatchObject({
+      cause: {
+        message: expect.stringContaining('never deleted') as string,
+      },
+    });
+    expect(await client.db.select().from(settings)).toHaveLength(1);
+  });
+
   it('starts as one row at the defaults, with the NYC tax rate', async () => {
     const rows = await client.db.select().from(settings);
 
@@ -1399,22 +1456,6 @@ describe('guest reads', () => {
         bookingsPaused: false,
       });
     });
-
-    it('gives the hold and payment paths every number, on the pool or inside a transaction', async () => {
-      const onPool = await settingsApi.getSettings();
-      const inTransaction = await client.db.transaction((tx) =>
-        settingsApi.getSettings(tx),
-      );
-
-      expect(onPool).toMatchObject({
-        holdMinutes: 10,
-        paymentGraceMinutes: 5,
-        giftValidityMonths: 12,
-        giftExpiryAction: 'refund_buyer',
-        taxRatePpm: 88_750,
-      });
-      expect(inTransaction).toEqual(onPool);
-    });
   });
 });
 
@@ -1838,6 +1879,91 @@ describe('saving the home page', () => {
     ).rejects.toThrow();
   });
 
+  describe('a module and the kind of collection it shows', () => {
+    let pickId: string;
+    let giftGuideId: string;
+
+    beforeAll(async () => {
+      pickId = (await saved(editorial.saveCollection(ops, collectionInput())))
+        .value.id;
+      const existing = (await editorial.listCollectionsForEditing(ops)).find(
+        (entry) => entry.kind === 'gift_guide',
+      );
+      giftGuideId =
+        existing?.id ??
+        (
+          await saved(
+            editorial.saveCollection(
+              ops,
+              collectionInput({ kind: 'gift_guide', slug: 'gift-guide' }),
+            ),
+          )
+        ).value.id;
+    });
+
+    it.each([
+      ['a picks module on the gift guide', 'picks', () => giftGuideId],
+      ['a gift_guide module on a Pick', 'gift_guide', () => pickId],
+    ] as const)(
+      'refuses %s and keeps the list it had',
+      async (_name, kind, id) => {
+        await saved(editorial.saveHomeModules(ops, [homeModule('Kept')]));
+
+        await expect(
+          editorial.saveHomeModules(ops, [
+            { ...homeModule('Wrong'), kind, collectionId: id() },
+          ]),
+        ).resolves.toEqual({ status: 'collection_kind_mismatch' });
+
+        expect(
+          (await client.db.select().from(homeModules)).map(
+            (row) => row.heading,
+          ),
+        ).toEqual(['Kept']);
+      },
+    );
+
+    it('accepts a picks module on a Pick and a gift_guide module on the gift guide', async () => {
+      const result = await saved(
+        editorial.saveHomeModules(ops, [
+          { ...homeModule('Picks'), kind: 'picks', collectionId: pickId },
+          {
+            ...homeModule('Gifts'),
+            kind: 'gift_guide',
+            collectionId: giftGuideId,
+          },
+        ]),
+      );
+
+      expect(result.value.map((entry) => entry.kind)).toEqual([
+        'picks',
+        'gift_guide',
+      ]);
+    });
+
+    it('is also held by the table, and a shown collection cannot change kind', async () => {
+      await client.db.delete(homeModules);
+
+      await expect(
+        client.db
+          .insert(homeModules)
+          .values({ position: 0, kind: 'picks', collectionId: giftGuideId }),
+      ).rejects.toMatchObject({
+        cause: { constraint: 'home_modules_collection_kind_fk' },
+      });
+      await client.db
+        .insert(homeModules)
+        .values({ position: 0, kind: 'picks', collectionId: pickId });
+      await expect(
+        client.db
+          .update(collections)
+          .set({ kind: 'gift_guide' })
+          .where(eq(collections.id, pickId)),
+      ).rejects.toThrow();
+      await client.db.delete(homeModules);
+    });
+  });
+
   it('invalidates the home page', async () => {
     await saved(editorial.saveHomeModules(ops, [homeModule('Tagged')]));
 
@@ -2125,98 +2251,10 @@ describe('legal drafts and publishing', () => {
   });
 });
 
-describe('recording acceptances', () => {
-  async function publishedVersion(key: string) {
-    const draft = await legal.createLegalDraft(ops, {
-      doc: key,
-      title: key,
-      body: doc(),
-    });
-    return (await saved(legal.publishLegalDocument(ops, draft.id))).value;
-  }
-
-  it('records each accepted version once, and a retry records nothing new', async () => {
-    const terms = await publishedVersion('waiver-accept-a');
-    const waiver = await publishedVersion('waiver-accept-b');
-    const input = {
-      subjectKind: 'order' as const,
-      subjectId: uuid(10),
-      documentIds: [terms.id, waiver.id, terms.id],
-    };
-
-    const first = await legal.recordLegalAcceptances(client.db, input);
-    const retry = await legal.recordLegalAcceptances(client.db, input);
-
-    expect(first).toEqual({ recorded: 2 });
-    expect(retry).toEqual({ recorded: 0 });
-    expect(
-      await client.db
-        .select()
-        .from(legalAcceptances)
-        .where(eq(legalAcceptances.subjectId, uuid(10))),
-    ).toHaveLength(2);
-  });
-
-  it('commits with the caller’s transaction and leaves nothing behind when it rolls back', async () => {
-    const version = await publishedVersion('waiver-accept-c');
-
-    await expect(
-      client.db.transaction(async (tx) => {
-        await legal.recordLegalAcceptances(tx, {
-          subjectKind: 'host',
-          subjectId: uuid(11),
-          documentIds: [version.id],
-        });
-        throw new Error('the order failed');
-      }),
-    ).rejects.toThrow('the order failed');
-
-    expect(
-      await client.db
-        .select()
-        .from(legalAcceptances)
-        .where(eq(legalAcceptances.subjectId, uuid(11))),
-    ).toEqual([]);
-  });
-
-  it('fails the whole submission when one version is a draft', async () => {
-    const published = await publishedVersion('waiver-accept-d');
-    const draft = await legal.createLegalDraft(ops, {
-      doc: 'waiver-accept-e',
-      title: 'Draft',
-      body: doc(),
-    });
-
-    await expect(
-      legal.recordLegalAcceptances(client.db, {
-        subjectKind: 'order',
-        subjectId: uuid(12),
-        documentIds: [published.id, draft.id],
-      }),
-    ).rejects.toThrow();
-
-    expect(
-      await client.db
-        .select()
-        .from(legalAcceptances)
-        .where(eq(legalAcceptances.subjectId, uuid(12))),
-    ).toEqual([]);
-  });
-
-  it('refuses input the schema refuses', async () => {
-    await expect(
-      legal.recordLegalAcceptances(client.db, {
-        subjectKind: 'order',
-        subjectId: uuid(13),
-        documentIds: [],
-      }),
-    ).rejects.toThrow();
-  });
-});
-
 describe('updating settings', () => {
   it('changes only the named settings and bumps the update time', async () => {
-    const before = await settingsApi.getSettings();
+    const [before] = await client.db.select().from(settings);
+    if (!before) throw new Error('The migration inserts the settings row');
 
     const after = await settingsApi.updateSettings(ops, {
       holdMinutes: 15,
@@ -2269,6 +2307,84 @@ describe('updating settings', () => {
     ).rejects.toThrow();
 
     expect(updateTag).not.toHaveBeenCalled();
-    expect((await settingsApi.getSettings()).holdMinutes).toBe(10);
+    expect((await client.db.select().from(settings))[0]?.holdMinutes).toBe(10);
   });
+});
+
+describe('text Postgres cannot store', () => {
+  // The Zod contracts refuse U+0000 and lone surrogates; the unit table covers every field. Here
+  // each write function is shown to refuse before the database, with a ZodError whose message
+  // holds neither SQL nor the value, and to leave nothing behind.
+  const bad = ['\u0000', '\ud800'] as const;
+  const noSqlInMessage = (error: unknown) => {
+    expect(error).toBeInstanceOf(ZodError);
+    const { message } = error as ZodError;
+    expect(message).not.toMatch(/insert into|update "|params:/i);
+  };
+
+  it.each(bad)(
+    'refuses %j in every write and writes nothing',
+    async (value) => {
+      const slug = unique('unstorable');
+      const attempts = [
+        () =>
+          editorial.saveCollection(
+            ops,
+            collectionInput({ slug, title: `Title ${value}` }),
+          ),
+        () =>
+          editorial.saveHelpArticle(
+            ops,
+            helpInput({ slug, body: doc(`Body ${value}`) }),
+          ),
+        () =>
+          legal.createLegalDraft(ops, {
+            doc: 'waiver-unstorable',
+            title: `Title ${value}`,
+            body: doc(),
+          }),
+        () =>
+          settingsApi.updateSettings(ops, { bannerText: `Banner ${value}` }),
+        () =>
+          editorial.saveHomeModules(ops, [
+            {
+              kind: 'this_week',
+              enabled: true,
+              heading: `Heading ${value}`,
+              body: null,
+              collectionId: null,
+            },
+          ]),
+      ];
+
+      for (const attempt of attempts) {
+        await attempt().then(() => {
+          throw new Error('The write was accepted');
+        }, noSqlInMessage);
+      }
+
+      expect(
+        await client.db
+          .select()
+          .from(collections)
+          .where(eq(collections.slug, slug)),
+      ).toEqual([]);
+      expect(
+        await client.db
+          .select()
+          .from(helpArticles)
+          .where(eq(helpArticles.slug, slug)),
+      ).toEqual([]);
+      expect(
+        await client.db
+          .select()
+          .from(legalDocuments)
+          .where(eq(legalDocuments.doc, 'waiver-unstorable')),
+      ).toEqual([]);
+      expect(
+        (await client.db.select().from(settings))[0]?.bannerText,
+      ).toBeNull();
+      expect(tagsUpdated()).toEqual([]);
+    },
+  );
 });

@@ -28,7 +28,9 @@ import {
 } from './schema';
 
 // The only place that decides what a guest may see. Every guest read goes through it.
-const guestVisible = inArray(experiences.status, [...guestVisibleStatuses]);
+export const guestVisible = inArray(experiences.status, [
+  ...guestVisibleStatuses,
+]);
 
 const byNameThenId = [asc(experiences.name), asc(experiences.id)];
 
@@ -72,7 +74,6 @@ export async function getGuestExperience(
   return row ? GuestExperienceSchema.parse(row) : null;
 }
 
-// TODO(U-031): first caller
 export async function listCategories(): Promise<Category[]> {
   const rows = await dbRead
     .select()
@@ -81,7 +82,6 @@ export async function listCategories(): Promise<Category[]> {
   return CategorySchema.array().parse(rows);
 }
 
-// TODO(U-031): first caller
 export async function listNeighborhoods(): Promise<Neighborhood[]> {
   const rows = await dbRead
     .select()

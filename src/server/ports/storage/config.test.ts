@@ -34,7 +34,10 @@ describe('getStorage', () => {
 
   it('is vercel-blob when both stores are configured', async () => {
     vi.stubEnv('STORAGE_PROVIDER', 'vercel-blob');
-    vi.stubEnv('BLOB_PUBLIC_READ_WRITE_TOKEN', 'test-public-token');
+    vi.stubEnv(
+      'BLOB_PUBLIC_READ_WRITE_TOKEN',
+      'vercel_blob_rw_teststore1_notarealsecret',
+    );
     vi.stubEnv('BLOB_PRIVATE_READ_WRITE_TOKEN', 'test-private-token');
     const { getStorage } = await loadConfig();
 

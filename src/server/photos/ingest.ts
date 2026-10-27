@@ -1,11 +1,12 @@
 import 'server-only';
-import sharp, { type OutputInfo } from 'sharp';
 import {
   photoLimits,
   refusalForHeader,
   refusalForUpload,
   type PhotoRefusalCode,
 } from '@/lib/photos';
+import { ImageError, type ImagePort } from '@/server/ports/image';
+import { getImagePort } from '@/server/ports/image/config';
 
 export class PhotoRefusedError extends Error {
   readonly code: PhotoRefusalCode;
@@ -18,8 +19,8 @@ export class PhotoRefusedError extends Error {
 }
 
 export type IngestedPhoto = {
-  /** The stored copy: a baseline-safe JPEG with no EXIF, GPS, XMP, IPTC, or embedded profile. */
-  bytes: Buffer;
+  /** The stored copy: a JPEG with no EXIF, GPS, XMP, IPTC, or embedded profile. */
+  bytes: Uint8Array;
   width: number;
   height: number;
   blurDataUrl: string;
@@ -36,74 +37,49 @@ const blurQuality = 40;
  * nothing from the original file but pixels survives: location data and every other tag are gone.
  * Anything the decoder cannot read is refused, never repaired.
  */
-export async function ingestPhoto(upload: Uint8Array): Promise<IngestedPhoto> {
+export async function ingestPhoto(
+  upload: Uint8Array,
+  image: ImagePort = getImagePort(),
+): Promise<IngestedPhoto> {
   const uploadRefusal = refusalForUpload(upload.byteLength);
   if (uploadRefusal) throw new PhotoRefusedError(uploadRefusal);
 
-  const header = await readHeader(upload);
+  const header = await image.inspect(upload).catch((error: unknown) => {
+    if (error instanceof ImageError) {
+      throw new PhotoRefusedError('unsupported_format');
+    }
+    throw error;
+  });
   const headerRefusal = refusalForHeader(header);
   if (headerRefusal) throw new PhotoRefusedError(headerRefusal);
 
-  let stored: { data: Buffer; info: OutputInfo };
-  try {
-    stored = await sharp(upload, {
-      limitInputPixels: photoLimits.maxPixels,
-      failOn: 'warning',
+  const stored = await image
+    .reencodeAsJpeg(upload, {
+      maxPixels: photoLimits.maxPixels,
+      fitWithin: photoLimits.storedEdge,
+      quality: storedQuality,
     })
-      // Apply the camera's rotation before the tags that record it are dropped.
-      .rotate()
-      .resize({
-        width: photoLimits.storedEdge,
-        height: photoLimits.storedEdge,
-        fit: 'inside',
-        withoutEnlargement: true,
-      })
-      .toColourspace('srgb')
-      .flatten({ background: '#ffffff' })
-      .jpeg({ quality: storedQuality, mozjpeg: true })
-      .toBuffer({ resolveWithObject: true });
-  } catch {
-    throw new PhotoRefusedError('corrupt');
-  }
-  if (stored.data.byteLength > photoLimits.maxStoredBytes) {
+    .catch((error: unknown) => {
+      if (error instanceof ImageError) throw new PhotoRefusedError('corrupt');
+      throw error;
+    });
+  if (stored.bytes.byteLength > photoLimits.maxStoredBytes) {
     throw new PhotoRefusedError('too_large');
   }
 
-  return {
-    bytes: stored.data,
-    width: stored.info.width,
-    height: stored.info.height,
-    blurDataUrl: await blurPlaceholder(stored.data),
-  };
-}
-
-/** Reads the file header only. The pixel limit is off here because no pixel is decoded. */
-async function readHeader(upload: Uint8Array) {
-  try {
-    const meta = await sharp(upload, { limitInputPixels: false }).metadata();
-    return {
-      format: meta.format,
-      width: meta.width,
-      height: meta.height,
-      pages: meta.pages,
-    };
-  } catch {
-    throw new PhotoRefusedError('unsupported_format');
-  }
-}
-
-async function blurPlaceholder(stored: Buffer): Promise<string> {
-  const tiny = await sharp(stored)
-    .resize({
-      width: blurEdge,
-      height: blurEdge,
-      fit: 'inside',
-    })
-    .jpeg({ quality: blurQuality })
-    .toBuffer();
-  const dataUrl = `data:image/jpeg;base64,${tiny.toString('base64')}`;
-  if (dataUrl.length > photoLimits.maxBlurLength) {
+  const tiny = await image.thumbnail(stored.bytes, {
+    edge: blurEdge,
+    quality: blurQuality,
+  });
+  const blurDataUrl = `data:image/jpeg;base64,${Buffer.from(tiny).toString('base64')}`;
+  if (blurDataUrl.length > photoLimits.maxBlurLength) {
     throw new Error('Blur placeholder exceeds its length limit');
   }
-  return dataUrl;
+
+  return {
+    bytes: stored.bytes,
+    width: stored.width,
+    height: stored.height,
+    blurDataUrl,
+  };
 }

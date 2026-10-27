@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   allowedContentTypes,
+  publicStoreIdFromToken,
   defaultSignedUrlSeconds,
   maxSignedUrlSeconds,
   storageSettingIssues,
@@ -53,17 +54,45 @@ describe('signed link lifetime', () => {
   });
 });
 
+describe('publicStoreIdFromToken', () => {
+  it.each([
+    ['vercel_blob_rw_AbC123xyz_Zk90QwErTy', 'abc123xyz'],
+    ['vercel_blob_rw_store1_a_b_c', 'store1'],
+    ['vercel_blob_rw__secret', null],
+    ['vercel_blob_rw_store1', null],
+    ['vercel_blob_rw_store.1_secret', null],
+    ['vercel_blob_ro_store1_secret', null],
+    ['vercel_blob_rw_store1_has space', null],
+    [`vercel_blob_rw_${'a'.repeat(65)}_secret`, null],
+    ['test-public-token', null],
+    ['', null],
+  ])('%j gives %j', (token, expected) => {
+    expect(publicStoreIdFromToken(token)).toBe(expected);
+  });
+});
+
 describe('storageSettingIssues', () => {
-  it('asks for nothing of the fake', () => {
-    expect(storageSettingIssues({ STORAGE_PROVIDER: 'fake' })).toEqual([]);
+  const publicToken = 'vercel_blob_rw_teststore1_notarealsecret';
+  const names = (settings: Parameters<typeof storageSettingIssues>[0]) =>
+    storageSettingIssues(settings).map((issue) => issue.name);
+
+  it.each([undefined, 'development', 'preview'] as const)(
+    'asks nothing of the fake when VERCEL_ENV is %s',
+    (VERCEL_ENV) => {
+      expect(
+        storageSettingIssues({ STORAGE_PROVIDER: 'fake', VERCEL_ENV }),
+      ).toEqual([]);
+    },
+  );
+
+  it('refuses the fake in a production deployment', () => {
+    expect(
+      names({ STORAGE_PROVIDER: 'fake', VERCEL_ENV: 'production' }),
+    ).toEqual(['STORAGE_PROVIDER']);
   });
 
   it('asks for both tokens of vercel-blob, one issue each', () => {
-    expect(
-      storageSettingIssues({ STORAGE_PROVIDER: 'vercel-blob' }).map(
-        (issue) => issue.name,
-      ),
-    ).toEqual([
+    expect(names({ STORAGE_PROVIDER: 'vercel-blob' })).toEqual([
       'BLOB_PUBLIC_READ_WRITE_TOKEN',
       'BLOB_PRIVATE_READ_WRITE_TOKEN',
     ]);
@@ -71,20 +100,34 @@ describe('storageSettingIssues', () => {
 
   it('asks only for the token that is missing', () => {
     expect(
-      storageSettingIssues({
+      names({
         STORAGE_PROVIDER: 'vercel-blob',
-        BLOB_PUBLIC_READ_WRITE_TOKEN: 'x',
-      }).map((issue) => issue.name),
+        BLOB_PUBLIC_READ_WRITE_TOKEN: publicToken,
+      }),
     ).toEqual(['BLOB_PRIVATE_READ_WRITE_TOKEN']);
   });
 
-  it('is satisfied by both tokens', () => {
+  it('refuses a public token whose store id cannot be read, since it pins the image host', () => {
     expect(
-      storageSettingIssues({
+      names({
         STORAGE_PROVIDER: 'vercel-blob',
-        BLOB_PUBLIC_READ_WRITE_TOKEN: 'x',
+        BLOB_PUBLIC_READ_WRITE_TOKEN: 'not-a-blob-token',
         BLOB_PRIVATE_READ_WRITE_TOKEN: 'y',
       }),
-    ).toEqual([]);
+    ).toEqual(['BLOB_PUBLIC_READ_WRITE_TOKEN']);
   });
+
+  it.each(['production', 'preview', undefined] as const)(
+    'is satisfied by both tokens when VERCEL_ENV is %s',
+    (VERCEL_ENV) => {
+      expect(
+        storageSettingIssues({
+          STORAGE_PROVIDER: 'vercel-blob',
+          VERCEL_ENV,
+          BLOB_PUBLIC_READ_WRITE_TOKEN: publicToken,
+          BLOB_PRIVATE_READ_WRITE_TOKEN: 'y',
+        }),
+      ).toEqual([]);
+    },
+  );
 });

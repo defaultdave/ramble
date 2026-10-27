@@ -34,17 +34,42 @@ export const maxObjectBytes = 10 * 1024 * 1024;
 export const defaultSignedUrlSeconds = 300;
 export const maxSignedUrlSeconds = 900;
 
+/**
+ * The store id inside a read-write token, `vercel_blob_rw_<storeId>_<random>`, which is also the first
+ * label of the store's public host. The SDK reads it the same way. Null when the token has another shape.
+ */
+export function publicStoreIdFromToken(token: string): string | null {
+  const match = /^vercel_blob_rw_([A-Za-z0-9]{1,64})_\S+$/.exec(token);
+  return match?.[1] ? match[1].toLowerCase() : null;
+}
+
 type StorageSettings = {
   STORAGE_PROVIDER: StorageProviderName;
+  VERCEL_ENV?: 'production' | 'preview' | 'development' | undefined;
   BLOB_PUBLIC_READ_WRITE_TOKEN?: string | undefined;
   BLOB_PRIVATE_READ_WRITE_TOKEN?: string | undefined;
 };
 
-/** What the environment must also hold for the chosen provider. The fake needs nothing. */
+/**
+ * What the environment must also hold for the chosen provider. The fake needs nothing, but it is
+ * refused in a production deployment, where it would lose every photo on the next restart. Only
+ * `VERCEL_ENV` says "deployed to production": `NODE_ENV` is also `production` for `next build` and
+ * `next start` on a laptop or in CI, which must keep working with no keys.
+ */
 export function storageSettingIssues(
   settings: StorageSettings,
 ): { name: string; message: string }[] {
-  if (settings.STORAGE_PROVIDER !== 'vercel-blob') return [];
+  if (settings.STORAGE_PROVIDER === 'fake') {
+    return settings.VERCEL_ENV === 'production'
+      ? [
+          {
+            name: 'STORAGE_PROVIDER',
+            message:
+              'fake keeps photos in memory and is not allowed in a production deployment; use vercel-blob',
+          },
+        ]
+      : [];
+  }
   const issues: { name: string; message: string }[] = [];
   for (const name of [
     'BLOB_PUBLIC_READ_WRITE_TOKEN',
@@ -56,6 +81,14 @@ export function storageSettingIssues(
         message: 'Required when STORAGE_PROVIDER=vercel-blob',
       });
     }
+  }
+  const publicToken = settings.BLOB_PUBLIC_READ_WRITE_TOKEN;
+  if (publicToken && !publicStoreIdFromToken(publicToken)) {
+    issues.push({
+      name: 'BLOB_PUBLIC_READ_WRITE_TOKEN',
+      message:
+        'Expected the vercel_blob_rw_<storeId>_... form; the store id pins which host next/image may fetch',
+    });
   }
   return issues;
 }

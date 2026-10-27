@@ -1,31 +1,46 @@
-import sharp from 'sharp';
-import { beforeAll, describe, expect, it } from 'vitest';
-import { blurDataUrlPattern, photoLimits } from '@/lib/photos';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  blurDataUrlPattern,
+  photoLimits,
+  type ImageHeader,
+} from '@/lib/photos';
+import { ImageError, type ImagePort } from '@/server/ports/image';
 import { ingestPhoto, PhotoRefusedError } from './ingest';
 
 // Behaviours under test, one per decision, branch or risk:
-// - a valid photo comes back as a JPEG with its blur placeholder
-// - EXIF (with GPS), XMP, and the embedded profile of the original are gone from the stored copy
-// - a photo larger than the stored square is fitted inside it, a smaller one is not enlarged
-// - the camera's rotation is applied before the tag that records it is dropped
-// - a PNG with transparency is flattened, and a WebP is accepted
-// - each refusal is reported with its code, and nothing is decoded for a size refusal
-// - a file that is not an image, a truncated one, and an animation are refused
+// - a size refusal never reaches the port, and a header refusal never decodes a pixel
+// - a port that cannot read the header means an unsupported format; one that cannot decode means a corrupt file
+// - the decode is asked for with the stored square, the pixel limit, and a quality from the rules
+// - a re-encode over the stored byte cap is refused before the placeholder is made
+// - an error that is not the port's refusal propagates unchanged
+// - the blur placeholder is a data URL within its length cap
 
-const solid = { r: 90, g: 140, b: 180 };
+const goodHeader: ImageHeader = {
+  format: 'jpeg',
+  width: 2000,
+  height: 1500,
+  pages: 1,
+};
 
-function raw(width: number, height: number) {
-  return sharp({
-    create: { width, height, channels: 3, background: solid },
-  });
+function stubPort(overrides: Partial<ImagePort> = {}) {
+  const port = {
+    provider: 'sharp' as const,
+    inspect: vi.fn(() => Promise.resolve(goodHeader)),
+    reencodeAsJpeg: vi.fn(() =>
+      Promise.resolve({
+        bytes: new Uint8Array(1000),
+        width: 2000,
+        height: 1500,
+      }),
+    ),
+    thumbnail: vi.fn(() => Promise.resolve(new Uint8Array([1, 2, 3]))),
+    ...overrides,
+  };
+  return port;
 }
 
-async function jpeg(width: number, height: number) {
-  return raw(width, height).jpeg().toBuffer();
-}
-
-async function codeOf(upload: Uint8Array) {
-  const error = await ingestPhoto(upload).then(
+async function codeOf(attempt: Promise<unknown>) {
+  const error = await attempt.then(
     () => null,
     (reason: unknown) => reason,
   );
@@ -33,193 +48,124 @@ async function codeOf(upload: Uint8Array) {
   return (error as PhotoRefusedError).code;
 }
 
-let landscape: Buffer;
+const upload = new Uint8Array([1, 2, 3]);
 
-beforeAll(async () => {
-  landscape = await jpeg(2000, 1500);
-});
+describe('ingestPhoto rules', () => {
+  it.each([
+    ['empty', new Uint8Array(0), 'corrupt'],
+    [
+      'over the byte limit',
+      new Uint8Array(photoLimits.maxInputBytes + 1),
+      'too_large',
+    ],
+  ] as const)(
+    'refuses an upload that is %s without calling the port',
+    async (_name, bytes, code) => {
+      const port = stubPort();
 
-describe('ingestPhoto', () => {
-  it('re-encodes a valid photo as a JPEG and returns a blur placeholder', async () => {
-    const result = await ingestPhoto(landscape);
+      expect(await codeOf(ingestPhoto(bytes, port))).toBe(code);
 
-    const meta = await sharp(result.bytes).metadata();
-    expect(meta.format).toBe('jpeg');
-    expect([result.width, result.height]).toEqual([2000, 1500]);
-    expect([meta.width, meta.height]).toEqual([2000, 1500]);
+      expect(port.inspect).not.toHaveBeenCalled();
+      expect(port.reencodeAsJpeg).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not decode an image whose header is refused', async () => {
+    const port = stubPort({
+      inspect: vi.fn(() =>
+        Promise.resolve({ ...goodHeader, width: 9000, height: 9000 }),
+      ),
+    });
+
+    expect(await codeOf(ingestPhoto(upload, port))).toBe('too_many_pixels');
+
+    expect(port.reencodeAsJpeg).not.toHaveBeenCalled();
+  });
+
+  it('reads an unreadable header as an unsupported format', async () => {
+    const port = stubPort({
+      inspect: vi.fn(() => Promise.reject(new ImageError('unreadable'))),
+    });
+
+    expect(await codeOf(ingestPhoto(upload, port))).toBe('unsupported_format');
+    expect(port.reencodeAsJpeg).not.toHaveBeenCalled();
+  });
+
+  it('reads a failed decode as a corrupt file', async () => {
+    const port = stubPort({
+      reencodeAsJpeg: vi.fn(() => Promise.reject(new ImageError('unreadable'))),
+    });
+
+    expect(await codeOf(ingestPhoto(upload, port))).toBe('corrupt');
+    expect(port.thumbnail).not.toHaveBeenCalled();
+  });
+
+  it('asks for the stored square and the pixel limit from the rules', async () => {
+    const port = stubPort();
+
+    await ingestPhoto(upload, port);
+
+    expect(port.reencodeAsJpeg).toHaveBeenCalledWith(upload, {
+      maxPixels: photoLimits.maxPixels,
+      fitWithin: photoLimits.storedEdge,
+      quality: expect.any(Number) as number,
+    });
+  });
+
+  it('refuses a copy over the stored byte cap before making the placeholder', async () => {
+    const port = stubPort({
+      reencodeAsJpeg: vi.fn(() =>
+        Promise.resolve({
+          bytes: new Uint8Array(photoLimits.maxStoredBytes + 1),
+          width: 2000,
+          height: 1500,
+        }),
+      ),
+    });
+
+    expect(await codeOf(ingestPhoto(upload, port))).toBe('too_large');
+    expect(port.thumbnail).not.toHaveBeenCalled();
+  });
+
+  it('accepts a copy of exactly the stored byte cap', async () => {
+    const port = stubPort({
+      reencodeAsJpeg: vi.fn(() =>
+        Promise.resolve({
+          bytes: new Uint8Array(photoLimits.maxStoredBytes),
+          width: 2000,
+          height: 1500,
+        }),
+      ),
+    });
+
+    await expect(ingestPhoto(upload, port)).resolves.toBeDefined();
+  });
+
+  it.each(['inspect', 'reencodeAsJpeg', 'thumbnail'] as const)(
+    'lets a failure of %s that is not a refusal propagate',
+    async (method) => {
+      const failure = new Error('decoder crashed');
+      const port = stubPort({ [method]: vi.fn(() => Promise.reject(failure)) });
+
+      await expect(ingestPhoto(upload, port)).rejects.toBe(failure);
+    },
+  );
+
+  it('returns the placeholder as a data URL', async () => {
+    const result = await ingestPhoto(upload, stubPort());
+
+    expect(result.blurDataUrl).toBe('data:image/jpeg;base64,AQID');
     expect(result.blurDataUrl).toMatch(new RegExp(blurDataUrlPattern));
-    expect(result.blurDataUrl.length).toBeLessThanOrEqual(
-      photoLimits.maxBlurLength,
-    );
   });
 
-  it('drops EXIF with its GPS position, XMP, and the embedded profile', async () => {
-    const tagged = await raw(2000, 1500)
-      .withExif({
-        IFD0: { Copyright: 'Somebody', Make: 'CameraCo' },
-        IFD3: {
-          GPSLatitudeRef: 'N',
-          GPSLatitude: '40/1 44/1 5400/100',
-          GPSLongitudeRef: 'W',
-          GPSLongitude: '73/1 59/1 3000/100',
-        },
-      })
-      .withXmp(
-        '<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"/></x:xmpmeta>',
-      )
-      .withIccProfile('p3')
-      .jpeg()
-      .toBuffer();
-    const before = await sharp(tagged).metadata();
-    expect(before.exif).toBeDefined();
-    expect(before.xmp).toBeDefined();
-    expect(before.icc).toBeDefined();
-
-    const result = await ingestPhoto(tagged);
-
-    const after = await sharp(result.bytes).metadata();
-    expect(after.exif).toBeUndefined();
-    expect(after.xmp).toBeUndefined();
-    expect(after.iptc).toBeUndefined();
-    expect(after.icc).toBeUndefined();
-    expect(result.bytes.includes(Buffer.from('GPS'))).toBe(false);
-    expect(result.bytes.includes(Buffer.from('Somebody'))).toBe(false);
-    expect(result.bytes.includes(Buffer.from('CameraCo'))).toBe(false);
-  });
-
-  it('fits a photo larger than the stored square inside it', async () => {
-    const result = await ingestPhoto(await jpeg(4000, 3000));
-
-    expect([result.width, result.height]).toEqual([2400, 1800]);
-  });
-
-  it('does not enlarge a photo smaller than the stored square', async () => {
-    const result = await ingestPhoto(await jpeg(1600, 1000));
-
-    expect([result.width, result.height]).toEqual([1600, 1000]);
-  });
-
-  it('applies the rotation tag before dropping it', async () => {
-    const rotated = await raw(2000, 1600)
-      .withMetadata({ orientation: 6 })
-      .jpeg()
-      .toBuffer();
-    expect((await sharp(rotated).metadata()).orientation).toBe(6);
-
-    const result = await ingestPhoto(rotated);
-
-    expect([result.width, result.height]).toEqual([1600, 2000]);
-    expect((await sharp(result.bytes).metadata()).orientation).toBeUndefined();
-  });
-
-  it('flattens a transparent PNG onto white', async () => {
-    const png = await sharp({
-      create: {
-        width: 1800,
-        height: 1200,
-        channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 0 },
-      },
-    })
-      .png()
-      .toBuffer();
-
-    const result = await ingestPhoto(png);
-
-    const { data } = await sharp(result.bytes)
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-    expect([...data.subarray(0, 3)].every((value) => value > 250)).toBe(true);
-  });
-
-  it('accepts a WebP', async () => {
-    const webp = await raw(1800, 1200).webp().toBuffer();
-
-    const result = await ingestPhoto(webp);
-
-    expect(result.width).toBe(1800);
-  });
-
-  describe('refusals', () => {
-    it.each([
-      ['an empty upload', Buffer.alloc(0), 'corrupt'],
-      [
-        'an upload over the byte limit',
-        Buffer.alloc(photoLimits.maxInputBytes + 1),
-        'too_large',
-      ],
-    ] as const)('refuses %s before decoding', async (_name, upload, code) => {
-      expect(await codeOf(upload)).toBe(code);
+  it('fails, rather than storing, when the placeholder is over its length cap', async () => {
+    const port = stubPort({
+      thumbnail: vi.fn(() => Promise.resolve(new Uint8Array(2000))),
     });
 
-    it('accepts an upload of exactly the byte limit as far as the size check goes', async () => {
-      expect(await codeOf(Buffer.alloc(photoLimits.maxInputBytes))).toBe(
-        'unsupported_format',
-      );
-    });
+    const error = await ingestPhoto(upload, port).catch((e: unknown) => e);
 
-    it('refuses bytes that are not an image', async () => {
-      expect(await codeOf(Buffer.from('<html>not a photo</html>'))).toBe(
-        'unsupported_format',
-      );
-    });
-
-    it('refuses a format outside the accepted list', async () => {
-      const tiff = await raw(1800, 1200).tiff().toBuffer();
-
-      expect(await codeOf(tiff)).toBe('unsupported_format');
-    });
-
-    it.each([
-      ['a long edge under 1,600 px', 1500, 1000],
-      ['a short edge under 400 px', 3000, 300],
-    ])('refuses a photo with %s', async (_name, width, height) => {
-      expect(await codeOf(await jpeg(width, height))).toBe('too_small');
-    });
-
-    it('refuses a long edge over 8,192 px from the header, so a tiny file cannot ask for a huge decode', async () => {
-      const wide = await raw(8193, 600).png({ compressionLevel: 9 }).toBuffer();
-      expect(wide.byteLength).toBeLessThan(photoLimits.maxInputBytes);
-
-      expect(await codeOf(wide)).toBe('too_many_pixels');
-    });
-
-    it('refuses an area over the pixel limit even when each edge is in range', async () => {
-      const big = await sharp({
-        create: { width: 8000, height: 7000, channels: 3, background: solid },
-      })
-        .png({ compressionLevel: 9 })
-        .toBuffer();
-      expect(big.byteLength).toBeLessThan(photoLimits.maxInputBytes);
-
-      expect(await codeOf(big)).toBe('too_many_pixels');
-    });
-
-    it('refuses a truncated JPEG instead of storing the part that decoded', async () => {
-      const truncated = landscape.subarray(0, Math.floor(landscape.length / 2));
-
-      expect(await codeOf(truncated)).toBe('corrupt');
-    });
-
-    it('refuses an animation', async () => {
-      const frame = (background: string) =>
-        sharp({
-          create: { width: 1600, height: 800, channels: 3, background },
-        })
-          .png()
-          .toBuffer();
-      // Identical frames would be merged into one, so the two differ.
-      const animated = await sharp(
-        [await frame('#ff0000'), await frame('#0000ff')],
-        {
-          join: { animated: true },
-        },
-      )
-        .webp()
-        .toBuffer();
-      expect((await sharp(animated).metadata()).pages).toBe(2);
-
-      expect(await codeOf(animated)).toBe('animated');
-    });
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(PhotoRefusedError);
   });
 });

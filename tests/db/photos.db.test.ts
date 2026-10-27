@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { photoLimits } from '@/lib/photos';
+import { GuestPhotoSchema, photoLimits } from '@/lib/photos';
 import { anonymousCaller, ForbiddenError, Role } from '@/server/auth/caller';
 import { testCaller } from '@/server/auth/test-caller';
 import {
@@ -13,7 +13,7 @@ import {
   neighborhoods,
   photos,
 } from '@/server/db/schema';
-import type { StoragePort } from '@/server/ports/storage';
+import { StorageError, type StoragePort } from '@/server/ports/storage';
 import {
   createFakeStorageAdapter,
   type FakeStorageAdapter,
@@ -323,11 +323,43 @@ describe('addPhoto', () => {
       );
     });
 
-    it('an experience that does not exist', async () => {
+    it('an experience that does not exist, for ops', async () => {
       await expect(
         photoStore.addPhoto(ops, newPhoto(randomUUID()), validUpload, storage),
       ).rejects.toBeInstanceOf(photoStore.ExperienceNotFoundError);
     });
+
+    it.each([
+      ['a signed-out visitor', () => anonymousCaller],
+      ['a guest', () => testCaller()],
+      [
+        'a host owner',
+        () => testCaller({ roles: [Role.HostOwner], hostIds: [randomUUID()] }),
+      ],
+    ])(
+      'gives %s the same refusal for a missing experience as for an existing one, so IDs cannot be probed',
+      async (_name, makeCaller) => {
+        const existing = await insertExperience();
+        const attempt = (experienceId: string) =>
+          photoStore
+            .addPhoto(
+              makeCaller(),
+              newPhoto(experienceId),
+              validUpload,
+              storage,
+            )
+            .catch((error: unknown) => error);
+
+        const forExisting = await attempt(existing.id);
+        const forMissing = await attempt(randomUUID());
+
+        expect(forExisting).toBeInstanceOf(ForbiddenError);
+        expect(forMissing).toBeInstanceOf(ForbiddenError);
+        expect((forMissing as Error).message).toBe(
+          (forExisting as Error).message,
+        );
+      },
+    );
   });
 
   describe('the gallery limit', () => {
@@ -452,6 +484,114 @@ describe('addPhoto', () => {
 
     expect(stored).toHaveLength(1);
     expect(storage.read(stored[0] ?? '')).toBeNull();
+  });
+
+  it('logs only the error kind and photo id when the cleanup delete fails, and still throws the original error', async () => {
+    const { logger } = await import('@/server/monitoring/logger');
+    const logged = vi
+      .spyOn(logger, 'error')
+      .mockImplementation(() => undefined);
+    const experience = await insertExperience();
+    const keys: string[] = [];
+    const failingCleanup: StoragePort = {
+      ...storage,
+      put: async (input) => {
+        keys.push(input.key);
+        const result = await storage.put(input);
+        await client.db
+          .delete(experiences)
+          .where(eq(experiences.id, experience.id));
+        return result;
+      },
+      delete: () =>
+        Promise.reject(
+          new StorageError(
+            'provider_unavailable',
+            'token abc-secret rejected for public/photos/x.jpg',
+          ),
+        ),
+    };
+
+    await expect(
+      photoStore.addPhoto(
+        ops,
+        newPhoto(experience.id),
+        validUpload,
+        failingCleanup,
+      ),
+    ).rejects.toMatchObject({
+      cause: { constraint: 'photos_experience_id_experiences_id_fk' },
+    });
+
+    const photoId = /\/([0-9a-f-]{36})\.jpg$/.exec(keys[0] ?? '')?.[1];
+    expect(photoId).toBeDefined();
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(logged).toHaveBeenCalledWith(expect.any(String), {
+      photoId,
+      errorKind: 'StorageError',
+    });
+    logged.mockRestore();
+  });
+
+  it('keeps the file when the row turns out to be stored although the transaction call failed', async () => {
+    // A connection that drops after the commit reports a failure for work that happened.
+    const experience = await insertExperience();
+    const keys: string[] = [];
+    const real = storage;
+    const spyDelete = vi.spyOn(real, 'delete');
+    const recording: StoragePort = {
+      ...real,
+      put: async (input) => {
+        keys.push(input.key);
+        const result = await real.put(input);
+        const id = /\/([0-9a-f-]{36})\.jpg$/.exec(input.key)?.[1] ?? '';
+        await client.db.insert(photos).values({
+          id,
+          experienceId: experience.id,
+          position: 0,
+          storageKey: input.key,
+          url: result.url ?? '',
+          width: 1600,
+          height: 1000,
+          byteSize: 10,
+          decorative: true,
+          blurDataUrl: 'data:image/jpeg;base64,/9j/4AAQ',
+          rightsBasis: 'ramble_owned',
+        });
+        return result;
+      },
+    };
+
+    // The row already exists at the photo's position, so the transaction's own insert fails.
+    await expect(
+      photoStore.addPhoto(ops, newPhoto(experience.id), validUpload, recording),
+    ).rejects.toBeDefined();
+
+    expect(spyDelete).not.toHaveBeenCalled();
+    expect(real.read(keys[0] ?? '')).not.toBeNull();
+    spyDelete.mockRestore();
+  });
+
+  it('does not delete the file when the row is stored but the result cannot be read back', async () => {
+    const experience = await insertExperience();
+    const readFails = new Error('result did not match its schema');
+    const parse = vi
+      .spyOn(GuestPhotoSchema, 'parse')
+      .mockImplementationOnce(() => {
+        throw readFails;
+      });
+    const spyDelete = vi.spyOn(storage, 'delete');
+
+    await expect(
+      photoStore.addPhoto(ops, newPhoto(experience.id), validUpload, storage),
+    ).rejects.toBe(readFails);
+
+    const [row] = await photoRows(experience.id);
+    expect(row).toBeDefined();
+    expect(spyDelete).not.toHaveBeenCalled();
+    expect(storage.read(row?.storageKey ?? '')).not.toBeNull();
+    parse.mockRestore();
+    spyDelete.mockRestore();
   });
 });
 

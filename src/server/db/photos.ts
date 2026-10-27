@@ -11,7 +11,12 @@ import {
   storedPhotoContentType,
   type GuestPhoto,
 } from '@/lib/photos';
-import { Role, requireRole, type Caller } from '@/server/auth/caller';
+import {
+  ForbiddenError,
+  Role,
+  requireRole,
+  type Caller,
+} from '@/server/auth/caller';
 import { logger } from '@/server/monitoring/logger';
 import { ingestPhoto } from '@/server/photos/ingest';
 import type { StoragePort } from '@/server/ports/storage';
@@ -45,12 +50,8 @@ const photoColumns = {
 };
 
 /** Ops and admin add photos to any experience; a host owner only to their own host's. */
-function requireCanEditPhotos(caller: Caller, hostId: string) {
-  const staffRole = [Role.Ops, Role.Admin].find((role) =>
-    caller.roles.includes(role),
-  );
-  if (staffRole) requireRole(caller, staffRole, {});
-  else requireRole(caller, Role.HostOwner, { hostId });
+function staffRoleOf(caller: Caller) {
+  return [Role.Ops, Role.Admin].find((role) => caller.roles.includes(role));
 }
 
 // TODO(U-074b): first caller
@@ -68,12 +69,23 @@ export async function addPhoto(
   storage: StoragePort,
 ): Promise<GuestPhoto> {
   const photo = NewPhotoSchema.parse(input);
+  // A caller with neither a staff role nor a host role is refused before any lookup, and a host
+  // owner is refused the same way for a missing experience as for another host's, so none of them
+  // can tell from the answer which experience IDs exist.
+  const staffRole = staffRoleOf(caller);
+  if (!staffRole && !caller.roles.includes(Role.HostOwner)) {
+    throw new ForbiddenError(Role.HostOwner);
+  }
   const [experience] = await db
     .select({ id: experiences.id, hostId: experiences.hostId })
     .from(experiences)
     .where(eq(experiences.id, photo.experienceId));
-  if (!experience) throw new ExperienceNotFoundError();
-  requireCanEditPhotos(caller, experience.hostId);
+  if (!experience) {
+    if (staffRole) throw new ExperienceNotFoundError();
+    throw new ForbiddenError(Role.HostOwner);
+  }
+  if (staffRole) requireRole(caller, staffRole, {});
+  else requireRole(caller, Role.HostOwner, { hostId: experience.hostId });
 
   // A full gallery is refused before any pixel is decoded; the transaction below decides for certain.
   if (nextPhotoPosition(await takenPositions(experience.id)) === null) {
@@ -92,8 +104,9 @@ export async function addPhoto(
     throw new Error('A public photo came back without an address');
   const url = stored.url;
 
+  let row;
   try {
-    const row = await db.transaction(async (tx) => {
+    row = await db.transaction(async (tx) => {
       await tx
         .select({ id: experiences.id })
         .from(experiences)
@@ -128,11 +141,12 @@ export async function addPhoto(
       if (!inserted) throw new Error('The photo row was not returned');
       return inserted;
     });
-    return GuestPhotoSchema.parse(row);
   } catch (error) {
     await removeOrphan(storage, storageKey, id);
     throw error;
   }
+  // Outside the try: the row is stored by now, so a failure here must not delete the file it points at.
+  return GuestPhotoSchema.parse(row);
 }
 
 async function takenPositions(experienceId: string): Promise<number[]> {
@@ -143,13 +157,23 @@ async function takenPositions(experienceId: string): Promise<number[]> {
   return rows.map((row) => row.position);
 }
 
-/** Best effort: a failure is logged by kind and photo id, and the original error still reaches the caller. */
+/**
+ * Removes the file of a photo whose row could not be written. A failed transaction call can still
+ * have gone through (the connection drops after the commit), and a row pointing at a deleted file is
+ * worse than a stray file, so the file goes only once the row is known to be absent. Best effort: a
+ * failure is logged by error kind and photo id, and the original error still reaches the caller.
+ */
 async function removeOrphan(
   storage: StoragePort,
   storageKey: string,
   photoId: string,
 ) {
   try {
+    const [stored] = await db
+      .select({ id: photos.id })
+      .from(photos)
+      .where(eq(photos.id, photoId));
+    if (stored) return;
     await storage.delete({ key: storageKey });
   } catch (error) {
     logger.error('Photo file left in storage after its row failed', {

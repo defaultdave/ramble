@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   LegalDocSchema,
+  isDraft,
   LegalDraftInputSchema,
   legalChange,
   isSuperseded,
@@ -111,4 +112,22 @@ describe('isSuperseded', () => {
       expect(isSuperseded(draft, published)).toBe(expected);
     },
   );
+});
+
+describe('isDraft', () => {
+  it.each([
+    ['draft', true],
+    ['published', false],
+  ] as const)('a %s version is a draft: %s', (status, expected) => {
+    expect(isDraft(status)).toBe(expected);
+  });
+});
+
+describe('a document key of millions of characters', () => {
+  it.each([
+    ['a waiver slug', `waiver-${'a-'.repeat(3_000_000)}a`],
+    ['letters', 'a'.repeat(6_000_000)],
+  ])('is refused for %s without throwing', (_name, value) => {
+    expect(LegalDocSchema.safeParse(value).success).toBe(false);
+  });
 });

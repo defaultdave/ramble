@@ -16,6 +16,7 @@ import {
   experienceIdsOf,
   hasCollectionKindMismatch,
   hasMissingIds,
+  isSameCollectionKind,
   isSingleCollection,
   pageCopyChange,
   positioned,
@@ -560,5 +561,105 @@ describe('isSingleCollection', () => {
     ['gift_guide', true],
   ] as const)('a %s is a single collection: %s', (kind, expected) => {
     expect(isSingleCollection(kind)).toBe(expected);
+  });
+});
+
+describe('isSameCollectionKind', () => {
+  it.each([
+    ['pick', 'pick', true],
+    ['gift_guide', 'gift_guide', true],
+    ['pick', 'gift_guide', false],
+    ['gift_guide', 'pick', false],
+  ] as const)('stored %s, requested %s: %s', (stored, requested, expected) => {
+    expect(isSameCollectionKind(stored, requested)).toBe(expected);
+  });
+});
+
+describe('hasMissingIds when the missing one is not last', () => {
+  it.each([
+    ['first', ['a', 'b', 'c'], ['b', 'c']],
+    ['in the middle', ['a', 'b', 'c'], ['a', 'c']],
+    ['last', ['a', 'b', 'c'], ['a', 'b']],
+  ])('finds the id missing %s', (_name, requested, found) => {
+    expect(hasMissingIds(requested, found)).toBe(true);
+  });
+});
+
+describe('ids written in capitals', () => {
+  const upper = '0A0B0C0D-0000-4000-8000-00000000ABCD';
+  const lower = upper.toLowerCase();
+
+  it('are lower-cased in every write contract, as Postgres returns them', () => {
+    const collection = CollectionInputSchema.parse({
+      id: upper,
+      kind: 'pick',
+      slug: 'a-pick',
+      title: 'T',
+      summary: null,
+      intro: null,
+      status: 'draft',
+      items: [{ experienceId: upper, note: null }],
+    });
+    const modules = HomeModulesInputSchema.parse([
+      {
+        kind: 'picks',
+        enabled: true,
+        heading: null,
+        body: null,
+        collectionId: upper,
+      },
+    ]);
+    const page = PageCopyInputSchema.parse({
+      kind: 'category',
+      targetId: upper,
+      heading: null,
+      metaDescription: null,
+      status: 'draft',
+      intro: null,
+      body: null,
+    });
+    const help = HelpArticleInputSchema.parse({
+      id: upper,
+      slug: 'a-help',
+      title: 'T',
+      summary: null,
+      position: 0,
+      status: 'draft',
+      body: { type: 'doc', content: [] },
+    });
+
+    expect(collection.id).toBe(lower);
+    expect(collection.items[0]?.experienceId).toBe(lower);
+    expect(modules[0]?.collectionId).toBe(lower);
+    expect(page.targetId).toBe(lower);
+    expect(help.id).toBe(lower);
+  });
+
+  it('still refuse a malformed id', () => {
+    expect(
+      HomeModulesInputSchema.safeParse([
+        {
+          kind: 'picks',
+          enabled: true,
+          heading: null,
+          body: null,
+          collectionId: 'not-an-id',
+        },
+      ]).success,
+    ).toBe(false);
+  });
+
+  it('are compared as the same id as the lower-case one a lookup returns', () => {
+    const [parsed] = HomeModulesInputSchema.parse([
+      {
+        kind: 'picks',
+        enabled: true,
+        heading: null,
+        body: null,
+        collectionId: upper,
+      },
+    ]);
+
+    expect(hasMissingIds([parsed?.collectionId ?? ''], [lower])).toBe(false);
   });
 });

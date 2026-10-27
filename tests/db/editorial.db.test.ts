@@ -1,6 +1,6 @@
 import { updateTag } from 'next/cache';
 import { ZodError } from 'zod';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   afterAll,
   beforeAll,
@@ -2387,4 +2387,111 @@ describe('text Postgres cannot store', () => {
       expect(tagsUpdated()).toEqual([]);
     },
   );
+});
+
+describe('ids written in capitals', () => {
+  it('find the experience a collection lists, instead of reporting it unknown', async () => {
+    const experience = await insertExperience();
+
+    const result = await editorial.saveCollection(
+      ops,
+      collectionInput({
+        items: [{ experienceId: experience.id.toUpperCase(), note: null }],
+      }),
+    );
+
+    expect(result).toMatchObject({
+      status: 'saved',
+      value: { items: [{ experienceId: experience.id }] },
+    });
+  });
+
+  it('find the collection a home module shows, instead of reporting it unknown', async () => {
+    const pick = await saved(editorial.saveCollection(ops, collectionInput()));
+
+    const result = await editorial.saveHomeModules(ops, [
+      {
+        kind: 'picks',
+        enabled: true,
+        heading: 'Shown',
+        body: null,
+        collectionId: pick.value.id.toUpperCase(),
+      },
+    ]);
+
+    expect(result).toMatchObject({
+      status: 'saved',
+      value: [{ collectionId: pick.value.id }],
+    });
+  });
+});
+
+describe('the publish lookup in publishLegalDocument', () => {
+  const insertDrafts = (doc: string, count: number) =>
+    client.db.execute(
+      sql`INSERT INTO legal_documents (doc, version, title, body)
+        SELECT ${doc}, g, 'T', '{"type":"doc","content":[]}'::jsonb
+        FROM generate_series(1, ${count}::int) AS g`,
+    );
+
+  // One statement, in order, so each version publishes above the ones before it.
+  const publishVersions = (doc: string, versions: readonly number[]) =>
+    client.db.execute(
+      sql`DO $$
+        DECLARE v int;
+        BEGIN
+          FOREACH v IN ARRAY ${sql.raw(`ARRAY[${versions.join(',')}]`)} LOOP
+            UPDATE legal_documents SET status = 'published'
+              WHERE doc = ${sql.raw(`'${doc}'`)} AND version = v;
+          END LOOP;
+        END
+        $$`,
+    );
+
+  const idOf = async (doc: string, version: number) => {
+    const [row] = await client.db
+      .select({ id: legalDocuments.id })
+      .from(legalDocuments)
+      .where(
+        and(eq(legalDocuments.doc, doc), eq(legalDocuments.version, version)),
+      );
+    if (!row) throw new Error('missing version');
+    return row.id;
+  };
+
+  it('publishes a lower draft while the higher version is only a draft', async () => {
+    const lower = await legal.createLegalDraft(ops, {
+      doc: 'waiver-draft-above',
+      title: 'v1',
+      body: doc(),
+    });
+    await legal.createLegalDraft(ops, {
+      doc: 'waiver-draft-above',
+      title: 'v2',
+      body: doc(),
+    });
+
+    const result = await legal.publishLegalDocument(ops, lower.id);
+
+    expect(result).toMatchObject({
+      status: 'published',
+      value: { version: 1 },
+    });
+  });
+
+  it('sees a published version above the draft however many are published, and in any position', async () => {
+    const key = 'waiver-cap-order';
+    await insertDrafts(key, 203);
+    const published = [...Array.from({ length: 200 }, (_, n) => n + 2), 203];
+    await publishVersions(key, published);
+    expect(published.length).toBeGreaterThan(editorialLimits.listed);
+
+    // 1 has published versions above it; 202 has 200 below it and only 203 above, which a lookup
+    // that took the lowest 200 would never see.
+    for (const version of [1, 202]) {
+      expect(
+        await legal.publishLegalDocument(ops, await idOf(key, version)),
+      ).toEqual({ status: 'superseded' });
+    }
+  });
 });

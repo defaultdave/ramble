@@ -14,10 +14,16 @@ import {
  */
 export const legalDocPattern = String.raw`^(terms|privacy|host-agreement|waiver-[a-z0-9]+(-[a-z0-9]+)*)$`;
 
+const legalDocRegex = new RegExp(legalDocPattern);
+
+// The length is checked before the pattern, which repeats a group and recurses on long input.
 export const LegalDocSchema = z
   .string()
-  .max(editorialLimits.slug)
-  .regex(new RegExp(legalDocPattern));
+  .refine(
+    (value) =>
+      value.length <= editorialLimits.slug && legalDocRegex.test(value),
+    { message: 'A legal document key' },
+  );
 
 export type LegalKind =
   'marketplace_terms' | 'privacy_policy' | 'host_agreement' | 'waiver';
@@ -70,6 +76,11 @@ export function legalChange(doc: string): CacheChange {
 }
 
 /** The number of the next version of a document, given the highest version written so far, if any. */
+/** Only a draft can be edited or published. */
+export function isDraft(status: (typeof legalStatuses)[number]): boolean {
+  return status === 'draft';
+}
+
 export function nextLegalVersion(latestVersion: number | undefined): number {
   return (latestVersion ?? 0) + 1;
 }

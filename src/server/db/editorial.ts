@@ -20,6 +20,7 @@ import {
   experienceIdsOf,
   hasCollectionKindMismatch,
   hasMissingIds,
+  isSameCollectionKind,
   isSingleCollection,
   pageCopyChange,
   positioned,
@@ -328,15 +329,15 @@ export async function saveCollection(
       ? await tx
           .select()
           .from(collections)
-          .where(
-            and(
-              eq(collections.id, parsed.id),
-              eq(collections.kind, parsed.kind),
-            ),
-          )
+          .where(eq(collections.id, parsed.id))
           .for('update')
       : [];
-    if (parsed.id && !before) return { status: 'not_found' } as const;
+    if (
+      parsed.id &&
+      (!before || !isSameCollectionKind(before.kind, parsed.kind))
+    ) {
+      return { status: 'not_found' } as const;
+    }
 
     const notThis = before ? ne(collections.id, before.id) : undefined;
     const [slugClash] = await tx

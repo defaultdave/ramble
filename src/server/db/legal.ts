@@ -7,6 +7,7 @@ import {
   LegalDocumentSchema,
   LegalDraftEditSchema,
   LegalDraftInputSchema,
+  isDraft,
   isSuperseded,
   legalChange,
   nextLegalVersion,
@@ -124,6 +125,13 @@ export async function editLegalDraft(
   const parsedId = EntityIdSchema.safeParse(id);
   if (!parsedId.success) return { status: 'not_a_draft' };
   const parsed = LegalDraftEditSchema.parse(edit);
+  const [current] = await db
+    .select({ status: legalDocuments.status })
+    .from(legalDocuments)
+    .where(eq(legalDocuments.id, parsedId.data));
+  if (!current || !isDraft(current.status)) return { status: 'not_a_draft' };
+  // The status predicate is the race guard: a publish that commits after the read above leaves
+  // no row to update, and the answer is the same.
   const [row] = await db
     .update(legalDocuments)
     .set(parsed)
@@ -167,13 +175,10 @@ export async function publishLegalDocument(
     const [draft] = await tx
       .select()
       .from(legalDocuments)
-      .where(
-        and(
-          eq(legalDocuments.id, parsedId.data),
-          eq(legalDocuments.status, 'draft'),
-        ),
-      );
-    if (!draft) return { status: 'not_a_draft' } as const;
+      .where(eq(legalDocuments.id, parsedId.data));
+    if (!draft || !isDraft(draft.status)) {
+      return { status: 'not_a_draft' } as const;
+    }
     const published = await tx
       .select({ version: legalDocuments.version })
       .from(legalDocuments)

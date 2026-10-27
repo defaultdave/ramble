@@ -37,8 +37,23 @@ export const slugEntityKinds = [
 // A guid, not a strict RFC uuid: the column accepts any uuid, and a seeded id outside the RFC variants must still read.
 export const EntityIdSchema = z.guid();
 
-/** Lower-case words joined by single hyphens. The database CHECK on every slug column spells the same pattern. */
-export const SlugSchema = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+/**
+ * Lower-case words joined by single hyphens. The database CHECK on every slug column spells the
+ * pattern `^[a-z0-9]+(-[a-z0-9]+)*$`; this states it without a repeated group, because V8 matches
+ * a repeated group by recursion and a slug of a few million characters overflows the stack.
+ */
+export function isSlug(value: string): boolean {
+  return (
+    /^[a-z0-9-]+$/.test(value) &&
+    !value.startsWith('-') &&
+    !value.endsWith('-') &&
+    !value.includes('--')
+  );
+}
+
+export const SlugSchema = z.string().refine(isSlug, {
+  message: 'Lower-case words joined by single hyphens',
+});
 
 /**
  * The one rule for a stored link, used by the read schemas and by the database CHECKs on

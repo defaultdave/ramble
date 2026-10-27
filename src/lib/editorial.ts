@@ -74,6 +74,13 @@ export const RichTextStoredSchema = z
 
 const SlugFieldSchema = SlugSchema.max(editorialLimits.slug);
 
+/**
+ * An ID in a write. `z.guid()` accepts upper case and Postgres returns lower case, so an ID
+ * written in capitals is lower-cased here: compared against what the database found, it is the
+ * same ID, not a missing one.
+ */
+const WriteIdSchema = EntityIdSchema.transform((id) => id.toLowerCase());
+
 const timestamps = {
   publishedAt: z.date().nullable(),
   updatedAt: z.date(),
@@ -82,7 +89,7 @@ const timestamps = {
 // ---- Collections: Ramble Picks and the gift guide ----
 
 const CollectionItemSchema = z.object({
-  experienceId: EntityIdSchema,
+  experienceId: WriteIdSchema,
   note: optionalText(editorialLimits.note),
 });
 export type CollectionItem = z.infer<typeof CollectionItemSchema>;
@@ -109,7 +116,7 @@ const uniqueExperienceIds = (items: readonly CollectionItem[]) =>
 
 /** `id` is set to edit a collection and left out to create one. The kind of an existing collection never changes. */
 export const CollectionInputSchema = z.strictObject({
-  id: collectionFields.id.optional(),
+  id: WriteIdSchema.optional(),
   kind: collectionFields.kind,
   slug: collectionFields.slug,
   title: collectionFields.title,
@@ -131,7 +138,7 @@ const homeModuleFields = {
   kind: z.enum(homeModuleKinds),
   enabled: z.boolean(),
   heading: optionalText(editorialLimits.heading),
-  collectionId: EntityIdSchema.nullable(),
+  collectionId: WriteIdSchema.nullable(),
 };
 
 type CollectionTarget = {
@@ -151,6 +158,14 @@ function collectionNotAllowed(module: CollectionTarget): boolean {
  * A picks module shows a Pick and a gift_guide module shows the gift guide. The database holds
  * the same rule as a composite foreign key from `home_modules` to `collections (id, kind)`.
  */
+/** A collection never changes kind: a save names the kind the stored collection has. */
+export function isSameCollectionKind(
+  storedKind: (typeof collectionKinds)[number],
+  requestedKind: (typeof collectionKinds)[number],
+): boolean {
+  return storedKind === requestedKind;
+}
+
 export function hasCollectionKindMismatch(
   modules: readonly CollectionTarget[],
   collectionKindById: ReadonlyMap<string, (typeof collectionKinds)[number]>,
@@ -219,7 +234,7 @@ export type PageCopy = z.infer<typeof PageCopySchema>;
 /** Copy for a category or neighborhood that has none yet is created; one that has some is replaced. */
 export const PageCopyInputSchema = z.strictObject({
   kind: z.enum(pageCopyKinds),
-  targetId: EntityIdSchema,
+  targetId: WriteIdSchema,
   ...pageCopyFields,
   intro: RichTextInputSchema.nullable(),
   body: RichTextInputSchema.nullable(),
@@ -254,7 +269,7 @@ export const HelpArticleSummarySchema = HelpArticleSchema.pick({
 export type HelpArticleSummary = z.infer<typeof HelpArticleSummarySchema>;
 
 export const HelpArticleInputSchema = z.strictObject({
-  id: EntityIdSchema.optional(),
+  id: WriteIdSchema.optional(),
   ...helpArticleFields,
   body: RichTextInputSchema,
 });

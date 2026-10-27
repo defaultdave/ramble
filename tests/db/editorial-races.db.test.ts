@@ -449,3 +449,88 @@ describe('saving the home page', () => {
     ).toEqual(['Second']);
   });
 });
+
+describe('the publication time of a legal version', () => {
+  const databaseNow = async () => {
+    const result = await client.db.execute(sql`SELECT clock_timestamp() AS t`);
+    return new Date((result.rows[0] as { t: Date }).t).getTime();
+  };
+
+  it.each([
+    ['in the past', new Date('2001-01-01T00:00:00Z')],
+    ['in the future', new Date('2999-01-01T00:00:00Z')],
+    ['null', null],
+  ])(
+    'is the moment of publishing, whatever a raw update supplies: %s',
+    async (_name, supplied) => {
+      const draft = await draftOf(unique('waiver-stamp'));
+      const before = await databaseNow();
+
+      await client.db
+        .update(legalDocuments)
+        .set({ status: 'published', publishedAt: supplied })
+        .where(eq(legalDocuments.id, draft.id));
+
+      const after = await databaseNow();
+      const [row] = await client.db
+        .select({ publishedAt: legalDocuments.publishedAt })
+        .from(legalDocuments)
+        .where(eq(legalDocuments.id, draft.id));
+      const stamped = row?.publishedAt?.getTime() ?? 0;
+      expect(stamped).toBeGreaterThanOrEqual(before);
+      expect(stamped).toBeLessThanOrEqual(after);
+    },
+  );
+
+  it('is taken after a wait on a row lock, not when the statement began', async () => {
+    const key = unique('waiver-row-lock');
+    const low = await draftOf(key);
+    const high = await draftOf(key);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let held!: () => void;
+    const holding = new Promise<void>((resolve) => {
+      held = resolve;
+    });
+    // An editor holds the row lock of the higher draft, so its publish statement starts first and
+    // waits on that lock before the trigger runs.
+    const editor = client.db.transaction(async (tx) => {
+      await tx
+        .update(legalDocuments)
+        .set({ title: 'edited' })
+        .where(eq(legalDocuments.id, high.id));
+      held();
+      await gate;
+    });
+    await holding;
+    // A query builder runs only when awaited, so this starts the statement now.
+    const highPublish = (async () => {
+      await client.db
+        .update(legalDocuments)
+        .set({ status: 'published' })
+        .where(eq(legalDocuments.id, high.id));
+    })();
+    await aFewMoments();
+    await client.db
+      .update(legalDocuments)
+      .set({ status: 'published' })
+      .where(eq(legalDocuments.id, low.id));
+    release();
+    await editor;
+    await highPublish;
+
+    const rows = await client.db
+      .select({
+        version: legalDocuments.version,
+        publishedAt: legalDocuments.publishedAt,
+      })
+      .from(legalDocuments)
+      .where(eq(legalDocuments.doc, key))
+      .orderBy(legalDocuments.version);
+    expect(rows.map((row) => row.version)).toEqual([1, 2]);
+    const [first, second] = rows.map((row) => row.publishedAt?.getTime() ?? 0);
+    expect(second).toBeGreaterThan(first ?? Number.MAX_SAFE_INTEGER);
+  });
+});

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { thisWeekWindow } from '@/lib/home';
+import { homeLimits, thisWeekWindow } from '@/lib/home';
 import { getHomeContent, getThisWeek } from './home';
 
 // Behaviours under test, one per decision, branch or risk:
@@ -7,6 +7,7 @@ import { getHomeContent, getThisWeek } from './home';
 // - the home read asks for the experiences its modules might show, and only those
 // - the this-week read uses the browse profile, reads the window of its key, and tags the catalog and each listed experience
 // - the this-week read looks up only the experiences with an open session, soonest first
+// - the this-week read refuses a key that is not an ISO instant before asking the database anything, and asks for the candidate limit's worth
 // - a failed read throws only the kind of the failure, never the query or its values
 
 const cache = vi.hoisted(() => ({ life: vi.fn(), tag: vi.fn() }));
@@ -127,6 +128,33 @@ describe('getThisWeek', () => {
     await getThisWeek(asOf);
 
     expect(db.experiences).toHaveBeenCalledExactlyOnceWith([id(2)]);
+  });
+
+  it.each(['not a date', '2026-11-02', ''])(
+    'refuses the key %j before asking the database anything',
+    async (key) => {
+      const failure = await getThisWeek(key).catch((error: unknown) => error);
+
+      expect(failure).toMatchObject({
+        message: 'This week read failed: ZodError',
+      });
+      expect(db.sessions).not.toHaveBeenCalled();
+      expect(db.experiences).not.toHaveBeenCalled();
+    },
+  );
+
+  it('looks up as many candidates as the limit names', async () => {
+    db.sessions.mockResolvedValue(
+      Array.from({ length: homeLimits.thisWeekCandidates + 5 }, (_, n) =>
+        session(n + 1, n + 1),
+      ),
+    );
+
+    await getThisWeek(asOf);
+
+    expect(db.experiences.mock.calls[0]?.[0]).toHaveLength(
+      homeLimits.thisWeekCandidates,
+    );
   });
 
   it('throws only the kind of a failed read', async () => {

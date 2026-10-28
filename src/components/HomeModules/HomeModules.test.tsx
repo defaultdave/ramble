@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { homeCopy } from '@/lib/home';
 import { HomeModules } from './HomeModules';
 import {
   categoryRail,
@@ -20,7 +21,7 @@ import {
 // - Ramble Picks shows its cards under an h2 with an h3 each, links to the whole Pick, and carries the anchor
 // - a guide-only card links out and says it is not bookable
 // - the gift guide links to /gifts and carries the sponsor line; without copy it shows none
-// - "On this week" lists its cards; the reassurance rows list their facts
+// - "On this week" lists its cards; the reassurance rows list their facts, each with the icon it carries
 // - every module is a labelled region, and the modules appear in the order they are given
 // - no module renders nothing
 
@@ -179,6 +180,28 @@ describe('this week and reassurance', () => {
       'Free cancellation up to 24 hours before on most experiences',
       'Your confirmation lands in your inbox within minutes',
       'Pay with card, Apple Pay, or Google Pay',
+    ]);
+  });
+
+  it('draws the icon each fact carries, whatever its place in the list', () => {
+    const [check, clock, info] = homeCopy.reassurance;
+    render_([
+      {
+        kind: 'reassurance',
+        id: 'reordered',
+        facts: [info, check, clock, info],
+      },
+    ]);
+    const region = screen.getByRole('region', { name: 'Booking with Ramble' });
+    expect(
+      within(region)
+        .getAllByRole('listitem')
+        .map((item) => item.querySelector('svg')?.getAttribute('class')),
+    ).toEqual([
+      expect.stringContaining('lucide-info'),
+      expect.stringContaining('lucide-check'),
+      expect.stringContaining('lucide-clock'),
+      expect.stringContaining('lucide-info'),
     ]);
   });
 });

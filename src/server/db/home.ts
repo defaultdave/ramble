@@ -1,6 +1,7 @@
 import 'server-only';
 import { and, asc, eq, gt, inArray, lte } from 'drizzle-orm';
 import {
+  HomeExperienceIdsSchema,
   HomeExperienceSchema,
   ThisWeekSessionSchema,
   homeLimits,
@@ -19,14 +20,9 @@ import { experiences, sessions } from './schema';
 export async function listHomeExperiences(
   ids: readonly string[],
 ): Promise<HomeExperience[]> {
-  if (ids.length === 0) return [];
-  if (ids.length > homeLimits.maxCardIds) {
-    throw new RangeError(
-      `A home read looks up at most ${String(homeLimits.maxCardIds)} experiences`,
-    );
-  }
+  const lookedUp = HomeExperienceIdsSchema.parse(ids);
   const rows = await dbRead.query.experiences.findMany({
-    where: and(guestVisible, inArray(experiences.id, [...ids])),
+    where: and(guestVisible, inArray(experiences.id, lookedUp)),
     columns: {
       id: true,
       slug: true,

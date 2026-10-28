@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { describe, expect, it } from 'vitest';
-import { CachedReadError, readOrRefuse } from './readOrRefuse';
+import { readOrRefuse } from './readOrRefuse';
 
 // Behaviours under test, one per decision, branch or risk:
 // - a read that succeeds returns its answer
@@ -25,7 +25,6 @@ describe('readOrRefuse', () => {
       Promise.reject(driverError),
     ).catch((error: unknown) => error);
 
-    expect(failure).toBeInstanceOf(CachedReadError);
     expect(failure).toMatchObject({
       name: 'CachedReadError',
       message: 'Home read failed: Error',

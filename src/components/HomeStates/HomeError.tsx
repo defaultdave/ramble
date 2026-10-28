@@ -14,14 +14,12 @@ export function HomeError() {
         tone="danger"
         title="We couldn't load the home page"
         body="Something went wrong on our side. Try again in a moment."
-        action={
-          <form className={styles.retry} action="/" method="get">
-            <Button type="submit" variant="secondary">
-              Try again
-            </Button>
-          </form>
-        }
       />
+      <form className={styles.retry} action="/" method="get">
+        <Button type="submit" variant="secondary">
+          Try again
+        </Button>
+      </form>
     </div>
   );
 }

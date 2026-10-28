@@ -6,7 +6,7 @@ import { unstable_rethrow } from 'next/navigation';
  * values, and Next.js logs whatever a cached function throws, so the cause stays inside and only
  * the name of its kind comes out.
  */
-export class CachedReadError extends Error {
+class CachedReadError extends Error {
   constructor(read: string, kind: string) {
     super(`${read} read failed: ${kind}`);
     this.name = 'CachedReadError';

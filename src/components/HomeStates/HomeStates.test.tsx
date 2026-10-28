@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { HomeEmpty, HomeError, HomeSkeleton, HomeTitle } from '.';
 
@@ -37,12 +37,24 @@ describe('HomeError', () => {
 
   it('retries with a GET form to the same page, so it works with no script', () => {
     render(<HomeError />);
-    const alert = screen.getByRole('alert');
-    const button = within(alert).getByRole('button', { name: 'Try again' });
+    const button = screen.getByRole('button', { name: 'Try again' });
     expect(button).toHaveAttribute('type', 'submit');
     const form = button.closest('form');
     expect(form).toHaveAttribute('action', '/');
     expect(form).toHaveAttribute('method', 'get');
+  });
+
+  it('puts Try again under the alert as its own button, not inside it', () => {
+    render(<HomeError />);
+    const alert = screen.getByRole('alert');
+    const form = screen
+      .getByRole('button', { name: 'Try again' })
+      .closest('form');
+    expect(alert).not.toContainElement(form);
+    expect(alert.parentElement).toBe(form?.parentElement);
+    expect(alert.compareDocumentPosition(form as Node)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
   });
 });
 

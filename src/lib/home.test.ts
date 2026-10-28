@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ZodError } from 'zod';
 import type { Collection, HomeModule } from './editorial';
 import {
   browseHref,
@@ -11,6 +12,7 @@ import {
   homeAsOf,
   homeCopy,
   homeExperienceIds,
+  HomeExperienceIdsSchema,
   homeLimits,
   priceLabel,
   thisWeekExperienceIds,
@@ -25,7 +27,7 @@ import {
 
 // Behaviours under test, one per decision, branch or risk:
 // - the venue day is the New York calendar day, on both sides of its midnight and across the clock change
-// - the cache key is the minute; the week window runs a week from it; a bad key is refused
+// - the cache key is the minute; the week window runs a week from it; a key that is not the ISO instant homeAsOf writes is refused
 // - the browse address writes only the parameters that are set, escaped, in the grammar order
 // - an experience address names the area by its status
 // - a duration reads as minutes, hours, or half hours, and falls back to hours and minutes
@@ -106,8 +108,46 @@ describe('homeAsOf and thisWeekWindow', () => {
     expect(window.to.toISOString()).toBe('2026-11-09T15:00:00.000Z');
   });
 
-  it('refuses a key that is not a date', () => {
-    expect(() => thisWeekWindow('not a date')).toThrow(RangeError);
+  it.each([
+    ['text', 'not a date'],
+    ['a date with no time', '2026-11-02'],
+    ['a time with an offset', '2026-11-02T15:00:00.000+02:00'],
+    ['an empty key', ''],
+    ['a month that does not exist', '2026-13-02T15:00:00.000Z'],
+  ])('refuses a key that is %s', (_name, key) => {
+    expect(() => thisWeekWindow(key)).toThrow(ZodError);
+  });
+
+  it('accepts the key homeAsOf writes', () => {
+    expect(() =>
+      thisWeekWindow(homeAsOf(new Date('2026-11-02T15:00:59.999Z'))),
+    ).not.toThrow();
+  });
+});
+
+describe('HomeExperienceIdsSchema', () => {
+  it('accepts up to the limit of IDs', () => {
+    const ids = Array.from({ length: homeLimits.maxCardIds }, (_, n) => id(n));
+    expect(HomeExperienceIdsSchema.parse(ids)).toEqual(ids);
+  });
+
+  it.each([
+    [
+      'one past the limit',
+      Array.from({ length: homeLimits.maxCardIds + 1 }, (_, n) => id(n)),
+    ],
+    ['an ID that is not a uuid', ['not-a-uuid']],
+    ['an empty ID', ['']],
+  ])('refuses %s', (_name, ids) => {
+    expect(() => HomeExperienceIdsSchema.parse(ids)).toThrow(ZodError);
+  });
+});
+
+describe('homeLimits', () => {
+  it('looks up more candidates for "On this week" than it shows', () => {
+    expect(homeLimits.thisWeekCandidates).toBeGreaterThan(
+      homeLimits.thisWeekShown,
+    );
   });
 });
 

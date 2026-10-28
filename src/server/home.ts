@@ -69,11 +69,10 @@ export async function getThisWeek(asOf: string): Promise<ThisWeekContent> {
   const content = await readOrRefuse('This week', async () => {
     const window = thisWeekWindow(asOf);
     const sessions = await listThisWeekSessions(window);
-    // Twice what is shown, so an experience that cannot be a card does not leave the module short.
     const experienceIds = thisWeekExperienceIds(
       sessions,
       window,
-      homeLimits.thisWeekShown * 2,
+      homeLimits.thisWeekCandidates,
     );
     const experiences = await listHomeExperiences(experienceIds);
     return { experienceIds, experiences };

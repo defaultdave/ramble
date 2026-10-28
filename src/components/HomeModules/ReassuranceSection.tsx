@@ -1,22 +1,26 @@
 import { Check, Clock, Info, type LucideIcon } from 'lucide-react';
+import type { ReassuranceFact } from '@/lib/home';
 import styles from './HomeModules.module.css';
 
-export type ReassuranceSectionProps = { facts: readonly string[] };
+export type ReassuranceSectionProps = { facts: readonly ReassuranceFact[] };
 
-// The Figma rows pair each fact with one of these, in this order.
-const icons: readonly LucideIcon[] = [Check, Clock, Info];
+const icons: Record<ReassuranceFact['icon'], LucideIcon> = {
+  check: Check,
+  clock: Clock,
+  info: Info,
+};
 
 export function ReassuranceSection({ facts }: ReassuranceSectionProps) {
   return (
     <section className={styles.section} aria-label="Booking with Ramble">
       <div className={styles.inner}>
         <ul className={styles.facts} role="list">
-          {facts.map((fact, index) => {
-            const Icon = icons[index % icons.length] ?? Check;
+          {facts.map((fact) => {
+            const Icon = icons[fact.icon];
             return (
-              <li key={fact} className={styles.fact}>
+              <li key={fact.text} className={styles.fact}>
                 <Icon className={styles.factIcon} aria-hidden="true" />
-                {fact}
+                {fact.text}
               </li>
             );
           })}

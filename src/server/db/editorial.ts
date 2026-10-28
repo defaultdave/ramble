@@ -142,7 +142,8 @@ export async function listHomeModules(): Promise<HomeModule[]> {
         sql`${homeModules.collectionId} IS NULL OR ${collections.status} = 'published'`,
       ),
     )
-    .orderBy(asc(homeModules.position));
+    .orderBy(asc(homeModules.position))
+    .limit(editorialLimits.homeModules);
   return HomeModuleSchema.array().parse(rows.map(({ module }) => module));
 }
 

@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { ZodError } from 'zod';
 import { homeLimits, thisWeekWindow } from '@/lib/home';
 import {
   categories,
@@ -20,7 +21,7 @@ import {
 // - the experience read returns live and guide-only experiences with the card's fields, and never a draft, one in review, or a paused one
 // - the experience read returns only the IDs asked for, and nothing for an empty list
 // - the experience read carries the neighborhood name and every price option, and nothing the card does not show
-// - an unbounded list of IDs is refused before the database is asked
+// - an unbounded list of IDs, or an ID that is not a uuid, is refused before the database is asked
 // - the session read returns scheduled sessions that start after the window opens and up to its end, soonest first
 //   (the opening instant is outside, the closing instant inside)
 // - the session read leaves out cancelled and completed sessions and those of an experience a guest cannot see
@@ -210,7 +211,7 @@ describe('listHomeExperiences', () => {
     expect(found.map((row) => row.id)).toEqual([asked.id]);
   });
 
-  it('answers an empty list with nothing and asks the database nothing', async () => {
+  it('answers an empty list with nothing', async () => {
     await expect(home.listHomeExperiences([])).resolves.toEqual([]);
   });
 
@@ -220,7 +221,13 @@ describe('listHomeExperiences', () => {
       (_, n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`,
     );
 
-    await expect(home.listHomeExperiences(tooMany)).rejects.toThrow(RangeError);
+    await expect(home.listHomeExperiences(tooMany)).rejects.toThrow(ZodError);
+  });
+
+  it('refuses an ID that is not a uuid', async () => {
+    await expect(home.listHomeExperiences(['not-a-uuid'])).rejects.toThrow(
+      ZodError,
+    );
   });
 });
 

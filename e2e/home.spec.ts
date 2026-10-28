@@ -31,7 +31,7 @@ test.describe('the home page when its read fails', () => {
 
   test('retries from the same address', async ({ page }) => {
     await page.goto('/');
-    await errorAlert(page).getByRole('button', { name: 'Try again' }).click();
+    await page.getByRole('button', { name: 'Try again' }).click();
 
     await expect(page).toHaveURL(/\/\?$|\/$/);
     await expect(errorAlert(page)).toBeVisible();

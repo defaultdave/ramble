@@ -15,6 +15,8 @@ export const homeLimits = {
   picksCandidates: 12,
   /** Cards in the "On this week" module. */
   thisWeekShown: 4,
+  /** Experiences "On this week" looks up, twice what it shows, so one that cannot be a card does not leave the module short. */
+  thisWeekCandidates: 8,
   /** Sessions one "On this week" read looks at. */
   thisWeekSessions: 500,
   /** How far ahead "On this week" looks. */
@@ -22,6 +24,14 @@ export const homeLimits = {
   /** Experiences one home read looks up by ID: 20 modules at most, each with `picksCandidates` entries. */
   maxCardIds: 240,
 } as const;
+
+/** The experience IDs one home read looks up, by the bound the page is built for. */
+export const HomeExperienceIdsSchema = z
+  .array(EntityIdSchema)
+  .max(homeLimits.maxCardIds);
+
+/** The minute key a cached read takes, as `homeAsOf` writes it. */
+const AsOfSchema = z.iso.datetime();
 
 const MS_PER_MINUTE = 60_000;
 const MS_PER_DAY = 86_400_000;
@@ -54,10 +64,7 @@ export type ThisWeekWindow = { from: Date; to: Date };
 
 /** The sessions "On this week" looks at: those that start after `asOf`, up to a week ahead. */
 export function thisWeekWindow(asOf: string): ThisWeekWindow {
-  const from = new Date(asOf);
-  if (Number.isNaN(from.getTime())) {
-    throw new RangeError('asOf must be an ISO date and time');
-  }
+  const from = new Date(AsOfSchema.parse(asOf));
   return {
     from,
     to: new Date(from.getTime() + homeLimits.thisWeekDays * MS_PER_DAY),
@@ -266,10 +273,16 @@ export const homeCopy = {
   giftGuideSponsor: 'Presented by our holiday partner',
   thisWeekHeading: 'On this week',
   reassurance: [
-    'Free cancellation up to 24 hours before on most experiences',
-    'Your confirmation lands in your inbox within minutes',
-    'Pay with card, Apple Pay, or Google Pay',
-  ],
+    {
+      icon: 'check',
+      text: 'Free cancellation up to 24 hours before on most experiences',
+    },
+    {
+      icon: 'clock',
+      text: 'Your confirmation lands in your inbox within minutes',
+    },
+    { icon: 'info', text: 'Pay with card, Apple Pay, or Google Pay' },
+  ] as const satisfies readonly ReassuranceFact[],
 } as const;
 
 /** A plain sentence as a rich-text document, so default copy and edited copy render the same way. */
@@ -283,6 +296,12 @@ export function docOfText(text: string): RichTextDoc {
 function hasText(doc: RichTextDoc | null): doc is RichTextDoc {
   return doc !== null && doc.content.length > 0;
 }
+
+/** One reassurance row; the Figma rows pair each fact with its own icon. */
+export type ReassuranceFact = {
+  icon: 'check' | 'clock' | 'info';
+  text: string;
+};
 
 export type HomeCategory = { slug: string; name: string; href: string };
 
@@ -327,7 +346,7 @@ export type HomeModuleView =
       heading: string;
       cards: HomeCard[];
     }
-  | { kind: 'reassurance'; id: string; facts: readonly string[] };
+  | { kind: 'reassurance'; id: string; facts: readonly ReassuranceFact[] };
 
 export type HomeInput = {
   /** The enabled modules in order, as the data layer reads them. */

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  checkSeedTarget,
+  checkSeedTarget as check,
   seedTargets,
+  type SeedRunOptions,
   type SeedTargetInput,
   type SeedTargetVerdict,
 } from './target';
@@ -18,6 +19,10 @@ import {
 //   is refused for every target, including one that makes the address read as production or local
 // - an address the guard and the driver could read differently is refused: a percent escape in the host or
 //   database, an empty host or database, a protocol other than postgres
+// - SEED_TARGET=production-demo is the one way to seed production: VERCEL_ENV=production and a Neon-style
+//   host are accepted, and the production-name and local-host checks are skipped
+// - production-demo still refuses NODE_ENV=production, every unreadable or overriding URL, a missing
+//   database, and --scale; local, staging, and load-test still refuse VERCEL_ENV=production
 // - refusals carry a reason and a message that never repeats the URL (it holds credentials)
 
 const local: SeedTargetInput = {
@@ -26,6 +31,11 @@ const local: SeedTargetInput = {
   seedTarget: 'local',
   databaseUrl: 'postgres://ramble:secret@localhost:5432/ramble',
 };
+
+const checkSeedTarget = (
+  input: SeedTargetInput,
+  options: SeedRunOptions = { scale: false },
+) => check(input, options);
 
 const refusal = (verdict: SeedTargetVerdict) =>
   verdict.ok ? undefined : verdict.reason;
@@ -218,5 +228,127 @@ describe('checkSeedTarget', () => {
       const verdict = checkSeedTarget({ ...local, ...change });
       expect(verdict.ok ? '' : verdict.message).not.toMatch(/hunter2|secret/);
     }
+  });
+
+  describe('SEED_TARGET=production-demo', () => {
+    const neon =
+      'postgres://owner:secret@ep-quiet-cell-123.us-east-2.aws.neon.tech/neondb';
+    const demo: SeedTargetInput = {
+      nodeEnv: 'development',
+      vercelEnv: 'production',
+      seedTarget: 'production-demo',
+      databaseUrl: neon,
+    };
+
+    it('accepts VERCEL_ENV production with a Neon-style host', () => {
+      expect(checkSeedTarget(demo)).toEqual({
+        ok: true,
+        target: 'production-demo',
+        host: 'ep-quiet-cell-123.us-east-2.aws.neon.tech',
+      });
+    });
+
+    it('accepts a run with VERCEL_ENV unset', () => {
+      expect(checkSeedTarget({ ...demo, vercelEnv: undefined }).ok).toBe(true);
+    });
+
+    it.each([
+      [
+        'a production word in the host',
+        'postgres://u:p@ramble-prod.example.com/ramble',
+      ],
+      [
+        'a production word in the database name',
+        'postgres://u:p@db.example.com/production',
+      ],
+      ['a host that is not local', 'postgres://u:p@db.example.com/ramble'],
+    ])('skips the host and name checks for %s', (_name, databaseUrl) => {
+      expect(checkSeedTarget({ ...demo, databaseUrl }).ok).toBe(true);
+    });
+
+    it.each([
+      ['NODE_ENV production', { nodeEnv: 'production' }, 'production_runtime'],
+      ['no database', { databaseUrl: undefined }, 'no_database'],
+      [
+        'an unreadable URL',
+        { databaseUrl: 'not a url' },
+        'unreadable_database_url',
+      ],
+      [
+        'a percent escape in the host',
+        { databaseUrl: 'postgres://u:p@ep-%70rod.example.com/neondb' },
+        'unreadable_database_url',
+      ],
+      [
+        'a percent escape in the database name',
+        { databaseUrl: 'postgres://u:p@db.example.com/%70rod' },
+        'unreadable_database_url',
+      ],
+      [
+        'no database name',
+        { databaseUrl: 'postgres://u:p@db.example.com' },
+        'unreadable_database_url',
+      ],
+      [
+        'a protocol that is not postgres',
+        { databaseUrl: 'http://u:p@db.example.com/neondb' },
+        'unreadable_database_url',
+      ],
+    ] as const)('still refuses %s', (_name, change, reason) => {
+      expect(refusal(checkSeedTarget({ ...demo, ...change }))).toBe(reason);
+    });
+
+    it.each(['host', 'hostaddr', 'dbname', 'database', 'HOST'])(
+      'still refuses ?%s=... in the address',
+      (key) => {
+        const verdict = checkSeedTarget({
+          ...demo,
+          databaseUrl: `${neon}?${key}=elsewhere.invalid`,
+        });
+        expect(refusal(verdict)).toBe('address_overridden');
+      },
+    );
+
+    it('refuses the scale fixture', () => {
+      expect(refusal(checkSeedTarget(demo, { scale: true }))).toBe(
+        'scale_on_demo',
+      );
+    });
+
+    it('refuses the scale fixture without VERCEL_ENV set', () => {
+      const verdict = checkSeedTarget(
+        { ...demo, vercelEnv: undefined },
+        { scale: true },
+      );
+      expect(refusal(verdict)).toBe('scale_on_demo');
+    });
+
+    it('does not repeat the connection string in a refusal', () => {
+      const verdict = checkSeedTarget(demo, { scale: true });
+      expect(verdict.ok ? '' : verdict.message).not.toMatch(/secret|neon/);
+    });
+  });
+
+  describe('the other targets with VERCEL_ENV=production', () => {
+    it.each(['local', 'staging', 'load-test'] as const)(
+      'refuses %s',
+      (seedTarget) => {
+        const verdict = checkSeedTarget({
+          ...local,
+          seedTarget,
+          vercelEnv: 'production',
+        });
+        expect(refusal(verdict)).toBe('production_runtime');
+      },
+    );
+
+    it.each(['local', 'staging', 'load-test'] as const)(
+      'accepts --scale for %s',
+      (seedTarget) => {
+        expect(
+          checkSeedTarget({ ...local, seedTarget }, { scale: true }).ok,
+        ).toBe(true);
+      },
+    );
   });
 });

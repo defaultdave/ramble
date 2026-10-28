@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BrowseDayRowsSchema,
   browseAsOf,
+  browseDays,
   browseDateHorizonDays,
   browsePageSize,
   browseView,
@@ -8,6 +10,8 @@ import {
   dateChipLabel,
   durationLabel,
   errorView,
+  maxHandEnteredDayRows,
+  maxStoredDayRows,
   experienceAddress,
   priceLabel,
   resultsSummary,
@@ -27,6 +31,9 @@ import { noFilters } from './filters';
 // - the cache time is cut to the minute, and the window runs from it to the horizon
 // - a page is cut from page size plus one rows: the extra row makes the cursor and is not shown
 // - a read becomes a page, and a cursor with no visible row is an outdated page, not an empty one
+// - the calendar days: a generated session keeps its stored date, a hand-entered one is on the day its start falls on in its own zone
+//   (east of UTC, west of UTC, a clock-change day), days are merged, de-duplicated, and sorted, and an unknown zone refuses the read
+// - the raw calendar rows are bounded: too many stored dates or hand-entered sessions, a bad date, or a bad zone is refused
 // - prices are grouped under their experience, lowest first
 // - a duration reads as minutes, hours, or half hours
 // - a card price is the lowest price, with "From" only when prices differ; no price is a refusal
@@ -409,5 +416,187 @@ describe('errorView', () => {
         ],
       },
     });
+  });
+});
+
+describe('browseDays', () => {
+  const at = (startsAt: string, timeZone: string) => ({
+    startsAt: new Date(startsAt),
+    timeZone,
+  });
+
+  it('has no days when there are no rows', () => {
+    expect(browseDays({ storedDates: [], handEntered: [] })).toEqual([]);
+  });
+
+  it.each([
+    // 16:00 UTC on 7 November is 01:00 on the 8th in Tokyo (UTC+9).
+    [
+      'east of UTC, after midnight there',
+      '2026-11-07T16:00:00Z',
+      'Asia/Tokyo',
+      '2026-11-08',
+    ],
+    [
+      'east of UTC, the minute before midnight there',
+      '2026-11-07T14:59:00Z',
+      'Asia/Tokyo',
+      '2026-11-07',
+    ],
+    [
+      'far east of UTC (UTC+14)',
+      '2026-11-07T10:00:00Z',
+      'Pacific/Kiritimati',
+      '2026-11-08',
+    ],
+    // 03:00 UTC on 8 November is 19:00 on the 7th in Los Angeles (UTC-8).
+    [
+      'west of UTC, before midnight there',
+      '2026-11-08T03:00:00Z',
+      'America/Los_Angeles',
+      '2026-11-07',
+    ],
+    [
+      'west of UTC, the minute after midnight there',
+      '2026-11-08T08:00:00Z',
+      'America/Los_Angeles',
+      '2026-11-08',
+    ],
+    ['UTC itself', '2026-11-08T00:00:00Z', 'UTC', '2026-11-08'],
+    // New York goes back an hour on 1 November 2026: midnight is 04:00 UTC before the change and 05:00 UTC after.
+    [
+      'the clock-change day, still summer time',
+      '2026-11-01T04:00:00Z',
+      'America/New_York',
+      '2026-11-01',
+    ],
+    [
+      'the day before the clock change',
+      '2026-11-01T03:59:00Z',
+      'America/New_York',
+      '2026-10-31',
+    ],
+    [
+      'the end of the 25-hour clock-change day',
+      '2026-11-02T04:59:00Z',
+      'America/New_York',
+      '2026-11-01',
+    ],
+    [
+      'the start of the day after the clock change',
+      '2026-11-02T05:00:00Z',
+      'America/New_York',
+      '2026-11-02',
+    ],
+    // New York goes forward on 8 March 2026: midnight is 05:00 UTC before the change; the day is 23 hours long.
+    [
+      'the end of the 23-hour clock-change day',
+      '2026-03-09T03:59:00Z',
+      'America/New_York',
+      '2026-03-08',
+    ],
+    [
+      'the start of the day after the short day',
+      '2026-03-09T04:00:00Z',
+      'America/New_York',
+      '2026-03-09',
+    ],
+  ])(
+    'puts a hand-entered session %s on its own calendar day',
+    (_name, startsAt, zone, day) => {
+      expect(
+        browseDays({ storedDates: [], handEntered: [at(startsAt, zone)] }),
+      ).toEqual([day]);
+    },
+  );
+
+  it('keeps a stored date as it is, whatever the zone says', () => {
+    expect(
+      browseDays({ storedDates: ['2026-11-09'], handEntered: [] }),
+    ).toEqual(['2026-11-09']);
+  });
+
+  it('merges both kinds, lists each day once, and sorts the days', () => {
+    expect(
+      browseDays({
+        storedDates: ['2026-11-12', '2026-11-08', '2026-11-12'],
+        handEntered: [
+          at('2026-11-07T16:00:00Z', 'Asia/Tokyo'),
+          at('2026-11-08T15:00:00Z', 'America/New_York'),
+          at('2026-11-08T15:00:00Z', 'America/New_York'),
+          at('2026-11-10T15:00:00Z', 'America/New_York'),
+        ],
+      }),
+    ).toEqual(['2026-11-08', '2026-11-10', '2026-11-12']);
+  });
+
+  it.each([
+    ['a name Intl does not know', 'Mars/Olympus_Mons'],
+    ['an area with no such place', 'Europe/Atlantis'],
+  ])('refuses %s without naming it', (_name, zone) => {
+    const refusal = (() => {
+      try {
+        browseDays({
+          storedDates: ['2026-11-08'],
+          handEntered: [at('2026-11-07T16:00:00Z', zone)],
+        });
+      } catch (error) {
+        return error;
+      }
+      return null;
+    })();
+
+    expect(refusal).toBeInstanceOf(RangeError);
+    expect((refusal as RangeError).message).not.toContain(zone);
+  });
+});
+
+describe('BrowseDayRowsSchema', () => {
+  const valid = {
+    storedDates: ['2026-11-07'],
+    handEntered: [
+      { startsAt: new Date('2026-11-07T16:00:00Z'), timeZone: 'Asia/Tokyo' },
+    ],
+  };
+
+  it('accepts what the data layer reads', () => {
+    expect(BrowseDayRowsSchema.parse(valid)).toEqual(valid);
+  });
+
+  it.each([
+    [
+      'too many stored dates',
+      {
+        ...valid,
+        storedDates: Array.from(
+          { length: maxStoredDayRows + 1 },
+          () => '2026-11-07',
+        ),
+      },
+    ],
+    [
+      'too many hand-entered sessions',
+      {
+        ...valid,
+        handEntered: Array.from(
+          { length: maxHandEnteredDayRows + 1 },
+          () => valid.handEntered[0],
+        ),
+      },
+    ],
+    [
+      'a stored date that is not a day',
+      { ...valid, storedDates: ['2026-02-30'] },
+    ],
+    ['a stored date that is missing', { ...valid, storedDates: [null] }],
+    [
+      'a zone that is not well formed',
+      {
+        ...valid,
+        handEntered: [{ ...valid.handEntered[0], timeZone: 'Tokyo' }],
+      },
+    ],
+  ])('refuses %s', (_name, rows) => {
+    expect(BrowseDayRowsSchema.safeParse(rows).success).toBe(false);
   });
 });

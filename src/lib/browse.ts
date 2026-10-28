@@ -8,6 +8,7 @@ import {
   type BrowseQuery,
 } from './filters';
 import { formatPrice } from './money';
+import { IsoDateSchema, TimeZoneSchema, isKnownTimeZone } from './sessions';
 
 /** A hard page size: the data layer reads one more row than this to learn whether there is a next page. */
 export const browsePageSize = 12;
@@ -54,6 +55,57 @@ export function browseWindow(asOf: string): BrowseWindow {
     from,
     to: new Date(from.getTime() + (browseDateHorizonDays + 1) * MS_PER_DAY),
   };
+}
+
+/**
+ * The most distinct stored dates a window can hold. The window is one day longer than the horizon,
+ * and host zones from UTC-12 to UTC+14 can put one instant on three dates, so a few days sit at each end.
+ */
+export const maxStoredDayRows = browseDateHorizonDays + 5;
+
+/** The most hand-entered sessions one calendar read takes. A hand-entered session is rare; a cap keeps a flood from growing the read. */
+export const maxHandEnteredDayRows = 1000;
+
+/** What the data layer reads for the calendar: raw stored values, with no day decided. */
+export const BrowseDayRowsSchema = z.object({
+  /** `local_date` of generated sessions, which the generator already decided. */
+  storedDates: z.array(IsoDateSchema).max(maxStoredDayRows),
+  /** Sessions entered by hand, which have no stored date. */
+  handEntered: z
+    .array(z.object({ startsAt: z.date(), timeZone: TimeZoneSchema }))
+    .max(maxHandEnteredDayRows),
+});
+export type BrowseDayRows = z.infer<typeof BrowseDayRowsSchema>;
+
+function dayInZone(zone: string): Intl.DateTimeFormat {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: zone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+}
+
+/**
+ * The calendar days a guest can pick, each once and in order. A generated session already carries its
+ * date; a session entered by hand is on the day its start falls on in its own time zone. A zone that
+ * Intl does not know refuses the whole read: guessing a day would show the guest a date that is wrong.
+ */
+export function browseDays(rows: BrowseDayRows): string[] {
+  const days = new Set(rows.storedDates);
+  const formats = new Map<string, Intl.DateTimeFormat>();
+  for (const { startsAt, timeZone } of rows.handEntered) {
+    let format = formats.get(timeZone);
+    if (!format) {
+      if (!isKnownTimeZone(timeZone)) {
+        throw new RangeError('A session has a time zone that is not known');
+      }
+      format = dayInZone(timeZone);
+      formats.set(timeZone, format);
+    }
+    days.add(format.format(startsAt));
+  }
+  return [...days].sort();
 }
 
 const BrowsePriceOptionSchema = z.object({

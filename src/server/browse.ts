@@ -1,11 +1,11 @@
 import 'server-only';
 import { cacheLife, cacheTag } from 'next/cache';
 import { unstable_rethrow } from 'next/navigation';
-import { toBrowsePage, type BrowsePage } from '@/lib/browse';
+import { browseDays, toBrowsePage, type BrowsePage } from '@/lib/browse';
 import { tags } from '@/lib/cacheTags';
 import type { Category, Neighborhood } from '@/lib/catalog';
 import type { BrowseFilters, BrowseQuery } from '@/lib/filters';
-import { listBrowseDates, listBrowseExperiences } from '@/server/db/browse';
+import { listBrowseDayRows, listBrowseExperiences } from '@/server/db/browse';
 import { listCategories, listNeighborhoods } from '@/server/db/catalog';
 
 /**
@@ -57,7 +57,9 @@ export async function getBrowseDates(
   'use cache';
   cacheLife('browse');
   cacheTag(tags.catalog);
-  return readOrRefuse(() => listBrowseDates(filters, asOf));
+  return readOrRefuse(async () =>
+    browseDays(await listBrowseDayRows(filters, asOf)),
+  );
 }
 
 /** Every category and neighborhood, for the chips. They change when staff publish, and `tags.catalog` says so. */

@@ -6,6 +6,8 @@ import {
   exists,
   gte,
   inArray,
+  isNotNull,
+  isNull,
   lt,
   or,
   sql,
@@ -13,13 +15,16 @@ import {
 } from 'drizzle-orm';
 import { z } from 'zod';
 import {
+  BrowseDayRowsSchema,
   BrowseExperienceSchema,
   browsePageSize,
-  browseDateHorizonDays,
   browseWindow,
+  maxHandEnteredDayRows,
+  maxStoredDayRows,
   splitPage,
   withPriceOptions,
   type BrowseCursorRow,
+  type BrowseDayRows,
   type BrowseExperience,
   type BrowseRead,
   type BrowseWindow,
@@ -30,7 +35,6 @@ import {
   type BrowseFilters,
   type BrowseQuery,
 } from '@/lib/filters';
-import { IsoDateSchema } from '@/lib/sessions';
 import { guestVisible } from './catalog';
 import { dbRead } from './client';
 import {
@@ -58,7 +62,9 @@ function shownInBrowse(): SQL | undefined {
   );
 }
 
-// The date on the host's wall calendar. A session entered by hand has no stored one, so it is worked out.
+// The date filter's match, in the WHERE clause only. A session entered by hand has no stored date, so its
+// day is the one its start falls on in its own zone, which is what `browseDays` decides for the calendar;
+// the database test keeps the two together.
 const sessionLocalDate = sql`coalesce(${sessions.localDate}, (${sessions.startsAt} at time zone ${sessions.timeZone})::date)`;
 
 function inChosenCategories(slugs: readonly string[]): SQL | undefined {
@@ -197,39 +203,50 @@ export async function listBrowseExperiences(
   return { cursor, items: await attachPriceOptions(items), nextCursor };
 }
 
-const DatesSchema = z.array(IsoDateSchema);
-
-// The window spans the horizon plus a day, and a zone offset can add one more local date at each end.
-const maxBrowseDates = browseDateHorizonDays + 5;
-
 /**
- * The calendar days that have a scheduled session in the window, for the experiences the category
- * and neighborhood filters leave. The date filter itself is not applied: the calendar must show every
- * day a guest could switch to.
+ * The stored values the calendar is worked out from, for scheduled sessions in the window of the
+ * experiences the category and neighborhood filters leave. The date filter itself is not applied:
+ * the calendar must show every day a guest could switch to. No day is decided here: a generated
+ * session brings its stored date and a session entered by hand its start and zone, and `browseDays`
+ * turns them into days. Each list has a hard cap.
  */
-export async function listBrowseDates(
+export async function listBrowseDayRows(
   filters: Pick<BrowseFilters, 'categories' | 'neighborhoods'>,
   asOf: string,
-): Promise<string[]> {
+): Promise<BrowseDayRows> {
   const { categories: chosenCategories, neighborhoods: chosenNeighborhoods } =
     BrowseFiltersSchema.pick({
       categories: true,
       neighborhoods: true,
     }).parse(filters);
   const window = browseWindow(asOf);
-  const rows = await dbRead
-    .selectDistinct({ date: sql<string>`${sessionLocalDate}::text` })
-    .from(sessions)
-    .innerJoin(experiences, eq(experiences.id, sessions.experienceId))
-    .where(
-      and(
-        shownInBrowse(),
-        inChosenCategories(chosenCategories),
-        inChosenNeighborhoods(chosenNeighborhoods),
-        scheduledInWindow(window),
-      ),
-    )
-    .orderBy(sql`1`)
-    .limit(maxBrowseDates);
-  return DatesSchema.parse(rows.map(({ date }) => date));
+  const shown = and(
+    shownInBrowse(),
+    inChosenCategories(chosenCategories),
+    inChosenNeighborhoods(chosenNeighborhoods),
+    scheduledInWindow(window),
+  );
+  const [storedDates, handEntered] = await Promise.all([
+    dbRead
+      .selectDistinct({ localDate: sessions.localDate })
+      .from(sessions)
+      .innerJoin(experiences, eq(experiences.id, sessions.experienceId))
+      .where(and(shown, isNotNull(sessions.localDate)))
+      .orderBy(asc(sessions.localDate))
+      .limit(maxStoredDayRows),
+    dbRead
+      .selectDistinct({
+        startsAt: sessions.startsAt,
+        timeZone: sessions.timeZone,
+      })
+      .from(sessions)
+      .innerJoin(experiences, eq(experiences.id, sessions.experienceId))
+      .where(and(shown, isNull(sessions.localDate)))
+      .orderBy(asc(sessions.startsAt), asc(sessions.timeZone))
+      .limit(maxHandEnteredDayRows),
+  ]);
+  return BrowseDayRowsSchema.parse({
+    storedDates: storedDates.map(({ localDate }) => localDate),
+    handEntered,
+  });
 }

@@ -22,7 +22,7 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@/server/db/browse', () => ({
   listBrowseExperiences: db.results,
-  listBrowseDates: db.dates,
+  listBrowseDayRows: db.dates,
 }));
 vi.mock('@/server/db/catalog', () => ({
   listCategories: db.categories,
@@ -101,11 +101,16 @@ describe('getBrowseResults', () => {
 
 describe('getBrowseDates', () => {
   it('uses the browse profile and tags the catalog', async () => {
-    db.dates.mockResolvedValue(['2026-11-07']);
+    db.dates.mockResolvedValue({
+      storedDates: ['2026-11-08'],
+      handEntered: [
+        { startsAt: new Date('2026-11-07T16:00:00Z'), timeZone: 'Asia/Tokyo' },
+      ],
+    });
 
     await expect(
       getBrowseDates({ categories: [], neighborhoods: [] }, asOf),
-    ).resolves.toEqual(['2026-11-07']);
+    ).resolves.toEqual(['2026-11-08']);
 
     expect(cache.life).toHaveBeenCalledExactlyOnceWith('browse');
     expect(cache.tag.mock.calls.flat()).toEqual(['catalog']);
@@ -117,6 +122,28 @@ describe('getBrowseDates', () => {
     await expect(
       getBrowseDates({ categories: [], neighborhoods: [] }, asOf),
     ).rejects.toThrow('Browse read failed: Error');
+  });
+});
+
+describe('getBrowseDates with a session the calendar cannot place', () => {
+  it('throws only the kind of the failure and not the zone', async () => {
+    db.dates.mockResolvedValue({
+      storedDates: [],
+      handEntered: [
+        { startsAt: new Date('2026-11-07T16:00:00Z'), timeZone: 'Mars/Phobos' },
+      ],
+    });
+
+    const failure = await getBrowseDates(
+      { categories: [], neighborhoods: [] },
+      asOf,
+    ).catch((error: unknown) => error);
+
+    expect(failure).toMatchObject({
+      name: 'BrowseReadError',
+      message: 'Browse read failed: RangeError',
+    });
+    expect(JSON.stringify(failure)).not.toContain('Phobos');
   });
 });
 

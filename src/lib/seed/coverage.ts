@@ -658,8 +658,7 @@ export const coverage: CoverageEntry[] = [
     title: 'Experience',
     probes: ['kayak-page', 'kayak-session-states', 'neighbors'],
     trigger: 'Open the kayak page.',
-    // TODO(U-021b): seed the photo pool, then drop this gap.
-    gap: 'The seed writes no photo rows; the gallery shows its placeholder.',
+    gap: 'Photos are not seeded (U-010 is not in main); the gallery shows its placeholder.',
   },
   {
     id: '03b',

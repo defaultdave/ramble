@@ -13,7 +13,7 @@ A state that needs a hold, a payment, or an order cannot be reached from seed ro
 | 01 | 44:10 | Home | `home-modules`, `picks-published`, `gift-guide`, `this-week`, `categories-eight` | Open the home page. **Gap:** The sponsor line on the gift module has no data model yet (Q-13). |
 | 02 | 45:190 | Browse | `categories-eight`, `neighborhoods-six`, `cooking-page`, `page-copy`, `guide-only`, `many-results` | Open a category, neighborhood, Pick, gift guide, or search page. |
 | 02b | 45:413 | Browse, filters open | `filter-variety` | Open All filters on a browse page. |
-| 03 | 46:678 | Experience | `kayak-page`, `kayak-session-states`, `neighbors` | Open the kayak page. **Gap:** The seed writes no photo rows; the gallery shows its placeholder. |
+| 03 | 46:678 | Experience | `kayak-page`, `kayak-session-states`, `neighbors` | Open the kayak page. **Gap:** Photos are not seeded (U-010 is not in main); the gallery shows its placeholder. |
 | 03b | 46:897 | Guide-only page | `guide-only` | Open the sourdough entry. |
 | 04 | 47:890 | Choose date and party | `kayak-session-states`, `kayak-full-day`, `bookable-party` | Tap the booking bar on the kayak page. |
 | 04b | 47:1132 | Choose date, kids | `kids-booking` | Tap the booking bar on the kids wheel class. |

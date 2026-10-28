@@ -1,0 +1,403 @@
+import { durationLabel } from './browse';
+import {
+  EntityIdSchema,
+  isSlug,
+  type CancellationTier,
+  type Category,
+  type GuestExperience,
+  type Neighborhood,
+} from './catalog';
+import { MAX_FULL_REFUND_HOURS } from './cancellation';
+import { formatPrice } from './money';
+import type { GuestPhoto } from './photos';
+import { photoView, type PhotoView } from './photoViews';
+
+// ---- The address ----
+
+/** A canonical uuid is 36 characters; the address ends with one, after a hyphen. */
+const idLength = 36;
+
+/** Far longer than any slug plus its ID, so a request for a megabyte path is refused before it is looked at. */
+export const maxAddressLength = 300;
+
+export type ExperienceAddress = { slug: string; id: string };
+
+/**
+ * The slug and ID in `/experiences/[slug]-[id]`, or null when the address is not that shape. The
+ * ID is the key, so the slug is checked for shape only; a slug that has since changed still
+ * finds its experience.
+ */
+export function parseExperienceAddress(
+  slugAndId: string,
+): ExperienceAddress | null {
+  if (slugAndId.length > maxAddressLength) return null;
+  const idStart = slugAndId.length - idLength;
+  if (idStart < 2 || slugAndId[idStart - 1] !== '-') return null;
+  const slug = slugAndId.slice(0, idStart - 1);
+  const id = slugAndId.slice(idStart);
+  if (!isSlug(slug) || !EntityIdSchema.safeParse(id).success) return null;
+  return { slug, id: id.toLowerCase() };
+}
+
+export const categoryPath = (slug: string) => `/new-york/things-to-do/${slug}`;
+export const neighborhoodPath = (slug: string) =>
+  `/new-york/neighborhoods/${slug}`;
+
+/** The gift checkout for one experience. The page that answers it is the gift checkout unit's. */
+export const giftCheckoutPath = (experienceId: string) =>
+  `/gifts/checkout/${experienceId}`;
+
+/** Where a guest asks about a private session until the private-request form exists. */
+export const privateSessionPath = '/contact';
+
+// ---- Words ----
+
+function hoursLabel(hours: number): string {
+  return `${String(hours)} ${hours === 1 ? 'hour' : 'hours'}`;
+}
+
+/** The text with its ends trimmed, or null when nothing is left. */
+function presentText(value: string | null): string | null {
+  const text = value?.trim() ?? '';
+  return text === '' ? null : text;
+}
+
+/** One entry per non-blank line, so a description written in paragraphs or a list keeps its shape. */
+export function textLines(value: string | null): string[] {
+  return (value ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '');
+}
+
+/** The most rows "What's included" shows; the rest of a longer list is not drawn. */
+export const maxIncludedItems = 20;
+
+export function includedItems(included: string | null): string[] {
+  return textLines(included).slice(0, maxIncludedItems);
+}
+
+type AgeFields = Pick<GuestExperience, 'ageRule' | 'minAge' | 'maxAge'>;
+
+/** "All ages", "Ages 12 and up", "Ages 5 to 10", "21 and over". A rule missing the age it needs is refused, never guessed. */
+export function ageLabel({ ageRule, minAge, maxAge }: AgeFields): string {
+  switch (ageRule) {
+    case 'all_ages':
+      return 'All ages';
+    case 'twenty_one_plus':
+      return '21 and over';
+    case 'minimum_age':
+      if (minAge === null) throw new RangeError('minimum_age needs an age');
+      return `Ages ${String(minAge)} and up`;
+    case 'age_range':
+      if (minAge === null || maxAge === null) {
+        throw new RangeError('age_range needs two ages');
+      }
+      return `Ages ${String(minAge)} to ${String(maxAge)}`;
+  }
+}
+
+type WeatherFields = Pick<
+  GuestExperience,
+  'outdoor' | 'weatherPolicy' | 'weatherDecisionHours'
+>;
+
+/** The one-line weather fact and the paragraph under "Weather", or null for an indoor experience (PRD-12). */
+export function weatherTerms({
+  outdoor,
+  weatherPolicy,
+  weatherDecisionHours,
+}: WeatherFields): { fact: string; detail: string } | null {
+  if (!outdoor || weatherPolicy === null) return null;
+  if (weatherPolicy === 'rain_or_shine') {
+    return {
+      fact: 'Runs rain or shine',
+      detail: 'This experience runs rain or shine.',
+    };
+  }
+  if (weatherDecisionHours === null) {
+    throw new RangeError('decided_before_start needs its hours');
+  }
+  const before = hoursLabel(weatherDecisionHours);
+  return {
+    fact: `Weather call ${before} before start`,
+    detail: `Go or no-go is decided ${before} before start. If it's off, you're refunded in full and emailed right away.`,
+  };
+}
+
+/**
+ * How long before the start a guest can still cancel, in the tier's own words: whole days from two
+ * up, hours otherwise ("24 hours" stays hours, as the design shows it).
+ */
+function windowLabel(hours: number): string {
+  const day = 24;
+  return hours >= 2 * day && hours % day === 0
+    ? `${String(hours / day)} days`
+    : hoursLabel(hours);
+}
+
+/**
+ * What the page says about cancelling, from the experience's tier (PRD-10, PRD-46). It is stated
+ * before any date is chosen, so it names the window; the deadline for one session comes from
+ * `cancellationWindow` when a session is picked. A tier outside 0 to a year is refused, as there.
+ */
+export function cancellationTerms(
+  tier: Pick<CancellationTier, 'fullRefundHoursBefore'>,
+): { fact: string; detail: string } {
+  const hours = tier.fullRefundHoursBefore;
+  if (
+    !Number.isSafeInteger(hours) ||
+    hours < 0 ||
+    hours > MAX_FULL_REFUND_HOURS
+  ) {
+    throw new RangeError('The cancellation window is out of range');
+  }
+  const refunded =
+    'If the host or the weather cancels, you get everything back.';
+  if (hours === 0) {
+    return {
+      fact: 'Free cancellation until it starts',
+      detail: `Free cancellation until the experience starts. ${refunded}`,
+    };
+  }
+  const window = windowLabel(hours);
+  return {
+    fact: `Free cancellation up to ${window} before`,
+    detail: `Free cancellation up to ${window} before start. After that, no refund. ${refunded}`,
+  };
+}
+
+// ---- Prices ----
+
+export type PriceLine = { amount: string; unit: string };
+
+const kindOrder = { adult: 0, child: 1 } as const;
+
+/**
+ * One line per price option, adults first. A lone price reads "per person", as the cards do; with
+ * a second, each line names who it is for. A price of nothing reads "Free", as when an adult
+ * comes along with a child at no charge.
+ */
+export function priceLines(
+  options: GuestExperience['priceOptions'],
+): PriceLine[] {
+  const sorted = options.toSorted(
+    (a, b) => kindOrder[a.kind] - kindOrder[b.kind],
+  );
+  return sorted.map((option) => ({
+    amount: option.priceMinor === 0 ? 'Free' : formatPrice(option.priceMinor),
+    unit: sorted.length === 1 ? 'per person' : `per ${option.kind}`,
+  }));
+}
+
+// ---- Where ----
+
+export type Place = {
+  category: Pick<Category, 'slug' | 'name'>;
+  neighborhood: Pick<Neighborhood, 'slug' | 'name'>;
+};
+
+/** The category and neighborhood the experience belongs to. A missing one cannot happen under the foreign keys, so it is refused. */
+export function placeOf(
+  experience: Pick<GuestExperience, 'categoryId' | 'neighborhoodId'>,
+  categories: readonly Category[],
+  neighborhoods: readonly Neighborhood[],
+): Place {
+  const category = categories.find(({ id }) => id === experience.categoryId);
+  const neighborhood = neighborhoods.find(
+    ({ id }) => id === experience.neighborhoodId,
+  );
+  if (!category || !neighborhood) {
+    throw new RangeError(
+      'The experience names a category or neighborhood that is not listed',
+    );
+  }
+  return {
+    category: { slug: category.slug, name: category.name },
+    neighborhood: { slug: neighborhood.slug, name: neighborhood.name },
+  };
+}
+
+/** The most of the meeting point's first sentence a Maps search takes; a longer one is no address. */
+export const maxMapsQueryLength = 200;
+
+/**
+ * A Maps search for the meeting point (PRD-09), or null when there is none or its first sentence
+ * is too long to be an address. Only the first sentence is searched: what follows ("The exact
+ * door is in your confirmation.") is a note to the guest, not a place.
+ */
+export function mapsHref(meetingPoint: string | null): string | null {
+  const text = presentText(meetingPoint);
+  if (text === null) return null;
+  const stop = text.indexOf('. ');
+  const first = (stop === -1 ? text : text.slice(0, stop)).replace(/\.$/, '');
+  if (first === '' || first.length > maxMapsQueryLength) return null;
+  const query = encodeURIComponent(`${first}, New York`);
+  return `https://www.google.com/maps/search/?api=1&query=${query}`;
+}
+
+// ---- The page ----
+
+export type KeyFactIcon =
+  'place' | 'duration' | 'age' | 'weather' | 'cancellation';
+type KeyFact = { icon: KeyFactIcon; text: string };
+
+type ExperienceBadge = {
+  tone: 'green' | 'yellow' | 'pink';
+  label: string;
+  icon?: 'outdoor';
+};
+
+export type ExperiencePageView = {
+  title: string;
+  breadcrumb: { label: string; href: string }[];
+  badges: ExperienceBadge[];
+  /** Where, how long, and who for, in one line under the title on a wide screen. */
+  summary: string;
+  prices: PriceLine[];
+  keyFacts: KeyFact[];
+  gallery: PhotoView[];
+  about: string[];
+  included: string[];
+  host: { name: string; initial: string; description: string | null };
+  meeting: { text: string; mapsHref: string | null } | null;
+  accessibility: string | null;
+  weather: string | null;
+  cancellation: string;
+  /** Goes to the gift checkout, or null while gifts are switched off. */
+  giftHref: string | null;
+  privateSessionHref: string;
+};
+
+export type ExperiencePageInput = {
+  experience: GuestExperience;
+  photos: readonly GuestPhoto[];
+  place: Place;
+  giftsEnabled: boolean;
+};
+
+function badgesFor(experience: GuestExperience): ExperienceBadge[] {
+  const badges: ExperienceBadge[] = [];
+  if (experience.outdoor) {
+    badges.push({ tone: 'green', label: 'Outdoor', icon: 'outdoor' });
+  }
+  if (experience.ageRule === 'twenty_one_plus') {
+    badges.push({ tone: 'pink', label: '21+' });
+  }
+  if (experience.priceOptions.some((option) => option.kind === 'child')) {
+    badges.push({ tone: 'yellow', label: 'Kids' });
+  }
+  return badges;
+}
+
+/**
+ * Everything the experience page says, decided in one place so the page itself only draws it.
+ * Null for a guide entry: it has its own page and is not bookable here. The gallery is in the
+ * order staff set, whatever order the photos arrive in.
+ */
+export function buildExperiencePage(
+  input: ExperiencePageInput,
+): ExperiencePageView | null {
+  const { experience, photos, place, giftsEnabled } = input;
+  if (experience.status === 'guide_only') return null;
+
+  const cancellation = cancellationTerms(experience.cancellationTier);
+  const weather = weatherTerms(experience);
+  const keyFacts: KeyFact[] = [
+    { icon: 'place', text: place.neighborhood.name },
+    ...(experience.durationMinutes === null
+      ? []
+      : [
+          {
+            icon: 'duration' as const,
+            text: durationLabel(experience.durationMinutes),
+          },
+        ]),
+    { icon: 'age', text: ageLabel(experience) },
+    ...(weather ? [{ icon: 'weather' as const, text: weather.fact }] : []),
+    { icon: 'cancellation', text: cancellation.fact },
+  ];
+
+  const meetingText = presentText(experience.meetingPoint);
+  return {
+    title: experience.name,
+    breadcrumb: [
+      {
+        label: place.neighborhood.name,
+        href: neighborhoodPath(place.neighborhood.slug),
+      },
+      { label: place.category.name, href: categoryPath(place.category.slug) },
+    ],
+    badges: badgesFor(experience),
+    summary: keyFacts
+      .filter(
+        ({ icon }) => icon === 'place' || icon === 'duration' || icon === 'age',
+      )
+      .map(({ text }) => text)
+      .join(' · '),
+    prices: priceLines(experience.priceOptions),
+    keyFacts,
+    gallery: photos
+      .toSorted((a, b) => a.position - b.position)
+      .map((photo) => photoView(photo)),
+    about: textLines(experience.description),
+    included: includedItems(experience.included),
+    host: {
+      name: experience.host.name,
+      initial: Array.from(experience.host.name)[0]?.toUpperCase() ?? '',
+      description: presentText(experience.host.description),
+    },
+    meeting:
+      meetingText === null
+        ? null
+        : { text: meetingText, mapsHref: mapsHref(meetingText) },
+    accessibility: presentText(experience.accessibilityNotes),
+    weather: weather?.detail ?? null,
+    cancellation: cancellation.detail,
+    giftHref: giftsEnabled ? giftCheckoutPath(experience.id) : null,
+    privateSessionHref: privateSessionPath,
+  };
+}
+
+export const maxMetaDescriptionLength = 160;
+
+const trailingPunctuation = new Set([' ', '\t', '.', ',', ';', ':']);
+
+function withoutTrailingPunctuation(text: string): string {
+  let end = text.length;
+  while (end > 0 && trailingPunctuation.has(text.charAt(end - 1))) end--;
+  return text.slice(0, end);
+}
+
+/** The text a search result shows under the title: the description's opening, cut at a word, or a plain line when there is none. */
+export function metaDescription(
+  experience: Pick<GuestExperience, 'name' | 'description'>,
+  neighborhoodName: string,
+): string {
+  const [opening] = textLines(experience.description);
+  if (opening === undefined) {
+    return `${experience.name} in ${neighborhoodName}, on Ramble.`;
+  }
+  if (opening.length <= maxMetaDescriptionLength) return opening;
+  const cut = opening.slice(0, maxMetaDescriptionLength - 1);
+  const lastSpace = cut.lastIndexOf(' ');
+  return `${withoutTrailingPunctuation(lastSpace > 0 ? cut.slice(0, lastSpace) : cut)}…`;
+}
+
+export const fallbackTitle = 'Experience';
+
+/**
+ * The title and description for the page's head. A guide entry or an experience that is not there
+ * gets the plain title and no description: its page is not this one, and what it says is not ours to state.
+ */
+export function experienceHead(
+  data: Pick<ExperiencePageInput, 'experience' | 'place'> | null,
+): { title: string; description: string | null } {
+  if (data === null || data.experience.status === 'guide_only') {
+    return { title: fallbackTitle, description: null };
+  }
+  return {
+    title: data.experience.name,
+    description: metaDescription(data.experience, data.place.neighborhood.name),
+  };
+}

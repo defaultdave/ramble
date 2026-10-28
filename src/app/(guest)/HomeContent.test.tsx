@@ -8,12 +8,15 @@ import { HomeContent } from './HomeContent';
 // - a read that throws an Error carrying query text and params logs only its digest and renders the error state
 // - a framework control-flow error is rethrown and not logged
 // - a page with no module to show renders the empty state
+// - the cover photos of the cards on the page are read once, by the IDs of those cards, and shown on them
+// - a failed cover read is handled like any other failed read: the error state, with only the digest logged
 // - a page without a hero_search renders the hidden title, and one with it does not
 
 const server = vi.hoisted(() => ({
   content: vi.fn(),
   thisWeek: vi.fn(),
   settings: vi.fn(),
+  covers: vi.fn(),
   logError: vi.fn(),
 }));
 vi.mock('next/server', () => ({ connection: () => Promise.resolve() }));
@@ -21,6 +24,7 @@ vi.mock('@/server/home', () => ({
   getHomeContent: server.content,
   getThisWeek: server.thisWeek,
 }));
+vi.mock('@/server/coverPhotos', () => ({ getCoverPhotos: server.covers }));
 vi.mock('@/server/siteSettings', () => ({
   getCachedGuestSettings: server.settings,
 }));
@@ -34,14 +38,18 @@ vi.mock('@/components/RichText', () => ({
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
-const homeModule = (n: number, kind: 'hero_search' | 'reassurance') => ({
+const homeModule = (
+  n: number,
+  kind: 'hero_search' | 'reassurance' | 'picks',
+  collectionId: string | null = null,
+) => ({
   id: id(900 + n),
   position: n,
   kind,
   enabled: true,
   heading: null,
   body: null,
-  collectionId: null,
+  collectionId,
 });
 
 function content(modules: ReturnType<typeof homeModule>[]) {
@@ -65,6 +73,7 @@ beforeEach(() => {
   server.content.mockResolvedValue(content([homeModule(1, 'reassurance')]));
   server.thisWeek.mockResolvedValue({ experienceIds: [], experiences: [] });
   server.settings.mockResolvedValue({ giftsEnabled: true, bannerText: null });
+  server.covers.mockResolvedValue([]);
 });
 
 describe('HomeContent', () => {
@@ -138,5 +147,79 @@ describe('HomeContent', () => {
     const headings = screen.getAllByRole('heading', { level: 1 });
     expect(headings).toHaveLength(1);
     expect(headings[0]).not.toHaveTextContent(/^Ramble$/);
+  });
+
+  describe('cover photos', () => {
+    const picksPage = () => {
+      const picksModule = homeModule(1, 'picks', id(800));
+      return {
+        ...content([picksModule]),
+        picks: [
+          {
+            id: id(800),
+            slug: 'rainy-day',
+            title: 'Rainy day',
+            summary: null,
+            items: [{ experienceId: id(2) }, { experienceId: id(1) }],
+          },
+        ],
+        experiences: [id(1), id(2)].map((experienceId) => ({
+          id: experienceId,
+          slug: 'thing',
+          name: `Thing ${experienceId.slice(-1)}`,
+          status: 'live',
+          neighborhoodName: 'Greenpoint',
+          durationMinutes: 120,
+          linkOutUrl: null,
+          priceOptions: [{ kind: 'adult', priceMinor: 7000 }],
+        })),
+      };
+    };
+    const photo = {
+      id: id(100),
+      experienceId: id(2),
+      position: 0,
+      url: 'data:image/png;base64,iVBORw0KGgo=',
+      width: 1600,
+      height: 1000,
+      decorative: false,
+      altText: 'A kayak at dusk',
+      blurDataUrl: 'data:image/jpeg;base64,/9j/4AAQ',
+    };
+
+    it('reads the covers of the cards once, in one order, and shows them', async () => {
+      server.content.mockResolvedValue(picksPage());
+      server.covers.mockResolvedValue([photo]);
+
+      render(await HomeContent());
+
+      expect(server.covers).toHaveBeenCalledExactlyOnceWith([id(1), id(2)]);
+      expect(screen.getAllByRole('img')).toHaveLength(1);
+      expect(
+        screen.getByRole('img', { name: 'A kayak at dusk' }),
+      ).toBeInTheDocument();
+    });
+
+    it('asks for no cover when no card is shown', async () => {
+      render(await HomeContent());
+
+      expect(server.covers).toHaveBeenCalledExactlyOnceWith([]);
+    });
+
+    it('logs only the digest of a failed cover read and renders the error state', async () => {
+      server.content.mockResolvedValue(picksPage());
+      server.covers.mockRejectedValue(driverError);
+
+      render(await HomeContent());
+
+      expect(server.logError).toHaveBeenCalledExactlyOnceWith(
+        'The home page could not be read',
+        { digest: undefined },
+      );
+      expect(JSON.stringify(server.logError.mock.calls)).not.toMatch(
+        /secret|Failed query/,
+      );
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
   });
 });

@@ -1,23 +1,20 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { maxFilterValues, noFilters, type BrowseFilters } from '@/lib/filters';
 import { FilterBar, type FilterBarProps } from './FilterBar';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the three groups are labelled and each chip says whether it is chosen
-// - choosing a chip writes the address with it added, and keeps what else is chosen
-// - choosing a chosen chip takes it off
-// - a full list disables the chips that are not chosen and keeps the chosen ones usable
-// - the date chip shows the chosen day, opens the calendar, and says it is open
+// - a chip links to the address with it added, keeping what else is chosen; a chosen chip links to the address without it
+// - a full list disables the chips that are not chosen, without an address, and keeps the chosen ones linked
+// - the date chip shows the chosen day and is marked chosen; with no day it says "Pick a date"
+// - the calendar is closed until the date chip is opened
 // - a day in the address that has passed does not break the calendar
-// - picking a day writes it into the address and closes the calendar; clearing the date takes it off
-// - when the calendar closes from inside, focus goes to the date chip, never to the page
-// - Clear all filters is there only when a filter is on, and goes to the bare address
-
-const push = vi.hoisted(() => vi.fn());
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
+// - picking a day hands it to the route's action
+// - Clear date is there only when a day is chosen, and links to the address without it
+// - Clear all filters is there only when a filter is on, and links to the bare address
 
 const categories = [
   { slug: 'cooking', name: 'Cooking' },
@@ -32,21 +29,22 @@ function setup(
   filters: BrowseFilters = noFilters,
   overrides: Partial<FilterBarProps> = {},
 ) {
-  render(
+  const onPickDate = vi.fn();
+  const { container } = render(
     <FilterBar
       categories={categories}
       neighborhoods={neighborhoods}
       filters={filters}
       today="2026-10-26"
       availableDates={['2026-10-26', '2026-11-07', '2026-11-08']}
+      onPickDate={onPickDate}
       {...overrides}
     />,
   );
+  const details = container.querySelector('details');
+  if (!details) throw new Error('No calendar disclosure');
+  return { onPickDate, details };
 }
-
-beforeEach(() => {
-  push.mockClear();
-});
 
 describe('FilterBar', () => {
   it('labels the three groups', () => {
@@ -56,29 +54,29 @@ describe('FilterBar', () => {
     }
   });
 
-  it('marks the chosen chips as pressed', () => {
+  it('marks the chosen chips as current', () => {
     setup({ ...noFilters, categories: ['cooking'] });
-    expect(screen.getByRole('button', { name: 'Cooking' })).toHaveAttribute(
-      'aria-pressed',
+    expect(screen.getByRole('link', { name: 'Cooking' })).toHaveAttribute(
+      'aria-current',
       'true',
     );
     expect(
-      screen.getByRole('button', { name: 'Walking tours' }),
-    ).toHaveAttribute('aria-pressed', 'false');
+      screen.getByRole('link', { name: 'Walking tours' }),
+    ).not.toHaveAttribute('aria-current');
   });
 
-  it('adds a chip to the address and keeps the rest', async () => {
+  it('links a chip to the address with it added, keeping the rest', () => {
     setup({ ...noFilters, categories: ['cooking'], date: '2026-11-07' });
-    await userEvent.click(screen.getByRole('button', { name: 'DUMBO' }));
-    expect(push).toHaveBeenCalledExactlyOnceWith(
+    expect(screen.getByRole('link', { name: 'DUMBO' })).toHaveAttribute(
+      'href',
       '/new-york/browse?category=cooking&neighborhood=dumbo&date=2026-11-07',
     );
   });
 
-  it('takes a chosen chip off', async () => {
+  it('links a chosen chip to the address without it', () => {
     setup({ ...noFilters, categories: ['cooking', 'walking-tours'] });
-    await userEvent.click(screen.getByRole('button', { name: 'Cooking' }));
-    expect(push).toHaveBeenCalledExactlyOnceWith(
+    expect(screen.getByRole('link', { name: 'Cooking' })).toHaveAttribute(
+      'href',
       '/new-york/browse?category=walking-tours',
     );
   });
@@ -92,115 +90,86 @@ describe('FilterBar', () => {
       ...noFilters,
       categories: ['cooking', ...full].slice(0, maxFilterValues),
     });
-    expect(screen.getByRole('button', { name: 'Cooking' })).toBeEnabled();
-    expect(
-      screen.getByRole('button', { name: 'Walking tours' }),
-    ).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'DUMBO' })).toBeEnabled();
+    expect(screen.getByRole('link', { name: 'Cooking' })).toHaveAttribute(
+      'href',
+    );
+    const blocked = screen.getByRole('link', { name: 'Walking tours' });
+    expect(blocked).toHaveAttribute('aria-disabled', 'true');
+    expect(blocked).not.toHaveAttribute('href');
+    expect(screen.getByRole('link', { name: 'DUMBO' })).toHaveAttribute('href');
   });
 
   it('shows "Pick a date" with the calendar closed', () => {
-    setup();
-    const chip = screen.getByRole('button', { name: 'Pick a date' });
-    expect(chip).toHaveAttribute('aria-expanded', 'false');
-    expect(chip).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.queryByRole('grid')).not.toBeInTheDocument();
+    const { details } = setup();
+    const chip = screen.getByText('Pick a date');
+    expect(chip).not.toHaveAttribute('aria-current');
+    expect(details.open).toBe(false);
   });
 
-  it('shows the chosen day on the chip', () => {
+  it('shows the chosen day on a chip marked as chosen', () => {
     setup({ ...noFilters, date: '2026-11-07' });
-    expect(screen.getByRole('button', { name: 'Sat, Nov 7' })).toHaveAttribute(
-      'aria-pressed',
+    expect(screen.getByText('Sat, Nov 7')).toHaveAttribute(
+      'aria-current',
       'true',
     );
   });
 
   it('opens the calendar from the date chip', async () => {
-    setup();
-    const chip = screen.getByRole('button', { name: 'Pick a date' });
-    await userEvent.click(chip);
-    expect(chip).toHaveAttribute('aria-expanded', 'true');
+    const { details } = setup();
+    await userEvent.click(screen.getByText('Pick a date'));
+    expect(details.open).toBe(true);
     expect(screen.getByRole('grid', { name: /Choose a date/ })).toBeVisible();
-    expect(chip).toHaveAttribute('aria-controls');
   });
 
-  it('writes the picked day and closes the calendar', async () => {
-    setup({ ...noFilters, categories: ['cooking'] });
-    await userEvent.click(screen.getByRole('button', { name: 'Pick a date' }));
+  it('hands the picked day to the route', async () => {
+    const { onPickDate } = setup({ ...noFilters, categories: ['cooking'] });
+    await userEvent.click(screen.getByText('Pick a date'));
     const [next] = screen.getAllByRole('button', { name: 'Next' });
     if (!next) throw new Error('No Next button');
     await userEvent.click(next);
     await userEvent.click(
       screen.getByRole('button', { name: /Saturday, November 7, 2026/ }),
     );
-    expect(push).toHaveBeenCalledExactlyOnceWith(
-      '/new-york/browse?category=cooking&date=2026-11-07',
-    );
-    expect(screen.queryByRole('grid')).not.toBeInTheDocument();
-  });
-
-  it('keeps focus on the date chip when a day is picked with the keyboard', async () => {
-    setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Pick a date' }));
-    const day = screen.getByRole('button', {
-      name: /Monday, October 26, 2026/,
-    });
-    day.focus();
-    await userEvent.keyboard('{Enter}');
-
-    expect(screen.queryByRole('grid')).not.toBeInTheDocument();
-    expect(push).toHaveBeenCalledOnce();
-    expect(screen.getByRole('button', { name: 'Pick a date' })).toHaveFocus();
-  });
-
-  it('keeps focus on the date chip when the date is cleared', async () => {
-    setup({ ...noFilters, date: '2026-11-07' });
-    await userEvent.click(screen.getByRole('button', { name: 'Sat, Nov 7' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Clear date' }));
-
-    expect(screen.queryByRole('grid')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Sat, Nov 7' })).toHaveFocus();
-  });
-
-  it('takes the date off from the calendar', async () => {
-    setup({ ...noFilters, date: '2026-11-07' });
-    await userEvent.click(screen.getByRole('button', { name: 'Sat, Nov 7' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Clear date' }));
-    expect(push).toHaveBeenCalledExactlyOnceWith('/new-york/browse');
+    expect(onPickDate).toHaveBeenCalledExactlyOnceWith('2026-11-07');
   });
 
   it('still opens the calendar when the address names a day that has passed', async () => {
     setup({ ...noFilters, date: '2020-01-01' });
-    await userEvent.click(screen.getByRole('button', { name: 'Wed, Jan 1' }));
+    await userEvent.click(screen.getByText('Wed, Jan 1'));
     expect(screen.getByRole('grid', { name: /Choose a date/ })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Clear date' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Clear date' })).toBeVisible();
   });
 
-  it('has no Clear date when no date is chosen', async () => {
+  it('links Clear date to the address without the day', () => {
+    setup({ ...noFilters, categories: ['cooking'], date: '2026-11-07' });
+    expect(screen.getByRole('link', { name: 'Clear date' })).toHaveAttribute(
+      'href',
+      '/new-york/browse?category=cooking',
+    );
+  });
+
+  it('has no Clear date when no date is chosen', () => {
     setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Pick a date' }));
     expect(
-      screen.queryByRole('button', { name: 'Clear date' }),
+      screen.queryByRole('link', { name: 'Clear date' }),
     ).not.toBeInTheDocument();
   });
 
   it('has no Clear all filters when nothing is chosen', () => {
     setup();
     expect(
-      screen.queryByRole('button', { name: 'Clear all filters' }),
+      screen.queryByRole('link', { name: 'Clear all filters' }),
     ).not.toBeInTheDocument();
   });
 
-  it('clears everything to the bare address', async () => {
+  it('links Clear all filters to the bare address', () => {
     setup({
       categories: ['cooking'],
       neighborhoods: ['dumbo'],
       date: '2026-11-07',
     });
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Clear all filters' }),
-    );
-    expect(push).toHaveBeenCalledExactlyOnceWith('/new-york/browse');
-    expect(screen.getByRole('button', { name: 'Sat, Nov 7' })).toHaveFocus();
+    expect(
+      screen.getByRole('link', { name: 'Clear all filters' }),
+    ).toHaveAttribute('href', '/new-york/browse');
   });
 });

@@ -1,17 +1,13 @@
-'use client';
-
 import { Calendar } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useId, useRef, useState, useTransition } from 'react';
-import { Button } from '@/components/Button';
-import { Chip } from '@/components/Chip';
+import Link from 'next/link';
+import { ChipLink } from '@/components/Chip';
 import { DatePicker } from '@/components/DatePicker';
 import { dateChipLabel } from '@/lib/browse';
 import {
   activeFilterCount,
+  browsePath,
   chipState,
   hrefForFilters,
-  noFilters,
   toggleFilterValue,
   withDate,
   type BrowseFilters,
@@ -24,12 +20,14 @@ export type FilterOption = { slug: string; name: string };
 export type FilterBarProps = {
   categories: readonly FilterOption[];
   neighborhoods: readonly FilterOption[];
-  /** What the address says now. A chip change writes the address and the server sends the new results. */
+  /** What the address says now. Every chip is a link to the address with that chip turned on or off. */
   filters: BrowseFilters;
   /** The venue's current date as YYYY-MM-DD, from the server clock. */
   today: string;
   /** Days that have a session, as YYYY-MM-DD. */
   availableDates: readonly string[];
+  /** Called with the day the calendar picked. The route supplies the Server Action that moves to its address. */
+  onPickDate: (date: string) => unknown;
 };
 
 type ChipGroupProps = {
@@ -37,16 +35,9 @@ type ChipGroupProps = {
   listKey: FilterListKey;
   options: readonly FilterOption[];
   filters: BrowseFilters;
-  onChange: (next: BrowseFilters) => void;
 };
 
-function ChipGroup({
-  legend,
-  listKey,
-  options,
-  filters,
-  onChange,
-}: ChipGroupProps) {
+function ChipGroup({ legend, listKey, options, filters }: ChipGroupProps) {
   return (
     <fieldset className={styles.group}>
       <legend className={styles.legend}>{legend}</legend>
@@ -54,14 +45,12 @@ function ChipGroup({
         {options.map(({ slug, name }) => {
           const { selected, disabled } = chipState(filters, listKey, slug);
           return (
-            <Chip
+            <ChipLink
               key={slug}
               label={name}
               selected={selected}
               disabled={disabled}
-              onToggle={() => {
-                onChange(toggleFilterValue(filters, listKey, slug));
-              }}
+              href={hrefForFilters(toggleFilterValue(filters, listKey, slug))}
             />
           );
         })}
@@ -76,93 +65,60 @@ export function FilterBar({
   filters,
   today,
   availableDates,
+  onPickDate,
 }: FilterBarProps) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [calendarOpen, setCalendarOpen] = useState(false);
-  const calendarId = useId();
-  const dateChip = useRef<HTMLButtonElement>(null);
-
-  const change = (next: BrowseFilters) => {
-    startTransition(() => {
-      router.push(hrefForFilters(next));
-    });
-  };
-
-  // The button or day that was focused leaves the page with the calendar, so focus goes to the chip that opened it.
-  const closeCalendar = () => {
-    dateChip.current?.focus();
-    setCalendarOpen(false);
-  };
-
   return (
-    <div className={styles.bar} aria-busy={pending}>
+    <div className={styles.bar}>
       <fieldset className={styles.group}>
         <legend className={styles.legend}>When</legend>
-        <div className={styles.chips}>
-          <Chip
-            ref={dateChip}
-            label={filters.date ? dateChipLabel(filters.date) : 'Pick a date'}
-            iconStart={<Calendar />}
-            selected={filters.date !== null}
-            aria-expanded={calendarOpen}
-            aria-controls={calendarId}
-            onToggle={() => {
-              setCalendarOpen((open) => !open);
-            }}
-          />
-        </div>
-        {calendarOpen ? (
-          <div id={calendarId} className={styles.calendar}>
+        {/* The browser opens and closes the calendar, so the chip needs no script. The key closes it again once a day is chosen. */}
+        <details key={filters.date ?? 'none'} className={styles.when}>
+          <summary
+            className={styles.dateChip}
+            aria-current={filters.date ? 'true' : undefined}
+          >
+            <span className={styles.icon} aria-hidden="true">
+              <Calendar />
+            </span>
+            {filters.date ? dateChipLabel(filters.date) : 'Pick a date'}
+          </summary>
+          <div className={styles.calendar}>
             <DatePicker
               label="Choose a date"
               value={filters.date}
               today={today}
               availableDates={availableDates}
-              onChange={(date) => {
-                change(withDate(filters, date));
-                closeCalendar();
-              }}
+              onChange={onPickDate}
             />
             {filters.date ? (
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  change(withDate(filters, null));
-                  closeCalendar();
-                }}
+              <Link
+                className={styles.link}
+                href={hrefForFilters(withDate(filters, null))}
+                prefetch={false}
               >
                 Clear date
-              </Button>
+              </Link>
             ) : null}
           </div>
-        ) : null}
+        </details>
       </fieldset>
       <ChipGroup
         legend="Neighborhood"
         listKey="neighborhoods"
         options={neighborhoods}
         filters={filters}
-        onChange={change}
       />
       <ChipGroup
         legend="Category"
         listKey="categories"
         options={categories}
         filters={filters}
-        onChange={change}
       />
       {activeFilterCount(filters) > 0 ? (
         <div className={styles.clear}>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              change(noFilters);
-              closeCalendar();
-            }}
-          >
+          <Link className={styles.link} href={browsePath} prefetch={false}>
             Clear all filters
-          </Button>
+          </Link>
         </div>
       ) : null}
     </div>

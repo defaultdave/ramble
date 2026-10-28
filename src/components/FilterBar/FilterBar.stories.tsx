@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import { noFilters } from '@/lib/filters';
 import { FilterBar } from '@/components/FilterBar';
 import styles from './FilterBar.stories.module.css';
@@ -37,6 +37,7 @@ const meta = {
     categories,
     neighborhoods,
     filters: noFilters,
+    onPickDate: fn(),
     today: '2026-10-26',
     availableDates: [
       '2026-10-26',
@@ -93,7 +94,7 @@ export const AtTheLimit: Story = {
 
 const openCalendar: Story['play'] = async ({ canvasElement }) => {
   const canvas = within(canvasElement);
-  await userEvent.click(canvas.getByRole('button', { name: 'Pick a date' }));
+  await userEvent.click(canvas.getByText('Pick a date'));
   await expect(canvas.getByRole('grid')).toBeVisible();
 };
 
@@ -114,9 +115,9 @@ export const CalendarOpenWithDate: Story = {
   parameters: { colorScheme: 'light' },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole('button', { name: 'Sat, Oct 31' }));
+    await userEvent.click(canvas.getByText('Sat, Oct 31'));
     await expect(
-      canvas.getByRole('button', { name: 'Clear date' }),
+      canvas.getByRole('link', { name: 'Clear date' }),
     ).toBeVisible();
   },
 };
@@ -133,9 +134,9 @@ export const CalendarOpenAtPhoneWidth: Story = {
   ],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole('button', { name: 'Pick a date' }));
+    await userEvent.click(canvas.getByText('Pick a date'));
     const grid = canvas.getByRole('grid');
-    const box = grid.closest('[id]');
+    const box = grid.closest('details > div');
     if (!box) throw new Error('No calendar box');
     const edge = box.getBoundingClientRect().right;
     for (const cell of canvas.getAllByRole('gridcell')) {

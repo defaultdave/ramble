@@ -9,6 +9,7 @@ import {
   getBrowseResults,
   getFilterOptions,
 } from '@/server/browse';
+import { chooseBrowseDate } from '@/server/actions/browse';
 import { logger } from '@/server/monitoring/logger';
 
 type BrowseContentProps = { searchParams: Promise<RawSearchParams> };
@@ -59,6 +60,7 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
         filters={filters}
         today={venueToday(now)}
         availableDates={dates}
+        onPickDate={chooseBrowseDate.bind(null, filters)}
       />
       <BrowseResults {...browseView(query, page)} />
     </>

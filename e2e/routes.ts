@@ -12,7 +12,7 @@ export const routes: readonly RouteRow[] = [
   {
     path: '/new-york/browse',
     group: 'guest',
-    heading: 'Browse',
+    heading: 'Browse experiences',
     noindex: false,
   },
   {

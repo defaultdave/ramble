@@ -34,10 +34,10 @@ export type DatePickerProps = {
   /** Dates with sessions, as YYYY-MM-DD. Every other date is unavailable. */
   availableDates: readonly string[];
   disabled?: boolean;
-  onChange: (value: string) => void;
+  /** A Server Action can be passed here, so what the handler returns is ignored. */
+  onChange: (value: string) => unknown;
 };
 
-// TODO(U-031): first caller
 export function DatePicker({
   label,
   value,

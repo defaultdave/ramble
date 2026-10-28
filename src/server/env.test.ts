@@ -64,6 +64,33 @@ describe('environment', () => {
     });
   });
 
+  describe('SEED_TARGET', () => {
+    it.each(['local', 'staging', 'load-test'])('accepts %s', async (value) => {
+      vi.stubEnv('SEED_TARGET', value);
+
+      const env = await loadEnv();
+
+      expect(env.SEED_TARGET).toBe(value);
+    });
+
+    it.each([undefined, ''])('reads %j as not declared', async (value) => {
+      vi.stubEnv('SEED_TARGET', value);
+
+      const env = await loadEnv();
+
+      expect(env.SEED_TARGET).toBeUndefined();
+    });
+
+    it.each(['production', 'prod', 'Local'])(
+      'fails at import for %s, since there is no target for production',
+      async (value) => {
+        vi.stubEnv('SEED_TARGET', value);
+
+        await expect(loadEnv()).rejects.toThrow(/SEED_TARGET/);
+      },
+    );
+  });
+
   describe('database URLs', () => {
     const pooled = 'postgres://u:p@host-pooler.neon.tech/db';
     const direct = 'postgresql://u:p@host.neon.tech/db';

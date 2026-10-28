@@ -8,6 +8,7 @@ import {
 import { emailAdapterNames } from '@/lib/email/message';
 import { emailModes } from '@/lib/email/route';
 import { emailSettingIssues } from '@/lib/email/settings';
+import { seedTargets } from '@/lib/seed/target';
 
 const postgresUrl = z.url({ protocol: /^postgres(ql)?$/ });
 
@@ -36,6 +37,8 @@ const schema = z
     VERCEL: z.string().optional(),
     VERCEL_ENV: optional(z.enum(['production', 'preview', 'development'])),
     VERCEL_GIT_COMMIT_SHA: optional(z.string().max(64)),
+    // Read only by the seed command, which refuses to run unless this says what the database is.
+    SEED_TARGET: optional(z.enum(seedTargets)),
     EMAIL_MODE: z.enum(emailModes).default('sink'),
     EMAIL_PROVIDER: z.enum(emailAdapterNames).default('fake'),
     EMAIL_ALLOWLIST: EmailAllowlistSchema.default([]),

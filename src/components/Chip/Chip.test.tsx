@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, expectTypeOf } from 'vitest';
-import type { ComponentProps } from 'react';
+import { createRef, type ComponentProps } from 'react';
 import { Chip } from './Chip';
 
 describe('Chip', () => {
@@ -19,6 +19,14 @@ describe('Chip', () => {
     render(<Chip selected={false} label="Outdoor" onToggle={onToggle} />);
     await userEvent.click(screen.getByRole('button'));
     expect(onToggle).toHaveBeenCalledOnce();
+  });
+
+  it('hands its button to a ref, so a caller can move focus to it', () => {
+    const ref = createRef<HTMLButtonElement>();
+    render(
+      <Chip ref={ref} selected={false} label="Outdoor" onToggle={vi.fn()} />,
+    );
+    expect(ref.current).toBe(screen.getByRole('button', { name: 'Outdoor' }));
   });
 
   it('shows the count, including zero', () => {

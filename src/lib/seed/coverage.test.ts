@@ -6,6 +6,7 @@ import {
   probes,
   renderCoverageMatrix,
   requirements,
+  type Probe,
   type ProbeKey,
   type SeedSnapshot,
   type SnapshotExperience,
@@ -315,5 +316,123 @@ describe('the probes read the same way the guest reads do', () => {
       startsAt: new Date(now.getTime() - 1000),
     });
     expect(probes['bookable-party'].check(started)).toBe(false);
+  });
+});
+
+// The states a snapshot fails: each state is run through the probes it names, so a state whose own
+// check fails is a failing test, whether or not that probe is also checked on its own. The scale
+// probe is left out unless the scale fixture is loaded, as `evaluateCoverage` does.
+const failingStates = (snapshot: SeedSnapshot, { scale = false } = {}) =>
+  coverage
+    .filter((state) =>
+      state.probes.some((key) => {
+        const probe: Probe = probes[key];
+        return (scale || !probe.needsScale) && !probe.check(snapshot);
+      }),
+    )
+    .map((state) => state.id);
+
+const hasBreaker = (key: ProbeKey): key is keyof typeof breakers =>
+  key in breakers;
+
+describe('every state against its own check', () => {
+  it('passes all 24 states on the fixtures with the scale fixture loaded', () => {
+    expect(coverage).toHaveLength(figmaStates.length);
+    expect(failingStates(withScale, { scale: true })).toEqual([]);
+  });
+
+  it('fails the states that need the scale fixture when it did not load', () => {
+    expect(failingStates(base, { scale: true })).toEqual(
+      coverage
+        .filter((state) => state.probes.includes('many-results'))
+        .map((state) => state.id),
+    );
+  });
+
+  it.each(coverage.map((state) => [state.id, state] as const))(
+    '%s fails when any one of its probes fails',
+    (_id, state) => {
+      expect(failingStates(base)).not.toContain(state.id);
+      for (const key of state.probes.filter(hasBreaker)) {
+        expect(failingStates(breakers[key](base))).toContain(state.id);
+      }
+    },
+  );
+});
+
+describe('S2, zero results for kids in Williamsburg on a weeknight', () => {
+  const wheel = 'kids-wheel-class';
+  const session = (
+    localDate: string,
+    startsAt: string,
+    status = 'scheduled',
+  ): SnapshotSession => ({
+    experienceSlug: wheel,
+    localDate,
+    startsAt: new Date(startsAt),
+    allocation: 8,
+    seatsSold: 0,
+    source: 'ramble',
+    status,
+  });
+  const withSession = (extra: SnapshotSession): SeedSnapshot => ({
+    ...base,
+    sessions: [...base.sessions, extra],
+  });
+
+  it('holds on the fixtures: no weeknight finds a Williamsburg kids class and a weekend does', () => {
+    expect(failingStates(base)).not.toContain('S2');
+  });
+
+  it.each([
+    [
+      'the Tuesday that the first version of this state added',
+      '2026-11-03',
+      '2026-11-03T23:00:00Z',
+    ],
+    ['a Friday', '2026-11-06', '2026-11-06T23:00:00Z'],
+    [
+      'a Monday near the end of the window',
+      '2027-02-22',
+      '2027-02-22T23:00:00Z',
+    ],
+  ])('fails with a session on %s', (_label, localDate, startsAt) => {
+    expect(failingStates(withSession(session(localDate, startsAt)))).toContain(
+      'S2',
+    );
+  });
+
+  it.each([
+    ['cancelled', session('2026-11-03', '2026-11-03T23:00:00Z', 'cancelled')],
+    ['past the browse window', session('2027-04-06', '2027-04-06T23:00:00Z')],
+    ['already started', session('2026-10-27', '2026-10-27T23:00:00Z')],
+  ])('holds with a weeknight session that is %s', (_label, extra) => {
+    expect(failingStates(withSession(extra))).not.toContain('S2');
+  });
+
+  it('fails when a second Williamsburg kids experience has a weeknight session', () => {
+    const first = base.experiences.find((e) => e.slug === wheel);
+    if (!first) throw new Error('the fixtures lost the kids wheel class');
+    const second = { ...first, slug: 'kids-clay-club' };
+    const snapshot: SeedSnapshot = {
+      ...base,
+      experiences: [...base.experiences, second],
+      sessions: [
+        ...base.sessions,
+        {
+          ...session('2026-11-04', '2026-11-04T23:00:00Z'),
+          experienceSlug: second.slug,
+        },
+      ],
+    };
+    expect(failingStates(snapshot)).toContain('S2');
+  });
+
+  it('fails when the class has no weekend sessions either, since then the weeknight is not what empties the search', () => {
+    const snapshot: SeedSnapshot = {
+      ...base,
+      sessions: base.sessions.filter((x) => x.experienceSlug !== wheel),
+    };
+    expect(failingStates(snapshot)).toContain('S2');
   });
 });

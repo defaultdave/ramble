@@ -1,0 +1,324 @@
+import { eq } from 'drizzle-orm';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { homeLimits, thisWeekWindow } from '@/lib/home';
+import {
+  categories,
+  cancellationTiers,
+  experiences,
+  hosts,
+  neighborhoods,
+  priceOptions,
+  sessions,
+} from '@/server/db/schema';
+import {
+  createFreshDatabase,
+  serveNeonHttp,
+  type FreshDatabase,
+} from './harness';
+
+// Behaviours under test, one per decision, branch or risk:
+// - the experience read returns live and guide-only experiences with the card's fields, and never a draft, one in review, or a paused one
+// - the experience read returns only the IDs asked for, and nothing for an empty list
+// - the experience read carries the neighborhood name and every price option, and nothing the card does not show
+// - an unbounded list of IDs is refused before the database is asked
+// - the session read returns scheduled sessions that start after the window opens and up to its end, soonest first
+//   (the opening instant is outside, the closing instant inside)
+// - the session read leaves out cancelled and completed sessions and those of an experience a guest cannot see
+// - the session read never returns more than its limit
+
+let fresh: FreshDatabase;
+let stopHttp: () => Promise<void>;
+let client: typeof import('@/server/db/client');
+let home: typeof import('@/server/db/home');
+
+beforeAll(async () => {
+  fresh = await createFreshDatabase(process.env.DATABASE_URL_UNPOOLED ?? '');
+  stopHttp = await serveNeonHttp(fresh.url);
+  vi.stubEnv('DATABASE_URL', fresh.url);
+  client = await import('@/server/db/client');
+  home = await import('@/server/db/home');
+});
+
+afterAll(async () => {
+  await client.db.$client.end();
+  await stopHttp();
+  await fresh.dispose();
+  vi.unstubAllEnvs();
+});
+
+let counter = 0;
+function unique(prefix: string) {
+  counter += 1;
+  return `${prefix}-${String(counter)}`;
+}
+
+async function parents(neighborhoodName = unique('Neighborhood')) {
+  const [host] = await client.db
+    .insert(hosts)
+    .values({
+      slug: unique('host'),
+      name: unique('Host'),
+      timeZone: 'America/New_York',
+    })
+    .returning();
+  const [category] = await client.db
+    .insert(categories)
+    .values({ slug: unique('category'), name: unique('Category') })
+    .returning();
+  const [neighborhood] = await client.db
+    .insert(neighborhoods)
+    .values({ slug: unique('neighborhood'), name: neighborhoodName })
+    .returning();
+  const [tier] = await client.db
+    .select()
+    .from(cancellationTiers)
+    .where(eq(cancellationTiers.isDefault, true));
+  if (!host || !category || !neighborhood || !tier) {
+    throw new Error('missing parents');
+  }
+  return {
+    hostId: host.id,
+    categoryId: category.id,
+    neighborhoodId: neighborhood.id,
+    cancellationTierId: tier.id,
+  };
+}
+
+async function insertExperience(
+  overrides: Partial<typeof experiences.$inferInsert> = {},
+) {
+  const [row] = await client.db
+    .insert(experiences)
+    .values({
+      ...(await parents()),
+      slug: unique('experience'),
+      name: unique('Experience'),
+      status: 'live',
+      ...overrides,
+    })
+    .returning();
+  if (!row) throw new Error('insert returned no experience');
+  return row;
+}
+
+const opens = new Date('2026-11-02T15:00:00.000Z');
+const window = thisWeekWindow(opens.toISOString());
+
+async function insertSession(
+  experienceId: string,
+  startsAt: Date,
+  overrides: Partial<typeof sessions.$inferInsert> = {},
+) {
+  const [row] = await client.db
+    .insert(sessions)
+    .values({
+      experienceId,
+      startsAt,
+      endsAt: new Date(startsAt.getTime() + 2 * 3_600_000),
+      timeZone: 'America/New_York',
+      allocation: 8,
+      source: 'ramble',
+      ...overrides,
+    })
+    .returning();
+  if (!row) throw new Error('insert returned no session');
+  return row;
+}
+
+describe('listHomeExperiences', () => {
+  it('returns what a card shows for a live and a guide-only experience', async () => {
+    const live = await insertExperience({
+      name: 'Pasta night',
+      slug: 'pasta-night',
+      durationMinutes: 150,
+      ...(await parents('Carroll Gardens')),
+    });
+    await client.db.insert(priceOptions).values([
+      { experienceId: live.id, kind: 'child', priceMinor: 4000 },
+      { experienceId: live.id, kind: 'adult', priceMinor: 8500 },
+    ]);
+    const guide = await insertExperience({
+      name: 'Harbor walk',
+      status: 'guide_only',
+      linkOutUrl: 'https://host.example/walk',
+    });
+
+    const found = await home.listHomeExperiences([live.id, guide.id]);
+
+    expect(found.map((row) => row.name)).toEqual([
+      'Harbor walk',
+      'Pasta night',
+    ]);
+    const pasta = found.find((row) => row.id === live.id);
+    expect(pasta).toMatchObject({
+      slug: 'pasta-night',
+      status: 'live',
+      neighborhoodName: 'Carroll Gardens',
+      durationMinutes: 150,
+      linkOutUrl: null,
+    });
+    expect(
+      pasta?.priceOptions
+        .map((option) => `${option.kind}:${String(option.priceMinor)}`)
+        .toSorted(),
+    ).toEqual(['adult:8500', 'child:4000']);
+    expect(found.find((row) => row.id === guide.id)).toMatchObject({
+      status: 'guide_only',
+      linkOutUrl: 'https://host.example/walk',
+      priceOptions: [],
+    });
+  });
+
+  it('carries nothing a card does not show', async () => {
+    const live = await insertExperience({
+      taxTreatment: 'taxable',
+      meetingPoint: 'Pier 26',
+    });
+
+    const [found] = await home.listHomeExperiences([live.id]);
+
+    expect(Object.keys(found ?? {}).toSorted()).toEqual([
+      'durationMinutes',
+      'id',
+      'linkOutUrl',
+      'name',
+      'neighborhoodName',
+      'priceOptions',
+      'slug',
+      'status',
+    ]);
+  });
+
+  it.each(['draft', 'in_review', 'paused'] as const)(
+    'never returns an experience that is %s',
+    async (status) => {
+      const hidden = await insertExperience({ status });
+      const live = await insertExperience();
+
+      const found = await home.listHomeExperiences([hidden.id, live.id]);
+
+      expect(found.map((row) => row.id)).toEqual([live.id]);
+    },
+  );
+
+  it('returns only the IDs it was asked for', async () => {
+    const asked = await insertExperience();
+    await insertExperience();
+
+    const found = await home.listHomeExperiences([asked.id]);
+
+    expect(found.map((row) => row.id)).toEqual([asked.id]);
+  });
+
+  it('answers an empty list with nothing and asks the database nothing', async () => {
+    await expect(home.listHomeExperiences([])).resolves.toEqual([]);
+  });
+
+  it('refuses more IDs than a home read looks up', async () => {
+    const tooMany = Array.from(
+      { length: homeLimits.maxCardIds + 1 },
+      (_, n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`,
+    );
+
+    await expect(home.listHomeExperiences(tooMany)).rejects.toThrow(RangeError);
+  });
+});
+
+describe('listThisWeekSessions', () => {
+  it('returns scheduled sessions inside the window, soonest first', async () => {
+    const experience = await insertExperience();
+    const later = await insertSession(
+      experience.id,
+      new Date(opens.getTime() + 5 * 3_600_000),
+    );
+    const sooner = await insertSession(
+      experience.id,
+      new Date(opens.getTime() + 3_600_000),
+      { allocation: 5, seatsSold: 2 },
+    );
+
+    const found = (await home.listThisWeekSessions(window)).filter(
+      (row) => row.experienceId === experience.id,
+    );
+
+    expect(found.map((row) => row.startsAt.getTime())).toEqual([
+      sooner.startsAt.getTime(),
+      later.startsAt.getTime(),
+    ]);
+    expect(found[0]).toEqual({
+      experienceId: experience.id,
+      experienceStatus: 'live',
+      startsAt: sooner.startsAt,
+      allocation: 5,
+      seatsSold: 2,
+    });
+  });
+
+  it('leaves out the opening instant and keeps the closing one', async () => {
+    const experience = await insertExperience();
+    await insertSession(experience.id, window.from);
+    const atEnd = await insertSession(experience.id, window.to);
+    await insertSession(experience.id, new Date(window.to.getTime() + 1000));
+
+    const found = (await home.listThisWeekSessions(window)).filter(
+      (row) => row.experienceId === experience.id,
+    );
+
+    expect(found.map((row) => row.startsAt.getTime())).toEqual([
+      atEnd.startsAt.getTime(),
+    ]);
+  });
+
+  it.each(['cancelled', 'completed'] as const)(
+    'leaves out a %s session',
+    async (status) => {
+      const experience = await insertExperience();
+      await insertSession(
+        experience.id,
+        new Date(opens.getTime() + 3_600_000),
+        status === 'cancelled' ? { status, cancelReason: 'host' } : { status },
+      );
+
+      const found = (await home.listThisWeekSessions(window)).filter(
+        (row) => row.experienceId === experience.id,
+      );
+
+      expect(found).toEqual([]);
+    },
+  );
+
+  it.each(['draft', 'in_review', 'paused'] as const)(
+    'leaves out a session of an experience that is %s',
+    async (status) => {
+      const experience = await insertExperience({ status });
+      await insertSession(experience.id, new Date(opens.getTime() + 3_600_000));
+
+      const found = (await home.listThisWeekSessions(window)).filter(
+        (row) => row.experienceId === experience.id,
+      );
+
+      expect(found).toEqual([]);
+    },
+  );
+
+  it('never returns more than its limit', async () => {
+    const experience = await insertExperience();
+    await client.db.insert(sessions).values(
+      Array.from({ length: homeLimits.thisWeekSessions + 1 }, (_, n) => {
+        const startsAt = new Date(opens.getTime() + (n + 1) * 60_000);
+        return {
+          experienceId: experience.id,
+          startsAt,
+          endsAt: new Date(startsAt.getTime() + 3_600_000),
+          timeZone: 'America/New_York',
+          allocation: 8,
+          source: 'ramble' as const,
+        };
+      }),
+    );
+
+    const found = await home.listThisWeekSessions(window);
+
+    expect(found).toHaveLength(homeLimits.thisWeekSessions);
+  });
+});

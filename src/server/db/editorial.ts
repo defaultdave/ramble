@@ -92,7 +92,6 @@ async function readCollections(
 
 const publishedCollection = eq(collections.status, 'published');
 
-// TODO(U-030): first caller
 /** The published Ramble Picks, with the entries a guest can see. */
 export function listPublishedPicks(): Promise<Collection[]> {
   return readCollections(
@@ -128,7 +127,6 @@ export async function getPublishedGiftGuide(): Promise<Collection | null> {
   return guide ?? null;
 }
 
-// TODO(U-030): first caller
 /**
  * The enabled modules in order. A module that points at a collection still in draft is left out,
  * so the home page never shows an unpublished one.

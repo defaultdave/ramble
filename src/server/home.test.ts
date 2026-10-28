@@ -1,0 +1,140 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { thisWeekWindow } from '@/lib/home';
+import { getHomeContent, getThisWeek } from './home';
+
+// Behaviours under test, one per decision, branch or risk:
+// - the home read uses the editorial profile and tags the home, the catalog, and each experience on a card
+// - the home read asks for the experiences its modules might show, and only those
+// - the this-week read uses the browse profile, reads the window of its key, and tags the catalog and each listed experience
+// - the this-week read looks up only the experiences with an open session, soonest first
+// - a failed read throws only the kind of the failure, never the query or its values
+
+const cache = vi.hoisted(() => ({ life: vi.fn(), tag: vi.fn() }));
+vi.mock('next/cache', () => ({
+  cacheLife: cache.life,
+  cacheTag: cache.tag,
+}));
+
+const db = vi.hoisted(() => ({
+  modules: vi.fn(),
+  picks: vi.fn(),
+  categories: vi.fn(),
+  neighborhoods: vi.fn(),
+  experiences: vi.fn(),
+  sessions: vi.fn(),
+}));
+vi.mock('@/server/db/editorial', () => ({
+  listHomeModules: db.modules,
+  listPublishedPicks: db.picks,
+}));
+vi.mock('@/server/db/catalog', () => ({
+  listCategories: db.categories,
+  listNeighborhoods: db.neighborhoods,
+}));
+vi.mock('@/server/db/home', () => ({
+  listHomeExperiences: db.experiences,
+  listThisWeekSessions: db.sessions,
+}));
+
+const id = (n: number) =>
+  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+const asOf = '2026-11-02T15:00:00.000Z';
+
+const driverError = new Error(
+  'Failed query: select ... where id in ($1)\nparams: secret-id',
+);
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  db.modules.mockResolvedValue([
+    { id: id(900), kind: 'picks', collectionId: id(800) },
+    { id: id(901), kind: 'reassurance', collectionId: null },
+  ]);
+  db.picks.mockResolvedValue([
+    { id: id(800), items: [{ experienceId: id(1) }, { experienceId: id(2) }] },
+  ]);
+  db.categories.mockResolvedValue([]);
+  db.neighborhoods.mockResolvedValue([]);
+  db.experiences.mockImplementation((ids: string[]) =>
+    Promise.resolve(ids.map((experienceId) => ({ id: experienceId }))),
+  );
+});
+
+describe('getHomeContent', () => {
+  it('uses the editorial profile and tags the home, the catalog, and each card', async () => {
+    await getHomeContent();
+
+    expect(cache.life).toHaveBeenCalledExactlyOnceWith('editorial');
+    expect(cache.tag.mock.calls.flat()).toEqual([
+      'home',
+      'catalog',
+      `experience:${id(1)}`,
+      `experience:${id(2)}`,
+    ]);
+  });
+
+  it('looks up the experiences the Picks modules might show, and no others', async () => {
+    const content = await getHomeContent();
+
+    expect(db.experiences).toHaveBeenCalledExactlyOnceWith([id(1), id(2)]);
+    expect(content.experiences).toEqual([{ id: id(1) }, { id: id(2) }]);
+  });
+
+  it('throws only the kind of a failed read', async () => {
+    db.picks.mockRejectedValue(driverError);
+
+    const failure = await getHomeContent().catch((error: unknown) => error);
+
+    expect(failure).toMatchObject({ message: 'Home read failed: Error' });
+    expect(JSON.stringify(failure)).not.toContain('secret-id');
+  });
+});
+
+describe('getThisWeek', () => {
+  const session = (n: number, minutes: number, seatsSold = 0) => ({
+    experienceId: id(n),
+    experienceStatus: 'live',
+    startsAt: new Date(Date.parse(asOf) + minutes * 60_000),
+    allocation: 10,
+    seatsSold,
+  });
+
+  it('uses the browse profile and tags the catalog and each listed experience', async () => {
+    db.sessions.mockResolvedValue([session(1, 60), session(2, 30)]);
+
+    const content = await getThisWeek(asOf);
+
+    expect(cache.life).toHaveBeenCalledExactlyOnceWith('browse');
+    expect(cache.tag.mock.calls.flat()).toEqual([
+      'catalog',
+      `experience:${id(2)}`,
+      `experience:${id(1)}`,
+    ]);
+    expect(content.experienceIds).toEqual([id(2), id(1)]);
+  });
+
+  it('reads the week that starts at its key', async () => {
+    db.sessions.mockResolvedValue([]);
+
+    await getThisWeek(asOf);
+
+    expect(db.sessions).toHaveBeenCalledExactlyOnceWith(thisWeekWindow(asOf));
+  });
+
+  it('looks up only the experiences with an open session', async () => {
+    db.sessions.mockResolvedValue([session(1, 60, 10), session(2, 30)]);
+
+    await getThisWeek(asOf);
+
+    expect(db.experiences).toHaveBeenCalledExactlyOnceWith([id(2)]);
+  });
+
+  it('throws only the kind of a failed read', async () => {
+    db.sessions.mockRejectedValue(driverError);
+
+    const failure = await getThisWeek(asOf).catch((error: unknown) => error);
+
+    expect(failure).toMatchObject({ message: 'This week read failed: Error' });
+    expect(JSON.stringify(failure)).not.toContain('secret-id');
+  });
+});

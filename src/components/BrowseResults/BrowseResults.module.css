@@ -1,0 +1,92 @@
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  font-family: var(--font-family-body);
+}
+
+.summary {
+  margin: 0;
+  font-size: var(--font-size-body-s);
+  line-height: var(--font-line-height-body-s);
+  color: var(--color-text-secondary);
+}
+
+/* As many columns as fit at a card's minimum width, so no breakpoint is needed and nothing scrolls sideways. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  min-inline-size: 0;
+}
+
+.item > * {
+  flex: 1;
+}
+
+.more {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-3);
+  padding-block-start: var(--space-4);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The retry button sits below the alert, full width on a phone like Show more. */
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-4);
+  font-family: var(--font-family-body);
+}
+
+.notice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-6) 0;
+  font-family: var(--font-family-body);
+}
+
+.noticeTitle {
+  margin: 0;
+  font-size: var(--font-size-heading-s);
+  line-height: var(--font-line-height-heading-s);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.noticeText {
+  margin: 0;
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  color: var(--color-text-secondary);
+}
+
+@media (min-width: 768px) {
+  .more {
+    align-items: center;
+  }
+
+  .error {
+    align-items: flex-start;
+  }
+
+  .form {
+    inline-size: 15rem;
+  }
+}

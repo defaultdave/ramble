@@ -1,0 +1,7 @@
+/* Page-level defaults for the guest pages, on the tokens: the canvas, the text color, and the body face. */
+body {
+  margin: 0;
+  background: var(--color-bg-canvas);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-body);
+}

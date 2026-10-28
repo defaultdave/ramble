@@ -1,5 +1,11 @@
-import { RoutePlaceholder } from '@/components/RoutePlaceholder';
+import { Suspense } from 'react';
+import { HomeSkeleton } from '@/components/HomeStates';
+import { HomeContent } from './HomeContent';
 
 export default function HomePage() {
-  return <RoutePlaceholder name="Ramble" covers="PRD-01, PRD-03, PRD-04" />;
+  return (
+    <Suspense fallback={<HomeSkeleton />}>
+      <HomeContent />
+    </Suspense>
+  );
 }

@@ -1,0 +1,10 @@
+/* The story shell lays the two color schemes out in a grid, whose track would grow to fit a row of
+   chips. Containing the inline size makes the page as wide as its column, as it is on a real page. */
+.frame {
+  contain: inline-size;
+}
+
+/* The page's renderer resets paragraph margins; the stand-in does the same. */
+.copy > p {
+  margin: 0;
+}

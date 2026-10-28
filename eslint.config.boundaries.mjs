@@ -9,6 +9,7 @@ const vendorWrappers = [
   { folder: 'src/server/ports/payments', patterns: ['stripe'] },
   { folder: 'src/server/ports/email', patterns: ['resend'] },
   { folder: 'src/server/ports/storage', patterns: ['@vercel/blob'] },
+  { folder: 'src/server/ports/image', patterns: ['sharp'] },
   { folder: 'src/server/ports/rate-limit', patterns: ['botid', 'botid/*'] },
   { folder: 'src/server/monitoring', patterns: ['@sentry/*'] },
   {

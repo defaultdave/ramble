@@ -44,7 +44,8 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-2);
-  padding: var(--space-4);
+  /* The side padding is small on a phone so the seven days fit the 288 px a 320 px screen leaves. */
+  padding: var(--space-4) var(--space-1);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-lg);
   background: var(--color-bg-surface);
@@ -52,6 +53,12 @@
 
 .clear {
   display: flex;
+}
+
+@media (min-width: 480px) {
+  .calendar {
+    padding-inline: var(--space-4);
+  }
 }
 
 @media (min-width: 768px) {

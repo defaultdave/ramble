@@ -12,11 +12,13 @@ import {
   priceLabel,
   resultsSummary,
   splitPage,
+  toBrowsePage,
   withPriceOptions,
   toBrowseCard,
   venueToday,
   type BrowseExperience,
   type BrowsePage,
+  type BrowseRead,
 } from './browse';
 import { noFilters } from './filters';
 
@@ -24,6 +26,7 @@ import { noFilters } from './filters';
 // - "today" is the New York calendar date, across midnight and both sides of the clock change
 // - the cache time is cut to the minute, and the window runs from it to the horizon
 // - a page is cut from page size plus one rows: the extra row makes the cursor and is not shown
+// - a read becomes a page, and a cursor with no visible row is an outdated page, not an empty one
 // - prices are grouped under their experience, lowest first
 // - a duration reads as minutes, hours, or half hours
 // - a card price is the lowest price, with "From" only when prices differ; no price is a refusal
@@ -118,6 +121,45 @@ describe('splitPage', () => {
 
   it('handles no rows', () => {
     expect(splitPage([], 5)).toEqual({ items: [], nextCursor: null });
+  });
+});
+
+describe('toBrowsePage', () => {
+  const items = [experience(1), experience(2)];
+  const read = (overrides: Partial<BrowseRead> = {}): BrowseRead => ({
+    cursor: null,
+    items,
+    nextCursor: null,
+    ...overrides,
+  });
+
+  it('is the items and next cursor of a first page, which has no cursor row', () => {
+    expect(toBrowsePage(null, read({ nextCursor: id(2) }))).toEqual({
+      ok: true,
+      items,
+      nextCursor: id(2),
+    });
+  });
+
+  it('is the page after a cursor whose row was found', () => {
+    expect(
+      toBrowsePage(id(9), read({ cursor: { id: id(9), name: 'Thing 9' } })),
+    ).toEqual({ ok: true, items, nextCursor: null });
+  });
+
+  it('is an empty page, not an outdated one, when a first page has no items', () => {
+    expect(toBrowsePage(null, read({ items: [] }))).toEqual({
+      ok: true,
+      items: [],
+      nextCursor: null,
+    });
+  });
+
+  it('is outdated when the cursor names no visible experience, even with items', () => {
+    expect(toBrowsePage(id(9), read())).toEqual({
+      ok: false,
+      reason: 'cursor_not_found',
+    });
   });
 });
 

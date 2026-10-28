@@ -110,6 +110,33 @@ export type BrowsePage =
   | { ok: true; items: BrowseExperience[]; nextCursor: string | null }
   | { ok: false; reason: 'cursor_not_found' };
 
+/** The row a page cursor names, as the data layer found it. */
+export type BrowseCursorRow = { id: string; name: string };
+
+/**
+ * What the data layer read for one page. `cursor` is the row the request's `after` names, or null
+ * when the request had no `after` or no guest-visible experience has that id.
+ */
+export type BrowseRead = {
+  cursor: BrowseCursorRow | null;
+  items: BrowseExperience[];
+  nextCursor: string | null;
+};
+
+/**
+ * The page a guest gets from a read. A cursor that names an experience that is gone, hidden, or never
+ * existed is an outdated page rather than an empty one: the guest is sent back to the first results.
+ */
+export function toBrowsePage(
+  after: string | null,
+  read: BrowseRead,
+): BrowsePage {
+  if (after !== null && read.cursor === null) {
+    return { ok: false, reason: 'cursor_not_found' };
+  }
+  return { ok: true, items: read.items, nextCursor: read.nextCursor };
+}
+
 /** "2 hr", "2.5 hr", "45 min", "2 hr 15 min". */
 export function durationLabel(minutes: number): string {
   if (minutes < 60) return `${String(minutes)} min`;

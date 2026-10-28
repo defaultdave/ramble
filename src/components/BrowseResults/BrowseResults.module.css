@@ -44,6 +44,15 @@
   flex-direction: column;
 }
 
+/* The retry button sits below the alert, full width on a phone like Show more. */
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-4);
+  font-family: var(--font-family-body);
+}
+
 .link {
   display: inline-flex;
   min-block-size: var(--size-touch-target);
@@ -90,6 +99,10 @@
 @media (min-width: 768px) {
   .more {
     align-items: center;
+  }
+
+  .error {
+    align-items: flex-start;
   }
 
   .form {

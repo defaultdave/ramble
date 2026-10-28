@@ -153,12 +153,15 @@ describe('BrowseResults empty', () => {
 describe('BrowseResults error', () => {
   it('announces the failure and retries the same address', () => {
     render(<BrowseResults state="error" retry={next} />);
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      "We couldn't load the experiences",
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent("We couldn't load experiences");
+    expect(alert).toHaveTextContent(
+      'Something went wrong on our side. Your filters are saved.',
     );
-    const form = screen
-      .getByRole('button', { name: 'Try again' })
-      .closest('form');
+    const retry = screen.getByRole('button', { name: 'Try again' });
+    // Inside the alert the button would lose its styles and read as a link.
+    expect(alert).not.toContainElement(retry);
+    const form = retry.closest('form');
     expect(form).toHaveAttribute('action', '/new-york/browse');
     expect(form?.querySelectorAll('input[type="hidden"]')).toHaveLength(2);
   });

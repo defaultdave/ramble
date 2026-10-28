@@ -12,9 +12,7 @@ const cursor = '0b1c2d3e-4f50-4a61-8b72-93a4b5c6d7e8';
 
 // The framework's route announcer is also an alert, so the error is found by its words.
 const errorAlert = (page: Page) =>
-  page
-    .getByRole('alert')
-    .filter({ hasText: "We couldn't load the experiences" });
+  page.getByRole('alert').filter({ hasText: "We couldn't load experiences" });
 
 const robots = (page: Page) => page.locator('meta[name="robots"]');
 

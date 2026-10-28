@@ -37,7 +37,6 @@ export type DatePickerProps = {
   onChange: (value: string) => void;
 };
 
-// TODO(U-031): first caller
 export function DatePicker({
   label,
   value,

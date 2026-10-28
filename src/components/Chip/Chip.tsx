@@ -1,8 +1,8 @@
-import type { ComponentPropsWithoutRef, ReactNode } from 'react';
+import type { ComponentPropsWithRef, ReactNode } from 'react';
 import styles from './Chip.module.css';
 
 export type ChipProps = Omit<
-  ComponentPropsWithoutRef<'button'>,
+  ComponentPropsWithRef<'button'>,
   'children' | 'onClick' | 'aria-pressed' | 'className' | 'style'
 > & {
   selected: boolean;

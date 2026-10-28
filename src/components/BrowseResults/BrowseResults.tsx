@@ -109,18 +109,18 @@ export function BrowseResults(props: BrowseResultsProps) {
       );
     case 'error':
       return (
-        <Alert
-          tone="danger"
-          title="We couldn't load the experiences"
-          body="Your filters are kept. Try again in a moment."
-          action={
-            <TargetButton
-              target={props.retry}
-              label="Try again"
-              variant="primary"
-            />
-          }
-        />
+        <div className={styles.error}>
+          <Alert
+            tone="danger"
+            title="We couldn't load experiences"
+            body="Something went wrong on our side. Your filters are saved."
+          />
+          <TargetButton
+            target={props.retry}
+            label="Try again"
+            variant="secondary"
+          />
+        </div>
       );
     case 'outdated':
       return (

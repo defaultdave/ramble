@@ -120,3 +120,29 @@ export const CalendarOpenWithDate: Story = {
     ).toBeVisible();
   },
 };
+
+/** The open calendar in the 288 px a 320 px phone leaves: the days must not run past the calendar box. */
+export const CalendarOpenAtPhoneWidth: Story = {
+  parameters: { colorScheme: 'light' },
+  decorators: [
+    (Story) => (
+      <div className={styles.phone}>
+        <Story />
+      </div>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole('button', { name: 'Pick a date' }));
+    const grid = canvas.getByRole('grid');
+    const box = grid.closest('[id]');
+    if (!box) throw new Error('No calendar box');
+    const edge = box.getBoundingClientRect().right;
+    for (const cell of canvas.getAllByRole('gridcell')) {
+      await expect(cell.getBoundingClientRect().right).toBeLessThanOrEqual(
+        edge,
+      );
+    }
+    await expect(box.scrollWidth).toBeLessThanOrEqual(box.clientWidth);
+  },
+};

@@ -40,7 +40,7 @@ A date matches an experience with a `scheduled` session that starts from `asOf` 
 
 ## When a read fails
 
-The three cached reads throw a `BrowseReadError` that carries the kind of the failure and nothing else, because Next.js logs whatever a cached function throws and a database error carries its query and values. Next.js logs that error with a digest, and the page logs only the digest, so the two lines can be matched. The page shows the heading and a danger alert ("We couldn't load the experiences"), and a Try again button. The button is a GET form with the same address as hidden fields, so it works with no script. The page answers 200 in this state: the failure is inside a streamed region.
+The three cached reads throw a `BrowseReadError` that carries the kind of the failure and nothing else, because Next.js logs whatever a cached function throws and a database error carries its query and values. Next.js logs that error with a digest, and the page logs only the digest, so the two lines can be matched. The page shows the heading and a danger alert ("We couldn't load experiences"), and a Try again button below it. The button is a GET form with the same address as hidden fields, so it works with no script. The page answers 200 in this state: the failure is inside a streamed region.
 
 ## What the e2e run covers
 

@@ -31,6 +31,7 @@ vi.mock('@/server/db/catalog', () => ({
 
 const asOf = '2026-10-26T12:00:00.000Z';
 const query = { filters: noFilters, after: null };
+const cursorId = '00000000-0000-4000-8000-0000000000aa';
 
 // What a database error carries: the query text and the values bound to it.
 const driverError = new Error(
@@ -44,7 +45,7 @@ beforeEach(() => {
 describe('getBrowseResults', () => {
   it('uses the browse profile and tags the catalog and each listed experience', async () => {
     db.results.mockResolvedValue({
-      ok: true,
+      cursor: null,
       items: [{ id: 'a' }, { id: 'b' }],
       nextCursor: null,
     });
@@ -60,9 +61,11 @@ describe('getBrowseResults', () => {
   });
 
   it('tags only the catalog when the cursor was not found', async () => {
-    db.results.mockResolvedValue({ ok: false, reason: 'cursor_not_found' });
+    db.results.mockResolvedValue({ cursor: null, items: [], nextCursor: null });
 
-    await expect(getBrowseResults(query, asOf)).resolves.toEqual({
+    await expect(
+      getBrowseResults({ ...query, after: cursorId }, asOf),
+    ).resolves.toEqual({
       ok: false,
       reason: 'cursor_not_found',
     });

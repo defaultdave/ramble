@@ -51,7 +51,6 @@ const headingTag = {
   5: 'h5',
 } satisfies Record<CardHeadingLevel, 'h2' | 'h3' | 'h4' | 'h5'>;
 
-// TODO(U-031): first caller, the browse results grid.
 export function Card({
   layout = 'vertical',
   title,

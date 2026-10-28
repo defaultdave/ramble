@@ -2,7 +2,7 @@
 
 import { Calendar } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useId, useState, useTransition } from 'react';
+import { useId, useRef, useState, useTransition } from 'react';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { DatePicker } from '@/components/DatePicker';
@@ -81,11 +81,18 @@ export function FilterBar({
   const [pending, startTransition] = useTransition();
   const [calendarOpen, setCalendarOpen] = useState(false);
   const calendarId = useId();
+  const dateChip = useRef<HTMLButtonElement>(null);
 
   const change = (next: BrowseFilters) => {
     startTransition(() => {
       router.push(hrefForFilters(next));
     });
+  };
+
+  // The button or day that was focused leaves the page with the calendar, so focus goes to the chip that opened it.
+  const closeCalendar = () => {
+    dateChip.current?.focus();
+    setCalendarOpen(false);
   };
 
   return (
@@ -94,6 +101,7 @@ export function FilterBar({
         <legend className={styles.legend}>When</legend>
         <div className={styles.chips}>
           <Chip
+            ref={dateChip}
             label={filters.date ? dateChipLabel(filters.date) : 'Pick a date'}
             iconStart={<Calendar />}
             selected={filters.date !== null}
@@ -113,7 +121,7 @@ export function FilterBar({
               availableDates={availableDates}
               onChange={(date) => {
                 change(withDate(filters, date));
-                setCalendarOpen(false);
+                closeCalendar();
               }}
             />
             {filters.date ? (
@@ -121,7 +129,7 @@ export function FilterBar({
                 variant="ghost"
                 onClick={() => {
                   change(withDate(filters, null));
-                  setCalendarOpen(false);
+                  closeCalendar();
                 }}
               >
                 Clear date
@@ -150,7 +158,7 @@ export function FilterBar({
             variant="ghost"
             onClick={() => {
               change(noFilters);
-              setCalendarOpen(false);
+              closeCalendar();
             }}
           >
             Clear all filters

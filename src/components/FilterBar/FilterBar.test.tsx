@@ -13,6 +13,7 @@ import { FilterBar, type FilterBarProps } from './FilterBar';
 // - the date chip shows the chosen day, opens the calendar, and says it is open
 // - a day in the address that has passed does not break the calendar
 // - picking a day writes it into the address and closes the calendar; clearing the date takes it off
+// - when the calendar closes from inside, focus goes to the date chip, never to the page
 // - Clear all filters is there only when a filter is on, and goes to the bare address
 
 const push = vi.hoisted(() => vi.fn());
@@ -138,6 +139,29 @@ describe('FilterBar', () => {
     expect(screen.queryByRole('grid')).not.toBeInTheDocument();
   });
 
+  it('keeps focus on the date chip when a day is picked with the keyboard', async () => {
+    setup();
+    await userEvent.click(screen.getByRole('button', { name: 'Pick a date' }));
+    const day = screen.getByRole('button', {
+      name: /Monday, October 26, 2026/,
+    });
+    day.focus();
+    await userEvent.keyboard('{Enter}');
+
+    expect(screen.queryByRole('grid')).not.toBeInTheDocument();
+    expect(push).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: 'Pick a date' })).toHaveFocus();
+  });
+
+  it('keeps focus on the date chip when the date is cleared', async () => {
+    setup({ ...noFilters, date: '2026-11-07' });
+    await userEvent.click(screen.getByRole('button', { name: 'Sat, Nov 7' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Clear date' }));
+
+    expect(screen.queryByRole('grid')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sat, Nov 7' })).toHaveFocus();
+  });
+
   it('takes the date off from the calendar', async () => {
     setup({ ...noFilters, date: '2026-11-07' });
     await userEvent.click(screen.getByRole('button', { name: 'Sat, Nov 7' }));
@@ -177,5 +201,6 @@ describe('FilterBar', () => {
       screen.getByRole('button', { name: 'Clear all filters' }),
     );
     expect(push).toHaveBeenCalledExactlyOnceWith('/new-york/browse');
+    expect(screen.getByRole('button', { name: 'Sat, Nov 7' })).toHaveFocus();
   });
 });

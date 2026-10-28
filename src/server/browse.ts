@@ -1,7 +1,7 @@
 import 'server-only';
 import { cacheLife, cacheTag } from 'next/cache';
 import { unstable_rethrow } from 'next/navigation';
-import type { BrowsePage } from '@/lib/browse';
+import { toBrowsePage, type BrowsePage } from '@/lib/browse';
 import { tags } from '@/lib/cacheTags';
 import type { Category, Neighborhood } from '@/lib/catalog';
 import type { BrowseFilters, BrowseQuery } from '@/lib/filters';
@@ -40,7 +40,8 @@ export async function getBrowseResults(
   'use cache';
   cacheLife('browse');
   cacheTag(tags.catalog);
-  const page = await readOrRefuse(() => listBrowseExperiences(query, asOf));
+  const read = await readOrRefuse(() => listBrowseExperiences(query, asOf));
+  const page = toBrowsePage(query.after, read);
   if (page.ok) {
     for (const experience of page.items)
       cacheTag(tags.experience(experience.id));

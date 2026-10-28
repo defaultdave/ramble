@@ -4,3 +4,10 @@
   padding: var(--space-4);
   background: var(--color-bg-canvas);
 }
+
+/* The content width a 320 px phone leaves after the page's 16 px gutters. */
+.phone {
+  inline-size: 18rem;
+  margin-inline: 0;
+  padding: 0;
+}

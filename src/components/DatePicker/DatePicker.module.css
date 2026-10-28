@@ -79,7 +79,9 @@
   display: inline-grid;
   place-items: center;
   box-sizing: border-box;
-  inline-size: var(--size-touch-target);
+  /* Seven full-size days do not fit a 320 px phone, so a day gives up width before it overflows; its height stays a touch target. */
+  inline-size: 100%;
+  max-inline-size: var(--size-touch-target);
   block-size: var(--size-touch-target);
   border: 1px solid transparent;
   border-radius: var(--radius-pill);

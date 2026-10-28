@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { browsePageSize, type BrowsePage } from '@/lib/browse';
+import { browsePageSize, toBrowsePage, type BrowsePage } from '@/lib/browse';
 import { noFilters, type BrowseFilters } from '@/lib/filters';
 import {
   cancellationTiers,
@@ -24,7 +24,7 @@ import {
 // - results come by name and then id, and the page is cut at the hard size with a cursor
 // - the next page starts after the cursor and no row is shown twice or skipped, including two rows with one name
 // - a row added before the cursor, or hidden after it, between two pages moves nothing already shown
-// - a cursor for a hidden or unknown experience is reported, not read as the end of the list
+// - a cursor for a hidden or unknown experience finds no row and reads no page; a visible one returns its row
 // - category and neighborhood filters match any value of their list and both must hold; an unknown slug matches nothing
 // - the date filter matches a scheduled session that starts that day in the host's own calendar, from the
 //   stored date or, for a session entered by hand, from its time zone
@@ -180,7 +180,8 @@ async function list(
   filters: BrowseFilters,
   after: string | null = null,
 ): Promise<Extract<BrowsePage, { ok: true }>> {
-  const page = await browse.listBrowseExperiences({ filters, after }, asOf);
+  const read = await browse.listBrowseExperiences({ filters, after }, asOf);
+  const page = toBrowsePage(after, read);
   if (!page.ok) throw new Error('expected a page');
   return page;
 }
@@ -315,26 +316,40 @@ describe('paging', () => {
     );
   });
 
-  it.each([
-    ['an experience that is not there', '00000000-0000-4000-8000-0000000000aa'],
-  ])('reports %s as a cursor that was not found', async (_name, after) => {
-    const page = await browse.listBrowseExperiences(
-      { filters: noFilters, after },
+  it('finds no row for a cursor that names an experience that is not there', async () => {
+    const read = await browse.listBrowseExperiences(
+      {
+        filters: noFilters,
+        after: '00000000-0000-4000-8000-0000000000aa',
+      },
       asOf,
     );
-    expect(page).toEqual({ ok: false, reason: 'cursor_not_found' });
+    expect(read).toEqual({ cursor: null, items: [], nextCursor: null });
   });
 
-  it('reports a cursor for a hidden experience as not found', async () => {
+  it('finds no row for a cursor that names a hidden experience, and reads no page', async () => {
     const where = await scope();
+    await insertExperience(where, { name: 'A live' });
     const paused = await insertExperience(where, { status: 'paused' });
 
-    const page = await browse.listBrowseExperiences(
+    const read = await browse.listBrowseExperiences(
       { filters: filtersFor(where), after: paused.id },
       asOf,
     );
 
-    expect(page).toEqual({ ok: false, reason: 'cursor_not_found' });
+    expect(read).toEqual({ cursor: null, items: [], nextCursor: null });
+  });
+
+  it('returns the row a visible cursor names', async () => {
+    const where = await scope();
+    const live = await insertExperience(where, { name: 'A live' });
+
+    const read = await browse.listBrowseExperiences(
+      { filters: filtersFor(where), after: live.id },
+      asOf,
+    );
+
+    expect(read.cursor).toEqual({ id: live.id, name: 'A live' });
   });
 });
 

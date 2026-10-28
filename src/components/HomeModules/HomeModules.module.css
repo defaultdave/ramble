@@ -1,0 +1,359 @@
+/* Every module is a full-width band with an inner column capped at the content width. */
+.section {
+  box-sizing: border-box;
+  padding: var(--space-8) var(--space-6);
+  font-family: var(--font-family-body);
+  color: var(--color-text-primary);
+}
+
+.inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: var(--size-content-max);
+  margin-inline: auto;
+}
+
+.heading,
+.headingLarge {
+  margin: 0;
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-heading-m);
+  line-height: var(--font-line-height-heading-m);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.headingLarge {
+  font-size: var(--font-size-heading-l);
+  line-height: var(--font-line-height-heading-l);
+}
+
+.summary {
+  margin: 0;
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  color: var(--color-text-secondary);
+}
+
+/* The eyebrow is the highlight pill of the Figma Badge; Badge has no highlight tone yet. */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-highlight);
+  font-size: var(--font-size-caption);
+  line-height: var(--font-line-height-caption);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-on-highlight);
+}
+
+.eyebrowIcon {
+  display: inline-flex;
+  flex: none;
+  width: calc(var(--space-4) - var(--space-1) / 2);
+  height: calc(var(--space-4) - var(--space-1) / 2);
+}
+
+.eyebrowIcon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.link {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--size-touch-target);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-label);
+  line-height: var(--font-line-height-label);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-link);
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.link:focus-visible,
+.pill:focus-visible,
+.action:focus-visible {
+  outline: 2px solid transparent;
+  box-shadow:
+    0 0 0 2px var(--color-bg-canvas),
+    0 0 0 4px var(--color-focus-ring);
+}
+
+/* A row that scrolls sideways on a phone and wraps or lays out as a grid from tablet up. The row
+   bleeds to the screen edge so the next card shows; the page itself never scrolls sideways. */
+.rail,
+.pills {
+  display: flex;
+  gap: var(--space-4);
+  margin: 0 calc(-1 * var(--space-6));
+  padding: var(--space-1) var(--space-6);
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: var(--space-6);
+}
+
+.rail > li,
+.pills > li {
+  flex: 0 0 85%;
+  min-width: 0;
+  max-width: calc(var(--space-16) * 6);
+  scroll-snap-align: start;
+}
+
+.pills {
+  gap: var(--space-2);
+}
+
+.pills > li {
+  flex: none;
+  max-width: none;
+}
+
+.pill {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--size-touch-target);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-surface);
+  font-size: var(--font-size-label);
+  line-height: var(--font-line-height-label);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.pill:hover {
+  background: var(--color-bg-sunken);
+}
+
+/* Ramble Picks: heading and "See all" share a row from tablet up and stack on a phone. */
+.picks {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'head'
+    'cards'
+    'more';
+  gap: var(--space-3);
+  max-width: var(--size-content-max);
+  margin-inline: auto;
+}
+
+.picksHead {
+  grid-area: head;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.picksCards {
+  grid-area: cards;
+  min-width: 0;
+}
+
+.picksMore {
+  grid-area: more;
+  justify-self: start;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stack > li {
+  min-width: 0;
+}
+
+/* Gift guide: a tinted card with the sponsor line under its action. */
+.gift {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-accent-subtle);
+  color: var(--color-text-primary);
+}
+
+.giftCopy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.giftBody {
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+}
+
+.action {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  gap: var(--space-2);
+  min-height: var(--size-touch-target);
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  font-size: var(--font-size-label);
+  line-height: var(--font-line-height-label);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  text-decoration: none;
+}
+
+.action:hover {
+  background: var(--color-bg-sunken);
+}
+
+.actionIcon {
+  flex: none;
+  width: var(--space-5);
+  height: var(--space-5);
+}
+
+.sponsor {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  line-height: var(--font-line-height-caption);
+  color: var(--color-text-primary);
+}
+
+.giftArt {
+  display: none;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fact {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+}
+
+.factIcon {
+  flex: none;
+  width: var(--space-5);
+  height: var(--space-5);
+  margin-top: calc(var(--space-1) / 2);
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+@media (min-width: 768px) {
+  .section {
+    padding-block: var(--space-12);
+  }
+
+  .inner {
+    gap: var(--space-4);
+  }
+
+  .rail,
+  .pills {
+    flex-wrap: wrap;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .pills {
+    gap: var(--space-2);
+  }
+
+  .rail {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-6);
+  }
+
+  .rail > li {
+    max-width: none;
+  }
+
+  .picks {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'head more'
+      'cards cards';
+    align-items: end;
+    gap: var(--space-6);
+  }
+
+  .picksMore {
+    justify-self: end;
+  }
+
+  .stack {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-6);
+  }
+
+  .gift {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-12);
+    padding: var(--space-12);
+  }
+
+  .giftCopy {
+    gap: var(--space-4);
+  }
+
+  .giftBody {
+    font-size: var(--font-size-body-l);
+    line-height: var(--font-line-height-body-l);
+  }
+
+  .giftArt {
+    display: block;
+    flex: 0 1 30%;
+    max-width: calc(var(--space-10) * 8);
+  }
+
+  .facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-6);
+  }
+}

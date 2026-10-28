@@ -256,7 +256,7 @@ describe('toBrowseCard', () => {
   });
 
   it('leaves the duration out when there is none', () => {
-    expect(toBrowseCard(experience(1, { durationMinutes: null })).meta).toBe(
+    expect(toBrowseCard(experience(1, { durationMinutes: null }))?.meta).toBe(
       'DUMBO',
     );
   });
@@ -277,16 +277,17 @@ describe('toBrowseCard', () => {
     });
   });
 
-  it('refuses a guide entry that has nowhere to link', () => {
-    expect(() =>
-      toBrowseCard(experience(2, { status: 'guide_only', priceOptions: [] })),
-    ).toThrow(RangeError);
-  });
-
-  it('refuses a bookable experience with no price', () => {
-    expect(() => toBrowseCard(experience(3, { priceOptions: [] }))).toThrow(
-      RangeError,
-    );
+  it.each([
+    [
+      'a guide entry that has nowhere to link',
+      experience(2, { status: 'guide_only', priceOptions: [] }),
+    ],
+    [
+      'a bookable experience with no price',
+      experience(3, { priceOptions: [] }),
+    ],
+  ])('leaves out %s', (_name, input) => {
+    expect(toBrowseCard(input)).toBeNull();
   });
 });
 
@@ -361,6 +362,43 @@ describe('browseView', () => {
       },
     });
     expect(view.state === 'results' && view.cards).toHaveLength(2);
+  });
+
+  it('leaves out a card that cannot be built and counts only the ones shown', () => {
+    const view = browseView(firstPage, {
+      ok: true,
+      items: [
+        experience(1),
+        experience(2, { priceOptions: [] }),
+        experience(3),
+      ],
+      nextCursor: null,
+    });
+    expect(view).toMatchObject({ state: 'results', summary: '2 experiences' });
+    expect(view.state === 'results' && view.cards.map((c) => c.id)).toEqual([
+      id(1),
+      id(3),
+    ]);
+  });
+
+  it('is empty when no card on the last page can be built', () => {
+    expect(
+      browseView(firstPage, {
+        ok: true,
+        items: [experience(2, { priceOptions: [] })],
+        nextCursor: null,
+      }),
+    ).toEqual({ state: 'empty', filtered: false });
+  });
+
+  it('keeps Show more when a full page has no buildable card but another page follows', () => {
+    const view = browseView(firstPage, {
+      ok: true,
+      items: [experience(2, { priceOptions: [] })],
+      nextCursor: id(2),
+    });
+    expect(view).toMatchObject({ state: 'results', cards: [] });
+    expect(view.state === 'results' && view.showMore).not.toBeNull();
   });
 
   it('has no Show more on the last page', () => {

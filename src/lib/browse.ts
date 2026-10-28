@@ -230,8 +230,13 @@ export type BrowseCard = {
   { kind: 'bookable'; price: string } | { kind: 'guide-only'; hostHref: string }
 );
 
-/** What a card says about an experience. A guide entry with no link out cannot be shown as one. */
-export function toBrowseCard(experience: BrowseExperience): BrowseCard {
+/**
+ * What a card says about an experience, or null when it cannot be shown as one: a bookable experience
+ * with no price, or a guide entry with no link out. A card is left out, never repaired. The read
+ * keeps both out already, but prices are read after the experiences, so a host who removes the last
+ * price between the two reads would otherwise take the whole page down.
+ */
+export function toBrowseCard(experience: BrowseExperience): BrowseCard | null {
   const meta = [
     experience.neighborhoodName,
     experience.durationMinutes === null
@@ -247,11 +252,10 @@ export function toBrowseCard(experience: BrowseExperience): BrowseCard {
     href: experienceAddress(experience),
   };
   if (experience.status === 'guide_only') {
-    if (experience.linkOutUrl === null) {
-      throw new RangeError('A guide-only entry links out');
-    }
+    if (experience.linkOutUrl === null) return null;
     return { ...base, kind: 'guide-only', hostHref: experience.linkOutUrl };
   }
+  if (experience.priceOptions.length === 0) return null;
   return {
     ...base,
     kind: 'bookable',
@@ -307,13 +311,14 @@ export function browseView(query: BrowseQuery, page: BrowsePage): BrowseView {
   if (!page.ok) {
     return { state: 'outdated', startHref: hrefForFilters(filters) };
   }
-  if (page.items.length === 0) {
+  const cards = page.items.flatMap((item) => toBrowseCard(item) ?? []);
+  if (cards.length === 0 && page.nextCursor === null) {
     return { state: 'empty', filtered: activeFilterCount(filters) > 0 };
   }
   return {
     state: 'results',
-    cards: page.items.map(toBrowseCard),
-    summary: resultsSummary(page.items.length, page.nextCursor !== null),
+    cards,
+    summary: resultsSummary(cards.length, page.nextCursor !== null),
     showMore:
       page.nextCursor === null
         ? null

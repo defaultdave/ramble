@@ -28,6 +28,8 @@ import {
 // Behaviours under test, one per decision, branch or risk:
 // - a guest sees live and guide-only experiences, never draft, in review or paused ones
 // - a live experience with no price is left out, and a guide-only entry with none is kept
+// - a guide-only row with no link out cannot be stored, by insert or by update, so no browse card lacks its link
+// - a live experience that loses its last price leaves the read, so no browse card lacks a price
 // - results come by name and then id, and the page is cut at the hard size with a cursor
 // - the next page starts after the cursor and no row is shown twice or skipped, including two rows with one name
 // - a row added before the cursor, or hidden after it, between two pages moves nothing already shown
@@ -249,6 +251,63 @@ describe('what a guest sees', () => {
       'A priced',
       'C guide',
     ]);
+  });
+
+  it('leaves out a live experience once its last price is removed', async () => {
+    const where = await scope();
+    const kept = await insertExperience(where, { name: 'A kept' });
+    const dropped = await insertExperience(where, { name: 'B dropped' });
+    expect(names(await list(filtersFor(where)))).toEqual([
+      'A kept',
+      'B dropped',
+    ]);
+
+    await client.db
+      .delete(priceOptions)
+      .where(eq(priceOptions.experienceId, dropped.id));
+
+    const page = await list(filtersFor(where));
+    expect(page.items.map(({ id }) => id)).toEqual([kept.id]);
+  });
+
+  it.each([
+    [
+      'an insert',
+      (where: Scope) =>
+        client.db.insert(experiences).values({
+          hostId: where.hostId,
+          categoryId: where.category.id,
+          neighborhoodId: where.neighborhood.id,
+          cancellationTierId: where.cancellationTierId,
+          slug: unique('experience'),
+          name: unique('Experience'),
+          status: 'guide_only',
+        }),
+    ],
+    [
+      'moving a live experience to guide-only',
+      async (where: Scope) => {
+        const row = await insertExperience(where);
+        await client.db
+          .update(experiences)
+          .set({ status: 'guide_only' })
+          .where(eq(experiences.id, row.id));
+      },
+    ],
+    [
+      'removing the link of a guide entry',
+      async (where: Scope) => {
+        const row = await insertExperience(where, { status: 'guide_only' });
+        await client.db
+          .update(experiences)
+          .set({ linkOutUrl: null })
+          .where(eq(experiences.id, row.id));
+      },
+    ],
+  ])('refuses a guide-only row with no link by %s', async (_name, attempt) => {
+    await expect(attempt(await scope())).rejects.toMatchObject({
+      cause: { constraint: 'experiences_guide_only_has_link' },
+    });
   });
 
   it('carries what a card shows and nothing a guest may not see', async () => {

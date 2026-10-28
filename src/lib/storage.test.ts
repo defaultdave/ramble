@@ -76,20 +76,14 @@ describe('storageSettingIssues', () => {
   const names = (settings: Parameters<typeof storageSettingIssues>[0]) =>
     storageSettingIssues(settings).map((issue) => issue.name);
 
-  it.each([undefined, 'development', 'preview'] as const)(
-    'asks nothing of the fake when VERCEL_ENV is %s',
+  it.each([undefined, 'development', 'preview', 'production'] as const)(
+    'asks nothing of the fake when VERCEL_ENV is %s, a production deployment included',
     (VERCEL_ENV) => {
       expect(
         storageSettingIssues({ STORAGE_PROVIDER: 'fake', VERCEL_ENV }),
       ).toEqual([]);
     },
   );
-
-  it('refuses the fake in a production deployment', () => {
-    expect(
-      names({ STORAGE_PROVIDER: 'fake', VERCEL_ENV: 'production' }),
-    ).toEqual(['STORAGE_PROVIDER']);
-  });
 
   it('asks for both tokens of vercel-blob, one issue each', () => {
     expect(names({ STORAGE_PROVIDER: 'vercel-blob' })).toEqual([

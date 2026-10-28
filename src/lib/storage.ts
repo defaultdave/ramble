@@ -51,25 +51,15 @@ type StorageSettings = {
 };
 
 /**
- * What the environment must also hold for the chosen provider. The fake needs nothing, but it is
- * refused in a production deployment, where it would lose every photo on the next restart. Only
- * `VERCEL_ENV` says "deployed to production": `NODE_ENV` is also `production` for `next build` and
- * `next start` on a laptop or in CI, which must keep working with no keys.
+ * What the environment must also hold for the chosen provider. The fake needs nothing and is
+ * allowed in every environment, a production deployment included, so the demo runs without Blob
+ * stores; it keeps photos in memory, so they vanish on the next restart.
  */
 export function storageSettingIssues(
   settings: StorageSettings,
 ): { name: string; message: string }[] {
-  if (settings.STORAGE_PROVIDER === 'fake') {
-    return settings.VERCEL_ENV === 'production'
-      ? [
-          {
-            name: 'STORAGE_PROVIDER',
-            message:
-              'fake keeps photos in memory and is not allowed in a production deployment; use vercel-blob',
-          },
-        ]
-      : [];
-  }
+  // TODO(U-021b): refuse the fake in a production deployment once the photo pool is stored; it keeps photos in memory.
+  if (settings.STORAGE_PROVIDER === 'fake') return [];
   const issues: { name: string; message: string }[] = [];
   for (const name of [
     'BLOB_PUBLIC_READ_WRITE_TOKEN',

@@ -361,16 +361,7 @@ describe('environment', () => {
   describe('storage', () => {
     const publicToken = 'vercel_blob_rw_teststore1_notarealsecret';
 
-    it('refuses the fake in a production deployment', async () => {
-      vi.stubEnv('STORAGE_PROVIDER', undefined);
-      vi.stubEnv('VERCEL_ENV', 'production');
-
-      await expect(loadEnv()).rejects.toThrow(
-        /Invalid environment variables[\s\S]*STORAGE_PROVIDER/,
-      );
-    });
-
-    it.each(['preview', 'development'])(
+    it.each(['production', 'preview', 'development'])(
       'allows the fake in a %s deployment',
       async (vercelEnv) => {
         vi.stubEnv('STORAGE_PROVIDER', undefined);

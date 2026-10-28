@@ -9,6 +9,7 @@ import {
   lookup,
   seatUpdates,
   SeedStepError,
+  templateNotFound,
   templateOutcome,
 } from './decide';
 import type { PlannedSession } from './plan';
@@ -20,6 +21,7 @@ import type { PlannedSession } from './plan';
 // - a refused data-layer answer stops the seed with a message that names the step and reason; a good one passes through
 // - a template that already exists is accepted; any other refusal stops the seed
 // - a missing lookup names what was missing
+// - a template the seed cannot read back is a seed message that names the experience, not a driver error
 // - seat updates raise a stored session to the plan, never lower it, and ignore sessions the plan does not name
 // - chunks are bounded and cover every item; a size under one is refused
 // - a failure prints a seed message as is, and for anything else only the kind and the error code, never the message
@@ -232,5 +234,15 @@ describe('describeFailure', () => {
         Object.assign(new Error('x'), { code: 'select * from t' }),
       ),
     ).toBe('Seed failed: Error');
+  });
+});
+
+describe('templateNotFound', () => {
+  it('is a seed message that names the experience', () => {
+    const error = templateNotFound('kayak');
+    expect(error).toBeInstanceOf(SeedStepError);
+    expect(error.message).toBe(
+      'Seed step "find session template" found none for kayak',
+    );
   });
 });

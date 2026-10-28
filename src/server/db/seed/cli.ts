@@ -1,9 +1,10 @@
 import 'server-only';
 import { parseSeedArgs } from '@/lib/seed/args';
-import { evaluateCoverage, coverageGaps } from '@/lib/seed/coverage';
 import { describeFailure } from '@/lib/seed/decide';
+import { coverageExit, refusalLine, startLine } from '@/lib/seed/outcome';
 import { checkSeedTarget, type SeedTargetInput } from '@/lib/seed/target';
 import { db } from '@/server/db/client';
+import { seedCaller } from './caller';
 import { readSeedSnapshot } from './read';
 import { runSeed } from './run';
 
@@ -29,22 +30,23 @@ export async function runSeedCommand(command: SeedCommand): Promise<number> {
   }
   const verdict = checkSeedTarget(command.target);
   if (!verdict.ok) {
-    write(`Refusing to seed: ${verdict.message}`);
+    write(refusalLine(verdict));
     return 1;
   }
-  write(`Seeding the ${verdict.target} database on ${verdict.host}`);
+  write(startLine(verdict));
   try {
-    await runSeed({ now: command.now, scale: args.scale, log: write });
-    const results = evaluateCoverage(await readSeedSnapshot(command.now), {
-      scale: args.scale !== undefined,
+    await runSeed({
+      caller: seedCaller,
+      now: command.now,
+      scale: args.scale,
+      log: write,
     });
-    const gaps = coverageGaps(results);
-    if (gaps.length > 0) {
-      write(`Seeded, but the coverage matrix has gaps: ${gaps.join(', ')}`);
-      return 1;
-    }
-    write(`Coverage matrix: ${String(results.length)} probes checked, no gaps`);
-    return 0;
+    const exit = coverageExit(
+      await readSeedSnapshot(seedCaller, command.now),
+      args.scale,
+    );
+    write(exit.line);
+    return exit.code;
   } catch (error) {
     write(describeFailure(error));
     return 1;

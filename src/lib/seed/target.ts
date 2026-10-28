@@ -21,6 +21,7 @@ type SeedRefusal =
   | 'production_runtime'
   | 'target_not_declared'
   | 'unreadable_database_url'
+  | 'address_overridden'
   | 'not_local'
   | 'looks_like_production';
 
@@ -36,18 +37,60 @@ const refuse = (reason: SeedRefusal, message: string): SeedTargetVerdict => ({
   message,
 });
 
-function readUrl(
-  value: string,
-): { host: string; database: string } | undefined {
-  try {
-    const url = new URL(value);
+type ReadUrl =
+  | { ok: true; host: string; database: string }
+  | { ok: false; verdict: SeedTargetVerdict };
+
+// The driver lets these query parameters replace the address in the URL, so the host and database
+// the guard reads from the address would not be the ones the seed connects to. Matched without
+// regard to case because the guard must not depend on how the driver spells its keys.
+const overridingParameters = ['host', 'hostaddr', 'dbname', 'database'];
+
+const connectionProtocols = ['postgres:', 'postgresql:'];
+
+function readUrl(value: string): ReadUrl {
+  if (!URL.canParse(value)) {
     return {
-      host: url.hostname,
-      database: decodeURIComponent(url.pathname.replace(/^\//, '')),
+      ok: false,
+      verdict: refuse(
+        'unreadable_database_url',
+        'DATABASE_URL cannot be read.',
+      ),
     };
-  } catch {
-    return undefined;
   }
+  const url = new URL(value);
+  const overrides = [...url.searchParams.keys()].some((key) =>
+    overridingParameters.includes(key.toLowerCase()),
+  );
+  if (overrides) {
+    return {
+      ok: false,
+      verdict: refuse(
+        'address_overridden',
+        'DATABASE_URL has a host, hostaddr, dbname, or database query parameter. The driver would use it in place of the address, so the seed cannot tell where it would write. Put the host and database in the address.',
+      ),
+    };
+  }
+  // The driver decodes percent escapes in the host and the database name; a name that hides a
+  // production word behind one would pass the check below, so no escape is accepted. An empty host
+  // or database makes the driver fall back to the PG environment variables.
+  const database = url.pathname.replace(/^\//, '');
+  const readable =
+    connectionProtocols.includes(url.protocol) &&
+    url.hostname !== '' &&
+    database !== '' &&
+    !url.hostname.includes('%') &&
+    !database.includes('%');
+  if (!readable) {
+    return {
+      ok: false,
+      verdict: refuse(
+        'unreadable_database_url',
+        'DATABASE_URL cannot be read.',
+      ),
+    };
+  }
+  return { ok: true, host: url.hostname, database };
 }
 
 export function checkSeedTarget(input: SeedTargetInput): SeedTargetVerdict {
@@ -73,9 +116,7 @@ export function checkSeedTarget(input: SeedTargetInput): SeedTargetVerdict {
     );
   }
   const database = readUrl(input.databaseUrl);
-  if (!database) {
-    return refuse('unreadable_database_url', 'DATABASE_URL cannot be read.');
-  }
+  if (!database.ok) return database.verdict;
   if (
     productionWord.test(database.host) ||
     productionWord.test(database.database)

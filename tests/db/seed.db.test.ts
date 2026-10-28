@@ -8,6 +8,7 @@ import {
   type ProbeKey,
 } from '@/lib/seed/coverage';
 import { SeedStepError } from '@/lib/seed/decide';
+import { ForbiddenError, Role, type Caller } from '@/server/auth/caller';
 import { curated } from '@/lib/seed/fixtures';
 import { planSessions } from '@/lib/seed/plan';
 import { experienceId } from '@/lib/seed/rows';
@@ -49,10 +50,12 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 // - a rerun is idempotent: no row is added, no id changes, no legal version is added, and a
 //   created-at stays; a booking that sold more than the plan is not lowered
 // - a document left as a draft by a stopped run is published by the next run, not duplicated
-// - the settings row, and so the tax rate U-018 seeds, is not touched
+// - the settings row, and so the tax rate the settings migration seeds, is not touched
 // - the scale fixture writes the requested number of experiences and hosts, passes the scale probe,
 //   repeats exactly on a second run, and keeps the zero-results state true
 // - a stored collection of another kind under a seeded slug stops the seed with a seed message
+// - the seed and the snapshot read refuse a caller who is not ops (guest, host owner, no roles) before
+//   any row is read or written
 // - the data layer's invalidation is called with tags (the stub the script installs stands in outside Next)
 
 let fresh: FreshDatabase;
@@ -60,6 +63,7 @@ let stopHttp: () => Promise<void>;
 let client: typeof import('@/server/db/client');
 let runner: typeof import('@/server/db/seed/run');
 let reader: typeof import('@/server/db/seed/read');
+let seedCaller: typeof import('@/server/db/seed/caller').seedCaller;
 let catalogReads: typeof import('@/server/db/catalog');
 let editorialReads: typeof import('@/server/db/editorial');
 let legalReads: typeof import('@/server/db/legal');
@@ -74,6 +78,7 @@ beforeAll(async () => {
   client = await import('@/server/db/client');
   runner = await import('@/server/db/seed/run');
   reader = await import('@/server/db/seed/read');
+  ({ seedCaller } = await import('@/server/db/seed/caller'));
   catalogReads = await import('@/server/db/catalog');
   editorialReads = await import('@/server/db/editorial');
   legalReads = await import('@/server/db/legal');
@@ -143,7 +148,7 @@ describe('the curated seed', () => {
   let invalidated: string[] = [];
 
   it('fills a migrated database', async () => {
-    first = await runner.runSeed({ now });
+    first = await runner.runSeed({ caller: seedCaller, now });
     invalidated = vi.mocked(updateTag).mock.calls.map(([tag]) => tag);
     const counts = await tableCounts();
     expect(counts).toMatchObject({
@@ -165,7 +170,7 @@ describe('the curated seed', () => {
   });
 
   it('holds every probe of the coverage matrix', async () => {
-    const snapshot = await reader.readSeedSnapshot(now);
+    const snapshot = await reader.readSeedSnapshot(seedCaller, now);
     const results = evaluateCoverage(snapshot, { scale: false });
     expect(coverageGaps(results)).toEqual([]);
     const probed = new Set<ProbeKey>(coverage.flatMap((e) => e.probes));
@@ -203,9 +208,12 @@ describe('the curated seed', () => {
   });
 
   it('gives the same answers from the database as from the fixtures', async () => {
-    const fromDatabase = evaluateCoverage(await reader.readSeedSnapshot(now), {
-      scale: false,
-    });
+    const fromDatabase = evaluateCoverage(
+      await reader.readSeedSnapshot(seedCaller, now),
+      {
+        scale: false,
+      },
+    );
     const fromFixtures = evaluateCoverage(
       snapshotFromFixtures(curated, undefined, now),
       { scale: false },
@@ -289,7 +297,7 @@ describe('the curated seed', () => {
     );
   });
 
-  it('leaves the settings row, and the tax rate U-018 seeds, alone', async () => {
+  it('leaves the settings row, and the tax rate the settings migration seeds, alone', async () => {
     const guest = await settingsReads.getGuestSettings();
     expect(guest.giftsEnabled).toBe(true);
     const [row] = await client.db
@@ -318,7 +326,7 @@ describe('the curated seed', () => {
     it('adds nothing and changes no id, version, publication time, or created-at', async () => {
       const beforeCounts = await tableCounts();
       const beforePrint = await fingerprint();
-      const second = await runner.runSeed({ now });
+      const second = await runner.runSeed({ caller: seedCaller, now });
       expect(await tableCounts()).toEqual(beforeCounts);
       expect(await fingerprint()).toEqual(beforePrint);
       expect(second.curated.sessionsCreated).toBe(0);
@@ -345,7 +353,7 @@ describe('the curated seed', () => {
         .update(sessions)
         .set({ seatsSold: target?.allocation ?? 0 })
         .where(eq(sessions.id, target?.id ?? ''));
-      await runner.runSeed({ now });
+      await runner.runSeed({ caller: seedCaller, now });
       const [after] = await client.db
         .select({ seatsSold: sessions.seatsSold })
         .from(sessions)
@@ -372,7 +380,7 @@ describe('the curated seed', () => {
           ALTER TABLE legal_documents ENABLE TRIGGER USER
         `);
       }
-      await runner.runSeed({ now });
+      await runner.runSeed({ caller: seedCaller, now });
       const versions = await client.db
         .select({
           version: legalDocuments.version,
@@ -396,12 +404,14 @@ describe('a collision with a stored collection', () => {
       title: 'Mine',
       status: 'draft',
     });
-    await expect(runner.runSeed({ now })).rejects.toBeInstanceOf(SeedStepError);
-    await expect(runner.runSeed({ now })).rejects.toThrow(
+    await expect(
+      runner.runSeed({ caller: seedCaller, now }),
+    ).rejects.toBeInstanceOf(SeedStepError);
+    await expect(runner.runSeed({ caller: seedCaller, now })).rejects.toThrow(
       'already exists as another kind',
     );
     await db.delete(collections).where(eq(collections.slug, 'gift-guide'));
-    await runner.runSeed({ now });
+    await runner.runSeed({ caller: seedCaller, now });
     expect((await editorialReads.getPublishedGiftGuide())?.items).toHaveLength(
       6,
     );
@@ -413,7 +423,11 @@ describe('the scale fixture', () => {
 
   it('writes the requested experiences and the hosts they need, and passes the scale probe', async () => {
     const before = await tableCounts();
-    const report = await runner.runSeed({ now, scale: options });
+    const report = await runner.runSeed({
+      caller: seedCaller,
+      now,
+      scale: options,
+    });
     const scale = generateScaleFixtures(options);
     expect(report.scale).toMatchObject({
       hosts: scale.hosts.length,
@@ -422,9 +436,12 @@ describe('the scale fixture', () => {
     const after = await tableCounts();
     expect(after.experiences - before.experiences).toBe(40);
     expect(after.hosts - before.hosts).toBe(scale.hosts.length);
-    const results = evaluateCoverage(await reader.readSeedSnapshot(now), {
-      scale: true,
-    });
+    const results = evaluateCoverage(
+      await reader.readSeedSnapshot(seedCaller, now),
+      {
+        scale: true,
+      },
+    );
     expect(coverageGaps(results)).toEqual([]);
     expect(results.find((r) => r.key === 'many-results')?.ok).toBe(true);
   });
@@ -432,7 +449,11 @@ describe('the scale fixture', () => {
   it('repeats exactly on a second run', async () => {
     const beforeCounts = await tableCounts();
     const beforePrint = await fingerprint();
-    const second = await runner.runSeed({ now, scale: options });
+    const second = await runner.runSeed({
+      caller: seedCaller,
+      now,
+      scale: options,
+    });
     expect(await tableCounts()).toEqual(beforeCounts);
     expect(await fingerprint()).toEqual(beforePrint);
     expect(second.scale?.sessionsCreated).toBe(0);
@@ -442,4 +463,26 @@ describe('the scale fixture', () => {
     const visible = await catalogReads.listGuestExperiences();
     expect(visible.length).toBeGreaterThan(30);
   });
+});
+
+describe('a caller who is not ops', () => {
+  const refused: [string, Caller][] = [
+    ['a guest', { userId: 'g', roles: [Role.Guest], hostIds: [] }],
+    ['a host owner', { userId: 'h', roles: [Role.HostOwner], hostIds: ['x'] }],
+    ['nobody signed in', { userId: null, roles: [], hostIds: [] }],
+  ];
+
+  it.each(refused)(
+    '%s may neither seed nor read the snapshot',
+    async (_who, caller) => {
+      const before = await tableCounts();
+      await expect(runner.runSeed({ caller, now })).rejects.toBeInstanceOf(
+        ForbiddenError,
+      );
+      await expect(reader.readSeedSnapshot(caller, now)).rejects.toBeInstanceOf(
+        ForbiddenError,
+      );
+      expect(await tableCounts()).toEqual(before);
+    },
+  );
 });

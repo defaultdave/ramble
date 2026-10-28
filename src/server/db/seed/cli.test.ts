@@ -3,6 +3,7 @@ import { curated } from '@/lib/seed/fixtures';
 import { snapshotFromFixtures } from '@/lib/seed/snapshot';
 import { SeedStepError } from '@/lib/seed/decide';
 import type { SeedCommand } from './cli';
+import { seedCaller } from './caller';
 
 // Behaviours under test:
 // - a bad argument stops with exit code 2 before anything else happens
@@ -99,9 +100,9 @@ describe('runSeedCommand', () => {
   it('seeds with the clock given, checks coverage, and exits 0', async () => {
     expect(await run()).toBe(0);
     expect(runSeed).toHaveBeenCalledWith(
-      expect.objectContaining({ now, scale: undefined }),
+      expect.objectContaining({ caller: seedCaller, now, scale: undefined }),
     );
-    expect(readSeedSnapshot).toHaveBeenCalledWith(now);
+    expect(readSeedSnapshot).toHaveBeenCalledWith(seedCaller, now);
     expect(lines.join('\n')).toContain('no gaps');
     expect(end).toHaveBeenCalledTimes(1);
   });

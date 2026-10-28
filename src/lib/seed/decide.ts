@@ -8,6 +8,10 @@ export class SeedStepError extends Error {
   }
 }
 
+/** The session template the seed just wrote is not there to read back. */
+export const templateNotFound = (slug: string): SeedStepError =>
+  new SeedStepError(`Seed step "find session template" found none for ${slug}`);
+
 // The decisions the seed runner takes while it writes. The runner fetches and persists; each
 // answer below comes from here so a unit test can reach it.
 

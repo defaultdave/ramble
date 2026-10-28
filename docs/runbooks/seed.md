@@ -37,7 +37,7 @@ A refusal prints the reason and never the connection string.
 | Categories, neighborhoods, hosts, experiences, price options | Written to the schema directly: the data layer has no write contract for them yet. The Zod schemas the app reads with validate every fixture first, and the database CHECKs backstop them |
 | Seats sold on the few sessions that must be nearly full or sold out | Written to the schema directly: seats sold otherwise move only with orders, which do not exist yet. A session that has sold more than the plan is never lowered |
 
-It writes no photo rows (U-010 is not in main), never touches the settings row (so the tax rate U-018 seeds stays as it is), and writes no help articles.
+It writes no photo rows (U-010 is not in main), never touches the settings row (so the tax rate the settings migration seeds stays as it is), and writes no help articles.
 
 ## Rerunning
 

@@ -1,5 +1,6 @@
 import 'server-only';
 import { eq } from 'drizzle-orm';
+import { requireRole, Role, type Caller } from '@/server/auth/caller';
 import { db } from '@/server/db/client';
 import {
   cancellationTiers,
@@ -31,9 +32,14 @@ const limits = {
 
 /**
  * What the seed left in the database, read straight from the tables and shaped for the coverage
- * probes. It reads every status, because the probes also check what a guest must not see.
+ * probes. It reads every status, because the probes also check what a guest must not see, so only ops
+ * may call it.
  */
-export async function readSeedSnapshot(now: Date): Promise<SeedSnapshot> {
+export async function readSeedSnapshot(
+  caller: Caller,
+  now: Date,
+): Promise<SeedSnapshot> {
+  requireRole(caller, Role.Ops, {});
   const categoryRows = await db
     .select({ slug: categories.slug })
     .from(categories)

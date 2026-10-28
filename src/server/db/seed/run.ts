@@ -1,6 +1,6 @@
 import 'server-only';
 import { and, desc, eq, sql } from 'drizzle-orm';
-import { Role, type Caller } from '@/server/auth/caller';
+import { requireRole, Role, type Caller } from '@/server/auth/caller';
 import { db } from '@/server/db/client';
 import {
   saveCollection,
@@ -28,7 +28,7 @@ import {
   inChunks,
   legalSeedStep,
   seatUpdates,
-  SeedStepError,
+  templateNotFound,
   templateOutcome,
 } from '@/lib/seed/decide';
 import { curated } from '@/lib/seed/fixtures';
@@ -51,6 +51,15 @@ import {
   templateInput,
   type RefMaps,
 } from '@/lib/seed/rows';
+import {
+  curatedLine,
+  editorialLine,
+  legalLine,
+  scaleLine,
+  stepNames,
+  taxonomyLine,
+  type CatalogCounts,
+} from '@/lib/seed/outcome';
 import { generateScaleFixtures } from '@/lib/seed/scale';
 import type { LegalFixture, ScaleFixtures } from '@/lib/seed/types';
 import { assertValidFixtures } from '@/lib/seed/validate';
@@ -62,28 +71,18 @@ import { assertValidFixtures } from '@/lib/seed/validate';
 // experiences, price options, and the seats sold on the sessions the coverage matrix needs nearly
 // full or sold out (seats sold otherwise move only with orders, which do not exist yet).
 
-/** The caller the seed acts as. Ops may write everything the seed touches. */
-const seedCaller: Caller = { userId: null, roles: [Role.Ops], hostIds: [] };
-
 const experienceBatch = 50;
 const rowBatch = 100;
 
 const excluded = (column: string) => sql`excluded.${sql.identifier(column)}`;
 
 export type SeedOptions = {
+  /** Who the seed writes as. Anything but ops is refused before a row is written. */
+  caller: Caller;
   /** The clock for session generation. The runner never reads one itself. */
   now: Date;
   scale?: ScaleOptions | undefined;
   log?: (line: string) => void;
-};
-
-type CatalogCounts = {
-  hosts: number;
-  experiences: number;
-  templates: number;
-  sessionsCreated: number;
-  sessionsAlreadyThere: number;
-  seatsAdjusted: number;
 };
 
 export type SeedReport = {
@@ -96,22 +95,28 @@ export type SeedReport = {
 };
 
 async function writeTaxonomy() {
-  const categoryRows = await db
-    .insert(categories)
-    .values(curated.categories.map((c) => taxonomyRow('category', c)))
-    .onConflictDoUpdate({
-      target: categories.slug,
-      set: { name: excluded('name') },
-    })
-    .returning({ id: categories.id, slug: categories.slug });
-  const neighborhoodRows = await db
-    .insert(neighborhoods)
-    .values(curated.neighborhoods.map((n) => taxonomyRow('neighborhood', n)))
-    .onConflictDoUpdate({
-      target: neighborhoods.slug,
-      set: { name: excluded('name') },
-    })
-    .returning({ id: neighborhoods.id, slug: neighborhoods.slug });
+  const { categoryRows, neighborhoodRows } = await db.transaction(
+    async (tx) => ({
+      categoryRows: await tx
+        .insert(categories)
+        .values(curated.categories.map((c) => taxonomyRow('category', c)))
+        .onConflictDoUpdate({
+          target: categories.slug,
+          set: { name: excluded('name') },
+        })
+        .returning({ id: categories.id, slug: categories.slug }),
+      neighborhoodRows: await tx
+        .insert(neighborhoods)
+        .values(
+          curated.neighborhoods.map((n) => taxonomyRow('neighborhood', n)),
+        )
+        .onConflictDoUpdate({
+          target: neighborhoods.slug,
+          set: { name: excluded('name') },
+        })
+        .returning({ id: neighborhoods.id, slug: neighborhoods.slug }),
+    }),
+  );
   const tierRows = await db
     .select({ id: cancellationTiers.id, key: cancellationTiers.key })
     .from(cancellationTiers);
@@ -141,7 +146,7 @@ async function publishedWaivers(docs: readonly LegalFixture[]) {
   return ids;
 }
 
-async function writeLegal(docs: readonly LegalFixture[]) {
+async function writeLegal(caller: Caller, docs: readonly LegalFixture[]) {
   for (const fixture of docs) {
     const versions = await db
       .select({
@@ -158,36 +163,36 @@ async function writeLegal(docs: readonly LegalFixture[]) {
       step.action === 'publish'
         ? step.id
         : (
-            await createLegalDraft(seedCaller, {
+            await createLegalDraft(caller, {
               doc: fixture.doc,
               title: fixture.title,
               body: fixture.body,
             })
           ).id;
     expectStatus(
-      `publish ${fixture.doc}`,
-      await publishLegalDocument(seedCaller, id),
+      stepNames.publishLegal(fixture.doc),
+      await publishLegalDocument(caller, id),
       'published',
     );
   }
 }
 
 async function writeHostsAndExperiences(catalog: ScaleFixtures, refs: RefMaps) {
-  for (const batch of inChunks(catalog.hosts, rowBatch)) {
-    await db
-      .insert(hosts)
-      .values(batch.map(hostRow))
-      .onConflictDoUpdate({
-        target: hosts.id,
-        set: {
-          name: excluded('name'),
-          description: excluded('description'),
-          timeZone: excluded('time_zone'),
-        },
-      });
-  }
-  for (const batch of inChunks(catalog.experiences, experienceBatch)) {
-    await db.transaction(async (tx) => {
+  await db.transaction(async (tx) => {
+    for (const batch of inChunks(catalog.hosts, rowBatch)) {
+      await tx
+        .insert(hosts)
+        .values(batch.map(hostRow))
+        .onConflictDoUpdate({
+          target: hosts.id,
+          set: {
+            name: excluded('name'),
+            description: excluded('description'),
+            timeZone: excluded('time_zone'),
+          },
+        });
+    }
+    for (const batch of inChunks(catalog.experiences, experienceBatch)) {
       await tx
         .insert(experiences)
         .values(batch.map((fixture) => experienceRow(fixture, refs)))
@@ -232,11 +237,12 @@ async function writeHostsAndExperiences(catalog: ScaleFixtures, refs: RefMaps) {
             },
           });
       }
-    });
-  }
+    }
+  });
 }
 
 async function writeSessions(
+  caller: Caller,
   catalog: ScaleFixtures,
   now: Date,
 ): Promise<
@@ -258,10 +264,7 @@ async function writeSessions(
   for (const fixture of catalog.experiences) {
     for (const slot of fixture.slots) {
       templateOutcome(
-        await createSessionTemplate(
-          seedCaller,
-          templateInput(fixture.slug, slot),
-        ),
+        await createSessionTemplate(caller, templateInput(fixture.slug, slot)),
       );
       const [template] = await db
         .select({ id: sessionTemplates.id })
@@ -274,14 +277,12 @@ async function writeSessions(
           ),
         );
       if (!template) {
-        throw new SeedStepError(
-          `Seed step "find session template" found none for ${fixture.slug}`,
-        );
+        throw templateNotFound(fixture.slug);
       }
       const generated = expectOk(
         'generate sessions',
         await generateSessions(
-          seedCaller,
+          caller,
           { templateId: template.id, ...range },
           now,
         ),
@@ -304,24 +305,28 @@ async function writeSessions(
       .innerJoin(sessionTemplates, eq(sessions.templateId, sessionTemplates.id))
       .where(eq(sessions.experienceId, experienceId(fixture.slug)))
       .limit(500);
-    for (const update of seatUpdates(plans, stored)) {
-      await db
-        .update(sessions)
-        .set({ seatsSold: update.seatsSold })
-        .where(eq(sessions.id, update.sessionId));
-      counts.seatsAdjusted += 1;
-    }
+    const updates = seatUpdates(plans, stored);
+    await db.transaction(async (tx) => {
+      for (const update of updates) {
+        await tx
+          .update(sessions)
+          .set({ seatsSold: update.seatsSold })
+          .where(eq(sessions.id, update.sessionId));
+      }
+    });
+    counts.seatsAdjusted += updates.length;
   }
   return counts;
 }
 
 async function writeCatalog(
+  caller: Caller,
   catalog: ScaleFixtures,
   refs: RefMaps,
   now: Date,
 ): Promise<CatalogCounts> {
   await writeHostsAndExperiences(catalog, refs);
-  const sessionCounts = await writeSessions(catalog, now);
+  const sessionCounts = await writeSessions(caller, catalog, now);
   return {
     hosts: catalog.hosts.length,
     experiences: catalog.experiences.length,
@@ -330,6 +335,7 @@ async function writeCatalog(
 }
 
 async function writeEditorial(
+  caller: Caller,
   refs: Pick<RefMaps, 'categories' | 'neighborhoods'>,
 ) {
   const stored = await db
@@ -343,8 +349,8 @@ async function writeEditorial(
   const collectionIds = new Map<string, string>();
   for (const fixture of curated.collections) {
     const saved = expectStatus(
-      `save collection ${fixture.slug}`,
-      await saveCollection(seedCaller, collectionInput(fixture, stored)),
+      stepNames.saveCollection(fixture.slug),
+      await saveCollection(caller, collectionInput(fixture, stored)),
       'saved',
     );
     collectionIds.set(fixture.slug, saved.value.id);
@@ -352,15 +358,15 @@ async function writeEditorial(
   expectStatus(
     'save home modules',
     await saveHomeModules(
-      seedCaller,
+      caller,
       homeModulesInput(curated.homeModules, collectionIds),
     ),
     'saved',
   );
   for (const fixture of curated.pageCopy) {
     expectStatus(
-      `save ${fixture.kind} copy ${fixture.slug}`,
-      await savePageCopy(seedCaller, pageCopyInput(fixture, refs)),
+      stepNames.savePageCopy(fixture.kind, fixture.slug),
+      await savePageCopy(caller, pageCopyInput(fixture, refs)),
       'saved',
     );
   }
@@ -372,6 +378,8 @@ async function writeEditorial(
  * where it is pointed (`checkSeedTarget`); this function does not.
  */
 export async function runSeed(options: SeedOptions): Promise<SeedReport> {
+  requireRole(options.caller, Role.Ops, {});
+  const { caller } = options;
   const log = options.log ?? (() => undefined);
   const scale = options.scale
     ? generateScaleFixtures(options.scale)
@@ -379,29 +387,27 @@ export async function runSeed(options: SeedOptions): Promise<SeedReport> {
   assertValidFixtures(curated, scale);
 
   const taxonomy = await writeTaxonomy();
-  log(
-    `Categories ${String(curated.categories.length)}, neighborhoods ${String(curated.neighborhoods.length)}`,
-  );
-  await writeLegal(curated.legal);
+  log(taxonomyLine(curated.categories.length, curated.neighborhoods.length));
+  await writeLegal(caller, curated.legal);
   const waivers = await publishedWaivers(curated.legal);
-  log(`Legal documents ${String(curated.legal.length)}`);
+  log(legalLine(curated.legal.length));
   const refs: RefMaps = { ...taxonomy, waivers };
 
-  const curatedCounts = await writeCatalog(curated, refs, options.now);
+  const curatedCounts = await writeCatalog(caller, curated, refs, options.now);
+  log(curatedLine(curatedCounts));
+  await writeEditorial(caller, refs);
   log(
-    `Curated: ${String(curatedCounts.experiences)} experiences, ${String(curatedCounts.sessionsCreated)} sessions created`,
-  );
-  await writeEditorial(refs);
-  log(
-    `Editorial: ${String(curated.collections.length)} collections, ${String(curated.homeModules.length)} home modules, ${String(curated.pageCopy.length)} page copies`,
+    editorialLine(
+      curated.collections.length,
+      curated.homeModules.length,
+      curated.pageCopy.length,
+    ),
   );
 
   let scaleCounts: CatalogCounts | undefined;
   if (scale) {
-    scaleCounts = await writeCatalog(scale, refs, options.now);
-    log(
-      `Scale: ${String(scaleCounts.hosts)} hosts, ${String(scaleCounts.experiences)} experiences, ${String(scaleCounts.sessionsCreated)} sessions created`,
-    );
+    scaleCounts = await writeCatalog(caller, scale, refs, options.now);
+    log(scaleLine(scaleCounts));
   }
   return {
     legalDocuments: curated.legal.length,

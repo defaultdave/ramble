@@ -1,7 +1,7 @@
 import type { ExperienceFixture, HostFixture } from '../types';
 
 // The coverage set: the fewest experiences that put data behind every P3 state (see coverage.ts).
-// It is not the curated catalog. U-021b grows the catalog around it. Everything here is fictional
+// It is not the curated catalog; the curated catalog grows around it. Everything here is fictional
 // and written fresh for Ramble; no name, address, or sentence comes from any real business.
 
 export const hosts: HostFixture[] = [

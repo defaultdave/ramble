@@ -1,7 +1,9 @@
 import 'server-only';
 import {
+  blurDataUrlFrom,
   photoLimits,
   refusalForHeader,
+  refusalForStoredCopy,
   refusalForUpload,
   type PhotoRefusalCode,
 } from '@/lib/photos';
@@ -63,18 +65,15 @@ export async function ingestPhoto(
       if (error instanceof ImageError) throw new PhotoRefusedError('corrupt');
       throw error;
     });
-  if (stored.bytes.byteLength > photoLimits.maxStoredBytes) {
-    throw new PhotoRefusedError('too_large');
-  }
+  const storedRefusal = refusalForStoredCopy(stored.bytes.byteLength);
+  if (storedRefusal) throw new PhotoRefusedError(storedRefusal);
 
   const tiny = await image.thumbnail(stored.bytes, {
     edge: blurEdge,
     quality: blurQuality,
   });
-  const blurDataUrl = `data:image/jpeg;base64,${Buffer.from(tiny).toString('base64')}`;
-  if (blurDataUrl.length > photoLimits.maxBlurLength) {
-    throw new Error('Blur placeholder exceeds its length limit');
-  }
+  const blurDataUrl = blurDataUrlFrom(tiny);
+  if (!blurDataUrl) throw new Error('Blur placeholder is empty or too long');
 
   return {
     bytes: stored.bytes,

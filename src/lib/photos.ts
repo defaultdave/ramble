@@ -62,6 +62,13 @@ export function refusalForUpload(byteLength: number): PhotoRefusalCode | null {
   return null;
 }
 
+/** The check on the re-encoded copy, once it exists: what is stored must fit the stored cap. */
+export function refusalForStoredCopy(
+  byteLength: number,
+): PhotoRefusalCode | null {
+  return byteLength > photoLimits.maxStoredBytes ? 'too_large' : null;
+}
+
 export type ImageHeader = {
   format: string | undefined;
   width: number | undefined;
@@ -107,6 +114,61 @@ export function nextPhotoPosition(taken: readonly number[]): number | null {
 
 /** A tiny JPEG as a data URL, for `next/image`'s `blurDataURL`. Its length is capped by its own CHECK. The separator is `.` because drizzle-kit cuts a CHECK at a literal semicolon. */
 export const blurDataUrlPattern = String.raw`^data:image/jpeg.base64,[A-Za-z0-9+/]+={0,2}$`;
+
+const blurDataUrlPrefix = 'data:image/jpeg;base64,';
+
+/**
+ * The placeholder as a data URL, or null when it is empty or would not fit `maxBlurLength`. The
+ * byte count is checked first, so the encoder never sees more than the cap allows.
+ */
+export function blurDataUrlFrom(bytes: Uint8Array): string | null {
+  if (bytes.byteLength === 0 || bytes.byteLength > photoLimits.maxBlurLength)
+    return null;
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  const url = `${blurDataUrlPrefix}${btoa(binary)}`;
+  return url.length > photoLimits.maxBlurLength ? null : url;
+}
+
+/** The roles that may add a photo to any experience, and the one that may add to its own host's. */
+const photoStaffRoles = ['ops', 'admin'] as const;
+type PhotoStaffRole = (typeof photoStaffRoles)[number];
+
+export type PhotoActor =
+  { kind: 'staff'; role: PhotoStaffRole } | { kind: 'host_owner' };
+
+/** Which way the caller may add photos, from their roles alone; null when they may not at all. */
+export function photoActorFor(roles: readonly string[]): PhotoActor | null {
+  const role = photoStaffRoles.find((staffRole) => roles.includes(staffRole));
+  if (role) return { kind: 'staff', role };
+  return roles.includes('host_owner') ? { kind: 'host_owner' } : null;
+}
+
+export type PhotoAccess =
+  | { outcome: 'staff'; role: PhotoStaffRole }
+  | { outcome: 'host_owner'; hostId: string }
+  /** Staff are told an experience does not exist. */
+  | { outcome: 'experience_missing' }
+  /** A host owner is refused the same way for a missing experience as for another host's. */
+  | { outcome: 'refused' };
+
+/**
+ * What an actor may do once the experience is looked up (`experienceHostId` is null when there is
+ * none). A host owner gets the refusal, not "missing", so the answer never says which IDs exist.
+ */
+export function photoAccessFor(
+  actor: PhotoActor,
+  experienceHostId: string | null,
+): PhotoAccess {
+  if (actor.kind === 'staff') {
+    return experienceHostId === null
+      ? { outcome: 'experience_missing' }
+      : { outcome: 'staff', role: actor.role };
+  }
+  return experienceHostId === null
+    ? { outcome: 'refused' }
+    : { outcome: 'host_owner', hostId: experienceHostId };
+}
 
 export const photoRightsBases = [
   'host_agreement',

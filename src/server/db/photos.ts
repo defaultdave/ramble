@@ -6,6 +6,8 @@ import {
   GuestPhotoSchema,
   NewPhotoSchema,
   nextPhotoPosition,
+  photoAccessFor,
+  photoActorFor,
   photoLimits,
   photoStorageKey,
   storedPhotoContentType,
@@ -49,9 +51,30 @@ const photoColumns = {
   blurDataUrl: photos.blurDataUrl,
 };
 
-/** Ops and admin add photos to any experience; a host owner only to their own host's. */
-function staffRoleOf(caller: Caller) {
-  return [Role.Ops, Role.Admin].find((role) => caller.roles.includes(role));
+/** What was left behind when a photo's file could not be removed; it carries the kind of the failure, never its message. */
+export class PhotoCleanupError extends Error {
+  readonly photoId: string;
+  readonly errorKind: string;
+
+  constructor(photoId: string, cause: unknown) {
+    super(`Photo file left in storage for ${photoId}`);
+    this.name = 'PhotoCleanupError';
+    this.photoId = photoId;
+    this.errorKind = cause instanceof Error ? cause.name : 'unknown';
+  }
+}
+
+/** Hands the cleanup failure to whoever reports the primary error, without replacing it. */
+function attachSuppressed(primary: unknown, suppressed: PhotoCleanupError) {
+  if (typeof primary !== 'object' || primary === null) return;
+  const existing: unknown = Reflect.get(primary, 'suppressed');
+  Reflect.defineProperty(primary, 'suppressed', {
+    value: Array.isArray(existing)
+      ? [...(existing as unknown[]), suppressed]
+      : [suppressed],
+    configurable: true,
+    writable: true,
+  });
 }
 
 // TODO(U-074b): first caller
@@ -70,31 +93,35 @@ export async function addPhoto(
 ): Promise<GuestPhoto> {
   const photo = NewPhotoSchema.parse(input);
   // A caller with neither a staff role nor a host role is refused before any lookup, and a host
-  // owner is refused the same way for a missing experience as for another host's, so none of them
-  // can tell from the answer which experience IDs exist.
-  const staffRole = staffRoleOf(caller);
-  if (!staffRole && !caller.roles.includes(Role.HostOwner)) {
-    throw new ForbiddenError(Role.HostOwner);
-  }
+  // owner is refused the same way for a missing experience as for another host's (`photoAccessFor`).
+  const actor = photoActorFor(caller.roles);
+  if (!actor) throw new ForbiddenError(Role.HostOwner);
   const [experience] = await db
     .select({ id: experiences.id, hostId: experiences.hostId })
     .from(experiences)
     .where(eq(experiences.id, photo.experienceId));
-  if (!experience) {
-    if (staffRole) throw new ExperienceNotFoundError();
-    throw new ForbiddenError(Role.HostOwner);
+  const access = photoAccessFor(actor, experience?.hostId ?? null);
+  switch (access.outcome) {
+    case 'experience_missing':
+      throw new ExperienceNotFoundError();
+    case 'refused':
+      throw new ForbiddenError(Role.HostOwner);
+    case 'staff':
+      requireRole(caller, access.role, {});
+      break;
+    case 'host_owner':
+      requireRole(caller, Role.HostOwner, { hostId: access.hostId });
+      break;
   }
-  if (staffRole) requireRole(caller, staffRole, {});
-  else requireRole(caller, Role.HostOwner, { hostId: experience.hostId });
 
   // A full gallery is refused before any pixel is decoded; the transaction below decides for certain.
-  if (nextPhotoPosition(await takenPositions(experience.id)) === null) {
+  if (nextPhotoPosition(await takenPositions(photo.experienceId)) === null) {
     throw new PhotoLimitError();
   }
 
   const ingested = await ingestPhoto(upload);
   const id = randomUUID();
-  const storageKey = photoStorageKey(experience.id, id);
+  const storageKey = photoStorageKey(photo.experienceId, id);
   const stored = await storage.put({
     key: storageKey,
     body: ingested.bytes,
@@ -110,19 +137,19 @@ export async function addPhoto(
       await tx
         .select({ id: experiences.id })
         .from(experiences)
-        .where(eq(experiences.id, experience.id))
+        .where(eq(experiences.id, photo.experienceId))
         .for('update');
       const taken = await tx
         .select({ position: photos.position })
         .from(photos)
-        .where(eq(photos.experienceId, experience.id));
+        .where(eq(photos.experienceId, photo.experienceId));
       const position = nextPhotoPosition(taken.map((row) => row.position));
       if (position === null) throw new PhotoLimitError();
       const [inserted] = await tx
         .insert(photos)
         .values({
           id,
-          experienceId: experience.id,
+          experienceId: photo.experienceId,
           position,
           storageKey,
           url,
@@ -142,7 +169,16 @@ export async function addPhoto(
       return inserted;
     });
   } catch (error) {
-    await removeOrphan(storage, storageKey, id);
+    try {
+      await removeOrphan(storage, storageKey, id);
+    } catch (cleanupError) {
+      const failure = new PhotoCleanupError(id, cleanupError);
+      logger.error('Photo file left in storage after its row failed', {
+        photoId: id,
+        errorKind: failure.errorKind,
+      });
+      attachSuppressed(error, failure);
+    }
     throw error;
   }
   // Outside the try: the row is stored by now, so a failure here must not delete the file it points at.
@@ -160,27 +196,20 @@ async function takenPositions(experienceId: string): Promise<number[]> {
 /**
  * Removes the file of a photo whose row could not be written. A failed transaction call can still
  * have gone through (the connection drops after the commit), and a row pointing at a deleted file is
- * worse than a stray file, so the file goes only once the row is known to be absent. Best effort: a
- * failure is logged by error kind and photo id, and the original error still reaches the caller.
+ * worse than a stray file, so the file goes only once the row is known to be absent. A failure here
+ * propagates to `addPhoto`, which attaches it to the error it is already rethrowing.
  */
 async function removeOrphan(
   storage: StoragePort,
   storageKey: string,
   photoId: string,
-) {
-  try {
-    const [stored] = await db
-      .select({ id: photos.id })
-      .from(photos)
-      .where(eq(photos.id, photoId));
-    if (stored) return;
-    await storage.delete({ key: storageKey });
-  } catch (error) {
-    logger.error('Photo file left in storage after its row failed', {
-      photoId,
-      errorKind: error instanceof Error ? error.name : 'unknown',
-    });
-  }
+): Promise<void> {
+  const [stored] = await db
+    .select({ id: photos.id })
+    .from(photos)
+    .where(eq(photos.id, photoId));
+  if (stored) return;
+  await storage.delete({ key: storageKey });
 }
 
 // TODO(U-039): first caller

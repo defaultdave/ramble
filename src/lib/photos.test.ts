@@ -1,20 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import {
+  blurDataUrlFrom,
   blurDataUrlPattern,
   GuestPhotoSchema,
   NewPhotoSchema,
   nextPhotoPosition,
   PhotoRightsSchema,
+  photoAccessFor,
+  photoActorFor,
   photoLimits,
   photoRefusalCodes,
   photoRefusalMessage,
   photoStorageKey,
   refusalForHeader,
+  refusalForStoredCopy,
   refusalForUpload,
 } from './photos';
 
 // Behaviours under test, one per decision, branch or risk:
 // - an upload is refused by size alone: empty, over the limit; the limit itself passes
+// - a re-encoded copy is refused over the stored cap; the cap itself passes
+// - the blur placeholder is a data URL, refused when empty or over its length cap
+// - the actor is staff (ops before admin), a host owner, or nobody, from roles alone
+// - access: staff are told a missing experience is missing, a host owner gets the refusal for a missing one
 // - a header is refused for format, missing size, frames, either edge, and area, each at its boundary
 // - the next position is the lowest free one and is null once the experience is full
 // - alt text is required unless decorative; a decorative photo carries none; blank and long alt text are refused
@@ -41,6 +49,79 @@ describe('refusalForUpload', () => {
     [photoLimits.maxInputBytes + 1, 'too_large'],
   ])('%i bytes gives %s', (byteLength, expected) => {
     expect(refusalForUpload(byteLength)).toBe(expected);
+  });
+});
+
+describe('refusalForStoredCopy', () => {
+  it.each([
+    [0, null],
+    [photoLimits.maxStoredBytes, null],
+    [photoLimits.maxStoredBytes + 1, 'too_large'],
+  ])('%i bytes gives %s', (byteLength, expected) => {
+    expect(refusalForStoredCopy(byteLength)).toBe(expected);
+  });
+});
+
+describe('blurDataUrlFrom', () => {
+  const prefix = 'data:image/jpeg;base64,';
+  const longestBytes =
+    Math.floor((photoLimits.maxBlurLength - prefix.length) / 4) * 3;
+
+  it('encodes the bytes as a jpeg data URL that the stored pattern accepts', () => {
+    const url = blurDataUrlFrom(new Uint8Array([1, 2, 3]));
+
+    expect(url).toBe('data:image/jpeg;base64,AQID');
+    expect(url).toMatch(new RegExp(blurDataUrlPattern));
+  });
+
+  it('keeps the longest placeholder that still fits the length cap', () => {
+    const url = blurDataUrlFrom(new Uint8Array(longestBytes));
+
+    // Base64 grows in steps of four characters, so the cap itself may sit one short of a step.
+    const longestLength =
+      prefix.length +
+      Math.floor((photoLimits.maxBlurLength - prefix.length) / 4) * 4;
+    expect(url?.length).toBe(longestLength);
+    expect(longestLength).toBeLessThanOrEqual(photoLimits.maxBlurLength);
+  });
+
+  it.each([
+    ['empty', 0],
+    ['one group of three bytes over the cap', longestBytes + 3],
+    [
+      'more bytes than the cap allows in any encoding',
+      photoLimits.maxBlurLength + 1,
+    ],
+  ])('refuses a placeholder that is %s', (_name, byteLength) => {
+    expect(blurDataUrlFrom(new Uint8Array(byteLength))).toBeNull();
+  });
+});
+
+describe('photoActorFor', () => {
+  it.each([
+    [['ops'], { kind: 'staff', role: 'ops' }],
+    [['admin'], { kind: 'staff', role: 'admin' }],
+    [['admin', 'ops'], { kind: 'staff', role: 'ops' }],
+    [['host_owner', 'admin'], { kind: 'staff', role: 'admin' }],
+    [['host_owner'], { kind: 'host_owner' }],
+    [['host_staff'], null],
+    [['guest'], null],
+    [[], null],
+  ])('%j gives %j', (roles, expected) => {
+    expect(photoActorFor(roles)).toEqual(expected);
+  });
+});
+
+describe('photoAccessFor', () => {
+  const hostId = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
+
+  it.each([
+    [{ kind: 'staff', role: 'ops' }, hostId, { outcome: 'staff', role: 'ops' }],
+    [{ kind: 'staff', role: 'admin' }, null, { outcome: 'experience_missing' }],
+    [{ kind: 'host_owner' }, hostId, { outcome: 'host_owner', hostId }],
+    [{ kind: 'host_owner' }, null, { outcome: 'refused' }],
+  ] as const)('%j with host %s gives %j', (actor, host, expected) => {
+    expect(photoAccessFor(actor, host)).toEqual(expected);
   });
 });
 

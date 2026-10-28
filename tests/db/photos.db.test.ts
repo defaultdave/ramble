@@ -35,6 +35,7 @@ import {
 // - a full gallery is refused before decoding, and two uploads racing for the last place give one
 //   photo and one refusal, with the loser's file removed
 // - a row that cannot be written removes its file again
+// - when that removal also fails, the failure rides on the original error (never swallowed) as its kind and photo id only
 // - guests list the photos of live and guide-only experiences in order, and none of a hidden one
 // - each CHECK refuses its row; deleting an experience with photos is refused
 
@@ -486,7 +487,7 @@ describe('addPhoto', () => {
     expect(storage.read(stored[0] ?? '')).toBeNull();
   });
 
-  it('logs only the error kind and photo id when the cleanup delete fails, and still throws the original error', async () => {
+  it('hands a failed cleanup to the caller on the original error, naming only the error kind and photo id', async () => {
     const { logger } = await import('@/server/monitoring/logger');
     const logged = vi
       .spyOn(logger, 'error')
@@ -512,19 +513,33 @@ describe('addPhoto', () => {
         ),
     };
 
-    await expect(
-      photoStore.addPhoto(
-        ops,
-        newPhoto(experience.id),
-        validUpload,
-        failingCleanup,
-      ),
-    ).rejects.toMatchObject({
+    const thrown: unknown = await photoStore
+      .addPhoto(ops, newPhoto(experience.id), validUpload, failingCleanup)
+      .catch((error: unknown) => error);
+
+    // The original error reaches the caller unchanged in kind.
+    expect(thrown).not.toBeInstanceOf(photoStore.PhotoCleanupError);
+    expect(thrown).toMatchObject({
       cause: { constraint: 'photos_experience_id_experiences_id_fk' },
     });
-
+    // The cleanup failure is not swallowed: it travels with that error, for whoever reports it.
     const photoId = /\/([0-9a-f-]{36})\.jpg$/.exec(keys[0] ?? '')?.[1];
     expect(photoId).toBeDefined();
+    const suppressed = (thrown as { suppressed?: unknown[] }).suppressed;
+    expect(suppressed).toHaveLength(1);
+    expect(suppressed?.[0]).toBeInstanceOf(photoStore.PhotoCleanupError);
+    expect(suppressed?.[0]).toMatchObject({
+      photoId,
+      errorKind: 'StorageError',
+    });
+    // The stray file is still there, and nothing raw from the provider is on the failure or in a log.
+    expect(storage.read(keys[0] ?? '')).not.toBeNull();
+    const everything = JSON.stringify([
+      (suppressed?.[0] as Error).message,
+      suppressed?.[0],
+      logged.mock.calls,
+    ]);
+    expect(everything).not.toContain('abc-secret');
     expect(logged).toHaveBeenCalledTimes(1);
     expect(logged).toHaveBeenCalledWith(expect.any(String), {
       photoId,

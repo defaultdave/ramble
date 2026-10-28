@@ -1,7 +1,6 @@
 import Form from 'next/form';
-import Link from 'next/link';
 import { Alert } from '@/components/Alert';
-import { Button } from '@/components/Button';
+import { Button, ButtonLink } from '@/components/Button';
 import { Card } from '@/components/Card';
 import type { BrowseCard, BrowseView, FormTarget } from '@/lib/browse';
 import { browsePath } from '@/lib/filters';
@@ -80,9 +79,9 @@ export function BrowseResults(props: BrowseResultsProps) {
               />
             ) : null}
             {props.startHref ? (
-              <Link className={styles.link} href={props.startHref}>
+              <ButtonLink href={props.startHref}>
                 Back to the first results
-              </Link>
+              </ButtonLink>
             ) : null}
           </div>
         </div>
@@ -101,9 +100,7 @@ export function BrowseResults(props: BrowseResultsProps) {
               : 'New experiences are on their way.'}
           </p>
           {props.filtered ? (
-            <Link className={styles.link} href={browsePath}>
-              Clear all filters
-            </Link>
+            <ButtonLink href={browsePath}>Clear all filters</ButtonLink>
           ) : null}
         </div>
       );
@@ -129,9 +126,9 @@ export function BrowseResults(props: BrowseResultsProps) {
           <p className={styles.noticeText}>
             The list changed while you were reading it.
           </p>
-          <Link className={styles.link} href={props.startHref}>
+          <ButtonLink href={props.startHref}>
             Back to the first results
-          </Link>
+          </ButtonLink>
         </div>
       );
   }

@@ -53,25 +53,6 @@
   font-family: var(--font-family-body);
 }
 
-.link {
-  display: inline-flex;
-  min-block-size: var(--size-touch-target);
-  align-items: center;
-  justify-content: center;
-  font-size: var(--font-size-label);
-  line-height: var(--font-line-height-label);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-link);
-}
-
-.link:focus-visible {
-  outline: 2px solid transparent;
-  border-radius: var(--radius-sm);
-  box-shadow:
-    0 0 0 2px var(--color-bg-canvas),
-    0 0 0 4px var(--color-focus-ring);
-}
-
 .notice {
   display: flex;
   flex-direction: column;

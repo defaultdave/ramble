@@ -1,5 +1,5 @@
 import { Calendar } from 'lucide-react';
-import Link from 'next/link';
+import { ButtonLink } from '@/components/Button';
 import { ChipLink } from '@/components/Chip';
 import { DatePicker } from '@/components/DatePicker';
 import { dateChipLabel } from '@/lib/browse';
@@ -91,13 +91,9 @@ export function FilterBar({
               onChange={onPickDate}
             />
             {filters.date ? (
-              <Link
-                className={styles.link}
-                href={hrefForFilters(withDate(filters, null))}
-                prefetch={false}
-              >
+              <ButtonLink href={hrefForFilters(withDate(filters, null))}>
                 Clear date
-              </Link>
+              </ButtonLink>
             ) : null}
           </div>
         </details>
@@ -116,9 +112,7 @@ export function FilterBar({
       />
       {activeFilterCount(filters) > 0 ? (
         <div className={styles.clear}>
-          <Link className={styles.link} href={browsePath} prefetch={false}>
-            Clear all filters
-          </Link>
+          <ButtonLink href={browsePath}>Clear all filters</ButtonLink>
         </div>
       ) : null}
     </div>

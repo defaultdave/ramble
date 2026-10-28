@@ -251,6 +251,10 @@ describe('environment', () => {
         VERCEL_ENV: 'production',
         DATABASE_URL: 'postgres://u:p@h/db',
         DATABASE_URL_UNPOOLED: 'postgres://u:p@h/db',
+        STORAGE_PROVIDER: 'vercel-blob',
+        BLOB_PUBLIC_READ_WRITE_TOKEN:
+          'vercel_blob_rw_teststore1_notarealsecret',
+        BLOB_PRIVATE_READ_WRITE_TOKEN: 'test-private-token',
       });
 
       const env = await loadEnv();
@@ -351,6 +355,90 @@ describe('environment', () => {
       await expect(loadEnv()).rejects.toThrow(
         new RegExp(`Invalid environment variables[\\s\\S]*${missing}`),
       );
+    });
+  });
+
+  describe('storage', () => {
+    const publicToken = 'vercel_blob_rw_teststore1_notarealsecret';
+
+    it.each(['production', 'preview', 'development'])(
+      'allows the fake in a %s deployment',
+      async (vercelEnv) => {
+        vi.stubEnv('STORAGE_PROVIDER', undefined);
+        vi.stubEnv('VERCEL_ENV', vercelEnv);
+
+        const env = await loadEnv();
+
+        expect(env.STORAGE_PROVIDER).toBe('fake');
+      },
+    );
+
+    it('allows the fake with NODE_ENV production when this is not a Vercel deployment (a local build or CI)', async () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('VERCEL_ENV', undefined);
+      vi.stubEnv('STORAGE_PROVIDER', undefined);
+      vi.stubEnv('NEXT_PHASE', 'phase-production-build');
+
+      const env = await loadEnv();
+
+      expect(env.STORAGE_PROVIDER).toBe('fake');
+    });
+
+    it('refuses a public token that does not carry a store id', async () => {
+      vi.stubEnv('STORAGE_PROVIDER', 'vercel-blob');
+      vi.stubEnv('BLOB_PUBLIC_READ_WRITE_TOKEN', 'test-public-token');
+      vi.stubEnv('BLOB_PRIVATE_READ_WRITE_TOKEN', 'test-private-token');
+
+      await expect(loadEnv()).rejects.toThrow(
+        /Invalid environment variables[\s\S]*BLOB_PUBLIC_READ_WRITE_TOKEN/,
+      );
+    });
+
+    it('uses the fake with no keys', async () => {
+      vi.stubEnv('STORAGE_PROVIDER', undefined);
+
+      const env = await loadEnv();
+
+      expect(env.STORAGE_PROVIDER).toBe('fake');
+    });
+
+    it('treats an empty token from a dashboard as unset', async () => {
+      vi.stubEnv('BLOB_PUBLIC_READ_WRITE_TOKEN', '');
+
+      const env = await loadEnv();
+
+      expect(env.BLOB_PUBLIC_READ_WRITE_TOKEN).toBeUndefined();
+    });
+
+    it('fails on a provider that does not exist', async () => {
+      vi.stubEnv('STORAGE_PROVIDER', 's3');
+
+      await expect(loadEnv()).rejects.toThrow(
+        /Invalid environment variables[\s\S]*STORAGE_PROVIDER/,
+      );
+    });
+
+    it.each([
+      ['BLOB_PUBLIC_READ_WRITE_TOKEN', 'BLOB_PRIVATE_READ_WRITE_TOKEN'],
+      ['BLOB_PRIVATE_READ_WRITE_TOKEN', 'BLOB_PUBLIC_READ_WRITE_TOKEN'],
+    ])('names %s when vercel-blob has only %s', async (missing, given) => {
+      vi.stubEnv('STORAGE_PROVIDER', 'vercel-blob');
+      vi.stubEnv(given, publicToken);
+      vi.stubEnv(missing, undefined);
+
+      await expect(loadEnv()).rejects.toThrow(
+        new RegExp(`Invalid environment variables[\\s\\S]*${missing}`),
+      );
+    });
+
+    it('accepts vercel-blob with both tokens', async () => {
+      vi.stubEnv('STORAGE_PROVIDER', 'vercel-blob');
+      vi.stubEnv('BLOB_PUBLIC_READ_WRITE_TOKEN', publicToken);
+      vi.stubEnv('BLOB_PRIVATE_READ_WRITE_TOKEN', 'test-private-token');
+
+      const env = await loadEnv();
+
+      expect(env.STORAGE_PROVIDER).toBe('vercel-blob');
     });
   });
 });

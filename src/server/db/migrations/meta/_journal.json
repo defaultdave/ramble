@@ -57,6 +57,13 @@
       "when": 1793061840162,
       "tag": "0007_editorial_policy_guards",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793164225116,
+      "tag": "0008_photos",
+      "breakpoints": true
     }
   ]
 }

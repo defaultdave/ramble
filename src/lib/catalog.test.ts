@@ -6,6 +6,7 @@ import {
   HostExperienceSchema,
   PriceOptionSchema,
   SlugSchema,
+  isSlug,
   type PriceOption,
 } from './catalog';
 
@@ -247,5 +248,42 @@ describe('identifiers', () => {
     expect(() =>
       CancellationTierSchema.parse({ ...tier, fullRefundHoursBefore: -1 }),
     ).toThrow();
+  });
+});
+
+describe('isSlug', () => {
+  const pattern = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+  it.each([
+    'a',
+    'summer',
+    'red-hook',
+    'a-b-c',
+    '2026-guide',
+    '',
+    '-',
+    '--',
+    'a-',
+    '-a',
+    'a--b',
+    'A',
+    'a b',
+    'a_b',
+    'a\n',
+    'é',
+    'a-b-',
+    'a-1-b2',
+  ])('agrees with the database pattern on %j', (value) => {
+    expect(isSlug(value)).toBe(pattern.test(value));
+  });
+
+  // The pattern's repeated group is matched by recursion, which overflows the stack on input
+  // of a few million characters; isSlug must answer instead of throwing.
+  it.each([
+    ['a long run of letters', 'a'.repeat(6_000_000), true],
+    ['a long run of hyphen-joined words', 'a-'.repeat(3_000_000) + 'a', true],
+    ['a long run of hyphens', '-'.repeat(6_000_000), false],
+  ])('answers for %s without throwing', (_name, value, expected) => {
+    expect(SlugSchema.safeParse(value).success).toBe(expected);
   });
 });

@@ -74,7 +74,7 @@ A state that needs a hold, a payment, or an order cannot be reached from seed ro
 | `legal-published` | Terms of service, privacy policy, and host agreement are published. |
 | `tax-treatments` | Live experiences cover each tax treatment: taxable (wine, pottery, coffee), not taxable (kayak, walk), and unknown (pasta). The total shows a tax line only for taxable. |
 | `neighbors` | The kayak shares Tribeca with a second live experience ("cast-iron-and-cobblestones"), for "More near Pier 26". |
-| `kids-zero-results` | Kids in Williamsburg exist but run only on weekends, so a weeknight search finds nothing; a kids class in Park Slope and other Williamsburg experiences give the "nearby" and "one less filter" suggestions. |
+| `kids-zero-results` | Kids in Williamsburg run only on weekends: browse for kids in Williamsburg on any weeknight in its date window returns nothing, and on a weekend returns the wheel class. A kids class in Park Slope and other Williamsburg experiences give the "nearby" and "one less filter" suggestions. |
 | `hidden-statuses` | A draft, an in-review, and a paused experience exist and are the only ones a guest cannot see; live and guide-only both are. |
 | `tiers-all` | Live experiences use each cancellation tier: flexible, moderate, and strict. |
 | `weather-both` | Live outdoor experiences cover both weather policies: rain or shine (the walk) and decided before start (the kayak). |

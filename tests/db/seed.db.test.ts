@@ -1,6 +1,7 @@
 import { updateTag } from 'next/cache';
 import { and, count, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { browseAsOf, browseWindow } from '@/lib/browse';
 import {
   coverage,
   coverageGaps,
@@ -42,6 +43,8 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 //   experiences, prices, templates, sessions, legal documents, collections, the home page, page copy
 // - every probe of the coverage matrix holds on what the database holds, and the sessions it holds
 //   are the ones the plan says, with the planned seats sold
+// - the zero-results state (S2) holds through browse's own query: kids in Williamsburg return nothing on
+//   every weeknight of browse's window and the wheel class on a weekend
 // - the guest reads the app will use parse the seeded rows and show what a guest may see: live and
 //   guide-only experiences, published Picks without the paused entry, the gift guide, six home
 //   modules in order, copy for every category and neighborhood, the published legal documents
@@ -65,6 +68,7 @@ let runner: typeof import('@/server/db/seed/run');
 let reader: typeof import('@/server/db/seed/read');
 let seedCaller: typeof import('@/server/db/seed/caller').seedCaller;
 let catalogReads: typeof import('@/server/db/catalog');
+let browseReads: typeof import('@/server/db/browse');
 let editorialReads: typeof import('@/server/db/editorial');
 let legalReads: typeof import('@/server/db/legal');
 let settingsReads: typeof import('@/server/db/settings');
@@ -80,6 +84,7 @@ beforeAll(async () => {
   reader = await import('@/server/db/seed/read');
   ({ seedCaller } = await import('@/server/db/seed/caller'));
   catalogReads = await import('@/server/db/catalog');
+  browseReads = await import('@/server/db/browse');
   editorialReads = await import('@/server/db/editorial');
   legalReads = await import('@/server/db/legal');
   settingsReads = await import('@/server/db/settings');
@@ -218,6 +223,49 @@ describe('the curated seed', () => {
     expect(
       results.filter((r) => probed.has(r.key) && !r.ok && !r.skipped),
     ).toEqual([]);
+  });
+
+  it('yields zero browse results for kids in Williamsburg on every weeknight of the window, and the wheel class on a weekend', async () => {
+    const asOf = browseAsOf(now);
+    const { from, to } = browseWindow(asOf);
+    const dayMs = 86_400_000;
+    const last = Date.parse(to.toISOString().slice(0, 10));
+    const dates: string[] = [];
+    for (
+      let day = Date.parse(from.toISOString().slice(0, 10));
+      day <= last;
+      day += dayMs
+    ) {
+      dates.push(new Date(day).toISOString().slice(0, 10));
+    }
+    const slugsOn = async (date: string) =>
+      (
+        await browseReads.listBrowseExperiences(
+          {
+            filters: {
+              categories: ['kids'],
+              neighborhoods: ['williamsburg'],
+              date,
+            },
+            after: null,
+          },
+          asOf,
+        )
+      ).items.map((e) => e.slug);
+    const found = await Promise.all(
+      dates.map(async (date) => ({ date, slugs: await slugsOn(date) })),
+    );
+    const isWeekend = (date: string) =>
+      [0, 6].includes(new Date(`${date}T00:00:00Z`).getUTCDay());
+    expect(
+      found.filter(({ date, slugs }) => !isWeekend(date) && slugs.length > 0),
+    ).toEqual([]);
+    expect(
+      found.some(
+        ({ date, slugs }) =>
+          isWeekend(date) && slugs.includes('kids-wheel-class'),
+      ),
+    ).toBe(true);
   });
 
   it('holds the sessions the plan says, with the planned seats sold', async () => {

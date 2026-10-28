@@ -3,12 +3,17 @@ import {
   type AnyPgColumn,
   boolean,
   check,
+  date,
+  foreignKey,
   index,
   integer,
   pgEnum,
   pgTable,
+  smallint,
   text,
+  time,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
@@ -26,7 +31,18 @@ import {
   photoLimits,
   photoRightsBases,
 } from '@/lib/photos';
-import { cancellationTiers } from './policies';
+import {
+  firstSessionDate,
+  ianaZonePattern,
+  lastSessionDate,
+  maxAllocation,
+  maxSessionMinutes,
+  maxTimeZoneLength,
+  sessionCancelReasons,
+  sessionSources,
+  sessionStatuses,
+} from '@/lib/sessions';
+import { cancellationTiers, legalDocuments } from './policies';
 
 export const experienceStatusEnum = pgEnum(
   'experience_status',
@@ -40,6 +56,12 @@ export const slugEntityKindEnum = pgEnum('slug_entity_kind', slugEntityKinds);
 export const photoRightsBasisEnum = pgEnum(
   'photo_rights_basis',
   photoRightsBases,
+);
+export const sessionSourceEnum = pgEnum('session_source', sessionSources);
+export const sessionStatusEnum = pgEnum('session_status', sessionStatuses);
+export const sessionCancelReasonEnum = pgEnum(
+  'session_cancel_reason',
+  sessionCancelReasons,
 );
 
 const timestampTz = () => timestamp({ withTimezone: true });
@@ -140,8 +162,9 @@ export const experiences = pgTable(
     maxAge: integer(),
     taxTreatment: taxTreatmentEnum().notNull().default('unknown'),
     waiverRequired: boolean().notNull().default(false),
-    // No foreign key: the legal documents table arrives with the policy schema.
-    waiverDocumentId: uuid(),
+    waiverDocumentId: uuid().references(() => legalDocuments.id, {
+      onDelete: 'restrict',
+    }),
     linkOutUrl: text(),
     affiliateUrl: text(),
     createdAt: timestampTz().notNull().defaultNow(),
@@ -341,6 +364,147 @@ export const slugHistory = pgTable(
   ],
 );
 
+/**
+ * A weekly recurrence: every `weekday` at `startTime` on the host's wall clock. The time zone is
+ * the host's (`hosts.time_zone`), read when sessions are generated, so a template cannot disagree
+ * with its host. Generated sessions copy the zone and the template's source and allocation.
+ */
+export const sessionTemplates = pgTable(
+  'session_templates',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    experienceId: uuid()
+      .notNull()
+      .references(() => experiences.id, { onDelete: 'restrict' }),
+    // 0 is Sunday, as in JavaScript.
+    weekday: smallint().notNull(),
+    startTime: time({ precision: 0 }).notNull(),
+    durationMinutes: integer().notNull(),
+    allocation: integer().notNull(),
+    source: sessionSourceEnum().notNull().default('ramble'),
+    createdAt: timestampTz().notNull().defaultNow(),
+  },
+  (table) => [
+    // Lets a session's foreign key name the template and the experience together.
+    unique('session_templates_id_experience_unique').on(
+      table.id,
+      table.experienceId,
+    ),
+    uniqueIndex('session_templates_slot_unique').on(
+      table.experienceId,
+      table.weekday,
+      table.startTime,
+    ),
+    check(
+      'session_templates_weekday_in_range',
+      sql`${table.weekday} BETWEEN 0 AND 6`,
+    ),
+    // '24:00:00' is a valid Postgres time, and so is a leap second; neither is a start time.
+    check(
+      'session_templates_start_time_whole_minute',
+      sql`${table.startTime} < '24:00:00' AND extract(second FROM ${table.startTime}) = 0`,
+    ),
+    check(
+      'session_templates_duration_in_range',
+      sql`${table.durationMinutes} BETWEEN 1 AND ${sql.raw(String(maxSessionMinutes))}`,
+    ),
+    check(
+      'session_templates_allocation_in_range',
+      sql`${table.allocation} BETWEEN 0 AND ${sql.raw(String(maxAllocation))}`,
+    ),
+    check(
+      'session_templates_source_generated',
+      sql`${table.source} IN ('ramble', 'allocation')`,
+    ),
+    check(
+      'session_templates_created_at_in_range',
+      isReadableDate(table.createdAt),
+    ),
+  ],
+);
+
+/**
+ * One dated session. `seats_sold` moves only when an order confirms or a confirmed order is
+ * cancelled (design doc 4.2.2). `local_date` and `template_id` together make generation
+ * idempotent: a template has at most one session per date on the host's wall calendar, whatever
+ * instant the zone's rules give it, and a session that was edited or cancelled is never rebuilt.
+ */
+export const sessions = pgTable(
+  'sessions',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    experienceId: uuid()
+      .notNull()
+      .references(() => experiences.id, { onDelete: 'restrict' }),
+    // Null for a session entered by hand.
+    templateId: uuid(),
+    localDate: date({ mode: 'string' }),
+    startsAt: timestampTz().notNull(),
+    endsAt: timestampTz().notNull(),
+    timeZone: text().notNull(),
+    allocation: integer().notNull(),
+    seatsSold: integer().notNull().default(0),
+    status: sessionStatusEnum().notNull().default('scheduled'),
+    source: sessionSourceEnum().notNull(),
+    cancelReason: sessionCancelReasonEnum(),
+    version: integer().notNull().default(1),
+  },
+  (table) => [
+    // A session cannot point at another experience's template. Without a template the key is not checked.
+    foreignKey({
+      name: 'sessions_template_experience_fk',
+      columns: [table.templateId, table.experienceId],
+      foreignColumns: [sessionTemplates.id, sessionTemplates.experienceId],
+    }).onDelete('restrict'),
+    index('sessions_experience_starts_at_idx').on(
+      table.experienceId,
+      table.startsAt,
+    ),
+    // Nulls never collide, so sessions without a template are not constrained.
+    uniqueIndex('sessions_template_local_date_unique').on(
+      table.templateId,
+      table.localDate,
+    ),
+    check(
+      'sessions_ends_after_start',
+      sql`${table.endsAt} > ${table.startsAt}`,
+    ),
+    check('sessions_starts_at_in_range', isReadableDate(table.startsAt)),
+    check('sessions_ends_at_in_range', isReadableDate(table.endsAt)),
+    check(
+      'sessions_allocation_in_range',
+      sql`${table.allocation} BETWEEN 0 AND ${sql.raw(String(maxAllocation))}`,
+    ),
+    check('sessions_seats_sold_not_negative', sql`${table.seatsSold} >= 0`),
+    // The backstop under the hold logic. It also refuses a capacity edit below what is booked.
+    check(
+      'sessions_seats_sold_within_allocation',
+      sql`${table.seatsSold} <= ${table.allocation}`,
+    ),
+    check(
+      'sessions_time_zone_iana',
+      sql`char_length(${table.timeZone}) <= ${sql.raw(String(maxTimeZoneLength))} AND ${table.timeZone} ~ ${sql.raw(`'${ianaZonePattern}'`)}`,
+    ),
+    check(
+      'sessions_cancel_reason_matches_status',
+      sql`(${table.status} = 'cancelled') = (${table.cancelReason} IS NOT NULL)`,
+    ),
+    check('sessions_version_positive', sql`${table.version} >= 1`),
+    check(
+      'sessions_template_has_local_date',
+      sql`(${table.templateId} IS NULL) = (${table.localDate} IS NULL)`,
+    ),
+    check(
+      'sessions_local_date_in_range',
+      sql`${table.localDate} IS NULL OR ${table.localDate} BETWEEN ${sql.raw(`'${firstSessionDate}'`)} AND ${sql.raw(`'${lastSessionDate}'`)}`,
+    ),
+    check(
+      'sessions_template_source_generated',
+      sql`${table.templateId} IS NULL OR ${table.source} IN ('ramble', 'allocation')`,
+    ),
+  ],
+);
+
 export const photosRelations = relations(photos, ({ one }) => ({
   experience: one(experiences, {
     fields: [photos.experienceId],
@@ -368,6 +532,30 @@ export const experiencesRelations = relations(experiences, ({ one, many }) => ({
   }),
   priceOptions: many(priceOptions),
   photos: many(photos),
+  sessionTemplates: many(sessionTemplates),
+  sessions: many(sessions),
+}));
+
+export const sessionTemplatesRelations = relations(
+  sessionTemplates,
+  ({ one, many }) => ({
+    experience: one(experiences, {
+      fields: [sessionTemplates.experienceId],
+      references: [experiences.id],
+    }),
+    sessions: many(sessions),
+  }),
+);
+
+export const sessionsRelations = relations(sessions, ({ one }) => ({
+  experience: one(experiences, {
+    fields: [sessions.experienceId],
+    references: [experiences.id],
+  }),
+  template: one(sessionTemplates, {
+    fields: [sessions.templateId],
+    references: [sessionTemplates.id],
+  }),
 }));
 
 export const priceOptionsRelations = relations(priceOptions, ({ one }) => ({

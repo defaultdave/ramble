@@ -1,5 +1,5 @@
 {
-  "id": "b3e1eed0-f94e-46c8-856c-e3504f422725",
+  "id": "ed8dc4fa-09dd-487b-8142-f848c42544b2",
   "prevId": "39dda0f0-532b-4fee-a97d-8d6760f23787",
   "version": "7",
   "dialect": "postgresql",
@@ -484,223 +484,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.photos": {
-      "name": "photos",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "experience_id": {
-          "name": "experience_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "position": {
-          "name": "position",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "storage_key": {
-          "name": "storage_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "url": {
-          "name": "url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "width": {
-          "name": "width",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "height": {
-          "name": "height",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "byte_size": {
-          "name": "byte_size",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "decorative": {
-          "name": "decorative",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "alt_text": {
-          "name": "alt_text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "blur_data_url": {
-          "name": "blur_data_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "rights_basis": {
-          "name": "rights_basis",
-          "type": "photo_rights_basis",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "rights_holder": {
-          "name": "rights_holder",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "rights_license": {
-          "name": "rights_license",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "rights_source_url": {
-          "name": "rights_source_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "photos_experience_position_unique": {
-          "name": "photos_experience_position_unique",
-          "columns": [
-            {
-              "expression": "experience_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "position",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "photos_storage_key_unique": {
-          "name": "photos_storage_key_unique",
-          "columns": [
-            {
-              "expression": "storage_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "photos_experience_id_experiences_id_fk": {
-          "name": "photos_experience_id_experiences_id_fk",
-          "tableFrom": "photos",
-          "tableTo": "experiences",
-          "columnsFrom": [
-            "experience_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "photos_position_in_range": {
-          "name": "photos_position_in_range",
-          "value": "\"photos\".\"position\" >= 0 AND \"photos\".\"position\" < 20"
-        },
-        "photos_storage_key_from_ids": {
-          "name": "photos_storage_key_from_ids",
-          "value": "\"photos\".\"storage_key\" = 'public/photos/' || \"photos\".\"experience_id\"::text || '/' || \"photos\".\"id\"::text || '.jpg'"
-        },
-        "photos_url_http": {
-          "name": "photos_url_http",
-          "value": "\"photos\".\"url\" ~ '^[Hh][Tt][Tt][Pp][Ss]?://((?![Xx][Nn]--)[A-Za-z0-9-]+\\.)*(?![Xx][Nn]--)[A-Za-z][A-Za-z0-9-]*(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[0-9]{1,4}))?([/?#][!-~]*)?$' AND char_length(\"photos\".\"url\") <= 2048"
-        },
-        "photos_dimensions_in_range": {
-          "name": "photos_dimensions_in_range",
-          "value": "\"photos\".\"width\" BETWEEN 1 AND 2400 AND \"photos\".\"height\" BETWEEN 1 AND 2400"
-        },
-        "photos_byte_size_in_range": {
-          "name": "photos_byte_size_in_range",
-          "value": "\"photos\".\"byte_size\" BETWEEN 1 AND 5242880"
-        },
-        "photos_alt_or_decorative": {
-          "name": "photos_alt_or_decorative",
-          "value": "(\"photos\".\"decorative\" AND \"photos\".\"alt_text\" IS NULL) OR (\n        NOT \"photos\".\"decorative\"\n          AND \"photos\".\"alt_text\" IS NOT NULL\n          AND char_length(\"photos\".\"alt_text\") BETWEEN 1 AND 300\n          AND \"photos\".\"alt_text\" ~ '[^[:space:]]'\n      )"
-        },
-        "photos_blur_data_url": {
-          "name": "photos_blur_data_url",
-          "value": "\"photos\".\"blur_data_url\" ~ '^data:image/jpeg.base64,[A-Za-z0-9+/]+={0,2}$' AND char_length(\"photos\".\"blur_data_url\") <= 2048"
-        },
-        "photos_rights_holder": {
-          "name": "photos_rights_holder",
-          "value": "\"photos\".\"rights_holder\" IS NULL OR (char_length(\"photos\".\"rights_holder\") BETWEEN 1 AND 200 AND \"photos\".\"rights_holder\" ~ '[^[:space:]]')"
-        },
-        "photos_rights_license": {
-          "name": "photos_rights_license",
-          "value": "\"photos\".\"rights_license\" IS NULL OR (char_length(\"photos\".\"rights_license\") BETWEEN 1 AND 200 AND \"photos\".\"rights_license\" ~ '[^[:space:]]')"
-        },
-        "photos_rights_source_url": {
-          "name": "photos_rights_source_url",
-          "value": "\"photos\".\"rights_source_url\" IS NULL OR (\"photos\".\"rights_source_url\" ~ '^[Hh][Tt][Tt][Pp][Ss]?://((?![Xx][Nn]--)[A-Za-z0-9-]+\\.)*(?![Xx][Nn]--)[A-Za-z][A-Za-z0-9-]*(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[0-9]{1,4}))?([/?#][!-~]*)?$' AND char_length(\"photos\".\"rights_source_url\") <= 2048)"
-        },
-        "photos_rights_licensed_complete": {
-          "name": "photos_rights_licensed_complete",
-          "value": "\"photos\".\"rights_basis\" <> 'licensed' OR (\n        \"photos\".\"rights_holder\" IS NOT NULL\n          AND \"photos\".\"rights_license\" IS NOT NULL\n          AND \"photos\".\"rights_source_url\" IS NOT NULL\n      )"
-        },
-        "photos_rights_unlicensed_bare": {
-          "name": "photos_rights_unlicensed_bare",
-          "value": "\"photos\".\"rights_basis\" = 'licensed' OR (\"photos\".\"rights_license\" IS NULL AND \"photos\".\"rights_source_url\" IS NULL)"
-        },
-        "photos_created_at_in_range": {
-          "name": "photos_created_at_in_range",
-          "value": "\"photos\".\"created_at\" >= '1000-01-01 00:00:00+00' AND \"photos\".\"created_at\" < '10000-01-01 00:00:00+00'"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.price_options": {
       "name": "price_options",
       "schema": "",
@@ -784,6 +567,366 @@
         "price_options_price_not_negative": {
           "name": "price_options_price_not_negative",
           "value": "\"price_options\".\"price_minor\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.session_templates": {
+      "name": "session_templates",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "experience_id": {
+          "name": "experience_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "weekday": {
+          "name": "weekday",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "start_time": {
+          "name": "start_time",
+          "type": "time(0)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "duration_minutes": {
+          "name": "duration_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "allocation": {
+          "name": "allocation",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "session_source",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'ramble'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "session_templates_slot_unique": {
+          "name": "session_templates_slot_unique",
+          "columns": [
+            {
+              "expression": "experience_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "weekday",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "start_time",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "session_templates_experience_id_experiences_id_fk": {
+          "name": "session_templates_experience_id_experiences_id_fk",
+          "tableFrom": "session_templates",
+          "tableTo": "experiences",
+          "columnsFrom": [
+            "experience_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "session_templates_id_experience_unique": {
+          "name": "session_templates_id_experience_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "id",
+            "experience_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "session_templates_weekday_in_range": {
+          "name": "session_templates_weekday_in_range",
+          "value": "\"session_templates\".\"weekday\" BETWEEN 0 AND 6"
+        },
+        "session_templates_start_time_whole_minute": {
+          "name": "session_templates_start_time_whole_minute",
+          "value": "\"session_templates\".\"start_time\" < '24:00:00' AND extract(second FROM \"session_templates\".\"start_time\") = 0"
+        },
+        "session_templates_duration_in_range": {
+          "name": "session_templates_duration_in_range",
+          "value": "\"session_templates\".\"duration_minutes\" BETWEEN 1 AND 1440"
+        },
+        "session_templates_allocation_in_range": {
+          "name": "session_templates_allocation_in_range",
+          "value": "\"session_templates\".\"allocation\" BETWEEN 0 AND 1000"
+        },
+        "session_templates_source_generated": {
+          "name": "session_templates_source_generated",
+          "value": "\"session_templates\".\"source\" IN ('ramble', 'allocation')"
+        },
+        "session_templates_created_at_in_range": {
+          "name": "session_templates_created_at_in_range",
+          "value": "\"session_templates\".\"created_at\" >= '1000-01-01 00:00:00+00' AND \"session_templates\".\"created_at\" < '10000-01-01 00:00:00+00'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.sessions": {
+      "name": "sessions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "experience_id": {
+          "name": "experience_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "template_id": {
+          "name": "template_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "local_date": {
+          "name": "local_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "starts_at": {
+          "name": "starts_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ends_at": {
+          "name": "ends_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "time_zone": {
+          "name": "time_zone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "allocation": {
+          "name": "allocation",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "seats_sold": {
+          "name": "seats_sold",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "status": {
+          "name": "status",
+          "type": "session_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'scheduled'"
+        },
+        "source": {
+          "name": "source",
+          "type": "session_source",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cancel_reason": {
+          "name": "cancel_reason",
+          "type": "session_cancel_reason",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        }
+      },
+      "indexes": {
+        "sessions_experience_starts_at_idx": {
+          "name": "sessions_experience_starts_at_idx",
+          "columns": [
+            {
+              "expression": "experience_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "starts_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sessions_template_local_date_unique": {
+          "name": "sessions_template_local_date_unique",
+          "columns": [
+            {
+              "expression": "template_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "local_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "sessions_experience_id_experiences_id_fk": {
+          "name": "sessions_experience_id_experiences_id_fk",
+          "tableFrom": "sessions",
+          "tableTo": "experiences",
+          "columnsFrom": [
+            "experience_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "sessions_template_experience_fk": {
+          "name": "sessions_template_experience_fk",
+          "tableFrom": "sessions",
+          "tableTo": "session_templates",
+          "columnsFrom": [
+            "template_id",
+            "experience_id"
+          ],
+          "columnsTo": [
+            "id",
+            "experience_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "sessions_ends_after_start": {
+          "name": "sessions_ends_after_start",
+          "value": "\"sessions\".\"ends_at\" > \"sessions\".\"starts_at\""
+        },
+        "sessions_starts_at_in_range": {
+          "name": "sessions_starts_at_in_range",
+          "value": "\"sessions\".\"starts_at\" >= '1000-01-01 00:00:00+00' AND \"sessions\".\"starts_at\" < '10000-01-01 00:00:00+00'"
+        },
+        "sessions_ends_at_in_range": {
+          "name": "sessions_ends_at_in_range",
+          "value": "\"sessions\".\"ends_at\" >= '1000-01-01 00:00:00+00' AND \"sessions\".\"ends_at\" < '10000-01-01 00:00:00+00'"
+        },
+        "sessions_allocation_in_range": {
+          "name": "sessions_allocation_in_range",
+          "value": "\"sessions\".\"allocation\" BETWEEN 0 AND 1000"
+        },
+        "sessions_seats_sold_not_negative": {
+          "name": "sessions_seats_sold_not_negative",
+          "value": "\"sessions\".\"seats_sold\" >= 0"
+        },
+        "sessions_seats_sold_within_allocation": {
+          "name": "sessions_seats_sold_within_allocation",
+          "value": "\"sessions\".\"seats_sold\" <= \"sessions\".\"allocation\""
+        },
+        "sessions_time_zone_iana": {
+          "name": "sessions_time_zone_iana",
+          "value": "char_length(\"sessions\".\"time_zone\") <= 64 AND \"sessions\".\"time_zone\" ~ '^[A-Za-z_]+(/[A-Za-z0-9_+-]+)+$|^UTC$'"
+        },
+        "sessions_cancel_reason_matches_status": {
+          "name": "sessions_cancel_reason_matches_status",
+          "value": "(\"sessions\".\"status\" = 'cancelled') = (\"sessions\".\"cancel_reason\" IS NOT NULL)"
+        },
+        "sessions_version_positive": {
+          "name": "sessions_version_positive",
+          "value": "\"sessions\".\"version\" >= 1"
+        },
+        "sessions_template_has_local_date": {
+          "name": "sessions_template_has_local_date",
+          "value": "(\"sessions\".\"template_id\" IS NULL) = (\"sessions\".\"local_date\" IS NULL)"
+        },
+        "sessions_local_date_in_range": {
+          "name": "sessions_local_date_in_range",
+          "value": "\"sessions\".\"local_date\" IS NULL OR \"sessions\".\"local_date\" BETWEEN '1000-01-01' AND '9999-12-31'"
+        },
+        "sessions_template_source_generated": {
+          "name": "sessions_template_source_generated",
+          "value": "\"sessions\".\"template_id\" IS NULL OR \"sessions\".\"source\" IN ('ramble', 'allocation')"
         }
       },
       "isRLSEnabled": false
@@ -1324,21 +1467,39 @@
         "guide_only"
       ]
     },
-    "public.photo_rights_basis": {
-      "name": "photo_rights_basis",
-      "schema": "public",
-      "values": [
-        "host_agreement",
-        "ramble_owned",
-        "licensed"
-      ]
-    },
     "public.price_kind": {
       "name": "price_kind",
       "schema": "public",
       "values": [
         "adult",
         "child"
+      ]
+    },
+    "public.session_cancel_reason": {
+      "name": "session_cancel_reason",
+      "schema": "public",
+      "values": [
+        "host",
+        "weather",
+        "ramble"
+      ]
+    },
+    "public.session_source": {
+      "name": "session_source",
+      "schema": "public",
+      "values": [
+        "ramble",
+        "allocation",
+        "external"
+      ]
+    },
+    "public.session_status": {
+      "name": "session_status",
+      "schema": "public",
+      "values": [
+        "scheduled",
+        "cancelled",
+        "completed"
       ]
     },
     "public.slug_entity_kind": {

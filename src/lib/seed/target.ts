@@ -1,7 +1,16 @@
 // Where the seed may run. It fails closed: it runs only when the environment says, in so many words,
-// that this is a local, staging, or load-test database, and nothing it finds can say otherwise.
+// what this database is, and nothing it finds can say otherwise. Local, staging, and load-test refuse
+// any production environment and any database that reads as production. `production-demo` is the one
+// explicit way to seed production, for the Prototype demo: it allows VERCEL_ENV=production and skips
+// the production-name and local-host checks, and it still refuses NODE_ENV=production (the seed never
+// runs inside the deployed app), an unreadable address, and the scale fixture.
 
-export const seedTargets = ['local', 'staging', 'load-test'] as const;
+export const seedTargets = [
+  'local',
+  'staging',
+  'load-test',
+  'production-demo',
+] as const;
 type SeedTarget = (typeof seedTargets)[number];
 
 export type SeedTargetInput = {
@@ -20,6 +29,7 @@ type SeedRefusal =
   | 'no_database'
   | 'production_runtime'
   | 'target_not_declared'
+  | 'scale_on_demo'
   | 'unreadable_database_url'
   | 'address_overridden'
   | 'not_local'
@@ -93,7 +103,16 @@ function readUrl(value: string): ReadUrl {
   return { ok: true, host: url.hostname, database };
 }
 
-export function checkSeedTarget(input: SeedTargetInput): SeedTargetVerdict {
+export type SeedRunOptions = {
+  /** The command line asked for the scale fixture (`--scale`). */
+  scale: boolean;
+};
+
+export function checkSeedTarget(
+  input: SeedTargetInput,
+  options: SeedRunOptions,
+): SeedTargetVerdict {
+  const demo = input.seedTarget === 'production-demo';
   if (!input.databaseUrl) {
     return refuse('no_database', 'DATABASE_URL is not set.');
   }
@@ -103,10 +122,10 @@ export function checkSeedTarget(input: SeedTargetInput): SeedTargetVerdict {
       'NODE_ENV is production. The seed never runs there.',
     );
   }
-  if (input.vercelEnv === 'production') {
+  if (input.vercelEnv === 'production' && !demo) {
     return refuse(
       'production_runtime',
-      'VERCEL_ENV is production. The seed never runs there.',
+      'VERCEL_ENV is production. The seed never runs there unless SEED_TARGET is production-demo.',
     );
   }
   if (!input.seedTarget) {
@@ -115,11 +134,18 @@ export function checkSeedTarget(input: SeedTargetInput): SeedTargetVerdict {
       `SEED_TARGET is not set. Set it to one of ${seedTargets.join(', ')} to say what this database is.`,
     );
   }
+  if (demo && options.scale) {
+    return refuse(
+      'scale_on_demo',
+      'SEED_TARGET is production-demo, which takes the curated set only. Run it without --scale.',
+    );
+  }
   const database = readUrl(input.databaseUrl);
   if (!database.ok) return database.verdict;
   if (
-    productionWord.test(database.host) ||
-    productionWord.test(database.database)
+    !demo &&
+    (productionWord.test(database.host) ||
+      productionWord.test(database.database))
   ) {
     return refuse(
       'looks_like_production',

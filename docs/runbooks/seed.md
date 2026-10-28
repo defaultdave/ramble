@@ -20,12 +20,32 @@ It ends by reading the database back and running every probe of the coverage mat
 
 The seed fails closed. It runs only when all of these hold, and it checks them before it opens a connection:
 
-- `SEED_TARGET` is set to `local`, `staging`, or `load-test`. There is no value for production, and an unset value refuses.
-- `NODE_ENV` is not `production` and `VERCEL_ENV` is not `production`.
-- The database host and name do not read as production (a whole word `prod` or `production`).
+- `SEED_TARGET` is set to `local`, `staging`, `load-test`, or `production-demo`. An unset value refuses.
+- `NODE_ENV` is not `production`, for every target. The seed never runs inside the deployed app.
+- `VERCEL_ENV` is not `production`, unless `SEED_TARGET=production-demo` (see below).
+- The database host and name do not read as production (a whole word `prod` or `production`), unless `SEED_TARGET=production-demo`.
 - With `SEED_TARGET=local`, the database is on this machine.
+- `DATABASE_URL` is readable and has no `host`, `hostaddr`, `dbname`, or `database` query parameter and no percent escape in the host or database name, for every target.
+- With `SEED_TARGET=production-demo`, `--scale` is not given.
 
 A refusal prints the reason and never the connection string.
+
+## Seeding the production demo
+
+`SEED_TARGET=production-demo` is the one explicit way to seed the production database, for the Prototype demo site. It loads the curated set only (`--scale` is refused), and it is idempotent: a rerun changes nothing, and a legal document that already has a published version is left alone.
+
+Run `db-migrate-production` first (the GitHub Actions workflow; the seed needs the migrated schema). Then, from the repo root on your laptop, with the Vercel CLI linked to the Ramble project (`vercel link`):
+
+```
+vercel env pull .env.production-demo.local --environment=production --yes
+pull() { grep "^$1=" .env.production-demo.local | cut -d= -f2- | tr -d '"'; }
+SEED_TARGET=production-demo DATABASE_URL="$(pull DATABASE_URL)" DATABASE_URL_UNPOOLED="$(pull DATABASE_URL_UNPOOLED)" pnpm db:seed
+rm .env.production-demo.local
+```
+
+`.env*` is gitignored (only `.env.example` is tracked), so the pulled file is never committed. The seed gets only the two database URLs from it; nothing else in the file is passed on. If `vercel env pull` leaves either value empty, the seed refuses with `DATABASE_URL is not set`. Delete the file even when the seed fails. A successful run prints `Seeding the production-demo database on <host>` and ends with the coverage line.
+
+The seed still refuses `NODE_ENV=production`, an unreadable `DATABASE_URL`, and one with a `host`, `hostaddr`, `dbname`, or `database` query parameter or a percent escape in the host or database name. Pages cached by the running deployment serve the old data until they expire (see Caches), so redeploy production after seeding.
 
 ## What it writes
 

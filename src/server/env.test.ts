@@ -65,13 +65,16 @@ describe('environment', () => {
   });
 
   describe('SEED_TARGET', () => {
-    it.each(['local', 'staging', 'load-test'])('accepts %s', async (value) => {
-      vi.stubEnv('SEED_TARGET', value);
+    it.each(['local', 'staging', 'load-test', 'production-demo'])(
+      'accepts %s',
+      async (value) => {
+        vi.stubEnv('SEED_TARGET', value);
 
-      const env = await loadEnv();
+        const env = await loadEnv();
 
-      expect(env.SEED_TARGET).toBe(value);
-    });
+        expect(env.SEED_TARGET).toBe(value);
+      },
+    );
 
     it.each([undefined, ''])('reads %j as not declared', async (value) => {
       vi.stubEnv('SEED_TARGET', value);
@@ -81,8 +84,8 @@ describe('environment', () => {
       expect(env.SEED_TARGET).toBeUndefined();
     });
 
-    it.each(['production', 'prod', 'Local'])(
-      'fails at import for %s, since there is no target for production',
+    it.each(['production', 'prod', 'Local', 'production_demo'])(
+      'fails at import for %s, which is not a target',
       async (value) => {
         vi.stubEnv('SEED_TARGET', value);
 

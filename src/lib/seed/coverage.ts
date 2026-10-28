@@ -1,3 +1,4 @@
+import { browseAsOf, browseWindow } from '@/lib/browse';
 import { guestVisibleStatuses } from '@/lib/catalog';
 import { spacesStatus } from '@/lib/spaces';
 
@@ -122,14 +123,17 @@ function visibleItems(snapshot: SeedSnapshot, collection: SnapshotCollection) {
 const isWeekend = (localDate: string) =>
   [0, 6].includes(new Date(`${localDate}T00:00:00Z`).getUTCDay());
 
-// Browse looks from now up to 120 days ahead, plus the day it started on (browseWindow in src/lib/browse.ts).
-// TODO(U-031): take the window from browseWindow once browse is in main.
-const browseWindowDays = 121;
+/** The window browse reads for a seed taken at `now`, cut down the way a browse read cuts it. */
+function seedBrowseWindow(snapshot: SeedSnapshot) {
+  return browseWindow(browseAsOf(snapshot.now));
+}
 
-/** Every calendar date a browse date filter can match: from the day before now's date to the end of the window. */
+/** Every calendar date a browse date filter can match: from the day before now's date to the day after the window ends. */
 function browseDates(snapshot: SeedSnapshot): string[] {
-  const first = Date.parse(snapshot.now.toISOString().slice(0, 10)) - dayMs;
-  return Array.from({ length: browseWindowDays + 3 }, (_, i) =>
+  const { from, to } = seedBrowseWindow(snapshot);
+  const first = Date.parse(from.toISOString().slice(0, 10)) - dayMs;
+  const last = Date.parse(to.toISOString().slice(0, 10)) + dayMs;
+  return Array.from({ length: (last - first) / dayMs + 1 }, (_, i) =>
     new Date(first + i * dayMs).toISOString().slice(0, 10),
   );
 }
@@ -143,8 +147,7 @@ function browseResults(
   snapshot: SeedSnapshot,
   search: { category: string; neighborhood: string; date: string },
 ): SnapshotExperience[] {
-  const from = snapshot.now.getTime();
-  const to = from + browseWindowDays * dayMs;
+  const { from, to } = seedBrowseWindow(snapshot);
   return snapshot.experiences.filter(
     (e) =>
       isVisible(e) &&
@@ -155,8 +158,8 @@ function browseResults(
         (x) =>
           x.experienceSlug === e.slug &&
           x.status === 'scheduled' &&
-          x.startsAt.getTime() >= from &&
-          x.startsAt.getTime() < to &&
+          x.startsAt >= from &&
+          x.startsAt < to &&
           x.localDate === search.date,
       ),
   );

@@ -13,12 +13,14 @@ import {
   photoRefusalMessage,
   photoStorageKey,
   refusalForHeader,
+  refusalForImageStage,
   refusalForStoredCopy,
   refusalForUpload,
 } from './photos';
 
 // Behaviours under test, one per decision, branch or risk:
 // - an upload is refused by size alone: empty, over the limit; the limit itself passes
+// - a decoder failure is an unsupported format at the header stage and a corrupt file at the re-encode stage
 // - a re-encoded copy is refused over the stored cap; the cap itself passes
 // - the blur placeholder is a data URL, refused when empty or over its length cap
 // - the actor is staff (ops before admin), a host owner, or nobody, from roles alone
@@ -49,6 +51,15 @@ describe('refusalForUpload', () => {
     [photoLimits.maxInputBytes + 1, 'too_large'],
   ])('%i bytes gives %s', (byteLength, expected) => {
     expect(refusalForUpload(byteLength)).toBe(expected);
+  });
+});
+
+describe('refusalForImageStage', () => {
+  it.each([
+    ['inspect', 'unsupported_format'],
+    ['reencode', 'corrupt'],
+  ] as const)('a decoder failure at %s gives %s', (stage, expected) => {
+    expect(refusalForImageStage(stage)).toBe(expected);
   });
 });
 

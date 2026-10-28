@@ -25,6 +25,7 @@ import type { StoragePort } from '@/server/ports/storage';
 import { db, dbRead } from './client';
 import { experiences, photos } from './schema';
 
+// TODO(U-074b): first caller
 export class ExperienceNotFoundError extends Error {
   constructor() {
     super('No experience with that ID');
@@ -32,6 +33,7 @@ export class ExperienceNotFoundError extends Error {
   }
 }
 
+// TODO(U-074b): first caller
 export class PhotoLimitError extends Error {
   constructor() {
     super('The experience already holds the most photos it can');
@@ -52,7 +54,7 @@ const photoColumns = {
 };
 
 /** What was left behind when a photo's file could not be removed; it carries the kind of the failure, never its message. */
-export class PhotoCleanupError extends Error {
+class PhotoCleanupError extends Error {
   readonly photoId: string;
   readonly errorKind: string;
 

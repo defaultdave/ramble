@@ -518,7 +518,7 @@ describe('addPhoto', () => {
       .catch((error: unknown) => error);
 
     // The original error reaches the caller unchanged in kind.
-    expect(thrown).not.toBeInstanceOf(photoStore.PhotoCleanupError);
+    expect(thrown).not.toMatchObject({ name: 'PhotoCleanupError' });
     expect(thrown).toMatchObject({
       cause: { constraint: 'photos_experience_id_experiences_id_fk' },
     });
@@ -527,8 +527,8 @@ describe('addPhoto', () => {
     expect(photoId).toBeDefined();
     const suppressed = (thrown as { suppressed?: unknown[] }).suppressed;
     expect(suppressed).toHaveLength(1);
-    expect(suppressed?.[0]).toBeInstanceOf(photoStore.PhotoCleanupError);
     expect(suppressed?.[0]).toMatchObject({
+      name: 'PhotoCleanupError',
       photoId,
       errorKind: 'StorageError',
     });

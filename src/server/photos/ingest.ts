@@ -3,6 +3,7 @@ import {
   blurDataUrlFrom,
   photoLimits,
   refusalForHeader,
+  refusalForImageStage,
   refusalForStoredCopy,
   refusalForUpload,
   type PhotoRefusalCode,
@@ -10,6 +11,7 @@ import {
 import { ImageError, type ImagePort } from '@/server/ports/image';
 import { getImagePort } from '@/server/ports/image/config';
 
+// TODO(U-074b): first caller
 export class PhotoRefusedError extends Error {
   readonly code: PhotoRefusalCode;
 
@@ -48,7 +50,7 @@ export async function ingestPhoto(
 
   const header = await image.inspect(upload).catch((error: unknown) => {
     if (error instanceof ImageError) {
-      throw new PhotoRefusedError('unsupported_format');
+      throw new PhotoRefusedError(refusalForImageStage('inspect'));
     }
     throw error;
   });
@@ -62,7 +64,9 @@ export async function ingestPhoto(
       quality: storedQuality,
     })
     .catch((error: unknown) => {
-      if (error instanceof ImageError) throw new PhotoRefusedError('corrupt');
+      if (error instanceof ImageError) {
+        throw new PhotoRefusedError(refusalForImageStage('reencode'));
+      }
       throw error;
     });
   const storedRefusal = refusalForStoredCopy(stored.bytes.byteLength);

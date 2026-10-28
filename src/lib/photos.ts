@@ -62,6 +62,13 @@ export function refusalForUpload(byteLength: number): PhotoRefusalCode | null {
   return null;
 }
 
+type ImageStage = 'inspect' | 'reencode';
+
+/** The refusal for a file the decoder could not handle at a stage: no readable header means the format is not one we take, a failed decode of a readable header means the file is damaged. */
+export function refusalForImageStage(stage: ImageStage): PhotoRefusalCode {
+  return stage === 'inspect' ? 'unsupported_format' : 'corrupt';
+}
+
 /** The check on the re-encoded copy, once it exists: what is stored must fit the stored cap. */
 export function refusalForStoredCopy(
   byteLength: number,

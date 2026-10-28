@@ -12,6 +12,10 @@ export class SeedStepError extends Error {
 export const templateNotFound = (slug: string): SeedStepError =>
   new SeedStepError(`Seed step "find session template" found none for ${slug}`);
 
+/** The singleton settings row is missing, so the snapshot cannot say whether gifts and bookings are on. */
+export const settingsRowMissing = (): SeedStepError =>
+  new SeedStepError('Seed step "read settings" found no settings row');
+
 // The decisions the seed runner takes while it writes. The runner fetches and persists; each
 // answer below comes from here so a unit test can reach it.
 

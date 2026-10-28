@@ -9,6 +9,7 @@ import {
   lookup,
   seatUpdates,
   SeedStepError,
+  settingsRowMissing,
   templateNotFound,
   templateOutcome,
 } from './decide';
@@ -243,6 +244,16 @@ describe('templateNotFound', () => {
     expect(error).toBeInstanceOf(SeedStepError);
     expect(error.message).toBe(
       'Seed step "find session template" found none for kayak',
+    );
+  });
+});
+
+describe('settingsRowMissing', () => {
+  it('is a seed message that names the step', () => {
+    const error = settingsRowMissing();
+    expect(error).toBeInstanceOf(SeedStepError);
+    expect(error.message).toBe(
+      'Seed step "read settings" found no settings row',
     );
   });
 });

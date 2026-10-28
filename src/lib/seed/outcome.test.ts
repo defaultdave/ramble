@@ -87,6 +87,8 @@ describe('progress lines and step names', () => {
   });
 
   it('name what the step is about', () => {
+    expect(stepNames.generateSessions).toBe('generate sessions');
+    expect(stepNames.saveHomeModules).toBe('save home modules');
     expect(stepNames.publishLegal('waiver')).toBe('publish waiver');
     expect(stepNames.saveCollection('picks')).toBe('save collection picks');
     expect(stepNames.savePageCopy('category', 'kayaking')).toBe(

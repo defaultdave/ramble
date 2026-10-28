@@ -18,6 +18,7 @@ import {
   settings,
 } from '@/server/db/schema';
 import type { SeedSnapshot } from '@/lib/seed/coverage';
+import { settingsRowMissing } from '@/lib/seed/decide';
 import { assembleSnapshot } from '@/lib/seed/snapshot';
 
 // Every read has a limit. They sit above the most the seed can write: 1000 scale experiences with
@@ -172,7 +173,7 @@ export async function readSeedSnapshot(
       bookingsPaused: settings.bookingsPaused,
     })
     .from(settings);
-  if (!settingsRow) throw new Error('The settings row is missing');
+  if (!settingsRow) throw settingsRowMissing();
 
   return assembleSnapshot(
     {

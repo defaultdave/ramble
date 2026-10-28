@@ -69,6 +69,8 @@ export const scaleLine = (counts: CatalogCounts) =>
 
 /** The names a refused step carries in its message. */
 export const stepNames = {
+  generateSessions: 'generate sessions',
+  saveHomeModules: 'save home modules',
   publishLegal: (doc: string) => `publish ${doc}`,
   saveCollection: (slug: string) => `save collection ${slug}`,
   savePageCopy: (kind: string, slug: string) => `save ${kind} copy ${slug}`,

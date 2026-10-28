@@ -280,7 +280,7 @@ async function writeSessions(
         throw templateNotFound(fixture.slug);
       }
       const generated = expectOk(
-        'generate sessions',
+        stepNames.generateSessions,
         await generateSessions(
           caller,
           { templateId: template.id, ...range },
@@ -356,7 +356,7 @@ async function writeEditorial(
     collectionIds.set(fixture.slug, saved.value.id);
   }
   expectStatus(
-    'save home modules',
+    stepNames.saveHomeModules,
     await saveHomeModules(
       caller,
       homeModulesInput(curated.homeModules, collectionIds),

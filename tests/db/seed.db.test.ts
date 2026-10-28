@@ -142,6 +142,36 @@ async function fingerprint() {
   };
 }
 
+// Runs before any seeding: the database is empty, so a guard that fires late shows up as a row.
+const nothingWritten = {
+  categories: 0,
+  neighborhoods: 0,
+  hosts: 0,
+  experiences: 0,
+  legal: 0,
+};
+
+describe('a caller who is not ops', () => {
+  const refused: [string, Caller][] = [
+    ['a guest', { userId: 'g', roles: [Role.Guest], hostIds: [] }],
+    ['a host owner', { userId: 'h', roles: [Role.HostOwner], hostIds: ['x'] }],
+    ['nobody signed in', { userId: null, roles: [], hostIds: [] }],
+  ];
+
+  it.each(refused)(
+    '%s may neither seed nor read the snapshot',
+    async (_who, caller) => {
+      await expect(runner.runSeed({ caller, now })).rejects.toBeInstanceOf(
+        ForbiddenError,
+      );
+      await expect(reader.readSeedSnapshot(caller, now)).rejects.toBeInstanceOf(
+        ForbiddenError,
+      );
+      expect(await tableCounts()).toMatchObject(nothingWritten);
+    },
+  );
+});
+
 describe('the curated seed', () => {
   let first: Awaited<ReturnType<typeof runner.runSeed>>;
   // Mocks are cleared between tests, so the tags are kept from the run that made them.
@@ -463,26 +493,4 @@ describe('the scale fixture', () => {
     const visible = await catalogReads.listGuestExperiences();
     expect(visible.length).toBeGreaterThan(30);
   });
-});
-
-describe('a caller who is not ops', () => {
-  const refused: [string, Caller][] = [
-    ['a guest', { userId: 'g', roles: [Role.Guest], hostIds: [] }],
-    ['a host owner', { userId: 'h', roles: [Role.HostOwner], hostIds: ['x'] }],
-    ['nobody signed in', { userId: null, roles: [], hostIds: [] }],
-  ];
-
-  it.each(refused)(
-    '%s may neither seed nor read the snapshot',
-    async (_who, caller) => {
-      const before = await tableCounts();
-      await expect(runner.runSeed({ caller, now })).rejects.toBeInstanceOf(
-        ForbiddenError,
-      );
-      await expect(reader.readSeedSnapshot(caller, now)).rejects.toBeInstanceOf(
-        ForbiddenError,
-      );
-      expect(await tableCounts()).toEqual(before);
-    },
-  );
 });

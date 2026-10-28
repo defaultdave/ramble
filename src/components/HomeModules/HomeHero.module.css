@@ -1,0 +1,163 @@
+.hero {
+  box-sizing: border-box;
+  padding: var(--space-8) var(--space-6);
+  font-family: var(--font-family-body);
+  color: var(--color-text-primary);
+}
+
+.inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: var(--size-content-max);
+  margin-inline: auto;
+}
+
+.copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* The picture sits above the copy on a phone and beside it from tablet up, while the heading
+   stays first in reading order. */
+.art {
+  order: -1;
+  width: calc(var(--space-10) * 4);
+}
+
+.heading {
+  margin: 0;
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-display-l);
+  line-height: var(--font-line-height-display-l);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.body {
+  font-size: var(--font-size-body-l);
+  line-height: var(--font-line-height-body-l);
+  color: var(--color-text-secondary);
+}
+
+.body > * {
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.search {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+}
+
+.field {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.label {
+  font-size: var(--font-size-label);
+  line-height: var(--font-line-height-label);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.select {
+  position: relative;
+}
+
+.selectControl {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--size-touch-target);
+  padding: var(--space-3) var(--space-10) var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  color: var(--color-text-primary);
+  appearance: none;
+  text-overflow: ellipsis;
+}
+
+/* The inset line thickens the 1px border to 2px without moving the text, as Input does. */
+.selectControl:focus-visible {
+  outline: 2px solid transparent;
+  border-color: var(--color-focus-ring);
+  box-shadow:
+    inset 0 0 0 1px var(--color-focus-ring),
+    0 0 0 2px var(--color-bg-canvas),
+    0 0 0 4px var(--color-focus-ring);
+}
+
+.chevron {
+  position: absolute;
+  top: 50%;
+  right: var(--space-4);
+  width: var(--space-5);
+  height: var(--space-5);
+  color: var(--color-text-secondary);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.submit {
+  display: flex;
+}
+
+.submit > button {
+  flex: 1;
+}
+
+@media (min-width: 768px) {
+  .hero {
+    padding-block: var(--space-16) var(--space-12);
+  }
+
+  .inner {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-12);
+  }
+
+  .copy {
+    gap: var(--space-5);
+  }
+
+  /* Two fifths of the row, up to the 416px of the Figma frame, so the copy keeps the rest on a tablet. */
+  .art {
+    order: 0;
+    flex: 0 1 40%;
+    width: auto;
+    max-width: calc(var(--space-16) * 6 + var(--space-8));
+  }
+
+  .search {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+
+  .submit {
+    flex: none;
+  }
+
+  .submit > button {
+    flex: none;
+  }
+}

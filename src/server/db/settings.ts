@@ -25,7 +25,6 @@ function onlyRow<T>(rows: T[]): T {
   return row;
 }
 
-// TODO(U-030): first caller
 /** The banner and the switches a guest page shows. Only these four columns leave the database. */
 export async function getGuestSettings(): Promise<GuestSettings> {
   const rows = await dbRead

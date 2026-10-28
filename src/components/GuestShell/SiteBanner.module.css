@@ -1,0 +1,17 @@
+.banner {
+  box-sizing: border-box;
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-status-info-bg);
+  color: var(--color-status-info-text);
+  font-family: var(--font-family-body);
+}
+
+.text {
+  max-width: var(--size-content-max);
+  margin: 0 auto;
+  font-size: var(--font-size-body-s);
+  line-height: var(--font-line-height-body-s);
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+  overflow-wrap: anywhere;
+}

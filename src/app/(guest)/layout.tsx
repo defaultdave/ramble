@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
-import type { ReactNode } from 'react';
-import { SiteShell } from '@/components/SiteShell';
+import { Suspense, type ReactNode } from 'react';
+import { GuestShell } from '@/components/GuestShell';
 import { VercelMeasurement } from '@/server/analytics/VercelMeasurement';
 import { SentryBrowserScript } from '@/server/monitoring/SentryBrowserScript';
+import '@/styles/base.css';
 import '@/styles/tokens.css';
 import { fontVariables } from '../fonts';
+import { GuestBanner } from './GuestBanner';
 
 export const metadata: Metadata = {
   title: { default: 'Ramble', template: '%s | Ramble' },
@@ -15,7 +17,15 @@ export default function GuestLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={fontVariables}>
       <body>
-        <SiteShell>{children}</SiteShell>
+        <GuestShell
+          banner={
+            <Suspense fallback={null}>
+              <GuestBanner />
+            </Suspense>
+          }
+        >
+          {children}
+        </GuestShell>
         <VercelMeasurement />
         <SentryBrowserScript />
       </body>

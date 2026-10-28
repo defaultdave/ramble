@@ -13,7 +13,7 @@ A state that needs a hold, a payment, or an order cannot be reached from seed ro
 | 01 | 44:10 | Home | `home-modules`, `picks-published`, `gift-guide`, `this-week`, `categories-eight` | Open the home page. **Gap:** The sponsor line on the gift module has no data model yet (Q-13). |
 | 02 | 45:190 | Browse | `categories-eight`, `neighborhoods-six`, `cooking-page`, `page-copy`, `guide-only`, `many-results` | Open a category, neighborhood, Pick, gift guide, or search page. |
 | 02b | 45:413 | Browse, filters open | `filter-variety` | Open All filters on a browse page. |
-| 03 | 46:678 | Experience | `kayak-page`, `kayak-session-states`, `neighbors` | Open the kayak page. **Gap:** Photos are not seeded (U-010 is not in main); the gallery shows its placeholder. |
+| 03 | 46:678 | Experience | `kayak-page`, `kayak-session-states`, `neighbors` | Open the kayak page. **Gap:** The seed writes no photo rows; the gallery shows its placeholder. |
 | 03b | 46:897 | Guide-only page | `guide-only` | Open the sourdough entry. |
 | 04 | 47:890 | Choose date and party | `kayak-session-states`, `kayak-full-day`, `bookable-party` | Tap the booking bar on the kayak page. |
 | 04b | 47:1132 | Choose date, kids | `kids-booking` | Tap the booking bar on the kids wheel class. |
@@ -74,7 +74,7 @@ A state that needs a hold, a payment, or an order cannot be reached from seed ro
 | `legal-published` | Terms of service, privacy policy, and host agreement are published. |
 | `tax-treatments` | Live experiences cover each tax treatment: taxable (wine, pottery, coffee), not taxable (kayak, walk), and unknown (pasta). The total shows a tax line only for taxable. |
 | `neighbors` | The kayak shares Tribeca with a second live experience ("cast-iron-and-cobblestones"), for "More near Pier 26". |
-| `kids-zero-results` | Kids in Williamsburg exist but run only on weekends, so a weeknight search finds nothing; a kids class in Park Slope and other Williamsburg experiences give the "nearby" and "one less filter" suggestions. |
+| `kids-zero-results` | Kids in Williamsburg run only on weekends: browse for kids in Williamsburg on any weeknight in its date window returns nothing, and on a weekend returns the wheel class. A kids class in Park Slope and other Williamsburg experiences give the "nearby" and "one less filter" suggestions. |
 | `hidden-statuses` | A draft, an in-review, and a paused experience exist and are the only ones a guest cannot see; live and guide-only both are. |
 | `tiers-all` | Live experiences use each cancellation tier: flexible, moderate, and strict. |
 | `weather-both` | Live outdoor experiences cover both weather policies: rain or shine (the walk) and decided before start (the kayak). |

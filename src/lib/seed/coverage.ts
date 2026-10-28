@@ -119,8 +119,47 @@ function visibleItems(snapshot: SeedSnapshot, collection: SnapshotCollection) {
   return collection.items.filter((slug) => visible.has(slug));
 }
 
-function weekdayOf(localDate: string): number {
-  return new Date(`${localDate}T00:00:00Z`).getUTCDay();
+const isWeekend = (localDate: string) =>
+  [0, 6].includes(new Date(`${localDate}T00:00:00Z`).getUTCDay());
+
+// Browse looks from now up to 120 days ahead, plus the day it started on (browseWindow in src/lib/browse.ts).
+// TODO(U-031): take the window from browseWindow once browse is in main.
+const browseWindowDays = 121;
+
+/** Every calendar date a browse date filter can match: from the day before now's date to the end of the window. */
+function browseDates(snapshot: SeedSnapshot): string[] {
+  const first = Date.parse(snapshot.now.toISOString().slice(0, 10)) - dayMs;
+  return Array.from({ length: browseWindowDays + 3 }, (_, i) =>
+    new Date(first + i * dayMs).toISOString().slice(0, 10),
+  );
+}
+
+/**
+ * What browse returns for a category, a neighborhood, and a date: a guest-visible experience that can be
+ * shown on a card (guide-only, or with a price) and has a scheduled session in the window that starts on
+ * that date. Mirrors `listBrowseExperiences`.
+ */
+function browseResults(
+  snapshot: SeedSnapshot,
+  search: { category: string; neighborhood: string; date: string },
+): SnapshotExperience[] {
+  const from = snapshot.now.getTime();
+  const to = from + browseWindowDays * dayMs;
+  return snapshot.experiences.filter(
+    (e) =>
+      isVisible(e) &&
+      (e.status === 'guide_only' || e.prices.length > 0) &&
+      e.categorySlug === search.category &&
+      e.neighborhoodSlug === search.neighborhood &&
+      snapshot.sessions.some(
+        (x) =>
+          x.experienceSlug === e.slug &&
+          x.status === 'scheduled' &&
+          x.startsAt.getTime() >= from &&
+          x.startsAt.getTime() < to &&
+          x.localDate === search.date,
+      ),
+  );
 }
 
 /** The home modules a guest sees: enabled, and a collection only once published. Mirrors `listHomeModules`. */
@@ -495,21 +534,20 @@ export const probes = {
   },
   'kids-zero-results': {
     holds:
-      'Kids in Williamsburg exist but run only on weekends, so a weeknight search finds nothing; a kids class in Park Slope and other Williamsburg experiences give the "nearby" and "one less filter" suggestions.',
+      'Kids in Williamsburg run only on weekends: browse for kids in Williamsburg on any weeknight in its date window returns nothing, and on a weekend returns the wheel class. A kids class in Park Slope and other Williamsburg experiences give the "nearby" and "one less filter" suggestions.',
     check: (s) => {
-      const kidsHere = liveIn(s, 'categorySlug', 'kids').filter(
-        (e) => e.neighborhoodSlug === 'williamsburg',
-      );
-      const weekend = (x: SnapshotSession) =>
-        [0, 6].includes(weekdayOf(x.localDate));
+      const search = { category: 'kids', neighborhood: 'williamsburg' };
+      const found = (date: string) =>
+        browseResults(s, { ...search, date }).length > 0;
+      const dates = browseDates(s);
       const nearby = liveIn(s, 'categorySlug', 'kids').filter(
         (e) =>
           e.neighborhoodSlug !== 'williamsburg' &&
-          upcoming(s, e.slug).some(weekend),
+          upcoming(s, e.slug).some((x) => isWeekend(x.localDate)),
       );
       return (
-        kidsHere.length > 0 &&
-        kidsHere.every((e) => upcoming(s, e.slug).every(weekend)) &&
+        dates.filter((d) => !isWeekend(d)).every((d) => !found(d)) &&
+        dates.filter(isWeekend).some(found) &&
         nearby.length > 0 &&
         liveIn(s, 'neighborhoodSlug', 'williamsburg').some(
           (e) => e.categorySlug !== 'kids',
@@ -620,7 +658,8 @@ export const coverage: CoverageEntry[] = [
     title: 'Experience',
     probes: ['kayak-page', 'kayak-session-states', 'neighbors'],
     trigger: 'Open the kayak page.',
-    gap: 'Photos are not seeded (U-010 is not in main); the gallery shows its placeholder.',
+    // TODO(U-021b): seed the photo pool, then drop this gap.
+    gap: 'The seed writes no photo rows; the gallery shows its placeholder.',
   },
   {
     id: '03b',

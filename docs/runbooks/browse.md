@@ -26,9 +26,11 @@ A filter change always starts again from the first results: `hrefForFilters` lea
 | Function | Where | Cache |
 |---|---|---|
 | `listBrowseExperiences(query, asOf)` | `src/server/db/browse.ts` | none; the data layer |
-| `listBrowseDates(filters, asOf)` | same | none |
+| `listBrowseDayRows(filters, asOf)` | same | none; returns the stored `local_date` values plus the start and zone of hand-entered sessions, not days |
 | `getBrowseResults`, `getBrowseDates` | `src/server/browse.ts` | `'use cache'`, profile `browse` (revalidate 60 s, expire 10 min), tagged `catalog` and, for results, each listed experience |
 | `getFilterOptions` | same | profile `catalog` |
+
+`getBrowseDates` passes the rows from `listBrowseDayRows` to `browseDays` in `src/lib/browse.ts`, which decides the days: the data layer fetches, the lib decides.
 
 The cache key includes `asOf`, the current time cut to the minute (`browseAsOf`), so guests inside one minute share an entry. A change that reaches an entry through `tagsForChange` is seen at once; a session added to an experience that is not on a cached page waits out the 60 seconds.
 

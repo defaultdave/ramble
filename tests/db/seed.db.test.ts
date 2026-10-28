@@ -112,6 +112,17 @@ async function tableCounts() {
   };
 }
 
+/** Every stored experience through the guest read, which answers null for one a guest may not see. */
+async function visibleToGuest() {
+  const stored = await client.db
+    .select({ id: experiences.id })
+    .from(experiences);
+  const read = await Promise.all(
+    stored.map(({ id }) => catalogReads.getGuestExperience(id)),
+  );
+  return read.filter((experience) => experience !== null);
+}
+
 async function fingerprint() {
   const { db } = client;
   return {
@@ -252,7 +263,7 @@ describe('the curated seed', () => {
   });
 
   it('shows a guest the live and guide-only experiences and nothing else', async () => {
-    const visible = await catalogReads.listGuestExperiences();
+    const visible = await visibleToGuest();
     const expected = curated.experiences
       .filter((e) => e.status === 'live' || e.status === 'guide_only')
       .map((e) => e.slug)
@@ -490,7 +501,7 @@ describe('the scale fixture', () => {
   });
 
   it('every scale experience reads back through the guest schema when visible', async () => {
-    const visible = await catalogReads.listGuestExperiences();
+    const visible = await visibleToGuest();
     expect(visible.length).toBeGreaterThan(30);
   });
 });

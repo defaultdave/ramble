@@ -42,21 +42,6 @@ const RetiredSlugQuerySchema = z.object({
   slug: SlugSchema,
 });
 
-// TODO(U-031): first caller
-/** Every experience a guest can see. Filtering and paging happen in memory, in the browse page. */
-export async function listGuestExperiences(): Promise<GuestExperience[]> {
-  const rows = await dbRead.query.experiences.findMany({
-    where: guestVisible,
-    with: {
-      host: true,
-      cancellationTier: true,
-      priceOptions: { orderBy: adultFirst },
-    },
-    orderBy: byNameThenId,
-  });
-  return GuestExperienceSchema.array().parse(rows);
-}
-
 // TODO(U-039): first caller
 /** Null when the ID is malformed, the row is missing, or its status is not visible to guests. */
 export async function getGuestExperience(
@@ -75,7 +60,6 @@ export async function getGuestExperience(
   return row ? GuestExperienceSchema.parse(row) : null;
 }
 
-// TODO(U-031): first caller
 export async function listCategories(): Promise<Category[]> {
   const rows = await dbRead
     .select()
@@ -85,7 +69,6 @@ export async function listCategories(): Promise<Category[]> {
   return CategorySchema.array().parse(rows);
 }
 
-// TODO(U-031): first caller
 export async function listNeighborhoods(): Promise<Neighborhood[]> {
   const rows = await dbRead
     .select()

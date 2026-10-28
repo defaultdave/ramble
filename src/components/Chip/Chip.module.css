@@ -1,4 +1,6 @@
 .chip {
+  /* A link and a summary default to content-box, a button to border-box; the 44 px height must hold on all three. */
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -12,24 +14,28 @@
   line-height: var(--font-line-height-label);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
+  text-decoration: none;
   cursor: pointer;
 }
 
-.chip:hover:enabled {
+.chip:hover:not(:disabled, [aria-disabled='true']) {
   background: var(--color-bg-sunken);
 }
 
-.chip[aria-pressed='true'] {
+.chip[aria-pressed='true'],
+.chip[aria-current='true'] {
   border-color: var(--color-bg-inverse);
   background: var(--color-bg-inverse);
   color: var(--color-text-inverse);
 }
 
-.chip[aria-pressed='true']:hover:enabled {
+.chip[aria-pressed='true']:hover:not(:disabled),
+.chip[aria-current='true']:hover:not([aria-disabled='true']) {
   background: var(--color-bg-inverse);
 }
 
-.chip:disabled {
+.chip:disabled,
+.chip[aria-disabled='true'] {
   border-color: var(--color-bg-disabled);
   background: var(--color-bg-disabled);
   color: var(--color-text-disabled);
@@ -62,12 +68,14 @@
   color: var(--color-text-primary);
 }
 
-.chip[aria-pressed='true'] .count {
+.chip[aria-pressed='true'] .count,
+.chip[aria-current='true'] .count {
   background: var(--color-bg-highlight);
   color: var(--color-text-on-highlight);
 }
 
-.chip:disabled .count {
+.chip:disabled .count,
+.chip[aria-disabled='true'] .count {
   background: var(--color-bg-sunken);
   color: var(--color-text-primary);
 }

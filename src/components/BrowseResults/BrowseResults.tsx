@@ -1,0 +1,135 @@
+import Form from 'next/form';
+import { Alert } from '@/components/Alert';
+import { Button, ButtonLink } from '@/components/Button';
+import { Card } from '@/components/Card';
+import type { BrowseCard, BrowseView, FormTarget } from '@/lib/browse';
+import { browsePath } from '@/lib/filters';
+import styles from './BrowseResults.module.css';
+
+type TargetButtonProps = {
+  target: FormTarget;
+  label: string;
+  variant: 'primary' | 'secondary';
+};
+
+function TargetButton({ target, label, variant }: TargetButtonProps) {
+  return (
+    <Form action={target.action} className={styles.form}>
+      {target.fields.map(([name, value]) => (
+        <input
+          key={`${name}=${value}`}
+          type="hidden"
+          name={name}
+          value={value}
+        />
+      ))}
+      <Button type="submit" variant={variant}>
+        {label}
+      </Button>
+    </Form>
+  );
+}
+
+export type BrowseResultsProps = BrowseView;
+
+function ResultCard({ card }: { card: BrowseCard }) {
+  return card.kind === 'guide-only' ? (
+    <Card
+      kind="guide-only"
+      headingLevel={2}
+      title={card.title}
+      meta={card.meta}
+      href={card.href}
+      hostHref={card.hostHref}
+      // TODO(U-010): the experience photo, once the photos table exists.
+      image={null}
+    />
+  ) : (
+    <Card
+      headingLevel={2}
+      title={card.title}
+      meta={card.meta}
+      href={card.href}
+      price={card.price}
+      // TODO(U-010): the experience photo, once the photos table exists.
+      image={null}
+    />
+  );
+}
+
+export function BrowseResults(props: BrowseResultsProps) {
+  switch (props.state) {
+    case 'results':
+      return (
+        <div className={styles.results}>
+          <p className={styles.summary}>{props.summary}</p>
+          <ul className={styles.grid}>
+            {props.cards.map((card) => (
+              <li key={card.id} className={styles.item}>
+                <ResultCard card={card} />
+              </li>
+            ))}
+          </ul>
+          <div className={styles.more}>
+            {props.showMore ? (
+              <TargetButton
+                target={props.showMore}
+                label="Show more"
+                variant="secondary"
+              />
+            ) : null}
+            {props.startHref ? (
+              <ButtonLink href={props.startHref}>
+                Back to the first results
+              </ButtonLink>
+            ) : null}
+          </div>
+        </div>
+      );
+    case 'empty':
+      return (
+        <div className={styles.notice}>
+          <h2 className={styles.noticeTitle}>
+            {props.filtered
+              ? 'Nothing matches those filters'
+              : 'Nothing to browse yet'}
+          </h2>
+          <p className={styles.noticeText}>
+            {props.filtered
+              ? 'Try another day, or take a filter off.'
+              : 'New experiences are on their way.'}
+          </p>
+          {props.filtered ? (
+            <ButtonLink href={browsePath}>Clear all filters</ButtonLink>
+          ) : null}
+        </div>
+      );
+    case 'error':
+      return (
+        <div className={styles.error}>
+          <Alert
+            tone="danger"
+            title="We couldn't load experiences"
+            body="Something went wrong on our side. Your filters are saved."
+          />
+          <TargetButton
+            target={props.retry}
+            label="Try again"
+            variant="secondary"
+          />
+        </div>
+      );
+    case 'outdated':
+      return (
+        <div className={styles.notice}>
+          <h2 className={styles.noticeTitle}>That page of results has moved</h2>
+          <p className={styles.noticeText}>
+            The list changed while you were reading it.
+          </p>
+          <ButtonLink href={props.startHref}>
+            Back to the first results
+          </ButtonLink>
+        </div>
+      );
+  }
+}

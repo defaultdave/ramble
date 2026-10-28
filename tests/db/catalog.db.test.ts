@@ -25,8 +25,7 @@ import {
 
 // Behaviours under test, one per decision, branch or risk:
 // - the migration inserts three cancellation tiers and exactly one is the default
-// - a guest list holds live and guide-only rows and hides draft, in_review and paused
-// - a guest list carries the ids a cache tag needs, children in one result, and no host-only field
+// - a guest lookup carries the ids a cache tag needs, children in one result, and no host-only field
 // - a guest lookup hides the three hidden statuses, and a malformed or unknown ID is null
 // - categories and neighborhoods list by name and look up by slug; a malformed slug is null
 // - a renamed slug resolves to its entity, an unknown or malformed one is null, and a slug
@@ -203,18 +202,8 @@ describe('guest reads', () => {
     };
   });
 
-  it('lists live and guide-only experiences and hides the rest', async () => {
-    const listed = await catalog.listGuestExperiences();
-
-    const names = listed.map((experience) => experience.name);
-    expect(names).toContain('AAA live');
-    expect(names).toContain('AAB guide');
-    expect(names.some((name) => name.startsWith('AAC'))).toBe(false);
-  });
-
   it('carries the ids a cache tag needs, its children, and no host-only field', async () => {
-    const listed = await catalog.listGuestExperiences();
-    const live = listed.find((experience) => experience.id === liveId);
+    const live = await catalog.getGuestExperience(liveId);
 
     expect(live).toMatchObject({
       hostId: ids.hostId,

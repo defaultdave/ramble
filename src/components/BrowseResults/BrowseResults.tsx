@@ -41,7 +41,7 @@ function ResultCard({ card }: { card: BrowseCard }) {
       meta={card.meta}
       href={card.href}
       hostHref={card.hostHref}
-      // TODO(U-010): the experience photo, once the photos table exists.
+      // TODO(U-039): the experience's cover photo.
       image={null}
     />
   ) : (
@@ -51,7 +51,7 @@ function ResultCard({ card }: { card: BrowseCard }) {
       meta={card.meta}
       href={card.href}
       price={card.price}
-      // TODO(U-010): the experience photo, once the photos table exists.
+      // TODO(U-039): the experience's cover photo.
       image={null}
     />
   );

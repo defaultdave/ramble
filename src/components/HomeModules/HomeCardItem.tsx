@@ -4,7 +4,7 @@ import type { HomeCard } from '@/lib/home';
 type HomeCardItemProps = { card: HomeCard; layout: CardLayout };
 
 export function HomeCardItem({ card, layout }: HomeCardItemProps) {
-  // TODO(U-010): the experience photo, once the photos table exists.
+  // TODO(U-039): the experience's cover photo.
   const image = null;
   return card.kind === 'guide-only' ? (
     <Card

@@ -10,7 +10,6 @@ export type IllustrationProps = Omit<
 const FRAME =
   'M0 20C0 8.95431 8.95431 0 20 0H140C151.046 0 160 8.95431 160 20V100C160 111.046 151.046 120 140 120H20C8.95431 120 0 111.046 0 100V20Z';
 
-// TODO(U-030): first caller, the home page.
 export function Illustration(props: IllustrationProps) {
   const clipId = useId();
 

@@ -9,6 +9,7 @@ import {
   NeighborhoodSchema,
   RetiredSlugSchema,
   SlugSchema,
+  catalogLimits,
   guestVisibleStatuses,
   slugEntityKinds,
   type Category,
@@ -79,7 +80,8 @@ export async function listCategories(): Promise<Category[]> {
   const rows = await dbRead
     .select()
     .from(categories)
-    .orderBy(asc(categories.name), asc(categories.id));
+    .orderBy(asc(categories.name), asc(categories.id))
+    .limit(catalogLimits.categories);
   return CategorySchema.array().parse(rows);
 }
 
@@ -88,7 +90,8 @@ export async function listNeighborhoods(): Promise<Neighborhood[]> {
   const rows = await dbRead
     .select()
     .from(neighborhoods)
-    .orderBy(asc(neighborhoods.name), asc(neighborhoods.id));
+    .orderBy(asc(neighborhoods.name), asc(neighborhoods.id))
+    .limit(catalogLimits.neighborhoods);
   return NeighborhoodSchema.array().parse(rows);
 }
 

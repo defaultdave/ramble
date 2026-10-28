@@ -11,6 +11,12 @@ export const experienceStatuses = [
 /** The statuses a guest can see. A paused experience, which also covers a discontinued one, is hidden. */
 export const guestVisibleStatuses = ['live', 'guide_only'] as const;
 
+/** The most rows a list read of the shared catalog returns, so a read cannot grow with it. */
+export const catalogLimits = {
+  categories: 100,
+  neighborhoods: 100,
+} as const;
+
 export const ageRules = [
   'all_ages',
   'minimum_age',

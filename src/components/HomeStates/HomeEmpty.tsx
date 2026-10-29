@@ -6,14 +6,16 @@ import styles from './HomeStates.module.css';
 export function HomeEmpty() {
   return (
     <div className={styles.page}>
-      <h1 className={styles.title}>Ramble</h1>
-      <p className={styles.text}>
-        We are still putting the home page together. Everything that is on is a
-        click away.
-      </p>
-      <Link className={styles.link} href={browsePath}>
-        Browse experiences
-      </Link>
+      <div className={styles.pageInner}>
+        <h1 className={styles.title}>Ramble</h1>
+        <p className={styles.text}>
+          We are still putting the home page together. Everything that is on is
+          a click away.
+        </p>
+        <Link className={styles.link} href={browsePath}>
+          Browse experiences
+        </Link>
+      </div>
     </div>
   );
 }

@@ -216,11 +216,12 @@ function fullStopEndsSentence(
 ): boolean {
   const word = token.slice(0, -1).toLowerCase();
   if (innerAbbreviations.has(word)) return false;
+  if (next !== undefined && /^\p{Ll}/u.test(next)) return false;
+  if (!streetSuffixes.has(word)) return true;
   if (next !== undefined) {
     const nextWord = /^[\p{L}\p{N}]*/u.exec(next)?.[0] ?? '';
-    if (/^\p{Ll}/u.test(next) || nextWord.length === 1) return false;
+    if (nextWord.length === 1 && /\p{L}/u.test(nextWord)) return false;
   }
-  if (!streetSuffixes.has(word)) return true;
   if (previous === undefined) return false;
   const isPrefix =
     /^\p{Ll}/u.test(previous) ||

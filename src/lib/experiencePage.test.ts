@@ -254,6 +254,15 @@ describe('mapsHref', () => {
     // Pinned limit: a single letter after a street reads as "Ave. B", so the note stays in.
     ['Hudson St. A door', 'Hudson St. A door'],
     ['Ave. B', 'Ave. B'],
+    ['Pier 26. A guide will wait there.', 'Pier 26'],
+    ['The Cloisters. A staff member opens at 9.', 'The Cloisters'],
+    ["Central Park Zoo. I'm in a red hat.", 'Central Park Zoo'],
+    ['Pier 26. 5 minutes early please', 'Pier 26'],
+    ['Pier 26. 4 people wait.', 'Pier 26'],
+    ['Park Ave. 5 is closed', 'Park Ave'],
+    ['Ave. 5 is closed', 'Ave. 5 is closed'],
+    // Pinned limit: a lowercase next word reads as the same sentence, so this note stays in.
+    ['Hudson St. use the side door', 'Hudson St. use the side door'],
     ['Meet at 10 Ave. B', 'Meet at 10 Ave. B'],
     ['Pier 57, 25 11th Ave. Meet at the gate.', 'Pier 57, 25 11th Ave'],
     ['Gate 5. Meet at the sign.', 'Gate 5'],

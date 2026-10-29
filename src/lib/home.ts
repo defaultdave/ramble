@@ -2,11 +2,20 @@ import { z } from 'zod';
 import { EntityIdSchema, SlugSchema, guestVisibleStatuses } from './catalog';
 import type { Category, Neighborhood } from './catalog';
 import type { Collection, HomeModule } from './editorial';
+import { durationLabel } from './duration';
+import { hrefForFilters, noFilters } from './filters';
 import { withCovers, type PhotoView } from './photoViews';
 import { cardPriceLabel } from './pricing';
 import type { RichTextDoc } from './richText/format';
+import {
+  experienceCardPath,
+  giftGuidePath,
+  picksAnchor,
+  picksPath,
+} from './routes';
 import type { GuestSettings } from './settings';
 import { spacesStatus } from './spaces';
+import { msPerDay } from './time';
 
 /** Every bound the home page reads or shows, so a read cannot grow with the catalog. */
 export const homeLimits = {
@@ -31,35 +40,8 @@ export const HomeExperienceIdsSchema = z
   .array(EntityIdSchema)
   .max(homeLimits.maxCardIds);
 
-/** The minute key a cached read takes, as `homeAsOf` writes it. */
+/** The minute key a cached read takes, as `minuteAsOf` writes it. */
 const AsOfSchema = z.iso.datetime();
-
-const MS_PER_MINUTE = 60_000;
-const MS_PER_DAY = 86_400_000;
-
-/** Every host is in New York today, and "today" on the home page means a New York calendar date. */
-const venueTimeZone = 'America/New_York';
-
-const venueDate = new Intl.DateTimeFormat('en-CA', {
-  timeZone: venueTimeZone,
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
-
-/** The calendar date in New York at `now`, as YYYY-MM-DD. */
-export function venueToday(now: Date): string {
-  return venueDate.format(now);
-}
-
-/**
- * `now` cut down to the minute, as an ISO string. A cached read takes it as an argument, so two
- * guests inside the same minute share one cache entry instead of each making their own.
- */
-export function homeAsOf(now: Date): string {
-  const cut = Math.floor(now.getTime() / MS_PER_MINUTE) * MS_PER_MINUTE;
-  return new Date(cut).toISOString();
-}
 
 export type ThisWeekWindow = { from: Date; to: Date };
 
@@ -68,7 +50,7 @@ export function thisWeekWindow(asOf: string): ThisWeekWindow {
   const from = new Date(AsOfSchema.parse(asOf));
   return {
     from,
-    to: new Date(from.getTime() + homeLimits.thisWeekDays * MS_PER_DAY),
+    to: new Date(from.getTime() + homeLimits.thisWeekDays * msPerDay),
   };
 }
 
@@ -103,60 +85,7 @@ export const ThisWeekSessionSchema = z.object({
 });
 export type ThisWeekSession = z.infer<typeof ThisWeekSessionSchema>;
 
-// ---- Addresses ----
-
-export const browsePath = '/new-york/browse';
-
-export type BrowseTarget = {
-  category?: string;
-  neighborhood?: string;
-  date?: string;
-};
-
-/**
- * An address on the browse page, in its grammar: `category`, `neighborhood`, and `date` as query
- * parameters (docs/runbooks/browse.md). Each value is a slug or a date the caller already holds.
- */
-export function browseHref(target: BrowseTarget): string {
-  const query = (['category', 'neighborhood', 'date'] as const)
-    .flatMap((name) => {
-      const value = target[name];
-      return value === undefined || value === ''
-        ? []
-        : [`${name}=${encodeURIComponent(value)}`];
-    })
-    .join('&');
-  return query === '' ? browsePath : `${browsePath}?${query}`;
-}
-
-/** The address of an experience page (`/experiences/[slug]-[id]`) or a guide entry (`/guide/[slug]-[id]`). */
-export function experiencePath(
-  experience: Pick<HomeExperience, 'id' | 'slug' | 'status'>,
-): string {
-  const area = experience.status === 'guide_only' ? 'guide' : 'experiences';
-  return `/${area}/${experience.slug}-${experience.id}`;
-}
-
-function picksPath(slug: string): string {
-  return `/picks/${slug}`;
-}
-
-export const giftGuidePath = '/gifts';
-
-/** The id of the first Ramble Picks module, which the header and footer link to. */
-export const picksAnchor = 'picks';
-
 // ---- Cards ----
-
-/** "2 hr", "2.5 hr", "45 min", "2 hr 15 min". */
-export function durationLabel(minutes: number): string {
-  if (minutes < 60) return `${String(minutes)} min`;
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  if (rest === 0) return `${String(hours)} hr`;
-  if (rest === 30) return `${String(hours)}.5 hr`;
-  return `${String(hours)} hr ${String(rest)} min`;
-}
 
 export type HomeCard = {
   id: string;
@@ -186,7 +115,7 @@ export function toHomeCard(experience: HomeExperience): HomeCard | null {
     id: experience.id,
     title: experience.name,
     meta,
-    href: experiencePath(experience),
+    href: experienceCardPath(experience),
     image: null,
   };
   if (experience.status === 'guide_only') {
@@ -410,7 +339,7 @@ function viewOf(
             categories: context.categories.map(({ slug, name }) => ({
               slug,
               name,
-              href: browseHref({ category: slug }),
+              href: hrefForFilters({ ...noFilters, categories: [slug] }),
             })),
           };
     case 'picks': {

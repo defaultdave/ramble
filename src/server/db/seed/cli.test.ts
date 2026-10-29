@@ -32,6 +32,7 @@ const command = (overrides: Partial<SeedCommand> = {}): SeedCommand => ({
     vercelEnv: undefined,
     seedTarget: 'local',
     databaseUrl: 'postgres://ramble:ramble@localhost:5432/ramble',
+    seedHost: undefined,
   },
   now,
   write: (line) => lines.push(line),
@@ -105,6 +106,7 @@ describe('runSeedCommand', () => {
       seedTarget: 'production-demo' as const,
       databaseUrl:
         'postgres://u:secret@ep-quiet.us-east-2.aws.neon.tech/neondb',
+      seedHost: 'ep-quiet.us-east-2.aws.neon.tech',
     });
 
     it('seeds the curated set against production', async () => {

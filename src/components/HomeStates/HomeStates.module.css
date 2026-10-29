@@ -222,17 +222,18 @@
 }
 
 .cards {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  display: flex;
   gap: var(--space-4);
-  box-sizing: border-box;
-  width: 85%;
-  max-width: calc(var(--space-16) * 6);
-  padding-block: var(--space-1);
+  margin-inline: calc(-1 * var(--size-gutter));
+  padding: var(--space-1) var(--size-gutter);
+  overflow: hidden;
 }
 
-.cards > :not(:first-child) {
-  display: none;
+/* The loaded rail's card size, so the first card matches it and --space-2 of the second shows. */
+.cards > * {
+  flex: 0 0 calc(100% + var(--size-gutter) - var(--space-4) - var(--space-2));
+  min-width: 0;
+  max-width: calc(var(--space-16) * 6);
 }
 
 .visuallyHidden {
@@ -312,15 +313,16 @@
   }
 
   .cards {
+    display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--space-6);
-    width: auto;
-    max-width: none;
-    padding-block: 0;
+    margin-inline: 0;
+    padding: 0;
+    overflow: visible;
   }
 
-  .cards > :not(:first-child) {
-    display: block;
+  .cards > * {
+    max-width: none;
   }
 
   .linkBar {

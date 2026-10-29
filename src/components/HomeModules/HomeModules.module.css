@@ -105,10 +105,15 @@
 
 .rail > li,
 .pills > li {
-  flex: 0 0 85%;
   min-width: 0;
   max-width: calc(var(--space-16) * 6);
   scroll-snap-align: start;
+}
+
+/* One card fills the column and --space-2 of the next shows past the gutter. The percentage is the
+   rail's content box (the column); the gutter is added back because the rail bleeds into it. */
+.rail > li {
+  flex: 0 0 calc(100% + var(--size-gutter) - var(--space-4) - var(--space-2));
 }
 
 .pills {

@@ -375,6 +375,7 @@ describe('what a guest sees', () => {
       neighborhoodName: where.neighborhood.name,
       durationMinutes: 150,
       linkOutUrl: null,
+      image: null,
       priceOptions: [
         { priceMinor: 3500, usesSpace: true },
         { priceMinor: 7000, usesSpace: true },

@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, fn, userEvent, within } from 'storybook/test';
+import { useState } from 'react';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { noFilters } from '@/lib/filters';
 import { FilterBar } from '@/components/FilterBar';
 import styles from './FilterBar.stories.module.css';
@@ -145,5 +146,47 @@ export const CalendarOpenAtPhoneWidth: Story = {
       );
     }
     await expect(box.scrollWidth).toBeLessThanOrEqual(box.clientWidth);
+  },
+};
+
+/** A stand-in for the page: a control outside the bar changes the chosen date, as the next-day link does. */
+function DayChangesInPlace(args: React.ComponentProps<typeof FilterBar>) {
+  const [date, setDate] = useState<string | null>(null);
+  return (
+    <>
+      <FilterBar {...args} filters={{ ...args.filters, date }} />
+      <button
+        type="button"
+        onClick={() => {
+          setDate('2026-11-07');
+        }}
+      >
+        Go to Nov 7
+      </button>
+    </>
+  );
+}
+
+/** With the calendar open, a new day must leave focus on the chip, not on the page. */
+export const FocusStaysOnTheChipWhenTheDayChanges: Story = {
+  parameters: { colorScheme: 'light' },
+  render: (args) => <DayChangesInPlace {...args} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const chip = canvas.getByText('Pick a date').closest('summary');
+    const disclosure = chip?.closest('details');
+    if (!chip || !disclosure) throw new Error('No date disclosure');
+    await userEvent.click(chip);
+    await waitFor(() => expect(disclosure).toHaveProperty('open', true));
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Go to Nov 7' }));
+
+    await waitFor(() => expect(disclosure).toHaveProperty('open', false));
+    await waitFor(() =>
+      expect(canvas.getByText('Sat, Nov 7').closest('details')).toBe(
+        disclosure,
+      ),
+    );
+    await waitFor(() => expect(chip).toHaveFocus());
   },
 };

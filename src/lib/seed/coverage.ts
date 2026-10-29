@@ -1,6 +1,6 @@
 import { browseWindow } from '@/lib/browse';
 import { guestVisibleStatuses } from '@/lib/catalog';
-import { spacesStatus } from '@/lib/spaces';
+import { hasSpaceLeft, spacesLeft, spacesStatus } from '@/lib/spaces';
 import { isoDateOf, minuteAsOf, msPerDay } from '@/lib/time';
 
 // The coverage matrix (ADR 0008): every state in the signed-off Figma file (the mobile screens 01 to
@@ -87,7 +87,6 @@ const kidsWheel = 'kids-wheel-class';
 const isLive = (e: SnapshotExperience) => e.status === 'live';
 const isVisible = (e: SnapshotExperience) =>
   (guestVisibleStatuses as readonly string[]).includes(e.status);
-const spacesLeft = (s: SnapshotSession) => s.allocation - s.seatsSold;
 
 function upcoming(snapshot: SeedSnapshot, slug?: string): SnapshotSession[] {
   return snapshot.sessions.filter(
@@ -140,7 +139,7 @@ function browseDates(snapshot: SeedSnapshot): string[] {
 
 /**
  * What browse returns for a category, a neighborhood, and a date: a guest-visible experience that can be
- * shown on a card (guide-only, or with a price) and has a scheduled session in the window that starts on
+ * shown on a card (guide-only, or with a price) and has a scheduled session in the window with space left that starts on
  * that date. Mirrors `listBrowseExperiences`.
  */
 function browseResults(
@@ -160,6 +159,7 @@ function browseResults(
           x.status === 'scheduled' &&
           x.startsAt >= from &&
           x.startsAt < to &&
+          hasSpaceLeft(x) &&
           x.localDate === search.date,
       ),
   );

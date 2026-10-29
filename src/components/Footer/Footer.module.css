@@ -59,16 +59,16 @@
 .list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-/* The block padding lifts each link to a 24px target without moving the rows apart. */
+/* The block padding makes each row a 44px target; rows touch but never overlap. nowrap keeps a link on one line while the columns share a row. */
 .link {
   display: inline-block;
-  padding: calc(var(--space-1) / 2) 0;
+  padding: var(--space-3) 0;
+  white-space: nowrap;
   border-radius: var(--radius-sm);
   font-size: var(--font-size-body-s);
   line-height: var(--font-line-height-body-s);

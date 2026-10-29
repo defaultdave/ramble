@@ -24,7 +24,7 @@ import {
   type BrowseCursorRow,
   type BrowseDayRows,
   type BrowseRead,
-} from '@/lib/browse';
+} from '@/lib/pages/browse';
 import {
   CardExperienceSchema,
   CardPriceOptionSchema,

@@ -3,7 +3,7 @@ import {
   toExperienceCard,
   type CardExperience,
   type ExperienceCard,
-} from './experienceCards';
+} from '../experienceCards';
 import {
   activeFilterCount,
   hrefForFilters,
@@ -11,10 +11,10 @@ import {
   withDate,
   type BrowseFilters,
   type BrowseQuery,
-} from './filters';
-import { browsePath } from './routes';
-import { IsoDateSchema, TimeZoneSchema, isKnownTimeZone } from './sessions';
-import { calendarDateFormat } from './time';
+} from '../filters';
+import { browsePath } from '../routes';
+import { IsoDateSchema, TimeZoneSchema, isKnownTimeZone } from '../sessions';
+import { calendarDateFormat } from '../time';
 
 /** A hard page size: the data layer reads one more row than this to learn whether there is a next page. */
 export const browsePageSize = 12;

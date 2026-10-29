@@ -20,8 +20,8 @@ import {
   type BrowseView,
   type BrowseRead,
 } from './browse';
-import type { CardExperience } from './experienceCards';
-import { noFilters, type BrowseFilters } from './filters';
+import type { CardExperience } from '../experienceCards';
+import { noFilters, type BrowseFilters } from '../filters';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the window runs from the cache time to the horizon

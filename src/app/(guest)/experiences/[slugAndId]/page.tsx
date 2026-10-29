@@ -5,7 +5,7 @@ import {
   buildExperiencePage,
   experienceHead,
   fallbackTitle,
-} from '@/lib/experiencePage';
+} from '@/lib/pages/experience';
 import { experiencePath, parseExperienceAddress } from '@/lib/routes';
 import { getExperiencePage } from '@/server/experiencePage';
 import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';

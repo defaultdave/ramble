@@ -1,5 +1,5 @@
 import { Check, Clock, Info, type LucideIcon } from 'lucide-react';
-import type { ReassuranceFact } from '@/lib/home';
+import type { ReassuranceFact } from '@/lib/pages/home';
 import styles from './HomeModules.module.css';
 
 export type ReassuranceSectionProps = { facts: readonly ReassuranceFact[] };

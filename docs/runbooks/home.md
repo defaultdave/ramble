@@ -4,7 +4,7 @@ How `/` is built from the modules staff arrange, what each module shows and when
 
 ## The modules
 
-`listHomeModules()` returns the enabled modules in position order, leaving out one whose collection is still a draft. `buildHomePage` in `src/lib/home.ts` turns them into what the page shows, and leaves out a module that has nothing to show. A module with nothing to show is hidden whole, never drawn empty.
+`listHomeModules()` returns the enabled modules in position order, leaving out one whose collection is still a draft. `buildHomePage` in `src/lib/pages/home.ts` turns them into what the page shows, and leaves out a module that has nothing to show. A module with nothing to show is hidden whole, never drawn empty.
 
 | Module | Shows | Copy comes from | Hidden when |
 |---|---|---|---|
@@ -47,7 +47,7 @@ The home cards and the browse cards show the same photo for one experience: the 
 
 Two ways reach a card. The browse cards and the home "On this week" cards get their cover in the experience read itself: `listBrowseExperiences` left-joins `guestCoverOf`, and `listHomeExperiences(ids, { covers: true })` loads it with `coverWith`. The row carries `image` (null for an experience with no photo, which still lists and keeps the empty frame), so the entry that holds the experiences (`getBrowseResults`, `getThisWeek`) holds the covers, with its own lifetime and the `experience:<id>` tags it already carries. A failed read takes the page's error path, as a failed experience read does; there is no separate cover read to fail alone.
 
-The home Picks cards are built with no image and the page then reads their covers (`homeCardIds`, `withHomeCovers` in `src/lib/home.ts`) with `getCoverPhotos(ids)` in `src/server/coverPhotos.ts`: `'use cache'`, profile `catalog`, tagged `experience:<id>` for every ID it was asked about, so a photo added to an experience reaches every card that lists it. `getHomeContent` reads its experiences with `{ covers: false }` because its entry lives under the longer `editorial` profile, which would show a new cover later than `catalog` does. Pass the IDs through `coverLookupIds` so two pages that list the same experiences in another order share one entry. A photo is decoration, so a failed read of the Picks covers costs the photos and not the page: `readGuestCovers` logs it and the cards render with no image.
+The home Picks cards are built with no image and the page then reads their covers (`homeCardIds`, `withHomeCovers` in `src/lib/pages/home.ts`) with `getCoverPhotos(ids)` in `src/server/coverPhotos.ts`: `'use cache'`, profile `catalog`, tagged `experience:<id>` for every ID it was asked about, so a photo added to an experience reaches every card that lists it. `getHomeContent` reads its experiences with `{ covers: false }` because its entry lives under the longer `editorial` profile, which would show a new cover later than `catalog` does. Pass the IDs through `coverLookupIds` so two pages that list the same experiences in another order share one entry. A photo is decoration, so a failed read of the Picks covers costs the photos and not the page: `readGuestCovers` logs it and the cards render with no image.
 
 `listGuestCoverPhotos` takes at most `photoLimits.maxCoverLookups` IDs (240, `cardLookupLimit` in `src/lib/experienceCards.ts`, the most the home page can list) and returns one row per experience, guest-visible experiences only. A longer or malformed list is refused, never cut.
 

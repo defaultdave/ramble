@@ -63,6 +63,12 @@ const libPackagePatterns = [
   'server-only',
 ];
 
+// Everything in src/lib except the page modules, the seed (a page-level mirror), and test files.
+const sharedLibGlobs = [
+  './src/lib/!(*.test).{ts,tsx}',
+  './src/lib/!(pages|seed)/**/!(*.test).{ts,tsx}',
+];
+
 const boundaryMessage = (text) => ({ message: text });
 
 export const boundaryConfigs = [
@@ -80,6 +86,13 @@ export const boundaryConfigs = [
               from: ['./src/server', './src/components', './src/app'],
               ...boundaryMessage(
                 'src/lib imports only src/lib and pure libraries.',
+              ),
+            },
+            {
+              target: sharedLibGlobs,
+              from: './src/lib/pages',
+              ...boundaryMessage(
+                'Shared src/lib modules never import the page modules in src/lib/pages.',
               ),
             },
             {

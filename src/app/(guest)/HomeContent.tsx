@@ -2,7 +2,7 @@ import { connection } from 'next/server';
 import { HomeModules } from '@/components/HomeModules';
 import { RichText } from '@/components/RichText';
 import { HomeEmpty, HomeError, HomeTitle } from '@/components/HomeStates';
-import { buildHomePage, homeCardIds, withHomeCovers } from '@/lib/home';
+import { buildHomePage, homeCardIds, withHomeCovers } from '@/lib/pages/home';
 import { minuteAsOf } from '@/lib/time';
 import { venueToday } from '@/lib/venue';
 import { readGuestCovers } from '@/server/guestCovers';

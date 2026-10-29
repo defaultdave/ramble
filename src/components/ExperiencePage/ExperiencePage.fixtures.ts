@@ -1,5 +1,5 @@
 import { samplePhotos } from '@/components/Photo/Photo.fixtures';
-import { galleryView, type ExperiencePageView } from '@/lib/experiencePage';
+import { galleryView, type ExperiencePageView } from '@/lib/pages/experience';
 
 /** The experience of Figma frame 03: outdoor, with a weather call, a host, a meeting point, and fifteen photos. */
 export const sunsetKayak: ExperiencePageView = {

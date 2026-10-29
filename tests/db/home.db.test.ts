@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ZodError } from 'zod';
-import { homeLimits } from '@/lib/home';
+import { homeLimits } from '@/lib/pages/home';
 import { upcomingWindow } from '@/lib/sessionWindow';
 import {
   categories,

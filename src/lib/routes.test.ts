@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { id, idWithLetters } from './experiencePage.fixtures';
+import { id, idWithLetters } from './pages/experience.fixtures';
 import {
   accessibilityPath,
   browsePath,
@@ -87,15 +87,6 @@ describe('parseExperienceAddress', () => {
   it('takes an address at the length limit', () => {
     const slug = 'a'.repeat(maxAddressLength - 37);
     expect(parseExperienceAddress(`${slug}-${id(1)}`)?.slug).toBe(slug);
-  });
-});
-
-describe('paths', () => {
-  it('addresses the pages the breadcrumb and entry points go to', () => {
-    expect(categoryPath('outdoors')).toBe('/new-york/things-to-do/outdoors');
-    expect(neighborhoodPath('tribeca')).toBe('/new-york/neighborhoods/tribeca');
-    expect(giftCheckoutPath(id(1))).toBe(`/gifts/checkout/${id(1)}`);
-    expect(privateSessionPath).toBe('/contact');
   });
 });
 

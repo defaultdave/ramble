@@ -78,6 +78,20 @@
       "when": 1793294516385,
       "tag": "0010_guests_consents_privacy",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793298149106,
+      "tag": "0011_orders_and_payments",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793304529297,
+      "tag": "0012_blank_text_checks",
+      "breakpoints": true
     }
   ]
 }

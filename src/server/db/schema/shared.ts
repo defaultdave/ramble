@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { type AnyPgColumn, pgEnum } from 'drizzle-orm/pg-core';
 import { editorialLimits, publishStatuses } from '@/lib/editorial';
+import { notBlankPattern } from '@/lib/text';
 
 // No `import 'server-only'` here: drizzle-kit loads the schema outside Next.js, where that import throws.
 // What the editorial and policy tables share: the publish status enum and CHECK builders. Each one states a rule the Zod schemas in
@@ -8,7 +9,9 @@ import { editorialLimits, publishStatuses } from '@/lib/editorial';
 
 export const publishStatusEnum = pgEnum('publish_status', publishStatuses);
 
-const notBlank = (column: AnyPgColumn) => sql`${column} ~ '[^[:space:]]'`;
+/** Not empty and not only whitespace, with the class `src/lib/text.ts` uses, so Zod and the CHECK agree. */
+export const notBlank = (column: AnyPgColumn) =>
+  sql`${column} ~ ${sql.raw(`'${notBlankPattern}'`)}`;
 
 export const isKebab = (column: AnyPgColumn) =>
   sql`${column} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`;

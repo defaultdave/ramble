@@ -63,6 +63,20 @@ function roundHalfUpPpm(amountMinor: number, ratePpm: number): number {
   return remainder * 2 >= PPM ? quotient + 1 : quotient;
 }
 
+/** The tax on a ticket subtotal: `round_half_up(subtotal * rate / 1_000_000)` (PRD-19). */
+export function taxMinor(ticketSubtotalMinor: number, ratePpm: number): number {
+  return roundHalfUpPpm(ticketSubtotalMinor, ratePpm);
+}
+
+/** `round_half_up(subtotal * bps / 10_000)`, on the ticket before tax (Q-03). A basis point is 100 ppm. */
+// TODO(U-047a): first caller, the order snapshot in startPayment (the order row check reads it today).
+export function commissionMinor(
+  ticketSubtotalMinor: number,
+  commissionRateBps: number,
+): number {
+  return roundHalfUpPpm(ticketSubtotalMinor, commissionRateBps * 100);
+}
+
 /**
  * The rate to charge for an experience (PRD-78): the configured rate when it is taxable, and 0
  * when it is not taxable or unknown (unknown is charged as not taxable until Q-12 is answered).
@@ -151,13 +165,13 @@ export function lines(
     });
   }
 
-  const taxMinor = roundHalfUpPpm(ticketSubtotalMinor, ratePpm);
+  const tax = taxMinor(ticketSubtotalMinor, ratePpm);
   return {
     lines: priced,
     ticketSubtotalMinor,
     taxRatePpm: ratePpm,
-    taxMinor,
-    totalMinor: ticketSubtotalMinor + taxMinor,
+    taxMinor: tax,
+    totalMinor: ticketSubtotalMinor + tax,
   };
 }
 

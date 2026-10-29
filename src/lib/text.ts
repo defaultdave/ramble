@@ -10,25 +10,36 @@ export function isStorable(value: string): boolean {
 }
 
 /**
- * Whether every key and string in a JSON value is storable. Iterative, and linear in the size of
- * the value, which the callers have already bounded.
+ * Calls `visit` on a JSON value and on every key, string, and child inside it, and stops at the
+ * first `false`. Iterative, so a wide or deep value cannot overflow the stack, and linear in the
+ * size of the value, which the callers have already bounded.
  */
-export function isStorableJson(value: unknown): boolean {
+export function everyJsonNode(
+  value: unknown,
+  visit: (node: unknown) => boolean,
+): boolean {
   const pending: unknown[] = [value];
   while (pending.length > 0) {
     const current = pending.pop();
-    if (typeof current === 'string') {
-      if (!isStorable(current)) return false;
-    } else if (Array.isArray(current)) {
-      pending.push(...(current as unknown[]));
+    if (!visit(current)) return false;
+    if (Array.isArray(current)) {
+      for (const child of current as unknown[]) pending.push(child);
     } else if (typeof current === 'object' && current !== null) {
       for (const [key, child] of Object.entries(current)) {
-        if (!isStorable(key)) return false;
+        if (!visit(key)) return false;
         pending.push(child);
       }
     }
   }
   return true;
+}
+
+/** Whether every key and string in a JSON value is storable. */
+export function isStorableJson(value: unknown): boolean {
+  return everyJsonNode(
+    value,
+    (node) => typeof node !== 'string' || isStorable(node),
+  );
 }
 
 /**
@@ -51,7 +62,16 @@ function boundedText(max: number) {
     });
 }
 
-const notBlank = (value: string) => /\S/.test(value);
+/**
+ * Every character JavaScript's `\s` matches, spelled out so the same class can be handed to
+ * Postgres, whose `[[:space:]]` differs (it takes U+00A0 and U+FEFF as text). The database CHECKs
+ * use `notBlankPattern` too, so a value is blank in Zod exactly when it is blank in the database.
+ */
+const whitespaceClass = String.raw`\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff`;
+export const notBlankPattern = `[^${whitespaceClass}]`;
+const notBlankRegex = new RegExp(notBlankPattern);
+
+const notBlank = (value: string) => notBlankRegex.test(value);
 
 export function requiredText(max: number) {
   return boundedText(max).refine(notBlank, { message: 'Must not be blank' });

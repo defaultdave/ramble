@@ -71,6 +71,16 @@ afterAll(async () => {
 type Bookable = Awaited<ReturnType<typeof seedBookable>>;
 type Tx = Parameters<Parameters<typeof client.db.transaction>[0]>[0];
 
+// A failed query's message hides the Postgres error; the report needs its code and text.
+const describeFailure = (reason: unknown) => {
+  const cause = reason instanceof Error ? reason.cause : undefined;
+  if (cause instanceof Error) {
+    const code = (cause as { code?: unknown }).code;
+    return `${String(reason)} | cause ${String(code)}: ${cause.message}`;
+  }
+  return String(reason);
+};
+
 const ops = testCaller({ roles: [Role.Ops] });
 const aFewMoments = () => new Promise((resolve) => setTimeout(resolve, 300));
 
@@ -457,7 +467,7 @@ describe('reserve, release, and capacity edit together', () => {
         (outcome) => outcome.status === 'rejected',
       );
       expect(
-        failures.map((outcome) => String(outcome.reason)),
+        failures.map((outcome) => describeFailure(outcome.reason)),
         'no operation threw, deadlock (40P01) included',
       ).toEqual([]);
       const result = await client.db.execute(

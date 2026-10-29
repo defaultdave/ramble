@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import type { db as Db } from '@/server/db/client';
 import {
@@ -129,8 +129,9 @@ export async function insertHold(
   sessionId: string,
   overrides: { [K in keyof HoldInsert]?: HoldInsert[K] | SQL } = {},
 ) {
-  const createdAt =
-    overrides.createdAt instanceof Date ? overrides.createdAt : new Date();
+  // The timestamps come from the database clock unless the caller gives a createdAt: a product write
+  // stamps updated_at from that clock, and the host clock can run ahead of it.
+  const createdAt = overrides.createdAt;
   const [row] = await db
     .insert(holds)
     .values({
@@ -140,9 +141,19 @@ export async function insertHold(
       seats: 1,
       deviceKey: hash('a'),
       ipHash: hash('b'),
-      createdAt,
-      updatedAt: createdAt,
-      expiresAt: new Date(createdAt.getTime() + 10 * minute),
+      ...(createdAt === undefined
+        ? {
+            createdAt: sql`now()`,
+            updatedAt: sql`now()`,
+            expiresAt: sql`now() + make_interval(mins => 10)`,
+          }
+        : {
+            updatedAt: createdAt,
+            expiresAt:
+              createdAt instanceof Date
+                ? new Date(createdAt.getTime() + 10 * minute)
+                : sql`${createdAt} + make_interval(mins => 10)`,
+          }),
       ...overrides,
     })
     .returning();

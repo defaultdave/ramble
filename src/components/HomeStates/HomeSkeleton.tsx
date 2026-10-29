@@ -1,22 +1,63 @@
 import { Skeleton } from '@/components/Skeleton';
+import { classNames } from '@/lib/classNames';
 import styles from './HomeStates.module.css';
 
-/** The loading state: the hero, then the first row of cards, at their final size. */
+const bar = styles.bar;
+
+/**
+ * The loading state: the hero, the category row and the first row of Picks, at the sizes and in the
+ * order of the loaded page. Its hidden heading is the page's h1 until the real one arrives.
+ */
 export function HomeSkeleton() {
   return (
-    <div className={styles.skeleton} role="status">
+    <div role="status">
+      <h1 className={styles.visuallyHidden}>Ramble</h1>
       <span className={styles.visuallyHidden}>Loading the home page</span>
-      <div className={styles.hero} aria-hidden="true">
-        <div>
-          <Skeleton kind="text" />
+      <div
+        className={classNames(styles.band, styles.heroBand)}
+        aria-hidden="true"
+      >
+        <div className={classNames(styles.skeletonInner, styles.heroRow)}>
+          <div className={styles.copy}>
+            <span className={classNames(bar, styles.eyebrowBar)} />
+            <div className={classNames(styles.lines, styles.headingLines)}>
+              <span className={bar} />
+              <span className={bar} />
+              <span className={bar} />
+              <span className={bar} />
+            </div>
+            <div className={classNames(styles.lines, styles.bodyLines)}>
+              <span className={bar} />
+              <span className={bar} />
+              <span className={bar} />
+            </div>
+            <div className={styles.search} />
+          </div>
+          <div className={styles.art} />
         </div>
-        <div className={styles.art} />
       </div>
-      <div className={styles.search} aria-hidden="true" />
-      <div className={styles.cards}>
-        <Skeleton kind="card" />
-        <Skeleton kind="card" />
-        <Skeleton kind="card" />
+      <div className={styles.band} aria-hidden="true">
+        <div className={styles.skeletonInner}>
+          <span className={classNames(bar, styles.railHeadingBar)} />
+          <div className={styles.pills}>
+            {Array.from({ length: 8 }, (_, index) => (
+              <span key={index} className={classNames(bar, styles.pillBar)} />
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className={styles.band} aria-hidden="true">
+        <div className={styles.skeletonInner}>
+          <span className={classNames(bar, styles.eyebrowBar)} />
+          <span className={classNames(bar, styles.picksHeadingBar)} />
+          <span className={classNames(bar, styles.summaryBar)} />
+          <div className={styles.cards}>
+            <Skeleton kind="card" />
+            <Skeleton kind="card" />
+            <Skeleton kind="card" />
+          </div>
+          <span className={classNames(bar, styles.linkBar)} />
+        </div>
       </div>
     </div>
   );

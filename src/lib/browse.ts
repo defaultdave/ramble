@@ -14,7 +14,7 @@ import {
 } from './filters';
 import { browsePath } from './routes';
 import { IsoDateSchema, TimeZoneSchema, isKnownTimeZone } from './sessions';
-import { calendarDateFormat, msPerDay } from './time';
+import { calendarDateFormat } from './time';
 
 /** A hard page size: the data layer reads one more row than this to learn whether there is a next page. */
 export const browsePageSize = 12;
@@ -22,19 +22,8 @@ export const browsePageSize = 12;
 /** How far ahead a guest can pick a date. Sessions are generated a year ahead; browse looks a season out. */
 export const browseDateHorizonDays = 120;
 
-export type BrowseWindow = { from: Date; to: Date };
-
-/** The sessions a browse read looks at: those that start from `asOf` up to the horizon. */
-export function browseWindow(asOf: string): BrowseWindow {
-  const from = new Date(asOf);
-  if (Number.isNaN(from.getTime())) {
-    throw new RangeError('asOf must be an ISO date and time');
-  }
-  return {
-    from,
-    to: new Date(from.getTime() + (browseDateHorizonDays + 1) * msPerDay),
-  };
-}
+/** How long a browse read's window runs: the horizon and the whole last day, so the last pickable date is in it. */
+export const browseWindowDays = browseDateHorizonDays + 1;
 
 /**
  * The most distinct stored dates a window can hold. The window is one day longer than the horizon,

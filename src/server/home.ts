@@ -7,9 +7,9 @@ import {
   homeExperienceIds,
   homeLimits,
   thisWeekExperienceIds,
-  thisWeekWindow,
 } from '@/lib/home';
 import type { CardExperience } from '@/lib/experienceCards';
+import { upcomingWindow } from '@/lib/sessionWindow';
 import { readOrRefuse } from '@/server/cache/readOrRefuse';
 import { listCategories, listNeighborhoods } from '@/server/db/catalog';
 import {
@@ -82,7 +82,7 @@ export async function getThisWeek(asOf: string): Promise<ThisWeekContent> {
   cacheLife('browse');
   cacheTag(tags.catalog);
   const content = await readOrRefuse('This week', async () => {
-    const window = thisWeekWindow(asOf);
+    const window = upcomingWindow(asOf, homeLimits.thisWeekDays);
     const sessions = await listThisWeekSessions(window);
     const experienceIds = thisWeekExperienceIds(
       sessions,

@@ -1,15 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { ZodError } from 'zod';
 import {
   browseDays,
   browsePageSize,
+  browseWindowDays,
   maxHandEnteredDayRows,
   maxStoredDayRows,
   toBrowsePage,
   type BrowsePage,
 } from '@/lib/browse';
 import { noFilters, type BrowseFilters } from '@/lib/filters';
+import { msPerDay } from '@/lib/time';
 import {
   cancellationTiers,
   categories,
@@ -37,9 +40,11 @@ import {
 // - the next page starts after the cursor and no row is shown twice or skipped, including two rows with one name
 // - a row added before the cursor, or hidden after it, between two pages moves nothing already shown
 // - a cursor for a hidden or unknown experience finds no row and reads no page; a visible one returns its row
+// - the cursor row is read once per request, as its own query, and the page query does not read it again
 // - category and neighborhood filters match any value of their list and both must hold; an unknown slug matches nothing
 // - the date filter matches a scheduled session that starts that day in the host's own calendar, from the
 //   stored date or, for a session entered by hand, from its time zone
+// - a session starting exactly at asOf is offered and matches; one starting exactly at the window's end does neither
 // - a cancelled session, a session already started, and a session past the window never match
 // - the calendar read returns raw stored values only (stored dates, and start and zone of hand-entered sessions) and decides no day
 // - each calendar list has a hard cap
@@ -813,6 +818,39 @@ describe('the calendar read', () => {
   });
 });
 
+describe('the window edges', () => {
+  const opening = asOf;
+  const closing = new Date(
+    new Date(asOf).getTime() + browseWindowDays * msPerDay,
+  ).toISOString();
+
+  it('offers and matches a session starting exactly when the window opens', async () => {
+    const where = await scope();
+    const exp = await insertExperience(where, { name: 'At the opening' });
+    await insertSession(exp.id, opening);
+
+    expect(
+      await daysFor({ categories: [where.category.slug], neighborhoods: [] }),
+    ).toEqual([opening.slice(0, 10)]);
+    expect(
+      names(await list(filtersFor(where, { date: opening.slice(0, 10) }))),
+    ).toEqual(['At the opening']);
+  });
+
+  it('neither offers nor matches a session starting exactly when the window ends', async () => {
+    const where = await scope();
+    const exp = await insertExperience(where, { name: 'At the closing' });
+    await insertSession(exp.id, closing);
+
+    expect(
+      await daysFor({ categories: [where.category.slug], neighborhoods: [] }),
+    ).toEqual([]);
+    expect(
+      (await list(filtersFor(where, { date: closing.slice(0, 10) }))).items,
+    ).toEqual([]);
+  });
+});
+
 describe('days with no space left', () => {
   it('neither offers nor matches a day whose only sessions are sold out, and does both for a day with one space left', async () => {
     const where = await scope();
@@ -939,9 +977,55 @@ describe('input the schema refuses', () => {
   it('refuses a time it cannot read', async () => {
     await expect(
       browse.listBrowseExperiences({ filters: noFilters, after: null }, 'soon'),
-    ).rejects.toThrow(RangeError);
+    ).rejects.toThrow(ZodError);
     await expect(
       browse.listBrowseDayRows({ categories: [], neighborhoods: [] }, 'soon'),
-    ).rejects.toThrow(RangeError);
+    ).rejects.toThrow(ZodError);
+  });
+
+  describe('queries sent for a cursor', () => {
+    async function sentQueries(after: string, where: Scope) {
+      const send = vi.spyOn(globalThis, 'fetch');
+      try {
+        await browse.listBrowseExperiences(
+          { filters: filtersFor(where), after },
+          asOf,
+        );
+        return send.mock.calls.map(
+          ([, init]) =>
+            JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+              query: string;
+            },
+        );
+      } finally {
+        send.mockRestore();
+      }
+    }
+
+    it('sends one query for a cursor nobody can see', async () => {
+      const where = await scope();
+      await insertExperience(where, { name: 'A live' });
+
+      const sent = await sentQueries(
+        '00000000-0000-4000-8000-0000000000aa',
+        where,
+      );
+
+      expect(sent).toHaveLength(1);
+    });
+
+    it('reads the cursor row once, and the page query only compares against it', async () => {
+      const where = await scope();
+      const first = await insertExperience(where, { name: 'A first' });
+      await insertExperience(where, { name: 'B second' });
+
+      const sent = await sentQueries(first.id, where);
+
+      const readsCursor = sent.filter(({ query }) =>
+        query.includes('"experiences"."id" = $1'),
+      );
+      expect(readsCursor).toHaveLength(1);
+      expect(sent.length).toBeGreaterThan(1);
+    });
   });
 });

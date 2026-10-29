@@ -7,6 +7,8 @@ import { BrowseContent } from './BrowseContent';
 // - a card shows the cover its experience read carried, and none for one without
 // - a polite live region carries the count, or the empty heading, for the current filters
 // - the live region is on the page and empty when the content read failed
+// - a slug the catalog has no row for never reaches the cached reads, and the page keeps the address it was given
+// - filters that match nothing show the empty state without any date or result read
 // - a failed content read renders the error state
 
 const server = vi.hoisted(() => ({
@@ -146,5 +148,43 @@ describe('BrowseContent', () => {
     expect(screen.getByRole('status')).toHaveTextContent(
       'Nothing on Sat, Nov 7',
     );
+  });
+
+  describe('with a slug the catalog does not have', () => {
+    const withSlugs = (searchParams: Record<string, string | string[]>) =>
+      BrowseContent({ searchParams: Promise.resolve(searchParams) });
+
+    beforeEach(() => {
+      server.options.mockResolvedValue({
+        categories: [{ slug: 'cooking', name: 'Cooking' }],
+        neighborhoods: [],
+      });
+    });
+
+    it('reads with the known slugs only', async () => {
+      render(await withSlugs({ category: ['junk', 'cooking'] }));
+
+      expect(server.dates).toHaveBeenCalledExactlyOnceWith(
+        { categories: ['cooking'], neighborhoods: [], date: null },
+        expect.any(String),
+      );
+      expect(server.results).toHaveBeenCalledExactlyOnceWith(
+        {
+          filters: { categories: ['cooking'], neighborhoods: [], date: null },
+          after: null,
+        },
+        expect.any(String),
+      );
+    });
+
+    it('shows the empty state and reads neither dates nor results when no slug is known', async () => {
+      render(await withSlugs({ category: 'junk' }));
+
+      expect(server.dates).not.toHaveBeenCalled();
+      expect(server.results).not.toHaveBeenCalled();
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Nothing matches those filters',
+      );
+    });
   });
 });

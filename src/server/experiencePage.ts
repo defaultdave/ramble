@@ -21,8 +21,8 @@ export type ExperiencePageData = {
 /**
  * What the experience page reads, or null when no experience with this ID is visible to guests.
  * Publishing, editing, or taking the experience down reaches it through `tags.experience(id)`, and a
- * renamed category or neighborhood through `tags.catalog`. A hidden experience is cached as null too,
- * so a request for one never reaches the database twice inside the profile.
+ * renamed category or neighborhood through `tags.catalog`. A miss is not kept (the `uncached` profile),
+ * so made-up IDs fill nothing; a hidden experience costs one read per request.
  */
 export async function getExperiencePage(
   id: string,
@@ -30,9 +30,12 @@ export async function getExperiencePage(
   'use cache';
   cacheLife('catalog');
   // safeParse, not parse: a ZodError carries the raw value, and Next.js logs what a cached function throws.
-  if (!EntityIdSchema.safeParse(id).success) return null;
+  if (!EntityIdSchema.safeParse(id).success) {
+    cacheLife('uncached');
+    return null;
+  }
   cacheTag(tags.experience(id.toLowerCase()), tags.catalog);
-  return readOrRefuse('Experience', async () => {
+  const page = await readOrRefuse('Experience', async () => {
     const experience = await getGuestExperience(id);
     if (!experience) return null;
     const [photos, categories, neighborhoods] = await Promise.all([
@@ -46,4 +49,6 @@ export async function getExperiencePage(
       place: placeOf(experience, categories, neighborhoods),
     };
   });
+  if (page === null) cacheLife('uncached');
+  return page;
 }

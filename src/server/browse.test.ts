@@ -11,6 +11,7 @@ import {
 
 // Behaviours under test, one per decision, branch or risk:
 // - each cached read names its cache profile and tags itself, results with the catalog and every experience they list
+// - a cursor nobody can see is not kept: the uncached profile is named; a page that was found names no other
 // - a failed read throws only the name of the read and the kind of the failure, never the query, its values, or the cause
 // - a framework control-flow error passes through unchanged
 
@@ -80,6 +81,7 @@ describe('getBrowseResults', () => {
     });
 
     expect(cache.tag.mock.calls.flat()).toEqual(['catalog']);
+    expect(cache.life).toHaveBeenLastCalledWith('uncached');
   });
 
   it('throws the kind of a failed read and not the query or its values', async () => {

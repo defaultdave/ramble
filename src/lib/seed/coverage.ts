@@ -1,6 +1,12 @@
-import { browseWindow } from '@/lib/browse';
+import { browseWindowDays } from '@/lib/browse';
 import { guestVisibleStatuses } from '@/lib/catalog';
-import { hasSpaceLeft, spacesLeft, spacesStatus } from '@/lib/spaces';
+import { homeLimits } from '@/lib/home';
+import {
+  isOpenSession,
+  isUpcomingSession,
+  upcomingWindow,
+} from '@/lib/sessionWindow';
+import { spacesLeft, spacesStatus } from '@/lib/spaces';
 import { isoDateOf, minuteAsOf, msPerDay } from '@/lib/time';
 
 // The coverage matrix (ADR 0008): every state in the signed-off Figma file (the mobile screens 01 to
@@ -81,6 +87,9 @@ export type SeedSnapshot = {
   settings: { giftsEnabled: boolean; bookingsPaused: boolean };
 };
 
+/** How far ahead the `bookable-party` probe looks for a session with room for six. */
+const bookablePartyDays = 14;
+
 const kayak = 'sunset-kayak-on-the-hudson';
 const kidsWheel = 'kids-wheel-class';
 
@@ -89,10 +98,11 @@ const isVisible = (e: SnapshotExperience) =>
   (guestVisibleStatuses as readonly string[]).includes(e.status);
 
 function upcoming(snapshot: SeedSnapshot, slug?: string): SnapshotSession[] {
+  const window = seedBrowseWindow(snapshot);
   return snapshot.sessions.filter(
     (session) =>
       session.status === 'scheduled' &&
-      session.startsAt.getTime() > snapshot.now.getTime() &&
+      isUpcomingSession(session, window) &&
       (slug === undefined || session.experienceSlug === slug),
   );
 }
@@ -124,7 +134,7 @@ const isWeekend = (localDate: string) =>
 
 /** The window browse reads for a seed taken at `now`, cut down the way a browse read cuts it. */
 function seedBrowseWindow(snapshot: SeedSnapshot) {
-  return browseWindow(minuteAsOf(snapshot.now));
+  return upcomingWindow(minuteAsOf(snapshot.now), browseWindowDays);
 }
 
 /** Every calendar date a browse date filter can match: from the day before now's date to the day after the window ends. */
@@ -146,7 +156,7 @@ function browseResults(
   snapshot: SeedSnapshot,
   search: { category: string; neighborhood: string; date: string },
 ): SnapshotExperience[] {
-  const { from, to } = seedBrowseWindow(snapshot);
+  const window = seedBrowseWindow(snapshot);
   return snapshot.experiences.filter(
     (e) =>
       isVisible(e) &&
@@ -157,9 +167,7 @@ function browseResults(
         (x) =>
           x.experienceSlug === e.slug &&
           x.status === 'scheduled' &&
-          x.startsAt >= from &&
-          x.startsAt < to &&
-          hasSpaceLeft(x) &&
+          isOpenSession(x, window) &&
           x.localDate === search.date,
       ),
   );
@@ -278,10 +286,13 @@ export const probes = {
     holds:
       'At least four live experiences have a session in the next seven days (the "On this week" module).',
     check: (s) => {
-      const horizon = s.now.getTime() + 7 * msPerDay;
+      const week = upcomingWindow(minuteAsOf(s.now), homeLimits.thisWeekDays);
       const soon = new Set(
-        upcoming(s)
-          .filter((session) => session.startsAt.getTime() <= horizon)
+        s.sessions
+          .filter(
+            (session) =>
+              session.status === 'scheduled' && isOpenSession(session, week),
+          )
           .map((session) => session.experienceSlug),
       );
       return (
@@ -437,9 +448,9 @@ export const probes = {
     holds:
       'At least one session in the next 14 days has room for six, the most one guest can hold, so the booking flow and every payment state have something to book.',
     check: (s) => {
-      const horizon = s.now.getTime() + 14 * msPerDay;
+      const fortnight = upcomingWindow(minuteAsOf(s.now), bookablePartyDays);
       return upcoming(s).some(
-        (x) => spacesLeft(x) >= 6 && x.startsAt.getTime() <= horizon,
+        (x) => spacesLeft(x) >= 6 && isUpcomingSession(x, fortnight),
       );
     },
   },

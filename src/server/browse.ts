@@ -29,6 +29,8 @@ export async function getBrowseResults(
     listBrowseExperiences(query, asOf),
   );
   const page = toBrowsePage(query.after, read);
+  // A cursor nobody can see is not worth an entry per made-up id.
+  if (!page.ok) cacheLife('uncached');
   if (page.ok) {
     for (const experience of page.items)
       cacheTag(tags.experience(experience.id));

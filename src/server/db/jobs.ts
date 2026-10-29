@@ -2,8 +2,8 @@ import 'server-only';
 import { and, asc, eq, inArray, lte, or, sql } from 'drizzle-orm';
 import {
   abandonedMessage,
-  claimDecision,
   lockExpiry,
+  partitionClaims,
   type FailureOutcome,
   type JobClaim,
 } from '@/lib/jobs';
@@ -66,12 +66,7 @@ export async function claimDueJobs(
       .limit(limit)
       .for('update', { skipLocked: true });
 
-    const toClaim = candidates.filter(
-      (row) => claimDecision(row, now) === 'claim',
-    );
-    const toAbandon = candidates.filter(
-      (row) => claimDecision(row, now) === 'abandon',
-    );
+    const { toClaim, toAbandon } = partitionClaims(candidates, now);
 
     const lockedUntil = lockExpiry(now);
     const claimed =

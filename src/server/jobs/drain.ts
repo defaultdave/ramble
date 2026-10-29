@@ -1,11 +1,17 @@
 import 'server-only';
 import {
+  claimFoundWork,
   deadJobAlertKey,
   drainMayContinue,
+  emptyDrainReport,
   failureOutcome,
   jobLimits,
   nextClaimSize,
   ownsClaim,
+  tallyClaimBatch,
+  tallyOutcome,
+  type DrainReport,
+  type RunOutcome,
 } from '@/lib/jobs';
 import { db } from '@/server/db/client';
 import {
@@ -21,19 +27,6 @@ import { logger } from '@/server/monitoring/logger';
 import type { Clock } from '@/server/ports/clock';
 import { findJob, jobRegistry, type JobRegistry } from './registry';
 
-export type DrainReport = {
-  claimed: number;
-  succeeded: number;
-  retried: number;
-  dead: number;
-  /** Jobs whose failure could not be written down; they are reclaimed once their lock lapses. */
-  unrecorded: number;
-  /** Jobs still due when the call stopped, counted up to 1,000. */
-  left: number;
-};
-
-export type RunOutcome = 'succeeded' | 'retried' | 'dead' | 'lost';
-
 function raiseDead(kind: string, jobId: string): void {
   alerts.raise('job-dead', 'error', deadJobAlertKey(kind, jobId), {
     kind,
@@ -47,7 +40,7 @@ function raiseDead(kind: string, jobId: string): void {
  * handler does not run. A handler that throws rolls back its writes, then the failure is recorded
  * in a second transaction: a retry after a backoff, or a dead letter on the last attempt.
  */
-export async function runJob(
+async function runJob(
   job: ClaimedJob,
   clock: Clock,
   registry: JobRegistry = jobRegistry,
@@ -113,14 +106,7 @@ export async function drainJobs(
   registry: JobRegistry = jobRegistry,
 ): Promise<DrainReport> {
   const startedAt = performance.now();
-  const report: DrainReport = {
-    claimed: 0,
-    succeeded: 0,
-    retried: 0,
-    dead: 0,
-    unrecorded: 0,
-    left: 0,
-  };
+  let report: DrainReport = emptyDrainReport;
 
   while (
     drainMayContinue({
@@ -133,9 +119,9 @@ export async function drainJobs(
       nextClaimSize(report.claimed),
     );
     for (const job of abandoned) raiseDead(job.kind, job.id);
-    report.dead += abandoned.length;
-    if (claimed.length === 0 && abandoned.length === 0) break;
-    report.claimed += claimed.length;
+    const batch = { claimed: claimed.length, abandoned: abandoned.length };
+    if (!claimFoundWork(batch)) break;
+    report = tallyClaimBatch(report, batch);
 
     for (const job of claimed) {
       let outcome: RunOutcome;
@@ -149,15 +135,15 @@ export async function drainJobs(
           kind: job.kind,
           errorName: error instanceof Error ? error.name : 'NonError',
         });
-        report.unrecorded += 1;
+        report = tallyOutcome(report, 'unrecorded');
         continue;
       }
-      if (outcome === 'succeeded') report.succeeded += 1;
-      else if (outcome === 'retried') report.retried += 1;
-      else if (outcome === 'dead') report.dead += 1;
+      report = tallyOutcome(report, outcome);
     }
   }
 
-  report.left = await countDueJobs(clock.now(), jobLimits.leftCountCap);
-  return report;
+  return {
+    ...report,
+    left: await countDueJobs(clock.now(), jobLimits.leftCountCap),
+  };
 }

@@ -116,6 +116,7 @@ describe('POST /api/pulse against a database', () => {
       succeeded: 1,
       retried: 0,
       dead: 0,
+      lost: 0,
       unrecorded: 0,
       left: 0,
       purged: 1,

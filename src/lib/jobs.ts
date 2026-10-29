@@ -117,6 +117,24 @@ export function claimDecision(row: ClaimableRow, now: Date): ClaimDecision {
   return row.attempts >= row.maxAttempts ? 'abandon' : 'claim';
 }
 
+/**
+ * Splits the rows a claim has locked into the ones to run and the ones to dead-letter, each judged
+ * once by `claimDecision`. Rows that are not due are in neither list.
+ */
+export function partitionClaims<T extends ClaimableRow>(
+  rows: readonly T[],
+  now: Date,
+): { toClaim: T[]; toAbandon: T[] } {
+  const toClaim: T[] = [];
+  const toAbandon: T[] = [];
+  for (const row of rows) {
+    const decision = claimDecision(row, now);
+    if (decision === 'claim') toClaim.push(row);
+    else if (decision === 'abandon') toAbandon.push(row);
+  }
+  return { toClaim, toAbandon };
+}
+
 export function lockExpiry(now: Date): Date {
   return new Date(now.getTime() + jobLimits.lockSeconds * 1000);
 }
@@ -184,6 +202,64 @@ export function drainMayContinue(progress: {
   );
 }
 
+/** A claim that took and abandoned nothing means no work is due, so the drain stops. */
+export function claimFoundWork(batch: {
+  claimed: number;
+  abandoned: number;
+}): boolean {
+  return batch.claimed > 0 || batch.abandoned > 0;
+}
+
+export type RunOutcome = 'succeeded' | 'retried' | 'dead' | 'lost';
+
+export type DrainReport = {
+  /** Every row a claim took, including the ones it dead-lettered without running. */
+  claimed: number;
+  succeeded: number;
+  retried: number;
+  /** Dead-lettered without running, or dead after a failed last attempt. */
+  dead: number;
+  /** Jobs whose claim was gone when their row lock was granted; nothing ran or was written. */
+  lost: number;
+  /** Jobs whose failure could not be written down; they are reclaimed once their lock lapses. */
+  unrecorded: number;
+  /** Jobs still due when the call stopped, counted up to 1,000. */
+  left: number;
+};
+
+export const emptyDrainReport: DrainReport = {
+  claimed: 0,
+  succeeded: 0,
+  retried: 0,
+  dead: 0,
+  lost: 0,
+  unrecorded: 0,
+  left: 0,
+};
+
+/**
+ * Counts one claim batch. Abandoned rows were claimed too and end up dead, so
+ * `claimed = succeeded + retried + dead + lost + unrecorded` holds once the batch has been tallied.
+ */
+export function tallyClaimBatch(
+  report: DrainReport,
+  batch: { claimed: number; abandoned: number },
+): DrainReport {
+  return {
+    ...report,
+    claimed: report.claimed + batch.claimed + batch.abandoned,
+    dead: report.dead + batch.abandoned,
+  };
+}
+
+/** Puts one claimed job's outcome in exactly one bucket. */
+export function tallyOutcome(
+  report: DrainReport,
+  outcome: RunOutcome | 'unrecorded',
+): DrainReport {
+  return { ...report, [outcome]: report[outcome] + 1 };
+}
+
 /** How many rows the next claim may take: a full batch, or what is left of the call's job budget. */
 export function nextClaimSize(claimed: number): number {
   return Math.min(jobLimits.claimBatch, jobLimits.drainMaxJobs - claimed);
@@ -215,6 +291,17 @@ export type PulseDecision =
   | { action: 'refuse' }
   | { action: 'reject-secret' }
   | { action: 'run'; sendHeartbeat: boolean };
+
+/**
+ * Whether the heartbeat goes out after a pulse that ran to the end. A failure that could not be
+ * written down points at the database, so the monitor must hear nothing and alarm.
+ */
+export function heartbeatDue(input: {
+  sendHeartbeat: boolean;
+  unrecorded: number;
+}): boolean {
+  return input.sendHeartbeat && input.unrecorded === 0;
+}
 
 /**
  * The pulse route's gates. Only POST is served, and a wrong method is refused without being

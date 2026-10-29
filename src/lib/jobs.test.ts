@@ -7,18 +7,25 @@ import {
   backoffSeconds,
   chooseClock,
   claimDecision,
+  claimFoundWork,
   deadJobAlertKey,
   decidePulse,
   describeJobError,
   drainMayContinue,
+  emptyDrainReport,
   failureOutcome,
+  heartbeatDue,
   jobLimits,
   lockExpiry,
   nextClaimSize,
   ownsClaim,
   parsePulseBody,
+  partitionClaims,
   payloadFits,
   purgeMayContinue,
+  tallyClaimBatch,
+  tallyOutcome,
+  type DrainReport,
 } from './jobs';
 
 // Behaviours under test, one per decision, branch, or risk:
@@ -30,6 +37,9 @@ import {
 // - a claim is still ours only when status, attempts, and lock all match
 // - a failure retries with backoff until the last attempt, then dead-letters; the stored error is redacted and bounded
 // - the drain stops at 200 jobs or 60 seconds, and the last claim is cut to the jobs left
+// - a claim splits rows once into run and dead-letter; a claim that found nothing stops the drain
+// - every outcome lands in exactly one bucket, so the counts sum to claimed (abandoned rows count as claimed and dead)
+// - the heartbeat is skipped when a failure could not be recorded
 // - the purge goes on only after a full batch and within the time budget
 // - the dead-job alert key is a valid alert dedupe key whatever the kind length
 // - a bearer header is read only in the exact form; the pulse body is empty or exactly { asOf }
@@ -446,5 +456,115 @@ describe('MaxAttemptsSchema', () => {
 
   it.each([0, 21, 1.5, -1, '3'])('refuses %j', (value) => {
     expect(MaxAttemptsSchema.safeParse(value).success).toBe(false);
+  });
+});
+
+describe('partitionClaims', () => {
+  const earlier = new Date(now.getTime() - 1000);
+  const later = new Date(now.getTime() + 1000);
+  const base = {
+    status: 'pending' as const,
+    runAfter: earlier,
+    lockedUntil: null,
+    attempts: 0,
+    maxAttempts: 3,
+  };
+
+  it('sorts due rows into run and dead-letter, keeps order, and drops the rest', () => {
+    const due = { ...base, id: 'due' };
+    const notYet = { ...base, id: 'not-yet', runAfter: later };
+    const spent = { ...base, id: 'spent', attempts: 3 };
+    const lapsed = {
+      ...base,
+      id: 'lapsed',
+      status: 'running' as const,
+      lockedUntil: earlier,
+      attempts: 1,
+    };
+    const live = {
+      ...base,
+      id: 'live',
+      status: 'running' as const,
+      lockedUntil: later,
+    };
+
+    const result = partitionClaims([due, notYet, spent, lapsed, live], now);
+
+    expect(result.toClaim).toEqual([due, lapsed]);
+    expect(result.toAbandon).toEqual([spent]);
+  });
+
+  it('returns two empty lists for no rows', () => {
+    expect(partitionClaims([], now)).toEqual({ toClaim: [], toAbandon: [] });
+  });
+});
+
+describe('claimFoundWork', () => {
+  it.each([
+    [{ claimed: 0, abandoned: 0 }, false],
+    [{ claimed: 1, abandoned: 0 }, true],
+    [{ claimed: 0, abandoned: 1 }, true],
+    [{ claimed: 3, abandoned: 2 }, true],
+  ])('%j finds work: %s', (batch, expected) => {
+    expect(claimFoundWork(batch)).toBe(expected);
+  });
+});
+
+describe('the drain report tallies', () => {
+  const sum = (report: DrainReport) =>
+    report.succeeded +
+    report.retried +
+    report.dead +
+    report.lost +
+    report.unrecorded;
+
+  it.each(['succeeded', 'retried', 'dead', 'lost', 'unrecorded'] as const)(
+    '%s lands in its own bucket and no other',
+    (outcome) => {
+      const tallied = tallyOutcome(emptyDrainReport, outcome);
+
+      expect(tallied[outcome]).toBe(1);
+      expect(sum(tallied)).toBe(1);
+      expect(emptyDrainReport[outcome]).toBe(0);
+    },
+  );
+
+  it('keeps claimed equal to the outcome counts across a mixed batch with abandoned rows', () => {
+    let report = tallyClaimBatch(emptyDrainReport, {
+      claimed: 5,
+      abandoned: 2,
+    });
+    for (const outcome of [
+      'succeeded',
+      'succeeded',
+      'retried',
+      'dead',
+      'lost',
+    ] as const) {
+      report = tallyOutcome(report, outcome);
+    }
+    report = tallyClaimBatch(report, { claimed: 1, abandoned: 0 });
+    report = tallyOutcome(report, 'unrecorded');
+
+    expect(report).toMatchObject({
+      claimed: 8,
+      succeeded: 2,
+      retried: 1,
+      dead: 3,
+      lost: 1,
+      unrecorded: 1,
+    });
+    expect(sum(report)).toBe(report.claimed);
+  });
+});
+
+describe('heartbeatDue', () => {
+  it.each([
+    [{ sendHeartbeat: true, unrecorded: 0 }, true],
+    [{ sendHeartbeat: true, unrecorded: 1 }, false],
+    [{ sendHeartbeat: false, unrecorded: 0 }, false],
+    [{ sendHeartbeat: false, unrecorded: 2 }, false],
+  ])('%j sends: %s', (input, expected) => {
+    expect(heartbeatDue(input)).toBe(expected);
   });
 });

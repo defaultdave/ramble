@@ -27,6 +27,7 @@ vi.mock('@/server/ports/rate-limit', () => ({ consumeRateLimit: vi.fn() }));
 // - a plain pulse drains on the system clock, purges until a short batch, pings the heartbeat once, and answers counts only
 // - asOf with DEMO_CLOCK on drains on a clock fixed at asOf and sends no heartbeat
 // - a drain or purge failure is thrown and sends no heartbeat
+// - a drain that could not record a failure answers 200 with its counts but sends no heartbeat
 // - a heartbeat that fails does not fail the pulse
 
 // The clock rule bans Date.now() here too; this reads the same instant.
@@ -39,6 +40,7 @@ const report = {
   succeeded: 2,
   retried: 1,
   dead: 0,
+  lost: 0,
   unrecorded: 0,
   left: 4,
 };
@@ -273,6 +275,21 @@ describe('a good pulse', () => {
     expect(response.status).toBe(200);
     const clock = vi.mocked(drainJobs).mock.calls[0]?.[0];
     expect(clock?.now()).toEqual(near);
+    expect(sendHeartbeat).not.toHaveBeenCalled();
+  });
+
+  it('answers its counts but sends no heartbeat when a failure could not be recorded', async () => {
+    vi.mocked(drainJobs).mockResolvedValue({ ...report, unrecorded: 1 });
+
+    const response = await pulseResponse(post());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      ...report,
+      unrecorded: 1,
+      purged: 0,
+    });
+    expect(purgeExpiredRateLimits).toHaveBeenCalled();
     expect(sendHeartbeat).not.toHaveBeenCalled();
   });
 

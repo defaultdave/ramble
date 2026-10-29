@@ -5,6 +5,8 @@ import { bearerToken } from '@/lib/http';
 import {
   chooseClock,
   decidePulse,
+  heartbeatDue,
+  type DrainReport,
   jobLimits,
   parsePulseBody,
   purgeMayContinue,
@@ -12,7 +14,7 @@ import {
 import { readBodyText } from '@/server/boundedBody';
 import { PURGE_BATCH, purgeExpiredRateLimits } from '@/server/db/rateLimits';
 import { env } from '@/server/env';
-import { drainJobs, type DrainReport } from '@/server/jobs/drain';
+import { drainJobs } from '@/server/jobs/drain';
 import { sendHeartbeat } from '@/server/monitoring/heartbeat';
 import { fixedClock, systemClock } from '@/server/ports/clock';
 import { consumeRateLimit } from '@/server/ports/rate-limit';
@@ -52,7 +54,11 @@ async function runPulse(
   const startedAt = performance.now();
   const report = await drainJobs(asOf ? fixedClock(asOf) : systemClock);
   const purged = await purgeRateLimits(startedAt);
-  if (heartbeat) await sendHeartbeat(env.BETTERSTACK_HEARTBEAT_URL);
+  if (
+    heartbeatDue({ sendHeartbeat: heartbeat, unrecorded: report.unrecorded })
+  ) {
+    await sendHeartbeat(env.BETTERSTACK_HEARTBEAT_URL);
+  }
   return { ...report, purged };
 }
 

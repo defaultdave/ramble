@@ -46,14 +46,26 @@ let jobsDb: typeof import('@/server/db/jobs');
 let clockModule: typeof import('@/server/ports/clock');
 let side: Pool;
 
-/** Held shut until a test lets the `gated` kind's handler throw. */
-let gate: { promise: Promise<void>; open: () => void };
+/**
+ * Held shut until a test lets the `gated` and `held` kinds' handlers go on; `entered` resolves once
+ * one of them has started, which means the job holds its row lock.
+ */
+let gate: {
+  promise: Promise<void>;
+  open: () => void;
+  entered: Promise<void>;
+  enter: () => void;
+};
 function closeGate() {
   let open: () => void = () => undefined;
+  let enter: () => void = () => undefined;
   const promise = new Promise<void>((resolve) => {
     open = resolve;
   });
-  gate = { promise, open };
+  const entered = new Promise<void>((resolve) => {
+    enter = resolve;
+  });
+  gate = { promise, open, entered, enter };
 }
 
 const handled: { kind: string; jobId: string; payload: unknown }[] = [];
@@ -93,10 +105,20 @@ beforeAll(async () => {
       maxAttempts: 3,
       handleIdempotent: () => Promise.reject(new Error('always fails')),
     },
+    held: {
+      payload: z.object({}),
+      maxAttempts: 3,
+      handleIdempotent: async (context) => {
+        gate.enter();
+        await gate.promise;
+        await record('held')(context);
+      },
+    },
     gated: {
       payload: z.object({}),
       maxAttempts: 2,
       handleIdempotent: async () => {
+        gate.enter();
         await gate.promise;
         throw new Error('boom after the gate');
       },
@@ -409,6 +431,7 @@ describe('drain', () => {
       succeeded: 1,
       retried: 0,
       dead: 0,
+      lost: 0,
       unrecorded: 0,
       left: 0,
     });
@@ -545,7 +568,7 @@ describe('drain', () => {
 
     const report = await drainAt('2030-01-01T00:05:00Z');
 
-    expect(report).toMatchObject({ claimed: 0, dead: 1 });
+    expect(report).toMatchObject({ claimed: 1, dead: 1 });
     expect(handled).toHaveLength(0);
     expect(await onlyRow()).toMatchObject({
       status: 'dead',
@@ -575,6 +598,7 @@ describe('drain', () => {
       succeeded: 200,
       retried: 0,
       dead: 0,
+      lost: 0,
       unrecorded: 0,
       left: 5,
     });
@@ -636,113 +660,167 @@ describe('claim', () => {
   });
 });
 
-describe('the locked re-check before a job runs', () => {
-  const now = new Date('2030-01-01T00:00:00Z');
+/** Polls until `check` is true, so a loaded machine only makes a test slower, never reorders it. */
+async function waitUntil(
+  what: string,
+  check: () => Promise<boolean>,
+  timeoutMs = 15_000,
+) {
+  const deadline = performance.now() + timeoutMs;
+  while (!(await check())) {
+    if (performance.now() > deadline) {
+      throw new Error(`timed out waiting until ${what}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}
 
-  /** Claims the only job, then lets `change` alter its row while holding the lock, and runs it. */
-  async function runWhileAnotherTransactionChangesTheRow(change: string) {
-    await insertRaw();
-    const { claimed } = await jobsDb.claimDueJobs(now, 25);
-    const job = claimed[0];
-    if (!job) throw new Error('nothing was claimed');
+/** Whether a backend of this database, other than `exceptPid`, is queued behind a row lock. */
+async function someoneIsWaitingForALock(exceptPid: number) {
+  const { rows } = await side.query(
+    `SELECT 1 FROM pg_stat_activity
+     WHERE datname = current_database() AND wait_event_type = 'Lock' AND pid <> $1`,
+    [exceptPid],
+  );
+  return rows.length > 0;
+}
+
+async function isWaitingForALock(pid: number) {
+  const { rows } = await side.query(
+    `SELECT 1 FROM pg_stat_activity WHERE pid = $1 AND wait_event_type = 'Lock'`,
+    [pid],
+  );
+  return rows.length > 0;
+}
+
+async function backendPid(connection: PoolClient) {
+  const { rows } = await connection.query<{ pid: number }>(
+    'SELECT pg_backend_pid() AS pid',
+  );
+  return (rows[0] as { pid: number }).pid;
+}
+
+const t0 = new Date('2030-01-01T00:00:00Z');
+const finishedMeanwhile = `UPDATE jobs SET status = 'succeeded', locked_until = NULL, finished_at = clock_timestamp() WHERE id = $1`;
+const takenAgain = `UPDATE jobs SET attempts = attempts + 1, locked_until = locked_until + interval '10 minutes' WHERE id = $1`;
+
+describe('the locked re-check before a job runs', () => {
+  /**
+   * Drains two jobs. The first (`held`) stops at the gate, so the second is already claimed when a
+   * second connection locks its row; the drain then queues for that lock when it reaches the
+   * second job, and `change` alters the row before the lock is released.
+   */
+  async function drainWhileAnotherTransactionChangesTheSecondRow(
+    change: string,
+  ) {
+    await insertRaw({ kind: 'held', runAfter: '2026-01-01T00:00:00Z' });
+    const second = await insertRaw({ runAfter: '2026-01-02T00:00:00Z' });
 
     const other: PoolClient = await side.connect();
+    let draining: ReturnType<typeof drainModule.drainJobs> | undefined;
     try {
-      await other.query('BEGIN');
-      await other.query('SELECT id FROM jobs WHERE id = $1 FOR UPDATE', [
-        job.id,
-      ]);
-      const running = drainModule.runJob(
-        job,
-        clockModule.fixedClock(now),
+      const otherPid = await backendPid(other);
+      draining = drainModule.drainJobs(
+        clockModule.fixedClock(t0),
         testRegistry,
       );
-      // runJob is now waiting on the row lock; give it time to get there before changing the row.
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      await other.query(change, [job.id]);
+      await gate.entered; // both jobs are claimed; the second one is not locked by anyone
+      await other.query('BEGIN');
+      await other.query('SELECT id FROM jobs WHERE id = $1 FOR UPDATE', [
+        second,
+      ]);
+      gate.open();
+      await waitUntil('the drain is queued for the second row', () =>
+        someoneIsWaitingForALock(otherPid),
+      );
+      await other.query(change, [second]);
       await other.query('COMMIT');
-      return await running;
+      return { report: await draining, second };
     } finally {
+      gate.open();
+      await other.query('ROLLBACK').catch(() => undefined);
       other.release();
+      await draining?.catch(() => undefined);
     }
   }
 
   it('does not run a job that finished while it waited for the lock', async () => {
-    const outcome = await runWhileAnotherTransactionChangesTheRow(
-      `UPDATE jobs SET status = 'succeeded', locked_until = NULL, finished_at = clock_timestamp() WHERE id = $1`,
-    );
+    const { report, second } =
+      await drainWhileAnotherTransactionChangesTheSecondRow(finishedMeanwhile);
 
-    expect(outcome).toBe('lost');
-    expect(handled).toHaveLength(0);
-    expect((await onlyRow()).attempts).toBe(1);
+    expect(report).toMatchObject({ claimed: 2, succeeded: 1, lost: 1 });
+    expect(handled.map((entry) => entry.kind)).toEqual(['held']);
+    const row = (await allRows()).find((entry) => entry.id === second);
+    expect(row).toMatchObject({ status: 'succeeded', attempts: 1 });
   });
 
   it('does not run a job another drain took again while it waited', async () => {
-    const outcome = await runWhileAnotherTransactionChangesTheRow(
-      `UPDATE jobs SET attempts = attempts + 1, locked_until = locked_until + interval '10 minutes' WHERE id = $1`,
-    );
+    const { report } =
+      await drainWhileAnotherTransactionChangesTheSecondRow(takenAgain);
 
-    expect(outcome).toBe('lost');
-    expect(handled).toHaveLength(0);
+    expect(report).toMatchObject({ claimed: 2, succeeded: 1, lost: 1 });
+    expect(handled.map((entry) => entry.kind)).toEqual(['held']);
   });
 
   it('runs a job whose row was only touched, not taken', async () => {
-    const outcome = await runWhileAnotherTransactionChangesTheRow(
+    const { report } = await drainWhileAnotherTransactionChangesTheSecondRow(
       `UPDATE jobs SET last_error = 'seen' WHERE id = $1`,
     );
 
-    expect(outcome).toBe('succeeded');
-    expect(handled).toHaveLength(1);
+    expect(report).toMatchObject({ claimed: 2, succeeded: 2, lost: 0 });
+    expect(handled.map((entry) => entry.kind)).toEqual(['held', 'ok']);
   });
 });
 
 describe('the locked re-check when recording a failure', () => {
-  const now = new Date('2030-01-01T00:00:00Z');
-  const pause = () => new Promise((resolve) => setTimeout(resolve, 150));
-
   /**
-   * Runs a job whose handler throws. A second connection queues for the row lock while the handler
-   * still holds it, so it is granted the lock the moment the handler's transaction rolls back, and
-   * the failure recording has to wait behind it. `change` alters the row before that lock is released.
+   * Drains one job whose handler throws. A second connection queues for the row lock while the
+   * handler still holds it, so it is granted the lock the moment the handler's transaction rolls
+   * back, and the failure recording has to wait behind it. `change` alters the row before that lock
+   * is released.
    */
   async function failWhileAnotherTransactionChangesTheRow(change: string) {
-    await insertRaw({ kind: 'gated', maxAttempts: 2 });
-    const { claimed } = await jobsDb.claimDueJobs(now, 25);
-    const job = claimed[0];
-    if (!job) throw new Error('nothing was claimed');
-    const before = await onlyRow();
+    const id = await insertRaw({ kind: 'gated', maxAttempts: 2 });
 
     const other: PoolClient = await side.connect();
+    let draining: ReturnType<typeof drainModule.drainJobs> | undefined;
     try {
-      await other.query('BEGIN');
-      const running = drainModule.runJob(
-        job,
-        clockModule.fixedClock(now),
+      const otherPid = await backendPid(other);
+      draining = drainModule.drainJobs(
+        clockModule.fixedClock(t0),
         testRegistry,
       );
-      await pause(); // the handler now holds the row lock and waits at the gate
+      await gate.entered; // the handler now holds the row lock and waits at the gate
+      const before = await onlyRow();
+      await other.query('BEGIN');
       const queued = other.query(
         'SELECT id FROM jobs WHERE id = $1 FOR UPDATE',
-        [job.id],
+        [id],
       );
-      await pause();
+      await waitUntil('the side connection is queued for the row', () =>
+        isWaitingForALock(otherPid),
+      );
       gate.open();
       await queued;
-      await pause(); // the failure recording is now waiting for the lock this connection holds
-      await other.query(change, [job.id]);
+      await waitUntil('the failure recording is queued for the row', () =>
+        someoneIsWaitingForALock(otherPid),
+      );
+      await other.query(change, [id]);
       await other.query('COMMIT');
-      return { outcome: await running, before };
+      return { report: await draining, before };
     } finally {
+      gate.open();
+      await other.query('ROLLBACK').catch(() => undefined);
       other.release();
+      await draining?.catch(() => undefined);
     }
   }
 
   it('records nothing when another drain took the job again while the handler ran', async () => {
-    const { outcome, before } = await failWhileAnotherTransactionChangesTheRow(
-      `UPDATE jobs SET attempts = attempts + 1, locked_until = locked_until + interval '10 minutes' WHERE id = $1`,
-    );
+    const { report, before } =
+      await failWhileAnotherTransactionChangesTheRow(takenAgain);
 
-    expect(outcome).toBe('lost');
+    expect(report).toMatchObject({ claimed: 1, lost: 1, retried: 0, dead: 0 });
     expect(await onlyRow()).toEqual({
       ...before,
       attempts: before.attempts + 1,
@@ -752,11 +830,10 @@ describe('the locked re-check when recording a failure', () => {
   });
 
   it('records nothing when the job finished meanwhile', async () => {
-    const { outcome, before } = await failWhileAnotherTransactionChangesTheRow(
-      `UPDATE jobs SET status = 'succeeded', locked_until = NULL, finished_at = clock_timestamp() WHERE id = $1`,
-    );
+    const { report, before } =
+      await failWhileAnotherTransactionChangesTheRow(finishedMeanwhile);
 
-    expect(outcome).toBe('lost');
+    expect(report).toMatchObject({ claimed: 1, lost: 1, retried: 0, dead: 0 });
     const row = await onlyRow();
     expect(row).toMatchObject({
       status: 'succeeded',
@@ -797,6 +874,7 @@ describe('a failure that cannot be recorded', () => {
         succeeded: 2,
         retried: 0,
         dead: 0,
+        lost: 0,
         unrecorded: 1,
       });
       expect(handled).toHaveLength(2);

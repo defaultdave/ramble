@@ -1,5 +1,5 @@
 {
-  "id": "364d3a24-74a1-45b8-b98c-6de2e653acae",
+  "id": "c91009ec-099e-45c6-9cee-1743d2f2f7da",
   "prevId": "3f20a1f2-4a01-4e60-875c-4053f22bf427",
   "version": "7",
   "dialect": "postgresql",
@@ -415,6 +415,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "notification_email": {
+          "name": "notification_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -436,6 +442,10 @@
         "hosts_name_not_blank": {
           "name": "hosts_name_not_blank",
           "value": "\"hosts\".\"name\" ~ '[^\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]'"
+        },
+        "hosts_notification_email_shape": {
+          "name": "hosts_notification_email_shape",
+          "value": "\"hosts\".\"notification_email\" IS NULL OR (\"hosts\".\"notification_email\" ~ '^[a-z0-9._%+-]+@[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$' AND char_length(\"hosts\".\"notification_email\") <= 254)"
         },
         "hosts_created_at_in_range": {
           "name": "hosts_created_at_in_range",
@@ -4935,315 +4945,6 @@
         }
       },
       "isRLSEnabled": false
-    },
-    "public.ledger_entries": {
-      "name": "ledger_entries",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "bigint",
-          "primaryKey": true,
-          "notNull": true,
-          "identity": {
-            "type": "always",
-            "name": "ledger_entries_id_seq",
-            "schema": "public",
-            "increment": "1",
-            "startWith": "1",
-            "minValue": "1",
-            "maxValue": "9223372036854775807",
-            "cache": "1",
-            "cycle": false
-          }
-        },
-        "occurred_at": {
-          "name": "occurred_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "recorded_at": {
-          "name": "recorded_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "clock_timestamp()"
-        },
-        "entry_type": {
-          "name": "entry_type",
-          "type": "ledger_entry_type",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "debit_account": {
-          "name": "debit_account",
-          "type": "ledger_account",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "credit_account": {
-          "name": "credit_account",
-          "type": "ledger_account",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "amount_minor": {
-          "name": "amount_minor",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "currency": {
-          "name": "currency",
-          "type": "char(3)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'USD'"
-        },
-        "order_id": {
-          "name": "order_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "gift_id": {
-          "name": "gift_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "host_id": {
-          "name": "host_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "payment_attempt_id": {
-          "name": "payment_attempt_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "refund_id": {
-          "name": "refund_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "transfer_id": {
-          "name": "transfer_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "dispute_id": {
-          "name": "dispute_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "provider_object_id": {
-          "name": "provider_object_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "simulated": {
-          "name": "simulated",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "memo": {
-          "name": "memo",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "ledger_entries_cash_event_unique": {
-          "name": "ledger_entries_cash_event_unique",
-          "columns": [
-            {
-              "expression": "entry_type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "provider_object_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"ledger_entries\".\"provider_object_id\" IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "ledger_entries_host_occurred_idx": {
-          "name": "ledger_entries_host_occurred_idx",
-          "columns": [
-            {
-              "expression": "host_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "occurred_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "ledger_entries_order_id_idx": {
-          "name": "ledger_entries_order_id_idx",
-          "columns": [
-            {
-              "expression": "order_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "ledger_entries_order_id_orders_id_fk": {
-          "name": "ledger_entries_order_id_orders_id_fk",
-          "tableFrom": "ledger_entries",
-          "tableTo": "orders",
-          "columnsFrom": [
-            "order_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "ledger_entries_host_id_hosts_id_fk": {
-          "name": "ledger_entries_host_id_hosts_id_fk",
-          "tableFrom": "ledger_entries",
-          "tableTo": "hosts",
-          "columnsFrom": [
-            "host_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "ledger_entries_payment_attempt_id_payment_attempts_id_fk": {
-          "name": "ledger_entries_payment_attempt_id_payment_attempts_id_fk",
-          "tableFrom": "ledger_entries",
-          "tableTo": "payment_attempts",
-          "columnsFrom": [
-            "payment_attempt_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "ledger_entries_refund_id_refunds_id_fk": {
-          "name": "ledger_entries_refund_id_refunds_id_fk",
-          "tableFrom": "ledger_entries",
-          "tableTo": "refunds",
-          "columnsFrom": [
-            "refund_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "ledger_entries_transfer_id_transfers_id_fk": {
-          "name": "ledger_entries_transfer_id_transfers_id_fk",
-          "tableFrom": "ledger_entries",
-          "tableTo": "transfers",
-          "columnsFrom": [
-            "transfer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "ledger_entries_accounts_differ": {
-          "name": "ledger_entries_accounts_differ",
-          "value": "\"ledger_entries\".\"debit_account\" <> \"ledger_entries\".\"credit_account\""
-        },
-        "ledger_entries_entry_type_accounts": {
-          "name": "ledger_entries_entry_type_accounts",
-          "value": "(\"ledger_entries\".\"entry_type\", \"ledger_entries\".\"debit_account\", \"ledger_entries\".\"credit_account\") IN (('charge_host_share', 'platform_cash', 'host_payable'), ('charge_commission', 'platform_cash', 'ramble_commission'), ('charge_tax', 'platform_cash', 'host_payable'), ('processing_fee', 'processing_fees', 'platform_cash'), ('transfer_to_host', 'host_payable', 'platform_cash'), ('transfer_reversal', 'platform_cash', 'host_payable'), ('refund_host_share', 'host_payable', 'refunds_pending'), ('commission_returned', 'ramble_commission', 'refunds_pending'), ('refund_tax', 'host_payable', 'refunds_pending'), ('refund_cash_out', 'refunds_pending', 'platform_cash'), ('refund_reversal', 'refunds_pending', 'host_payable'), ('refund_reversal', 'refunds_pending', 'ramble_commission'), ('gift_liability_in', 'platform_cash', 'gift_liability'), ('gift_to_host_share', 'gift_liability', 'host_payable'), ('gift_to_commission', 'gift_liability', 'ramble_commission'), ('gift_to_tax', 'gift_liability', 'host_payable'), ('gift_refund', 'gift_liability', 'refunds_pending'), ('gift_reinstated', 'host_payable', 'gift_liability'), ('gift_reinstated', 'ramble_commission', 'gift_liability'), ('ramble_payout', 'ramble_payouts', 'platform_cash'), ('dispute_withdrawal', 'dispute_hold', 'platform_cash'), ('dispute_fee', 'processing_fees', 'platform_cash'), ('dispute_reinstated', 'platform_cash', 'dispute_hold'), ('dispute_to_host', 'host_payable', 'dispute_hold'), ('dispute_loss', 'dispute_losses', 'dispute_hold'))"
-        },
-        "ledger_entries_amount_in_range": {
-          "name": "ledger_entries_amount_in_range",
-          "value": "\"ledger_entries\".\"amount_minor\" BETWEEN 1 AND 2000000000"
-        },
-        "ledger_entries_currency_usd": {
-          "name": "ledger_entries_currency_usd",
-          "value": "\"ledger_entries\".\"currency\" = 'USD'"
-        },
-        "ledger_entries_names_a_subject": {
-          "name": "ledger_entries_names_a_subject",
-          "value": "num_nonnulls(\"ledger_entries\".\"order_id\", \"ledger_entries\".\"gift_id\", \"ledger_entries\".\"host_id\") >= 1 OR \"ledger_entries\".\"entry_type\" = 'ramble_payout'"
-        },
-        "ledger_entries_provider_id_on_cash": {
-          "name": "ledger_entries_provider_id_on_cash",
-          "value": "(\"ledger_entries\".\"provider_object_id\" IS NOT NULL) = (\"ledger_entries\".\"debit_account\" = 'platform_cash' OR \"ledger_entries\".\"credit_account\" = 'platform_cash')"
-        },
-        "ledger_entries_provider_id_text": {
-          "name": "ledger_entries_provider_id_text",
-          "value": "\"ledger_entries\".\"provider_object_id\" IS NULL OR (\"ledger_entries\".\"provider_object_id\" ~ '[^\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]' AND char_length(\"ledger_entries\".\"provider_object_id\") <= 255)"
-        },
-        "ledger_entries_memo_text": {
-          "name": "ledger_entries_memo_text",
-          "value": "\"ledger_entries\".\"memo\" IS NULL OR (\"ledger_entries\".\"memo\" ~ '[^\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]' AND char_length(\"ledger_entries\".\"memo\") <= 500)"
-        },
-        "ledger_entries_occurred_at_in_range": {
-          "name": "ledger_entries_occurred_at_in_range",
-          "value": "\"ledger_entries\".\"occurred_at\" >= '1000-01-01 00:00:00+00' AND \"ledger_entries\".\"occurred_at\" < '10000-01-01 00:00:00+00'"
-        },
-        "ledger_entries_recorded_at_in_range": {
-          "name": "ledger_entries_recorded_at_in_range",
-          "value": "\"ledger_entries\".\"recorded_at\" >= '1000-01-01 00:00:00+00' AND \"ledger_entries\".\"recorded_at\" < '10000-01-01 00:00:00+00'"
-        }
-      },
-      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -5613,50 +5314,6 @@
         "reversed",
         "skipped",
         "simulated"
-      ]
-    },
-    "public.ledger_account": {
-      "name": "ledger_account",
-      "schema": "public",
-      "values": [
-        "platform_cash",
-        "host_payable",
-        "ramble_commission",
-        "processing_fees",
-        "gift_liability",
-        "refunds_pending",
-        "dispute_hold",
-        "dispute_losses",
-        "ramble_payouts"
-      ]
-    },
-    "public.ledger_entry_type": {
-      "name": "ledger_entry_type",
-      "schema": "public",
-      "values": [
-        "charge_host_share",
-        "charge_commission",
-        "charge_tax",
-        "processing_fee",
-        "transfer_to_host",
-        "transfer_reversal",
-        "refund_host_share",
-        "commission_returned",
-        "refund_tax",
-        "refund_cash_out",
-        "refund_reversal",
-        "gift_liability_in",
-        "gift_to_host_share",
-        "gift_to_commission",
-        "gift_to_tax",
-        "gift_refund",
-        "gift_reinstated",
-        "ramble_payout",
-        "dispute_withdrawal",
-        "dispute_fee",
-        "dispute_reinstated",
-        "dispute_to_host",
-        "dispute_loss"
       ]
     }
   },

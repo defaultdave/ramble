@@ -1,5 +1,5 @@
 -- Custom SQL migration: what keeps the ledger append-only (PRD-74, ADR 0002). It lives apart from
--- 0014 so regenerating that schema migration never drops it.
+-- 0015 so regenerating that schema migration never drops it.
 --
 -- A row is never changed or removed, and the table is never emptied. The trigger fires for the
 -- table owner too, so it is the real guard; the role below is the pattern the audit log and the

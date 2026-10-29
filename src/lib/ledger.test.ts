@@ -345,6 +345,42 @@ describe('which accounts each entry type moves money between', () => {
           : null,
     });
 
+  it('is exactly the postings table of design doc 4.2.3', () => {
+    // Typed out by hand from the design doc, so an edit to the map cannot pass by editing both.
+    const designDoc = [
+      ['charge_host_share', 'platform_cash', 'host_payable'],
+      ['charge_commission', 'platform_cash', 'ramble_commission'],
+      ['charge_tax', 'platform_cash', 'host_payable'],
+      ['processing_fee', 'processing_fees', 'platform_cash'],
+      ['transfer_to_host', 'host_payable', 'platform_cash'],
+      ['transfer_reversal', 'platform_cash', 'host_payable'],
+      ['refund_host_share', 'host_payable', 'refunds_pending'],
+      ['commission_returned', 'ramble_commission', 'refunds_pending'],
+      ['refund_tax', 'host_payable', 'refunds_pending'],
+      ['refund_cash_out', 'refunds_pending', 'platform_cash'],
+      ['refund_reversal', 'refunds_pending', 'host_payable'],
+      ['refund_reversal', 'refunds_pending', 'ramble_commission'],
+      ['gift_liability_in', 'platform_cash', 'gift_liability'],
+      ['gift_to_host_share', 'gift_liability', 'host_payable'],
+      ['gift_to_commission', 'gift_liability', 'ramble_commission'],
+      ['gift_to_tax', 'gift_liability', 'host_payable'],
+      ['gift_refund', 'gift_liability', 'refunds_pending'],
+      ['gift_reinstated', 'host_payable', 'gift_liability'],
+      ['gift_reinstated', 'ramble_commission', 'gift_liability'],
+      ['ramble_payout', 'ramble_payouts', 'platform_cash'],
+      ['dispute_withdrawal', 'dispute_hold', 'platform_cash'],
+      ['dispute_fee', 'processing_fees', 'platform_cash'],
+      ['dispute_reinstated', 'platform_cash', 'dispute_hold'],
+      ['dispute_to_host', 'host_payable', 'dispute_hold'],
+      ['dispute_loss', 'dispute_losses', 'dispute_hold'],
+    ];
+    expect(designDoc).toHaveLength(25);
+    const inMap = Object.entries(ledgerPostings).flatMap(([type, pairs]) =>
+      pairs.map(([debit, credit]) => [type, debit, credit]),
+    );
+    expect(inMap.toSorted()).toEqual(designDoc.toSorted());
+  });
+
   it('lists every entry type, once', () => {
     expect(Object.keys(ledgerPostings).toSorted()).toEqual(
       [...ledgerEntryTypes].toSorted(),

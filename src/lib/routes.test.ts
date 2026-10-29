@@ -13,6 +13,7 @@ import {
   helpPath,
   homePicksHref,
   legalPath,
+  managePath,
   maxAddressLength,
   neighborhoodPath,
   parseExperienceAddress,
@@ -116,6 +117,7 @@ describe('literal addresses', () => {
     ['the terms', legalPath('terms'), '/legal/terms'],
     ['the privacy policy', legalPath('privacy'), '/legal/privacy'],
     ['a private session', privateSessionPath, '/contact'],
+    ['a manage page', managePath('abc'), '/manage/abc'],
   ])('writes %s', (_name, actual, expected) => {
     expect(actual).toBe(expected);
   });

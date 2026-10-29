@@ -3,12 +3,18 @@ import { render } from 'react-email';
 import type { ReactElement } from 'react';
 import { RenderedEmailSchema, type RenderedEmail } from '@/lib/email/message';
 import {
+  attachmentsFor,
   subjectFor,
   type EmailRequest,
   type EmailTemplateData,
   type EmailTemplateName,
 } from '@/lib/email/templates';
+import { BookingCancellation } from './templates/BookingCancellation';
+import { BookingRefund } from './templates/BookingRefund';
 import { DevCheck } from './templates/DevCheck';
+import { GuestConfirmation } from './templates/GuestConfirmation';
+import { HostBookingNotice } from './templates/HostBookingNotice';
+import { PaidAfterLapse } from './templates/PaidAfterLapse';
 
 type Markup = {
   [Name in EmailTemplateName]: (
@@ -19,6 +25,21 @@ type Markup = {
 
 const markup: Markup = {
   'dev-check': (data, helpUrl) => <DevCheck data={data} helpUrl={helpUrl} />,
+  'guest-confirmation': (data, helpUrl) => (
+    <GuestConfirmation data={data} helpUrl={helpUrl} />
+  ),
+  'host-booking-notice': (data, helpUrl) => (
+    <HostBookingNotice data={data} helpUrl={helpUrl} />
+  ),
+  'booking-cancellation': (data, helpUrl) => (
+    <BookingCancellation data={data} helpUrl={helpUrl} />
+  ),
+  'booking-refund': (data, helpUrl) => (
+    <BookingRefund data={data} helpUrl={helpUrl} />
+  ),
+  'paid-after-lapse': (data, helpUrl) => (
+    <PaidAfterLapse data={data} helpUrl={helpUrl} />
+  ),
 };
 
 // Generic so each template's markup receives exactly that template's data.
@@ -46,5 +67,6 @@ export async function renderEmail(
     subject: subjectFor(request),
     html,
     text,
+    attachments: attachmentsFor(request),
   });
 }

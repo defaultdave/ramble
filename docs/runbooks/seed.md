@@ -62,7 +62,30 @@ The seed still refuses `NODE_ENV=production`, an unreadable `DATABASE_URL`, and 
 | Categories, neighborhoods, hosts, experiences, price options | Written to the schema directly: the data layer has no write contract for them yet. The Zod schemas the app reads with validate every fixture first, and the database CHECKs backstop them |
 | Seats sold on the few sessions that must be nearly full or sold out | Written to the schema directly: seats sold otherwise move only with orders, which do not exist yet. A session that has sold more than the plan is never lowered |
 
-It writes no photo rows yet (U-021b seeds the photo pool), never touches the settings row (so the tax rate the settings migration seeds stays as it is), and writes no help articles.
+Generated test photos for the curated experiences are written as the last step (see Test photos). It never touches the settings row (so the tax rate the settings migration seeds stays as it is), and writes no help articles.
+
+## Test photos
+
+After the coverage matrix, the seed gives each curated experience 3 to 5 generated photos: a labelled colour gradient, drawn by the code, with no third-party art. Position 0 is the cover. Every experience holds one source of each size class (1,600, 1,920, and 2,400 px on the long edge) in its first three positions, and the fourth and fifth are portrait. Ingest refuses a source under 1,600 px (PRD-50), so 1,600 px is the smallest source. Each image goes through the same ingest and storage port an upload uses, then a `photos` row is written with alt text and the `ramble_owned` rights basis. The scale fixture gets no photos.
+
+A rerun writes only what is missing, under the same ids and keys: a row that exists is left alone, whoever wrote it, and a file left without its row by a stopped run is replaced. The step ends with a coverage line, and a curated experience with no cover, fewer than 3 photos, or a photo without alt text exits the seed with code 1 and names it.
+
+| `STORAGE_PROVIDER` | `SEED_TARGET` | Result |
+|---|---|---|
+| `fake` | `local` | Photos are written to memory and the rows point at an address that does not resolve. Enough for tests and the coverage check; the pages show no image. |
+| `fake` | any other | The step is skipped with a line saying so. |
+| `vercel-blob` | any | Photos go to the public store. |
+
+Creating the store and running the step, once:
+
+```
+vercel blob create-store ramble-photos --access public
+# In the target Vercel environment set STORAGE_PROVIDER=vercel-blob and BLOB_PUBLIC_READ_WRITE_TOKEN
+# (BLOB_PRIVATE_READ_WRITE_TOKEN is required with it), then redeploy: the store id is read at build.
+# Run the seed as above with the same two storage variables in the shell, passed on the command line.
+```
+
+The seed refuses production as it always does, so a production run needs `SEED_TARGET=production-demo`. Photos are served from `<storeId>.public.blob.vercel-storage.com/public/photos/` through `/_next/image`.
 
 ## Rerunning
 

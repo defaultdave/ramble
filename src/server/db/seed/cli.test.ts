@@ -12,15 +12,23 @@ import { seedCaller } from './caller';
 // - production-demo seeds the curated set against production and refuses --scale before anything runs
 // - a good run seeds with the clock and scale it was given, checks coverage, prints the result, exits 0
 // - a coverage gap exits 1 and names the probe; a scale run holds the scale probe to account
+// - after the coverage matrix the photo step opens the store, writes the photos, and checks the cover and
+//   the three-photo floor; a gap exits 1 and names the experience
+// - the fake provider on any target but local skips the photo step without opening the store
+// - a refusal never opens the store
 // - a failure prints only a safe message, exits 1, and still closes the pool
 
 const end = vi.fn(() => Promise.resolve());
 const runSeed = vi.fn();
 const readSeedSnapshot = vi.fn();
+const seedTestPhotos = vi.fn();
+const readPhotoCoverageGaps = vi.fn();
+const openStorage = vi.fn();
 
 vi.mock('@/server/db/client', () => ({ db: { $client: { end } } }));
 vi.mock('./run', () => ({ runSeed }));
 vi.mock('./read', () => ({ readSeedSnapshot }));
+vi.mock('./photos', () => ({ seedTestPhotos, readPhotoCoverageGaps }));
 
 const now = new Date('2026-10-28T15:00:00Z');
 const lines: string[] = [];
@@ -35,6 +43,7 @@ const command = (overrides: Partial<SeedCommand> = {}): SeedCommand => ({
     seedHost: undefined,
   },
   now,
+  storage: { provider: 'vercel-blob', open: openStorage },
   write: (line) => lines.push(line),
   ...overrides,
 });
@@ -48,6 +57,9 @@ beforeEach(() => {
   lines.length = 0;
   end.mockClear();
   runSeed.mockReset().mockResolvedValue({});
+  openStorage.mockReset().mockReturnValue({ provider: 'vercel-blob' });
+  seedTestPhotos.mockReset().mockResolvedValue({ created: 2, alreadyThere: 1 });
+  readPhotoCoverageGaps.mockReset().mockResolvedValue([]);
   readSeedSnapshot
     .mockReset()
     .mockResolvedValue(snapshotFromFixtures(curated, undefined, now));
@@ -139,6 +151,68 @@ describe('runSeedCommand', () => {
     expect(readSeedSnapshot).toHaveBeenCalledWith(seedCaller, now);
     expect(lines.join('\n')).toContain('no gaps');
     expect(end).toHaveBeenCalledTimes(1);
+  });
+
+  describe('photos', () => {
+    it('writes them after the matrix and reports the count and the coverage', async () => {
+      expect(await run()).toBe(0);
+      expect(seedTestPhotos).toHaveBeenCalledWith(seedCaller, {
+        provider: 'vercel-blob',
+      });
+      const output = lines.join('\n');
+      expect(output).toContain('Photos: 2 written, 1 already there');
+      expect(output).toContain('Photo coverage: 14 experiences');
+    });
+
+    it('exits 1 and names the experience when one lacks its photos', async () => {
+      readPhotoCoverageGaps.mockResolvedValue([
+        'kids-wheel-class has no cover',
+      ]);
+      expect(await run()).toBe(1);
+      expect(lines.join('\n')).toContain('kids-wheel-class has no cover');
+      expect(end).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips them for the fake provider on a staging target, without opening the store', async () => {
+      const base = command().target;
+      const code = await run({
+        storage: { provider: 'fake', open: openStorage },
+        target: {
+          ...base,
+          seedTarget: 'staging',
+          databaseUrl: 'postgres://u:secret@db.example.com/ramble',
+          seedHost: 'db.example.com',
+        },
+      });
+      expect(code).toBe(0);
+      expect(lines.join('\n')).toContain('Photos skipped');
+      expect(openStorage).not.toHaveBeenCalled();
+      expect(seedTestPhotos).not.toHaveBeenCalled();
+    });
+
+    it('writes them on the local target with the fake provider', async () => {
+      expect(
+        await run({ storage: { provider: 'fake', open: openStorage } }),
+      ).toBe(0);
+      expect(seedTestPhotos).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not open the store when the target is refused', async () => {
+      const base = command().target;
+      await run({ target: { ...base, vercelEnv: 'production' } });
+      expect(openStorage).not.toHaveBeenCalled();
+      expect(seedTestPhotos).not.toHaveBeenCalled();
+    });
+
+    it('keeps the matrix gap as the exit code when the photos are fine', async () => {
+      const snapshot = snapshotFromFixtures(curated, undefined, now);
+      readSeedSnapshot.mockResolvedValue({
+        ...snapshot,
+        settings: { ...snapshot.settings, giftsEnabled: false },
+      });
+      expect(await run()).toBe(1);
+      expect(seedTestPhotos).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('passes the scale options to the seed', async () => {

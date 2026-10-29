@@ -12,6 +12,7 @@ import {
   type SnapshotExperience,
   type SnapshotSession,
 } from './coverage';
+import { msPerDay } from '@/lib/time';
 import { curated } from './fixtures';
 import { generateScaleFixtures } from './scale';
 import { snapshotFromFixtures } from './snapshot';
@@ -316,6 +317,42 @@ describe('the probes read the same way the guest reads do', () => {
       startsAt: new Date(now.getTime() - 1000),
     });
     expect(probes['bookable-party'].check(started)).toBe(false);
+  });
+
+  it.each([
+    ['exactly now', 0, true],
+    ['a millisecond before now', -1, false],
+    ['a millisecond before the end of the week', 7 * msPerDay - 1, true],
+    ['exactly at the end of the week', 7 * msPerDay, false],
+  ])(
+    'counts the sessions of "On this week" the way home does: starting %s',
+    (_name, offsetMs, expected) => {
+      const moved = editSessions(base, () => true, {
+        startsAt: new Date(now.getTime() + offsetMs),
+      });
+      expect(probes['this-week'].check(moved)).toBe(expected);
+    },
+  );
+
+  it('does not count a sold-out session toward "On this week"', () => {
+    const full = editSessions(base, () => true, {
+      startsAt: new Date(now.getTime() + 60_000),
+      seatsSold: 1000,
+      allocation: 1000,
+    });
+    expect(probes['this-week'].check(full)).toBe(false);
+  });
+
+  it.each([
+    ['a millisecond before the end of the fortnight', 14 * msPerDay - 1, true],
+    ['exactly at the end of the fortnight', 14 * msPerDay, false],
+  ])('looks for room for six in the fortnight: starting %s', (_n, ms, ok) => {
+    const moved = editSessions(base, () => true, {
+      startsAt: new Date(now.getTime() + ms),
+      allocation: 1000,
+      seatsSold: 0,
+    });
+    expect(probes['bookable-party'].check(moved)).toBe(ok);
   });
 });
 

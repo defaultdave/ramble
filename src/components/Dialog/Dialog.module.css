@@ -35,6 +35,7 @@
   flex: 1 1 auto;
   flex-direction: column;
   min-block-size: 0;
+  /* The panel takes programmatic focus on open (tabindex -1) and is never a tab stop; the close button and content carry the visible rings. */
   outline: none;
 }
 

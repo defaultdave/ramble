@@ -3,10 +3,12 @@ import {
   cardPriceLabel,
   commissionMinor,
   defaultCommissionRateBps,
+  fromPriceLabel,
   lines,
   MAX_LINES,
   MAX_QUANTITY,
   MAX_UNIT_PRICE_MINOR,
+  perPersonAmount,
   PPM,
   taxMinor,
   taxRatePpm,
@@ -389,7 +391,15 @@ describe('cardPriceLabel', () => {
         { priceMinor: 0, usesSpace: true },
         { priceMinor: 500, usesSpace: true },
       ],
-      'From $0',
+      'Free',
+    ],
+    [
+      'free options only',
+      [
+        { priceMinor: 0, usesSpace: true },
+        { priceMinor: 0, usesSpace: true },
+      ],
+      'Free',
     ],
     [
       'a free accompanying adult beside a paid child',
@@ -418,6 +428,26 @@ describe('cardPriceLabel', () => {
     ],
   ])('%s', (_name, options, label) => {
     expect(cardPriceLabel(options)).toBe(label);
+  });
+});
+
+describe('perPersonAmount', () => {
+  it.each([
+    [0, 'Free'],
+    [8500, '$85'],
+    [1250, '$12.50'],
+  ])('reads %i as %s', (minor, label) => {
+    expect(perPersonAmount(minor)).toBe(label);
+  });
+});
+
+describe('fromPriceLabel', () => {
+  it.each([
+    [8500, 'From $85'],
+    [6550, 'From $65.50'],
+    [0, 'Free'],
+  ])('labels a lowest price of %i', (minor, label) => {
+    expect(fromPriceLabel(minor)).toBe(label);
   });
 });
 

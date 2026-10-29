@@ -1,6 +1,6 @@
 import { ImageOff } from 'lucide-react';
 import { Photo } from '@/components/Photo';
-import type { GalleryView } from '@/lib/experiencePage';
+import type { GalleryView } from '@/lib/pages/experience';
 import styles from './ExperienceGallery.module.css';
 
 export type ExperienceGalleryProps = {

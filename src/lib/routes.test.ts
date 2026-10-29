@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { id, idWithLetters } from './experiencePage.fixtures';
+import { id, idWithLetters } from './pages/experience.fixtures';
 import {
   accessibilityPath,
   browsePath,
   categoryPath,
+  checkoutPath,
   contactPath,
   experienceCardPath,
   experiencePath,
@@ -16,6 +17,7 @@ import {
   managePath,
   maxAddressLength,
   neighborhoodPath,
+  orderPath,
   parseExperienceAddress,
   picksAnchor,
   picksPath,
@@ -88,15 +90,6 @@ describe('parseExperienceAddress', () => {
   });
 });
 
-describe('paths', () => {
-  it('addresses the pages the breadcrumb and entry points go to', () => {
-    expect(categoryPath('outdoors')).toBe('/new-york/things-to-do/outdoors');
-    expect(neighborhoodPath('tribeca')).toBe('/new-york/neighborhoods/tribeca');
-    expect(giftCheckoutPath(id(1))).toBe(`/gifts/checkout/${id(1)}`);
-    expect(privateSessionPath).toBe('/contact');
-  });
-});
-
 describe('literal addresses', () => {
   it.each([
     ['browse', browsePath, '/new-york/browse'],
@@ -111,6 +104,8 @@ describe('literal addresses', () => {
       '/new-york/neighborhoods/tribeca',
     ],
     ['a gift checkout', giftCheckoutPath(id(1)), `/gifts/checkout/${id(1)}`],
+    ['a checkout', checkoutPath(id(1)), `/checkout/${id(1)}`],
+    ['an order', orderPath('RMB-ABC123'), '/orders/RMB-ABC123'],
     ['contact', contactPath, '/contact'],
     ['help', helpPath, '/help'],
     ['accessibility', accessibilityPath, '/accessibility'],

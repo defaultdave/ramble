@@ -1,7 +1,10 @@
 export type CacheProfile = {
   /** Seconds the browser's router cache may reuse the result without asking the server. */
   stale: number;
-  /** Seconds before the server serves the entry while it refreshes it in the background. */
+  /**
+   * Seconds after which the server treats the entry as out of date. Next's in-memory `'use cache'`
+   * handler drops it here rather than serving it stale, so the next request waits for a fresh read.
+   */
   revalidate: number;
   /** Seconds after which the entry is dropped and the next request waits for a fresh read. */
   expire: number;
@@ -19,10 +22,13 @@ export const cacheProfiles = {
   editorial: { stale: 300, revalidate: 3_600, expire: 86_400 },
   /** The experience and guide shells and the two catalog indexes the listings filter in memory. */
   catalog: { stale: 300, revalidate: 900, expire: 86_400 },
-  /** Browse results for one filter combination. */
+  /** Short-lived schedule reads: browse results for one filter combination, and home's "On this week". */
   browse: { stale: 30, revalidate: 60, expire: 600 },
   /** The site banner and other ops switches that guest pages show. */
   settings: { stale: 60, revalidate: 300, expire: 3_600 },
+  /** A read that found nothing: a missing experience or a cursor nobody can see. A production build stores nothing for it (dev keeps it), so a stream of made-up addresses fills nothing. */
+  uncached: { stale: 0, revalidate: 0, expire: 0 },
+  // TODO(U-040): first caller
   /** Spaces left for one session, read through the runtime cache. Postgres decides at reserve. */
   spacesLeft: { stale: 5, revalidate: 8, expire: 60 },
 } as const satisfies Record<string, CacheProfile>;

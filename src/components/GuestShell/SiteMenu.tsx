@@ -1,6 +1,6 @@
 import { Menu } from 'lucide-react';
 import Link from 'next/link';
-import type { SiteLink } from '@/lib/siteNav';
+import type { SiteLink } from '@/lib/pages/siteNav';
 import styles from './SiteMenu.module.css';
 
 export type SiteMenuProps = { links: readonly SiteLink[] };

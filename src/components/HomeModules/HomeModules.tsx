@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { HomeModuleView } from '@/lib/home';
+import type { HomeModuleView } from '@/lib/pages/home';
 import type { RichTextDoc } from '@/lib/richText/format';
 import { CategoryRail } from './CategoryRail';
 import { GiftGuideSection } from './GiftGuideSection';

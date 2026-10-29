@@ -4,7 +4,7 @@ How `/` is built from the modules staff arrange, what each module shows and when
 
 ## The modules
 
-`listHomeModules()` returns the enabled modules in position order, leaving out one whose collection is still a draft. `buildHomePage` in `src/lib/home.ts` turns them into what the page shows, and leaves out a module that has nothing to show. A module with nothing to show is hidden whole, never drawn empty.
+`listHomeModules()` returns the enabled modules in position order, leaving out one whose collection is still a draft. `buildHomePage` in `src/lib/pages/home.ts` turns them into what the page shows, and leaves out a module that has nothing to show. A module with nothing to show is hidden whole, never drawn empty.
 
 | Module | Shows | Copy comes from | Hidden when |
 |---|---|---|---|
@@ -17,7 +17,7 @@ How `/` is built from the modules staff arrange, what each module shows and when
 
 The first `picks` module that shows carries the id `picks`, which the header and footer link to (`/#picks`).
 
-A card is left out, never repaired, when it cannot be shown: a bookable experience with no price option that takes a space, or a guide entry with no link out. The price on a card is the lowest price among the options that take a space (`cardPriceLabel` in `src/lib/pricing.ts`, the same function browse uses), so the free adult who goes with a child never makes a kids class read "From $0". A card shows its experience's cover photo (see "Cover photos" below); an experience with no photo keeps the empty frame, the missing-image state the `Card` already has.
+A card is left out, never repaired, when it cannot be shown: a bookable experience with no price option that takes a space, or a guide entry with no link out. The price on a card is the lowest price among the options that take a space (`cardPriceLabel` in `src/lib/pricing.ts`, the same function browse uses), so the free adult who goes with a child never makes a kids class read "From $0". A price of nothing reads "Free", on a card and in the booking panel. Home and browse build their cards with one function, `toExperienceCard` in `src/lib/experienceCards.ts`, and draw them with one component, `ExperienceCardItem` (home headings are h3, browse headings h2). A card shows its experience's cover photo (see "Cover photos" below); an experience with no photo keeps the empty frame, the missing-image state the `Card` already has.
 
 The page has no hero when staff switch it off. Then a visually hidden h1 stands in, so the page always has one. With no module at all, the page says so and links to browse.
 
@@ -37,23 +37,29 @@ The hero's search is a plain GET form to `/new-york/browse`. It sends `neighborh
 
 The page and the banner read after `connection()`, inside `<Suspense>`. The build therefore never reads the database (CI builds with none), and a prefetch stops at the skeleton. The cached reads still hold the data between requests.
 
+"On this week" counts a session that is open in the next seven days: it starts from `asOf` up to, not including, seven days later, and has a space left. The window and that rule are `upcomingWindow` and `isOpenSession` in `src/lib/sessionWindow.ts`, the same ones browse uses.
+
 The reads are `listHomeExperiences` and `listThisWeekSessions` in `src/server/db/home.ts`. Both are bounded (`homeLimits`) and read guest-visible rows only, so they take no caller.
 
 ## Cover photos
 
-The home cards and the browse cards show the same photo for one experience: the one with the lowest position in its gallery. `buildHomePage` builds the cards with no image, then the page reads the covers of the cards it kept and sets them (`homeCardIds`, `withHomeCovers` in `src/lib/home.ts`; `browseCardIds`, `withBrowseCovers` in `src/lib/browse.ts`). The read is `getCoverPhotos(ids)` in `src/server/coverPhotos.ts`: `'use cache'`, profile `catalog`, tagged `experience:<id>` for every ID it was asked about, so a photo added to an experience reaches every card that lists it. Pass the IDs through `coverLookupIds` so two pages that list the same experiences in another order share one entry.
+The home cards and the browse cards show the same photo for one experience: the one with the lowest position in its gallery. That rule is written once, in `src/server/db/photos.ts` (`guestCoverOf` for the query builder, `coverWith` for the relational `with`, both ordered by position and cut to one row), and every cover read goes through it.
 
-`listGuestCoverPhotos` (`src/server/db/photos.ts`) takes at most `photoLimits.maxCoverLookups` IDs (240, the most the home page can list) and returns one row per experience, guest-visible experiences only. A longer or malformed list is refused, never cut. A failed cover read is handled like any other failed read of the page: the error state, and only the digest is logged.
+Two ways reach a card. The browse cards and the home "On this week" cards get their cover in the experience read itself: `listBrowseExperiences` left-joins `guestCoverOf`, and `listHomeExperiences(ids, { covers: true })` loads it with `coverWith`. The row carries `image` (null for an experience with no photo, which still lists and keeps the empty frame), so the entry that holds the experiences (`getBrowseResults`, `getThisWeek`) holds the covers, with its own lifetime and the `experience:<id>` tags it already carries. A failed read takes the page's error path, as a failed experience read does; there is no separate cover read to fail alone.
+
+The home Picks cards are built with no image and the page then reads their covers (`homeCardIds`, `withHomeCovers` in `src/lib/pages/home.ts`) with `getCoverPhotos(ids)` in `src/server/coverPhotos.ts`: `'use cache'`, profile `catalog`, tagged `experience:<id>` for every ID it was asked about, so a photo added to an experience reaches every card that lists it. `getHomeContent` reads its experiences with `{ covers: false }` because its entry lives under the longer `editorial` profile, which would show a new cover later than `catalog` does. Pass the IDs through `coverLookupIds` so two pages that list the same experiences in another order share one entry. A photo is decoration, so a failed read of the Picks covers costs the photos and not the page: `readGuestCovers` logs it and the cards render with no image.
+
+`listGuestCoverPhotos` takes at most `photoLimits.maxCoverLookups` IDs (240, `cardLookupLimit` in `src/lib/experienceCards.ts`, the most the home page can list) and returns one row per experience, guest-visible experiences only. A longer or malformed list is refused, never cut.
 
 `Photo` (`src/components/Photo`) draws the image with `next/image`, filling its frame, with the blur placeholder. A decorative photo has an empty alt. The cards ask for `384px` from the tablet width and `100vw` below it; the horizontal card asks for `168px`.
 
 ## The site banner
 
-`GuestBanner` reads the cached settings above the header on every guest page and shows `bannerText` when it is not blank. A failed read leaves the banner out and logs the digest; the switches that matter (paused bookings, checkout maintenance) are enforced where they act, not by this notice.
+`GuestBanner` reads the cached settings above the header on every guest page and shows `bannerText` when it is not blank. A failed read leaves the banner out and logs the digest and kind of the error; the switches that matter (paused bookings, checkout maintenance) are enforced where they act, not by this notice.
 
 ## When a read fails
 
-A cached read throws only the kind of the failure (`CachedReadError`), because Next.js logs whatever a cached function throws and a database error carries its query and values. The page logs the digest of that error, shows the heading and a danger alert ("We couldn't load the home page"), and a Try again button. The button is a GET form to `/`, so it works with no script. The page answers 200 in this state: the failure is inside a streamed region.
+A cached read throws only the kind of the failure (`CachedReadError`), because Next.js logs whatever a cached function throws and a database error carries its query and values. The page logs the digest of that error and its kind (`digest` and `kind` fields, through `rethrowOrLog`), shows the heading and a danger alert ("We couldn't load the home page"), and a Try again button. The button is a GET form to `/`, so it works with no script. The page answers 200 in this state: the failure is inside a streamed region.
 
 ## What the e2e run covers
 

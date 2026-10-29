@@ -13,7 +13,7 @@ import { useId, type ReactNode } from 'react';
 import { Badge } from '@/components/Badge';
 import { ButtonLink } from '@/components/Button';
 import { ExperienceGallery } from '@/components/ExperienceGallery';
-import type { ExperiencePageView, KeyFactIcon } from '@/lib/experiencePage';
+import type { ExperiencePageView, KeyFactIcon } from '@/lib/pages/experience';
 import styles from './ExperiencePage.module.css';
 
 export type ExperiencePageProps = { view: ExperiencePageView };
@@ -112,6 +112,11 @@ export function ExperiencePage({ view }: ExperiencePageProps) {
 
         {/* TODO(U-040): the upcoming dates and spaces left go here, streamed into reserved space. */}
         {/* TODO(U-041): the booking bar and sheet on a phone, and the panel beside this column from the tablet width. */}
+        <div className={styles.action}>
+          <ButtonLink href={view.bookHref} variant="primary" size="lg">
+            Book
+          </ButtonLink>
+        </div>
 
         {view.about.length > 0 ? (
           <Section heading="About">

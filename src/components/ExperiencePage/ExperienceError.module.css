@@ -1,11 +1,10 @@
 .page {
   box-sizing: border-box;
-  display: flex;
-  max-inline-size: var(--size-content-max);
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, var(--size-content-max));
+  justify-content: center;
   gap: var(--space-4);
-  margin-inline: auto;
-  padding: var(--space-8) var(--space-6);
+  padding: var(--space-8) var(--size-gutter);
   font-family: var(--font-family-body);
   color: var(--color-text-primary);
 }

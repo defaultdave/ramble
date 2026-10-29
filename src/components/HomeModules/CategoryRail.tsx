@@ -1,6 +1,6 @@
-import Link from 'next/link';
 import { useId } from 'react';
-import type { HomeCategory } from '@/lib/home';
+import { ChipLink } from '@/components/Chip';
+import type { HomeCategory } from '@/lib/pages/home';
 import styles from './HomeModules.module.css';
 
 export type CategoryRailProps = {
@@ -20,9 +20,7 @@ export function CategoryRail({ heading, categories }: CategoryRailProps) {
         <ul className={styles.pills} role="list">
           {categories.map(({ slug, name, href }) => (
             <li key={slug}>
-              <Link className={styles.pill} href={href}>
-                {name}
-              </Link>
+              <ChipLink label={name} href={href} selected={false} />
             </li>
           ))}
         </ul>

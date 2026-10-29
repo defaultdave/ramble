@@ -7,9 +7,8 @@ import {
   consentKindsToWithdraw,
 } from '@/lib/guests';
 import type { Caller } from '@/server/auth/caller';
-import { db } from './client';
+import { db, type Transaction } from './client';
 import { lockGuestRow } from './guests';
-import type { Transaction } from './locks';
 import { consents, guests } from './schema';
 import { requireStaff } from './staff';
 

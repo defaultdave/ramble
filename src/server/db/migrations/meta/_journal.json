@@ -71,6 +71,13 @@
       "when": 1793240172031,
       "tag": "0009_jobs_outbox",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793294516385,
+      "tag": "0010_guests_consents_privacy",
+      "breakpoints": true
     }
   ]
 }

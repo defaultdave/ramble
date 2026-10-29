@@ -15,8 +15,7 @@ import {
   type PrivacyRequest,
 } from '@/lib/guests';
 import type { Caller } from '@/server/auth/caller';
-import { db } from './client';
-import type { Transaction } from './locks';
+import { db, type Transaction } from './client';
 import { consents, guests, privacyRequests } from './schema';
 import { requireStaff } from './staff';
 

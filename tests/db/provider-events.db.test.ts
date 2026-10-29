@@ -12,14 +12,16 @@ import {
 } from 'vitest';
 import { paymentLimits } from '@/lib/payments';
 import {
+  ProcessProviderEventPayloadSchema,
   alertAfterEventAttempts,
   processProviderEventKind,
   providerEventRow,
   type IncomingProviderEvent,
 } from '@/lib/providerEvents';
 import { backoffSeconds } from '@/lib/jobs';
-import type { ConfirmOrder } from '@/server/db/confirmOrder';
+import { confirmOrder, type ConfirmOrder } from '@/server/db/confirmOrder';
 import { createFakePaymentsAdapter } from '@/server/ports/payments/fake';
+import { getFakePayments } from '@/server/ports/payments/gateway';
 import {
   deliverEmittedEvents,
   type SimulatedDelivery,
@@ -70,7 +72,9 @@ const parents = {
 
 beforeAll(async () => {
   fresh = await createFreshDatabase(process.env.DATABASE_URL_UNPOOLED ?? '');
-  vi.stubEnv('DATABASE_URL', fresh.url);
+  const handlerUrl = new URL(fresh.url);
+  handlerUrl.searchParams.set('application_name', fresh.schema);
+  vi.stubEnv('DATABASE_URL', handlerUrl.toString());
   client = await import('@/server/db/client');
   dbEvents = await import('@/server/db/providerEvents');
   jobModule = await import('@/server/jobs/providerEvents');
@@ -246,24 +250,23 @@ const confirmsOrder: ConfirmOrder = async (tx, input) => {
   return { status: 'confirmed' };
 };
 
-const noMetadata = () => Promise.resolve(null);
-
 async function run(
   eventId: string,
-  dependencies: Parameters<typeof jobModule.handleProviderEvent>[1] = {
-    confirmOrder: confirmsOrder,
-    lookupMetadata: noMetadata,
-  },
+  options: {
+    confirmOrder?: ConfirmOrder;
+    prepared?: { orderId: string; recordId: string } | null;
+  } = {},
 ) {
   await client.db.transaction((tx) =>
     jobModule.handleProviderEvent(
       {
         tx,
         payload: { eventId },
+        prepared: options.prepared ?? null,
         jobId: randomUUID(),
         clock: clockModule.systemClock,
       },
-      dependencies,
+      { confirmOrder: options.confirmOrder ?? confirmsOrder },
     ),
   );
 }
@@ -393,7 +396,7 @@ describe('payment.succeeded', () => {
     expect(raise).not.toHaveBeenCalled();
   });
 
-  it('with the confirm seam of this unit, marks the attempt succeeded, leaves the event unprocessed, and alerts nobody', async () => {
+  it('with the confirm seam of this unit, keeps the succeeded mark, schedules a retry, and alerts nobody; a working seam then confirms the order', async () => {
     await clearJobs();
     const world = await seedWorld();
     const id = await store(incoming(world, 'payment.succeeded'));
@@ -402,8 +405,65 @@ describe('payment.succeeded', () => {
     expect(report).toMatchObject({ succeeded: 1, retried: 0, dead: 0 });
     expect(await attemptOf(world)).toMatchObject({ status: 'succeeded' });
     expect((await orderOf(world)).status).toBe('pending_payment');
-    expect((await eventOf(id)).processedAt).toBeNull();
+    expect(await eventOf(id)).toMatchObject({
+      processedAt: null,
+      attempts: 1,
+      lastError: 'Order confirmation is not available yet',
+    });
+    const jobs = await jobsFor(id);
+    expect(jobs).toHaveLength(2);
+    const retry = jobs.find((job) => job.dedupe_key.endsWith(':1'));
+    expect(retry?.status).toBe('pending');
+    expect(new Date(retry?.run_after ?? 0).getTime()).toBeGreaterThan(
+      Date.now(),
+    );
     expect(raise).not.toHaveBeenCalled();
+
+    await client.db.execute(
+      sql`UPDATE jobs SET run_after = now() WHERE id = ${retry?.id}`,
+    );
+    const { jobRegistry } = await import('@/server/jobs/registry');
+    await drain.drainJobs(clockModule.systemClock, {
+      ...jobRegistry,
+      [processProviderEventKind]: {
+        ...jobRegistry[processProviderEventKind],
+        handleIdempotent: (context) =>
+          jobModule.handleProviderEvent(
+            {
+              ...context,
+              payload: ProcessProviderEventPayloadSchema.parse(context.payload),
+            },
+            {
+              confirmOrder: confirmsOrder,
+            },
+          ),
+      },
+    });
+
+    expect((await orderOf(world)).status).toBe('confirmed');
+    expect(await attemptOf(world)).toMatchObject({ status: 'succeeded' });
+    expect((await eventOf(id)).processedAt).not.toBeNull();
+    expect(raise).not.toHaveBeenCalled();
+  });
+
+  it('gives up on a success that could not be confirmed with one alert and no more jobs', async () => {
+    const world = await seedWorld({ attempt: { status: 'succeeded' } });
+    const id = await store(incoming(world, 'payment.succeeded'));
+    await client.db
+      .update(schema.providerEvents)
+      .set({ attempts: paymentLimits.maxEventAttempts - 1 })
+      .where(eq(schema.providerEvents.id, id));
+    await run(id, { confirmOrder });
+
+    expect((await eventOf(id)).attempts).toBe(paymentLimits.maxEventAttempts);
+    expect(raise).toHaveBeenCalledTimes(1);
+    expect(raise).toHaveBeenCalledWith(
+      'payment-confirm-unavailable',
+      'error',
+      `event:${id}:gave-up`,
+      { eventId: id, tries: paymentLimits.maxEventAttempts },
+    );
+    expect(await jobsFor(id)).toHaveLength(1);
   });
 
   it('confirms again, without moving the attempt, when an earlier run left it succeeded and the order unconfirmed', async () => {
@@ -613,9 +673,7 @@ describe('events that match nothing', () => {
     const world = await seedWorld({ attempt: { status: 'processing' } });
     const id = await store(unmatchedEvent({ objectId: world.paymentId }));
     await run(id, {
-      confirmOrder: confirmsOrder,
-      lookupMetadata: () =>
-        Promise.resolve({ orderId: world.orderId, recordId: world.attemptId }),
+      prepared: { orderId: world.orderId, recordId: world.attemptId },
     });
 
     expect(await eventOf(id)).toMatchObject({
@@ -623,6 +681,40 @@ describe('events that match nothing', () => {
       rambleRecordId: world.attemptId,
     });
     expect(await attemptOf(world)).toMatchObject({ status: 'succeeded' });
+  });
+
+  it('looks up the ids at the provider before the transaction, only for an event that needs it', async () => {
+    const fake = getFakePayments();
+    const recordId = randomUUID();
+    const orderId = randomUUID();
+    const payment = await fake.createPayment({
+      idempotencyKey: `pay:${orderId}:1`,
+      amountMinor: 5_000,
+      currency: 'USD',
+      metadata: { orderId, recordId },
+    });
+    const bare = await store(unmatchedEvent({ objectId: payment.id }));
+    expect(await jobModule.prepareProviderEvent({ eventId: bare })).toEqual({
+      orderId,
+      recordId,
+    });
+
+    const unknown = await store(unmatchedEvent());
+    expect(
+      await jobModule.prepareProviderEvent({ eventId: unknown }),
+    ).toBeNull();
+
+    const world = await seedWorld();
+    const named = await store(incoming(world, 'payment.failed'));
+    expect(await jobModule.prepareProviderEvent({ eventId: named })).toBeNull();
+  });
+
+  it('refuses to look up an event of a provider the port is not', async () => {
+    const id = await store(unmatchedEvent({ provider: 'stripe' }));
+
+    await expect(
+      jobModule.prepareProviderEvent({ eventId: id }),
+    ).rejects.toThrow('No payments adapter for this provider');
   });
 
   it('counts the try, queues a retry after a backoff, and does not alert on the first', async () => {
@@ -718,7 +810,8 @@ async function waitUntilBlocked(count: number) {
   const deadline = Date.now() + 5000;
   for (;;) {
     const { rows } = await side.query<{ n: number }>(
-      `SELECT count(*)::int AS n FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND datname = current_database() AND query NOT LIKE '%pg_stat_activity%'`,
+      `SELECT count(*)::int AS n FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND application_name = $1`,
+      [fresh.schema],
     );
     if ((rows[0]?.n ?? 0) >= count) return;
     if (Date.now() > deadline)
@@ -757,6 +850,28 @@ describe('one order at a time', () => {
       `event:${id}`,
       expect.anything(),
     );
+  });
+
+  it('lets two handlers on one event act once: the second re-reads processed_at after the lock', async () => {
+    const world = await seedWorld({ attempt: { status: 'created' } });
+    const id = await store(incoming(world, 'payment.failed'));
+    const holder = await side.connect();
+    await holder.query('BEGIN');
+    await holder.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
+      `order-events:${world.orderId}`,
+    ]);
+
+    const both = Promise.all([run(id), run(id)]);
+    await waitUntilBlocked(2);
+    await holder.query('COMMIT');
+    holder.release();
+    await both;
+
+    expect(await attemptOf(world)).toMatchObject({
+      status: 'failed_try',
+      failedTries: 1,
+    });
+    expect((await eventOf(id)).processedAt).not.toBeNull();
   });
 
   it('holds the session and hold locks while it waits for the order row', async () => {

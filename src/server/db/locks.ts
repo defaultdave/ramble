@@ -1,5 +1,6 @@
 import 'server-only';
 import { eq, sql } from 'drizzle-orm';
+import { orderEventsLockKey } from '@/lib/providerEvents';
 import type { Transaction } from './client';
 import { experiences, holds, orders, sessions } from './schema';
 
@@ -7,6 +8,7 @@ import { experiences, holds, orders, sessions } from './schema';
  * THE LOCK ORDER (design doc 4.2.3 rule 1, architecture rule B10). Every transaction that takes
  * more than one of these takes them in this order and never the other way round:
  *
+ *   0. the order-events advisory lock (provider events only)  lockOrderEvents
  *   1. the device advisory lock   (reserve only)      lockDevice
  *   2. the session row            FOR UPDATE          lockSessionRow
  *   3. the hold row               FOR UPDATE          lockHoldRow
@@ -86,4 +88,15 @@ export async function lockOrderRow(tx: Transaction, orderId: string) {
     .where(eq(orders.id, orderId))
     .for('update');
   return row;
+}
+
+/**
+ * Lock 0, before every other lock on a provider event's path (design doc 4.2.3 rule 8): the events
+ * of one order are handled one at a time. The reserve path never takes it, so it cannot meet lock 1.
+ */
+export async function lockOrderEvents(
+  tx: Transaction,
+  orderId: string,
+): Promise<void> {
+  await lockFor(tx, orderEventsLockKey(orderId));
 }

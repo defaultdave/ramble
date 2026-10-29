@@ -1,7 +1,12 @@
 import 'server-only';
 import { clientAddress } from '@/lib/clientAddress';
 import { declaredLengthExceeds } from '@/lib/email/message';
-import { providerEventRow } from '@/lib/providerEvents';
+import {
+  intakeResponse,
+  isRefusedSignature,
+  providerEventRow,
+  type IntakeOutcome,
+} from '@/lib/providerEvents';
 import { readBodyText } from '@/server/boundedBody';
 import { recordProviderEvent } from '@/server/db/providerEvents';
 import { logger } from '@/server/monitoring/logger';
@@ -16,12 +21,9 @@ import { consumeRateLimit } from '@/server/ports/rate-limit';
 /** The header the fake gateway signs with; the Stripe adapter reads `stripe-signature` instead. */
 const signatureHeader = 'x-ramble-signature';
 
-type WebhookResult =
-  { status: 200 | 400 | 413 } | { status: 429; retryAfterSeconds: number };
-
 type Verified = Awaited<ReturnType<PaymentsPort['verifyWebhook']>>;
 
-/** A refused signature is a PaymentsError of these kinds; anything else is a provider fault and surfaces. */
+/** Null for a refused signature; a provider fault (anything else) surfaces. */
 async function verify(
   port: PaymentsPort,
   rawBody: string,
@@ -31,10 +33,7 @@ async function verify(
   try {
     return await port.verifyWebhook({ rawBody, signature });
   } catch (error) {
-    if (
-      error instanceof PaymentsError &&
-      (error.code === 'invalid_signature' || error.code === 'invalid_input')
-    ) {
+    if (error instanceof PaymentsError && isRefusedSignature(error.code)) {
       return null;
     }
     throw error;
@@ -48,58 +47,55 @@ async function verify(
  * and answered 2xx, however often the provider repeats it. The signature is the capability, so
  * the route takes no `Caller`. Only the kind of a refusal is logged, never the body.
  */
-async function handlePaymentWebhook(request: Request): Promise<WebhookResult> {
+async function takePaymentWebhook(request: Request): Promise<IntakeOutcome> {
   if (
     declaredLengthExceeds(
       request.headers.get('content-length'),
       maxWebhookBodyLength,
     )
   ) {
-    return { status: 413 };
+    return { kind: 'too_large' };
   }
   const { text: rawBody, exceeded } = await readBodyText(
     request,
     maxWebhookBodyLength,
   );
-  if (exceeded) return { status: 413 };
+  if (exceeded) return { kind: 'too_large' };
 
-  const port = getPaymentsPort();
   const verified = await verify(
-    port,
+    getPaymentsPort(),
     rawBody,
     request.headers.get(signatureHeader),
   );
   if (verified === null) {
     logger.warn('payment webhook refused', { kind: 'invalid_signature' });
-    const failures = await consumeRateLimit(
-      'payment_webhook_failed',
-      clientAddress(request.headers.get('x-forwarded-for')),
-    );
-    return failures.allowed
-      ? { status: 400 }
-      : { status: 429, retryAfterSeconds: failures.retryAfterSeconds };
+    return {
+      kind: 'refused',
+      failures: await consumeRateLimit(
+        'payment_webhook_failed',
+        clientAddress(request.headers.get('x-forwarded-for')),
+      ),
+    };
   }
 
   const budget = await consumeRateLimit('payment_webhook', 'provider');
-  if (!budget.allowed) {
-    return { status: 429, retryAfterSeconds: budget.retryAfterSeconds };
-  }
+  if (!budget.allowed) return { kind: 'over_budget', budget };
 
-  if (verified.status === 'ignored') return { status: 200 };
+  if (verified.status === 'ignored') return { kind: 'accepted' };
   const row = providerEventRow(verified.event);
   if (row === null) {
     logger.warn('payment webhook refused', { kind: 'event_not_storable' });
-    return { status: 400 };
+    return { kind: 'unstorable' };
   }
   await recordProviderEvent(row);
-  return { status: 200 };
+  return { kind: 'accepted' };
 }
 
 /** The HTTP answer for a payment webhook: empty, with `Retry-After` when the caller is told to slow down. */
 export async function paymentWebhookResponse(
   request: Request,
 ): Promise<Response> {
-  const result = await handlePaymentWebhook(request);
+  const result = intakeResponse(await takePaymentWebhook(request));
   return result.status === 429
     ? new Response(null, {
         status: 429,

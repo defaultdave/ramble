@@ -13,6 +13,7 @@ import { jobs } from './schema';
 export type ClaimedJob = JobClaim & {
   id: string;
   kind: string;
+  payload: unknown;
   maxAttempts: number;
 };
 
@@ -88,6 +89,7 @@ export async function claimDueJobs(
             .returning({
               id: jobs.id,
               kind: jobs.kind,
+              payload: jobs.payload,
               attempts: jobs.attempts,
               maxAttempts: jobs.maxAttempts,
             });

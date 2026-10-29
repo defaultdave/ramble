@@ -46,6 +46,10 @@ async function runJob(
   registry: JobRegistry = jobRegistry,
 ): Promise<RunOutcome> {
   try {
+    const early = findJob(registry, job.kind);
+    const prepared = early?.prepare
+      ? await early.prepare(early.payload.parse(job.payload))
+      : undefined;
     return await db.transaction(async (tx) => {
       const row = await lockJobForRun(tx, job.id);
       if (!row || !ownsClaim(row, job)) return 'lost';
@@ -55,6 +59,7 @@ async function runJob(
       await definition.handleIdempotent({
         tx,
         payload,
+        prepared,
         jobId: job.id,
         clock,
       });

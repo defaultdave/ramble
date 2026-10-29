@@ -1,32 +1,42 @@
 import 'server-only';
 import { asc, eq, sql } from 'drizzle-orm';
-import type { OrderStatus } from '@/lib/orders';
 import {
   paymentLimits,
   ProviderEventSchema,
   type AttemptStatus,
 } from '@/lib/payments';
 import {
+  afterConfirm,
   extendedPayingUntil,
-  isDeferredEventType,
+  isPaymentEventType,
   matchEventAttempt,
-  orderEventsLockKey,
+  needsMetadataLookup,
   payloadFacts,
   processEventDedupeKey,
   processProviderEventKind,
   providerEventAction,
   requireAttemptTransition,
   requireOrderTransition,
-  unmatchedOutcome,
+  eventIds,
+  eventRetry,
   type EventFacts,
+  type EventMetadata,
   type EventOrder,
   type FailedTryAction,
+  type PaymentEventType,
+  type ProviderEventResult,
   type ProviderEventRow,
+  type RetryReason,
 } from '@/lib/providerEvents';
 import { enqueue } from '@/server/jobs/enqueue';
 import { db, type Transaction } from './client';
 import type { ConfirmOrder } from './confirmOrder';
-import { lockFor, lockHoldRow, lockOrderRow, lockSessionRow } from './locks';
+import {
+  lockHoldRow,
+  lockOrderEvents,
+  lockOrderRow,
+  lockSessionRow,
+} from './locks';
 import {
   holds,
   orders,
@@ -39,7 +49,8 @@ import { readDatabaseTime } from './time';
 // The webhook's side of design doc 4.2.3. The route holds no `Caller`: the provider's signature
 // is the capability, checked before anything here runs (architecture rule B6, by design). Writes
 // here take their times from `clock_timestamp()`, so a row never reads as older than the row it
-// follows.
+// follows. Every decision is a function in `src/lib/providerEvents.ts`; this file locks, reads,
+// and writes what those functions say.
 
 /**
  * Stores a verified event once and queues its processing, in one transaction. A repeat delivery
@@ -74,29 +85,32 @@ async function readProviderEvent(tx: Transaction, eventId: string) {
   return row && ProviderEventSchema.parse(row);
 }
 
-type StoredEvent = NonNullable<Awaited<ReturnType<typeof readProviderEvent>>>;
-
-export type EventMetadata = { orderId: string; recordId: string };
-
-export type EventProcessing =
-  | { status: 'processed' }
-  | { status: 'already_processed' }
-  /** Left unprocessed for the unit that owns it; the job is done. */
-  | {
-      status: 'left';
-      reason: 'deferred_type' | 'confirm_unavailable' | 'duplicate_payment';
-      orderId: string | null;
-    }
-  | {
-      status: 'unmatched';
-      tries: number;
-      alert: 'unmatched' | 'gave_up' | null;
-    };
+/**
+ * The event a job is about to handle, when its Ramble ids must be asked of the provider first. Read
+ * outside any transaction, so the provider call that follows holds no connection.
+ */
+export async function readEventToLookUp(
+  eventId: string,
+): Promise<{ provider: string; objectId: string } | null> {
+  const [row] = await db
+    .select({
+      provider: providerEvents.provider,
+      objectId: providerEvents.objectId,
+      type: providerEvents.type,
+      rambleOrderId: providerEvents.rambleOrderId,
+      processedAt: providerEvents.processedAt,
+    })
+    .from(providerEvents)
+    .where(eq(providerEvents.id, eventId));
+  return row && needsMetadataLookup(row)
+    ? { provider: row.provider, objectId: row.objectId }
+    : null;
+}
 
 type ProcessInput = {
   eventId: string;
-  /** Asks the provider for the payment's Ramble ids when the event carried none (rule 7). */
-  lookupMetadata: (event: StoredEvent) => Promise<EventMetadata | null>;
+  /** The Ramble ids the provider reported for an event that carried none (rule 7), looked up before the transaction. */
+  metadata: EventMetadata | null;
   confirmOrder: ConfirmOrder;
 };
 
@@ -106,27 +120,27 @@ const markProcessed = (tx: Transaction, eventId: string) =>
     .set({ processedAt: sql`clock_timestamp()` })
     .where(eq(providerEvents.id, eventId));
 
-/** One more failed match: counted, and the next try queued after a backoff. */
-async function recordUnmatched(
+/** One more try that did not finish the event: counted, and the next job queued after a backoff. */
+async function recordRetry(
   tx: Transaction,
-  event: StoredEvent,
-): Promise<EventProcessing> {
-  const tries = event.attempts + 1;
+  event: { id: string; attempts: number },
+  reason: RetryReason,
+): Promise<ProviderEventResult> {
+  const now = await readDatabaseTime(tx);
+  const retry = eventRetry(reason, event.attempts, event.id, now);
   await tx
     .update(providerEvents)
-    .set({ attempts: tries, lastError: 'No matching payment attempt' })
+    .set({ attempts: retry.tries, lastError: retry.lastError })
     .where(eq(providerEvents.id, event.id));
-  const outcome = unmatchedOutcome(tries, event.id);
-  if (outcome.retryAfterSeconds !== null) {
-    const now = await readDatabaseTime(tx);
+  if (retry.runAfter !== null) {
     await enqueue(tx, {
       kind: processProviderEventKind,
       payload: { eventId: event.id },
-      dedupeKey: processEventDedupeKey(event.id, tries),
-      runAfter: new Date(now.getTime() + outcome.retryAfterSeconds * 1000),
+      dedupeKey: processEventDedupeKey(event.id, retry.tries),
+      runAfter: retry.runAfter,
     });
   }
-  return { status: 'unmatched', tries, alert: outcome.alert };
+  return { status: 'retry', reason, tries: retry.tries, alert: retry.alert };
 }
 
 /** The hold's grace for a challenge; the settings row is configuration, read with a plain SELECT. */
@@ -139,7 +153,7 @@ async function readPaymentGraceMinutes(tx: Transaction): Promise<number> {
   return row.minutes;
 }
 
-async function readAttempts(tx: Transaction, orderId: string) {
+function readAttempts(tx: Transaction, orderId: string) {
   return tx
     .select({
       id: paymentAttempts.id,
@@ -154,52 +168,94 @@ async function readAttempts(tx: Transaction, orderId: string) {
     .limit(paymentLimits.maxAttemptNo + 1);
 }
 
-function attemptOf<T extends { id: string }>(attempts: T[], id: string): T {
-  const attempt = attempts.find((candidate) => candidate.id === id);
-  if (!attempt) throw new Error('The matched attempt is missing');
-  return attempt;
-}
-
-function eventFacts(event: StoredEvent): EventFacts {
-  const { method, failureCode } = payloadFacts(event.payload);
+function eventFacts(
+  payload: Record<string, unknown>,
+  event: { objectId: string },
+  type: PaymentEventType,
+  recordId: string | null,
+): EventFacts {
+  const { method, failureCode } = payloadFacts(payload);
   return {
-    type: event.type,
+    type,
     objectId: event.objectId,
-    rambleRecordId: event.rambleRecordId,
+    rambleRecordId: recordId,
     method,
     failureCode,
   };
 }
 
-async function failedTry(
+/**
+ * Takes the session, hold, and order locks in their one order, after the events lock, and returns
+ * what the decision needs. Null when the order does not exist. The ids are read first without a lock.
+ */
+async function lockOrderRows(
+  tx: Transaction,
+  orderId: string,
+): Promise<EventOrder | null> {
+  const [unlocked] = await tx
+    .select({ holdId: orders.holdId, sessionId: orders.sessionId })
+    .from(orders)
+    .where(eq(orders.id, orderId));
+  if (!unlocked) return null;
+  if (unlocked.sessionId !== null) await lockSessionRow(tx, unlocked.sessionId);
+  const hold =
+    unlocked.holdId === null
+      ? undefined
+      : await lockHoldRow(tx, unlocked.holdId);
+  const order = await lockOrderRow(tx, orderId);
+  if (!order) return null;
+  return {
+    id: order.id,
+    status: order.status,
+    hold: hold
+      ? {
+          id: hold.id,
+          status: hold.status,
+          expiresAt: hold.expiresAt,
+          payingUntil: hold.payingUntil,
+        }
+      : null,
+  };
+}
+
+const setAttempt = (
+  tx: Transaction,
+  attemptId: string,
+  from: AttemptStatus,
+  to: AttemptStatus,
+  values: Partial<typeof paymentAttempts.$inferInsert>,
+) => {
+  requireAttemptTransition(from, to);
+  return tx
+    .update(paymentAttempts)
+    .set({ ...values, status: to, updatedAt: sql`clock_timestamp()` })
+    .where(eq(paymentAttempts.id, attemptId));
+};
+
+async function applyFailedTry(
   tx: Transaction,
   action: FailedTryAction,
-  context: {
-    attempt: { status: AttemptStatus };
-    order: { id: string; status: OrderStatus };
-    holdId: string | null;
-    providerPaymentId: string;
-  },
+  providerPaymentId: string,
 ) {
-  requireAttemptTransition(context.attempt.status, action.attemptStatus);
-  await tx
-    .update(paymentAttempts)
-    .set({
-      status: action.attemptStatus,
+  await setAttempt(
+    tx,
+    action.attemptId,
+    action.attemptFrom,
+    action.attemptStatus,
+    {
       failedTries: action.failedTries,
       failureCode: action.failureCode,
-      providerPaymentId: context.providerPaymentId,
-      updatedAt: sql`clock_timestamp()`,
-    })
-    .where(eq(paymentAttempts.id, action.attemptId));
-  if (action.orderStatus !== null) {
-    requireOrderTransition(context.order.status, action.orderStatus);
+      providerPaymentId,
+    },
+  );
+  if (action.orderMove) {
+    requireOrderTransition(action.orderMove.from, action.orderMove.to);
     await tx
       .update(orders)
-      .set({ status: action.orderStatus })
-      .where(eq(orders.id, context.order.id));
+      .set({ status: action.orderMove.to })
+      .where(eq(orders.id, action.orderMove.id));
   }
-  if (action.reopenHold && context.holdId !== null) {
+  if (action.reopenHoldId) {
     await tx
       .update(holds)
       .set({
@@ -207,23 +263,25 @@ async function failedTry(
         payingUntil: null,
         updatedAt: sql`clock_timestamp()`,
       })
-      .where(eq(holds.id, context.holdId));
+      .where(eq(holds.id, action.reopenHoldId));
   }
 }
 
 /**
  * Handles one stored event, inside the job's transaction. The order's events lock comes first
  * (rule 8), then the session, hold, and order locks in their one order (rule 1), and everything the
- * decision rests on is read after them. Time for the decision is read after the locks too (rule 2).
+ * decision rests on is read after them, the event row included. Time for the decision is read after
+ * the locks too (rule 2).
  */
 export async function processProviderEvent(
   tx: Transaction,
   input: ProcessInput,
-): Promise<EventProcessing> {
+): Promise<ProviderEventResult> {
   const first = await readProviderEvent(tx, input.eventId);
   if (!first) throw new Error('The provider event does not exist');
   if (first.processedAt !== null) return { status: 'already_processed' };
-  if (isDeferredEventType(first.type)) {
+  const type = first.type;
+  if (!isPaymentEventType(type)) {
     return {
       status: 'left',
       reason: 'deferred_type',
@@ -231,137 +289,112 @@ export async function processProviderEvent(
     };
   }
 
-  let { rambleOrderId: orderId, rambleRecordId: recordId } = first;
-  if (orderId === null) {
-    const found = await input.lookupMetadata(first);
-    if (found) {
-      orderId = found.orderId.toLowerCase();
-      recordId = found.recordId.toLowerCase();
-      await tx
-        .update(providerEvents)
-        .set({ rambleOrderId: orderId, rambleRecordId: recordId })
-        .where(eq(providerEvents.id, first.id));
-    }
+  const ids = eventIds(first, input.metadata);
+  if (ids.adopted) {
+    await tx
+      .update(providerEvents)
+      .set({ rambleOrderId: ids.orderId, rambleRecordId: ids.recordId })
+      .where(eq(providerEvents.id, first.id));
   }
-  if (orderId === null) return recordUnmatched(tx, first);
 
-  await lockFor(tx, orderEventsLockKey(orderId));
-  const event = await readProviderEvent(tx, input.eventId);
-  if (!event) throw new Error('The provider event does not exist');
-  if (event.processedAt !== null) return { status: 'already_processed' };
-
-  const [unlocked] = await tx
-    .select({ holdId: orders.holdId, sessionId: orders.sessionId })
-    .from(orders)
-    .where(eq(orders.id, orderId));
-  if (!unlocked) return recordUnmatched(tx, event);
-  if (unlocked.sessionId !== null) await lockSessionRow(tx, unlocked.sessionId);
-  const hold =
-    unlocked.holdId === null
-      ? undefined
-      : await lockHoldRow(tx, unlocked.holdId);
-  const order = await lockOrderRow(tx, orderId);
-  if (!order) return recordUnmatched(tx, event);
+  let event = first;
+  let order: EventOrder | null = null;
+  if (ids.orderId !== null) {
+    await lockOrderEvents(tx, ids.orderId);
+    const reread = await readProviderEvent(tx, input.eventId);
+    if (!reread) throw new Error('The provider event does not exist');
+    if (reread.processedAt !== null) return { status: 'already_processed' };
+    event = reread;
+    order = await lockOrderRows(tx, ids.orderId);
+  }
 
   const now = await readDatabaseTime(tx);
-  const attempts = await readAttempts(tx, orderId);
-  const facts = eventFacts({ ...event, rambleRecordId: recordId });
-  const match = matchEventAttempt(facts, attempts);
-  const eventOrder: EventOrder = {
-    status: order.status,
-    hold: hold ? { status: hold.status, expiresAt: hold.expiresAt } : null,
-  };
-  const action = providerEventAction(facts, match, eventOrder, now);
+  const attempts = order === null ? [] : await readAttempts(tx, order.id);
+  const facts = eventFacts(event.payload, event, type, ids.recordId);
+  const action = providerEventAction(
+    facts,
+    matchEventAttempt(facts, attempts),
+    order,
+    now,
+  );
 
   switch (action.kind) {
-    case 'wait':
-      return { status: 'left', reason: 'deferred_type', orderId };
     case 'unmatched':
-      return recordUnmatched(tx, event);
+      return recordRetry(tx, event, 'unmatched');
     case 'duplicate_payment':
-      return { status: 'left', reason: 'duplicate_payment', orderId };
+      return {
+        status: 'left',
+        reason: 'duplicate_payment',
+        orderId: ids.orderId,
+      };
     case 'noop':
       await markProcessed(tx, event.id);
       return { status: 'processed' };
     case 'confirm': {
-      const attempt = attemptOf(attempts, action.attemptId);
       if (action.markSucceeded) {
-        requireAttemptTransition(attempt.status, 'succeeded');
-        await tx
-          .update(paymentAttempts)
-          .set({
-            status: 'succeeded',
-            method: action.method ?? attempt.method,
+        await setAttempt(
+          tx,
+          action.attemptId,
+          action.attemptFrom,
+          'succeeded',
+          {
+            method: action.method,
             providerPaymentId: event.objectId,
-            updatedAt: sql`clock_timestamp()`,
-          })
-          .where(eq(paymentAttempts.id, attempt.id));
+          },
+        );
       }
-      const { feeMinor } = payloadFacts(event.payload);
       const result = await input.confirmOrder(tx, {
-        orderId,
-        attemptId: attempt.id,
+        orderId: action.orderId,
+        attemptId: action.attemptId,
         providerEventId: event.id,
         providerPaymentId: event.objectId,
         amountMinor: event.amountMinor,
         currency: event.currency,
-        feeMinor,
+        feeMinor: payloadFacts(event.payload).feeMinor,
         now,
       });
-      if (result.status === 'unavailable') {
-        return { status: 'left', reason: 'confirm_unavailable', orderId };
+      if (afterConfirm(result.status) === 'retry') {
+        return recordRetry(tx, event, 'confirm_unavailable');
       }
       await markProcessed(tx, event.id);
       return { status: 'processed' };
     }
-    case 'payment_failed': {
-      const attempt = attemptOf(attempts, action.attemptId);
-      await failedTry(tx, action, {
-        attempt,
-        order,
-        holdId: unlocked.holdId,
-        providerPaymentId: event.objectId,
-      });
+    case 'payment_failed':
+      await applyFailedTry(tx, action, event.objectId);
       await markProcessed(tx, event.id);
       return { status: 'processed' };
-    }
     case 'requires_action': {
-      const attempt = attemptOf(attempts, action.attemptId);
-      requireAttemptTransition(attempt.status, 'requires_action');
-      await tx
-        .update(paymentAttempts)
-        .set({
-          status: 'requires_action',
+      await setAttempt(
+        tx,
+        action.attemptId,
+        action.attemptFrom,
+        'requires_action',
+        {
           providerPaymentId: event.objectId,
-          updatedAt: sql`clock_timestamp()`,
-        })
-        .where(eq(paymentAttempts.id, attempt.id));
-      if (action.extendPaying && hold) {
+        },
+      );
+      if (action.extendHold) {
         const grace = await readPaymentGraceMinutes(tx);
         await tx
           .update(holds)
           .set({
-            payingUntil: extendedPayingUntil(hold.payingUntil, now, grace),
+            payingUntil: extendedPayingUntil(
+              action.extendHold.payingUntil,
+              now,
+              grace,
+            ),
             updatedAt: sql`clock_timestamp()`,
           })
-          .where(eq(holds.id, hold.id));
+          .where(eq(holds.id, action.extendHold.id));
       }
       await markProcessed(tx, event.id);
       return { status: 'processed' };
     }
-    case 'cancel_attempt': {
-      const attempt = attemptOf(attempts, action.attemptId);
-      requireAttemptTransition(attempt.status, 'canceled');
-      await tx
-        .update(paymentAttempts)
-        .set({
-          status: 'canceled',
-          providerPaymentId: event.objectId,
-          updatedAt: sql`clock_timestamp()`,
-        })
-        .where(eq(paymentAttempts.id, attempt.id));
+    case 'cancel_attempt':
+      await setAttempt(tx, action.attemptId, action.attemptFrom, 'canceled', {
+        providerPaymentId: event.objectId,
+      });
       await markProcessed(tx, event.id);
       return { status: 'processed' };
-    }
   }
 }

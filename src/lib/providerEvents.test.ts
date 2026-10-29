@@ -1,14 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import { backoffSeconds } from './jobs';
 import { orderLimits, type OrderStatus } from './orders';
-import {
-  paymentLimits,
-  type AttemptStatus,
-  type ProviderEventType,
-} from './payments';
+import { paymentLimits, type AttemptStatus } from './payments';
 import {
   ProcessProviderEventPayloadSchema,
+  EventMetadataSchema,
+  afterConfirm,
   alertAfterEventAttempts,
+  alertFor,
+  eventIds,
+  eventRetry,
+  intakeResponse,
+  isPaymentEventType,
+  isProviderMismatch,
+  isRefusedSignature,
+  needsMetadataLookup,
+  parsePreparedMetadata,
+  retryErrors,
+  type ProviderEventResult,
   eventAlertKey,
   extendedPayingUntil,
   isDeferredEventType,
@@ -21,11 +30,11 @@ import {
   providerEventRow,
   requireAttemptTransition,
   requireOrderTransition,
-  unmatchedOutcome,
   type AttemptMatch,
   type EventAttempt,
   type EventFacts,
   type EventHold,
+  type PaymentEventType,
   type EventOrder,
   type IncomingProviderEvent,
 } from './providerEvents';
@@ -45,7 +54,8 @@ import {
 //   requires_action (live attempt, pending order, extension only for a paying hold), canceled (any non-terminal attempt);
 //   an event with no order or no attempt is unmatched
 // - a terminal attempt never changes
-// - unmatched events retry with backoff, alert on the 5th try, and give up with an alert on the last
+// - an unmatched event or a success waiting for the confirm step retries with backoff and a counted try; only the first
+//   alerts on the 5th try; both give up with one alert on the last; alerts, intake statuses, ids, and lookups are decided here
 // - paying_until moves to now plus grace and never earlier than it was
 
 const now = new Date('2026-10-29T12:00:00.000Z');
@@ -61,12 +71,13 @@ function attempt(over: Partial<EventAttempt> = {}): EventAttempt {
     status: 'created',
     failedTries: 0,
     providerPaymentId: 'pay_1',
+    method: null,
     ...over,
   };
 }
 
 function facts(
-  type: ProviderEventType,
+  type: PaymentEventType,
   over: Partial<EventFacts> = {},
 ): EventFacts {
   return {
@@ -79,11 +90,21 @@ function facts(
   };
 }
 
+const holdId = '00000000-0000-4000-8000-0000000000d4';
+
+function hold(
+  status: EventHold['status'],
+  expiresAt: Date,
+  payingUntil: Date | null = null,
+): EventHold {
+  return { id: holdId, status, expiresAt, payingUntil };
+}
+
 function order(
   status: OrderStatus,
-  hold: EventHold | null = { status: 'paying', expiresAt: later },
+  heldBy: EventHold | null = hold('paying', later),
 ): EventOrder {
-  return { status, hold };
+  return { id: orderId, status, hold: heldBy };
 }
 
 const same = (a: EventAttempt): AttemptMatch => ({
@@ -278,7 +299,9 @@ describe('providerEventAction: payment.succeeded', () => {
         ),
       ).toEqual({
         kind: 'confirm',
+        orderId,
         attemptId,
+        attemptFrom: status,
         markSucceeded: true,
         method: 'google_pay',
       });
@@ -325,7 +348,9 @@ describe('providerEventAction: payment.succeeded', () => {
         ),
       ).toEqual({
         kind: 'confirm',
+        orderId,
         attemptId,
+        attemptFrom: 'succeeded',
         markSucceeded: false,
         method: 'card',
       });
@@ -372,11 +397,12 @@ describe('providerEventAction: payment.failed', () => {
     ).toEqual({
       kind: 'payment_failed',
       attemptId,
+      attemptFrom: 'created',
       attemptStatus: 'failed_try',
       failedTries: 1,
       failureCode: 'card_declined',
-      orderStatus: 'payment_failed',
-      reopenHold: true,
+      orderMove: { id: orderId, from: 'pending_payment', to: 'payment_failed' },
+      reopenHoldId: holdId,
     });
   });
 
@@ -391,7 +417,7 @@ describe('providerEventAction: payment.failed', () => {
     ).toMatchObject({
       attemptStatus: 'failed_try',
       failedTries: 4,
-      orderStatus: 'payment_failed',
+      orderMove: { to: 'payment_failed' },
     });
   });
 
@@ -406,38 +432,41 @@ describe('providerEventAction: payment.failed', () => {
     ).toMatchObject({
       attemptStatus: 'canceled',
       failedTries: 5,
-      orderStatus: 'void',
-      reopenHold: true,
+      orderMove: { to: 'void' },
+      reopenHoldId: holdId,
     });
   });
 
   it.each([
-    ['an expired hold', { status: 'paying', expiresAt: earlier }],
-    ['a hold expiring right now', { status: 'paying', expiresAt: now }],
-    ['an active hold', { status: 'active', expiresAt: later }],
-    ['a converted hold', { status: 'converted', expiresAt: later }],
+    ['an expired hold', hold('paying', earlier)],
+    ['a hold expiring right now', hold('paying', now)],
+    ['an active hold', hold('active', later)],
+    ['a converted hold', hold('converted', later)],
     ['no hold', null],
-  ] as const)('leaves the hold alone for %s', (_name, hold) => {
+  ] as const)('leaves the hold alone for %s', (_name, heldBy) => {
     expect(
       providerEventAction(
         facts('payment.failed'),
         live(),
-        order('pending_payment', hold),
+        order('pending_payment', heldBy),
         now,
       ),
-    ).toMatchObject({ orderStatus: 'payment_failed', reopenHold: false });
+    ).toMatchObject({
+      orderMove: { to: 'payment_failed' },
+      reopenHoldId: null,
+    });
   });
 
   it('judges the hold by processing time, not by when the provider says it happened', () => {
-    const hold: EventHold = { status: 'paying', expiresAt: later };
+    const heldBy = hold('paying', later);
     expect(
       providerEventAction(
         facts('payment.failed'),
         live(),
-        order('pending_payment', hold),
+        order('pending_payment', heldBy),
         new Date(later.getTime() + 1),
       ),
-    ).toMatchObject({ reopenHold: false });
+    ).toMatchObject({ reopenHoldId: null });
   });
 
   it.each(['payment_failed', 'void', 'confirmed'] as const)(
@@ -453,11 +482,12 @@ describe('providerEventAction: payment.failed', () => {
       ).toEqual({
         kind: 'payment_failed',
         attemptId,
+        attemptFrom: 'failed_try',
         attemptStatus: 'failed_try',
         failedTries: 2,
         failureCode: 'card_declined',
-        orderStatus: null,
-        reopenHold: false,
+        orderMove: null,
+        reopenHoldId: null,
       });
     },
   );
@@ -512,22 +542,32 @@ describe('providerEventAction: payment.requires_action', () => {
           order('pending_payment'),
           now,
         ),
-      ).toEqual({ kind: 'requires_action', attemptId, extendPaying: true });
+      ).toEqual({
+        kind: 'requires_action',
+        attemptId,
+        attemptFrom: status,
+        extendHold: { id: holdId, payingUntil: null },
+      });
     },
   );
 
   it.each([
-    ['an active hold', { status: 'active', expiresAt: later }],
+    ['an active hold', hold('active', later)],
     ['no hold', null],
-  ] as const)('does not extend %s', (_name, hold) => {
+  ] as const)('does not extend %s', (_name, heldBy) => {
     expect(
       providerEventAction(
         facts('payment.requires_action'),
         same(attempt()),
-        order('pending_payment', hold),
+        order('pending_payment', heldBy),
         now,
       ),
-    ).toEqual({ kind: 'requires_action', attemptId, extendPaying: false });
+    ).toEqual({
+      kind: 'requires_action',
+      attemptId,
+      attemptFrom: 'created',
+      extendHold: null,
+    });
   });
 
   it.each([
@@ -568,7 +608,7 @@ describe('providerEventAction: payment.canceled', () => {
           order('confirmed'),
           now,
         ),
-      ).toEqual({ kind: 'cancel_attempt', attemptId });
+      ).toEqual({ kind: 'cancel_attempt', attemptId, attemptFrom: status });
     },
   );
 
@@ -614,29 +654,6 @@ describe('providerEventAction: events with nothing to act on', () => {
       ),
     ).toEqual({ kind: 'unmatched' });
   });
-
-  it.each([
-    'refund.succeeded',
-    'refund.failed',
-    'transfer.paid',
-    'transfer.failed',
-    'transfer.reversed',
-    'dispute.opened',
-    'dispute.won',
-    'dispute.lost',
-  ] as const)('%s waits for the unit that owns it', (type) => {
-    expect(
-      providerEventAction(
-        facts(type),
-        same(attempt()),
-        order('confirmed'),
-        now,
-      ),
-    ).toEqual({ kind: 'wait' });
-    expect(
-      providerEventAction(facts(type), { kind: 'none' }, null, now),
-    ).toEqual({ kind: 'wait' });
-  });
 });
 
 describe('transition guards', () => {
@@ -656,40 +673,239 @@ describe('transition guards', () => {
   });
 });
 
-describe('unmatchedOutcome', () => {
+describe('eventRetry', () => {
   const id = '00000000-0000-4000-8000-0000000000c3';
+  const at = (tries: number) =>
+    new Date(now.getTime() + backoffSeconds(tries, id) * 1000);
 
-  it.each([1, 2, 3, 4])(
-    'retries after a backoff on try %i without an alert',
-    (tries) => {
-      expect(unmatchedOutcome(tries, id)).toEqual({
-        retryAfterSeconds: backoffSeconds(tries, id),
+  it.each([0, 1, 2, 3])(
+    'queues the next try after a backoff, with no alert, after %i earlier tries',
+    (before) => {
+      expect(eventRetry('unmatched', before, id, now)).toEqual({
+        tries: before + 1,
+        runAfter: at(before + 1),
         alert: null,
+        lastError: retryErrors.unmatched,
       });
     },
   );
 
-  it('retries and alerts on the fifth try', () => {
-    expect(unmatchedOutcome(alertAfterEventAttempts, id)).toEqual({
-      retryAfterSeconds: backoffSeconds(alertAfterEventAttempts, id),
+  it('alerts on the fifth try of an unmatched event and keeps retrying', () => {
+    expect(
+      eventRetry('unmatched', alertAfterEventAttempts - 1, id, now),
+    ).toMatchObject({
+      tries: alertAfterEventAttempts,
+      runAfter: at(alertAfterEventAttempts),
       alert: 'unmatched',
     });
+    expect(
+      eventRetry('unmatched', alertAfterEventAttempts, id, now).alert,
+    ).toBeNull();
   });
 
-  it('retries without another alert after the fifth', () => {
-    expect(unmatchedOutcome(6, id).alert).toBeNull();
+  it('does not alert on the fifth try of a success waiting for the confirm step', () => {
     expect(
-      unmatchedOutcome(paymentLimits.maxEventAttempts - 1, id),
+      eventRetry('confirm_unavailable', alertAfterEventAttempts - 1, id, now),
     ).toMatchObject({
       alert: null,
+      lastError: retryErrors.confirm_unavailable,
     });
   });
 
-  it('gives up with an alert on the last try the table allows', () => {
-    expect(unmatchedOutcome(paymentLimits.maxEventAttempts, id)).toEqual({
-      retryAfterSeconds: null,
-      alert: 'gave_up',
+  it.each(['unmatched', 'confirm_unavailable'] as const)(
+    'gives up with one alert on the last try the table allows (%s)',
+    (reason) => {
+      expect(
+        eventRetry(reason, paymentLimits.maxEventAttempts - 1, id, now),
+      ).toMatchObject({
+        tries: paymentLimits.maxEventAttempts,
+        runAfter: null,
+        alert: 'gave_up',
+      });
+    },
+  );
+
+  it('never counts past the last try', () => {
+    expect(
+      eventRetry('unmatched', paymentLimits.maxEventAttempts, id, now).tries,
+    ).toBe(paymentLimits.maxEventAttempts);
+  });
+});
+
+describe('afterConfirm', () => {
+  it.each([
+    ['confirmed', 'finish'],
+    ['unavailable', 'retry'],
+  ] as const)('%s means %s', (status, outcome) => {
+    expect(afterConfirm(status)).toBe(outcome);
+  });
+});
+
+describe('alertFor', () => {
+  const id = '00000000-0000-4000-8000-0000000000e5';
+  const results: [string, ProviderEventResult, object | null][] = [
+    ['a processed event', { status: 'processed' }, null],
+    ['an event seen again', { status: 'already_processed' }, null],
+    [
+      'a deferred type',
+      { status: 'left', reason: 'deferred_type', orderId },
+      null,
+    ],
+    [
+      'a duplicate payment',
+      { status: 'left', reason: 'duplicate_payment', orderId },
+      {
+        kind: 'payment-duplicate',
+        key: `event:${id}`,
+        context: { eventId: id, orderId },
+      },
+    ],
+    [
+      'a retry with no alert',
+      { status: 'retry', reason: 'unmatched', tries: 2, alert: null },
+      null,
+    ],
+    [
+      'the fifth unmatched try',
+      { status: 'retry', reason: 'unmatched', tries: 5, alert: 'unmatched' },
+      {
+        kind: 'payment-event-unmatched',
+        key: `event:${id}`,
+        context: { eventId: id, tries: 5 },
+      },
+    ],
+    [
+      'giving up on an unmatched event',
+      { status: 'retry', reason: 'unmatched', tries: 25, alert: 'gave_up' },
+      {
+        kind: 'payment-event-unmatched',
+        key: `event:${id}:gave-up`,
+        context: { eventId: id, tries: 25 },
+      },
+    ],
+    [
+      'giving up on a success that could not be confirmed',
+      {
+        status: 'retry',
+        reason: 'confirm_unavailable',
+        tries: 25,
+        alert: 'gave_up',
+      },
+      {
+        kind: 'payment-confirm-unavailable',
+        key: `event:${id}:gave-up`,
+        context: { eventId: id, tries: 25 },
+      },
+    ],
+  ];
+
+  it.each(results)('for %s', (_name, result, expected) => {
+    expect(alertFor(result, id)).toEqual(expected);
+  });
+});
+
+describe('intake helpers', () => {
+  it.each([
+    ['invalid_signature', true],
+    ['invalid_input', true],
+    ['provider_unavailable', false],
+    ['not_found', false],
+  ])('a %s refuses the signature: %s', (code, refused) => {
+    expect(isRefusedSignature(code)).toBe(refused);
+  });
+
+  it.each([
+    [{ kind: 'too_large' }, { status: 413 }],
+    [
+      { kind: 'refused', failures: { allowed: true, remaining: 3 } },
+      { status: 400 },
+    ],
+    [
+      { kind: 'refused', failures: { allowed: false, retryAfterSeconds: 42 } },
+      { status: 429, retryAfterSeconds: 42 },
+    ],
+    [
+      { kind: 'over_budget', budget: { allowed: false, retryAfterSeconds: 7 } },
+      { status: 429, retryAfterSeconds: 7 },
+    ],
+    [
+      { kind: 'over_budget', budget: { allowed: true, remaining: 1 } },
+      { status: 200 },
+    ],
+    [{ kind: 'unstorable' }, { status: 400 }],
+    [{ kind: 'accepted' }, { status: 200 }],
+  ] as const)('answers %j with %j', (outcome, response) => {
+    expect(intakeResponse(outcome)).toEqual(response);
+  });
+
+  it('knows a payment event from one that belongs to a later unit', () => {
+    expect(isPaymentEventType('payment.failed')).toBe(true);
+    expect(isPaymentEventType('refund.failed')).toBe(false);
+  });
+});
+
+describe('metadata and lookups', () => {
+  it('lower-cases the ids the provider reports and refuses a malformed one', () => {
+    expect(
+      EventMetadataSchema.parse({
+        orderId: orderId.toUpperCase(),
+        recordId: recordId.toUpperCase(),
+      }),
+    ).toEqual({ orderId, recordId });
+    expect(
+      EventMetadataSchema.safeParse({ orderId: 'nope', recordId }).success,
+    ).toBe(false);
+  });
+
+  it('reads the prepared lookup: none as null, ids as ids, anything else refused', () => {
+    expect(parsePreparedMetadata(undefined)).toBeNull();
+    expect(parsePreparedMetadata(null)).toBeNull();
+    expect(parsePreparedMetadata({ orderId, recordId })).toEqual({
+      orderId,
+      recordId,
     });
+    expect(() => parsePreparedMetadata({ orderId: 'x' })).toThrow();
+  });
+
+  it('refuses an event of another provider than the port', () => {
+    expect(isProviderMismatch('fake', 'fake')).toBe(false);
+    expect(isProviderMismatch('fake', 'stripe')).toBe(true);
+  });
+
+  it.each([
+    [
+      'an unprocessed payment event with no order',
+      'payment.succeeded',
+      null,
+      null,
+      true,
+    ],
+    [
+      'an event that names its order',
+      'payment.succeeded',
+      orderId,
+      null,
+      false,
+    ],
+    ['an event already processed', 'payment.succeeded', null, now, false],
+    ['a refund with no order', 'refund.succeeded', null, null, false],
+  ] as const)('looks up %s: %s', (_name, type, order, processedAt, lookup) => {
+    expect(
+      needsMetadataLookup({ type, rambleOrderId: order, processedAt }),
+    ).toBe(lookup);
+  });
+
+  it('handles an event under its own ids, or adopts the looked-up ones only when it has none', () => {
+    const found = { orderId, recordId };
+    expect(
+      eventIds({ rambleOrderId: null, rambleRecordId: null }, found),
+    ).toEqual({ ...found, adopted: true });
+    expect(
+      eventIds({ rambleOrderId: 'own-o', rambleRecordId: 'own-r' }, found),
+    ).toEqual({ orderId: 'own-o', recordId: 'own-r', adopted: false });
+    expect(
+      eventIds({ rambleOrderId: null, rambleRecordId: null }, null),
+    ).toEqual({ orderId: null, recordId: null, adopted: false });
   });
 });
 

@@ -204,7 +204,7 @@ describe('getBrowseTitle', () => {
     );
   });
 
-  it('returns the title without filter names, logs only the digest, and does not throw when the read fails', async () => {
+  it('returns the title without filter names, logs only the digest and kind, and does not throw when the read fails', async () => {
     db.categories.mockRejectedValue(driverError);
     db.neighborhoods.mockResolvedValue([]);
 
@@ -214,7 +214,7 @@ describe('getBrowseTitle', () => {
 
     expect(log.error).toHaveBeenCalledExactlyOnceWith(
       'Browse title could not be read',
-      { digest: undefined },
+      { digest: undefined, kind: 'CachedReadError' },
     );
     expect(JSON.stringify(log.error.mock.calls)).not.toContain('secret-slug');
   });

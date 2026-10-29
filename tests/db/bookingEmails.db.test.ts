@@ -484,7 +484,7 @@ describe('the guest confirmation', () => {
     });
 
     await expect(run(handlers.sendGuestConfirmation, order.id)).rejects.toThrow(
-      handlers.BookingEmailError,
+      'the order is not a confirmed booking',
     );
     expect(await messageRows()).toHaveLength(0);
   });

@@ -175,6 +175,7 @@ describe('guest confirmation', () => {
     expect(html).toContain(
       'href="https://calendar.google.com/calendar/render?',
     );
+    expect(text).toContain('https://calendar.google.com/calendar/render?');
     expect(attachments).toHaveLength(1);
     expect(attachments[0]?.filename).toBe('ramble-booking.ics');
   });

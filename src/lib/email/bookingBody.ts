@@ -95,7 +95,7 @@ export function bookingCancellationBody(
   return {
     preview: `Cancelled: ${data.experienceName}.`,
     heading: 'Booking cancelled',
-    intro: `Hi ${data.recipientName}, ${data.reasonLine}`,
+    intro: `Hi ${data.recipientName}. ${data.reasonLine}`,
     rows: [
       { label: 'Experience', value: data.experienceName },
       { label: 'Date', value: data.dayLabel },

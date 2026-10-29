@@ -1,7 +1,7 @@
 import 'server-only';
 import { asc, eq } from 'drizzle-orm';
 import type { BookingEmailSource } from '@/lib/bookingEmails';
-import { maxMoneyLines } from '@/lib/email/bookingTemplates';
+import { MAX_LINES } from '@/lib/pricing';
 import type { Transaction } from './client';
 import { experiences, hosts, orderItems, orders, sessions } from './schema';
 
@@ -65,7 +65,7 @@ export async function readBookingEmailOrder(
     .from(orderItems)
     .where(eq(orderItems.orderId, orderId))
     .orderBy(asc(orderItems.label), asc(orderItems.priceOptionId))
-    .limit(maxMoneyLines + 1);
+    .limit(MAX_LINES + 1);
 
   const {
     contactEmail,

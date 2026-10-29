@@ -126,6 +126,31 @@ describe('foldIcsLine', () => {
   });
 });
 
+describe('dates with milliseconds', () => {
+  it('writes every date as whole seconds, so each matches the RFC 5545 form', () => {
+    const ics = buildIcs({
+      ...event,
+      startsAt: new Date('2026-11-07T19:00:00.123Z'),
+      endsAt: new Date('2026-11-07T21:00:00.999Z'),
+      stampedAt: new Date('2026-10-29T15:30:00.456Z'),
+    });
+
+    const dates = ics.match(/^(DTSTAMP|DTSTART|DTEND):(.*)$/gm) ?? [];
+    expect(dates).toHaveLength(3);
+    for (const line of dates) {
+      expect(line.split(':')[1]).toMatch(/^\d{8}T\d{6}Z$/);
+    }
+    expect(ics).toContain('DTSTAMP:20261029T153000Z');
+    expect(ics).toContain('DTEND:20261107T210000Z');
+  });
+
+  it('cuts milliseconds down, never up', () => {
+    expect(basicUtc(new Date('2026-11-07T19:00:59.999Z'))).toBe(
+      '20261107T190059Z',
+    );
+  });
+});
+
 describe('basicUtc', () => {
   it('writes an instant without separators or milliseconds', () => {
     expect(basicUtc(new Date('2026-11-07T19:00:00.000Z'))).toBe(

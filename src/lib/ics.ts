@@ -23,9 +23,14 @@ export const calendarLimits = {
 const lineLimitOctets = 75;
 const encoder = new TextEncoder();
 
-/** `20261107T190000Z`: the UTC basic form both iCalendar and Google Calendar read. */
+/**
+ * `20261107T190000Z`: the UTC basic form both iCalendar and Google Calendar read. Cut to whole
+ * seconds, because the form has no fraction, so a stamp with milliseconds still gives valid bytes
+ * and the same bytes every time.
+ */
 export function basicUtc(instant: Date): string {
-  return instant.toISOString().replace(/[-:]/g, '').replace('.000', '');
+  const seconds = new Date(Math.floor(instant.getTime() / 1000) * 1000);
+  return seconds.toISOString().replace(/[-:]/g, '').replace('.000', '');
 }
 
 function clip(text: string, max: number): string {

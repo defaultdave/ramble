@@ -31,7 +31,7 @@ export type BookingEmailPayload = z.output<typeof BookingEmailPayloadSchema>;
 type Context = { tx: Transaction; payload: BookingEmailPayload; jobId: string };
 
 /** Thrown for an order that should not have a job. The message names no address, name, or token. */
-export class BookingEmailError extends Error {
+class BookingEmailError extends Error {
   constructor(reason: string) {
     super(`Booking email refused: ${reason}`);
     this.name = 'BookingEmailError';
@@ -53,7 +53,7 @@ async function loadOrder(tx: Transaction, orderId: string) {
  * token's hash. A link that would not open the order (the confirm step wrote no hash yet, or a bump
  * left this version behind) is never sent.
  */
-export function liveManageToken(order: BookingEmailOrder): string {
+function liveManageToken(order: BookingEmailOrder): string {
   const token = capabilityToken(
     'manage',
     order.source.orderId,

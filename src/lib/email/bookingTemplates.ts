@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { buildIcs } from '../ics';
 import { isOrderReference } from '../orders';
+import { MAX_LINES } from '../pricing';
 import { oneLineClipped } from '../text';
 import type { EmailAttachment } from './message';
 
@@ -16,8 +17,6 @@ const link = z.url({ protocol: /^https?$/ }).max(2048);
 
 const Reference = z.string().max(10).refine(isOrderReference);
 const Money = z.object({ label: line(120), amount: line(20) });
-
-export const maxMoneyLines = 4;
 
 const cancellationAudiences = ['guest', 'host'] as const;
 
@@ -41,7 +40,7 @@ export const GuestConfirmationDataSchema = z.object({
   durationLabel: line(40).nullable(),
   meetingPoint: line(600).nullable(),
   partyLabel: line(40),
-  lines: Money.array().min(1).max(maxMoneyLines),
+  lines: Money.array().min(1).max(MAX_LINES),
   taxLine: Money.nullable(),
   total: line(20),
   giftApplied: line(20).nullable(),

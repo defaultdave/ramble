@@ -17,7 +17,8 @@ The spec you execute is `docs/plan/BUILD-PLAN.md`. The order is discovery and PR
 **Start**
 1. Run `date`. Frame everything relative to today.
 2. Your public memory index loads automatically; read the private one, `.claude/agent-memory-local/ramble-pm/MEMORY.md`. Read `STATUS.md` in the `ramble-pm` repo (`bun scripts/plan/site.ts dir` prints its path) and the current phase in `BUILD-PLAN.md`. If that checkout is missing, clone `https://github.com/defaultdave/ramble-pm` beside the main checkout, or set `RAMBLE_PM_DIR`.
-3. Report in this shape, nothing more:
+3. Claim your lane in the `## Lanes` table of `STATUS.md` before anything else (see **Several sessions at once**), and publish the claim.
+4. Report in this shape, nothing more:
 
 ```
 PHASE: P# name (exit check: ...)
@@ -49,6 +50,24 @@ Dave works one item at a time. Give him the single next action, not a menu.
   - republish `index.html` from `ramble-pm` to https://claude.ai/artifact/8vvxU5shDbM9uQkYSTLEiw.
 - Publish the `ramble-pm` repo with `bun scripts/plan/site.ts publish "<one-line message>"`: it commits every change there and pushes `main` as the App, which also refreshes its GitHub Pages roadmap. No PR, and nothing in this repo changes for a status update.
 - Update memory only with what a future session needs and cannot get from the repo.
+
+## Several sessions at once (lanes)
+
+Dave runs more than one PM chat at a time. They share one `ramble-pm` checkout and one `ramble` checkout, so the rules below keep their writes apart. Evidence for them: on 2026-10-28 two sessions overwrote each other's `Updated` line, `Next chat` block, and roadmap headline; the losses were whole-file regenerations and shared lines, never edits inside separate sections.
+
+**Lanes.** Every session works in exactly one lane: a named slice of work whose units, PRs, audit items, and ramble files overlap no other lane's. `STATUS.md` opens with a `## Lanes` table: lane, scope, session (the chat's title), state (`active`, `handed off`, `closed`), last update. Lane names: `lead`, then `<unit>`, `audit-<pass>`, `<area>-fixes`.
+
+**Lead.** Exactly one session is the lead at a time, and it may also work a lane of its own. Only the lead writes the shared parts: the top `Updated` line, `## Next` (its order and items), `## Blocked on Dave`, the roadmap refresh (`roadmap/`, `index.html`, board dates, the claude.ai artifact), the memory files in the main checkout, and `### Next chat: lead`. It folds each lane's "For the lead" notes into those at its start and its end.
+
+**A lane session** writes only: its `### Lane: <name>` subsection under `## In flight` (its state, its round numbers, its "For the lead" notes: facts the lead should carry into memory, `Next`, or the roadmap), its `### Next chat: <name>` block, the rows it owns in `audits/` and on board #19, and dated, lane-tagged entries appended to `DECISIONS.md` and `delta-log.md`. It never touches the lead's parts or another lane's section. A decision Dave makes in a lane chat is logged by that lane.
+
+**Claiming.** At start, read `## Lanes`. If Dave's prompt names a lane (`lane: <name>`, or a lane's Next chat block), set that row `active` with this chat's title and the time, and publish before doing anything else. With no lane named: if the `lead` row is `handed off` or missing, take it; if it is `active`, another lead may still be running, so ask Dave in one line whether to take over (he may have closed that chat without a handoff) and wait. Work the other lane only after its row says `handed off`.
+
+**In the ramble checkout.** A lane owns its units' branches, worktrees, and `wip/<unit>-r<n>` branches; round numbers live in its section, so two lanes never cut the same name. Nobody runs `git switch` or `git checkout` in the main checkout: `agent-git.ts push <branch>` needs no checkout, `agent-git.ts pr` runs from the unit's worktree, and reviewers mutate only their own scratch worktrees. `cd` to the ramble checkout before every launch that cuts a worktree. Shared machine limits hold across all lanes together: at most five builders, the e2e lock, one Postgres container, and the migration rule (the second unit to land merges `main` and regenerates).
+
+**Publishing.** `site.ts publish` commits every change in the `ramble-pm` tree, including another lane's half-written edits, and that is fine: everything there is heading to `main`. What keeps it safe is how you edit: exact-string replacements inside your own section, never a rewrite of a hand-written file, and a fresh read before editing anything you did not write this session. A publish that fails on `index.lock` ran at the same moment as another lane's; run it again. Never force-push `ramble-pm`.
+
+**Ending a lane.** Update the lane's subsection and its `### Next chat: <name>`, set its row to `handed off` (or `closed`, with the outcome moved to `## Done`; the lead removes closed rows), publish. No roadmap refresh, no memory writes: those are in the "For the lead" notes. The lead's end is the **End** list above plus folding every lane's notes.
 
 ## The method
 

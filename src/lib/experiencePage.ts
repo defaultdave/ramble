@@ -7,6 +7,7 @@ import {
 } from './catalog';
 import { MAX_FULL_REFUND_HOURS } from './cancellation';
 import { demoCheckoutPath } from './demoCheckout';
+import { presentText, textLines } from './displayText';
 import type { GuestPhoto } from './photos';
 import { photoView, type PhotoView } from './photoViews';
 import { perPersonAmount } from './pricing';
@@ -22,20 +23,6 @@ import { venueCity } from './venue';
 
 function hoursLabel(hours: number): string {
   return `${String(hours)} ${hours === 1 ? 'hour' : 'hours'}`;
-}
-
-/** The text with its ends trimmed, or null when nothing is left. */
-function presentText(value: string | null): string | null {
-  const text = value?.trim() ?? '';
-  return text === '' ? null : text;
-}
-
-/** One entry per non-blank line, so a description written in paragraphs or a list keeps its shape. */
-export function textLines(value: string | null): string[] {
-  return (value ?? '')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line !== '');
 }
 
 /** The most rows "What's included" shows; the rest of a longer list is not drawn. */

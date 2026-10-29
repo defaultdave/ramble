@@ -11,6 +11,7 @@ import {
 import { hrefForFilters, noFilters } from './filters';
 import { withCovers, type PhotoView } from './photoViews';
 import type { RichTextDoc } from './richText/format';
+import { hasContent, paragraphs } from './richText/paragraphs';
 import { giftGuidePath, picksAnchor, picksPath } from './routes';
 import type { GuestSettings } from './settings';
 import { spacesStatus } from './spaces';
@@ -124,18 +125,6 @@ export const homeCopy = {
   ] as const satisfies readonly ReassuranceFact[],
 } as const;
 
-/** A plain sentence as a rich-text document, so default copy and edited copy render the same way. */
-export function docOfText(text: string): RichTextDoc {
-  return {
-    type: 'doc',
-    content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
-  };
-}
-
-function hasText(doc: RichTextDoc | null): doc is RichTextDoc {
-  return doc !== null && doc.content.length > 0;
-}
-
 /** One reassurance row; the Figma rows pair each fact with its own icon. */
 export type ReassuranceFact = {
   icon: 'check' | 'clock' | 'info';
@@ -242,7 +231,9 @@ function viewOf(
         id: module.id,
         eyebrow: homeCopy.heroEyebrow,
         heading: module.heading ?? homeCopy.heroHeading,
-        body: hasText(module.body) ? module.body : docOfText(homeCopy.heroBody),
+        body: hasContent(module.body)
+          ? module.body
+          : paragraphs(homeCopy.heroBody),
         neighborhoods: context.neighborhoods.map(({ slug, name }) => ({
           slug,
           name,
@@ -292,7 +283,7 @@ function viewOf(
         id: module.id,
         eyebrow: homeCopy.giftGuideEyebrow,
         heading: module.heading ?? homeCopy.giftGuideHeading,
-        body: hasText(module.body) ? module.body : null,
+        body: hasContent(module.body) ? module.body : null,
         action: { href: giftGuidePath, label: homeCopy.giftGuideAction },
         sponsor: homeCopy.giftGuideSponsor,
       };
@@ -391,12 +382,4 @@ export function withHomeCovers(
         : module,
     ),
   };
-}
-
-/** The site banner: its text, or null when there is none or it is blank. */
-export function bannerText(
-  settings: Pick<GuestSettings, 'bannerText'>,
-): string | null {
-  const text = settings.bannerText?.trim() ?? '';
-  return text === '' ? null : text;
 }

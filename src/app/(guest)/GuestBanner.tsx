@@ -2,7 +2,7 @@ import { unstable_rethrow } from 'next/navigation';
 import { connection } from 'next/server';
 import { SiteBanner } from '@/components/GuestShell';
 import { errorDigest } from '@/lib/errorDigest';
-import { bannerText } from '@/lib/home';
+import { bannerText } from '@/lib/settings';
 import { logger } from '@/server/monitoring/logger';
 import { getCachedGuestSettings } from '@/server/siteSettings';
 

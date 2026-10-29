@@ -4,8 +4,6 @@ import type { Collection, HomeModule } from './editorial';
 import type { CardExperience } from './experienceCards';
 import {
   buildHomePage,
-  bannerText,
-  docOfText,
   homeCopy,
   homeCardIds,
   homeExperienceIds,
@@ -18,6 +16,7 @@ import {
   type HomeModuleView,
   type ThisWeekSession,
 } from './home';
+import { paragraphs } from './richText/paragraphs';
 import { minuteAsOf } from './time';
 
 // Behaviours under test, one per decision, branch or risk:
@@ -287,13 +286,13 @@ describe('buildHomePage hero', () => {
       id: id(901),
       eyebrow: homeCopy.heroEyebrow,
       heading: homeCopy.heroHeading,
-      body: docOfText(homeCopy.heroBody),
+      body: paragraphs(homeCopy.heroBody),
       neighborhoods: [{ slug: 'dumbo', name: 'DUMBO' }],
     });
   });
 
   it('shows the heading and body staff wrote', () => {
-    const body = docOfText('Pasta, mostly.');
+    const body = paragraphs('Pasta, mostly.');
     const [hero] = modulesOf({
       modules: [module(1, 'hero_search', { heading: 'Eat more', body })],
     });
@@ -306,7 +305,7 @@ describe('buildHomePage hero', () => {
         module(1, 'hero_search', { body: { type: 'doc', content: [] } }),
       ],
     });
-    expect(hero).toMatchObject({ body: docOfText(homeCopy.heroBody) });
+    expect(hero).toMatchObject({ body: paragraphs(homeCopy.heroBody) });
   });
 });
 
@@ -455,7 +454,7 @@ describe('buildHomePage gift guide', () => {
   });
 
   it('shows the heading and body staff wrote', () => {
-    const body = docOfText('Give a Saturday.');
+    const body = paragraphs('Give a Saturday.');
     const [view] = modulesOf({
       modules: [module(1, 'gift_guide', { heading: 'Not a sweater', body })],
     });
@@ -604,16 +603,5 @@ describe('covers on the home page', () => {
     expect(covered.kind === 'modules' && covered.modules.at(-1)?.kind).toBe(
       'reassurance',
     );
-  });
-});
-
-describe('bannerText', () => {
-  it.each([
-    ['text', 'Closed Monday for weather', 'Closed Monday for weather'],
-    ['padded text', '  Closed Monday  ', 'Closed Monday'],
-    ['blank text', '   ', null],
-    ['no text', null, null],
-  ])('%s', (_name, bannerTextValue, expected) => {
-    expect(bannerText({ bannerText: bannerTextValue })).toBe(expected);
   });
 });

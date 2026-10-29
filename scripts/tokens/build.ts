@@ -99,6 +99,42 @@ function typeValue(name: string, raw: string | number): string {
   return `${String(raw)}px`;
 }
 
+const LINE_HEIGHT_PREFIX = 'font/line-height/';
+const LINE_HEIGHT_DECIMALS = 4;
+
+/**
+ * A line height is emitted as a ratio of its font size so the line box scales
+ * with text-only zoom. Each `font/line-height/<style>` pairs with the
+ * `font/size/<style>` of the same name, in the same mode.
+ */
+export function lineHeightRatio(
+  lineHeightPx: number,
+  fontSizePx: number,
+): string {
+  if (!(lineHeightPx > 0) || !(fontSizePx > 0)) {
+    throw new Error(
+      `Line height ${String(lineHeightPx)} and font size ${String(fontSizePx)} must both be positive`,
+    );
+  }
+  return String(
+    Number((lineHeightPx / fontSizePx).toFixed(LINE_HEIGHT_DECIMALS)),
+  );
+}
+
+function pairedFontSize(
+  variables: TokenSource['collections']['Type']['variables'],
+  lineHeightName: string,
+  mode: Mode,
+): number {
+  const sizeName = `font/size/${lineHeightName.slice(LINE_HEIGHT_PREFIX.length)}`;
+  const size = variables.find((v) => v.name === sizeName);
+  const raw = mode === 'desktop' ? size?.desktop : size?.mobile;
+  if (typeof raw !== 'number') {
+    throw new Error(`${lineHeightName} has no numeric ${sizeName} to pair with`);
+  }
+  return raw;
+}
+
 interface ModeTokens {
   tree: TokenNode;
   emitted: Set<string>;
@@ -129,6 +165,19 @@ function collectTokens(source: TokenSource, mode: Mode): ModeTokens {
     add(v.name, `${String(v.value)}px`, base);
   }
   for (const v of collections.Type.variables) {
+    if (v.name.startsWith(LINE_HEIGHT_PREFIX)) {
+      const ratioIn = (m: Mode) =>
+        lineHeightRatio(
+          Number(m === 'desktop' ? v.desktop : v.mobile),
+          pairedFontSize(collections.Type.variables, v.name, m),
+        );
+      add(
+        v.name,
+        ratioIn(mode),
+        base || (mode === 'desktop' && ratioIn('desktop') !== ratioIn('base')),
+      );
+      continue;
+    }
     const raw = mode === 'desktop' ? v.desktop : v.mobile;
     add(
       v.name,

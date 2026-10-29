@@ -77,6 +77,7 @@ Test files (`*.test.*`, `*.spec.*`, `e2e/**`) are read only to answer rules B7 a
 | B14 | Cached code never reads the caller (stricter than DATA-11, which allows it with the user id in the key, because Ramble's personal pages are all dynamic) | A `'use cache'` function, or a function it calls, that reads cookies, headers, `getCaller()`, a capability token, or personal data. Cached functions take every input as an argument and tag their output with `cacheTag`; publishing invalidates through `tagsForChange()` |
 | B15 | Endpoints stay on the list | A new Route Handler outside design doc 3.2's machine endpoints, or one without a signature or secret check and a rate-limit key |
 | B16 | Styles use tokens (UI-1, UI-2, ADR 0005, design doc 4.4) | An inline `style` prop (UI-1); a colour, spacing, radius, or font-size literal in a `*.module.css` file instead of a `var(--…)` token; a primitive whose props are not named as the Figma properties; a styling system other than CSS Modules |
+| B17 | Reuse before writing (DRY; Dave, 2026-10-28) | A new function, hook, component, constant, or Zod schema that does the job, or nearly the job, of one already in `src/lib/`, `src/server/`, or `src/components/` that could have been used or extended; a general helper (money, durations, dates, the New York day, addresses, labels, card building, read wrappers) placed in a page module such as `src/lib/home.ts`, `browse.ts`, or `experiencePage.ts` instead of a shared module named for what it does. Fix: call the existing code or extend it with a parameter or variant and a test; move a general helper to a shared module with its callers and tests. Duplication that predates the diff is not blocking; it is logged as an audit item (`audits/` in the ramble-pm repo) |
 
 ## Advisory rules (notes only, do not block)
 
@@ -88,6 +89,8 @@ Test files (`*.test.*`, `*.spec.*`, `e2e/**`) are read only to answer rules B7 a
 | A4 | Reuse before writing (ARCH-10) | A new helper, hook, component, or Zod schema that duplicates one already in the repo, or a decision function that repeats one listed in design doc 4.3 |
 | A5 | Streamed parts keep their space (PRD-68, design doc 4.1) | A streamed region on a cached page (spaces left, upcoming dates) without a skeleton sized to the final content |
 | A6 | Hooks are for shared state only (STATE-12) | A custom hook that wraps a pure decision (use the `src/lib/` function) or serves one component |
+
+- A new hook, shared component, or cross-cutting `src/lib` module is named in the PR's Decisions with the existing code checked first, so the PM can confirm it is not a duplicate (B17).
 
 ## Placement decisions (Dave, 2026-10-21)
 

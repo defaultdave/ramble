@@ -6,6 +6,7 @@ import {
   alternativeWindow,
   blockedForBot,
   blockedForRateLimit,
+  reserveBlock,
   decideRelease,
   giftRefusal,
   heldResult,
@@ -456,6 +457,35 @@ describe('results', () => {
       reason: 'too_many_holds',
       until: '2026-11-01T12:01:30.000Z',
     });
+  });
+
+  it.each([
+    ['a bot', 'bot', null, { status: 'blocked', reason: 'too_many_holds' }],
+    [
+      'a bot, whatever the limit says',
+      'bot',
+      { allowed: true, remaining: 3 },
+      { status: 'blocked', reason: 'too_many_holds' },
+    ],
+    [
+      'a person over the limit',
+      'human',
+      { allowed: false, retryAfterSeconds: 90 },
+      {
+        status: 'blocked',
+        reason: 'too_many_holds',
+        until: '2026-11-01T12:01:30.000Z',
+      },
+    ],
+    [
+      'a person within the limit',
+      'human',
+      { allowed: true, remaining: 3 },
+      null,
+    ],
+    ['a person with no try spent', 'human', null, null],
+  ] as const)('reserveBlock answers %s', (_name, verdict, tried, expected) => {
+    expect(reserveBlock(verdict, tried, at)).toEqual(expected);
   });
 
   it.each([

@@ -9,7 +9,13 @@ import {
   serveNeonHttp,
   type FreshDatabase,
 } from './harness';
+import { testDevice } from '../deviceFixture';
 import { hash, insertHold, insertSession, seedBookable } from './holdFixtures';
+
+vi.mock(
+  'next/headers',
+  async () => (await import('../deviceFixture')).nextHeadersMock,
+);
 
 // The reserve path's real-database concurrency tests (ADR 0002 item 13, ADR 0006). The client is
 // replaced by one with a pool of 25, so 30 reserves really do compete for connections.
@@ -45,7 +51,6 @@ let stopHttp: () => Promise<void>;
 let client: typeof import('@/server/db/client');
 let holdData: typeof import('@/server/db/holds');
 let sessionData: typeof import('@/server/db/sessions');
-let testDevice: typeof import('@/server/test-device').testDevice;
 
 beforeAll(async () => {
   fresh = await createFreshDatabase(process.env.DATABASE_URL_UNPOOLED ?? '');
@@ -54,7 +59,6 @@ beforeAll(async () => {
   client = await import('@/server/db/client');
   holdData = await import('@/server/db/holds');
   sessionData = await import('@/server/db/sessions');
-  ({ testDevice } = await import('@/server/test-device'));
 });
 
 afterAll(async () => {
@@ -136,8 +140,10 @@ describe('parallel reserves', () => {
   it('30 devices after 10 spaces: exactly 10 held and 20 sold out, 5 rounds', async () => {
     for (let round = 0; round < 5; round += 1) {
       const bookable = await seedBookable(client.db, { allocation: 10 });
-      const devices = Array.from({ length: 30 }, (_, index) =>
-        testDevice(`thirty-${String(round)}-${String(index)}`),
+      const devices = await Promise.all(
+        Array.from({ length: 30 }, (_, index) =>
+          testDevice(`thirty-${String(round)}-${String(index)}`),
+        ),
       );
 
       const answers = await Promise.all(
@@ -166,11 +172,13 @@ describe('parallel reserves', () => {
         (await insertSession(client.db, bookable.experience.id)).id,
         (await insertSession(client.db, bookable.experience.id)).id,
       ];
-      const asks = Array.from({ length: 60 }, (_, index) => ({
-        sessionId: sessionIds[index % 3] ?? bookable.session.id,
-        quantity: ((index * 7) % 3) + 1,
-        device: testDevice(`sixty-${String(round)}-${String(index)}`),
-      }));
+      const asks = await Promise.all(
+        Array.from({ length: 60 }, async (_, index) => ({
+          sessionId: sessionIds[index % 3] ?? bookable.session.id,
+          quantity: ((index * 7) % 3) + 1,
+          device: await testDevice(`sixty-${String(round)}-${String(index)}`),
+        })),
+      );
 
       const answers = await Promise.all(
         asks.map((ask) =>
@@ -209,9 +217,9 @@ describe('a reserve that waited for the session lock', () => {
           seats: 1,
         });
       },
-      () =>
+      async () =>
         holdData.reserveSpaces(
-          testDevice('late-device'),
+          await testDevice('late-device'),
           request(bookable.session.id, bookable),
         ),
     );
@@ -229,9 +237,9 @@ describe('a reserve that waited for the session lock', () => {
           sql`UPDATE sessions SET status = 'cancelled', cancel_reason = 'host' WHERE id = ${bookable.session.id}`,
         );
       },
-      () =>
+      async () =>
         holdData.reserveSpaces(
-          testDevice('late-device'),
+          await testDevice('late-device'),
           request(bookable.session.id, bookable),
         ),
     );
@@ -248,9 +256,9 @@ describe('a reserve that waited for the session lock', () => {
 
     const answer = await raceAgainstOpenTransaction(
       (tx) => lockSession(tx, bookable.session.id).then(() => undefined),
-      () =>
+      async () =>
         holdData.reserveSpaces(
-          testDevice('timed-device'),
+          await testDevice('timed-device'),
           request(bookable.session.id, bookable),
         ),
       {
@@ -277,7 +285,7 @@ describe('a reserve that waited for the session lock', () => {
 describe('the lock order', () => {
   it('takes the device lock before the session row', async () => {
     const bookable = await seedBookable(client.db);
-    const device = testDevice('ordered-device');
+    const device = await testDevice('ordered-device');
 
     const answer = await raceAgainstOpenTransaction(
       async (tx) => {
@@ -334,7 +342,7 @@ describe('a capacity edit and a release that waited for the session lock', () =>
 
   it('see a hold that moved to paying meanwhile, and refuse to release it', async () => {
     const bookable = await seedBookable(client.db);
-    const device = testDevice('releasing-device');
+    const device = await testDevice('releasing-device');
     const hold = await insertHold(client.db, bookable.session.id, {
       deviceKey: device.deviceKey,
     });
@@ -357,9 +365,46 @@ describe('a capacity edit and a release that waited for the session lock', () =>
     expect(stored?.status).toBe('paying');
   });
 
+  it('waits for the session row alone, before it looks at the hold', async () => {
+    const bookable = await seedBookable(client.db);
+    const device = await testDevice('session-row-device');
+    const hold = await insertHold(client.db, bookable.session.id, {
+      deviceKey: device.deviceKey,
+    });
+
+    const answer = await raceAgainstOpenTransaction(
+      (tx) => lockSession(tx, bookable.session.id).then(() => undefined),
+      () => holdData.releaseHold(device, { holdId: hold.id }),
+    );
+
+    expect(answer).toEqual({ status: 'released' });
+  });
+
+  it('waits for the hold row alone, and sees what a holder of only that row changed', async () => {
+    const bookable = await seedBookable(client.db);
+    const device = await testDevice('hold-row-device');
+    const hold = await insertHold(client.db, bookable.session.id, {
+      deviceKey: device.deviceKey,
+    });
+
+    const answer = await raceAgainstOpenTransaction(
+      async (tx) => {
+        await tx.execute(
+          sql`SELECT id FROM holds WHERE id = ${hold.id} FOR UPDATE`,
+        );
+        await tx.execute(
+          sql`UPDATE holds SET status = 'paying', paying_until = expires_at + interval '5 minutes' WHERE id = ${hold.id}`,
+        );
+      },
+      () => holdData.releaseHold(device, { holdId: hold.id }),
+    );
+
+    expect(answer).toEqual({ status: 'payment_in_progress' });
+  });
+
   it('see a hold that was converted meanwhile, and answer not_found', async () => {
     const bookable = await seedBookable(client.db);
-    const device = testDevice('converting-device');
+    const device = await testDevice('converting-device');
     const hold = await insertHold(client.db, bookable.session.id, {
       deviceKey: device.deviceKey,
     });
@@ -381,7 +426,7 @@ describe('a capacity edit and a release that waited for the session lock', () =>
 describe('reserve, release, and capacity edit together', () => {
   it('never deadlock, and never let sold plus held pass the allocation, in 50 rounds', async () => {
     const bookable = await seedBookable(client.db, { allocation: 6 });
-    const owner: Device = testDevice('mixed-owner');
+    const owner: Device = await testDevice('mixed-owner');
 
     for (let round = 0; round < 50; round += 1) {
       const session = await insertSession(client.db, bookable.experience.id, {
@@ -392,20 +437,14 @@ describe('reserve, release, and capacity edit together', () => {
         seats: 2,
       });
       const tag = String(round);
+      const guestA = await testDevice(`mixed-a-${tag}`);
+      const guestB = await testDevice(`mixed-b-${tag}`);
+      const guestC = await testDevice(`mixed-c-${tag}`);
 
       const outcomes = await Promise.allSettled([
-        holdData.reserveSpaces(
-          testDevice(`mixed-a-${tag}`),
-          request(session.id, bookable, 3),
-        ),
-        holdData.reserveSpaces(
-          testDevice(`mixed-b-${tag}`),
-          request(session.id, bookable, 2),
-        ),
-        holdData.reserveSpaces(
-          testDevice(`mixed-c-${tag}`),
-          request(session.id, bookable, 1),
-        ),
+        holdData.reserveSpaces(guestA, request(session.id, bookable, 3)),
+        holdData.reserveSpaces(guestB, request(session.id, bookable, 2)),
+        holdData.reserveSpaces(guestC, request(session.id, bookable, 1)),
         holdData.releaseHold(owner, { holdId: mine.id }),
         sessionData.updateSessionAllocation(ops, {
           sessionId: session.id,
@@ -429,5 +468,5 @@ describe('reserve, release, and capacity edit together', () => {
         row.seats_sold + (await heldSeatsOf(session.id)),
       ).toBeLessThanOrEqual(row.allocation);
     }
-  });
+  }, 120_000);
 });

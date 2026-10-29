@@ -9,7 +9,6 @@ import {
 const state = vi.hoisted(() => ({
   cookie: undefined as string | undefined,
   forwardedFor: null as string | null,
-  nodeEnv: 'test',
   set: vi.fn(),
 }));
 
@@ -28,21 +27,13 @@ vi.mock('next/headers', () => ({
         name === 'x-forwarded-for' ? state.forwardedFor : null,
     }),
 }));
-vi.mock('@/server/env', () => ({
-  env: {
-    get NODE_ENV() {
-      return state.nodeEnv;
-    },
-  },
-}));
-
-import { deviceFrom, getDevice } from './device';
+import { getDevice } from './device';
 
 // Behaviours under test, one per decision, branch or risk:
 // - a valid cookie is the device: the key is its sha-256, the address hash is the sha-256 of the
 //   first forwarded address, and no cookie is written
 // - no cookie, or one this app did not mint, mints a new 32-byte cookie, set httpOnly, SameSite Lax,
-//   path /, 400 days, and Secure in production only
+//   path /, 400 days, and Secure in every environment
 // - the same cookie from another address is the same device key with another address hash
 // - an absent or malformed address hashes as "unknown", so a forged header cannot grow the key space
 // - the device is a plain pair of hashes: the cookie value never appears in it
@@ -54,7 +45,6 @@ const minted = 'A'.repeat(43);
 beforeEach(() => {
   state.cookie = undefined;
   state.forwardedFor = null;
-  state.nodeEnv = 'test';
   state.set.mockReset();
 });
 
@@ -89,7 +79,7 @@ describe('getDevice', () => {
     expect(isDeviceCookie(value)).toBe(true);
     expect(options).toEqual({
       httpOnly: true,
-      secure: false,
+      secure: true,
       sameSite: 'lax',
       path: '/',
       maxAge: deviceCookieMaxAgeSeconds,
@@ -102,14 +92,6 @@ describe('getDevice', () => {
     await getDevice();
 
     expect(state.set.mock.calls[0]?.[1]).not.toBe(state.set.mock.calls[1]?.[1]);
-  });
-
-  it('marks the cookie Secure in production', async () => {
-    state.nodeEnv = 'production';
-
-    await getDevice();
-
-    expect(state.set.mock.calls[0]?.[2]).toMatchObject({ secure: true });
   });
 
   it('keeps the device key when only the address changes', async () => {
@@ -134,9 +116,12 @@ describe('getDevice', () => {
   );
 });
 
-describe('deviceFrom', () => {
-  it('holds hashes only, never the cookie', () => {
-    const device = deviceFrom(minted, '203.0.113.9');
+describe('the device', () => {
+  it('holds hashes only, never the cookie', async () => {
+    state.cookie = minted;
+    state.forwardedFor = '203.0.113.9';
+
+    const device = await getDevice();
 
     expect(JSON.stringify(device)).not.toContain(minted);
     expect(device.deviceKey).toMatch(/^[0-9a-f]{64}$/);

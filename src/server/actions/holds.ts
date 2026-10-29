@@ -1,8 +1,7 @@
 'use server';
 
 import {
-  blockedForBot,
-  blockedForRateLimit,
+  reserveBlock,
   type ReleaseHoldInput,
   type ReleaseResult,
   type ReserveResult,
@@ -27,14 +26,14 @@ export async function reserveSpaces(
   input: ReserveSpacesInput,
 ): Promise<ReserveResult> {
   const device = await getDevice();
-  if ((await checkBot()) === 'bot') return blockedForBot();
-  const tried = await consumeRateLimit('reserve', device.deviceKey);
-  if (!tried.allowed) {
-    return blockedForRateLimit(
-      tried.retryAfterSeconds,
-      await currentDatabaseTime(),
-    );
-  }
+  const verdict = await checkBot();
+  // A bot spends no try: the limit is only asked of a request that passed the bot check.
+  const tried =
+    verdict === 'bot'
+      ? null
+      : await consumeRateLimit('reserve', device.deviceKey);
+  const blocked = reserveBlock(verdict, tried, await currentDatabaseTime());
+  if (blocked) return blocked;
   return reserveSpacesRow(device, input);
 }
 

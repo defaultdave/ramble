@@ -12,13 +12,13 @@ export type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
  *   1. the device advisory lock   (reserve only)      lockDevice
  *   2. the session row            FOR UPDATE          lockSessionRow
  *   3. the hold row               FOR UPDATE          lockHoldRow
- *   4. the order row                                  (U-047a)
- *   5. the gift row                                   (U-064a)
+ *   4. the order row                                  (a later unit)
+ *   5. the gift row                                   (a later unit)
  *
  * A path that starts from a hold, an order, or a provider event reads the ids it needs without a
  * lock, then locks in this order and re-checks what it read. Locks are transaction-level only
  * (`pg_advisory_xact_lock`, `FOR UPDATE`), because app traffic goes through the pooler in
- * transaction mode (ADR 0002 amendment; the pooler keeps `FOR UPDATE`, U-013 spike). The settings
+ * transaction mode (ADR 0002 amendment; the pooler keeps `FOR UPDATE`, see docs/adr/research/u-013-neon-concurrency-spike.md). The settings
  * row is read with a plain SELECT, so it is not a lock and sits outside the order. Later units add
  * their lockers here, below the one they follow.
  */

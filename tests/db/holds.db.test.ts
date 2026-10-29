@@ -25,6 +25,7 @@ import {
   serveNeonHttp,
   type FreshDatabase,
 } from './harness';
+import { testDevice } from '../deviceFixture';
 import {
   day,
   hash,
@@ -50,12 +51,16 @@ import {
 // - a capacity edit is refused below seats sold plus open holds, allowed at exactly that, and lapsed holds
 //   do not block it
 
+vi.mock(
+  'next/headers',
+  async () => (await import('../deviceFixture')).nextHeadersMock,
+);
+
 let fresh: FreshDatabase;
 let stopHttp: () => Promise<void>;
 let client: typeof import('@/server/db/client');
 let holdData: typeof import('@/server/db/holds');
 let sessionData: typeof import('@/server/db/sessions');
-let testDevice: typeof import('@/server/test-device').testDevice;
 let guestA: Device;
 let guestB: Device;
 
@@ -66,10 +71,8 @@ beforeAll(async () => {
   client = await import('@/server/db/client');
   holdData = await import('@/server/db/holds');
   sessionData = await import('@/server/db/sessions');
-  // The environment module reads DATABASE_URL when it is first imported, so the device waits for the stub.
-  ({ testDevice } = await import('@/server/test-device'));
-  guestA = testDevice('guest-a');
-  guestB = testDevice('guest-b');
+  guestA = await testDevice('guest-a');
+  guestB = await testDevice('guest-b');
 });
 
 afterAll(async () => {
@@ -464,6 +467,32 @@ describe('reserveSpaces answers held', () => {
     },
   );
 
+  it('stamps the hold with the database clock, not the JavaScript one', async () => {
+    const bookable = await seedBookable(client.db);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2001-01-01T00:00:00.000Z'));
+    let answer;
+    try {
+      answer = await holdData.reserveSpaces(guestA, forAdults(bookable, 1));
+    } finally {
+      vi.useRealTimers();
+    }
+    if (answer.status !== 'held') throw new Error('expected held');
+
+    const stored = await storedHold(answer.holdId);
+    const result = await client.db.execute(
+      sql`SELECT floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint AS ms`,
+    );
+    const databaseNow = Number((result.rows[0] as { ms: string }).ms);
+    expect(Math.abs(stored.createdAt.getTime() - databaseNow)).toBeLessThan(
+      60_000,
+    );
+    expect(stored.updatedAt.getTime()).toBe(stored.createdAt.getTime());
+    expect(stored.expiresAt.getTime() - stored.createdAt.getTime()).toBe(
+      10 * minute,
+    );
+  });
+
   it('prices a rate changed in settings', async () => {
     const bookable = await seedBookable(client.db);
     await client.db.update(settings).set({ taxRatePpm: 0 });
@@ -804,7 +833,7 @@ describe('sold out', () => {
       forAdults(bookable, 1),
     );
     const none = await holdData.reserveSpaces(
-      testDevice('guest-c'),
+      await testDevice('guest-c'),
       forAdults(bookable, 1),
     );
 
@@ -1026,6 +1055,51 @@ describe('the SQL pre-filter and isOpenHold', () => {
     // Open: the two active holds ending at .001 and .001999 (1 seat each) and the paying hold ending
     // at .001 (2 seats). A deadline within the millisecond of `at` (.000, .000500, .000999) is reached.
     expect(fromSql).toBe(1 + 1 + 2);
+  });
+
+  // `readOpenHeldSeats` re-judges the rows with `isOpenHold`, so a loose pre-filter shows only in
+  // the bounded fetch: the largest capacity of open holds plus one that must not be fetched.
+  it.each([
+    ['an active hold ending exactly at the time', 'active', '0 microseconds'],
+    [
+      'an active hold ending within the millisecond',
+      'active',
+      '500 microseconds',
+    ],
+    ['a paying hold ending exactly at the time', 'paying', '0 microseconds'],
+    [
+      'a paying hold ending within the millisecond',
+      'paying',
+      '999 microseconds',
+    ],
+  ] as const)('does not fetch %s', async (_name, status, offset) => {
+    const bookable = await seedBookable(client.db);
+    await client.db.execute(sql`
+        INSERT INTO holds (session_id, purpose, status, seats, device_key, ip_hash, expires_at, created_at, updated_at)
+        SELECT ${bookable.session.id}, 'booking', 'active', 1, ${hash('c')}, ${hash('d')},
+               ${at}::timestamptz + interval '5 minutes', ${createdAt}, ${createdAt}
+        FROM generate_series(1, ${maxAllocation})
+      `);
+    const edge = sql`${at.toISOString()}::timestamptz + ${offset}::interval`;
+    await insertHold(
+      client.db,
+      bookable.session.id,
+      status === 'active'
+        ? { createdAt, updatedAt: createdAt, expiresAt: edge }
+        : {
+            createdAt,
+            updatedAt: createdAt,
+            status: 'paying',
+            expiresAt: new Date('2026-11-01T11:56:00.000Z'),
+            payingUntil: edge,
+          },
+    );
+
+    await expect(
+      client.db.transaction((tx) =>
+        holdData.readOpenHeldSeats(tx, bookable.session.id, at),
+      ),
+    ).resolves.toBe(maxAllocation);
   });
 
   it('refuses more open holds than the largest capacity', async () => {

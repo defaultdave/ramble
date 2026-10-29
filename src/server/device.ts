@@ -7,7 +7,6 @@ import {
   deviceCookieName,
   isDeviceCookie,
 } from '@/lib/device';
-import { env } from '@/server/env';
 
 declare const deviceBrand: unique symbol;
 
@@ -29,14 +28,15 @@ function sha256(value: string): string {
 }
 
 /**
- * The device behind a cookie value and a forwarded-for header. A plain sha-256 of an address can be
- * reversed by trying every address, which the rate-limit keys already accept: a keyed hash would
- * need a new secret.
+ * The device behind a cookie value and a forwarded-for header. Only a value that passes
+ * `isDeviceCookie` becomes a device, so a caller cannot mint one from an arbitrary string. A plain
+ * sha-256 of an address can be reversed by trying every address, which the rate-limit keys already
+ * accept: a keyed hash would need a new secret.
  */
-export function deviceFrom(
-  cookieValue: string,
-  forwardedFor: string | null,
-): Device {
+function deviceFrom(cookieValue: string, forwardedFor: string | null): Device {
+  if (!isDeviceCookie(cookieValue)) {
+    throw new TypeError('A device comes only from a device cookie');
+  }
   return {
     deviceKey: sha256(cookieValue),
     ipHash: sha256(clientAddress(forwardedFor)),
@@ -58,8 +58,8 @@ export async function getDevice(): Promise<Device> {
     value = randomBytes(32).toString('base64url');
     jar.set(deviceCookieName, value, {
       httpOnly: true,
-      // Local development runs on plain http, as the dev mailbox's cookie does.
-      secure: env.NODE_ENV === 'production',
+      // Browsers accept a Secure cookie on http://localhost, so local runs keep working.
+      secure: true,
       sameSite: 'lax',
       path: '/',
       maxAge: deviceCookieMaxAgeSeconds,

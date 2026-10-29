@@ -18,7 +18,7 @@ async function botIdVerdict(): Promise<BotVerdict> {
 }
 
 // TODO(U-004a): call it on the sign-in request too, and on the guest forms (U-038, U-043). Each adds
-// its path to `botProtectedRoutes` in `src/lib/botCheck.ts`.
+// its path to `botProtectedRoutes` in `src/lib/botChallenge.ts`.
 /**
  * Asks BotID whether the request comes from a person. Call it on reserve, sign-in, and guest
  * forms only: checkout carries no third-party scripts (ADR 0003, ADR 0007), and a test fails the

@@ -1,7 +1,9 @@
 import { z } from 'zod';
+import type { BotCheckResult } from './botCheck';
 import { WriteIdSchema, experienceStatuses, priceKinds } from './catalog';
 import { MAX_LINES, type PricedOption, type PricingLines } from './pricing';
 import { maxAllocation, sessionStatuses } from './sessions';
+import { sha256HexDigits, type RateLimitDecision } from './rateLimits';
 import { settingsBounds } from './settings';
 
 export const holdPurposes = ['booking', 'gift_redemption'] as const;
@@ -38,7 +40,7 @@ export const holdLimits = {
 } as const;
 
 /** sha-256 in hex, the shape `rate_limits` keys already use. The database CHECKs on `holds` spell the same pattern. */
-export const deviceHashPattern = String.raw`^[0-9a-f]{64}$`;
+export const deviceHashPattern = `^${sha256HexDigits}$`;
 
 const millisecondsPerMinute = 60_000;
 const millisecondsPerDay = 86_400_000;
@@ -60,9 +62,11 @@ export const ReserveInputSchema = z
     giftToken: z.string().min(1).max(holdLimits.giftTokenChars).optional(),
   })
   .superRefine((input, context) => {
+    // Zod runs this after `.max()` fails too, so the length comes first.
     if (
+      input.items.length <= holdLimits.maxItems &&
       new Set(input.items.map((item) => item.priceOptionId)).size !==
-      input.items.length
+        input.items.length
     ) {
       context.addIssue({
         code: 'custom',
@@ -281,7 +285,7 @@ export function pausedRefusal(bookingsPaused: boolean): ReserveResult | null {
 
 /**
  * A gift redemption is refused until the gift branch exists, so the closed stub fails closed and
- * U-064a changes no schema.
+ * the gift branch changes no schema.
  * TODO(U-064a): the gift branch: lock the gift, check it is delivered and before `valid_until`.
  */
 export function giftRefusal(
@@ -351,6 +355,22 @@ export function blockedForRateLimit(
     reason: 'too_many_holds',
     until: new Date(at.getTime() + retryAfterSeconds * 1000).toISOString(),
   };
+}
+
+/**
+ * Why a reserve is refused before it reaches the data layer, or `null` to let it through: a bot is
+ * blocked with no end time, a device over its limit until the window frees a try. `tried` is `null`
+ * when no try was spent, which only a bot's request skips. `at` is the database clock.
+ */
+export function reserveBlock(
+  verdict: BotCheckResult,
+  tried: RateLimitDecision | null,
+  at: Date,
+): ReserveResult | null {
+  if (verdict === 'bot') return blockedForBot();
+  return tried === null || tried.allowed
+    ? null
+    : blockedForRateLimit(tried.retryAfterSeconds, at);
 }
 
 type ReleaseSubject = {

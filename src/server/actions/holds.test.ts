@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { testDevice } from '@/server/test-device';
+import { testDevice } from '../../../tests/deviceFixture';
 
 const mocks = vi.hoisted(() => ({
   checkBot: vi.fn(),
@@ -10,6 +10,10 @@ const mocks = vi.hoisted(() => ({
   getDevice: vi.fn(),
 }));
 
+vi.mock(
+  'next/headers',
+  async () => (await import('../../../tests/deviceFixture')).nextHeadersMock,
+);
 vi.mock('@/server/ports/rate-limit/bot-check', () => ({
   checkBot: mocks.checkBot,
 }));
@@ -38,7 +42,7 @@ import { releaseHold, reserveSpaces } from './holds';
 // - a failed bot lookup or a failed limit store rejects, and nothing is held (fail closed)
 // - release goes to the data layer with the calling device and the input
 
-const device = testDevice('reserve-door');
+const device = await testDevice('reserve-door');
 const input = {
   sessionId: '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
   items: [

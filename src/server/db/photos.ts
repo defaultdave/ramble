@@ -12,7 +12,6 @@ import {
   photoActorFor,
   photoLimits,
   photoStorageKey,
-  storedPhotoContentType,
   type GuestPhoto,
 } from '@/lib/photos';
 import {
@@ -23,6 +22,7 @@ import {
 } from '@/server/auth/caller';
 import { logger } from '@/server/monitoring/logger';
 import { ingestPhoto } from '@/server/photos/ingest';
+import { storeIngestedPhoto } from '@/server/photos/store';
 import type { StoragePort } from '@/server/ports/storage';
 import { guestVisible } from './catalog';
 import { db, dbRead } from './client';
@@ -186,14 +186,7 @@ export async function addPhoto(
   const ingested = await ingestPhoto(upload);
   const id = randomUUID();
   const storageKey = photoStorageKey(photo.experienceId, id);
-  const stored = await storage.put({
-    key: storageKey,
-    body: ingested.bytes,
-    contentType: storedPhotoContentType,
-  });
-  if (!stored.url)
-    throw new Error('A public photo came back without an address');
-  const url = stored.url;
+  const url = await storeIngestedPhoto(storage, storageKey, ingested);
 
   let row;
   try {

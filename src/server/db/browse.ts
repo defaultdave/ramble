@@ -40,6 +40,7 @@ import {
 import { upcomingWindow, type SessionWindow } from '@/lib/sessionWindow';
 import { guestVisible } from './catalog';
 import { dbRead } from './client';
+import { coverImage, coverSelection, guestCoverOf } from './photos';
 import {
   categories,
   experiences,
@@ -194,6 +195,7 @@ export async function listBrowseExperiences(
   const cursorRows: Promise<BrowseCursorRow[]> =
     after === null ? Promise.resolve([]) : visibleCursor(after);
 
+  const cover = guestCoverOf(experiences.id);
   const pageRows = dbRead
     .select({
       id: experiences.id,
@@ -203,9 +205,11 @@ export async function listBrowseExperiences(
       neighborhoodName: neighborhoods.name,
       durationMinutes: experiences.durationMinutes,
       linkOutUrl: experiences.linkOutUrl,
+      cover: coverSelection(cover),
     })
     .from(experiences)
     .innerJoin(neighborhoods, eq(neighborhoods.id, experiences.neighborhoodId))
+    .leftJoinLateral(cover, sql`true`)
     .where(
       and(
         shownInBrowse(),
@@ -220,7 +224,11 @@ export async function listBrowseExperiences(
 
   const [[cursor = null], rows] = await Promise.all([cursorRows, pageRows]);
   const { items, nextCursor } = splitPage(rows, browsePageSize);
-  return { cursor, items: await attachPriceOptions(items), nextCursor };
+  const withImages = items.map(({ cover: joined, ...row }) => ({
+    ...row,
+    image: coverImage(joined),
+  }));
+  return { cursor, items: await attachPriceOptions(withImages), nextCursor };
 }
 
 /**

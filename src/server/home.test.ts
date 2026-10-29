@@ -7,7 +7,7 @@ import { getHomeContent, getThisWeek } from './home';
 // - the home read uses the editorial profile and tags the home, the catalog, and each experience on a card
 // - the home read asks for the experiences its modules might show, and only those
 // - the this-week read uses the browse profile, reads the window of its key, and tags the catalog and each listed experience
-// - the this-week read looks up only the experiences with an open session, soonest first
+// - the this-week read looks up only the experiences with an open session, soonest first, and asks for their covers; the Picks experiences are read without covers
 // - the this-week read refuses a key that is not an ISO instant before asking the database anything, and asks for the candidate limit's worth
 // - a failed read throws only the kind of the failure, never the query or its values
 
@@ -87,7 +87,9 @@ describe('getHomeContent', () => {
   it('looks up the experiences the Picks modules might show, and no others', async () => {
     const content = await getHomeContent();
 
-    expect(db.experiences).toHaveBeenCalledExactlyOnceWith([id(1), id(2)]);
+    expect(db.experiences).toHaveBeenCalledExactlyOnceWith([id(1), id(2)], {
+      covers: false,
+    });
     expect(content.experiences).toEqual([{ id: id(1) }, { id: id(2) }]);
   });
 
@@ -139,7 +141,9 @@ describe('getThisWeek', () => {
 
     await getThisWeek(asOf);
 
-    expect(db.experiences).toHaveBeenCalledExactlyOnceWith([id(2)]);
+    expect(db.experiences).toHaveBeenCalledExactlyOnceWith([id(2)], {
+      covers: true,
+    });
   });
 
   it.each(['not a date', '2026-11-02', ''])(

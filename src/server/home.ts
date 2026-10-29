@@ -48,6 +48,7 @@ export async function getHomeContent(): Promise<HomeContent> {
       ]);
     const experiences = await listHomeExperiences(
       homeExperienceIds(modules, picks),
+      { covers: false },
     );
     return {
       modules,
@@ -88,7 +89,9 @@ export async function getThisWeek(asOf: string): Promise<ThisWeekContent> {
       window,
       homeLimits.thisWeekCandidates,
     );
-    const experiences = await listHomeExperiences(experienceIds);
+    const experiences = await listHomeExperiences(experienceIds, {
+      covers: true,
+    });
     return { experienceIds, experiences };
   });
   for (const experience of content.experiences) {

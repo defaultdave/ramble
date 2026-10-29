@@ -115,8 +115,12 @@ pnpm install                 # also runs `next typegen`, so route and cache-prof
 docker compose up -d --wait  # local Postgres 17
 cp .env.example .env.local   # APP_URL has a default; the two database URLs do not
 pnpm db:migrate
+SEED_TARGET=local pnpm db:seed   # optional: demo data for home and browse
+pnpm db:http                     # second terminal: prints the NEON_HTTP_ENDPOINT line for .env.local
 pnpm dev
 ```
+
+Guest pages read through Neon's HTTP driver, which cannot reach the Docker Postgres, so without `NEON_HTTP_ENDPOINT` home and browse show their error state locally. `pnpm db:http` serves that protocol in front of `DATABASE_URL` (local databases only, port 4444 or `NEON_HTTP_PORT`); paste the address it prints into `.env.local` and restart the app. It works the same under `pnpm build && pnpm start`. See [`docs/runbooks/seed.md`](docs/runbooks/seed.md).
 
 The gates CI runs on every PR (`.github/workflows/ci.yml`), each a script you can run locally: `pnpm format:check`, `lint`, `typecheck`, `test`, `build`, `knip`, and `e2e` (Playwright; run `pnpm exec playwright install chromium` once). Storybook has three local scripts: `pnpm storybook` (dev server), `pnpm storybook:build`, and `pnpm storybook:test` (runs the stories with the a11y gate); its CI job is landing separately. `pnpm smoke` runs the same Playwright smoke of every route against the built app; the route list is `e2e/routes.ts`, one row per route. Environment variables are read and validated in one place, `src/server/env.ts`. Import boundaries between `src/app`, `src/components`, `src/lib`, and `src/server` are enforced by `pnpm lint`; `tests/lint-boundaries.test.ts` fails if a rule is weakened. Secrets, and how to rotate them, are in [`docs/runbooks/secret-rotation.md`](docs/runbooks/secret-rotation.md). Logging, error tracking, and how to raise an alert are in [`docs/runbooks/alerting.md`](docs/runbooks/alerting.md). The two-tier Content Security Policy (enforced with a nonce on dynamic routes, report-only on cached ones), the security header set, and `security.txt` are in [`docs/runbooks/security-headers.md`](docs/runbooks/security-headers.md). The browse address grammar, its cache, and its failure state are in [`docs/runbooks/browse.md`](docs/runbooks/browse.md).
 

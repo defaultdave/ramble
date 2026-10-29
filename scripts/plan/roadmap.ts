@@ -6,6 +6,7 @@
 //      bun scripts/plan/roadmap.ts
 // status.json is the PM's digest of STATUS.md and DECISIONS.md, updated by hand each session.
 
+import { statusProblems } from "./roadmap-status";
 import { siteDir, writeBlock } from "./units";
 
 const site = siteDir();
@@ -15,15 +16,18 @@ const inline = (json: string) => JSON.stringify(JSON.parse(json)).replace(/</g, 
 
 type Dates = { p50: string; p90: string };
 type Scenario = { name: string; prototype: { dates: Dates }; finish: { dates: Dates } };
-type Item = { title: string; detail?: string; recommendation?: string };
+type Decision = { title: string; recommendation: string };
+type Action = { title: string; detail: string };
 type Held = { what: string; waitingOn: string };
-type Status = { asOf: string; headline: string; decisionsNeeded: Item[]; actionsForDave: Item[]; heldUp: Held[] };
+type Status = { asOf: string; headline: string; decisionsNeeded: Decision[]; actionsForDave: Action[]; heldUp: Held[] };
 
 const template = await read("template.html");
 if (!template.includes("__SCHEDULE__") || !template.includes("__STATUS__"))
   throw new Error("template.html needs the __SCHEDULE__ and __STATUS__ placeholders");
 const scheduleJson = await read("schedule.json");
 const statusJson = await read("status.json");
+const problems = statusProblems(JSON.parse(statusJson));
+if (problems.length) throw new Error(`status.json would render blank on the page; missing or not text: ${problems.join(", ")}`);
 await Bun.write(`${site}/index.html`, template.replace("__SCHEDULE__", inline(scheduleJson)).replace("__STATUS__", inline(statusJson)));
 
 const day = (iso: string) =>
@@ -48,11 +52,11 @@ await writeBlock(
     "",
     "**Next for Dave**",
     "",
-    list(status.actionsForDave.map((a) => `${a.title}. ${a.detail ?? ""}`.trim())),
+    list(status.actionsForDave.map((a) => `${a.title}. ${a.detail}`.trim())),
     "",
     "**Decisions needed**",
     "",
-    list(status.decisionsNeeded.map((d) => `${d.title}.${d.recommendation ? ` Recommended: ${d.recommendation}.` : ""}`)),
+    list(status.decisionsNeeded.map((d) => `${d.title}. Recommended: ${d.recommendation}.`)),
     "",
     "**Held up**",
     "",

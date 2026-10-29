@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildTokensCss,
   cssName,
+  lineHeightRatio,
   readTokenSource,
 } from '../scripts/tokens/build';
 
@@ -80,7 +81,7 @@ describe('token modes', () => {
     const css = await readFile(COMMITTED_CSS, 'utf8');
     const desktop = css.slice(css.indexOf('@media (min-width'));
     expect(desktop).not.toContain('--font-size-body-m');
-    expect(desktop).toContain('--font-line-height-heading-l: 38px');
+    expect(desktop).toContain('--font-line-height-heading-l: 1.1875');
   });
 
   it('derives elevation from the shadow color token', async () => {
@@ -88,5 +89,37 @@ describe('token modes', () => {
     expect(css).toContain(
       '--elevation-2: 0px 4px 12px 0px var(--color-shadow)',
     );
+  });
+});
+
+describe('line height tokens', () => {
+  it.each([
+    [44, 40, '1.1'],
+    [24, 16, '1.5'],
+    [20, 14, '1.4286'],
+    [28, 18, '1.5556'],
+    [68, 64, '1.0625'],
+  ])('%ipx over %ipx is the ratio %s', (lineHeight, fontSize, ratio) => {
+    expect(lineHeightRatio(lineHeight, fontSize)).toBe(ratio);
+  });
+
+  it.each([
+    [0, 16],
+    [24, 0],
+    [-1, 16],
+    [Number.NaN, 16],
+  ])('refuses %f over %f', (lineHeight, fontSize) => {
+    expect(() => lineHeightRatio(lineHeight, fontSize)).toThrow();
+  });
+
+  it('emits every line height as a unitless ratio in both blocks', async () => {
+    const css = await readFile(COMMITTED_CSS, 'utf8');
+    const declarations = [
+      ...css.matchAll(/(--font-line-height-[a-z-]+): ([^;]+);/g),
+    ];
+    expect(declarations.length).toBeGreaterThanOrEqual(10);
+    for (const [, , value] of declarations) {
+      expect(value).toMatch(/^\d+(\.\d+)?$/);
+    }
   });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Category, Neighborhood } from './catalog';
+import type { Category, Neighborhood } from '../catalog';
+import { demoCheckoutPath } from '../demoCheckout';
 import {
   ageLabel,
   buildExperiencePage,
@@ -15,12 +16,11 @@ import {
   metaDescription,
   placeOf,
   priceLines,
-  textLines,
   weatherTerms,
   type ExperiencePageInput,
-} from './experiencePage';
-import { experience, id, place } from './experiencePage.fixtures';
-import type { GuestPhoto } from './photos';
+} from './experience';
+import { experience, id, place } from './experience.fixtures';
+import type { GuestPhoto } from '../photos';
 
 // Behaviours under test, one per decision, branch or risk:
 // - an age rule reads in words, and a rule missing the age it needs is refused rather than guessed
@@ -293,17 +293,8 @@ describe('mapsHref', () => {
   });
 });
 
-describe('textLines and includedItems', () => {
-  it('has one entry per non-blank line, trimmed', () => {
-    expect(textLines('  one \n\n two\n   \nthree')).toEqual([
-      'one',
-      'two',
-      'three',
-    ]);
-  });
-
+describe('includedItems', () => {
   it('has none for no text', () => {
-    expect(textLines(null)).toEqual([]);
     expect(includedItems('')).toEqual([]);
   });
 
@@ -411,6 +402,10 @@ describe('buildExperiencePage', () => {
       })?.badges,
     ).toEqual([{ tone: 'yellow', label: 'Kids' }]);
     expect(build({ experience: experience(indoor) })?.badges).toEqual([]);
+  });
+
+  it('books through the demo checkout with the experience id', () => {
+    expect(build()?.bookHref).toBe(demoCheckoutPath(id(1)));
   });
 
   it('goes to the gift checkout when gifts are on, and has no gift entry when they are off', () => {

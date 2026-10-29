@@ -16,6 +16,25 @@ SEED_TARGET=staging SEED_HOST=<the host in DATABASE_URL> pnpm db:seed --scale=40
 
 It ends by reading the database back and running every probe of the coverage matrix. A gap exits with code 1 and names the probe.
 
+## Reading the seeded data in a local app
+
+The seed writes through `pg`, but guest pages (home, browse, experience) read through Neon's HTTP driver, which cannot reach the Docker Postgres. Without help, a local `pnpm dev` or `pnpm build && pnpm start` shows the error state on those pages. Run an HTTP stand-in for Neon's endpoint in front of the local database:
+
+```
+pnpm db:http        # needs DATABASE_URL (from .env.local, or the shell); prints the line to set
+```
+
+Put the printed line in `.env.local` and restart the app:
+
+```
+NEON_HTTP_ENDPOINT=http://127.0.0.1:4444/sql
+```
+
+- `pnpm db:http` is the same shim the database tests use (`tests/db/harness.ts`). It listens on `127.0.0.1` only, port 4444 unless `NEON_HTTP_PORT` says otherwise, and refuses a `DATABASE_URL` that is not on this machine. It runs any SQL it is sent, so stop it when you are done; it also refuses requests that carry an `Origin` header or a non-local `Host`, which keeps a web page from driving it.
+- `NEON_HTTP_ENDPOINT` is validated in `src/server/env.ts`: an `http` URL on `localhost`, `127.0.0.1`, or `::1`. Any other host fails at startup, and so does any value when `VERCEL_ENV` is `production` or `preview`. The refusal never prints the value. Leave it unset everywhere else.
+- When set, `dbRead` sends its queries to that address through `neonConfig.fetchEndpoint`. The pooled `db` writer is unchanged.
+- Pages cached by a running server keep serving until they expire (see Caches); restart the app after seeding.
+
 ## What it refuses
 
 The seed fails closed. It runs only when all of these hold, and it checks them before it opens a connection:
@@ -62,7 +81,26 @@ The seed still refuses `NODE_ENV=production`, an unreadable `DATABASE_URL`, and 
 | Categories, neighborhoods, hosts, experiences, price options | Written to the schema directly: the data layer has no write contract for them yet. The Zod schemas the app reads with validate every fixture first, and the database CHECKs backstop them |
 | Seats sold on the few sessions that must be nearly full or sold out | Written to the schema directly: seats sold otherwise move only with orders, which do not exist yet. A session that has sold more than the plan is never lowered |
 
-It writes no photo rows yet (U-021b seeds the photo pool), never touches the settings row (so the tax rate the settings migration seeds stays as it is), and writes no help articles.
+Generated test photos for the curated experiences are written as the last step (see Test photos). It never touches the settings row (so the tax rate the settings migration seeds stays as it is), and writes no help articles.
+
+## Test photos
+
+After the coverage matrix, the seed gives each curated experience 3 to 5 generated photos: a labelled colour gradient, drawn by the code, with no third-party art. Position 0 is the cover. Every experience holds one source of each size class (1,600, 1,920, and 2,400 px on the long edge) in its first three positions, and the fourth and fifth are portrait. Ingest refuses a source under 1,600 px (PRD-50), so 1,600 px is the smallest source. Each image goes through the same ingest and storage port an upload uses, then a `photos` row is written with alt text and the `ramble_owned` rights basis. The scale fixture gets no photos.
+
+A rerun writes only what is missing, under the same ids and keys: a row that exists is left alone, whoever wrote it, and a file left without its row by a stopped run is replaced, unless a row owns its key. Each experience's files are stored first and its rows written in one transaction, and only rows the database took are counted. Do not run the seed concurrently with itself: two photo steps can race for the same positions, and the one that loses removes its file. The step ends with a coverage line, and a curated experience with no cover, fewer than 3 photos, or a photo without alt text exits the seed with code 1 and names it.
+
+Only `STORAGE_PROVIDER=vercel-blob` seeds photos, on any target. With `fake` (the default) the step is skipped with a line saying so, on every target, `local` included: the fake's addresses are not displayable, and `next/image` throws on a host it is not configured for, so a row pointing at one would break every page that draws the photo in `next dev`. The fake stays for the unit and database tests, which hand it to the step directly.
+
+Creating the store and running the step, once:
+
+```
+vercel blob create-store ramble-photos --access public
+# In the target Vercel environment set STORAGE_PROVIDER=vercel-blob and BLOB_PUBLIC_READ_WRITE_TOKEN
+# (BLOB_PRIVATE_READ_WRITE_TOKEN is required with it), then redeploy: the store id is read at build.
+# Run the seed as above with the same two storage variables in the shell, passed on the command line.
+```
+
+The seed refuses production as it always does, so a production run needs `SEED_TARGET=production-demo`. Photos are served from `<storeId>.public.blob.vercel-storage.com/public/photos/` through `/_next/image`.
 
 ## Rerunning
 

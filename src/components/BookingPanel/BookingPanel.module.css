@@ -99,9 +99,7 @@
   align-items: center;
   align-self: flex-start;
   min-block-size: var(--size-touch-target);
-  margin-block: calc(
-    (var(--font-line-height-label) - var(--size-touch-target)) / 2
-  );
+  margin-block: calc((1lh - var(--size-touch-target)) / 2);
   color: var(--color-text-link);
   font-size: var(--font-size-label);
   line-height: var(--font-line-height-label);

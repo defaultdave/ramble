@@ -1,11 +1,11 @@
 import { useId } from 'react';
-import type { HomeCard } from '@/lib/home';
-import { HomeCardItem } from './HomeCardItem';
+import { ExperienceCardItem } from '@/components/ExperienceCard';
+import type { ExperienceCard } from '@/lib/experienceCards';
 import styles from './HomeModules.module.css';
 
 export type ThisWeekSectionProps = {
   heading: string;
-  cards: readonly HomeCard[];
+  cards: readonly ExperienceCard[];
 };
 
 export function ThisWeekSection({ heading, cards }: ThisWeekSectionProps) {
@@ -20,7 +20,11 @@ export function ThisWeekSection({ heading, cards }: ThisWeekSectionProps) {
         <ul className={styles.stack} role="list">
           {cards.map((card) => (
             <li key={card.id}>
-              <HomeCardItem card={card} layout="horizontal" />
+              <ExperienceCardItem
+                card={card}
+                layout="horizontal"
+                headingLevel={3}
+              />
             </li>
           ))}
         </ul>

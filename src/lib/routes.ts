@@ -7,21 +7,19 @@ export const browsePath = '/new-york/browse';
 
 // ---- Experiences and the guide ----
 
-type ExperienceRef = { slug: string; id: string };
-
 /** The address of an experience page: `/experiences/[slug]-[id]`. */
-export function experiencePath({ slug, id }: ExperienceRef): string {
+export function experiencePath({ slug, id }: ExperienceAddress): string {
   return `/experiences/${slug}-${id}`;
 }
 
 /** The address of a guide entry: `/guide/[slug]-[id]`. */
-export function guidePath({ slug, id }: ExperienceRef): string {
+export function guidePath({ slug, id }: ExperienceAddress): string {
   return `/guide/${slug}-${id}`;
 }
 
 /** A card links to the experience page, or to the guide entry when the experience is guide only. */
 export function experienceCardPath(
-  experience: ExperienceRef & { status: string },
+  experience: ExperienceAddress & { status: string },
 ): string {
   return experience.status === 'guide_only'
     ? guidePath(experience)
@@ -72,6 +70,11 @@ export const neighborhoodPath = (slug: string) =>
 /** The gift checkout for one experience. The page that answers it is the gift checkout unit's. */
 export const giftCheckoutPath = (experienceId: string) =>
   `/gifts/checkout/${experienceId}`;
+
+// ---- Checkout and orders ----
+
+export const checkoutPath = (holdId: string) => `/checkout/${holdId}`;
+export const orderPath = (reference: string) => `/orders/${reference}`;
 
 // ---- Help and legal ----
 

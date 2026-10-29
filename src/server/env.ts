@@ -35,6 +35,8 @@ const hostname = z
     'not a hostname',
   );
 
+const loopbackHosts = ['localhost', '127.0.0.1', '[::1]', '::1'];
+
 const httpsUrl = z.url({ protocol: /^https$/ });
 
 const schema = z
@@ -52,6 +54,9 @@ const schema = z
     SEED_TARGET: optional(z.enum(seedTargets)),
     // The database host the seed may write to; it must equal the DATABASE_URL host for every target but local.
     SEED_HOST: optional(hostname),
+    // Sends the Neon HTTP driver (dbRead) to a local stand-in for Neon's endpoint, so a local build can
+    // read the docker-compose database (`pnpm db:http`). Refused in a Vercel production or preview deployment.
+    NEON_HTTP_ENDPOINT: optional(z.url({ protocol: /^http$/ })),
     EMAIL_MODE: z.enum(emailModes).default('sink'),
     EMAIL_PROVIDER: z.enum(emailAdapterNames).default('fake'),
     EMAIL_ALLOWLIST: EmailAllowlistSchema.default([]),
@@ -87,6 +92,24 @@ const schema = z
   .superRefine((value, ctx) => {
     for (const { name, message } of storageSettingIssues(value)) {
       ctx.addIssue({ code: 'custom', path: [name], message });
+    }
+  })
+  .superRefine((value, ctx) => {
+    if (!value.NEON_HTTP_ENDPOINT) return;
+    // The messages never repeat the value: it may carry credentials.
+    if (value.VERCEL_ENV === 'production' || value.VERCEL_ENV === 'preview') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['NEON_HTTP_ENDPOINT'],
+        message: 'Must not be set in a production or preview deployment',
+      });
+    }
+    if (!loopbackHosts.includes(new URL(value.NEON_HTTP_ENDPOINT).hostname)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['NEON_HTTP_ENDPOINT'],
+        message: 'Must point at localhost, 127.0.0.1, or ::1',
+      });
     }
   })
   .superRefine((value, ctx) => {

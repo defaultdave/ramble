@@ -1,7 +1,7 @@
 /* Every module is a full-width band with an inner column capped at the content width. */
 .section {
   box-sizing: border-box;
-  padding: var(--space-8) var(--space-6);
+  padding: var(--space-8) var(--size-gutter);
   font-family: var(--font-family-body);
   color: var(--color-text-primary);
 }
@@ -81,7 +81,6 @@
 }
 
 .link:focus-visible,
-.pill:focus-visible,
 .action:focus-visible {
   outline: 2px solid transparent;
   box-shadow:
@@ -95,20 +94,25 @@
 .pills {
   display: flex;
   gap: var(--space-4);
-  margin: 0 calc(-1 * var(--space-6));
-  padding: var(--space-1) var(--space-6);
+  margin: 0 calc(-1 * var(--size-gutter));
+  padding: var(--space-1) var(--size-gutter);
   list-style: none;
   overflow-x: auto;
   scroll-snap-type: x proximity;
-  scroll-padding-inline: var(--space-6);
+  scroll-padding-inline: var(--size-gutter);
 }
 
 .rail > li,
 .pills > li {
-  flex: 0 0 85%;
   min-width: 0;
   max-width: calc(var(--space-16) * 6);
   scroll-snap-align: start;
+}
+
+/* One card fills the column and --space-2 of the next shows past the gutter. The percentage is the
+   rail's content box (the column); the gutter is added back because the rail bleeds into it. */
+.rail > li {
+  flex: 0 0 calc(100% + var(--size-gutter) - var(--space-4) - var(--space-2));
 }
 
 .pills {
@@ -118,27 +122,6 @@
 .pills > li {
   flex: none;
   max-width: none;
-}
-
-.pill {
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--size-touch-target);
-  padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-pill);
-  background: var(--color-bg-surface);
-  font-size: var(--font-size-label);
-  line-height: var(--font-line-height-label);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.pill:hover {
-  background: var(--color-bg-sunken);
 }
 
 /* Ramble Picks: heading and "See all" share a row from tablet up and stack on a phone. */

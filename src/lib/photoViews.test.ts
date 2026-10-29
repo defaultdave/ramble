@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { idWithLetters } from './experiencePage.fixtures';
+import { idWithLetters } from './pages/experience.fixtures';
 import type { GuestPhoto } from './photos';
 import { photoLimits } from './photos';
 import {

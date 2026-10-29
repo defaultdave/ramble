@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SeedStepError } from './decide';
 import { curated } from './fixtures';
-import { paragraphs } from './richText';
+import { paragraphs } from '@/lib/richText/paragraphs';
 import type { CuratedFixtures, ExperienceFixture } from './types';
 import { assertValidFixtures, fixtureIssues } from './validate';
 

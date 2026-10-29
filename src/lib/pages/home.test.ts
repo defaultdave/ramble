@@ -1,44 +1,34 @@
 import { describe, expect, it } from 'vitest';
 import { ZodError } from 'zod';
-import { toBrowseCard } from './browse';
-import type { Collection, HomeModule } from './editorial';
+import type { Collection, HomeModule } from '../editorial';
+import type { CardExperience } from '../experienceCards';
 import {
   buildHomePage,
-  bannerText,
-  cardsInOrder,
-  docOfText,
+  collectionModuleCopy,
   homeCopy,
   homeCardIds,
   homeExperienceIds,
   HomeExperienceIdsSchema,
   homeLimits,
   thisWeekExperienceIds,
-  thisWeekWindow,
-  toHomeCard,
   withHomeCovers,
-  type HomeExperience,
   type HomeInput,
   type HomeModuleView,
   type ThisWeekSession,
 } from './home';
-import { minuteAsOf } from './time';
+import { paragraphs } from '../richText/paragraphs';
+import { upcomingWindow } from '../sessionWindow';
 
 // Behaviours under test, one per decision, branch or risk:
-// - the cache key is the minute; the week window runs a week from it; a key that is not the ISO instant minuteAsOf writes is refused
 // - the browse address writes only the parameters that are set, escaped, in the grammar order
-// - an experience address names the area by its status
-// - a card price comes only from options that take a space, so a kids class with a free accompanying adult reads the child price
-// - one experience gets the same price on a home card and a browse card
-// - a card is left out when it cannot be shown: no price to book, or no link out
-// - cards follow the order given, skip what is missing, and stop at the limit
 // - "On this week" lists bookable experiences with an open session in the window, soonest first, once each
-//   (a started, late, full, or guide-only session does not count; the edges of the window are exact)
+//   (a started, late, full, or guide-only session does not count; a start exactly at the window's opening counts and one exactly at its end does not)
 // - the experiences a Picks module may show are looked up once, bounded per collection and in all
 // - each module shows its own copy or the default, and is left out whole when it has nothing to show
 // - the first Picks module alone carries the anchor
 // - the page is empty when no module shows, and needs its own title when there is no hero
 // - a card starts with no photo; the page's card IDs are those of its Picks and this-week cards, each once, and none for an empty page
-// - a cover is set on the cards of Picks and this-week modules only, and a card with no cover keeps none
+// - a cover read is set on the Picks cards only; a this-week card keeps the cover it arrived with, and a card with none keeps none
 // - the banner is its trimmed text, or nothing when there is none
 
 const id = (n: number) =>
@@ -46,8 +36,8 @@ const id = (n: number) =>
 
 function experience(
   n: number,
-  overrides: Partial<HomeExperience> = {},
-): HomeExperience {
+  overrides: Partial<CardExperience> = {},
+): CardExperience {
   return {
     id: id(n),
     slug: `thing-${String(n)}`,
@@ -56,7 +46,7 @@ function experience(
     neighborhoodName: 'Greenpoint',
     durationMinutes: 120,
     linkOutUrl: null,
-    priceOptions: [{ kind: 'adult', priceMinor: 7000, usesSpace: true }],
+    priceOptions: [{ priceMinor: 7000, usesSpace: true }],
     ...overrides,
   };
 }
@@ -78,30 +68,7 @@ function session(
   };
 }
 
-const window = thisWeekWindow(date.toISOString());
-
-describe('thisWeekWindow', () => {
-  it('runs the window from the key to seven days later', () => {
-    expect(window.from.toISOString()).toBe('2026-11-02T15:00:00.000Z');
-    expect(window.to.toISOString()).toBe('2026-11-09T15:00:00.000Z');
-  });
-
-  it.each([
-    ['text', 'not a date'],
-    ['a date with no time', '2026-11-02'],
-    ['a time with an offset', '2026-11-02T15:00:00.000+02:00'],
-    ['an empty key', ''],
-    ['a month that does not exist', '2026-13-02T15:00:00.000Z'],
-  ])('refuses a key that is %s', (_name, key) => {
-    expect(() => thisWeekWindow(key)).toThrow(ZodError);
-  });
-
-  it('accepts the key minuteAsOf writes', () => {
-    expect(() =>
-      thisWeekWindow(minuteAsOf(new Date('2026-11-02T15:00:59.999Z'))),
-    ).not.toThrow();
-  });
-});
+const window = upcomingWindow(date.toISOString(), homeLimits.thisWeekDays);
 
 describe('HomeExperienceIdsSchema', () => {
   it('accepts up to the limit of IDs', () => {
@@ -129,158 +96,6 @@ describe('homeLimits', () => {
   });
 });
 
-describe('toHomeCard', () => {
-  it('shows a bookable experience with its neighborhood, length, and price', () => {
-    expect(toHomeCard(experience(1))).toEqual({
-      id: id(1),
-      title: 'Thing 1',
-      meta: 'Greenpoint · 2\u00a0hr',
-      href: `/experiences/thing-1-${id(1)}`,
-      image: null,
-      kind: 'bookable',
-      price: '$70',
-    });
-  });
-
-  it('prices a kids class from the child, not from the free accompanying adult', () => {
-    const kidsClass = experience(1, {
-      priceOptions: [
-        { kind: 'adult', priceMinor: 0, usesSpace: false },
-        { kind: 'child', priceMinor: 4500, usesSpace: true },
-      ],
-    });
-    expect(toHomeCard(kidsClass)).toMatchObject({
-      kind: 'bookable',
-      price: '$45',
-    });
-  });
-
-  it('leaves the length out of the meta when there is none', () => {
-    expect(toHomeCard(experience(1, { durationMinutes: null }))?.meta).toBe(
-      'Greenpoint',
-    );
-  });
-
-  it('shows a guide entry with its link out and no price', () => {
-    expect(
-      toHomeCard(
-        experience(1, {
-          status: 'guide_only',
-          linkOutUrl: 'https://host.example/kayak',
-        }),
-      ),
-    ).toEqual({
-      id: id(1),
-      title: 'Thing 1',
-      meta: 'Greenpoint · 2\u00a0hr',
-      href: `/guide/thing-1-${id(1)}`,
-      image: null,
-      kind: 'guide-only',
-      hostHref: 'https://host.example/kayak',
-    });
-  });
-
-  it.each([
-    ['a bookable experience with no price', { priceOptions: [] }],
-    [
-      'a bookable experience whose only option takes no space',
-      {
-        priceOptions: [
-          { kind: 'adult' as const, priceMinor: 0, usesSpace: false },
-        ],
-      },
-    ],
-    ['a guide entry with no link out', { status: 'guide_only' as const }],
-  ])('leaves out %s', (_name, overrides) => {
-    expect(toHomeCard(experience(1, overrides))).toBeNull();
-  });
-});
-
-describe('the price on a home card and on a browse card', () => {
-  it.each([
-    [
-      'a kids class with a free accompanying adult',
-      [
-        { kind: 'adult', priceMinor: 0, usesSpace: false },
-        { kind: 'child', priceMinor: 4500, usesSpace: true },
-      ],
-    ],
-    [
-      'an adult and a child price',
-      [
-        { kind: 'adult', priceMinor: 8500, usesSpace: true },
-        { kind: 'child', priceMinor: 4500, usesSpace: true },
-      ],
-    ],
-    ['one price', [{ kind: 'adult', priceMinor: 7000, usesSpace: true }]],
-    [
-      'a free option that takes a space',
-      [
-        { kind: 'adult', priceMinor: 0, usesSpace: true },
-        { kind: 'child', priceMinor: 500, usesSpace: true },
-      ],
-    ],
-    [
-      'no option that takes a space',
-      [{ kind: 'adult', priceMinor: 0, usesSpace: false }],
-    ],
-    ['no option', []],
-  ] satisfies [string, HomeExperience['priceOptions']][])(
-    'agree for %s',
-    (_name, priceOptions) => {
-      const home = toHomeCard(experience(1, { priceOptions }));
-      const browse = toBrowseCard({
-        ...experience(1),
-        priceOptions: priceOptions.map(({ priceMinor, usesSpace }) => ({
-          priceMinor,
-          usesSpace,
-        })),
-      });
-      const priceOf = (card: { kind: string; price?: string } | null) =>
-        card?.kind === 'bookable' ? card.price : null;
-      expect(priceOf(home)).toBe(priceOf(browse));
-    },
-  );
-});
-
-describe('cardsInOrder', () => {
-  const all = [experience(1), experience(2), experience(3), experience(4)];
-
-  it('follows the order of the IDs, not of the experiences', () => {
-    expect(
-      cardsInOrder([id(3), id(1), id(2)], all, 10).map((card) => card.id),
-    ).toEqual([id(3), id(1), id(2)]);
-  });
-
-  it('skips an ID with no experience and one that cannot be a card', () => {
-    const noPrice = experience(5, { priceOptions: [] });
-    expect(
-      cardsInOrder([id(9), id(5), id(2)], [...all, noPrice], 10).map(
-        (card) => card.id,
-      ),
-    ).toEqual([id(2)]);
-  });
-
-  it('stops at the limit', () => {
-    expect(
-      cardsInOrder(
-        all.map((e) => e.id),
-        all,
-        2,
-      ),
-    ).toHaveLength(2);
-  });
-
-  it('takes cards past one that is skipped, to fill the limit', () => {
-    const noPrice = experience(5, { priceOptions: [] });
-    expect(
-      cardsInOrder([id(5), id(1), id(2)], [...all, noPrice], 2).map(
-        (card) => card.id,
-      ),
-    ).toEqual([id(1), id(2)]);
-  });
-});
-
 describe('thisWeekExperienceIds', () => {
   it('lists the soonest session first, each experience once', () => {
     const sessions = [
@@ -304,8 +119,8 @@ describe('thisWeekExperienceIds', () => {
 
   it.each([
     ['one that has started', session(1, -1)],
-    ['one that starts exactly now', session(1, 0)],
     ['one past the end of the week', session(1, 7 * 24 * 60 + 1)],
+    ['one that starts exactly at the end of the week', session(1, 7 * 24 * 60)],
     ['one with no space left', session(1, 60, { seatsSold: 10 })],
     ['one oversold', session(1, 60, { seatsSold: 12 })],
     [
@@ -318,7 +133,7 @@ describe('thisWeekExperienceIds', () => {
 
   it.each([
     ['one a minute from now', session(1, 1)],
-    ['one that starts exactly at the end of the week', session(1, 7 * 24 * 60)],
+    ['one that starts exactly now', session(1, 0)],
     ['one with a single space left', session(1, 60, { seatsSold: 9 })],
   ])('counts %s', (_name, included) => {
     expect(thisWeekExperienceIds([included], window, 10)).toEqual([id(1)]);
@@ -378,6 +193,7 @@ function collection(
 const baseInput: HomeInput = {
   modules: [],
   picks: [],
+  giftGuide: null,
   categories: [
     { id: id(700), slug: 'cooking', name: 'Cooking' },
     { id: id(701), slug: 'wine', name: 'Wine and cocktails' },
@@ -447,13 +263,13 @@ describe('buildHomePage hero', () => {
       id: id(901),
       eyebrow: homeCopy.heroEyebrow,
       heading: homeCopy.heroHeading,
-      body: docOfText(homeCopy.heroBody),
+      body: paragraphs(homeCopy.heroBody),
       neighborhoods: [{ slug: 'dumbo', name: 'DUMBO' }],
     });
   });
 
   it('shows the heading and body staff wrote', () => {
-    const body = docOfText('Pasta, mostly.');
+    const body = paragraphs('Pasta, mostly.');
     const [hero] = modulesOf({
       modules: [module(1, 'hero_search', { heading: 'Eat more', body })],
     });
@@ -466,7 +282,7 @@ describe('buildHomePage hero', () => {
         module(1, 'hero_search', { body: { type: 'doc', content: [] } }),
       ],
     });
-    expect(hero).toMatchObject({ body: docOfText(homeCopy.heroBody) });
+    expect(hero).toMatchObject({ body: paragraphs(homeCopy.heroBody) });
   });
 });
 
@@ -600,32 +416,105 @@ describe('buildHomePage picks', () => {
   });
 });
 
+describe('collectionModuleCopy', () => {
+  it.each([
+    ['the module heading wins', 'Mine', 'Mine'],
+    ['the collection title otherwise', null, 'Pick 1'],
+  ])('uses %s', (_name, heading, expected) => {
+    expect(collectionModuleCopy({ heading }, collection(1, [1])).heading).toBe(
+      expected,
+    );
+  });
+
+  it('takes the collection summary, which may be empty', () => {
+    expect(collectionModuleCopy({ heading: null }, collection(1, [1]))).toEqual(
+      { heading: 'Pick 1', summary: 'About pick 1' },
+    );
+    expect(
+      collectionModuleCopy(
+        { heading: null },
+        collection(1, [1], { summary: null }),
+      ).summary,
+    ).toBeNull();
+  });
+});
+
 describe('buildHomePage gift guide', () => {
-  it('shows the sponsor line and a link to the gift guide', () => {
-    const [view] = modulesOf({ modules: [module(1, 'gift_guide')] });
+  const guide = collection(5, [1, 2, 3, 4, 5, 6, 7], {
+    kind: 'gift_guide',
+    title: 'Give a Saturday',
+    summary: 'They pick the date.',
+  });
+  const guideModule = (overrides: Partial<HomeModule> = {}) =>
+    module(1, 'gift_guide', { collectionId: guide.id, ...overrides });
+
+  it('takes its collection title and summary, with a link and the sponsor line', () => {
+    const [view] = modulesOf({
+      modules: [guideModule()],
+      giftGuide: guide,
+    });
     expect(view).toEqual({
       kind: 'gift_guide',
       id: id(901),
       eyebrow: homeCopy.giftGuideEyebrow,
-      heading: homeCopy.giftGuideHeading,
-      body: null,
+      heading: 'Give a Saturday',
+      body: paragraphs('They pick the date.'),
       action: { href: '/gifts', label: homeCopy.giftGuideAction },
       sponsor: homeCopy.giftGuideSponsor,
     });
   });
 
-  it('shows the heading and body staff wrote', () => {
-    const body = docOfText('Give a Saturday.');
+  it('shows the heading and body staff wrote over the collection copy', () => {
+    const body = paragraphs('Give a Saturday.');
     const [view] = modulesOf({
-      modules: [module(1, 'gift_guide', { heading: 'Not a sweater', body })],
+      modules: [guideModule({ heading: 'Not a sweater', body })],
+      giftGuide: guide,
     });
     expect(view).toMatchObject({ heading: 'Not a sweater', body });
+  });
+
+  it('has no body when the collection has no summary', () => {
+    const [view] = modulesOf({
+      modules: [guideModule()],
+      giftGuide: { ...guide, summary: null },
+    });
+    expect(view).toMatchObject({ heading: 'Give a Saturday', body: null });
+  });
+
+  it.each([
+    ['no collection to take copy from', guideModule(), null],
+    [
+      'a module that names another collection',
+      guideModule({ collectionId: id(899) }),
+      guide,
+    ],
+  ])('is left out for %s when it has no heading of its own', (_n, m, g) => {
+    expect(modulesOf({ modules: [m], giftGuide: g })).toEqual([]);
+  });
+
+  it('keeps its own heading when no collection is published', () => {
+    const [view] = modulesOf({
+      modules: [guideModule({ heading: 'Gifts' })],
+    });
+    expect(view).toMatchObject({ heading: 'Gifts', body: null });
+  });
+
+  it('does not change the count the Picks link shows', () => {
+    const [view] = modulesOf({
+      modules: [module(1, 'picks', { collectionId: id(801) })],
+      picks: [collection(1, [1, 2, 3, 4, 5])],
+      experiences: [1, 2, 3].map((n) => experience(n)),
+    });
+    expect(view).toMatchObject({
+      seeAll: { label: 'See all 5 picks' },
+    });
   });
 
   it('is left out while gifts are switched off', () => {
     expect(
       modulesOf({
-        modules: [module(1, 'gift_guide')],
+        modules: [guideModule()],
+        giftGuide: guide,
         settings: { giftsEnabled: false },
       }),
     ).toEqual([]);
@@ -726,15 +615,15 @@ describe('covers on the home page', () => {
   };
   const page = buildHomePage({ ...baseInput, ...input });
 
-  it('lists each card experience once, across the Picks and this-week modules', () => {
-    expect(homeCardIds(page)).toEqual([id(1), id(2), id(3)]);
+  it('lists each Picks card experience once, and none from the this-week cards that arrive with theirs', () => {
+    expect(homeCardIds(page)).toEqual([id(1), id(2)]);
   });
 
   it('lists none for an empty page', () => {
     expect(homeCardIds({ kind: 'empty' })).toEqual([]);
   });
 
-  it('sets the cover of each card that has one and leaves the others without', () => {
+  it('sets the cover of each Picks card that has one, and leaves a this-week card as it arrived', () => {
     const covered = withHomeCovers(page, new Map([[id(2), cover]]));
 
     const cards =
@@ -748,7 +637,7 @@ describe('covers on the home page', () => {
     expect(cards.map((card) => [card.id, card.image?.alt ?? null])).toEqual([
       [id(1), null],
       [id(2), 'A kayak at dusk'],
-      [id(2), 'A kayak at dusk'],
+      [id(2), null],
       [id(3), null],
     ]);
   });
@@ -764,16 +653,5 @@ describe('covers on the home page', () => {
     expect(covered.kind === 'modules' && covered.modules.at(-1)?.kind).toBe(
       'reassurance',
     );
-  });
-});
-
-describe('bannerText', () => {
-  it.each([
-    ['text', 'Closed Monday for weather', 'Closed Monday for weather'],
-    ['padded text', '  Closed Monday  ', 'Closed Monday'],
-    ['blank text', '   ', null],
-    ['no text', null, null],
-  ])('%s', (_name, bannerTextValue, expected) => {
-    expect(bannerText({ bannerText: bannerTextValue })).toBe(expected);
   });
 });

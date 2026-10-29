@@ -1,9 +1,7 @@
 import 'server-only';
 import { eq, sql } from 'drizzle-orm';
-import type { db } from './client';
+import type { Transaction } from './client';
 import { experiences, holds, sessions } from './schema';
-
-export type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /*
  * THE LOCK ORDER (design doc 4.2.3 rule 1, architecture rule B10). Every transaction that takes

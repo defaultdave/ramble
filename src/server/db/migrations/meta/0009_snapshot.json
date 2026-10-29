@@ -1,5 +1,5 @@
 {
-  "id": "06d2710e-2f98-490b-ad88-7d8395963e19",
+  "id": "760825b9-610b-4293-9df9-67166d3c1e95",
   "prevId": "27cbd3e7-ca12-4e4f-97b7-a58f02aa44a2",
   "version": "7",
   "dialect": "postgresql",
@@ -2352,302 +2352,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.hold_items": {
-      "name": "hold_items",
-      "schema": "",
-      "columns": {
-        "hold_id": {
-          "name": "hold_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "price_option_id": {
-          "name": "price_option_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "quantity": {
-          "name": "quantity",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "unit_price_minor": {
-          "name": "unit_price_minor",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "uses_space": {
-          "name": "uses_space",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "hold_items_hold_id_holds_id_fk": {
-          "name": "hold_items_hold_id_holds_id_fk",
-          "tableFrom": "hold_items",
-          "tableTo": "holds",
-          "columnsFrom": [
-            "hold_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "hold_items_price_option_id_price_options_id_fk": {
-          "name": "hold_items_price_option_id_price_options_id_fk",
-          "tableFrom": "hold_items",
-          "tableTo": "price_options",
-          "columnsFrom": [
-            "price_option_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "hold_items_hold_id_price_option_id_pk": {
-          "name": "hold_items_hold_id_price_option_id_pk",
-          "columns": [
-            "hold_id",
-            "price_option_id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "hold_items_quantity_in_range": {
-          "name": "hold_items_quantity_in_range",
-          "value": "\"hold_items\".\"quantity\" BETWEEN 1 AND 6"
-        },
-        "hold_items_unit_price_in_range": {
-          "name": "hold_items_unit_price_in_range",
-          "value": "\"hold_items\".\"unit_price_minor\" BETWEEN 0 AND 10000000"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.holds": {
-      "name": "holds",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "session_id": {
-          "name": "session_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "purpose": {
-          "name": "purpose",
-          "type": "hold_purpose",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "gift_id": {
-          "name": "gift_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "hold_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'active'"
-        },
-        "seats": {
-          "name": "seats",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "device_key": {
-          "name": "device_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "ip_hash": {
-          "name": "ip_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "paying_until": {
-          "name": "paying_until",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "released_reason": {
-          "name": "released_reason",
-          "type": "hold_released_reason",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "superseded_by": {
-          "name": "superseded_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "holds_session_open_idx": {
-          "name": "holds_session_open_idx",
-          "columns": [
-            {
-              "expression": "session_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"holds\".\"status\" IN ('active', 'paying')",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "holds_session_id_sessions_id_fk": {
-          "name": "holds_session_id_sessions_id_fk",
-          "tableFrom": "holds",
-          "tableTo": "sessions",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "holds_superseded_by_fk": {
-          "name": "holds_superseded_by_fk",
-          "tableFrom": "holds",
-          "tableTo": "holds",
-          "columnsFrom": [
-            "superseded_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "holds_gift_matches_purpose": {
-          "name": "holds_gift_matches_purpose",
-          "value": "(\"holds\".\"purpose\" = 'gift_redemption') = (\"holds\".\"gift_id\" IS NOT NULL)"
-        },
-        "holds_seats_in_range": {
-          "name": "holds_seats_in_range",
-          "value": "\"holds\".\"seats\" BETWEEN 1 AND 6"
-        },
-        "holds_device_key_sha256": {
-          "name": "holds_device_key_sha256",
-          "value": "\"holds\".\"device_key\" ~ '^[0-9a-f]{64}$'"
-        },
-        "holds_ip_hash_sha256": {
-          "name": "holds_ip_hash_sha256",
-          "value": "\"holds\".\"ip_hash\" ~ '^[0-9a-f]{64}$'"
-        },
-        "holds_released_reason_matches_status": {
-          "name": "holds_released_reason_matches_status",
-          "value": "(\"holds\".\"status\" = 'released') = (\"holds\".\"released_reason\" IS NOT NULL)"
-        },
-        "holds_superseded_by_matches_reason": {
-          "name": "holds_superseded_by_matches_reason",
-          "value": "coalesce(\"holds\".\"released_reason\" = 'superseded', false) = (\"holds\".\"superseded_by\" IS NOT NULL)"
-        },
-        "holds_not_superseded_by_itself": {
-          "name": "holds_not_superseded_by_itself",
-          "value": "\"holds\".\"superseded_by\" IS NULL OR \"holds\".\"superseded_by\" <> \"holds\".\"id\""
-        },
-        "holds_paying_has_deadline": {
-          "name": "holds_paying_has_deadline",
-          "value": "\"holds\".\"status\" <> 'paying' OR \"holds\".\"paying_until\" IS NOT NULL"
-        },
-        "holds_paying_until_not_before_expiry": {
-          "name": "holds_paying_until_not_before_expiry",
-          "value": "\"holds\".\"paying_until\" IS NULL OR \"holds\".\"paying_until\" >= \"holds\".\"expires_at\""
-        },
-        "holds_expiry_window": {
-          "name": "holds_expiry_window",
-          "value": "\"holds\".\"expires_at\" > \"holds\".\"created_at\" AND \"holds\".\"expires_at\" <= \"holds\".\"created_at\" + make_interval(mins => 60)"
-        },
-        "holds_updated_not_before_created": {
-          "name": "holds_updated_not_before_created",
-          "value": "\"holds\".\"updated_at\" >= \"holds\".\"created_at\""
-        },
-        "holds_expires_at_in_range": {
-          "name": "holds_expires_at_in_range",
-          "value": "\"holds\".\"expires_at\" >= '1000-01-01 00:00:00+00' AND \"holds\".\"expires_at\" < '10000-01-01 00:00:00+00'"
-        },
-        "holds_paying_until_in_range": {
-          "name": "holds_paying_until_in_range",
-          "value": "\"holds\".\"paying_until\" >= '1000-01-01 00:00:00+00' AND \"holds\".\"paying_until\" < '10000-01-01 00:00:00+00'"
-        },
-        "holds_created_at_in_range": {
-          "name": "holds_created_at_in_range",
-          "value": "\"holds\".\"created_at\" >= '1000-01-01 00:00:00+00' AND \"holds\".\"created_at\" < '10000-01-01 00:00:00+00'"
-        },
-        "holds_updated_at_in_range": {
-          "name": "holds_updated_at_in_range",
-          "value": "\"holds\".\"updated_at\" >= '1000-01-01 00:00:00+00' AND \"holds\".\"updated_at\" < '10000-01-01 00:00:00+00'"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.email_suppressions": {
       "name": "email_suppressions",
       "schema": "",
@@ -2976,6 +2680,173 @@
         }
       },
       "isRLSEnabled": false
+    },
+    "public.jobs": {
+      "name": "jobs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dedupe_key": {
+          "name": "dedupe_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "job_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "max_attempts": {
+          "name": "max_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 8
+        },
+        "run_after": {
+          "name": "run_after",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "clock_timestamp()"
+        },
+        "locked_until": {
+          "name": "locked_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "clock_timestamp()"
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_error": {
+          "name": "last_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "jobs_dedupe_key_unique": {
+          "name": "jobs_dedupe_key_unique",
+          "columns": [
+            {
+              "expression": "dedupe_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"jobs\".\"dedupe_key\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "jobs_status_run_after": {
+          "name": "jobs_status_run_after",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "run_after",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "jobs_kind_shape": {
+          "name": "jobs_kind_shape",
+          "value": "\"jobs\".\"kind\" ~ '^[a-z0-9]+(-[a-z0-9]+)*$' AND char_length(\"jobs\".\"kind\") <= 64"
+        },
+        "jobs_payload_bounded": {
+          "name": "jobs_payload_bounded",
+          "value": "jsonb_typeof(\"jobs\".\"payload\") = 'object' AND pg_column_size(\"jobs\".\"payload\") <= 16384"
+        },
+        "jobs_dedupe_key_shape": {
+          "name": "jobs_dedupe_key_shape",
+          "value": "\"jobs\".\"dedupe_key\" IS NULL OR (\"jobs\".\"dedupe_key\" ~ '^[A-Za-z0-9][A-Za-z0-9:_./-]*$' AND char_length(\"jobs\".\"dedupe_key\") <= 200)"
+        },
+        "jobs_max_attempts_range": {
+          "name": "jobs_max_attempts_range",
+          "value": "\"jobs\".\"max_attempts\" BETWEEN 1 AND 20"
+        },
+        "jobs_attempts_range": {
+          "name": "jobs_attempts_range",
+          "value": "\"jobs\".\"attempts\" >= 0 AND \"jobs\".\"attempts\" <= \"jobs\".\"max_attempts\""
+        },
+        "jobs_last_error_bounded": {
+          "name": "jobs_last_error_bounded",
+          "value": "\"jobs\".\"last_error\" IS NULL OR char_length(\"jobs\".\"last_error\") <= 2000"
+        },
+        "jobs_finished_matches_status": {
+          "name": "jobs_finished_matches_status",
+          "value": "(\"jobs\".\"status\" IN ('succeeded', 'dead')) = (\"jobs\".\"finished_at\" IS NOT NULL)"
+        },
+        "jobs_locked_matches_status": {
+          "name": "jobs_locked_matches_status",
+          "value": "(\"jobs\".\"status\" = 'running') = (\"jobs\".\"locked_until\" IS NOT NULL)"
+        },
+        "jobs_run_after_readable": {
+          "name": "jobs_run_after_readable",
+          "value": "\"jobs\".\"run_after\" >= '1000-01-01 00:00:00+00' AND \"jobs\".\"run_after\" < '10000-01-01 00:00:00+00'"
+        }
+      },
+      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -3115,36 +2986,6 @@
         "reassurance"
       ]
     },
-    "public.hold_purpose": {
-      "name": "hold_purpose",
-      "schema": "public",
-      "values": [
-        "booking",
-        "gift_redemption"
-      ]
-    },
-    "public.hold_released_reason": {
-      "name": "hold_released_reason",
-      "schema": "public",
-      "values": [
-        "expired",
-        "guest_left",
-        "payment_abandoned",
-        "sold_out_after_lapse",
-        "session_cancelled",
-        "superseded"
-      ]
-    },
-    "public.hold_status": {
-      "name": "hold_status",
-      "schema": "public",
-      "values": [
-        "active",
-        "paying",
-        "converted",
-        "released"
-      ]
-    },
     "public.email_adapter": {
       "name": "email_adapter",
       "schema": "public",
@@ -3174,6 +3015,16 @@
       "values": [
         "hard_bounce",
         "complaint"
+      ]
+    },
+    "public.job_status": {
+      "name": "job_status",
+      "schema": "public",
+      "values": [
+        "pending",
+        "running",
+        "succeeded",
+        "dead"
       ]
     }
   },

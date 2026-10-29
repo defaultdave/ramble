@@ -29,13 +29,8 @@ import {
 import { MAX_LINES, lines as pricingLines, taxRatePpm } from '@/lib/pricing';
 import { maxAllocation } from '@/lib/sessions';
 import type { Device } from '@/server/device';
-import { db } from './client';
-import {
-  lockDevice,
-  lockHoldRow,
-  lockSessionRow,
-  type Transaction,
-} from './locks';
+import { db, type Transaction } from './client';
+import { lockDevice, lockHoldRow, lockSessionRow } from './locks';
 import { holdItems, holds, priceOptions, sessions } from './schema';
 import { readHoldSettings } from './settings';
 import { readDatabaseTime } from './time';

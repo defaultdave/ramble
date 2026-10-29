@@ -77,7 +77,7 @@ describe('BookingPanel', () => {
   it('blocks a second press while the hold is being placed', async () => {
     const onContinue = setup({ total, loading: true });
     const button = screen.getByRole('button', { name: 'Continue · $130.00' });
-    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-disabled', 'true');
     await userEvent.click(button);
     expect(onContinue).not.toHaveBeenCalled();
   });

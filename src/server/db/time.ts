@@ -2,7 +2,7 @@ import 'server-only';
 import { sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from './client';
-import type { Transaction } from './locks';
+import type { Transaction } from './client';
 
 // The driver hands timestamps back as text, so the time travels as whole milliseconds since the epoch.
 const TimeRowSchema = z.object({ atMs: z.coerce.number().int() });

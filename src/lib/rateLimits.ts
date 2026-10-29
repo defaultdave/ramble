@@ -9,6 +9,8 @@ export const rateLimitSurfaces = [
   'email_webhook',
   'email_webhook_failed',
   'mailbox_unlock_failed',
+  'pulse',
+  'pulse_failed',
 ] as const;
 
 export type RateLimitSurface = (typeof rateLimitSurfaces)[number];
@@ -56,6 +58,16 @@ export const rateLimitPolicies = {
   // Wrong dev-mailbox secrets, per source address. A correct secret is never counted or refused.
   mailbox_unlock_failed: {
     limit: 10,
+    windowSeconds: 10 * 60,
+    normalizeSubject: trimmed,
+  },
+  // Authenticated pulse calls on one shared counter. The schedule fires every 30 minutes and a demo
+  // adds a few manual ones, so this only stops a leaked secret from being used to hammer the drain.
+  pulse: { limit: 30, windowSeconds: 10 * 60, normalizeSubject: trimmed },
+  // Pulse calls with a wrong or missing secret, per source address; kept apart so bad traffic
+  // cannot refuse the real schedule.
+  pulse_failed: {
+    limit: 20,
     windowSeconds: 10 * 60,
     normalizeSubject: trimmed,
   },

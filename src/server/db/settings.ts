@@ -13,7 +13,7 @@ import {
 import type { Caller } from '@/server/auth/caller';
 import { updateTagsForChanges } from '@/server/cache/invalidate';
 import { db, dbRead } from './client';
-import type { Transaction } from './locks';
+import type { Transaction } from './client';
 import { settings } from './schema';
 import { requireStaff } from './staff';
 

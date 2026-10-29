@@ -2,6 +2,7 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { maxProviderMessageIdLength } from '@/lib/email/message';
+import { bearerToken } from '@/lib/http';
 import { secureEqual } from '@/server/secureEqual';
 import type { EmailAdapter } from './types';
 import { parseWebhookBody } from './wire';
@@ -23,13 +24,11 @@ export function createFakeAdapter(
     name: 'fake',
     send: () => Promise.resolve({ providerMessageId: `fake-${randomUUID()}` }),
     verifyWebhook: ({ headers }) => {
-      const presented = /^Bearer (.+)$/.exec(
-        headers.get('authorization') ?? '',
-      );
+      const presented = bearerToken(headers.get('authorization'));
       return (
         webhookSecret !== undefined &&
-        presented?.[1] !== undefined &&
-        secureEqual(presented[1], webhookSecret)
+        presented !== null &&
+        secureEqual(presented, webhookSecret)
       );
     },
     parseWebhook: (rawBody) => {

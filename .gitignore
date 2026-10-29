@@ -11,3 +11,6 @@ coverage/
 test-results/
 playwright-report/
 *.tsbuildinfo
+
+# Vitest browser-mode failure screenshots and attachments
+.vitest/

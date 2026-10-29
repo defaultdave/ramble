@@ -1193,21 +1193,22 @@ describe('guest reads', () => {
       ).value.id;
     });
 
+    const homeModule = (
+      kind: 'hero_search' | 'picks' | 'this_week' | 'reassurance',
+      extra: Partial<{
+        enabled: boolean;
+        heading: string;
+        collectionId: string;
+      }> = {},
+    ) => ({
+      kind,
+      enabled: extra.enabled ?? true,
+      heading: extra.heading ?? null,
+      body: null,
+      collectionId: extra.collectionId ?? null,
+    });
+
     it('lists the enabled modules in order and leaves out one whose collection is a draft', async () => {
-      const homeModule = (
-        kind: 'hero_search' | 'picks' | 'this_week' | 'reassurance',
-        extra: Partial<{
-          enabled: boolean;
-          heading: string;
-          collectionId: string;
-        }> = {},
-      ) => ({
-        kind,
-        enabled: extra.enabled ?? true,
-        heading: extra.heading ?? null,
-        body: null,
-        collectionId: extra.collectionId ?? null,
-      });
       await saved(
         editorial.saveHomeModules(ops, [
           homeModule('hero_search', { heading: 'First' }),
@@ -1232,6 +1233,30 @@ describe('guest reads', () => {
       expect(forEditing.map((entry) => entry.position)).toEqual([
         0, 1, 2, 3, 4,
       ]);
+    });
+
+    it('leaves out a switched-off module pinned to a published collection, and lists it once switched on', async () => {
+      const save = (enabled: boolean) =>
+        saved(
+          editorial.saveHomeModules(ops, [
+            homeModule('picks', {
+              enabled,
+              collectionId: publishedPickId,
+              heading: 'Pinned',
+            }),
+            homeModule('reassurance', { heading: 'Last' }),
+          ]),
+        );
+
+      await save(false);
+      expect((await editorial.listHomeModules()).map((m) => m.heading)).toEqual(
+        ['Last'],
+      );
+
+      await save(true);
+      expect((await editorial.listHomeModules()).map((m) => m.heading)).toEqual(
+        ['Pinned', 'Last'],
+      );
     });
   });
 

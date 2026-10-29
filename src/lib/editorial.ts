@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { CacheChange } from './cacheTags';
-import { EntityIdSchema, SlugSchema } from './catalog';
+import { EntityIdSchema, SlugSchema, WriteIdSchema } from './catalog';
 import type { RichTextDoc } from './richText/format';
 import { richTextSchema } from './richText/schema';
 import { sanitizeRichText } from './richText/sanitize';
@@ -73,13 +73,6 @@ export const RichTextStoredSchema = z
   .transform((value) => sanitizeRichText(value));
 
 const SlugFieldSchema = SlugSchema.max(editorialLimits.slug);
-
-/**
- * An ID in a write. `z.guid()` accepts upper case and Postgres returns lower case, so an ID
- * written in capitals is lower-cased here: compared against what the database found, it is the
- * same ID, not a missing one.
- */
-const WriteIdSchema = EntityIdSchema.transform((id) => id.toLowerCase());
 
 const timestamps = {
   publishedAt: z.date().nullable(),

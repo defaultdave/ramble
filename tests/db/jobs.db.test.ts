@@ -11,6 +11,8 @@ import {
   vi,
 } from 'vitest';
 import { backoffSeconds, deadJobAlertKey, jobLimits } from '@/lib/jobs';
+import type { JobRegistry } from '@/server/jobs/registry';
+import { logger } from '@/server/monitoring/logger';
 import { createFreshDatabase, type FreshDatabase } from './harness';
 
 const raise = vi.hoisted(() => vi.fn());
@@ -42,11 +44,20 @@ let enqueueModule: typeof import('@/server/jobs/enqueue');
 let drainModule: typeof import('@/server/jobs/drain');
 let jobsDb: typeof import('@/server/db/jobs');
 let clockModule: typeof import('@/server/ports/clock');
-let registryModule: typeof import('@/server/jobs/registry');
 let side: Pool;
 
+/** Held shut until a test lets the `gated` kind's handler throw. */
+let gate: { promise: Promise<void>; open: () => void };
+function closeGate() {
+  let open: () => void = () => undefined;
+  const promise = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  gate = { promise, open };
+}
+
 const handled: { kind: string; jobId: string; payload: unknown }[] = [];
-let testRegistry: import('@/server/jobs/registry').JobRegistry;
+let testRegistry: JobRegistry;
 
 beforeAll(async () => {
   fresh = await createFreshDatabase(process.env.DATABASE_URL_UNPOOLED ?? '');
@@ -56,30 +67,41 @@ beforeAll(async () => {
   drainModule = await import('@/server/jobs/drain');
   jobsDb = await import('@/server/db/jobs');
   clockModule = await import('@/server/ports/clock');
-  registryModule = await import('@/server/jobs/registry');
   side = new Pool({ connectionString: fresh.url, max: 4 });
 
-  const { defineJob } = registryModule;
   const record =
     (kind: string) => (context: { jobId: string; payload: unknown }) => {
       handled.push({ kind, jobId: context.jobId, payload: context.payload });
       return Promise.resolve();
     };
   testRegistry = {
-    ok: defineJob({
+    ok: {
       payload: z.object({ n: z.number().optional() }),
       maxAttempts: 3,
       handleIdempotent: record('ok'),
-    }),
-    slow: defineJob({
+    },
+    slow: {
       payload: z.object({}),
       maxAttempts: 3,
       handleIdempotent: async (context) => {
         await new Promise((resolve) => setTimeout(resolve, 10));
         await record('slow')(context);
       },
-    }),
-    broken: defineJob({
+    },
+    poison: {
+      payload: z.object({}),
+      maxAttempts: 3,
+      handleIdempotent: () => Promise.reject(new Error('always fails')),
+    },
+    gated: {
+      payload: z.object({}),
+      maxAttempts: 2,
+      handleIdempotent: async () => {
+        await gate.promise;
+        throw new Error('boom after the gate');
+      },
+    },
+    broken: {
       payload: z.object({}),
       maxAttempts: 2,
       handleIdempotent: async ({ tx }) => {
@@ -91,8 +113,8 @@ beforeAll(async () => {
         );
         throw new Error(`boom for guest@example.com ${'x'.repeat(4000)}`);
       },
-    }),
-  };
+    },
+  } satisfies JobRegistry;
 });
 
 afterAll(async () => {
@@ -104,6 +126,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   handled.length = 0;
+  closeGate();
   raise.mockClear();
   await client.db.execute(sql`DELETE FROM jobs`);
 });
@@ -386,6 +409,7 @@ describe('drain', () => {
       succeeded: 1,
       retried: 0,
       dead: 0,
+      unrecorded: 0,
       left: 0,
     });
     expect(handled).toEqual([{ kind: 'ok', jobId: id, payload: { n: 7 } }]);
@@ -551,6 +575,7 @@ describe('drain', () => {
       succeeded: 200,
       retried: 0,
       dead: 0,
+      unrecorded: 0,
       left: 5,
     });
   });
@@ -668,5 +693,125 @@ describe('the locked re-check before a job runs', () => {
 
     expect(outcome).toBe('succeeded');
     expect(handled).toHaveLength(1);
+  });
+});
+
+describe('the locked re-check when recording a failure', () => {
+  const now = new Date('2030-01-01T00:00:00Z');
+  const pause = () => new Promise((resolve) => setTimeout(resolve, 150));
+
+  /**
+   * Runs a job whose handler throws. A second connection queues for the row lock while the handler
+   * still holds it, so it is granted the lock the moment the handler's transaction rolls back, and
+   * the failure recording has to wait behind it. `change` alters the row before that lock is released.
+   */
+  async function failWhileAnotherTransactionChangesTheRow(change: string) {
+    await insertRaw({ kind: 'gated', maxAttempts: 2 });
+    const { claimed } = await jobsDb.claimDueJobs(now, 25);
+    const job = claimed[0];
+    if (!job) throw new Error('nothing was claimed');
+    const before = await onlyRow();
+
+    const other: PoolClient = await side.connect();
+    try {
+      await other.query('BEGIN');
+      const running = drainModule.runJob(
+        job,
+        clockModule.fixedClock(now),
+        testRegistry,
+      );
+      await pause(); // the handler now holds the row lock and waits at the gate
+      const queued = other.query(
+        'SELECT id FROM jobs WHERE id = $1 FOR UPDATE',
+        [job.id],
+      );
+      await pause();
+      gate.open();
+      await queued;
+      await pause(); // the failure recording is now waiting for the lock this connection holds
+      await other.query(change, [job.id]);
+      await other.query('COMMIT');
+      return { outcome: await running, before };
+    } finally {
+      other.release();
+    }
+  }
+
+  it('records nothing when another drain took the job again while the handler ran', async () => {
+    const { outcome, before } = await failWhileAnotherTransactionChangesTheRow(
+      `UPDATE jobs SET attempts = attempts + 1, locked_until = locked_until + interval '10 minutes' WHERE id = $1`,
+    );
+
+    expect(outcome).toBe('lost');
+    expect(await onlyRow()).toEqual({
+      ...before,
+      attempts: before.attempts + 1,
+      locked_until: new Date((before.locked_until as Date).getTime() + 600_000),
+    });
+    expect(raise).not.toHaveBeenCalled();
+  });
+
+  it('records nothing when the job finished meanwhile', async () => {
+    const { outcome, before } = await failWhileAnotherTransactionChangesTheRow(
+      `UPDATE jobs SET status = 'succeeded', locked_until = NULL, finished_at = clock_timestamp() WHERE id = $1`,
+    );
+
+    expect(outcome).toBe('lost');
+    const row = await onlyRow();
+    expect(row).toMatchObject({
+      status: 'succeeded',
+      attempts: 1,
+      last_error: null,
+      locked_until: null,
+    });
+    expect(row.run_after).toEqual(before.run_after);
+    expect(raise).not.toHaveBeenCalled();
+  });
+});
+
+describe('a failure that cannot be recorded', () => {
+  it('is counted and logged by name, and the rest of the batch still runs', async () => {
+    await client.db.execute(sql`
+      CREATE FUNCTION refuse_poison_failure() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        IF NEW.kind = 'poison' AND NEW.status <> 'running' THEN
+          RAISE EXCEPTION 'refused for guest@example.com';
+        END IF;
+        RETURN NEW;
+      END $$`);
+    await client.db.execute(sql`
+      CREATE TRIGGER refuse_poison_failure BEFORE UPDATE ON jobs
+      FOR EACH ROW EXECUTE FUNCTION refuse_poison_failure()`);
+    try {
+      const poison = await insertRaw({
+        kind: 'poison',
+        runAfter: '2026-01-01T00:00:00Z',
+      });
+      await insertRaw({ runAfter: '2026-01-02T00:00:00Z' });
+      await insertRaw({ runAfter: '2026-01-03T00:00:00Z' });
+
+      const report = await drainAt('2030-01-01T00:00:00Z');
+
+      expect(report).toMatchObject({
+        claimed: 3,
+        succeeded: 2,
+        retried: 0,
+        dead: 0,
+        unrecorded: 1,
+      });
+      expect(handled).toHaveLength(2);
+      const stuck = (await allRows()).find((row) => row.id === poison);
+      expect(stuck).toMatchObject({ status: 'running', last_error: null });
+      expect(logger.error).toHaveBeenCalledExactlyOnceWith(
+        'job failure could not be recorded',
+        { jobId: poison, kind: 'poison', errorName: 'Error' },
+      );
+      expect(JSON.stringify(vi.mocked(logger.error).mock.calls)).not.toContain(
+        'guest@example.com',
+      );
+    } finally {
+      await client.db.execute(sql`DROP TRIGGER refuse_poison_failure ON jobs`);
+      await client.db.execute(sql`DROP FUNCTION refuse_poison_failure()`);
+    }
   });
 });

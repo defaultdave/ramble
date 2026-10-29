@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { prepareAlert } from './alerts';
 import {
   EnqueueInputSchema,
+  MaxAttemptsSchema,
   abandonedMessage,
   backoffSeconds,
-  bearerToken,
   chooseClock,
   claimDecision,
   deadJobAlertKey,
+  decidePulse,
   describeJobError,
   drainMayContinue,
   failureOutcome,
@@ -321,19 +322,50 @@ describe('deadJobAlertKey', () => {
   });
 });
 
-describe('bearerToken', () => {
+describe('decidePulse', () => {
+  const asOf = new Date('2030-01-01T00:00:00Z');
+  const good = {
+    method: 'POST',
+    secretSet: true,
+    tokenMatches: true,
+    asOf: undefined,
+  };
+
+  it.each(['GET', 'PUT', 'DELETE', 'HEAD', 'post'])(
+    'refuses %s without counting it as a bad secret',
+    (method) => {
+      expect(decidePulse({ ...good, method })).toEqual({ action: 'refuse' });
+    },
+  );
+
   it.each([
-    ['Bearer abc123', 'abc123'],
-    ['bearer abc123', 'abc123'],
-    ['Bearer  abc', null],
-    ['Basic abc123', null],
-    ['Bearer', null],
-    ['Bearer a b', null],
-    [`Bearer ${'a'.repeat(257)}`, null],
-    ['', null],
-    [null, null],
-  ])('%j reads as %j', (header, token) => {
-    expect(bearerToken(header)).toBe(token);
+    ['no secret is configured', { secretSet: false, tokenMatches: false }],
+    [
+      'a token is presented but no secret is configured',
+      { secretSet: false, tokenMatches: true },
+    ],
+    ['the token does not match', { secretSet: true, tokenMatches: false }],
+  ])('rejects the secret when %s', (_name, override) => {
+    expect(decidePulse({ ...good, ...override })).toEqual({
+      action: 'reject-secret',
+    });
+  });
+
+  it('refuses a wrong method before looking at the secret', () => {
+    expect(
+      decidePulse({ ...good, method: 'GET', tokenMatches: false }),
+    ).toEqual({ action: 'refuse' });
+  });
+
+  it('runs a plain pulse and sends the heartbeat', () => {
+    expect(decidePulse(good)).toEqual({ action: 'run', sendHeartbeat: true });
+  });
+
+  it('runs an asOf pulse without a heartbeat', () => {
+    expect(decidePulse({ ...good, asOf })).toEqual({
+      action: 'run',
+      sendHeartbeat: false,
+    });
   });
 });
 
@@ -404,5 +436,15 @@ describe('chooseClock', () => {
       ok: false,
       reason: 'out-of-range',
     });
+  });
+});
+
+describe('MaxAttemptsSchema', () => {
+  it.each([1, 8, 20])('accepts %s', (value) => {
+    expect(MaxAttemptsSchema.safeParse(value).success).toBe(true);
+  });
+
+  it.each([0, 21, 1.5, -1, '3'])('refuses %j', (value) => {
+    expect(MaxAttemptsSchema.safeParse(value).success).toBe(false);
   });
 });

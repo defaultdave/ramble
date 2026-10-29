@@ -25,9 +25,11 @@ The pulse also deletes expired rate-limit rows and pings `BETTERSTACK_HEARTBEAT_
 
 ## Calling it
 
-`Authorization: Bearer <PULSE_SECRET>`, method POST. Any other method, a missing secret, or a wrong one gets an empty 401 (wrong ones are counted per source address; past 20 in 10 minutes the answer is 429). The answer is counts only: `claimed`, `succeeded`, `retried`, `dead`, `left`, `purged`.
+`Authorization: Bearer <PULSE_SECRET>`, method POST. Any other method, a missing secret, or a wrong one gets an empty 401 (wrong ones are counted per source address; past 20 in 10 minutes the answer is 429). The answer is counts only: `claimed`, `succeeded`, `retried`, `dead`, `unrecorded`, `left`, `purged`. `unrecorded` counts jobs whose failure could not be written down (the database refused the write); they keep their lock and are taken again once it lapses, and the rest of the batch still runs.
 
 To show a job "tomorrow" in the demo: set `DEMO_CLOCK=on`, then POST `{ "asOf": "<ISO date-time with offset>" }`. The jobs run as of that time. It must be within 400 days of now. With `DEMO_CLOCK` off (the default) a body with `asOf` gets 400 and nothing runs. Switch it off again afterwards.
+
+An `asOf` run treats the clock as `asOf` for everything, including the lock test. A row another drain is running right now has a lock that lapses after the real time, so at a later `asOf` it looks lapsed: the demo run takes it, and when the real drain finishes its re-check finds the claim gone and the outcome is `lost`. The job was not run twice by the real drain, but it cost an attempt. Use `asOf` when nothing is mid-run. A crashed `asOf` run leaves its rows locked until `asOf` plus 5 minutes, so a later real pulse will not touch them until the real clock passes that time; for an `asOf` in the future that can be a long wait. To free them sooner, set `status = 'pending'`, `locked_until = NULL`, `run_after = now()` on those rows (attempts already spent stay spent).
 
 ## Dead jobs
 

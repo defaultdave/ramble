@@ -1,10 +1,10 @@
 import 'server-only';
 import { z } from 'zod';
-import { jobLimits } from '@/lib/jobs';
+import { MaxAttemptsSchema } from '@/lib/jobs';
 import type { Transaction } from '@/server/db/client';
 import type { Clock } from '@/server/ports/clock';
 
-export type JobContext<Payload> = {
+type JobContext<Payload> = {
   /** The transaction the job's own writes belong to; it rolls back if the handler throws. */
   tx: Transaction;
   payload: Payload;
@@ -17,7 +17,7 @@ export type JobContext<Payload> = {
  * Delivery is at least once: a crash after a provider call but before the commit runs the job
  * again. A handler must therefore be safe to run twice for the same job ID.
  */
-export type IdempotentJobHandler<Payload> = (
+type IdempotentJobHandler<Payload> = (
   context: JobContext<Payload>,
 ) => Promise<void>;
 
@@ -29,10 +29,8 @@ export type JobDefinition<Schema extends z.ZodType = z.ZodType> = {
 
 export type JobRegistry = Record<string, JobDefinition>;
 
-const MaxAttemptsSchema = z.int().min(1).max(jobLimits.maxAttemptsCeiling);
-
 /** Checks the attempts bound at definition time, so a bad entry fails at import and not at the first enqueue. */
-export function defineJob<Schema extends z.ZodType>(
+function defineJob<Schema extends z.ZodType>(
   definition: JobDefinition<Schema>,
 ): JobDefinition {
   MaxAttemptsSchema.parse(definition.maxAttempts);

@@ -3,6 +3,7 @@ import {
   deadJobAlertKey,
   drainMayContinue,
   failureOutcome,
+  jobLimits,
   nextClaimSize,
   ownsClaim,
 } from '@/lib/jobs';
@@ -25,13 +26,13 @@ export type DrainReport = {
   succeeded: number;
   retried: number;
   dead: number;
+  /** Jobs whose failure could not be written down; they are reclaimed once their lock lapses. */
+  unrecorded: number;
   /** Jobs still due when the call stopped, counted up to 1,000. */
   left: number;
 };
 
 export type RunOutcome = 'succeeded' | 'retried' | 'dead' | 'lost';
-
-const leftCap = 1000;
 
 function raiseDead(kind: string, jobId: string): void {
   alerts.raise('job-dead', 'error', deadJobAlertKey(kind, jobId), {
@@ -117,6 +118,7 @@ export async function drainJobs(
     succeeded: 0,
     retried: 0,
     dead: 0,
+    unrecorded: 0,
     left: 0,
   };
 
@@ -136,13 +138,26 @@ export async function drainJobs(
     report.claimed += claimed.length;
 
     for (const job of claimed) {
-      const outcome = await runJob(job, clock, registry);
+      let outcome: RunOutcome;
+      try {
+        outcome = await runJob(job, clock, registry);
+      } catch (error) {
+        // Recording the failure itself failed (the database is unreachable, say). The row keeps its
+        // lock and is reclaimed once it lapses, so the rest of the batch still runs.
+        logger.error('job failure could not be recorded', {
+          jobId: job.id,
+          kind: job.kind,
+          errorName: error instanceof Error ? error.name : 'NonError',
+        });
+        report.unrecorded += 1;
+        continue;
+      }
       if (outcome === 'succeeded') report.succeeded += 1;
       else if (outcome === 'retried') report.retried += 1;
       else if (outcome === 'dead') report.dead += 1;
     }
   }
 
-  report.left = await countDueJobs(clock.now(), leftCap);
+  report.left = await countDueJobs(clock.now(), jobLimits.leftCountCap);
   return report;
 }

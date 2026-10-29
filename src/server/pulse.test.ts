@@ -34,7 +34,14 @@ const realNowMs = () => performance.timeOrigin + performance.now();
 const secret = 's'.repeat(40);
 const url = 'http://localhost/api/pulse';
 const allowed = { allowed: true, remaining: 1 } as const;
-const report = { claimed: 3, succeeded: 2, retried: 1, dead: 0, left: 4 };
+const report = {
+  claimed: 3,
+  succeeded: 2,
+  retried: 1,
+  dead: 0,
+  unrecorded: 0,
+  left: 4,
+};
 
 function post(body = '', headers: Record<string, string> = {}) {
   return new Request(url, {

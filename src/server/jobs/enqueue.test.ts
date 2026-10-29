@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Transaction, db } from '@/server/db/client';
 import { insertJob } from '@/server/db/jobs';
 import { enqueue } from './enqueue';
-import { defineJob, findJob, jobRegistry } from './registry';
+import { findJob, jobRegistry, type JobRegistry } from './registry';
 
 vi.mock('@/server/db/jobs', () => ({ insertJob: vi.fn() }));
 
@@ -13,21 +13,20 @@ vi.mock('@/server/db/jobs', () => ({ insertJob: vi.fn() }));
 // - an unknown kind, a kind named like an inherited property, a bad kind shape, or a bad dedupe key throws and writes nothing
 // - a payload the kind's schema refuses, or one over 16 KB, throws and writes nothing
 // - a dedupe key already used returns null
-// - a registry entry with max attempts outside 1..20 fails when defined
 
 const tx = {} as Transaction;
 const registry = {
-  big: defineJob({
+  big: {
     payload: z.object({ text: z.string() }),
     maxAttempts: 5,
     handleIdempotent: async () => {},
-  }),
-  strip: defineJob({
+  },
+  strip: {
     payload: z.object({ keep: z.string() }),
     maxAttempts: 2,
     handleIdempotent: async () => {},
-  }),
-};
+  },
+} satisfies JobRegistry;
 
 beforeEach(() => {
   vi.mocked(insertJob).mockReset().mockResolvedValue({ id: 'new-id' });
@@ -119,19 +118,6 @@ describe('enqueue', () => {
 });
 
 describe('registry', () => {
-  it.each([0, 21, 1.5, -1])(
-    'refuses max attempts %s when defined',
-    (maxAttempts) => {
-      expect(() =>
-        defineJob({
-          payload: z.object({}),
-          maxAttempts,
-          handleIdempotent: async () => {},
-        }),
-      ).toThrow();
-    },
-  );
-
   it('finds only own keys', () => {
     expect(findJob(jobRegistry, 'noop')).toBeDefined();
     expect(findJob(jobRegistry, 'toString')).toBeUndefined();

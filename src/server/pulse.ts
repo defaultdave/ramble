@@ -1,9 +1,10 @@
 import 'server-only';
 import { clientAddress } from '@/lib/clientAddress';
 import { declaredLengthExceeds } from '@/lib/email/message';
+import { bearerToken } from '@/lib/http';
 import {
-  bearerToken,
   chooseClock,
+  decidePulse,
   jobLimits,
   parsePulseBody,
   purgeMayContinue,
@@ -46,21 +47,26 @@ async function purgeRateLimits(startedAt: number): Promise<number> {
  */
 async function runPulse(
   asOf: Date | undefined,
+  heartbeat: boolean,
 ): Promise<DrainReport & { purged: number }> {
   const startedAt = performance.now();
   const report = await drainJobs(asOf ? fixedClock(asOf) : systemClock);
   const purged = await purgeRateLimits(startedAt);
-  // A manual run says nothing about whether the schedule is alive, so it sends no heartbeat.
-  if (!asOf) await sendHeartbeat(env.BETTERSTACK_HEARTBEAT_URL);
+  if (heartbeat) await sendHeartbeat(env.BETTERSTACK_HEARTBEAT_URL);
   return { ...report, purged };
 }
 
 async function handlePulse(request: Request): Promise<PulseResult> {
-  if (request.method !== 'POST') return { status: 401 };
-
   const token = bearerToken(request.headers.get('authorization'));
   const secret = env.PULSE_SECRET;
-  if (!token || !secret || !secureEqual(token, secret)) {
+  const gates = {
+    method: request.method,
+    secretSet: Boolean(secret),
+    tokenMatches: Boolean(token && secret && secureEqual(token, secret)),
+  };
+  const entry = decidePulse({ ...gates, asOf: undefined });
+  if (entry.action === 'refuse') return { status: 401 };
+  if (entry.action === 'reject-secret') {
     const failures = await consumeRateLimit(
       'pulse_failed',
       clientAddress(request.headers.get('x-forwarded-for')),
@@ -98,7 +104,14 @@ async function handlePulse(request: Request): Promise<PulseResult> {
   });
   if (!clock.ok) return { status: 400 };
 
-  return { status: 200, counts: await runPulse(clock.asOf) };
+  const run = decidePulse({ ...gates, asOf: clock.asOf });
+  return {
+    status: 200,
+    counts: await runPulse(
+      clock.asOf,
+      run.action === 'run' && run.sendHeartbeat,
+    ),
+  };
 }
 
 /**

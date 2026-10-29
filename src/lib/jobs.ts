@@ -25,6 +25,7 @@ export const jobLimits = {
   backoffCapSeconds: 6 * 60 * 60,
   asOfWindowDays: 400,
   pulseBodyMaxBytes: 1024,
+  leftCountCap: 1000,
 } as const;
 
 /** Shared with the `jobs_dedupe_key_shape` CHECK, which spells the same pattern. */
@@ -205,10 +206,33 @@ export function deadJobAlertKey(kind: string, jobId: string): string {
   return `${kind.slice(0, 40)}:${jobId}`;
 }
 
-/** Reads `Authorization: Bearer <token>`; anything else is no token. */
-export function bearerToken(header: string | null): string | null {
-  const match = /^bearer ([!-~]{1,256})$/i.exec(header ?? '');
-  return match?.[1] ?? null;
+export const MaxAttemptsSchema = z
+  .int()
+  .min(1)
+  .max(jobLimits.maxAttemptsCeiling);
+
+export type PulseDecision =
+  | { action: 'refuse' }
+  | { action: 'reject-secret' }
+  | { action: 'run'; sendHeartbeat: boolean };
+
+/**
+ * The pulse route's gates. Only POST is served, and a wrong method is refused without being
+ * counted. The secret must be configured and match; a missing, unset, or wrong one is counted by
+ * the route. A manual `asOf` run says nothing about whether the schedule is alive, so it sends no
+ * heartbeat.
+ */
+export function decidePulse(input: {
+  method: string;
+  secretSet: boolean;
+  tokenMatches: boolean;
+  asOf: Date | undefined;
+}): PulseDecision {
+  if (input.method !== 'POST') return { action: 'refuse' };
+  if (!input.secretSet || !input.tokenMatches) {
+    return { action: 'reject-secret' };
+  }
+  return { action: 'run', sendHeartbeat: input.asOf === undefined };
 }
 
 const PulseBodySchema = z.strictObject({

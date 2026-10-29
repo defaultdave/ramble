@@ -39,7 +39,10 @@ export async function insertJob(
   const [row] = await tx
     .insert(jobs)
     .values(values)
-    .onConflictDoNothing()
+    .onConflictDoNothing({
+      target: jobs.dedupeKey,
+      where: sql`${jobs.dedupeKey} IS NOT NULL`,
+    })
     .returning({ id: jobs.id });
   return row ?? null;
 }

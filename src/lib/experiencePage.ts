@@ -1,4 +1,4 @@
-import { durationLabel } from './browse';
+import { durationLabel } from './duration';
 import {
   type CancellationTier,
   type Category,
@@ -15,6 +15,7 @@ import {
   neighborhoodPath,
   privateSessionPath,
 } from './routes';
+import { venueCity } from './venue';
 
 // ---- Words ----
 
@@ -198,7 +199,7 @@ export function mapsHref(meetingPoint: string | null): string | null {
   const stop = text.indexOf('. ');
   const first = (stop === -1 ? text : text.slice(0, stop)).replace(/\.$/, '');
   if (first === '' || first.length > maxMapsQueryLength) return null;
-  const query = encodeURIComponent(`${first}, New York`);
+  const query = encodeURIComponent(`${first}, ${venueCity}`);
   return `https://www.google.com/maps/search/?api=1&query=${query}`;
 }
 

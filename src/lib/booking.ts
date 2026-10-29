@@ -1,9 +1,5 @@
-import { formatMoney, formatPrice } from './money';
+import { formatMoney } from './money';
 import { guestsLabel } from './orderSummary';
-
-export function fromPriceLabel(priceMinor: number): string {
-  return `From ${formatPrice(priceMinor)}`;
-}
 
 export function perPersonLabel(nextDate: string | undefined): string {
   return nextDate ? `per person · next ${nextDate}` : 'per person';

@@ -16,19 +16,22 @@ import {
 import { z } from 'zod';
 import {
   BrowseDayRowsSchema,
-  BrowseExperienceSchema,
   browsePageSize,
   browseWindow,
   maxHandEnteredDayRows,
   maxStoredDayRows,
   splitPage,
-  withPriceOptions,
   type BrowseCursorRow,
   type BrowseDayRows,
-  type BrowseExperience,
   type BrowseRead,
   type BrowseWindow,
 } from '@/lib/browse';
+import {
+  CardExperienceSchema,
+  CardPriceOptionSchema,
+  withPriceOptions,
+  type CardExperience,
+} from '@/lib/experienceCards';
 import {
   BrowseFiltersSchema,
   BrowseQuerySchema,
@@ -119,21 +122,17 @@ function hasSessionOn(date: string | null, window: BrowseWindow) {
 }
 
 const PriceRowsSchema = z.array(
-  z.object({
-    experienceId: z.guid(),
-    priceMinor: z.int().nonnegative(),
-    usesSpace: z.boolean(),
-  }),
+  CardPriceOptionSchema.extend({ experienceId: z.guid() }),
 );
 
 // The status is checked by the parse below, which refuses a row the guest condition let through.
-type ExperienceRow = Omit<BrowseExperience, 'priceOptions' | 'status'> & {
+type ExperienceRow = Omit<CardExperience, 'priceOptions' | 'status'> & {
   status: string;
 };
 
 async function attachPriceOptions(
   rows: readonly ExperienceRow[],
-): Promise<BrowseExperience[]> {
+): Promise<CardExperience[]> {
   if (rows.length === 0) return [];
   const prices = PriceRowsSchema.parse(
     await dbRead
@@ -152,7 +151,7 @@ async function attachPriceOptions(
       .orderBy(asc(priceOptions.priceMinor)),
   );
   return withPriceOptions(rows, prices).map((row) =>
-    BrowseExperienceSchema.parse(row),
+    CardExperienceSchema.parse(row),
   );
 }
 

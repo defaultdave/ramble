@@ -8,8 +8,8 @@ import {
   homeLimits,
   thisWeekExperienceIds,
   thisWeekWindow,
-  type HomeExperience,
 } from '@/lib/home';
+import type { CardExperience } from '@/lib/experienceCards';
 import { readOrRefuse } from '@/server/cache/readOrRefuse';
 import { listCategories, listNeighborhoods } from '@/server/db/catalog';
 import { listHomeModules, listPublishedPicks } from '@/server/db/editorial';
@@ -20,7 +20,7 @@ export type HomeContent = {
   picks: Collection[];
   categories: Category[];
   neighborhoods: Neighborhood[];
-  experiences: HomeExperience[];
+  experiences: CardExperience[];
 };
 
 /**
@@ -53,7 +53,7 @@ export async function getHomeContent(): Promise<HomeContent> {
 export type ThisWeekContent = {
   /** The experiences with an open session, soonest first. */
   experienceIds: string[];
-  experiences: HomeExperience[];
+  experiences: CardExperience[];
 };
 
 /**

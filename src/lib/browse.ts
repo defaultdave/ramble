@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { EntityIdSchema, SlugSchema, guestVisibleStatuses } from './catalog';
+import {
+  toExperienceCard,
+  type CardExperience,
+  type ExperienceCard,
+} from './experienceCards';
 import {
   activeFilterCount,
   hrefForFilters,
@@ -9,9 +13,7 @@ import {
   type BrowseQuery,
 } from './filters';
 import { withCovers, type PhotoView } from './photoViews';
-import { durationLabel } from './duration';
-import { cardPriceLabel } from './pricing';
-import { browsePath, experienceCardPath } from './routes';
+import { browsePath } from './routes';
 import { IsoDateSchema, TimeZoneSchema, isKnownTimeZone } from './sessions';
 import { calendarDateFormat, msPerDay } from './time';
 
@@ -77,45 +79,6 @@ export function browseDays(rows: BrowseDayRows): string[] {
   return [...days].sort();
 }
 
-const BrowsePriceOptionSchema = z.object({
-  priceMinor: z.int().nonnegative(),
-  usesSpace: z.boolean(),
-});
-export type BrowsePriceOption = z.infer<typeof BrowsePriceOptionSchema>;
-
-/** The part of an experience a browse card shows, with nothing a guest may not see. */
-export const BrowseExperienceSchema = z.object({
-  id: EntityIdSchema,
-  slug: SlugSchema,
-  name: z.string().min(1),
-  status: z.enum(guestVisibleStatuses),
-  neighborhoodName: z.string().min(1),
-  durationMinutes: z.int().positive().nullable(),
-  linkOutUrl: z.string().nullable(),
-  priceOptions: z.array(BrowsePriceOptionSchema),
-});
-export type BrowseExperience = z.infer<typeof BrowseExperienceSchema>;
-
-export type PriceRow = {
-  experienceId: string;
-  priceMinor: number;
-  usesSpace: boolean;
-};
-
-/** Each experience with the prices that belong to it, lowest first. A price for an experience that is not listed is ignored. */
-export function withPriceOptions<T extends { id: string }>(
-  rows: readonly T[],
-  prices: readonly PriceRow[],
-): (T & { priceOptions: BrowsePriceOption[] })[] {
-  return rows.map((row) => ({
-    ...row,
-    priceOptions: prices
-      .filter((price) => price.experienceId === row.id)
-      .map(({ priceMinor, usesSpace }) => ({ priceMinor, usesSpace }))
-      .sort((a, b) => a.priceMinor - b.priceMinor),
-  }));
-}
-
 /**
  * One page from a read that fetched `pageSize + 1` rows. The extra row is not shown; its
  * presence is what says there is more, and the last shown row is where the next page starts.
@@ -133,7 +96,7 @@ export function splitPage<T extends { id: string }>(
 }
 
 export type BrowsePage =
-  | { ok: true; items: BrowseExperience[]; nextCursor: string | null }
+  | { ok: true; items: CardExperience[]; nextCursor: string | null }
   | { ok: false; reason: 'cursor_not_found' };
 
 /** The row a page cursor names, as the data layer found it. */
@@ -145,7 +108,7 @@ export type BrowseCursorRow = { id: string; name: string };
  */
 export type BrowseRead = {
   cursor: BrowseCursorRow | null;
-  items: BrowseExperience[];
+  items: CardExperience[];
   nextCursor: string | null;
 };
 
@@ -161,47 +124,6 @@ export function toBrowsePage(
     return { ok: false, reason: 'cursor_not_found' };
   }
   return { ok: true, items: read.items, nextCursor: read.nextCursor };
-}
-
-export type BrowseCard = {
-  id: string;
-  title: string;
-  meta: string;
-  href: string;
-  /** The experience's cover photo; null shows the card's missing-image state. */
-  image: PhotoView | null;
-} & (
-  { kind: 'bookable'; price: string } | { kind: 'guide-only'; hostHref: string }
-);
-
-/**
- * What a card says about an experience, or null when it cannot be shown as one: a bookable experience
- * with no price option that takes a space, or a guide entry with no link out. A card is left out, never
- * repaired. The read keeps both out already, but prices are read after the experiences, so a host who
- * removes the last price between the two reads would otherwise take the whole page down.
- */
-export function toBrowseCard(experience: BrowseExperience): BrowseCard | null {
-  const meta = [
-    experience.neighborhoodName,
-    experience.durationMinutes === null
-      ? null
-      : durationLabel(experience.durationMinutes),
-  ]
-    .filter((part) => part !== null)
-    .join(' · ');
-  const base = {
-    id: experience.id,
-    title: experience.name,
-    meta,
-    href: experienceCardPath(experience),
-    image: null,
-  };
-  if (experience.status === 'guide_only') {
-    if (experience.linkOutUrl === null) return null;
-    return { ...base, kind: 'guide-only', hostHref: experience.linkOutUrl };
-  }
-  const price = cardPriceLabel(experience.priceOptions);
-  return price === null ? null : { ...base, kind: 'bookable', price };
 }
 
 const chipDate = new Intl.DateTimeFormat('en-US', {
@@ -313,7 +235,7 @@ export function nextBrowseDay(
 export type BrowseView =
   | {
       state: 'results';
-      cards: BrowseCard[];
+      cards: ExperienceCard[];
       summary: string;
       /** Goes to the next page, or null on the last. */
       showMore: FormTarget | null;
@@ -366,7 +288,7 @@ export function browseView(
   if (!page.ok) {
     return { state: 'outdated', startHref: hrefForFilters(filters) };
   }
-  const cards = page.items.flatMap((item) => toBrowseCard(item) ?? []);
+  const cards = page.items.flatMap((item) => toExperienceCard(item) ?? []);
   if (cards.length === 0 && page.nextCursor === null) {
     return {
       state: 'empty',

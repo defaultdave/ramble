@@ -3,7 +3,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { requireRole, Role, type Caller } from '@/server/auth/caller';
 import { db } from '@/server/db/client';
 import { experiences, photos } from '@/server/db/schema';
-import { photoLimits, storedPhotoContentType } from '@/lib/photos';
+import { photoLimits } from '@/lib/photos';
 import { curated } from '@/lib/seed/fixtures';
 import { experienceId } from '@/lib/seed/rows';
 import {
@@ -16,6 +16,7 @@ import {
   type TestPhotoPlan,
 } from '@/lib/seed/testPhotos';
 import { ingestPhoto, type IngestedPhoto } from '@/server/photos/ingest';
+import { storeIngestedPhoto } from '@/server/photos/store';
 import type { StoragePort } from '@/server/ports/storage';
 import { encodePng } from './png';
 
@@ -65,20 +66,14 @@ export async function seedTestPhotos(
       );
       // No row owns this key (reconcileTestPhotos), so a file here is left by a stopped run. Keys are never overwritten, so clear it first.
       await storage.delete({ key: photo.storageKey });
-      const put = await storage.put({
-        key: photo.storageKey,
-        body: ingested.bytes,
-        contentType: storedPhotoContentType,
-      });
-      if (!put.url) {
-        throw new Error('A public photo came back without an address');
-      }
-      ready.push({ photo, ingested, url: put.url });
+      const url = await storeIngestedPhoto(storage, photo.storageKey, ingested);
+      ready.push({ photo, ingested, url });
     }
     const { insertedIds, ownedIds } =
       ready.length === 0
         ? { insertedIds: [], ownedIds: [] }
-        : await db.transaction(async (tx) => {
+        : // A file left by a failed transaction is replaced by the next run on purpose (no row owns its key).
+          await db.transaction(async (tx) => {
             const inserted = await tx
               .insert(photos)
               .values(

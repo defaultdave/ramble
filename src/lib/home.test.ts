@@ -7,8 +7,6 @@ import {
   bannerText,
   cardsInOrder,
   docOfText,
-  durationLabel,
-  homeAsOf,
   homeCopy,
   homeCardIds,
   homeExperienceIds,
@@ -17,20 +15,18 @@ import {
   thisWeekExperienceIds,
   thisWeekWindow,
   toHomeCard,
-  venueToday,
   withHomeCovers,
   type HomeExperience,
   type HomeInput,
   type HomeModuleView,
   type ThisWeekSession,
 } from './home';
+import { minuteAsOf } from './time';
 
 // Behaviours under test, one per decision, branch or risk:
-// - the venue day is the New York calendar day, on both sides of its midnight and across the clock change
-// - the cache key is the minute; the week window runs a week from it; a key that is not the ISO instant homeAsOf writes is refused
+// - the cache key is the minute; the week window runs a week from it; a key that is not the ISO instant minuteAsOf writes is refused
 // - the browse address writes only the parameters that are set, escaped, in the grammar order
 // - an experience address names the area by its status
-// - a duration reads as minutes, hours, or half hours, and falls back to hours and minutes
 // - a card price comes only from options that take a space, so a kids class with a free accompanying adult reads the child price
 // - one experience gets the same price on a home card and a browse card
 // - a card is left out when it cannot be shown: no price to book, or no link out
@@ -84,33 +80,7 @@ function session(
 
 const window = thisWeekWindow(date.toISOString());
 
-describe('venueToday', () => {
-  it.each([
-    ['just before New York midnight', '2026-11-03T04:59:00.000Z', '2026-11-02'],
-    [
-      'at UTC midnight, still the evening before in New York',
-      '2026-11-03T00:00:00.000Z',
-      '2026-11-02',
-    ],
-    ['just after New York midnight', '2026-11-03T05:00:00.000Z', '2026-11-03'],
-    ['in summer time', '2026-07-01T03:59:00.000Z', '2026-06-30'],
-    [
-      'on the night the clocks go back',
-      '2026-11-01T05:30:00.000Z',
-      '2026-11-01',
-    ],
-  ])('%s', (_name, instant, expected) => {
-    expect(venueToday(new Date(instant))).toBe(expected);
-  });
-});
-
-describe('homeAsOf and thisWeekWindow', () => {
-  it('cuts the time to the minute', () => {
-    expect(homeAsOf(new Date('2026-11-02T15:00:59.999Z'))).toBe(
-      '2026-11-02T15:00:00.000Z',
-    );
-  });
-
+describe('thisWeekWindow', () => {
   it('runs the window from the key to seven days later', () => {
     expect(window.from.toISOString()).toBe('2026-11-02T15:00:00.000Z');
     expect(window.to.toISOString()).toBe('2026-11-09T15:00:00.000Z');
@@ -126,9 +96,9 @@ describe('homeAsOf and thisWeekWindow', () => {
     expect(() => thisWeekWindow(key)).toThrow(ZodError);
   });
 
-  it('accepts the key homeAsOf writes', () => {
+  it('accepts the key minuteAsOf writes', () => {
     expect(() =>
-      thisWeekWindow(homeAsOf(new Date('2026-11-02T15:00:59.999Z'))),
+      thisWeekWindow(minuteAsOf(new Date('2026-11-02T15:00:59.999Z'))),
     ).not.toThrow();
   });
 });
@@ -159,25 +129,12 @@ describe('homeLimits', () => {
   });
 });
 
-describe('durationLabel', () => {
-  it.each([
-    [45, '45 min'],
-    [59, '59 min'],
-    [60, '1 hr'],
-    [120, '2 hr'],
-    [150, '2.5 hr'],
-    [135, '2 hr 15 min'],
-  ])('%i minutes reads %s', (minutes, label) => {
-    expect(durationLabel(minutes)).toBe(label);
-  });
-});
-
 describe('toHomeCard', () => {
   it('shows a bookable experience with its neighborhood, length, and price', () => {
     expect(toHomeCard(experience(1))).toEqual({
       id: id(1),
       title: 'Thing 1',
-      meta: 'Greenpoint · 2 hr',
+      meta: 'Greenpoint · 2\u00a0hr',
       href: `/experiences/thing-1-${id(1)}`,
       image: null,
       kind: 'bookable',
@@ -215,7 +172,7 @@ describe('toHomeCard', () => {
     ).toEqual({
       id: id(1),
       title: 'Thing 1',
-      meta: 'Greenpoint · 2 hr',
+      meta: 'Greenpoint · 2\u00a0hr',
       href: `/guide/thing-1-${id(1)}`,
       image: null,
       kind: 'guide-only',

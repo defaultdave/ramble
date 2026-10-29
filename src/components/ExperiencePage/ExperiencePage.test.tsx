@@ -56,7 +56,7 @@ describe('ExperiencePage', () => {
         .map((item) => item.textContent),
     ).toEqual([
       'Tribeca',
-      '2 hr',
+      '2\u00a0hr',
       'Ages 14 and up',
       'Weather call 3 hours before start',
       'Free cancellation up to 24 hours before',

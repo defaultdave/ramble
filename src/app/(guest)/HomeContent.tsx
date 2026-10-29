@@ -4,14 +4,10 @@ import { HomeModules } from '@/components/HomeModules';
 import { RichText } from '@/components/RichText';
 import { HomeEmpty, HomeError, HomeTitle } from '@/components/HomeStates';
 import { errorDigest } from '@/lib/errorDigest';
-import {
-  buildHomePage,
-  homeAsOf,
-  homeCardIds,
-  venueToday,
-  withHomeCovers,
-} from '@/lib/home';
+import { buildHomePage, homeCardIds, withHomeCovers } from '@/lib/home';
 import { coverLookupIds, coversByExperience } from '@/lib/photoViews';
+import { minuteAsOf } from '@/lib/time';
+import { venueToday } from '@/lib/venue';
 import { getCoverPhotos } from '@/server/coverPhotos';
 import { getHomeContent, getThisWeek } from '@/server/home';
 import { logger } from '@/server/monitoring/logger';
@@ -27,7 +23,7 @@ export async function HomeContent() {
   try {
     const [content, thisWeek, settings] = await Promise.all([
       getHomeContent(),
-      getThisWeek(homeAsOf(now)),
+      getThisWeek(minuteAsOf(now)),
       getCachedGuestSettings(),
     ]);
     const built = buildHomePage({ ...content, thisWeek, settings });

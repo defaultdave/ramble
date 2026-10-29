@@ -27,6 +27,10 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 // - a rerun writes nothing and keeps every id, url, and created-at
 // - a row removed but its file left (a stopped run) is rewritten under the same id and key
 // - a photo already at a position, from any source, is left alone and its position is not planned again
+// - a photo whose row loses a race for its position is not counted, and its file is removed again
+// - a photo whose id (and so its storage key, which the CHECK builds from the ids) is taken by a row at
+//   another position is not counted, and its file is kept because that row points at it
+// - a file is cleared before a put only when no row owns its key
 // - the step refuses a caller who is not ops before any write
 
 let fresh: FreshDatabase;
@@ -216,4 +220,111 @@ describe('the photo step', () => {
     },
     stepTimeout,
   );
+  describe('when a row appears while the files are being stored', () => {
+    const slug = 'sunday-sound-bath';
+    const id = experienceId(slug);
+    const plan = planTestPhotos({ slug, name: slug });
+
+    const rival = (rivalId: string, position: number) => ({
+      id: rivalId,
+      experienceId: id,
+      position,
+      storageKey: photoStorageKey(id, rivalId),
+      url: 'https://example.invalid/rival.jpg',
+      width: 1600,
+      height: 1067,
+      byteSize: 1000,
+      altText: 'A rival photo',
+      blurDataUrl: 'data:image/jpeg;base64,AAAA',
+      rightsBasis: 'host_agreement' as const,
+    });
+
+    /** The fake store, with a row inserted right after the file of `key` is stored. */
+    const racing = (key: string, row: ReturnType<typeof rival>) => ({
+      ...storage,
+      provider: storage.provider,
+      delete: storage.delete.bind(storage),
+      getSignedUrl: storage.getSignedUrl.bind(storage),
+      put: async (input: Parameters<typeof storage.put>[0]) => {
+        const stored = await storage.put(input);
+        if (input.key === key) await client.db.insert(photos).values(row);
+        return stored;
+      },
+    });
+
+    it(
+      'counts only the rows written and removes the file of one that lost its position',
+      async () => {
+        await client.db.delete(photos).where(eq(photos.experienceId, id));
+        const lost = plan[1];
+        const report = await stepModule.seedTestPhotos(
+          seedCaller,
+          racing(
+            lost?.storageKey ?? '',
+            rival('00000000-0000-4000-8000-000000000002', 1),
+          ),
+        );
+        expect(report).toEqual({
+          created: plan.length - 1,
+          alreadyThere: plannedTotal - (plan.length - 1),
+        });
+        expect(storage.read(lost?.storageKey ?? '')).toBeNull();
+        const stored = await client.db
+          .select({ id: photos.id })
+          .from(photos)
+          .where(eq(photos.experienceId, id));
+        expect(stored).toHaveLength(plan.length);
+        expect(stored.map((row) => row.id)).toContain(
+          '00000000-0000-4000-8000-000000000002',
+        );
+      },
+      stepTimeout,
+    );
+
+    it(
+      'counts only the rows written and keeps the file a row with the same id points at',
+      async () => {
+        await client.db.delete(photos).where(eq(photos.experienceId, id));
+        const taken = plan[2];
+        const report = await stepModule.seedTestPhotos(
+          seedCaller,
+          racing(taken?.storageKey ?? '', rival(taken?.photoId ?? '', 15)),
+        );
+        expect(report).toEqual({
+          created: plan.length - 1,
+          alreadyThere: plannedTotal - (plan.length - 1),
+        });
+        expect(storage.read(taken?.storageKey ?? '')).not.toBeNull();
+        const [owner] = await client.db
+          .select({ position: photos.position })
+          .from(photos)
+          .where(eq(photos.id, taken?.photoId ?? ''));
+        expect(owner?.position).toBe(15);
+      },
+      stepTimeout,
+    );
+
+    it(
+      'does not clear a file that a row at another position owns',
+      async () => {
+        await client.db.delete(photos).where(eq(photos.experienceId, id));
+        const owned = plan[0];
+        await client.db.insert(photos).values(rival(owned?.photoId ?? '', 15));
+        const deleted: string[] = [];
+        const watching = {
+          ...storage,
+          provider: storage.provider,
+          put: storage.put.bind(storage),
+          getSignedUrl: storage.getSignedUrl.bind(storage),
+          delete: async (input: { key: string }) => {
+            deleted.push(input.key);
+            await storage.delete(input);
+          },
+        };
+        await stepModule.seedTestPhotos(seedCaller, watching);
+        expect(deleted).not.toContain(owned?.storageKey);
+      },
+      stepTimeout,
+    );
+  });
 });

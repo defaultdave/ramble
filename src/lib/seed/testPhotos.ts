@@ -2,7 +2,6 @@ import { photoLimits, photoStorageKey } from '@/lib/photos';
 import type { StorageProviderName } from '@/lib/storage';
 import { seedId } from './ids';
 import { experienceId } from './rows';
-import type { SeedTargetVerdict } from './target';
 
 // The generated test photos of the curated set: a labelled gradient per experience and position, drawn
 // from nothing but arithmetic, so no third-party art is involved and a rerun makes the same pixels.
@@ -15,7 +14,8 @@ export const testPhotoLongEdges = [
   photoLimits.storedEdge,
 ] as const;
 
-const minPhotos = 3;
+export const minTestPhotos = 3;
+const minPhotos = minTestPhotos;
 const maxPhotos = 5;
 const labelColumns = 18;
 
@@ -105,30 +105,81 @@ export function planTestPhotos(experience: {
   });
 }
 
-/** The planned positions that have no row yet, so a rerun writes only what is missing. */
-export function missingTestPhotos(
-  plan: readonly TestPhotoPlan[],
-  existingPositions: readonly number[],
-): TestPhotoPlan[] {
-  const taken = new Set(existingPositions);
-  return plan.filter((photo) => !taken.has(photo.position));
+export type TestPhotoTarget = {
+  slug: string;
+  experienceId: string;
+  plan: readonly TestPhotoPlan[];
+};
+
+export type StoredPhotoRef = {
+  experienceId: string;
+  id: string;
+  position: number;
+  storageKey: string;
+};
+
+export type TestPhotoWork = {
+  target: TestPhotoTarget;
+  /** The planned photos with no row at their position and none owning their id or key. */
+  missing: TestPhotoPlan[];
+};
+
+/**
+ * What each experience still needs, from the rows already stored. A photo is left alone when a row
+ * holds its position (whoever wrote it) or owns its id or storage key, so a rerun writes only what is
+ * missing and never clears a file that a row points at.
+ */
+export function reconcileTestPhotos(
+  targets: readonly TestPhotoTarget[],
+  stored: readonly StoredPhotoRef[],
+): TestPhotoWork[] {
+  return targets.map((target) => {
+    const own = stored.filter(
+      (row) => row.experienceId === target.experienceId,
+    );
+    const positions = new Set(own.map((row) => row.position));
+    const ids = new Set(own.map((row) => row.id));
+    const keys = new Set(own.map((row) => row.storageKey));
+    return {
+      target,
+      missing: target.plan.filter(
+        (photo) =>
+          !positions.has(photo.position) &&
+          !ids.has(photo.photoId) &&
+          !keys.has(photo.storageKey),
+      ),
+    };
+  });
+}
+
+/** What one experience's run counts: only rows the database took are written; every other planned photo was already there. */
+export function tallyTestPhotos(planned: number, inserted: number) {
+  return { created: inserted, alreadyThere: planned - inserted };
+}
+
+/** The files stored for photos whose row was not written and that no row owns, so nothing points at them. */
+export function orphanedTestPhotos<T extends { photoId: string }>(
+  attempted: readonly T[],
+  insertedIds: readonly string[],
+  ownedIds: readonly string[],
+): T[] {
+  const kept = new Set([...insertedIds, ...ownedIds]);
+  return attempted.filter((photo) => !kept.has(photo.photoId));
 }
 
 type StepVerdict = { run: true } | { run: false; line: string };
 
 /**
- * Whether the photo step runs. The fake provider keeps objects in memory behind an address that does
- * not resolve, so a row written for it is useless anywhere but the machine that made it: only the
- * local target takes it. Production is already refused by the target check unless the demo opt-in is set.
+ * Whether the photo step runs. The fake provider keeps objects in memory behind an address that
+ * `next/image` refuses outside production and test, so a row written for it breaks every page that
+ * draws the photo in `next dev`. Only a real store takes the step. Production is already refused by
+ * the target check unless the demo opt-in is set.
  */
-export function photoStepFor(
-  target: Extract<SeedTargetVerdict, { ok: true }>['target'],
-  provider: StorageProviderName,
-): StepVerdict {
-  if (provider === 'fake' && target !== 'local') {
+export function photoStepFor(provider: StorageProviderName): StepVerdict {
+  if (provider === 'fake') {
     return {
       run: false,
-      line: `Photos skipped: STORAGE_PROVIDER=fake keeps images in memory, so ${target} rows would point at nothing. Set STORAGE_PROVIDER=vercel-blob (docs/runbooks/seed.md).`,
+      line: 'Photos skipped: STORAGE_PROVIDER=fake has no address next/image can show. Set STORAGE_PROVIDER=vercel-blob to seed photos (docs/runbooks/seed.md).',
     };
   }
   return { run: true };
@@ -168,21 +219,6 @@ export function photoCoverageGaps(
     }
   }
   return gaps;
-}
-
-export const photosLine = (created: number, alreadyThere: number) =>
-  `Photos: ${String(created)} written, ${String(alreadyThere)} already there`;
-
-export function photoCoverageLine(
-  gaps: readonly string[],
-  experiences: number,
-): { code: 0 | 1; line: string } {
-  return gaps.length > 0
-    ? { code: 1, line: `Photo coverage has gaps: ${gaps.join('; ')}` }
-    : {
-        code: 0,
-        line: `Photo coverage: ${String(experiences)} experiences, each with a cover and at least ${String(minPhotos)} photos`,
-      };
 }
 
 // A 5 by 7 bitmap font for the labels, one 5-bit row per line. Anything not listed draws as blank.

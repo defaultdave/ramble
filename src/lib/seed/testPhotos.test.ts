@@ -4,11 +4,12 @@ import { curated } from './fixtures';
 import { experienceId } from './rows';
 import {
   labelScale,
-  missingTestPhotos,
   photoCoverageGaps,
-  photoCoverageLine,
   photoStepFor,
+  orphanedTestPhotos,
   planTestPhotos,
+  reconcileTestPhotos,
+  tallyTestPhotos,
   renderTestPhoto,
   testPhotoCount,
   testPhotoLongEdges,
@@ -125,24 +126,92 @@ describe('planTestPhotos', () => {
   });
 });
 
-describe('missingTestPhotos', () => {
+describe('reconcileTestPhotos', () => {
   const plan = planTestPhotos(sample);
+  const experienceId = 'e1';
+  const target = { slug: sample.slug, experienceId, plan };
+  const row = (
+    position: number,
+    id = `id-${String(position)}`,
+    key = `k-${id}`,
+  ) => ({
+    experienceId,
+    id,
+    position,
+    storageKey: key,
+  });
+  const missingPositions = (stored: ReturnType<typeof row>[]) =>
+    reconcileTestPhotos([target], stored)[0]?.missing.map((p) => p.position);
+  const all = plan.map((p) => p.position);
 
   it.each([
-    [[], plan.length],
-    [[0], plan.length - 1],
-    [[0, 1, 2], plan.length - 3],
-    [plan.map((p) => p.position), 0],
-    [[7], plan.length],
+    [[], all.length],
+    [[0], all.length - 1],
+    [[0, 1, 2], all.length - 3],
+    [all, 0],
+    [[7], all.length],
   ])('with positions %j stored plans %i more', (stored, expected) => {
-    expect(missingTestPhotos(plan, stored)).toHaveLength(expected);
+    expect(missingPositions(stored.map((p) => row(p)))).toHaveLength(expected);
   });
 
   it('keeps the planned order of what is left', () => {
-    expect(missingTestPhotos(plan, [1]).map((p) => p.position)).toEqual(
-      plan.map((p) => p.position).filter((p) => p !== 1),
+    expect(missingPositions([row(1)])).toEqual(all.filter((p) => p !== 1));
+  });
+
+  it('leaves a photo alone when a row at another position owns its id', () => {
+    expect(missingPositions([row(9, plan[2]?.photoId)])).toEqual(
+      all.filter((p) => p !== 2),
     );
   });
+
+  it('leaves a photo alone when a row at another position owns its storage key', () => {
+    expect(missingPositions([row(9, 'other', plan[1]?.storageKey)])).toEqual(
+      all.filter((p) => p !== 1),
+    );
+  });
+
+  it('ignores rows of other experiences and keeps one entry per target', () => {
+    const other = {
+      slug: 'o',
+      experienceId: 'e2',
+      plan: planTestPhotos({ slug: 'o', name: 'O' }),
+    };
+    const work = reconcileTestPhotos(
+      [target, other],
+      [{ ...row(0), experienceId: 'e2' }],
+    );
+    expect(work.map((w) => w.target.slug)).toEqual([sample.slug, 'o']);
+    expect(work[0]?.missing).toHaveLength(plan.length);
+    expect(work[1]?.missing).toHaveLength(other.plan.length - 1);
+  });
+});
+
+describe('tallyTestPhotos', () => {
+  it.each([
+    [5, 5, { created: 5, alreadyThere: 0 }],
+    [5, 0, { created: 0, alreadyThere: 5 }],
+    [5, 2, { created: 2, alreadyThere: 3 }],
+  ])('of %i planned with %i inserted', (planned, inserted, expected) => {
+    expect(tallyTestPhotos(planned, inserted)).toEqual(expected);
+  });
+});
+
+describe('orphanedTestPhotos', () => {
+  const attempted = [{ photoId: 'a' }, { photoId: 'b' }, { photoId: 'c' }];
+
+  it.each([
+    [['a', 'b', 'c'], [], []],
+    [['a'], ['b'], ['c']],
+    [[], [], ['a', 'b', 'c']],
+    [['a'], [], ['b', 'c']],
+  ])(
+    'with inserted %j and owned %j, orphans %j',
+    (inserted, owned, orphans) => {
+      expect(
+        orphanedTestPhotos(attempted, inserted, owned).map((p) => p.photoId),
+      ).toEqual(orphans);
+    },
+  );
 });
 
 describe('wrapLabel', () => {
@@ -233,22 +302,14 @@ describe('renderTestPhoto', () => {
 });
 
 describe('photoStepFor', () => {
-  it.each([
-    ['local', 'fake', true],
-    ['local', 'vercel-blob', true],
-    ['staging', 'vercel-blob', true],
-    ['load-test', 'vercel-blob', true],
-    ['production-demo', 'vercel-blob', true],
-    ['staging', 'fake', false],
-    ['load-test', 'fake', false],
-    ['production-demo', 'fake', false],
-  ] as const)('on %s with %s, runs: %s', (target, provider, run) => {
-    expect(photoStepFor(target, provider).run).toBe(run);
+  it('runs for the Blob store', () => {
+    expect(photoStepFor('vercel-blob')).toEqual({ run: true });
   });
 
-  it('says why the fake is skipped, naming the target', () => {
-    const verdict = photoStepFor('production-demo', 'fake');
-    expect(verdict.run ? '' : verdict.line).toContain('production-demo');
+  it('skips the fake provider and says what to set instead', () => {
+    const verdict = photoStepFor('fake');
+    expect(verdict.run).toBe(false);
+    expect(verdict.run ? '' : verdict.line).toContain('vercel-blob');
   });
 });
 
@@ -311,23 +372,5 @@ describe('photoCoverageGaps', () => {
 
   it('ignores photos of experiences it was not asked about', () => {
     expect(photoCoverageGaps(['a'], [...full('a'), row('z', 0)])).toEqual([]);
-  });
-});
-
-describe('photoCoverageLine', () => {
-  it('exits 0 with the count when there are no gaps', () => {
-    expect(photoCoverageLine([], 25)).toEqual({
-      code: 0,
-      line: expect.stringContaining('25 experiences') as unknown,
-    });
-  });
-
-  it('exits 1 and joins the gaps', () => {
-    const result = photoCoverageLine(
-      ['a has no cover', 'b has 1 photos, needs 3'],
-      25,
-    );
-    expect(result.code).toBe(1);
-    expect(result.line).toContain('a has no cover; b has 1 photos');
   });
 });

@@ -2,13 +2,17 @@ import 'server-only';
 import { curated } from '@/lib/seed/fixtures';
 import { parseSeedArgs } from '@/lib/seed/args';
 import { describeFailure } from '@/lib/seed/decide';
-import { coverageExit, refusalLine, startLine } from '@/lib/seed/outcome';
-import { checkSeedTarget, type SeedTargetInput } from '@/lib/seed/target';
 import {
+  combineSeedExits,
+  coverageExit,
   photoCoverageLine,
   photosLine,
-  photoStepFor,
-} from '@/lib/seed/testPhotos';
+  refusalLine,
+  startLine,
+  type SeedExit,
+} from '@/lib/seed/outcome';
+import { checkSeedTarget, type SeedTargetInput } from '@/lib/seed/target';
+import { photoStepFor } from '@/lib/seed/testPhotos';
 import type { StorageProviderName } from '@/lib/storage';
 import type { StoragePort } from '@/server/ports/storage';
 import { db } from '@/server/db/client';
@@ -27,14 +31,11 @@ export type SeedCommand = {
   write: (line: string) => void;
 };
 
-async function seedPhotos(
-  command: SeedCommand,
-  target: Parameters<typeof photoStepFor>[0],
-): Promise<0 | 1> {
-  const step = photoStepFor(target, command.storage.provider);
+async function seedPhotos(command: SeedCommand): Promise<SeedExit | null> {
+  const step = photoStepFor(command.storage.provider);
   if (!step.run) {
     command.write(step.line);
-    return 0;
+    return null;
   }
   const report = await seedTestPhotos(seedCaller, command.storage.open());
   command.write(photosLine(report.created, report.alreadyThere));
@@ -43,7 +44,7 @@ async function seedPhotos(
     curated.experiences.length,
   );
   command.write(exit.line);
-  return exit.code;
+  return exit;
 }
 
 /**
@@ -79,8 +80,7 @@ export async function runSeedCommand(command: SeedCommand): Promise<number> {
       args.scale,
     );
     write(exit.line);
-    const photoCode = await seedPhotos(command, verdict.target);
-    return exit.code === 0 ? photoCode : exit.code;
+    return combineSeedExits(exit, await seedPhotos(command));
   } catch (error) {
     write(describeFailure(error));
     return 1;

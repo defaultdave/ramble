@@ -14,7 +14,7 @@ import { seedCaller } from './caller';
 // - a coverage gap exits 1 and names the probe; a scale run holds the scale probe to account
 // - after the coverage matrix the photo step opens the store, writes the photos, and checks the cover and
 //   the three-photo floor; a gap exits 1 and names the experience
-// - the fake provider on any target but local skips the photo step without opening the store
+// - the fake provider on any target, local included, skips the photo step without opening the store
 // - a refusal never opens the store
 // - a failure prints only a safe message, exits 1, and still closes the pool
 
@@ -173,29 +173,29 @@ describe('runSeedCommand', () => {
       expect(end).toHaveBeenCalledTimes(1);
     });
 
-    it('skips them for the fake provider on a staging target, without opening the store', async () => {
-      const base = command().target;
-      const code = await run({
-        storage: { provider: 'fake', open: openStorage },
-        target: {
-          ...base,
-          seedTarget: 'staging',
-          databaseUrl: 'postgres://u:secret@db.example.com/ramble',
-          seedHost: 'db.example.com',
-        },
-      });
-      expect(code).toBe(0);
-      expect(lines.join('\n')).toContain('Photos skipped');
-      expect(openStorage).not.toHaveBeenCalled();
-      expect(seedTestPhotos).not.toHaveBeenCalled();
-    });
-
-    it('writes them on the local target with the fake provider', async () => {
-      expect(
-        await run({ storage: { provider: 'fake', open: openStorage } }),
-      ).toBe(0);
-      expect(seedTestPhotos).toHaveBeenCalledTimes(1);
-    });
+    it.each([['local'], ['staging']] as const)(
+      'skips them for the fake provider on the %s target, without opening the store',
+      async (seedTarget) => {
+        const base = command().target;
+        const code = await run({
+          storage: { provider: 'fake', open: openStorage },
+          target:
+            seedTarget === 'local'
+              ? base
+              : {
+                  ...base,
+                  seedTarget,
+                  databaseUrl: 'postgres://u:secret@db.example.com/ramble',
+                  seedHost: 'db.example.com',
+                },
+        });
+        expect(code).toBe(0);
+        expect(lines.join('\n')).toContain('Photos skipped');
+        expect(openStorage).not.toHaveBeenCalled();
+        expect(seedTestPhotos).not.toHaveBeenCalled();
+        expect(readPhotoCoverageGaps).not.toHaveBeenCalled();
+      },
+    );
 
     it('does not open the store when the target is refused', async () => {
       const base = command().target;

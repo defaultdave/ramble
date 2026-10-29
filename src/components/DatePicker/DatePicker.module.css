@@ -90,6 +90,7 @@
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
   cursor: pointer;
+  /* The ring is drawn from [data-focus-visible] below, so the browser's own outline would double it. */
   outline: none;
 }
 

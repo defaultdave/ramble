@@ -39,7 +39,7 @@ The lead photo goes through `next/image` preloaded (`next/image`'s `preload`) wi
 
 ## When a read fails
 
-A failed read renders the heading "Experience", a danger alert ("We couldn't load this experience"), and a Try again button, a GET form to the page's own address. Only the digest is logged. The head falls back to the plain title.
+A failed read renders the heading "Experience", a danger alert ("We couldn't load this experience"), and a Try again button, a GET form to the page's own address. Only the digest and the kind of the error are logged (`digest` and `kind` fields, through `rethrowOrLog`). The head falls back to the plain title and logs the same way, so a failed experience read logs twice per request, once from the head and once from the page.
 
 ## What the e2e run covers
 

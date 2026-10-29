@@ -132,8 +132,10 @@
 }
 
 /* The row waits for the copy column, not the viewport: beside the picture the column is too narrow
-   for two fields and a button until the viewport is wide. */
-@container (min-width: 640px) {
+   for two fields and a button until the viewport is wide. 736px is two selects at 230px (the
+   172px "Anywhere in New York" plus 16px, 40px and 2px of padding and border), the 218px button,
+   two 12px gaps and the 34px of box padding and border; a narrower row clips the label. */
+@container (min-width: 736px) {
   .search {
     flex-direction: row;
     align-items: flex-end;

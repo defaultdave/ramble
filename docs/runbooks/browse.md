@@ -4,7 +4,7 @@ How `/new-york/browse` works: the address grammar, what each part of it does, th
 
 ## The address
 
-`src/lib/filters.ts` is the one place the grammar lives. `parseFilters(searchParams)` reads it and `toQuery` / `browseHref` write it; nothing else builds a browse address.
+`src/lib/filters.ts` is the one place the grammar lives. `parseFilters(searchParams)` reads it and `toQuery` / `browseHref` write it. `src/lib/routes.ts` owns the path, `browsePath`; nothing else builds a browse address.
 
 | Parameter | Meaning | Rule |
 |---|---|---|
@@ -32,7 +32,7 @@ A filter change always starts again from the first results: `hrefForFilters` lea
 
 `getBrowseDates` passes the rows from `listBrowseDayRows` to `browseDays` in `src/lib/browse.ts`, which decides the days: the data layer fetches, the lib decides.
 
-The cache key includes `asOf`, the current time cut to the minute (`browseAsOf`), so guests inside one minute share an entry. A change that reaches an entry through `tagsForChange` is seen at once; a session added to an experience that is not on a cached page waits out the 60 seconds.
+The cache key includes `asOf`, the current time cut to the minute (`minuteAsOf`), so guests inside one minute share an entry. A change that reaches an entry through `tagsForChange` is seen at once; a session added to an experience that is not on a cached page waits out the 60 seconds.
 
 Paging is keyset, never `OFFSET`. Results are ordered by name and then id, a page is read as 13 rows and shown as 12 (`browsePageSize`), and `after` is the id of the last row shown. The next page is every row past that name and id. If the row behind `after` is hidden or gone, the data layer returns an empty page and no cursor row, and `toBrowsePage` in `src/lib/browse.ts` turns that into `cursor_not_found`: the page says so and links back to the first results.
 

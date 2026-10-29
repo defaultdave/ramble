@@ -332,7 +332,7 @@
 }
 
 /* The row waits for the copy column, as the hero's does. */
-@container (min-width: 640px) {
+@container (min-width: 736px) {
   .search {
     flex-direction: row;
     align-items: flex-end;

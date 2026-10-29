@@ -159,6 +159,46 @@ describe('environment', () => {
     );
   });
 
+  describe('SEED_HOST', () => {
+    it('accepts a hostname', async () => {
+      vi.stubEnv('SEED_HOST', 'ep-quiet-cell-123.us-east-2.aws.neon.tech');
+
+      const env = await loadEnv();
+
+      expect(env.SEED_HOST).toBe('ep-quiet-cell-123.us-east-2.aws.neon.tech');
+    });
+
+    it.each([undefined, ''])('reads %j as not set', async (value) => {
+      vi.stubEnv('SEED_HOST', value);
+
+      const env = await loadEnv();
+
+      expect(env.SEED_HOST).toBeUndefined();
+    });
+
+    it.each([
+      ['a URL', 'postgres://u:p@host.neon.tech/db'],
+      ['a space', 'host .neon.tech'],
+      ['a host longer than 253 characters', 'a'.repeat(254)],
+    ])('fails at import for %s', async (_name, value) => {
+      vi.stubEnv('SEED_HOST', value);
+
+      await expect(loadEnv()).rejects.toThrow(/SEED_HOST/);
+    });
+  });
+
+  it('reports only the length issue for an over-long SEED_HOST that also has a bad character', async () => {
+    vi.stubEnv('SEED_HOST', `${'a'.repeat(253)} b`);
+
+    const error = await loadEnv().then(
+      () => new Error('loaded'),
+      (caught: unknown) => (caught instanceof Error ? caught : new Error('?')),
+    );
+
+    expect(error.message.split('✖')).toHaveLength(2);
+    expect(error.message).not.toContain('not a hostname');
+  });
+
   describe('database URLs', () => {
     const pooled = 'postgres://u:p@host-pooler.neon.tech/db';
     const direct = 'postgresql://u:p@host.neon.tech/db';

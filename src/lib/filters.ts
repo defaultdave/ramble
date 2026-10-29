@@ -95,6 +95,39 @@ export function parseFilters(searchParams: RawSearchParams): BrowseQuery {
   };
 }
 
+type SlugOptions = {
+  categories: readonly { slug: string }[];
+  neighborhoods: readonly { slug: string }[];
+};
+
+/**
+ * The filters the catalog has a category or neighborhood for. A slug nobody has is dropped, so a
+ * made-up one never becomes a cache key or reaches the database. `matchesNothing` is set when a list
+ * had slugs and none is known: that list matches no experience, as a slug with no row always did, and
+ * the browse is empty without a read. A list with some known slugs shows what they match.
+ */
+export function knownFilters(
+  filters: BrowseFilters,
+  options: SlugOptions,
+): { filters: BrowseFilters; matchesNothing: boolean } {
+  const categories = keepKnown(filters.categories, options.categories);
+  const neighborhoods = keepKnown(filters.neighborhoods, options.neighborhoods);
+  return {
+    filters: { ...filters, categories, neighborhoods },
+    matchesNothing:
+      (filters.categories.length > 0 && categories.length === 0) ||
+      (filters.neighborhoods.length > 0 && neighborhoods.length === 0),
+  };
+}
+
+function keepKnown(
+  slugs: readonly string[],
+  options: readonly { slug: string }[],
+) {
+  const known = new Set(options.map(({ slug }) => slug));
+  return slugs.filter((slug) => known.has(slug));
+}
+
 /** The same pairs `toQuery` writes, for a form that sends them as hidden fields. */
 export function toQueryEntries({
   filters,

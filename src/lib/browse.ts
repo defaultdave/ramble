@@ -87,6 +87,13 @@ export type BrowsePage =
   | { ok: true; items: CardExperience[]; nextCursor: string | null }
   | { ok: false; reason: 'cursor_not_found' };
 
+/** The page for filters that match nothing, which needs no read. */
+export const emptyBrowsePage: BrowsePage = {
+  ok: true,
+  items: [],
+  nextCursor: null,
+};
+
 /** The row a page cursor names, as the data layer found it. */
 export type BrowseCursorRow = { id: string; name: string };
 

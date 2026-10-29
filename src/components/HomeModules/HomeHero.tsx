@@ -78,7 +78,7 @@ export function HomeHero({
               />
             </div>
             <div className={styles.submit}>
-              <Button type="submit" iconStart={<Search />}>
+              <Button type="submit" size="lg" iconStart={<Search />}>
                 Find something to do
               </Button>
             </div>

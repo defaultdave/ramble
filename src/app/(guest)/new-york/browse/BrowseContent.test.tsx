@@ -6,6 +6,8 @@ import { BrowseContent } from './BrowseContent';
 // Behaviours under test, one per decision, branch or risk:
 // - the cover photos of the experiences on the page are read once, by their IDs in one order, and shown on their cards
 // - a page with no result asks for no cover
+// - a polite live region carries the count, or the empty heading, for the current filters
+// - the live region is on the page and empty when the read failed
 // - a failed cover read logs only the digest and kind and renders the error state, which keeps the filters
 
 const server = vi.hoisted(() => ({
@@ -115,6 +117,14 @@ describe('BrowseContent', () => {
     );
   });
 
+  it('renders the live region empty on the error path, so a recovery updates the same node', async () => {
+    server.covers.mockRejectedValue(driverError);
+
+    await render_();
+
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+  });
+
   it('offers the next day from the calendar days when a dated browse has no results', async () => {
     server.dates.mockResolvedValue(['2026-11-02', '2026-11-09']);
     server.results.mockResolvedValue({
@@ -135,6 +145,30 @@ describe('BrowseContent', () => {
     expect(screen.getByRole('link', { name: 'Any day' })).toHaveAttribute(
       'href',
       '/new-york/browse',
+    );
+  });
+
+  it('carries the count in a live region', async () => {
+    await render_();
+
+    expect(screen.getByRole('status')).toHaveTextContent('2 experiences');
+  });
+
+  it('carries the empty heading for a chosen day in the live region', async () => {
+    server.results.mockResolvedValue({
+      ok: true,
+      items: [],
+      nextCursor: null,
+    });
+
+    render(
+      await BrowseContent({
+        searchParams: Promise.resolve({ date: '2026-11-07' }),
+      }),
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Nothing on Sat, Nov 7',
     );
   });
 });

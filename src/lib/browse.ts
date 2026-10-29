@@ -9,6 +9,7 @@ import {
   hrefForFilters,
   toQueryEntries,
   withDate,
+  type BrowseFilters,
   type BrowseQuery,
 } from './filters';
 import { withCovers, type PhotoView } from './photoViews';
@@ -141,6 +142,64 @@ export function dateChipLabel(date: string): string {
 export function resultsSummary(shown: number, hasMore: boolean): string {
   const count = `${String(shown)} ${shown === 1 ? 'experience' : 'experiences'}`;
   return hasMore ? `Showing ${count}` : count;
+}
+
+/**
+ * The heading over the results for what the page shows now: the count, or the words of the empty
+ * or moved state, for the live region that announces a change of filters. The error state has its
+ * own alert and no heading.
+ */
+export function browseHeading(view: BrowseView): string | null {
+  switch (view.state) {
+    case 'results':
+      return view.summary;
+    case 'empty':
+      if (view.dated) return `Nothing on ${view.dated.dateLabel}`;
+      return view.filtered
+        ? 'Nothing matches those filters'
+        : 'Nothing to browse yet';
+    case 'outdated':
+      return 'That page of results has moved';
+    case 'error':
+      return null;
+  }
+}
+
+type TitleOption = { slug: string; name: string };
+
+const titleList = new Intl.ListFormat('en-US', {
+  style: 'long',
+  type: 'conjunction',
+});
+
+/**
+ * The page title for the filters, so the route announcer reads something new after each change:
+ * "Browse Cooking experiences in DUMBO on Sat, Nov 7". Names are the chosen categories and
+ * neighborhoods, in the order of the filters, looked up in the options; a slug with no option is
+ * left out.
+ */
+export function browseTitle(
+  filters: BrowseFilters,
+  options: {
+    categories: readonly TitleOption[];
+    neighborhoods: readonly TitleOption[];
+  },
+): string {
+  const named = (slugs: readonly string[], rows: readonly TitleOption[]) => {
+    const lookup = new Map(rows.map(({ slug, name }) => [slug, name]));
+    return slugs.flatMap((slug) => lookup.get(slug) ?? []);
+  };
+  const categories = named(filters.categories, options.categories);
+  const neighborhoods = named(filters.neighborhoods, options.neighborhoods);
+  return [
+    'Browse',
+    categories.length > 0 ? titleList.format(categories) : null,
+    'experiences',
+    neighborhoods.length > 0 ? `in ${titleList.format(neighborhoods)}` : null,
+    filters.date ? `on ${dateChipLabel(filters.date)}` : null,
+  ]
+    .filter((part) => part !== null)
+    .join(' ');
 }
 
 /** A GET form that goes to `action` with `fields` in its query, so a button can carry a whole address. */

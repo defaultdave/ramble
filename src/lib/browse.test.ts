@@ -4,6 +4,8 @@ import {
   browseCardIds,
   browseDays,
   browseDateHorizonDays,
+  browseHeading,
+  browseTitle,
   browsePageSize,
   browseView,
   browseWindow,
@@ -17,10 +19,11 @@ import {
   toBrowsePage,
   withBrowseCovers,
   type BrowsePage,
+  type BrowseView,
   type BrowseRead,
 } from './browse';
 import type { CardExperience } from './experienceCards';
-import { noFilters } from './filters';
+import { noFilters, type BrowseFilters } from './filters';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the window runs from the cache time to the horizon
@@ -627,5 +630,99 @@ describe('BrowseDayRowsSchema', () => {
     ],
   ])('refuses %s', (_name, rows) => {
     expect(BrowseDayRowsSchema.safeParse(rows).success).toBe(false);
+  });
+});
+
+describe('browseHeading', () => {
+  const dated = {
+    dateLabel: 'Sat, Nov 7',
+    nextDay: null,
+    anyDayHref: '/new-york/browse',
+    message: '',
+  };
+  it.each([
+    [
+      'the count on results',
+      {
+        state: 'results',
+        cards: [],
+        summary: 'Showing 12 experiences',
+        showMore: null,
+        startHref: null,
+      },
+      'Showing 12 experiences',
+    ],
+    [
+      'the day on an empty chosen day',
+      { state: 'empty', filtered: true, dated },
+      'Nothing on Sat, Nov 7',
+    ],
+    [
+      'filters on an empty filtered page',
+      { state: 'empty', filtered: true, dated: null },
+      'Nothing matches those filters',
+    ],
+    [
+      'an empty catalog',
+      { state: 'empty', filtered: false, dated: null },
+      'Nothing to browse yet',
+    ],
+    [
+      'a moved page',
+      { state: 'outdated', startHref: '/new-york/browse' },
+      'That page of results has moved',
+    ],
+    [
+      'nothing on error, which has its own alert',
+      { state: 'error', retry: { action: '/new-york/browse', fields: [] } },
+      null,
+    ],
+  ] as const)('says %s', (_name, view, text) => {
+    expect(browseHeading(view as unknown as BrowseView)).toBe(text);
+  });
+});
+
+describe('browseTitle', () => {
+  const names = {
+    categories: [
+      { slug: 'cooking', name: 'Cooking' },
+      { slug: 'wine', name: 'Wine' },
+      { slug: 'tours', name: 'Tours' },
+    ],
+    neighborhoods: [{ slug: 'dumbo', name: 'DUMBO' }],
+  };
+  const empty = { categories: [], neighborhoods: [] };
+  const filters = (over: Partial<BrowseFilters>): BrowseFilters => ({
+    ...noFilters,
+    ...over,
+  });
+  it.each([
+    ['no filters', {}, 'Browse experiences'],
+    ['a day', { date: '2026-10-31' }, 'Browse experiences on Sat, Oct 31'],
+    ['a category', { categories: ['cooking'] }, 'Browse Cooking experiences'],
+    [
+      'two categories',
+      { categories: ['cooking', 'wine'] },
+      'Browse Cooking and Wine experiences',
+    ],
+    [
+      'three categories',
+      { categories: ['cooking', 'tours', 'wine'] },
+      'Browse Cooking, Tours, and Wine experiences',
+    ],
+    [
+      'everything',
+      { categories: ['cooking'], neighborhoods: ['dumbo'], date: '2026-11-07' },
+      'Browse Cooking experiences in DUMBO on Sat, Nov 7',
+    ],
+    [
+      'a slug with no name',
+      { categories: ['unknown'], neighborhoods: ['gone'] },
+      'Browse experiences',
+    ],
+    ['no options at all', { categories: ['cooking'] }, 'Browse experiences'],
+  ])('words %s', (name, over, title) => {
+    const options = name === 'no options at all' ? empty : names;
+    expect(browseTitle(filters(over), options)).toBe(title);
   });
 });

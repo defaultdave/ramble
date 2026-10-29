@@ -3,6 +3,7 @@ import { BrowseResults } from '@/components/BrowseResults';
 import { FilterBar } from '@/components/FilterBar';
 import {
   browseCardIds,
+  browseHeading,
   browseView,
   errorView,
   withBrowseCovers,
@@ -19,6 +20,8 @@ import {
 } from '@/server/browse';
 import { chooseBrowseDate } from '@/server/actions/browse';
 import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
+
+import styles from './page.module.css';
 
 type BrowseContentProps = { searchParams: Promise<RawSearchParams> };
 
@@ -42,12 +45,22 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
     loaded = { options, dates, page, covers: coversByExperience(covers) };
   } catch (error) {
     rethrowOrLog('Browse could not be read', error);
-    return <BrowseResults {...errorView(query)} />;
+    return (
+      <>
+        <p role="status" className={styles.announcement} />
+        <BrowseResults {...errorView(query)} />
+      </>
+    );
   }
 
   const { options, dates, page, covers } = loaded;
+  const view = withBrowseCovers(browseView(query, page, dates), covers);
   return (
     <>
+      {/* Always rendered, so a screen reader hears the text change when the filters do. */}
+      <p role="status" className={styles.announcement}>
+        {browseHeading(view)}
+      </p>
       <FilterBar
         categories={options.categories.map(({ slug, name }) => ({
           slug,
@@ -62,9 +75,7 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
         availableDates={dates}
         onPickDate={chooseBrowseDate.bind(null, filters)}
       />
-      <BrowseResults
-        {...withBrowseCovers(browseView(query, page, dates), covers)}
-      />
+      <BrowseResults {...view} />
     </>
   );
 }

@@ -9,6 +9,7 @@ import {
   planCard,
   testCards,
   validateCard,
+  visibleErrors,
   type CardFields,
 } from './fakeCard';
 
@@ -164,6 +165,26 @@ describe('validateCard', () => {
         validateCard({ number: '', expiry: '', cvc: '', zip: '' }, now),
       ),
     ).toEqual(['number', 'expiry', 'cvc', 'zip']);
+  });
+});
+
+describe('visibleErrors', () => {
+  it('lists the errors in the order the fields sit, whatever order they were found in', () => {
+    expect(visibleErrors({ zip: 'z', number: 'n', cvc: 'c' })).toEqual([
+      { field: 'number', message: 'n' },
+      { field: 'cvc', message: 'c' },
+      { field: 'zip', message: 'z' },
+    ]);
+  });
+
+  it('skips fields without an error', () => {
+    expect(visibleErrors({ expiry: 'e' })).toEqual([
+      { field: 'expiry', message: 'e' },
+    ]);
+  });
+
+  it('is empty when there are none', () => {
+    expect(visibleErrors({})).toEqual([]);
   });
 });
 

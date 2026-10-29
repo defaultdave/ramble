@@ -193,6 +193,35 @@ describe('FakePaymentForm', () => {
       );
     });
 
+    it('keeps focus off the page when the guest fails it: the notice takes it', async () => {
+      const { user, confirm } = await toChallenge();
+      confirm.mockResolvedValueOnce({
+        status: 'declined',
+        failureCode: 'authentication_failed',
+      });
+      const fail = screen.getByRole('button', { name: 'Fail verification' });
+      await user.click(fail);
+      await screen.findByText("We couldn't verify it's you");
+      await waitFor(() => {
+        expect(document.body).not.toHaveFocus();
+      });
+      expect(
+        screen.getByText("We couldn't verify it's you").closest('[tabindex]'),
+      ).toHaveFocus();
+    });
+
+    it('locks Fail verification with aria-disabled, not disabled, while sending', async () => {
+      const { user, confirm } = await toChallenge();
+      confirm.mockReturnValueOnce(new Promise(() => undefined));
+      await user.click(
+        screen.getByRole('button', { name: 'Fail verification' }),
+      );
+      const fail = screen.getByRole('button', { name: 'Fail verification' });
+      expect(fail).toHaveAttribute('aria-disabled', 'true');
+      expect(fail).toBeEnabled();
+      expect(fail).toHaveFocus();
+    });
+
     it('returns to the card with a message when the guest fails it', async () => {
       const { user, confirm } = await toChallenge();
       confirm.mockResolvedValueOnce({
@@ -244,7 +273,29 @@ describe('FakePaymentForm', () => {
       expect(await screen.findByText('Apple Pay was cancelled')).toBeVisible();
       expect(screen.getByText(/Nothing was charged/)).toBeVisible();
       expect(confirm).not.toHaveBeenCalled();
+      expect(
+        screen.getByText('Apple Pay was cancelled').closest('[tabindex]'),
+      ).toHaveFocus();
     });
+  });
+
+  it('announces the in-flight state', async () => {
+    let release: (result: FakeConfirmResult) => void = () => undefined;
+    const { user } = setup(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+    const announced = () =>
+      screen
+        .getAllByRole('status')
+        .some((region) => region.textContent === 'Confirming payment');
+    expect(announced()).toBe(false);
+    await fillCard(user, '4242424242424242');
+    await user.click(screen.getByRole('button', { name: 'Pay $130.00' }));
+    expect(announced()).toBe(true);
+    release({ status: 'succeeded' });
   });
 
   it('locks the form while sending, so a double tap pays once', async () => {

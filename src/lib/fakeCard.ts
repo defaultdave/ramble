@@ -121,7 +121,7 @@ export type CardField = keyof CardFields;
 export type CardErrors = Partial<Record<CardField, string>>;
 
 /** The order the fields sit in, which is the order focus moves to the first error. */
-export const cardFieldOrder = [
+const cardFieldOrder = [
   'number',
   'expiry',
   'cvc',
@@ -168,7 +168,17 @@ export function validateCard(fields: CardFields, now: Date): CardErrors {
   return errors;
 }
 
+/** The errors to show, in the order the fields sit on the form. */
+export function visibleErrors(
+  errors: CardErrors,
+): { field: CardField; message: string }[] {
+  return cardFieldOrder.flatMap((field) => {
+    const message = errors[field];
+    return message === undefined ? [] : [{ field, message }];
+  });
+}
+
 /** The first field with an error, in the order they sit on the form. */
 export function firstErrorField(errors: CardErrors): CardField | null {
-  return cardFieldOrder.find((field) => errors[field] !== undefined) ?? null;
+  return visibleErrors(errors)[0]?.field ?? null;
 }

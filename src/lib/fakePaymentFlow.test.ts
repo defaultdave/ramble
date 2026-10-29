@@ -8,6 +8,8 @@ import {
 import {
   flowNotice,
   flowReducer,
+  focusTarget,
+  onSheet,
   initialFlow,
   type FlowEvent,
   type FlowState,
@@ -151,5 +153,58 @@ describe('flowNotice', () => {
     { step: 'succeeded' },
   ])('shows none on %j', (state) => {
     expect(flowNotice(state)).toBeNull();
+  });
+});
+
+describe('onSheet', () => {
+  it.each<[FlowState, boolean]>([
+    [initialFlow, false],
+    [{ step: 'challenge' }, true],
+    [{ step: 'wallet', wallet: 'apple_pay' }, true],
+    [{ step: 'confirming', from: { step: 'challenge' } }, true],
+    [
+      { step: 'confirming', from: { step: 'wallet', wallet: 'google_pay' } },
+      true,
+    ],
+    [confirmingCard, false],
+    [{ step: 'succeeded' }, false],
+    [{ step: 'lost' }, false],
+  ])('%j is %s', (state, expected) => {
+    expect(onSheet(state)).toBe(expected);
+  });
+});
+
+describe('focusTarget', () => {
+  it.each<[string, boolean, FlowState, string | null]>([
+    ['a sheet opens', false, { step: 'challenge' }, 'sheet'],
+    [
+      'a wallet sheet opens',
+      false,
+      { step: 'wallet', wallet: 'apple_pay' },
+      'sheet',
+    ],
+    [
+      'a sheet closes with a notice',
+      true,
+      { step: 'entering', notice: refusedNotice },
+      'notice',
+    ],
+    ['a sheet closes with none', true, initialFlow, 'pay'],
+    [
+      'the form shows a notice but no sheet was open',
+      false,
+      { step: 'entering', notice: refusedNotice },
+      null,
+    ],
+    [
+      'a send starts from a sheet',
+      true,
+      { step: 'confirming', from: { step: 'challenge' } },
+      null,
+    ],
+    ['the payment goes through', true, { step: 'succeeded' }, null],
+    ['the answer is lost', true, { step: 'lost' }, null],
+  ])('when %s', (_name, fromSheet, state, expected) => {
+    expect(focusTarget(fromSheet, state)).toBe(expected);
   });
 });

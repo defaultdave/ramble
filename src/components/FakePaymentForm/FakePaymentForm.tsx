@@ -13,11 +13,11 @@ import {
 import { Alert } from '@/components/Alert';
 import { Button } from '@/components/Button';
 import {
-  cardFieldOrder,
   cardNumberDigits,
   cardOutcome,
   cvcDigits,
   firstErrorField,
+  visibleErrors,
   formatCardField,
   planCard,
   testCards,
@@ -39,7 +39,9 @@ import {
 import {
   flowNotice,
   flowReducer,
+  focusTarget,
   initialFlow,
+  onSheet,
   type ConfirmingFrom,
   type FlowState,
 } from '@/lib/fakePaymentFlow';
@@ -84,12 +86,21 @@ export function FakePaymentForm({
   const notice = flowNotice(flow);
   const payLabel = `Pay ${formatMoney(amountMinor)}`;
 
-  // The sheet that opens is where the next keystroke should land.
+  const noticeRef = useRef<HTMLDivElement>(null);
+  const wasOnSheet = useRef(false);
+
+  // Focus follows the step: into a sheet when it opens, and to the notice or Pay when it closes.
   useEffect(() => {
-    if (flow.step === 'challenge' || flow.step === 'wallet') {
-      panelHeadingRef.current?.focus();
+    const target = focusTarget(wasOnSheet.current, flow);
+    wasOnSheet.current = onSheet(flow);
+    if (target === 'sheet') panelHeadingRef.current?.focus();
+    if (target === 'notice') noticeRef.current?.focus();
+    if (target === 'pay') {
+      formRef.current
+        ?.querySelector<HTMLButtonElement>('button[type="submit"]')
+        ?.focus();
     }
-  }, [flow.step]);
+  }, [flow]);
 
   async function send(plan: FakeConfirmPlan) {
     if (sending.current) return;
@@ -160,8 +171,13 @@ export function FakePaymentForm({
         title="Demo payment form"
         body="No real payment is taken here, and no real card is accepted. Only the test cards listed below work."
       />
+      <p role="status" className={styles.visuallyHidden}>
+        {locked ? 'Confirming payment' : ''}
+      </p>
       {notice ? (
-        <Alert tone={notice.tone} title={notice.title} body={notice.body} />
+        <div ref={noticeRef} tabIndex={-1} className={styles.notice}>
+          <Alert tone={notice.tone} title={notice.title} body={notice.body} />
+        </div>
       ) : null}
 
       {view.step === 'entering' ? (
@@ -284,7 +300,7 @@ export function FakePaymentForm({
             <Button
               variant="secondary"
               size="lg"
-              disabled={locked}
+              loading={locked}
               onClick={() => void send(planChallenge(false))}
             >
               Fail verification
@@ -390,14 +406,14 @@ function CardInput({
 }
 
 function FieldErrors({ errors, uid }: { errors: CardErrors; uid: string }) {
-  const shown = cardFieldOrder.filter((field) => errors[field] !== undefined);
+  const shown = visibleErrors(errors);
   if (shown.length === 0) return null;
   return (
     <div role="alert" className={styles.errors}>
-      {shown.map((field) => (
+      {shown.map(({ field, message }) => (
         <p key={field} id={`${uid}-${field}-error`} className={styles.error}>
           <TriangleAlert className={styles.errorIcon} aria-hidden="true" />
-          {errors[field]}
+          {message}
         </p>
       ))}
     </div>

@@ -91,3 +91,27 @@ export function flowNotice(state: FlowState): NoticeCopy | null {
   if (state.step === 'lost') return connectionLostNotice;
   return null;
 }
+
+/** Whether the guest is on the 3-D Secure or wallet sheet, including while an answer from it is in flight. */
+export function onSheet(state: FlowState): boolean {
+  const step = state.step === 'confirming' ? state.from.step : state.step;
+  return step === 'challenge' || step === 'wallet';
+}
+
+export type FocusTarget = 'sheet' | 'notice' | 'pay';
+
+/**
+ * Where keyboard focus goes after a step change, so it never falls to the page when a sheet
+ * unmounts: into a sheet when it opens, and back to the notice (or Pay) when it closes.
+ * `fromSheet` is whether the step before this one was on a sheet.
+ */
+export function focusTarget(
+  fromSheet: boolean,
+  state: FlowState,
+): FocusTarget | null {
+  if (state.step === 'challenge' || state.step === 'wallet') return 'sheet';
+  if (state.step === 'entering' && fromSheet) {
+    return state.notice ? 'notice' : 'pay';
+  }
+  return null;
+}

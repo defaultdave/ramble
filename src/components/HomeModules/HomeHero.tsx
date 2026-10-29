@@ -3,7 +3,8 @@ import { useId, type ReactNode } from 'react';
 import { Button } from '@/components/Button';
 import { Illustration } from '@/components/Illustration';
 import { Input } from '@/components/Input';
-import { browsePath } from '@/lib/home';
+import { browseParamNames } from '@/lib/filters';
+import { browsePath } from '@/lib/routes';
 import { Eyebrow } from './Eyebrow';
 import styles from './HomeHero.module.css';
 
@@ -55,7 +56,7 @@ export function HomeHero({
                 <select
                   id={neighborhoodId}
                   className={styles.selectControl}
-                  name="neighborhood"
+                  name={browseParamNames.neighborhoods}
                   defaultValue=""
                 >
                   <option value="">Anywhere in New York</option>
@@ -71,7 +72,7 @@ export function HomeHero({
             <div className={styles.field}>
               <Input
                 type="date"
-                name="date"
+                name={browseParamNames.date}
                 label="When"
                 min={today}
                 defaultValue={today}

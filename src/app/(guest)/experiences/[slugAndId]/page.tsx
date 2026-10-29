@@ -6,9 +6,8 @@ import {
   buildExperiencePage,
   experienceHead,
   fallbackTitle,
-  parseExperienceAddress,
 } from '@/lib/experiencePage';
-import { experiencePath } from '@/lib/home';
+import { experiencePath, parseExperienceAddress } from '@/lib/routes';
 import { getExperiencePage } from '@/server/experiencePage';
 import { logger } from '@/server/monitoring/logger';
 import { getCachedGuestSettings } from '@/server/siteSettings';
@@ -58,11 +57,7 @@ export default async function ExperienceRoute({
     logger.error('The experience page could not be read', {
       digest: errorDigest(error),
     });
-    return (
-      <ExperienceError
-        retryHref={experiencePath({ ...address, status: 'live' })}
-      />
-    );
+    return <ExperienceError retryHref={experiencePath(address)} />;
   }
 
   if (!view) notFound();

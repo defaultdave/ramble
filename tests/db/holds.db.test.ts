@@ -1143,6 +1143,29 @@ describe('releaseHold', () => {
     ).toHaveLength(1);
   });
 
+  it('stamps the release with the database clock, not the JavaScript one', async () => {
+    const bookable = await seedBookable(client.db);
+    const { holdId } = await reserveHeld(bookable, 1);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2001-01-01T00:00:00.000Z'));
+    try {
+      expect(await holdData.releaseHold(guestA, { holdId })).toEqual({
+        status: 'released',
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const stored = await storedHold(holdId);
+    const result = await client.db.execute(
+      sql`SELECT floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint AS ms`,
+    );
+    const databaseNow = Number((result.rows[0] as { ms: string }).ms);
+    expect(Math.abs(stored.updatedAt.getTime() - databaseNow)).toBeLessThan(
+      60_000,
+    );
+  });
+
   it('frees the spaces at once', async () => {
     const bookable = await seedBookable(client.db, { allocation: 2 });
     const { holdId } = await reserveHeld(bookable, 2);

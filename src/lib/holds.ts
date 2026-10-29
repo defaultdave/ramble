@@ -357,10 +357,15 @@ export function blockedForRateLimit(
   };
 }
 
+/** Whether a reserve spends one of the device's tries: a bot is refused first and spends none. */
+export function spendsReserveTry(verdict: BotCheckResult): boolean {
+  return verdict !== 'bot';
+}
+
 /**
  * Why a reserve is refused before it reaches the data layer, or `null` to let it through: a bot is
  * blocked with no end time, a device over its limit until the window frees a try. `tried` is `null`
- * when no try was spent, which only a bot's request skips. `at` is the database clock.
+ * when no try was spent, which `spendsReserveTry` says only for a bot. `at` is the database clock.
  */
 export function reserveBlock(
   verdict: BotCheckResult,

@@ -2,6 +2,7 @@
 
 import {
   reserveBlock,
+  spendsReserveTry,
   type ReleaseHoldInput,
   type ReleaseResult,
   type ReserveResult,
@@ -27,11 +28,9 @@ export async function reserveSpaces(
 ): Promise<ReserveResult> {
   const device = await getDevice();
   const verdict = await checkBot();
-  // A bot spends no try: the limit is only asked of a request that passed the bot check.
-  const tried =
-    verdict === 'bot'
-      ? null
-      : await consumeRateLimit('reserve', device.deviceKey);
+  const tried = spendsReserveTry(verdict)
+    ? await consumeRateLimit('reserve', device.deviceKey)
+    : null;
   const blocked = reserveBlock(verdict, tried, await currentDatabaseTime());
   if (blocked) return blocked;
   return reserveSpacesRow(device, input);

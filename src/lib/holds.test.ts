@@ -7,6 +7,7 @@ import {
   blockedForBot,
   blockedForRateLimit,
   reserveBlock,
+  spendsReserveTry,
   decideRelease,
   giftRefusal,
   heldResult,
@@ -486,6 +487,13 @@ describe('results', () => {
     ['a person with no try spent', 'human', null, null],
   ] as const)('reserveBlock answers %s', (_name, verdict, tried, expected) => {
     expect(reserveBlock(verdict, tried, at)).toEqual(expected);
+  });
+
+  it.each([
+    ['a bot', 'bot', false],
+    ['a person', 'human', true],
+  ] as const)('spendsReserveTry answers for %s', (_name, verdict, expected) => {
+    expect(spendsReserveTry(verdict)).toBe(expected);
   });
 
   it.each([

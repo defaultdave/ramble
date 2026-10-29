@@ -18,6 +18,7 @@ import { giftExpiryActions, settingsBounds } from '@/lib/settings';
 import {
   isReadableDate,
   isRichTextDoc,
+  notBlank,
   publishedMatchesTime,
   publishStatusEnum,
   requiredText,
@@ -45,14 +46,8 @@ export const cancellationTiers = pgTable(
     isDefault: boolean().notNull().default(false),
   },
   (table) => [
-    check(
-      'cancellation_tiers_key_not_blank',
-      sql`${table.key} ~ '[^[:space:]]'`,
-    ),
-    check(
-      'cancellation_tiers_name_not_blank',
-      sql`${table.name} ~ '[^[:space:]]'`,
-    ),
+    check('cancellation_tiers_key_not_blank', notBlank(table.key)),
+    check('cancellation_tiers_name_not_blank', notBlank(table.name)),
     check(
       'cancellation_tiers_hours_not_negative',
       sql`${table.fullRefundHoursBefore} >= 0`,
@@ -160,7 +155,7 @@ export const settings = pgTable(
     check('settings_single_row', sql`${table.id}`),
     check(
       'settings_banner_text',
-      sql`${table.bannerText} IS NULL OR (${table.bannerText} ~ '[^[:space:]]' AND char_length(${table.bannerText}) <= ${sql.raw(String(settingsBounds.bannerChars))})`,
+      sql`${table.bannerText} IS NULL OR (${notBlank(table.bannerText)} AND char_length(${table.bannerText}) <= ${sql.raw(String(settingsBounds.bannerChars))})`,
     ),
     check(
       'settings_hold_minutes',

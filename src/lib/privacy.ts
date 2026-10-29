@@ -160,6 +160,51 @@ export const piiColumns: readonly PiiColumn[] = [
     deletionPath:
       "Not yet purged: U-014b's upkeep deletes released holds on a schedule, and the privacy-requests work (U-085) adds the step that clears it for an erased guest",
   },
+  {
+    table: 'orders',
+    column: 'guest_id',
+    kind: 'link',
+    data: 'Which guest an order belongs to',
+    location: databaseLocation,
+    deletionPath:
+      'The row stays as the booking and tax record (PRD-73); the guest it points at is anonymized',
+  },
+  ...(
+    [
+      ['contact_email', "The booker's email address, as typed at checkout"],
+      ['contact_phone', "The booker's phone number, if given"],
+      ['lead_guest_name', 'The name of the lead guest'],
+      ['children_ages', "The ages of the children on a kids' booking"],
+      ['guardian_name', "A child's parent or guardian's name"],
+      ['guardian_contact', "A child's parent or guardian's contact details"],
+    ] as const
+  ).map(([column, data]): PiiColumn => ({
+    table: 'orders',
+    column,
+    kind: 'identifier',
+    data,
+    location: databaseLocation,
+    deletionPath:
+      'Not yet anonymized: the privacy-requests work (U-085) adds an orders step to anonymizeGuest that clears it and keeps the booking and tax record',
+  })),
+  {
+    table: 'provider_events',
+    column: 'payload',
+    kind: 'identifier',
+    data: "The payment provider's event body, trimmed, which can carry billing details of the payer",
+    location: databaseLocation,
+    deletionPath:
+      'Not yet anonymized: the privacy-requests work (U-085) decides how long a body is kept; the ids and amounts the booking needs are also in their own columns',
+  },
+  {
+    table: 'refunds',
+    column: 'initiated_by',
+    kind: 'link',
+    data: 'The staff member who started a refund',
+    location: databaseLocation,
+    deletionPath:
+      'Kept with the refund as the audit record of who acted; a staff member who leaves is handled by the staff-removal step, not a guest deletion',
+  },
 ];
 
 const notPersonal = (
@@ -440,6 +485,148 @@ export const nonPiiColumns: readonly {
     'published_at',
     'updated_at',
   ]),
+  ...notPersonal('orders', aRandomId, ['id']),
+  ...notPersonal('orders', 'RMB- and six random characters; it names no one', [
+    'reference',
+  ]),
+  ...notPersonal('orders', aFixedList, [
+    'kind',
+    'status',
+    'tax_treatment',
+    'cancelled_by',
+    'currency',
+  ]),
+  ...notPersonal('orders', structure, [
+    'idempotency_key',
+    'hold_id',
+    'session_id',
+    'experience_id',
+    'host_id',
+    'gift_id',
+    'waiver_document_id',
+    'terms_document_id',
+    'cancellation_tier_id',
+    'age_confirmed',
+    'refund_failed',
+    'synthetic',
+    'manage_token_version',
+    'tax_rate_ppm',
+    'commission_rate_bps',
+  ]),
+  ...notPersonal('orders', 'An amount of money in minor units', [
+    'ticket_subtotal_minor',
+    'tax_minor',
+    'total_minor',
+    'gift_applied_minor',
+    'amount_due_minor',
+    'commission_minor',
+    'refunded_ticket_minor',
+    'refunded_tax_minor',
+    'commission_returned_minor',
+  ]),
+  ...notPersonal(
+    'orders',
+    'A short name of a marketing source, campaign, or issue; it names no one',
+    ['attribution_source', 'attribution_campaign', 'attribution_issue'],
+  ),
+  ...notPersonal(
+    'orders',
+    'A one-way hash of a capability token, which is a credential and says nothing about a person',
+    ['manage_token_hash'],
+  ),
+  ...notPersonal('orders', aTime, [
+    'free_cancel_until',
+    'created_at',
+    'confirmed_at',
+    'cancelled_at',
+  ]),
+  ...notPersonal('order_items', structure, [
+    'order_id',
+    'price_option_id',
+    'quantity',
+    'unit_price_minor',
+    'uses_space',
+    'line_total_minor',
+  ]),
+  ...notPersonal('order_items', publishedCopy, ['label']),
+  ...notPersonal('payment_attempts', aRandomId, ['id']),
+  ...notPersonal('payment_attempts', structure, [
+    'order_id',
+    'attempt_no',
+    'amount_minor',
+    'failed_tries',
+  ]),
+  ...notPersonal('payment_attempts', aFixedList, [
+    'provider',
+    'currency',
+    'method',
+    'status',
+  ]),
+  ...notPersonal(
+    'payment_attempts',
+    "The provider's own id or a key built from Ramble's ids",
+    ['provider_key', 'provider_payment_id'],
+  ),
+  ...notPersonal(
+    'payment_attempts',
+    'A short code from a fixed vocabulary, such as card_declined',
+    ['failure_code'],
+  ),
+  ...notPersonal('payment_attempts', aTime, ['created_at', 'updated_at']),
+  ...notPersonal('provider_events', aRandomId, ['id']),
+  ...notPersonal('provider_events', aFixedList, ['provider', 'type']),
+  ...notPersonal(
+    'provider_events',
+    "The provider's own id of an event or object",
+    ['provider_event_id', 'object_id'],
+  ),
+  ...notPersonal('provider_events', structure, [
+    'ramble_order_id',
+    'ramble_record_id',
+    'amount_minor',
+    'currency',
+    'attempts',
+  ]),
+  ...notPersonal(
+    'provider_events',
+    "Ramble's own error text from handling an event, cut to 500 characters; it never repeats the body",
+    ['last_error'],
+  ),
+  ...notPersonal('provider_events', aTime, [
+    'occurred_at',
+    'received_at',
+    'processed_at',
+  ]),
+  ...notPersonal('refunds', aRandomId, ['id']),
+  ...notPersonal('refunds', structure, [
+    'order_id',
+    'payment_attempt_id',
+    'ticket_minor',
+    'tax_minor',
+    'commission_returned_minor',
+    'amount_minor',
+  ]),
+  ...notPersonal('refunds', aFixedList, ['reason', 'status']),
+  ...notPersonal(
+    'refunds',
+    "The provider's own id or a key built from Ramble's ids",
+    ['provider_key', 'provider_refund_id'],
+  ),
+  ...notPersonal('refunds', aTime, ['created_at', 'succeeded_at']),
+  ...notPersonal('transfers', aRandomId, ['id']),
+  ...notPersonal('transfers', structure, [
+    'order_id',
+    'host_id',
+    'amount_minor',
+    'reversed_minor',
+  ]),
+  ...notPersonal('transfers', aFixedList, ['status']),
+  ...notPersonal(
+    'transfers',
+    "The provider's own id or a key built from Ramble's ids",
+    ['provider_key', 'provider_transfer_id'],
+  ),
+  ...notPersonal('transfers', aTime, ['release_after']),
 ];
 
 export type PiiVendor = {

@@ -61,11 +61,11 @@
   color: var(--color-action-primary-text);
 }
 
-.primary:hover:not(:disabled) {
+.primary:hover:not(:disabled, [data-loading]) {
   background: var(--color-action-primary-bg-hover);
 }
 
-.primary:active:not(:disabled) {
+.primary:active:not(:disabled, [data-loading]) {
   background: var(--color-action-primary-bg-pressed);
 }
 
@@ -75,11 +75,11 @@
   color: var(--color-text-primary);
 }
 
-.secondary:hover:not(:disabled) {
+.secondary:hover:not(:disabled, [data-loading]) {
   background: var(--color-bg-sunken);
 }
 
-.secondary:active:not(:disabled) {
+.secondary:active:not(:disabled, [data-loading]) {
   background: var(--color-bg-disabled);
 }
 
@@ -88,11 +88,11 @@
   color: var(--color-text-link);
 }
 
-.ghost:hover:not(:disabled) {
+.ghost:hover:not(:disabled, [data-loading]) {
   background: var(--color-bg-accent-subtle);
 }
 
-.ghost:active:not(:disabled) {
+.ghost:active:not(:disabled, [data-loading]) {
   background: var(--color-bg-sunken);
 }
 

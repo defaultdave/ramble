@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { SiteShell } from '@/components/SiteShell';
 import '@/styles/tokens.css';
+import '@/styles/forced-colors.css';
 import { fontVariables } from '../fonts';
 import { RenderPerRequest } from '../renderPerRequest';
 

@@ -124,3 +124,10 @@
 .cell[data-outside-month] {
   display: none;
 }
+
+/* The selected day is a background, which forced-colors mode drops. It becomes a thick Highlight border, so the CanvasText focus outline can sit outside it and both show on a focused day. */
+@media (forced-colors: active) {
+  .cell[data-selected] {
+    border: 3px solid Highlight;
+  }
+}

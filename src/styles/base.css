@@ -1,7 +1,27 @@
 /* Page-level defaults for the guest pages, on the tokens: the canvas, the text color, and the body face. */
+
+/* Native controls (date icon, select popup, scrollbars) follow the theme. Kept here because tokens.css is generated. */
+:root {
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+  }
+}
+
+/* A full-height column so the footer meets the bottom of the window on short pages. */
 body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
   margin: 0;
   background: var(--color-bg-canvas);
   color: var(--color-text-primary);
   font-family: var(--font-family-body);
+}
+
+body > main {
+  flex: 1;
 }

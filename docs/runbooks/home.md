@@ -33,7 +33,7 @@ The hero's search is a plain GET form to `/new-york/browse`. It sends `neighborh
 | `getThisWeek(asOf)` | `src/server/home.ts` | `browse` | `catalog`, `experience:<id>` for each listed experience |
 | `getCachedGuestSettings()` | `src/server/siteSettings.ts` | `settings` | `settings` |
 
-`asOf` is the current time cut to the minute (`homeAsOf`), so guests inside one minute share one entry. Saving settings invalidates `settings`, which is how a new banner reaches every guest page; publishing a module, a Pick, or a category reaches the home reads through `home` and `catalog`.
+`asOf` is the current time cut to the minute (`minuteAsOf`), so guests inside one minute share one entry. Saving settings invalidates `settings`, which is how a new banner reaches every guest page; publishing a module, a Pick, or a category reaches the home reads through `home` and `catalog`.
 
 The page and the banner read after `connection()`, inside `<Suspense>`. The build therefore never reads the database (CI builds with none), and a prefetch stops at the skeleton. The cached reads still hold the data between requests.
 

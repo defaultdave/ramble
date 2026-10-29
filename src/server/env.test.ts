@@ -64,6 +64,71 @@ describe('environment', () => {
     });
   });
 
+  describe('PULSE_SECRET', () => {
+    it.each([undefined, ''])('reads %j as not configured', async (value) => {
+      vi.stubEnv('PULSE_SECRET', value);
+
+      expect((await loadEnv()).PULSE_SECRET).toBeUndefined();
+    });
+
+    it('is read when long enough', async () => {
+      vi.stubEnv('PULSE_SECRET', 's'.repeat(32));
+
+      expect((await loadEnv()).PULSE_SECRET).toBe('s'.repeat(32));
+    });
+
+    it('fails at import when too short', async () => {
+      vi.stubEnv('PULSE_SECRET', 's'.repeat(31));
+
+      await expect(loadEnv()).rejects.toThrow(/PULSE_SECRET/);
+    });
+  });
+
+  describe('DEMO_CLOCK', () => {
+    it.each([undefined, ''])('defaults to off for %j', async (value) => {
+      vi.stubEnv('DEMO_CLOCK', value);
+
+      expect((await loadEnv()).DEMO_CLOCK).toBe('off');
+    });
+
+    it.each(['on', 'off'])('accepts %s', async (value) => {
+      vi.stubEnv('DEMO_CLOCK', value);
+
+      expect((await loadEnv()).DEMO_CLOCK).toBe(value);
+    });
+
+    it.each(['true', '1', 'ON'])('fails at import for %s', async (value) => {
+      vi.stubEnv('DEMO_CLOCK', value);
+
+      await expect(loadEnv()).rejects.toThrow(/DEMO_CLOCK/);
+    });
+  });
+
+  describe('BETTERSTACK_HEARTBEAT_URL', () => {
+    it.each([undefined, ''])('reads %j as not configured', async (value) => {
+      vi.stubEnv('BETTERSTACK_HEARTBEAT_URL', value);
+
+      expect((await loadEnv()).BETTERSTACK_HEARTBEAT_URL).toBeUndefined();
+    });
+
+    it('accepts an https URL', async () => {
+      vi.stubEnv('BETTERSTACK_HEARTBEAT_URL', 'https://uptime.example/h/abc');
+
+      expect((await loadEnv()).BETTERSTACK_HEARTBEAT_URL).toBe(
+        'https://uptime.example/h/abc',
+      );
+    });
+
+    it.each(['http://uptime.example/h/abc', 'not a url'])(
+      'fails at import for %s',
+      async (value) => {
+        vi.stubEnv('BETTERSTACK_HEARTBEAT_URL', value);
+
+        await expect(loadEnv()).rejects.toThrow(/BETTERSTACK_HEARTBEAT_URL/);
+      },
+    );
+  });
+
   describe('SEED_TARGET', () => {
     it.each(['local', 'staging', 'load-test'])('accepts %s', async (value) => {
       vi.stubEnv('SEED_TARGET', value);

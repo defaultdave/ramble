@@ -203,6 +203,26 @@ describe('no-restricted-syntax (time comes from the clock)', () => {
       'export const a = new Date();\n',
     ],
     ['new Date() in lib', 'src/lib/bad.ts', 'export const a = new Date();\n'],
+    [
+      'Date.now() in the jobs outbox',
+      'src/server/jobs/bad.ts',
+      'export const a = Date.now();\n',
+    ],
+    [
+      'new Date() in the jobs outbox',
+      'src/server/jobs/bad.ts',
+      'export const a = new Date();\n',
+    ],
+    [
+      'Date.now() in the jobs decisions',
+      'src/lib/jobs.ts',
+      'export const a = Date.now();\n',
+    ],
+    [
+      'new Date() in the jobs decisions',
+      'src/lib/jobs.ts',
+      'export const a = new Date();\n',
+    ],
   ])('rejects %s', async (_name, filePath, code) => {
     expect(await ruleIds(filePath, code)).toContain(SYNTAX);
   });

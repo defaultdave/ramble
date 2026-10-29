@@ -80,3 +80,18 @@ export function requiredText(max: number) {
 export function optionalText(max: number) {
   return requiredText(max).nullable();
 }
+
+/**
+ * One line of at most `max` characters: runs of whitespace (line breaks included) become one
+ * space, and a longer text is cut and ends in an ellipsis. For text that sits in a subject or a
+ * heading, where a stored description of unknown length must not break the layout.
+ */
+export function oneLineClipped(text: string, max: number): string {
+  const collapsed = text.split(/\s+/).filter(Boolean).join(' ');
+  const characters = Array.from(collapsed);
+  if (characters.length <= max) return collapsed;
+  return `${characters
+    .slice(0, max - 1)
+    .join('')
+    .trimEnd()}…`;
+}

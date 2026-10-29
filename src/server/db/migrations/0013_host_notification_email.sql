@@ -1,0 +1,2 @@
+ALTER TABLE "hosts" ADD COLUMN "notification_email" text;--> statement-breakpoint
+ALTER TABLE "hosts" ADD CONSTRAINT "hosts_notification_email_shape" CHECK ("hosts"."notification_email" IS NULL OR ("hosts"."notification_email" ~ '^[a-z0-9._%+-]+@[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$' AND char_length("hosts"."notification_email") <= 254));

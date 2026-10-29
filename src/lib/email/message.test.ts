@@ -12,6 +12,7 @@ import {
   sendAttemptsExhausted,
   summarizeRefusal,
   RenderedEmailSchema,
+  maxAttachmentChars,
   formatMailboxTimestamp,
   maxBodyLength,
   messageStatuses,
@@ -96,7 +97,17 @@ describe('IdempotencyKeySchema', () => {
 });
 
 describe('RenderedEmailSchema', () => {
-  const valid = { subject: 'Hello', html: '<p>Hi</p>', text: 'Hi' };
+  const file = {
+    filename: 'ramble-booking.ics',
+    contentType: 'text/calendar; charset=utf-8',
+    content: 'BEGIN:VCALENDAR',
+  };
+  const valid = {
+    subject: 'Hello',
+    html: '<p>Hi</p>',
+    text: 'Hi',
+    attachments: [file],
+  };
 
   it('accepts a complete email', () => {
     expect(RenderedEmailSchema.safeParse(valid).success).toBe(true);
@@ -110,6 +121,26 @@ describe('RenderedEmailSchema', () => {
     ['empty text', { text: '' }],
     ['html over the limit', { html: 'a'.repeat(maxBodyLength + 1) }],
     ['text over the limit', { text: 'a'.repeat(maxBodyLength + 1) }],
+    ['no attachment list', { attachments: undefined }],
+    ['more attachments than allowed', { attachments: [file, file, file] }],
+    [
+      'an attachment with no content',
+      { attachments: [{ ...file, content: '' }] },
+    ],
+    [
+      'an attachment over the size limit',
+      {
+        attachments: [{ ...file, content: 'a'.repeat(maxAttachmentChars + 1) }],
+      },
+    ],
+    [
+      'a file name with a path',
+      { attachments: [{ ...file, filename: '../secrets.ics' }] },
+    ],
+    [
+      'a content type that is not allowed',
+      { attachments: [{ ...file, contentType: 'text/html' }] },
+    ],
   ])('refuses %s', (_label, override) => {
     expect(
       RenderedEmailSchema.safeParse({ ...valid, ...override }).success,

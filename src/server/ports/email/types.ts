@@ -1,5 +1,9 @@
 import 'server-only';
-import type { DeliveryEvent, EmailAdapterName } from '@/lib/email/message';
+import type {
+  DeliveryEvent,
+  EmailAdapterName,
+  EmailAttachment,
+} from '@/lib/email/message';
 
 /** A fully rendered message, ready for a provider. */
 export type OutboundEmail = {
@@ -9,6 +13,7 @@ export type OutboundEmail = {
   subject: string;
   html: string;
   text: string;
+  attachments: readonly EmailAttachment[];
   idempotencyKey: string;
 };
 

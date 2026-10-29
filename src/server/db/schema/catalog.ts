@@ -27,6 +27,10 @@ import {
   weatherPolicies,
 } from '@/lib/catalog';
 import {
+  emailAddressPattern,
+  maxEmailAddressLength,
+} from '@/lib/email/address';
+import {
   blurDataUrlPattern,
   photoLimits,
   photoRightsBases,
@@ -85,11 +89,17 @@ export const hosts = pgTable(
     name: text().notNull(),
     description: text(),
     timeZone: text().notNull(),
+    /** Where booking and cancellation notices go (PRD-44). Not shown on listings. */
+    notificationEmail: text(),
     createdAt: timestampTz().notNull().defaultNow(),
   },
   (table) => [
     check('hosts_slug_kebab', sql`${table.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
     check('hosts_name_not_blank', notBlank(table.name)),
+    check(
+      'hosts_notification_email_shape',
+      sql`${table.notificationEmail} IS NULL OR (${table.notificationEmail} ~ ${sql.raw(`'${emailAddressPattern}'`)} AND char_length(${table.notificationEmail}) <= ${sql.raw(String(maxEmailAddressLength))})`,
+    ),
     check('hosts_created_at_in_range', isReadableDate(table.createdAt)),
     check('hosts_time_zone_not_blank', notBlank(table.timeZone)),
   ],

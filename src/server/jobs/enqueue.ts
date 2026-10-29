@@ -20,7 +20,7 @@ export type EnqueueInput = {
  * payload over 16 KB. Returns the new job's ID, or null when the dedupe key was already used (the
  * key stays used after the job finishes).
  */
-// TODO(U-054): first caller
+// TODO(U-049): first caller, confirmOrder enqueues the booking email jobs.
 export async function enqueue(
   tx: Transaction,
   input: EnqueueInput,

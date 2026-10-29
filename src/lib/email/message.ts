@@ -41,10 +41,27 @@ export const IdempotencyKeySchema = z
   .string()
   .regex(new RegExp(idempotencyKeyPattern));
 
+const maxAttachments = 2;
+export const maxAttachmentChars = 20_000;
+const maxAttachmentNameLength = 100;
+
+/** A file sent with a message. `content` is the file's text; an adapter encodes it for its provider. */
+export const EmailAttachmentSchema = z.object({
+  filename: z
+    .string()
+    .min(1)
+    .max(maxAttachmentNameLength)
+    .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/),
+  contentType: z.enum(['text/calendar; charset=utf-8']),
+  content: z.string().min(1).max(maxAttachmentChars),
+});
+export type EmailAttachment = z.infer<typeof EmailAttachmentSchema>;
+
 export const RenderedEmailSchema = z.object({
   subject: z.string().max(maxSubjectLength).regex(new RegExp(subjectPattern)),
   html: z.string().min(1).max(maxBodyLength),
   text: z.string().min(1).max(maxBodyLength),
+  attachments: EmailAttachmentSchema.array().max(maxAttachments),
 });
 export type RenderedEmail = z.infer<typeof RenderedEmailSchema>;
 

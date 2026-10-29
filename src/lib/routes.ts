@@ -81,6 +81,11 @@ export const accessibilityPath = '/accessibility';
 
 export const legalPath = (doc: 'terms' | 'privacy') => `/legal/${doc}`;
 
+// ---- Post-booking ----
+
+/** The manage page a booking email links to. The token is a capability: it is never logged or stored. */
+export const managePath = (token: string) => `/manage/${token}`;
+
 /**
  * Where a guest asks about a private session until the private-request form exists.
  * @alias

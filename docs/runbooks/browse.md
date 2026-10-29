@@ -4,7 +4,7 @@ How `/new-york/browse` works: the address grammar, what each part of it does, th
 
 ## The address
 
-`src/lib/filters.ts` is the one place the grammar lives. `parseFilters(searchParams)` reads it and `toQuery` / `browseHref` write it; nothing else builds a browse address.
+`src/lib/filters.ts` is the one place the grammar lives. `parseFilters(searchParams)` reads it and `toQuery` / `browseHref` write it. `src/lib/routes.ts` owns the path, `browsePath`; nothing else builds a browse address.
 
 | Parameter | Meaning | Rule |
 |---|---|---|

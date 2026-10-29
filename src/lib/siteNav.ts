@@ -1,14 +1,20 @@
-import { browsePath, giftGuidePath, picksAnchor } from './home';
+import {
+  accessibilityPath,
+  browsePath,
+  contactPath,
+  giftGuidePath,
+  helpPath,
+  homePicksHref,
+  legalPath,
+} from './routes';
 
 export type SiteLink = { label: string; href: string };
 export type SiteLinkGroup = { title: string; links: SiteLink[] };
 
-const picksPath = `/#${picksAnchor}`;
-
 /** The header's main links and the menu's, in the order the Figma header shows them. */
 export const mainLinks: SiteLink[] = [
   { label: 'Things to do', href: browsePath },
-  { label: 'Ramble Picks', href: picksPath },
+  { label: 'Ramble Picks', href: homePicksHref },
   { label: 'Gift guide', href: giftGuidePath },
 ];
 
@@ -18,23 +24,23 @@ export const footerGroups: SiteLinkGroup[] = [
     title: 'Explore',
     links: [
       { label: 'Gift guide', href: giftGuidePath },
-      { label: 'Ramble Picks', href: picksPath },
+      { label: 'Ramble Picks', href: homePicksHref },
       { label: 'Things to do', href: browsePath },
     ],
   },
   {
     title: 'Help',
     links: [
-      { label: 'Help center', href: '/help' },
-      { label: 'Contact us', href: '/contact' },
-      { label: 'Accessibility', href: '/accessibility' },
+      { label: 'Help center', href: helpPath },
+      { label: 'Contact us', href: contactPath },
+      { label: 'Accessibility', href: accessibilityPath },
     ],
   },
   {
     title: 'Ramble',
     links: [
-      { label: 'Terms', href: '/legal/terms' },
-      { label: 'Privacy', href: '/legal/privacy' },
+      { label: 'Terms', href: legalPath('terms') },
+      { label: 'Privacy', href: legalPath('privacy') },
     ],
   },
 ];

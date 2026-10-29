@@ -1,7 +1,5 @@
 import { durationLabel } from './browse';
 import {
-  EntityIdSchema,
-  isSlug,
   type CancellationTier,
   type Category,
   type GuestExperience,
@@ -11,44 +9,12 @@ import { MAX_FULL_REFUND_HOURS } from './cancellation';
 import { formatPrice } from './money';
 import type { GuestPhoto } from './photos';
 import { photoView, type PhotoView } from './photoViews';
-
-// ---- The address ----
-
-/** A canonical uuid is 36 characters; the address ends with one, after a hyphen. */
-const idLength = 36;
-
-/** Far longer than any slug plus its ID, so a request for a megabyte path is refused before it is looked at. */
-export const maxAddressLength = 300;
-
-export type ExperienceAddress = { slug: string; id: string };
-
-/**
- * The slug and ID in `/experiences/[slug]-[id]`, or null when the address is not that shape. The
- * ID is the key, so the slug is checked for shape only; a slug that has since changed still
- * finds its experience.
- */
-export function parseExperienceAddress(
-  slugAndId: string,
-): ExperienceAddress | null {
-  if (slugAndId.length > maxAddressLength) return null;
-  const idStart = slugAndId.length - idLength;
-  if (idStart < 2 || slugAndId[idStart - 1] !== '-') return null;
-  const slug = slugAndId.slice(0, idStart - 1);
-  const id = slugAndId.slice(idStart);
-  if (!isSlug(slug) || !EntityIdSchema.safeParse(id).success) return null;
-  return { slug, id: id.toLowerCase() };
-}
-
-export const categoryPath = (slug: string) => `/new-york/things-to-do/${slug}`;
-export const neighborhoodPath = (slug: string) =>
-  `/new-york/neighborhoods/${slug}`;
-
-/** The gift checkout for one experience. The page that answers it is the gift checkout unit's. */
-export const giftCheckoutPath = (experienceId: string) =>
-  `/gifts/checkout/${experienceId}`;
-
-/** Where a guest asks about a private session until the private-request form exists. */
-export const privateSessionPath = '/contact';
+import {
+  categoryPath,
+  giftCheckoutPath,
+  neighborhoodPath,
+  privateSessionPath,
+} from './routes';
 
 // ---- Words ----
 

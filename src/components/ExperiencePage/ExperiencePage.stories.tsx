@@ -6,7 +6,7 @@ import {
   sunsetKayak,
 } from './ExperiencePage.fixtures';
 
-// One story per state of the experience page, on a phone (Figma 03) and from the tablet width (D03),
+// One story per state of the experience page, on a phone (Figma 03) and from the tablet width (D03).
 const meta = {
   title: 'Experience/ExperiencePage',
   component: ExperiencePage,

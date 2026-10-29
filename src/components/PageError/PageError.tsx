@@ -1,6 +1,6 @@
 import { Alert } from '@/components/Alert';
 import { Button } from '@/components/Button';
-import styles from './PageError.module.css';
+import { PageHeading } from '@/components/PageHeading';
 
 export type PageErrorProps = {
   /** The page's h1, kept so the page still has a heading when its content failed. */
@@ -22,16 +22,13 @@ export function PageError({
   retryHref,
 }: PageErrorProps) {
   return (
-    <div className={styles.page}>
-      <div className={styles.pageInner}>
-        <h1 className={styles.title}>{title}</h1>
-        <Alert tone="danger" title={alertTitle} body={alertBody} />
-        <form className={styles.retry} action={retryHref} method="get">
-          <Button type="submit" variant="secondary">
-            Try again
-          </Button>
-        </form>
-      </div>
-    </div>
+    <PageHeading title={title}>
+      <Alert tone="danger" title={alertTitle} body={alertBody} />
+      <form action={retryHref} method="get">
+        <Button type="submit" variant="secondary">
+          Try again
+        </Button>
+      </form>
+    </PageHeading>
   );
 }

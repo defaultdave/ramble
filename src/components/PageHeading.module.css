@@ -30,9 +30,20 @@
   justify-self: stretch;
 }
 
+/* So is a form that holds only its button, such as a retry; the button fills the form. A form with fields keeps its own layout. */
+.page > form:has(> button:only-child) {
+  display: grid;
+  justify-self: stretch;
+}
+
+.page > form > button:only-child {
+  justify-self: stretch;
+}
+
 @media (min-width: 768px) {
   .page > a,
-  .page > button {
+  .page > button,
+  .page > form:has(> button:only-child) {
     justify-self: start;
   }
 }

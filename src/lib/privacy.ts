@@ -214,6 +214,15 @@ export const piiColumns: readonly PiiColumn[] = [
     deletionPath:
       'Kept with the refund as the audit record of who acted; a staff member who leaves is handled by the staff-removal step, not a guest deletion',
   },
+  {
+    table: 'ledger_entries',
+    column: 'created_by',
+    kind: 'link',
+    data: 'The staff member who posted a ledger row by hand',
+    location: databaseLocation,
+    deletionPath:
+      'Kept with the row as the audit record of who acted; the ledger is append-only (PRD-74), and a staff member who leaves is handled by the staff-removal step, not a guest deletion',
+  },
 ];
 
 const notPersonal = (
@@ -636,6 +645,35 @@ export const nonPiiColumns: readonly {
     ['provider_key', 'provider_transfer_id'],
   ),
   ...notPersonal('transfers', aTime, ['release_after']),
+  ...notPersonal('ledger_entries', 'A number', ['id']),
+  ...notPersonal('ledger_entries', aTime, ['occurred_at', 'recorded_at']),
+  ...notPersonal('ledger_entries', aFixedList, [
+    'entry_type',
+    'debit_account',
+    'credit_account',
+    'currency',
+  ]),
+  ...notPersonal('ledger_entries', structure, [
+    'amount_minor',
+    'order_id',
+    'gift_id',
+    'host_id',
+    'payment_attempt_id',
+    'refund_id',
+    'transfer_id',
+    'dispute_id',
+    'simulated',
+  ]),
+  ...notPersonal(
+    'ledger_entries',
+    "The provider's own id for a payment, refund, transfer, or dispute",
+    ['provider_object_id'],
+  ),
+  ...notPersonal(
+    'ledger_entries',
+    'A staff note about the money. The table cannot be edited, so a note never holds a guest name or contact',
+    ['memo'],
+  ),
 ];
 
 export type PiiVendor = {

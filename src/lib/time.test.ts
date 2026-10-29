@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   calendarDateFormat,
   isoDateOf,
+  isReadableInstant,
   minuteAsOf,
   msPerDay,
   msPerMinute,
@@ -14,6 +15,7 @@ import {
 // - a calendar date formatter writes the date in its own zone: east of UTC, west of UTC, across the
 //   day line, and on a clock-change day
 // - an ISO date is the UTC day, not the local one
+// - a readable instant is a real date from the first moment of year 1000 to the last of year 9999 UTC; an invalid date and the edges outside fail
 
 describe('the time constants', () => {
   it('are a minute and a day in milliseconds', () => {
@@ -65,5 +67,21 @@ describe('isoDateOf', () => {
     ['2026-12-31T23:59:59.999Z', '2026-12-31'],
   ])('is the UTC day of %s', (instant, expected) => {
     expect(isoDateOf(new Date(instant))).toBe(expected);
+  });
+});
+
+describe('isReadableInstant', () => {
+  it.each([
+    ['the first readable moment', '1000-01-01T00:00:00Z', true],
+    ['a current date', '2026-10-29T12:00:00Z', true],
+    ['the last readable millisecond', '9999-12-31T23:59:59.999Z', true],
+    ['a moment before year 1000', '0999-12-31T23:59:59.999Z', false],
+    ['the first moment of year 10000', '+010000-01-01T00:00:00Z', false],
+  ])('%s', (_name, iso, readable) => {
+    expect(isReadableInstant(new Date(iso))).toBe(readable);
+  });
+
+  it('refuses an invalid date', () => {
+    expect(isReadableInstant(new Date('not a date'))).toBe(false);
   });
 });

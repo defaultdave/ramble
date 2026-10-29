@@ -1,0 +1,7 @@
+/* Forced-colors mode (Windows high contrast) drops box-shadow, so the focus rings the components draw with it vanish. Their transparent outline is the fallback; this makes it a system-colour outline. !important because every component styles its own :focus-visible with a more specific selector. */
+@media (forced-colors: active) {
+  :is(:focus-visible, [data-focus-visible]) {
+    outline: 2px solid CanvasText !important;
+    outline-offset: 2px !important;
+  }
+}

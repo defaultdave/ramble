@@ -4,7 +4,7 @@ import { Button, ButtonLink } from '@/components/Button';
 import { Card, cardPhotoSizes } from '@/components/Card';
 import { Photo } from '@/components/Photo';
 import type { BrowseCard, BrowseView, FormTarget } from '@/lib/browse';
-import { browsePath } from '@/lib/filters';
+import { browsePath } from '@/lib/routes';
 import styles from './BrowseResults.module.css';
 
 type TargetButtonProps = {

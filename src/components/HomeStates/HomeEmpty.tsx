@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { browsePath } from '@/lib/home';
+import { browsePath } from '@/lib/routes';
 import styles from './HomeStates.module.css';
 
 /** What the page shows when no home module is switched on, so it is never a bare header and footer. */

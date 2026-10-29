@@ -13,7 +13,7 @@ const photo = <div data-testid="photo" />;
 
 const bookable = {
   title: 'Sunset kayak on the Hudson',
-  meta: 'Pier 26 · 2 hr',
+  meta: 'Pier 26 · 2\u00a0hr',
   href: '/experiences/sunset-kayak-12',
   image: photo,
   price: 'From $65',
@@ -100,7 +100,7 @@ describe('Card layout', () => {
 describe('Card guide-only', () => {
   const guide = {
     title: 'Sunset kayak on the Hudson',
-    meta: 'Pier 26 · 2 hr',
+    meta: 'Pier 26 · 2\u00a0hr',
     href: '/guide/sunset-kayak-12',
     image: photo,
     kind: 'guide-only' as const,

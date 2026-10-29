@@ -38,7 +38,7 @@ const cards: BrowseCard[] = [
     image: null,
     kind: 'bookable',
     title: 'Hand-rolled pasta',
-    meta: 'Carroll Gardens · 2.5 hr',
+    meta: 'Carroll Gardens · 2.5\u00a0hr',
     href: '/experiences/pasta-1',
     price: 'From $60',
   },

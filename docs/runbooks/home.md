@@ -43,17 +43,17 @@ The reads are `listHomeExperiences` and `listThisWeekSessions` in `src/server/db
 
 The home cards and the browse cards show the same photo for one experience: the one with the lowest position in its gallery. `buildHomePage` builds the cards with no image, then the page reads the covers of the cards it kept and sets them (`homeCardIds`, `withHomeCovers` in `src/lib/home.ts`; `browseCardIds`, `withBrowseCovers` in `src/lib/browse.ts`). The read is `getCoverPhotos(ids)` in `src/server/coverPhotos.ts`: `'use cache'`, profile `catalog`, tagged `experience:<id>` for every ID it was asked about, so a photo added to an experience reaches every card that lists it. Pass the IDs through `coverLookupIds` so two pages that list the same experiences in another order share one entry.
 
-`listGuestCoverPhotos` (`src/server/db/photos.ts`) takes at most `photoLimits.maxCoverLookups` IDs (240, the most the home page can list) and returns one row per experience, guest-visible experiences only. A longer or malformed list is refused, never cut. A failed cover read is handled like any other failed read of the page: the error state, and only the digest is logged.
+`listGuestCoverPhotos` (`src/server/db/photos.ts`) takes at most `photoLimits.maxCoverLookups` IDs (240, the most the home page can list) and returns one row per experience, guest-visible experiences only. A longer or malformed list is refused, never cut. A failed cover read is handled like any other failed read of the page: the error state, and only the digest and the kind of the error are logged.
 
 `Photo` (`src/components/Photo`) draws the image with `next/image`, filling its frame, with the blur placeholder. A decorative photo has an empty alt. The cards ask for `384px` from the tablet width and `100vw` below it; the horizontal card asks for `168px`.
 
 ## The site banner
 
-`GuestBanner` reads the cached settings above the header on every guest page and shows `bannerText` when it is not blank. A failed read leaves the banner out and logs the digest; the switches that matter (paused bookings, checkout maintenance) are enforced where they act, not by this notice.
+`GuestBanner` reads the cached settings above the header on every guest page and shows `bannerText` when it is not blank. A failed read leaves the banner out and logs the digest and kind of the error; the switches that matter (paused bookings, checkout maintenance) are enforced where they act, not by this notice.
 
 ## When a read fails
 
-A cached read throws only the kind of the failure (`CachedReadError`), because Next.js logs whatever a cached function throws and a database error carries its query and values. The page logs the digest of that error, shows the heading and a danger alert ("We couldn't load the home page"), and a Try again button. The button is a GET form to `/`, so it works with no script. The page answers 200 in this state: the failure is inside a streamed region.
+A cached read throws only the kind of the failure (`CachedReadError`), because Next.js logs whatever a cached function throws and a database error carries its query and values. The page logs the digest of that error and its kind (`digest` and `kind` fields, through `rethrowOrLog`), shows the heading and a danger alert ("We couldn't load the home page"), and a Try again button. The button is a GET form to `/`, so it works with no script. The page answers 200 in this state: the failure is inside a streamed region.
 
 ## What the e2e run covers
 

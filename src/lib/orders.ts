@@ -41,7 +41,20 @@ export const orderCancelledBys = [
 export const orderCurrency = 'USD';
 
 /** Crockford base32 leaves out I, L, O, and U, so a reference read aloud or typed from paper is unambiguous. */
-export const orderReferencePattern = String.raw`^RMB-[0-9A-HJKMNP-TV-Z]{6}$`;
+const referenceCharacterClass = '0-9A-HJKMNP-TV-Z';
+export const orderReferencePattern = `^RMB-[${referenceCharacterClass}]{6}$`;
+
+/** The characters the class spells out, in order, for code that makes a reference. */
+export const crockfordAlphabet = Array.from(
+  referenceCharacterClass.matchAll(/(.)-(.)|(.)/g),
+  ([, from, to, single]) =>
+    from !== undefined && to !== undefined
+      ? Array.from(
+          { length: to.charCodeAt(0) - from.charCodeAt(0) + 1 },
+          (_, step) => String.fromCharCode(from.charCodeAt(0) + step),
+        ).join('')
+      : (single ?? ''),
+).join('');
 const orderReferenceRegex = new RegExp(orderReferencePattern);
 const maxReferenceLength = 10;
 
@@ -79,7 +92,6 @@ const bookingKeyPrefix = 'book:';
 const uuidLength = 36;
 
 /** Two tabs or a refresh on one hold reach one order (design doc 4.2.3). */
-// TODO(U-047a): first caller, the order insert in startPayment.
 export function bookingIdempotencyKey(holdId: string): string {
   return `${bookingKeyPrefix}${holdId.toLowerCase()}`;
 }
@@ -128,7 +140,6 @@ export function canOrderTransition(
 }
 
 /** What the guest pays: the total less the gift applied, never below zero. */
-// TODO(U-047a): first caller, the order snapshot in startPayment.
 export function orderAmountDueMinor(
   totalMinor: number,
   giftAppliedMinor: number,
@@ -409,7 +420,6 @@ const orderFields = z.object({
   cancelledAt: z.date().nullable(),
 });
 
-// TODO(U-047a): first caller, the order read in startPayment.
 export const OrderSchema = orderFields.superRefine((order, ctx) => {
   addRuleIssues(orderRuleIssues(order), ctx);
 });
@@ -422,7 +432,6 @@ function orderItemLineTotalMinor(
   return quantity * unitPriceMinor;
 }
 
-// TODO(U-047a): first caller, the order items read in startPayment.
 export const OrderItemSchema = z
   .object({
     orderId: EntityIdSchema,

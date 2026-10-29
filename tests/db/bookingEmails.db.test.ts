@@ -23,6 +23,7 @@ import {
 import { server } from '../msw/server';
 import { setEnv } from '../email/testEnv';
 import { createFreshDatabase, type FreshDatabase } from './harness';
+import { insertHold } from './holdFixtures';
 import { createOrderParents } from './orderParents';
 
 const testEnv = vi.hoisted((): Record<string, unknown> => ({}));
@@ -163,7 +164,7 @@ async function insertOrder(
   }: OrderOptions = {},
 ) {
   const id = randomUUID();
-  const holdId = randomUUID();
+  const { id: holdId } = await insertHold(client.db, sessionId);
   const a = party === 'A';
   const subtotal = a ? 21500 : 8500;
   const taxRatePpm = a ? 88750 : 0;
@@ -193,7 +194,7 @@ async function insertOrder(
       guestId: parents.guestId,
       contactEmail: contactEmail ?? `${a ? 'pat' : 'sam'}@example.com`,
       leadGuestName: a ? 'Pat Rivera' : 'Sam Okoye',
-      termsDocumentId: randomUUID(),
+      termsDocumentId: parents.termsDocumentId,
       ticketSubtotalMinor: subtotal,
       taxTreatment: a ? 'taxable' : 'not_taxable',
       taxRatePpm,

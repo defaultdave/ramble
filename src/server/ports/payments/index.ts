@@ -13,10 +13,8 @@ const CurrencySchema = z.literal(orderCurrency);
 type Currency = typeof orderCurrency;
 
 /** The smallest charge the provider accepts, in cents (Stripe's USD minimum). */
-// TODO(U-047a): first caller
 export const minAmountMinor = 50;
 /** The largest single amount the provider accepts, in cents. */
-// TODO(U-047a): first caller
 export const maxAmountMinor = 99_999_999;
 /** Stripe caps an Idempotency-Key at 255 characters; the fake keeps the same bound. */
 const maxKeyLength = 255;
@@ -225,7 +223,6 @@ export class PaymentsError extends Error {
  * in metadata. Expected refusals reject with a `PaymentsError`; nothing is repaired.
  * Money is integer cents in USD.
  */
-// TODO(U-047a): first caller
 export type PaymentsPort = {
   readonly provider: PaymentProvider;
   /**

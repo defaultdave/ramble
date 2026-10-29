@@ -1,5 +1,6 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
+import { insertHold } from './holdFixtures';
 import { createOrderParents } from './orderParents';
 
 type Client = typeof import('@/server/db/client');
@@ -18,16 +19,16 @@ export async function createLedgerParents(db: Client['db'], tag: string) {
 
   async function newOrder(): Promise<string> {
     const id = randomUUID();
-    const holdId = randomUUID();
+    const { id: holdId } = await insertHold(db, parents.sessionId);
     await db.execute(sql`INSERT INTO orders (
       id, reference, kind, status, idempotency_key, hold_id, session_id, experience_id, host_id,
       guest_id, contact_email, lead_guest_name, terms_document_id, ticket_subtotal_minor,
       tax_treatment, tax_rate_ppm, tax_minor, total_minor, amount_due_minor, commission_rate_bps,
       commission_minor, cancellation_tier_id, created_at, confirmed_at
     ) VALUES (
-      ${id}, ${reference()}, 'booking', 'confirmed', ${`book:${holdId}`}, ${holdId}, ${randomUUID()},
+      ${id}, ${reference()}, 'booking', 'confirmed', ${`book:${holdId}`}, ${holdId}, ${parents.sessionId},
       ${parents.experienceId}, ${parents.hostId}, ${parents.guestId}, 'pat@example.com', 'Pat Smith',
-      ${randomUUID()}, 13000, 'not_taxable', 0, 0, 13000, 13000, 1500, 1950, ${parents.tierId},
+      ${parents.termsDocumentId}, 13000, 'not_taxable', 0, 0, 13000, 13000, 1500, 1950, ${parents.tierId},
       ${created}, ${created}
     )`);
     return id;

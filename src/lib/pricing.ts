@@ -56,7 +56,7 @@ function requireInt(
  * `round_half_up(amountMinor * ratePpm / 1_000_000)` (design doc 4.2.3) on integers: the quotient
  * is exact because the remainder is taken first, and a remainder of exactly half rounds up.
  */
-function roundHalfUpPpm(amountMinor: number, ratePpm: number): number {
+export function roundHalfUpPpm(amountMinor: number, ratePpm: number): number {
   const scaled = amountMinor * ratePpm;
   const remainder = scaled % PPM;
   const quotient = (scaled - remainder) / PPM;

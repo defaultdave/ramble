@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect, userEvent, within } from 'storybook/test';
 import { HomeModules } from '@/components/HomeModules';
 import { samplePhoto } from '@/components/Photo/Photo.fixtures';
 import type { HomeModuleView } from '@/lib/home';
@@ -17,7 +18,7 @@ import styles from './HomeModules.stories.module.css';
 const meta = {
   title: 'Home/HomeModules',
   component: HomeModules,
-  args: { modules: fullPage, minDate: '2026-11-02', renderCopy },
+  args: { modules: fullPage, today: '2026-11-02', renderCopy },
   decorators: [
     (Story) => (
       <div className={styles.frame}>
@@ -62,6 +63,29 @@ export const HeroDesktop: Story = {
   args: { modules: [hero] },
   globals: desktop,
   parameters: { ...meta.parameters, ...fullWidth },
+};
+// A story with a play function shows one scheme, because the same label would otherwise match twice.
+/** The When field starts on the day the page was given. */
+export const HeroWhenDefaultsToToday: Story = {
+  args: { modules: [hero] },
+  globals: mobile,
+  parameters: { ...meta.parameters, colorScheme: 'light' },
+  play: async ({ canvasElement }) => {
+    const when = within(canvasElement).getByLabelText('When');
+    await expect(when).toHaveValue('2026-11-02');
+  },
+};
+
+/** A guest who clears the day leaves the field empty, and the search goes to any day. */
+export const HeroWhenCleared: Story = {
+  args: { modules: [hero] },
+  globals: mobile,
+  parameters: { ...meta.parameters, colorScheme: 'light' },
+  play: async ({ canvasElement }) => {
+    const when = within(canvasElement).getByLabelText('When');
+    await userEvent.clear(when);
+    await expect(when).toHaveValue('');
+  },
 };
 export const CategoryRailMobile: Story = {
   args: { modules: [categoryRail] },

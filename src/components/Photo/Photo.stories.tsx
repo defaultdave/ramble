@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { cardPhotoSizes } from '@/components/Card';
 import { Photo } from '@/components/Photo';
 import { samplePhoto } from './Photo.fixtures';
 import styles from './Photo.stories.module.css';
@@ -6,7 +7,7 @@ import styles from './Photo.stories.module.css';
 const meta = {
   title: 'Primitives/Photo',
   component: Photo,
-  args: { photo: samplePhoto(0), sizes: '(min-width: 768px) 384px, 100vw' },
+  args: { photo: samplePhoto(0), sizes: cardPhotoSizes.vertical },
   decorators: [
     (Story) => (
       <div className={styles.frame}>

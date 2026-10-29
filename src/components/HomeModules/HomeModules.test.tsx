@@ -1,7 +1,8 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { samplePhoto } from '@/components/Photo/Photo.fixtures';
+import { parseFilters } from '@/lib/filters';
 import { homeCopy, type HomeModuleView } from '@/lib/home';
 import { HomeModules } from './HomeModules';
 import {
@@ -18,6 +19,7 @@ import {
 // Behaviours under test, one per decision, branch or risk:
 // - the hero is the page's one h1, with its copy, and its search is a GET form to the browse page
 // - the search offers every neighborhood after "Anywhere", a date no earlier than today, and a submit
+// - the When field starts on today, and the submitted address reads back as that day; cleared, it reads back as any day
 // - each category links to the browse page filtered by it
 // - Ramble Picks shows its cards under an h2 with an h3 each, links to the whole Pick, and carries the anchor
 // - a guide-only card links out and says it is not bookable
@@ -31,7 +33,7 @@ function render_(modules = fullPage) {
   return render(
     <HomeModules
       modules={modules}
-      minDate="2026-11-02"
+      today="2026-11-02"
       renderCopy={renderCopy}
     />,
   );
@@ -85,6 +87,38 @@ describe('hero search', () => {
     expect(screen.getByLabelText('When')).toHaveAttribute('min', '2026-11-02');
     expect(screen.getByLabelText('When')).toHaveAttribute('type', 'date');
   });
+
+  it('starts the day on today', () => {
+    render_([hero]);
+    expect(screen.getByLabelText('When')).toHaveValue('2026-11-02');
+  });
+
+  it.each([
+    ['as given', undefined, '2026-11-02'],
+    ['cleared by the guest', '', null],
+  ])(
+    'submits an address the browse page reads: the day %s',
+    (_name, typed, expected) => {
+      render_([hero]);
+      if (typed !== undefined) {
+        fireEvent.change(screen.getByLabelText('When'), {
+          target: { value: typed },
+        });
+      }
+      const form = screen.getByRole('form', { name: 'Find something to do' });
+      const sent = new URLSearchParams(
+        [...new FormData(form as HTMLFormElement)].flatMap(([k, v]) =>
+          typeof v === 'string' ? [[k, v]] : [],
+        ),
+      );
+      expect(sent.get('date')).toBe(expected ?? '');
+      expect(parseFilters(Object.fromEntries(sent)).filters).toEqual({
+        categories: [],
+        neighborhoods: [],
+        date: expected,
+      });
+    },
+  );
 });
 
 describe('category rail', () => {

@@ -64,6 +64,11 @@ export function createResendAdapter(options: {
           html: email.html,
           text: email.text,
           reply_to: email.replyTo,
+          attachments: email.attachments.map((file) => ({
+            filename: file.filename,
+            content: Buffer.from(file.content, 'utf8').toString('base64'),
+            content_type: file.contentType,
+          })),
         },
       });
       const { id } = parseSendResponse('resend', SendResponseSchema, body);

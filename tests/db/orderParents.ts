@@ -15,7 +15,7 @@ type Client = typeof import('@/server/db/client');
 
 /**
  * The rows an order points at, made once per test file: a host, an experience with one price option,
- * a session, a guest, the default tier, and a terms document (a draft: a foreign key needs only the row).
+ * a session, a guest, the default tier, and a document for the terms column to point at (a draft: a foreign key needs only the row).
  */
 export async function createOrderParents(db: Client['db'], tag: string) {
   const [host] = await db
@@ -62,9 +62,9 @@ export async function createOrderParents(db: Client['db'], tag: string) {
   const [terms] = await db
     .insert(legalDocuments)
     .values({
-      doc: 'terms',
+      doc: `waiver-parents-${tag}`,
       version: 1,
-      title: 'Terms',
+      title: 'Document',
       body: { type: 'doc', content: [] },
     })
     .returning();

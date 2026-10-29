@@ -3,6 +3,7 @@ import {
   everyJsonNode,
   isStorableJson,
   notBlankPattern,
+  oneLineClipped,
   requiredText,
 } from './text';
 
@@ -75,5 +76,24 @@ describe('everyJsonNode', () => {
     const wide = new Array<number>(500_000).fill(1);
 
     expect(isStorableJson({ data: wide })).toBe(true);
+  });
+});
+
+describe('oneLineClipped', () => {
+  it.each([
+    ['a short text', 'Harbor sail', 20, 'Harbor sail'],
+    [
+      'runs of whitespace and line breaks',
+      'Harbor \n\r\n  sail ',
+      20,
+      'Harbor sail',
+    ],
+    ['a text of exactly the limit', 'abcde', 5, 'abcde'],
+    ['a longer text, cut with an ellipsis', 'abcdefgh', 5, 'abcd…'],
+    ['a cut that would end in a space', 'abc defgh', 5, 'abc…'],
+    ['an emoji kept whole', '🙂🙂🙂🙂', 3, '🙂🙂…'],
+    ['only whitespace', ' \n ', 5, ''],
+  ])('gives %s', (_label, input, max, expected) => {
+    expect(oneLineClipped(input, max)).toBe(expected);
   });
 });

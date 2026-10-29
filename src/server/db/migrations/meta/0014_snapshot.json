@@ -1,5 +1,5 @@
 {
-  "id": "6904e6cc-f743-4869-9701-9cfc51f2e712",
+  "id": "c91009ec-099e-45c6-9cee-1743d2f2f7da",
   "prevId": "3f20a1f2-4a01-4e60-875c-4053f22bf427",
   "version": "7",
   "dialect": "postgresql",
@@ -415,6 +415,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "notification_email": {
+          "name": "notification_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -436,6 +442,10 @@
         "hosts_name_not_blank": {
           "name": "hosts_name_not_blank",
           "value": "\"hosts\".\"name\" ~ '[^\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]'"
+        },
+        "hosts_notification_email_shape": {
+          "name": "hosts_notification_email_shape",
+          "value": "\"hosts\".\"notification_email\" IS NULL OR (\"hosts\".\"notification_email\" ~ '^[a-z0-9._%+-]+@[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$' AND char_length(\"hosts\".\"notification_email\") <= 254)"
         },
         "hosts_created_at_in_range": {
           "name": "hosts_created_at_in_range",
@@ -3961,32 +3971,6 @@
         }
       },
       "foreignKeys": {
-        "orders_hold_id_holds_id_fk": {
-          "name": "orders_hold_id_holds_id_fk",
-          "tableFrom": "orders",
-          "tableTo": "holds",
-          "columnsFrom": [
-            "hold_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "orders_session_id_sessions_id_fk": {
-          "name": "orders_session_id_sessions_id_fk",
-          "tableFrom": "orders",
-          "tableTo": "sessions",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
         "orders_experience_id_experiences_id_fk": {
           "name": "orders_experience_id_experiences_id_fk",
           "tableFrom": "orders",
@@ -4019,32 +4003,6 @@
           "tableTo": "guests",
           "columnsFrom": [
             "guest_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "orders_waiver_document_id_legal_documents_id_fk": {
-          "name": "orders_waiver_document_id_legal_documents_id_fk",
-          "tableFrom": "orders",
-          "tableTo": "legal_documents",
-          "columnsFrom": [
-            "waiver_document_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "orders_terms_document_id_legal_documents_id_fk": {
-          "name": "orders_terms_document_id_legal_documents_id_fk",
-          "tableFrom": "orders",
-          "tableTo": "legal_documents",
-          "columnsFrom": [
-            "terms_document_id"
           ],
           "columnsTo": [
             "id"

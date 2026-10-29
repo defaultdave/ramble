@@ -1,16 +1,5 @@
 import type { BlockNode, RichTextDoc } from '@/lib/richText/format';
 
-/** A document of plain paragraphs, for fixtures. */
-export function paragraphs(...texts: string[]): RichTextDoc {
-  return {
-    type: 'doc',
-    content: texts.map((text) => ({
-      type: 'paragraph',
-      content: [{ type: 'text', text }],
-    })),
-  };
-}
-
 type Block = string | { heading: string };
 
 /** A document of paragraphs and level 2 headings. A string is a paragraph. */

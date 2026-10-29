@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { presentText } from './displayText';
 import { optionalText } from './text';
 
 export const giftExpiryActions = ['refund_buyer', 'leave_open'] as const;
@@ -13,14 +14,14 @@ export const settingsBounds = {
   bannerChars: 280,
 } as const;
 
-const bannerText = optionalText(settingsBounds.bannerChars);
+const bannerField = optionalText(settingsBounds.bannerChars);
 
 function intBetween({ min, max }: { min: number; max: number }) {
   return z.int().min(min).max(max);
 }
 
 const settingFields = {
-  bannerText,
+  bannerText: bannerField,
   bookingsPaused: z.boolean(),
   giftsEnabled: z.boolean(),
   checkoutMaintenance: z.boolean(),
@@ -55,3 +56,10 @@ export const SettingsChangeSchema = z
     { message: 'A change sets at least one setting' },
   );
 export type SettingsChange = z.infer<typeof SettingsChangeSchema>;
+
+/** The site banner: its text, or null when there is none or it is blank. */
+export function bannerText(
+  settings: Pick<GuestSettings, 'bannerText'>,
+): string | null {
+  return presentText(settings.bannerText);
+}

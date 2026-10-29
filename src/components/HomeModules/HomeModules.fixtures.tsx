@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { ExperienceCard } from '@/lib/experienceCards';
-import { docOfText, homeCopy, type HomeModuleView } from '@/lib/home';
+import { homeCopy, type HomeModuleView } from '@/lib/home';
+import { paragraphs } from '@/lib/richText/paragraphs';
 import type { RichTextDoc } from '@/lib/richText/format';
 import styles from './HomeModules.stories.module.css';
 
@@ -79,7 +80,7 @@ export const hero: HomeModuleView = {
   id: id(901),
   eyebrow: homeCopy.heroEyebrow,
   heading: homeCopy.heroHeading,
-  body: docOfText(homeCopy.heroBody),
+  body: paragraphs(homeCopy.heroBody),
   neighborhoods: [
     { slug: 'carroll-gardens', name: 'Carroll Gardens' },
     { slug: 'dumbo', name: 'DUMBO' },
@@ -122,7 +123,7 @@ export const giftGuide: HomeModuleView = {
   id: id(904),
   eyebrow: homeCopy.giftGuideEyebrow,
   heading: 'Give a Saturday, not a sweater',
-  body: docOfText(
+  body: paragraphs(
     'Experiences to give for every kind of person. They pick the date; you look thoughtful.',
   ),
   action: { href: '/gifts', label: homeCopy.giftGuideAction },

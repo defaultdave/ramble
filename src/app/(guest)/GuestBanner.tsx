@@ -1,6 +1,6 @@
 import { connection } from 'next/server';
 import { SiteBanner } from '@/components/GuestShell';
-import { bannerText } from '@/lib/home';
+import { bannerText } from '@/lib/settings';
 import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
 import { getCachedGuestSettings } from '@/server/siteSettings';
 

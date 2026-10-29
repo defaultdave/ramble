@@ -8,7 +8,7 @@ import { BrowseContent } from './BrowseContent';
 // - a page with no result asks for no cover
 // - a polite live region carries the count, or the empty heading, for the current filters
 // - the live region is on the page and empty when the read failed
-// - a failed cover read logs only the digest and renders the error state, which keeps the filters
+// - a failed cover read logs only the digest and kind and renders the error state, which keeps the filters
 
 const server = vi.hoisted(() => ({
   options: vi.fn(),
@@ -100,14 +100,14 @@ describe('BrowseContent', () => {
     expect(server.covers).toHaveBeenCalledExactlyOnceWith([]);
   });
 
-  it('logs only the digest of a failed cover read and renders the error state', async () => {
+  it('logs only the digest and kind of a failed cover read and renders the error state', async () => {
     server.covers.mockRejectedValue(driverError);
 
     await render_();
 
     expect(server.logError).toHaveBeenCalledExactlyOnceWith(
       'Browse could not be read',
-      { digest: undefined },
+      { digest: undefined, kind: 'Error' },
     );
     expect(JSON.stringify(server.logError.mock.calls)).not.toMatch(
       /secret|Failed query/,

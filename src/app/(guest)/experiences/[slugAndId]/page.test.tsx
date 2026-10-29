@@ -17,9 +17,9 @@ import ExperienceRoute, {
 // - an address that is not a slug and an ID is a not-found, before anything is read
 // - an experience that is not visible to guests, and a guide entry, are a not-found
 // - a visible experience renders its page, with the gift entry only while gifts are on
-// - a failed read logs only the digest and renders the error state, which retries at the page's own address
+// - a failed read logs only the digest and kind and renders the error state, which retries at the page's own address
 // - a framework control-flow error is rethrown and not logged
-// - the head names the experience and describes it; anything unreadable falls back to the plain title
+// - the head names the experience and describes it; a failed read falls back to the plain title and logs only its digest and kind, as the page does
 
 const server = vi.hoisted(() => ({
   page: vi.fn(),
@@ -132,7 +132,7 @@ describe('the experience route', () => {
     ['the experience', () => server.page.mockRejectedValue(driverError)],
     ['the settings', () => server.settings.mockRejectedValue(driverError)],
   ])(
-    'logs only the digest of a failed read of %s and renders the error state',
+    'logs only the digest and kind of a failed read of %s and renders the error state',
     async (_name, fail) => {
       fail();
 
@@ -140,7 +140,7 @@ describe('the experience route', () => {
 
       expect(server.logError).toHaveBeenCalledExactlyOnceWith(
         'The experience page could not be read',
-        { digest: undefined },
+        { digest: undefined, kind: 'Error' },
       );
       expect(JSON.stringify(server.logError.mock.calls)).not.toMatch(
         /secret|Failed query/,
@@ -154,7 +154,7 @@ describe('the experience route', () => {
     },
   );
 
-  it('logs the digest a cached read carries', async () => {
+  it('logs the digest and kind a cached read carries', async () => {
     server.page.mockRejectedValue(
       Object.assign(new Error('secret-id'), { digest: '1234567' }),
     );
@@ -163,7 +163,7 @@ describe('the experience route', () => {
 
     expect(server.logError).toHaveBeenCalledExactlyOnceWith(
       'The experience page could not be read',
-      { digest: '1234567' },
+      { digest: '1234567', kind: 'Error' },
     );
   });
 
@@ -202,13 +202,19 @@ describe('the experience head', () => {
     });
   });
 
-  it('falls back to the plain title when the read fails, and logs nothing of it', async () => {
+  it('falls back to the plain title when the read fails, and logs only its digest and kind', async () => {
     server.page.mockRejectedValue(driverError);
 
     expect(await generateMetadata(props(address))).toEqual({
       title: 'Experience',
     });
-    expect(server.logError).not.toHaveBeenCalled();
+    expect(server.logError).toHaveBeenCalledExactlyOnceWith(
+      'The experience head could not be read',
+      { digest: undefined, kind: 'Error' },
+    );
+    expect(JSON.stringify(server.logError.mock.calls)).not.toMatch(
+      /secret|Failed query/,
+    );
   });
 
   it('rethrows a framework control-flow error', async () => {

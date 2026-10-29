@@ -11,7 +11,7 @@ import {
 
 // Behaviours under test, one per decision, branch or risk:
 // - each cached read names its cache profile and tags itself, results with the catalog and every experience they list
-// - a failed read throws only the kind of the failure, never the query, its values, or the cause
+// - a failed read throws only the name of the read and the kind of the failure, never the query, its values, or the cause
 // - a framework control-flow error passes through unchanged
 
 const cache = vi.hoisted(() => ({ life: vi.fn(), tag: vi.fn() }));
@@ -90,7 +90,7 @@ describe('getBrowseResults', () => {
     );
 
     expect(failure).toMatchObject({
-      name: 'BrowseReadError',
+      name: 'CachedReadError',
       message: 'Browse read failed: Error',
     });
     expect(JSON.stringify(failure)).not.toContain('secret-slug');
@@ -130,7 +130,7 @@ describe('getBrowseDates', () => {
 
     await expect(
       getBrowseDates({ categories: [], neighborhoods: [] }, asOf),
-    ).rejects.toThrow('Browse read failed: Error');
+    ).rejects.toThrow('Browse dates read failed: Error');
   });
 });
 
@@ -149,8 +149,8 @@ describe('getBrowseDates with a session the calendar cannot place', () => {
     ).catch((error: unknown) => error);
 
     expect(failure).toMatchObject({
-      name: 'BrowseReadError',
-      message: 'Browse read failed: RangeError',
+      name: 'CachedReadError',
+      message: 'Browse dates read failed: RangeError',
     });
     expect(JSON.stringify(failure)).not.toContain('Phobos');
   });
@@ -177,7 +177,7 @@ describe('getFilterOptions', () => {
     db.neighborhoods.mockResolvedValue([]);
 
     await expect(getFilterOptions()).rejects.toThrow(
-      'Browse read failed: Error',
+      'Filter options read failed: Error',
     );
   });
 
@@ -186,7 +186,7 @@ describe('getFilterOptions', () => {
     db.neighborhoods.mockResolvedValue([]);
 
     await expect(getFilterOptions()).rejects.toThrow(
-      'Browse read failed: unknown',
+      'Filter options read failed: unknown',
     );
   });
 });

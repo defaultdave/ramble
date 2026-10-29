@@ -1,18 +1,25 @@
 import type { Metadata } from 'next';
-import { use } from 'react';
-import { RoutePlaceholder } from '@/components/RoutePlaceholder';
+import { Alert } from '@/components/Alert';
+import { ButtonLink } from '@/components/Button';
+import { demoOrderPath, demoSummary } from '@/lib/demoCheckout';
+import { DemoOrderSummary } from '../../_demo/DemoOrderSummary';
+import { DemoPage } from '../../_demo/DemoPage';
 
 export const metadata: Metadata = { title: 'Checkout' };
 
-export default function CheckoutPage({
-  params,
-}: PageProps<'/checkout/[holdId]'>) {
-  const { holdId } = use(params);
+// TODO(U-047b): replaced by the checkout page.
+export default function CheckoutPage() {
   return (
-    <RoutePlaceholder
-      name="Checkout"
-      covers="PRD-14 to PRD-24"
-      param={holdId}
-    />
+    <DemoPage title="Checkout">
+      <Alert
+        tone="info"
+        title="This is a demo checkout"
+        body="No payment is taken and nothing is booked."
+      />
+      <DemoOrderSummary summary={demoSummary} />
+      <ButtonLink href={demoOrderPath} variant="primary" size="lg">
+        Pay (demo)
+      </ButtonLink>
+    </DemoPage>
   );
 }

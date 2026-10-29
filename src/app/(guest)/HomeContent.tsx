@@ -1,16 +1,14 @@
-import { unstable_rethrow } from 'next/navigation';
 import { connection } from 'next/server';
 import { HomeModules } from '@/components/HomeModules';
 import { RichText } from '@/components/RichText';
 import { HomeEmpty, HomeError, HomeTitle } from '@/components/HomeStates';
-import { errorDigest } from '@/lib/errorDigest';
 import { buildHomePage, homeCardIds, withHomeCovers } from '@/lib/home';
 import { coverLookupIds, coversByExperience } from '@/lib/photoViews';
 import { minuteAsOf } from '@/lib/time';
 import { venueToday } from '@/lib/venue';
 import { getCoverPhotos } from '@/server/coverPhotos';
 import { getHomeContent, getThisWeek } from '@/server/home';
-import { logger } from '@/server/monitoring/logger';
+import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
 import { getCachedGuestSettings } from '@/server/siteSettings';
 
 export async function HomeContent() {
@@ -30,13 +28,7 @@ export async function HomeContent() {
     const covers = await getCoverPhotos(coverLookupIds(homeCardIds(built)));
     page = withHomeCovers(built, coversByExperience(covers));
   } catch (error) {
-    // Next.js ends a prerender by throwing; swallowing that would break the render.
-    unstable_rethrow(error);
-    // Only the digest is logged. Next.js strips the message of an error that crosses a cached
-    // function, and the digest finds the line it logged there, which names the kind of failure.
-    logger.error('The home page could not be read', {
-      digest: errorDigest(error),
-    });
+    rethrowOrLog('The home page could not be read', error);
     return <HomeError />;
   }
 

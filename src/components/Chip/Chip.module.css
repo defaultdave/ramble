@@ -80,11 +80,11 @@
   color: var(--color-text-primary);
 }
 
-/* The pressed state is a background, which forced-colors mode drops. */
+/* The pressed state is a background, which forced-colors mode drops. It becomes a thick Highlight border, not an outline: the focus ring is a CanvasText outline outside the border, so a focused selected chip shows both. */
 @media (forced-colors: active) {
   .chip[aria-pressed='true'],
   .chip[aria-current='true'] {
-    outline: 2px solid Highlight;
-    outline-offset: -4px;
+    border: 3px solid Highlight;
+    padding: calc(var(--space-2) - 2px) calc(var(--space-4) - 2px);
   }
 }

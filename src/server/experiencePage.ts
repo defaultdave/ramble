@@ -1,7 +1,7 @@
 import 'server-only';
 import { cacheLife, cacheTag } from 'next/cache';
 import { tags } from '@/lib/cacheTags';
-import type { GuestExperience } from '@/lib/catalog';
+import { EntityIdSchema, type GuestExperience } from '@/lib/catalog';
 import { placeOf, type Place } from '@/lib/experiencePage';
 import type { GuestPhoto } from '@/lib/photos';
 import { readOrRefuse } from '@/server/cache/readOrRefuse';
@@ -29,7 +29,9 @@ export async function getExperiencePage(
 ): Promise<ExperiencePageData | null> {
   'use cache';
   cacheLife('catalog');
-  cacheTag(tags.experience(id), tags.catalog);
+  // safeParse, not parse: a ZodError carries the raw value, and Next.js logs what a cached function throws.
+  if (!EntityIdSchema.safeParse(id).success) return null;
+  cacheTag(tags.experience(id.toLowerCase()), tags.catalog);
   return readOrRefuse('Experience', async () => {
     const experience = await getGuestExperience(id);
     if (!experience) return null;

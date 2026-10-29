@@ -82,7 +82,7 @@ export function ExperiencePage({ view }: ExperiencePageProps) {
       </header>
 
       <div className={styles.gallery}>
-        <ExperienceGallery title={view.title} photos={view.gallery} />
+        <ExperienceGallery title={view.title} gallery={view.gallery} />
       </div>
 
       <div className={styles.body}>

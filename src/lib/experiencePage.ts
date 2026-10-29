@@ -236,6 +236,63 @@ export function mapsHref(meetingPoint: string | null): string | null {
   return `https://www.google.com/maps/search/?api=1&query=${query}`;
 }
 
+// ---- The gallery ----
+
+/** Photos the desktop grid shows before "See all": the lead and the two beside it. */
+export const galleryGridPhotos = 3;
+
+/** How many photos the grid is laid out for; four or more share one layout, with the rest behind "See all". */
+type GalleryLayout = 'none' | 'one' | 'two' | 'three' | 'many';
+
+type GalleryPhoto = {
+  photo: PhotoView;
+  /** The one photo fetched ahead of the rest. */
+  isLead: boolean;
+  /** "2 of 5" on a phone, or null for a lone photo, which has no place in a set. */
+  counter: string | null;
+};
+
+export type GalleryView = {
+  layout: GalleryLayout;
+  /** Every photo, in order; the grid draws the first few and the strip all of them. */
+  photos: GalleryPhoto[];
+  /** The photos behind "See all". */
+  more: PhotoView[];
+  /** "See all 15 photos", or null when the grid already shows every photo. */
+  seeAllLabel: string | null;
+};
+
+function layoutFor(count: number): GalleryLayout {
+  switch (count) {
+    case 0:
+      return 'none';
+    case 1:
+      return 'one';
+    case 2:
+      return 'two';
+    case 3:
+      return 'three';
+    default:
+      return 'many';
+  }
+}
+
+/** How the photos are laid out and labelled: the lead, each photo's place in the set, and what sits behind "See all". */
+export function galleryView(photos: readonly PhotoView[]): GalleryView {
+  const count = photos.length;
+  const more = photos.slice(galleryGridPhotos);
+  return {
+    layout: layoutFor(count),
+    photos: photos.map((photo, index) => ({
+      photo,
+      isLead: index === 0,
+      counter: count > 1 ? `${String(index + 1)} of ${String(count)}` : null,
+    })),
+    more,
+    seeAllLabel: more.length > 0 ? `See all ${String(count)} photos` : null,
+  };
+}
+
 // ---- The page ----
 
 export type KeyFactIcon =
@@ -256,7 +313,7 @@ export type ExperiencePageView = {
   summary: string;
   prices: PriceLine[];
   keyFacts: KeyFact[];
-  gallery: PhotoView[];
+  gallery: GalleryView;
   about: string[];
   included: string[];
   host: { name: string; initial: string; description: string | null };
@@ -337,9 +394,11 @@ export function buildExperiencePage(
       .join(' · '),
     prices: priceLines(experience.priceOptions),
     keyFacts,
-    gallery: photos
-      .toSorted((a, b) => a.position - b.position)
-      .map((photo) => photoView(photo)),
+    gallery: galleryView(
+      photos
+        .toSorted((a, b) => a.position - b.position)
+        .map((photo) => photoView(photo)),
+    ),
     about: textLines(experience.description),
     included: includedItems(experience.included),
     host: {

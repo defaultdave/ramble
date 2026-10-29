@@ -2,7 +2,12 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import { notFound } from 'next/navigation';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { experience, id, place } from '@/lib/experiencePage.fixtures';
+import {
+  experience,
+  id,
+  idWithLetters,
+  place,
+} from '@/lib/experiencePage.fixtures';
 import ExperienceRoute, {
   generateMetadata,
   generateStaticParams,
@@ -71,9 +76,9 @@ describe('the experience route', () => {
   );
 
   it('reads the experience by the ID in the address, lower-cased', async () => {
-    await ExperienceRoute(props(`sunset-kayak-${id(1).toUpperCase()}`));
+    await ExperienceRoute(props(`sunset-kayak-${idWithLetters.toUpperCase()}`));
 
-    expect(server.page).toHaveBeenCalledExactlyOnceWith(id(1));
+    expect(server.page).toHaveBeenCalledExactlyOnceWith(idWithLetters);
   });
 
   it('is a not-found when the experience is not visible to guests', async () => {

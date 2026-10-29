@@ -21,10 +21,15 @@ export function photoView(photo: GuestPhoto): PhotoView {
   };
 }
 
-/** The experiences one batch read of cover photos takes, bounded so the read cannot grow with the page. */
+/**
+ * The experiences one batch read of cover photos takes, bounded so the read cannot grow with the
+ * page. The length is checked before any ID is, as Zod checks every ID of an array even when
+ * the array is already too long.
+ */
 export const CoverLookupSchema = z
-  .array(EntityIdSchema)
-  .max(photoLimits.maxCoverLookups);
+  .array(z.unknown())
+  .max(photoLimits.maxCoverLookups)
+  .pipe(z.array(EntityIdSchema));
 
 /**
  * The IDs a cover read looks up, each once, lower-case and in one order, so two pages that list the

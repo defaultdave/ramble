@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { idWithLetters } from './experiencePage.fixtures';
 import type { GuestPhoto } from './photos';
 import { photoLimits } from './photos';
 import {
@@ -63,6 +64,14 @@ describe('CoverLookupSchema', () => {
     expect(CoverLookupSchema.safeParse([...ids, id(9999)]).success).toBe(false);
   });
 
+  it('refuses a list past the limit without looking at its IDs', () => {
+    const result = CoverLookupSchema.safeParse(
+      Array.from({ length: photoLimits.maxCoverLookups + 1 }, () => 'x'),
+    );
+    expect(result.success).toBe(false);
+    expect(result.error?.issues).toHaveLength(1);
+  });
+
   it('refuses an ID that is not a uuid', () => {
     expect(CoverLookupSchema.safeParse(['not-a-uuid']).success).toBe(false);
   });
@@ -70,11 +79,15 @@ describe('CoverLookupSchema', () => {
 
 describe('coverLookupIds', () => {
   it('lower-cases, drops repeats, and sorts', () => {
-    expect(coverLookupIds([id(3), id(1).toUpperCase(), id(1), id(2)])).toEqual([
-      id(1),
-      id(2),
-      id(3),
-    ]);
+    expect(
+      coverLookupIds([
+        id(3),
+        idWithLetters.toUpperCase(),
+        idWithLetters,
+        id(1),
+        id(2),
+      ]),
+    ).toEqual([id(1), id(2), id(3), idWithLetters]);
   });
 
   it('gives the same list for the same IDs in another order', () => {

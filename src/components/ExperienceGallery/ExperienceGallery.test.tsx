@@ -3,6 +3,8 @@ import { render, screen, within } from '@testing-library/react';
 import type { ImageProps } from 'next/image';
 import { describe, expect, it, vi } from 'vitest';
 import { samplePhotos } from '@/components/Photo/Photo.fixtures';
+import { galleryView } from '@/lib/experiencePage';
+import type { PhotoView } from '@/lib/photoViews';
 import { ExperienceGallery } from './ExperienceGallery';
 
 // Behaviours under test, one per decision, branch or risk:
@@ -24,7 +26,7 @@ function gallery(count: number) {
   return render(
     <ExperienceGallery
       title="Sunset kayak on the Hudson"
-      photos={samplePhotos(count)}
+      gallery={galleryView(samplePhotos(count))}
     />,
   );
 }
@@ -68,6 +70,33 @@ describe('ExperienceGallery', () => {
   it('says nothing about position for a single photo', () => {
     gallery(1);
     expect(screen.queryByText(/ of /)).not.toBeInTheDocument();
+  });
+
+  it('draws the labels and the lead the view gives, and works none out itself', () => {
+    const [first, second, third] = samplePhotos(3);
+    const lead = { photo: first as PhotoView, isLead: false, counter: 'A' };
+    render(
+      <ExperienceGallery
+        title="Kayak"
+        gallery={{
+          layout: 'many',
+          photos: [
+            lead,
+            { photo: second as PhotoView, isLead: true, counter: null },
+          ],
+          more: [third as PhotoView],
+          seeAllLabel: 'Everything',
+        }}
+      />,
+    );
+
+    expect(screen.getByText('A')).toBeInTheDocument();
+    expect(screen.getByText('Everything')).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByRole('img', { hidden: true })
+        .map((image) => image.getAttribute('data-preload')),
+    ).toEqual(['false', 'true', 'false']);
   });
 
   it.each([1, 2, 3])('offers no "See all" for %i photos', (count) => {

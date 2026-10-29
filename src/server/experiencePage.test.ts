@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { idWithLetters } from '@/lib/experiencePage.fixtures';
 import { getExperiencePage } from './experiencePage';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the page read uses the catalog profile and tags the experience and the catalog
+// - an ID that is no guid gives null before anything is tagged or read; the tag is the lower-case ID
 // - an experience that is not visible to guests gives null, and nothing else is read for it
 // - a visible one comes back with its photos and its place, from the lists of categories and neighborhoods
 // - a failed read throws only the kind of the failure, never the query or its values
@@ -56,6 +58,24 @@ describe('getExperiencePage', () => {
     expect(cache.life).toHaveBeenCalledExactlyOnceWith('catalog');
     expect(cache.tag).toHaveBeenCalledExactlyOnceWith(
       `experience:${id(1)}`,
+      'catalog',
+    );
+  });
+
+  it.each(['', 'not-a-uuid', `${id(1)}-extra`, 'x'.repeat(100_000)])(
+    'gives null for the ID %j, and tags and reads nothing',
+    async (bad) => {
+      expect(await getExperiencePage(bad)).toBeNull();
+      expect(cache.tag).not.toHaveBeenCalled();
+      expect(db.experience).not.toHaveBeenCalled();
+    },
+  );
+
+  it('tags the lower-case ID', async () => {
+    await getExperiencePage(idWithLetters.toUpperCase());
+
+    expect(cache.tag).toHaveBeenCalledExactlyOnceWith(
+      `experience:${idWithLetters}`,
       'catalog',
     );
   });

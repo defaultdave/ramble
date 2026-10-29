@@ -1,5 +1,5 @@
 import { samplePhotos } from '@/components/Photo/Photo.fixtures';
-import type { ExperiencePageView } from '@/lib/experiencePage';
+import { galleryView, type ExperiencePageView } from '@/lib/experiencePage';
 
 /** The experience of Figma frame 03: outdoor, with a weather call, a host, a meeting point, and fifteen photos. */
 export const sunsetKayak: ExperiencePageView = {
@@ -18,7 +18,7 @@ export const sunsetKayak: ExperiencePageView = {
     { icon: 'weather', text: 'Weather call 3 hours before start' },
     { icon: 'cancellation', text: 'Free cancellation up to 24 hours before' },
   ],
-  gallery: samplePhotos(15),
+  gallery: galleryView(samplePhotos(15)),
   about: [
     'Paddle out as the light goes gold. Guides start with a 20-minute lesson on the dock, then lead a slow loop past the piers while the skyline turns pink behind you. No experience needed, and everyone wears a life jacket.',
   ],
@@ -68,7 +68,7 @@ export const kidsClass: ExperiencePageView = {
     { icon: 'age', text: 'Ages 5 to 10' },
     { icon: 'cancellation', text: 'Free cancellation up to 48 hours before' },
   ],
-  gallery: samplePhotos(1),
+  gallery: galleryView(samplePhotos(1)),
   about: [
     'Kids sit at their own wheel and make a bowl they can use at breakfast.',
     'The teacher keeps the group to eight, so every child gets hands-on help.',
@@ -102,7 +102,7 @@ export const bareExperience: ExperiencePageView = {
     { icon: 'age', text: 'All ages' },
     { icon: 'cancellation', text: 'Free cancellation up to 24 hours before' },
   ],
-  gallery: [],
+  gallery: galleryView([]),
   about: [],
   included: [],
   host: { name: 'Red Hook Walks', initial: 'R', description: null },

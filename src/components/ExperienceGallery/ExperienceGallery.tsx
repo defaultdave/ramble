@@ -1,17 +1,14 @@
 import { ImageOff } from 'lucide-react';
 import { Photo } from '@/components/Photo';
-import type { PhotoView } from '@/lib/photoViews';
+import type { GalleryView } from '@/lib/experiencePage';
 import styles from './ExperienceGallery.module.css';
 
 export type ExperienceGalleryProps = {
   /** The experience's name, which names the gallery for a screen reader. */
   title: string;
-  /** In gallery order; the first is the lead photo. */
-  photos: readonly PhotoView[];
+  /** How the photos are laid out and labelled, from `galleryView`. */
+  gallery: GalleryView;
 };
-
-/** Photos the desktop grid shows before "See all": the lead and the two beside it. */
-const gridPhotos = 3;
 
 const leadSizes = '(min-width: 1200px) 792px, (min-width: 768px) 66vw, 100vw';
 const sideSizes = '(min-width: 1200px) 384px, (min-width: 768px) 33vw, 100vw';
@@ -31,16 +28,14 @@ function Placeholder() {
  * the tablet width, the lead beside two more, and the rest behind "See all". Every photo holds its
  * space before it loads, and only the lead is fetched ahead of the rest. It needs no script.
  */
-export function ExperienceGallery({ title, photos }: ExperienceGalleryProps) {
-  const count = photos.length;
-  if (count === 0) {
+export function ExperienceGallery({ title, gallery }: ExperienceGalleryProps) {
+  if (gallery.layout === 'none') {
     return (
       <div className={styles.gallery}>
         <Placeholder />
       </div>
     );
   }
-  const extra = photos.slice(gridPhotos);
 
   return (
     <div className={styles.gallery}>
@@ -51,31 +46,26 @@ export function ExperienceGallery({ title, photos }: ExperienceGalleryProps) {
         aria-label={`Photos of ${title}`}
         tabIndex={0}
       >
-        <ul
-          className={styles.list}
-          data-count={count > gridPhotos ? 'many' : String(count)}
-        >
-          {photos.map((photo, index) => (
+        <ul className={styles.list} data-layout={gallery.layout}>
+          {gallery.photos.map(({ photo, isLead, counter }) => (
             <li key={photo.src} className={styles.item}>
               <Photo
                 photo={photo}
-                sizes={index === 0 ? leadSizes : sideSizes}
-                preload={index === 0}
+                sizes={isLead ? leadSizes : sideSizes}
+                preload={isLead}
               />
-              {count > 1 ? (
-                <span className={styles.counter}>
-                  {index + 1} of {count}
-                </span>
+              {counter ? (
+                <span className={styles.counter}>{counter}</span>
               ) : null}
             </li>
           ))}
         </ul>
       </div>
-      {extra.length > 0 ? (
+      {gallery.seeAllLabel ? (
         <details className={styles.more}>
-          <summary className={styles.summary}>See all {count} photos</summary>
+          <summary className={styles.summary}>{gallery.seeAllLabel}</summary>
           <ul className={styles.moreList}>
-            {extra.map((photo) => (
+            {gallery.more.map((photo) => (
               <li key={photo.src} className={styles.moreItem}>
                 <Photo photo={photo} sizes={moreSizes} />
               </li>

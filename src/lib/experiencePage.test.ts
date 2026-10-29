@@ -6,6 +6,8 @@ import {
   cancellationTerms,
   categoryPath,
   experienceHead,
+  galleryGridPhotos,
+  galleryView,
   giftCheckoutPath,
   includedItems,
   mapsHref,
@@ -23,7 +25,12 @@ import {
   weatherTerms,
   type ExperiencePageInput,
 } from './experiencePage';
-import { experience, id, place } from './experiencePage.fixtures';
+import {
+  experience,
+  id,
+  idWithLetters,
+  place,
+} from './experiencePage.fixtures';
 import type { GuestPhoto } from './photos';
 
 // Behaviours under test, one per decision, branch or risk:
@@ -39,6 +46,7 @@ import type { GuestPhoto } from './photos';
 // - the badges: outdoor, 21+, kids; each only when it applies
 // - gifts switched off leave the gift entry out; the private-session entry stays
 // - the gallery is in the order staff set; a blank text section is left out
+// - the gallery layout follows the photo count (none, one, two, three, many); only the first photo leads; each photo of a set says its place and a lone one says nothing; "See all" and the photos behind it appear only past the grid
 // - the head: a plain title for a guide entry or a missing experience, the name and an opening otherwise; the opening is cut at a word
 
 const photo = (position: number): GuestPhoto => ({
@@ -65,8 +73,8 @@ const build = (overrides: Partial<ExperiencePageInput> = {}) =>
 describe('parseExperienceAddress', () => {
   it('splits a slug and an ID, and lower-cases the ID', () => {
     expect(
-      parseExperienceAddress(`sunset-kayak-${id(1).toUpperCase()}`),
-    ).toEqual({ slug: 'sunset-kayak', id: id(1) });
+      parseExperienceAddress(`sunset-kayak-${idWithLetters.toUpperCase()}`),
+    ).toEqual({ slug: 'sunset-kayak', id: idWithLetters });
   });
 
   it('takes a one-word slug', () => {
@@ -419,9 +427,9 @@ describe('buildExperiencePage', () => {
 
   it('orders the gallery by position, whatever order the photos arrive in', () => {
     expect(
-      build({ photos: [photo(2), photo(0), photo(1)] })?.gallery.map(
-        ({ alt }) => alt,
-      ),
+      build({
+        photos: [photo(2), photo(0), photo(1)],
+      })?.gallery.photos.map(({ photo: { alt } }) => alt),
     ).toEqual(['Photo 0', 'Photo 1', 'Photo 2']);
   });
 
@@ -537,4 +545,76 @@ describe('experienceHead', () => {
       description: null,
     });
   });
+});
+
+describe('galleryView', () => {
+  const views = (count: number) =>
+    Array.from({ length: count }, (_, n) => ({
+      src: `https://store.example/${String(n)}.jpg`,
+      width: 1600,
+      height: 1000,
+      alt: `Photo ${String(n)}`,
+      blurDataUrl: 'data:image/jpeg;base64,/9j/4AAQ',
+    }));
+
+  it.each([
+    [0, 'none'],
+    [1, 'one'],
+    [2, 'two'],
+    [3, 'three'],
+    [4, 'many'],
+    [20, 'many'],
+  ])('lays out %i photos as %s', (count, layout) => {
+    expect(galleryView(views(count)).layout).toBe(layout);
+  });
+
+  it('marks only the first photo as the lead, and keeps the order', () => {
+    const gallery = galleryView(views(3));
+
+    expect(gallery.photos.map(({ isLead }) => isLead)).toEqual([
+      true,
+      false,
+      false,
+    ]);
+    expect(gallery.photos.map(({ photo: { alt } }) => alt)).toEqual([
+      'Photo 0',
+      'Photo 1',
+      'Photo 2',
+    ]);
+  });
+
+  it('says where each photo of a set is, and nothing for a lone photo', () => {
+    expect(galleryView(views(3)).photos.map(({ counter }) => counter)).toEqual([
+      '1 of 3',
+      '2 of 3',
+      '3 of 3',
+    ]);
+    expect(galleryView(views(1)).photos.map(({ counter }) => counter)).toEqual([
+      null,
+    ]);
+    expect(galleryView(views(0)).photos).toEqual([]);
+  });
+
+  it.each([0, 1, 2, galleryGridPhotos])(
+    'offers no "See all" and holds nothing back for %i photos',
+    (count) => {
+      const gallery = galleryView(views(count));
+      expect(gallery.seeAllLabel).toBeNull();
+      expect(gallery.more).toEqual([]);
+    },
+  );
+
+  it.each([4, 5, 15, 20])(
+    'puts every photo after the grid behind "See all %i photos"',
+    (count) => {
+      const gallery = galleryView(views(count));
+      expect(gallery.seeAllLabel).toBe(`See all ${String(count)} photos`);
+      expect(gallery.more.map(({ alt }) => alt)).toEqual(
+        views(count)
+          .slice(galleryGridPhotos)
+          .map(({ alt }) => alt),
+      );
+      expect(gallery.photos).toHaveLength(count);
+    },
+  );
 });

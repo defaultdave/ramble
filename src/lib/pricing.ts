@@ -67,8 +67,13 @@ export function taxMinor(ticketSubtotalMinor: number, ratePpm: number): number {
   return roundHalfUpPpm(ticketSubtotalMinor, ratePpm);
 }
 
+/**
+ * The commission Ramble takes on the ticket before tax, in basis points (Q-03, 15 percent). The
+ * `settings` row holds no commission rate, so an order snapshots this constant when it is made.
+ */
+export const defaultCommissionRateBps = 1500;
+
 /** `round_half_up(subtotal * bps / 10_000)`, on the ticket before tax (Q-03). A basis point is 100 ppm. */
-// TODO(U-047a): first caller, the order snapshot in startPayment (the order row check reads it today).
 export function commissionMinor(
   ticketSubtotalMinor: number,
   commissionRateBps: number,

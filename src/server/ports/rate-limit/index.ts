@@ -32,7 +32,7 @@ function rateLimitKey(surface: RateLimitSurface, subject: string): string {
   return `${surface}:${digest}`;
 }
 
-// TODO(U-004a): first caller for `sign_in_link`; U-047a (`payment_tries`), U-055 (`manage`), U-038
+// TODO(U-004a): first caller for `sign_in_link`; U-055 (`manage`), U-038
 // and U-043 (`forms`) follow. `reserve` is spent by the reserve action.
 /**
  * Spends one try on the surface's policy for this subject. Refuses (`allowed: false`) once the

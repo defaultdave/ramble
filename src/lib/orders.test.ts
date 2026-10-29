@@ -5,6 +5,7 @@ import {
   bookingIdempotencyKey,
   canOrderTransition,
   isGiftPurchaseKey,
+  crockfordAlphabet,
   isOrderReference,
   orderAmountDueMinor,
   orderInitialStatuses,
@@ -414,5 +415,17 @@ describe('OrderItemSchema', () => {
     expect(OrderItemSchema.safeParse({ ...item, ...change }).success).toBe(
       false,
     );
+  });
+});
+
+describe('the reference alphabet', () => {
+  it('is the 32 characters the reference pattern accepts, and no other', () => {
+    expect(crockfordAlphabet).toBe('0123456789ABCDEFGHJKMNPQRSTVWXYZ');
+    for (const character of crockfordAlphabet) {
+      expect(isOrderReference(`RMB-${character.repeat(6)}`)).toBe(true);
+    }
+    for (const character of 'ILOU') {
+      expect(isOrderReference(`RMB-${character.repeat(6)}`)).toBe(false);
+    }
   });
 });

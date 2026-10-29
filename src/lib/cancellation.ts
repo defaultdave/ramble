@@ -93,7 +93,6 @@ function localDeadline(instant: Date, timeZone: string): LocalDeadline {
  * The tier gives a full refund before its deadline and none after; a part-way refund would
  * return a fraction between 0 and 1_000_000. Bad input is refused: a tier outside 0 to a year,
  * a date that is not a real time, or a time zone that is not an IANA name throws a RangeError.
- * TODO(U-047a): first caller, the `free_cancel_until` snapshot written with the order.
  */
 export function cancellationWindow(
   tier: Pick<CancellationTier, 'fullRefundHoursBefore'>,

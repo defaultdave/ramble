@@ -126,10 +126,11 @@ describe('what a guest sees', () => {
 });
 
 describe('what the hold path reads', () => {
-  it('is the pause switch, the hold length, and the tax rate, with the rest stripped from a full row', () => {
+  it('is the pause switch, the hold length, the payment grace, and the tax rate, with the rest stripped from a full row', () => {
     expect(HoldSettingsSchema.parse(fullSettings)).toEqual({
       bookingsPaused: false,
       holdMinutes: 10,
+      paymentGraceMinutes: 5,
       taxRatePpm: 88_750,
     });
   });
@@ -137,6 +138,7 @@ describe('what the hold path reads', () => {
   it.each([
     ['a hold length of 0', { holdMinutes: 0 }],
     ['a hold length of 61', { holdMinutes: 61 }],
+    ['a payment grace of 31', { paymentGraceMinutes: 31 }],
     ['a rate over 25 percent', { taxRatePpm: 250_001 }],
   ])('refuses %s', (_name, change) => {
     expect(

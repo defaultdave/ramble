@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   cardPriceLabel,
   commissionMinor,
+  defaultCommissionRateBps,
   fromPriceLabel,
   lines,
   MAX_LINES,
@@ -447,5 +448,12 @@ describe('fromPriceLabel', () => {
     [0, 'Free'],
   ])('labels a lowest price of %i', (minor, label) => {
     expect(fromPriceLabel(minor)).toBe(label);
+  });
+});
+
+describe('the default commission rate', () => {
+  it('is 15 percent of the ticket before tax', () => {
+    expect(defaultCommissionRateBps).toBe(1500);
+    expect(commissionMinor(17_000, defaultCommissionRateBps)).toBe(2_550);
   });
 });

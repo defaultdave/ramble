@@ -148,7 +148,6 @@ function attemptRuleIssues(attempt: AttemptRuleFields): RuleIssue[] {
   return issues;
 }
 
-// TODO(U-047a): first caller, the attempt read in startPayment.
 export const PaymentAttemptSchema = z
   .object({
     id: EntityIdSchema,

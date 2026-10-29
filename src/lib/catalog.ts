@@ -34,6 +34,16 @@ export const taxTreatments = ['taxable', 'not_taxable', 'unknown'] as const;
 
 export const priceKinds = ['adult', 'child'] as const;
 
+/** The name a price option goes by on an order line, as it is snapshotted when the order is made. */
+export function priceKindLabel(kind: (typeof priceKinds)[number]): string {
+  switch (kind) {
+    case 'adult':
+      return 'Adult';
+    case 'child':
+      return 'Child';
+  }
+}
+
 export const slugEntityKinds = [
   'category',
   'neighborhood',

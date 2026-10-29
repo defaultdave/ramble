@@ -5,6 +5,11 @@ import {
   ReserveResultSchema,
   alternativeWindow,
   blockedForBot,
+  fieldErrorsFromIssues,
+  isHoldOfDevice,
+  payingHold,
+  payingUntil,
+  remainingSpaces,
   blockedForRateLimit,
   reserveBlock,
   spendsReserveTry,
@@ -46,6 +51,11 @@ import { maxAllocation } from './sessions';
 //   refused; released answers released; active releases
 // - alternatives: scheduled, after `at`, within 14 days, room for the whole party, soonest first, at
 //   most three, spaces left counting only open holds
+// - remaining spaces are capacity less sold less the seats held, negative as is
+// - the paying deadline is the later of expiry and now, plus the grace; a grace outside the bounds is refused
+// - only an open active hold becomes paying: a lapsed, paying, converted, or released one is left alone
+// - a hold is a device's only when the hash matches; a missing hold is nobody's
+// - field errors take the issue's first message, keyed as the caller says
 
 const at = new Date('2026-11-01T12:00:00.000Z');
 const later = (ms: number) => new Date(at.getTime() + ms);
@@ -617,5 +627,95 @@ describe('alternatives', () => {
     expect(
       pickAlternatives([candidate('a', day, { seatsSold: 10 })], [], 1, at),
     ).toEqual([]);
+  });
+});
+
+describe('remaining spaces', () => {
+  it.each([
+    [10, 3, 2, 5],
+    [10, 10, 0, 0],
+    [4, 3, 3, -2],
+  ])(
+    'capacity %i, sold %i, held %i leaves %i',
+    (allocation, seatsSold, held, left) => {
+      expect(remainingSpaces({ allocation, seatsSold }, held)).toBe(left);
+    },
+  );
+});
+
+describe('the paying deadline', () => {
+  it.each([
+    ['expiry still ahead', later(5 * 60_000), 5, later(10 * 60_000)],
+    ['expiry already past', later(-60_000), 5, later(5 * 60_000)],
+    ['expiry now', at, 0, at],
+    ['the largest grace', later(60_000), 30, later(31 * 60_000)],
+  ])(
+    'is the later of expiry and now plus the grace: %s',
+    (_name, expiresAt, grace, expected) => {
+      expect(payingUntil(expiresAt, at, grace)).toEqual(expected);
+    },
+  );
+
+  it.each([[-1], [31], [1.5], [Number.NaN]])(
+    'refuses a grace of %s',
+    (grace) => {
+      expect(() => payingUntil(at, at, grace)).toThrow(RangeError);
+    },
+  );
+});
+
+describe('making a hold paying', () => {
+  const hold = (change: Partial<HoldTimes>): HoldTimes => ({
+    status: 'active',
+    expiresAt: later(5 * 60_000),
+    payingUntil: null,
+    ...change,
+  });
+
+  it('moves an open active hold to paying with the deadline', () => {
+    expect(payingHold(hold({}), at, 5)).toEqual({
+      payingUntil: later(10 * 60_000),
+    });
+  });
+
+  it.each([
+    ['an active hold past its expiry', hold({ expiresAt: later(-1) })],
+    ['an active hold expiring now', hold({ expiresAt: at })],
+    [
+      'a paying hold, which keeps its deadline',
+      hold({ status: 'paying', payingUntil: later(60_000) }),
+    ],
+    ['a converted hold', hold({ status: 'converted' })],
+    ['a released hold', hold({ status: 'released' })],
+  ])('leaves %s alone', (_name, subject) => {
+    expect(payingHold(subject, at, 5)).toBeNull();
+  });
+});
+
+describe('whose hold it is', () => {
+  it('is the device whose hash it carries, and nobody’s when missing', () => {
+    expect(isHoldOfDevice({ deviceKey: 'a'.repeat(64) }, 'a'.repeat(64))).toBe(
+      true,
+    );
+    expect(isHoldOfDevice({ deviceKey: 'a'.repeat(64) }, 'b'.repeat(64))).toBe(
+      false,
+    );
+    expect(isHoldOfDevice(null, 'a'.repeat(64))).toBe(false);
+    expect(isHoldOfDevice(undefined, 'a'.repeat(64))).toBe(false);
+  });
+});
+
+describe('field errors from issues', () => {
+  it('keeps the first message per field and says required only for a rule that does', () => {
+    expect(
+      fieldErrorsFromIssues(
+        [
+          { path: ['a', 'b'], message: 'required' },
+          { path: ['a', 'b'], message: 'other' },
+          { path: ['c'], message: 'Invalid input' },
+        ],
+        (path) => path.map(String).join('.'),
+      ),
+    ).toEqual({ 'a.b': 'required', c: 'invalid' });
   });
 });

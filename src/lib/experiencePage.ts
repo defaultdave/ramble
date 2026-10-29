@@ -221,86 +221,81 @@ export function placeOf(
 /** The most of the meeting point's first sentence a Maps search takes; a longer one is no address. */
 export const maxMapsQueryLength = 200;
 
-/** Abbreviations that start or sit inside an address or a name, so their full stop never ends a sentence. */
+/** Abbreviations whose full stop never ends a sentence: compass letters and titles or labels inside an address or a name. */
 const innerAbbreviations = new Set(
   'w e n s ft mt mr mrs ms jr sr no apt fl ste'.split(' '),
 );
 
-/**
- * Street suffixes: "23rd St." can end the address, but "St. Marks Pl" and "Ave. B" go on. Their
- * full stop ends the sentence only after a numbered street or house ("11th Ave. Meet at...").
- */
+/** Street suffixes. Most also read as a prefix ("St. Marks Pl", "Dr. Smith"), so the words around them decide. */
 const streetSuffixes = new Set(
   'st ave blvd rd pl dr ln pkwy sq hwy'.split(' '),
 );
 
-function isWhitespace(char: string | undefined): boolean {
-  return char !== undefined && char.trim() === '';
-}
+/** Words that introduce a place, so a suffix right after one starts a name ("Near St. Marks Pl"). */
+const leadInWords = new Set(
+  'near at by to from behind outside opposite off of on past see visit meet'.split(
+    ' ',
+  ),
+);
 
-function isWordChar(char: string | undefined): boolean {
-  return char !== undefined && /[\p{L}\p{N}]/u.test(char);
-}
-
-/** The word chars ending just before `index`. */
-function wordBefore(text: string, index: number): string {
-  let start = index;
-  while (start > 0 && isWordChar(text[start - 1])) start -= 1;
-  return text.slice(start, index);
-}
-
-/** The word chars starting at the first non-space after `index`. */
-function wordAfter(text: string, index: number): string {
-  let start = index + 1;
-  while (isWhitespace(text[start])) start += 1;
-  let end = start;
-  while (isWordChar(text[end])) end += 1;
-  return text.slice(start, end);
-}
-
-/** The run of non-space chars just before the whitespace that precedes `index`. */
-function tokenBeforeWord(text: string, index: number): string {
-  let end = index - wordBefore(text, index).length;
-  while (end > 0 && isWhitespace(text[end - 1]) && text[end - 1] !== '\n') {
-    end -= 1;
+/**
+ * Whether the word ending in a full stop ends the sentence, given the words either side. A
+ * street suffix after a capitalised word or a number does ("Hudson St. The door"). Pinned
+ * limit: "Hudson St. A door" does not end, since a single letter reads as "Ave. B".
+ */
+function fullStopEndsSentence(
+  token: string,
+  previous: string | undefined,
+  next: string | undefined,
+): boolean {
+  const word = token.slice(0, -1).toLowerCase();
+  if (innerAbbreviations.has(word)) return false;
+  if (next !== undefined) {
+    const nextWord = /^[\p{L}\p{N}]*/u.exec(next)?.[0] ?? '';
+    if (/^\p{Ll}/u.test(next) || nextWord.length === 1) return false;
   }
-  let start = end;
-  while (start > 0 && !isWhitespace(text[start - 1])) start -= 1;
-  return text.slice(start, end);
-}
-
-/** Whether the char at `index` ends the first sentence: a newline, "! ", "? ", or a full stop that is no abbreviation's. */
-function endsSentenceAt(text: string, index: number): boolean {
-  const char = text[index];
-  if (char === '\n') return true;
-  if (index + 1 < text.length && !isWhitespace(text[index + 1])) return false;
-  if (char === '!' || char === '?') return true;
-  if (char !== '.') return false;
-  const word = wordBefore(text, index);
-  const lower = word.toLowerCase();
-  if (/^\p{L}$/u.test(word) || innerAbbreviations.has(lower)) return false;
-  if (!streetSuffixes.has(lower)) return true;
-  return (
-    /\d/.test(tokenBeforeWord(text, index)) &&
-    wordAfter(text, index).length !== 1
-  );
+  if (!streetSuffixes.has(word)) return true;
+  if (previous === undefined) return false;
+  const isPrefix =
+    /^\p{Ll}/u.test(previous) ||
+    previous.endsWith(',') ||
+    leadInWords.has(previous.toLowerCase());
+  return !isPrefix;
 }
 
 /**
  * A Maps search for the meeting point (PRD-09), or null when there is none or its first sentence
  * is too long to be an address. Only the first sentence is searched: what follows ("The exact
- * door is in your confirmation.") is a note to the guest, not a place. A full stop after a street
- * abbreviation ("W. 23rd St. The door...") does not end the sentence; a newline always does.
+ * door is in your confirmation.") is a note to the guest, not a place. A newline, "! " or "? "
+ * ends the sentence; so does a full stop, except after an abbreviation that belongs inside an
+ * address ("W. 23rd St. The door..." ends at "St", but "St. Marks Pl" and "Ave. B" go on).
  */
 export function mapsHref(meetingPoint: string | null): string | null {
   const text = presentText(meetingPoint);
   if (text === null) return null;
   // Whitespace can shrink when collapsed, so the walk may read twice the limit before giving up.
-  const windowEnd = Math.min(text.length, maxMapsQueryLength * 2);
-  let end = 0;
-  while (end < windowEnd && !endsSentenceAt(text, end)) end += 1;
-  if (end === windowEnd && text.length > windowEnd) return null;
-  const first = text
+  const windowText = text.slice(0, maxMapsQueryLength * 2);
+  const newline = windowText.indexOf('\n');
+  const line = newline < 0 ? windowText : windowText.slice(0, newline);
+  const tokens = Array.from(line.matchAll(/\S+/g));
+  let end = -1;
+  for (const [i, { 0: token, index }] of tokens.entries()) {
+    const last = token.at(-1);
+    const stop =
+      last === '!' ||
+      last === '?' ||
+      (last === '.' &&
+        fullStopEndsSentence(token, tokens[i - 1]?.[0], tokens[i + 1]?.[0]));
+    if (stop) {
+      end = index + token.length - 1;
+      break;
+    }
+  }
+  if (end < 0) {
+    if (newline < 0 && text.length > windowText.length) return null;
+    end = line.length;
+  }
+  const first = line
     .slice(0, end)
     .replace(/\s+/g, ' ')
     .trim()

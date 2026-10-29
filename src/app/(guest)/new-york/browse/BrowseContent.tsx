@@ -9,10 +9,9 @@ import {
   withBrowseCovers,
 } from '@/lib/browse';
 import { parseFilters, type RawSearchParams } from '@/lib/filters';
-import { coverLookupIds, coversByExperience } from '@/lib/photoViews';
 import { minuteAsOf } from '@/lib/time';
 import { venueToday } from '@/lib/venue';
-import { getCoverPhotos } from '@/server/coverPhotos';
+import { readGuestCovers } from '@/server/guestCovers';
 import {
   getBrowseDates,
   getBrowseResults,
@@ -41,8 +40,11 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
       getBrowseDates(filters, asOf),
       getBrowseResults(query, asOf),
     ]);
-    const covers = await getCoverPhotos(coverLookupIds(browseCardIds(page)));
-    loaded = { options, dates, page, covers: coversByExperience(covers) };
+    const covers = await readGuestCovers(
+      'Browse covers could not be read',
+      browseCardIds(page),
+    );
+    loaded = { options, dates, page, covers };
   } catch (error) {
     rethrowOrLog('Browse could not be read', error);
     return (

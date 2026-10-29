@@ -3,10 +3,9 @@ import { HomeModules } from '@/components/HomeModules';
 import { RichText } from '@/components/RichText';
 import { HomeEmpty, HomeError, HomeTitle } from '@/components/HomeStates';
 import { buildHomePage, homeCardIds, withHomeCovers } from '@/lib/home';
-import { coverLookupIds, coversByExperience } from '@/lib/photoViews';
 import { minuteAsOf } from '@/lib/time';
 import { venueToday } from '@/lib/venue';
-import { getCoverPhotos } from '@/server/coverPhotos';
+import { readGuestCovers } from '@/server/guestCovers';
 import { getHomeContent, getThisWeek } from '@/server/home';
 import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
 import { getCachedGuestSettings } from '@/server/siteSettings';
@@ -25,8 +24,11 @@ export async function HomeContent() {
       getCachedGuestSettings(),
     ]);
     const built = buildHomePage({ ...content, thisWeek, settings });
-    const covers = await getCoverPhotos(coverLookupIds(homeCardIds(built)));
-    page = withHomeCovers(built, coversByExperience(covers));
+    const covers = await readGuestCovers(
+      'The home page covers could not be read',
+      homeCardIds(built),
+    );
+    page = withHomeCovers(built, covers);
   } catch (error) {
     rethrowOrLog('The home page could not be read', error);
     return <HomeError />;

@@ -7,6 +7,11 @@ import {
 } from '@/lib/providerEvents';
 import type { Transaction } from '@/server/db/client';
 import type { Clock } from '@/server/ports/clock';
+import {
+  BookingEmailPayloadSchema,
+  sendGuestConfirmation,
+  sendHostBookingNotice,
+} from './bookingEmails';
 import { handleProviderEvent, prepareProviderEvent } from './providerEvents';
 
 type JobContext<Payload> = {
@@ -62,7 +67,7 @@ export function findJob(
 
 /**
  * Every kind of job. A later unit adds an entry and its handler here; the table needs no change.
- * Real handlers (emails, reminders, gift delivery, transfers, provider events) belong to those units.
+ * Handlers for reminders, gift delivery, transfers, and provider events belong to those units.
  */
 export const jobRegistry = {
   noop: defineJob({
@@ -77,5 +82,15 @@ export const jobRegistry = {
     maxAttempts: jobLimits.defaultMaxAttempts,
     prepare: (payload) => prepareProviderEvent(payload),
     handleIdempotent: (context) => handleProviderEvent(context),
+  }),
+  'guest-confirmation': defineJob({
+    payload: BookingEmailPayloadSchema,
+    maxAttempts: jobLimits.defaultMaxAttempts,
+    handleIdempotent: sendGuestConfirmation,
+  }),
+  'host-booking-notice': defineJob({
+    payload: BookingEmailPayloadSchema,
+    maxAttempts: jobLimits.defaultMaxAttempts,
+    handleIdempotent: sendHostBookingNotice,
   }),
 } satisfies JobRegistry;

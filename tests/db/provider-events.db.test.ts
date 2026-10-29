@@ -68,6 +68,7 @@ const parents = {
   tierId: '',
   guestId: '',
   priceOptionId: '',
+  termsDocumentId: '',
 };
 
 beforeAll(async () => {
@@ -158,7 +159,7 @@ async function seedWorld(
       guestId: parents.guestId,
       contactEmail: 'pat@example.com',
       leadGuestName: 'Pat Smith',
-      termsDocumentId: randomUUID(),
+      termsDocumentId: parents.termsDocumentId,
       ticketSubtotalMinor: 17000,
       taxTreatment: 'taxable',
       taxRatePpm: 88750,

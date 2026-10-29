@@ -110,7 +110,10 @@ afterEach(() => {
 let counter = 0;
 function request(
   overrides: Partial<
-    Parameters<typeof import('@/server/ports/email').sendEmail>[0]
+    Extract<
+      Parameters<typeof import('@/server/ports/email').sendEmail>[0],
+      { template: 'dev-check' }
+    >
   > = {},
 ) {
   counter += 1;

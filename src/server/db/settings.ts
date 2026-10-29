@@ -17,8 +17,7 @@ import type { Transaction } from './client';
 import { settings } from './schema';
 import { requireStaff } from './staff';
 
-// TODO(U-047a): read the payment grace inside the payment transaction. TODO(U-064a): read the gift
-// validity and expiry action inside the gift transactions. Each follows `readHoldSettings`.
+// TODO(U-064a): read the gift validity and expiry action inside the gift transactions, following `readHoldSettings`.
 
 /** The migration inserts the one row, so a read that finds none refuses rather than assuming defaults. */
 function onlyRow<T>(rows: T[]): T {
@@ -42,7 +41,7 @@ export async function getGuestSettings(): Promise<GuestSettings> {
 }
 
 /**
- * The pause switch, hold length, and tax rate, read inside the caller's open transaction with a
+ * The pause switch, hold length, payment grace, and tax rate, read inside the caller's open transaction with a
  * plain SELECT (no lock). The hold path needs them before it knows any caller, and a guest's
  * caller is a device, so `requireRole` has nothing to check. Exempt from B6 as a read of the
  * settings row (configuration, no personal data) that takes the caller's open transaction
@@ -53,6 +52,7 @@ export async function readHoldSettings(tx: Transaction): Promise<HoldSettings> {
     .select({
       bookingsPaused: settings.bookingsPaused,
       holdMinutes: settings.holdMinutes,
+      paymentGraceMinutes: settings.paymentGraceMinutes,
       taxRatePpm: settings.taxRatePpm,
     })
     .from(settings)

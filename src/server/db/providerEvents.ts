@@ -34,16 +34,11 @@ import type { ConfirmOrder } from './confirmOrder';
 import {
   lockHoldRow,
   lockOrderEvents,
-  lockOrderRow,
+  lockOrderById,
   lockSessionRow,
 } from './locks';
-import {
-  holds,
-  orders,
-  paymentAttempts,
-  providerEvents,
-  settings,
-} from './schema';
+import { holds, orders, paymentAttempts, providerEvents } from './schema';
+import { readHoldSettings } from './settings';
 import { readDatabaseTime } from './time';
 
 // The webhook's side of design doc 4.2.3. The route holds no `Caller`: the provider's signature
@@ -143,16 +138,6 @@ async function recordRetry(
   return { status: 'retry', reason, tries: retry.tries, alert: retry.alert };
 }
 
-/** The hold's grace for a challenge; the settings row is configuration, read with a plain SELECT. */
-async function readPaymentGraceMinutes(tx: Transaction): Promise<number> {
-  const [row] = await tx
-    .select({ minutes: settings.paymentGraceMinutes })
-    .from(settings)
-    .where(eq(settings.id, true));
-  if (!row) throw new Error('The settings row is missing');
-  return row.minutes;
-}
-
 function readAttempts(tx: Transaction, orderId: string) {
   return tx
     .select({
@@ -202,7 +187,7 @@ async function lockOrderRows(
     unlocked.holdId === null
       ? undefined
       : await lockHoldRow(tx, unlocked.holdId);
-  const order = await lockOrderRow(tx, orderId);
+  const order = await lockOrderById(tx, orderId);
   if (!order) return null;
   return {
     id: order.id,
@@ -374,7 +359,7 @@ export async function processProviderEvent(
         },
       );
       if (action.extendHold) {
-        const grace = await readPaymentGraceMinutes(tx);
+        const { paymentGraceMinutes: grace } = await readHoldSettings(tx);
         await tx
           .update(holds)
           .set({

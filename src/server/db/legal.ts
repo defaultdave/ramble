@@ -2,7 +2,9 @@ import 'server-only';
 import { and, desc, eq } from 'drizzle-orm';
 import { EntityIdSchema } from '@/lib/catalog';
 import { editorialLimits } from '@/lib/editorial';
+import { isHoldOfDevice } from '@/lib/holds';
 import {
+  OrderAcceptancesInputSchema,
   LegalDocSchema,
   LegalDocumentSchema,
   LegalDraftEditSchema,
@@ -17,14 +19,13 @@ import {
 } from '@/lib/legal';
 import type { Caller } from '@/server/auth/caller';
 import { updateTagsForChanges } from '@/server/cache/invalidate';
-import { db, dbRead } from './client';
+import type { Device } from '@/server/device';
+import { db, dbRead, type Transaction } from './client';
 import { lockFor } from './locks';
-import { legalDocuments } from './schema';
+import { holds, legalAcceptances, legalDocuments, orders } from './schema';
 import { requireStaff } from './staff';
 
-// TODO(U-047a): record the acceptances (`legal_acceptances`) inside the checkout transaction, and
-// the host agreement at onboarding. The table and its triggers ship with this unit; the insert
-// waits for a caller and for a rule on how a data-layer write with no signed-in caller checks it.
+// TODO(U-074a): record the host agreement acceptance at onboarding.
 
 // TODO(U-038): first caller
 /** The highest published version of a document. Null when the key is malformed or nothing is published. */
@@ -47,7 +48,6 @@ export async function getCurrentLegalDocument(
   return row ? LegalDocumentSchema.parse(row) : null;
 }
 
-// TODO(U-047a): first caller
 /** One published version by ID, such as the waiver text an experience points at. */
 export async function getPublishedLegalDocument(
   id: string,
@@ -211,4 +211,42 @@ export async function publishLegalDocument(
   if (outcome.status !== 'published') return outcome;
   updateTagsForChanges([legalChange(outcome.row.doc)]);
   return { status: 'published', value: LegalDocumentSchema.parse(outcome.row) };
+}
+
+export type RecordAcceptancesResult =
+  { status: 'recorded'; recorded: number } | { status: 'refused' };
+
+/**
+ * Records that the guest behind this order accepted each named published version (PRD-24), inside
+ * the checkout's open transaction. A guest has no signed-in caller, so the subject check is the
+ * device: the order's hold must carry the calling device's key, and any other order, a missing
+ * one, or a malformed input is `refused` with nothing written. Accepting a version again is a
+ * no-op, so a retry or a second tab records nothing twice. `recorded` counts the new rows.
+ */
+export async function recordOrderAcceptances(
+  tx: Transaction,
+  device: Device,
+  input: unknown,
+): Promise<RecordAcceptancesResult> {
+  const parsed = OrderAcceptancesInputSchema.safeParse(input);
+  if (!parsed.success) return { status: 'refused' };
+  const { orderId, legalDocumentIds } = parsed.data;
+  const [owner] = await tx
+    .select({ deviceKey: holds.deviceKey })
+    .from(orders)
+    .innerJoin(holds, eq(holds.id, orders.holdId))
+    .where(eq(orders.id, orderId));
+  if (!isHoldOfDevice(owner, device.deviceKey)) return { status: 'refused' };
+  const rows = await tx
+    .insert(legalAcceptances)
+    .values(
+      legalDocumentIds.map((legalDocumentId) => ({
+        legalDocumentId,
+        subjectKind: 'order' as const,
+        subjectId: orderId,
+      })),
+    )
+    .onConflictDoNothing()
+    .returning({ id: legalAcceptances.id });
+  return { status: 'recorded', recorded: rows.length };
 }

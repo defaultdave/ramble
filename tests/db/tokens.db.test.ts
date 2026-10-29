@@ -7,6 +7,7 @@ import {
   raceAgainstOpenTransaction as race,
   type FreshDatabase,
 } from './harness';
+import { insertHold } from './holdFixtures';
 import { createOrderParents } from './orderParents';
 
 // Behaviours under test, one per decision, branch or risk.
@@ -59,7 +60,7 @@ function reference() {
 }
 
 async function insertOrder(manageTokenHash: string | null = null) {
-  const holdId = randomUUID();
+  const { id: holdId } = await insertHold(client.db, parents.sessionId);
   const [row] = await client.db
     .insert(orders)
     .values({
@@ -68,13 +69,13 @@ async function insertOrder(manageTokenHash: string | null = null) {
       status: 'confirmed',
       idempotencyKey: `book:${holdId}`,
       holdId,
-      sessionId: randomUUID(),
+      sessionId: parents.sessionId,
       experienceId: parents.experienceId,
       hostId: parents.hostId,
       guestId: parents.guestId,
       contactEmail: 'pat@example.com',
       leadGuestName: 'Pat',
-      termsDocumentId: randomUUID(),
+      termsDocumentId: parents.termsDocumentId,
       ticketSubtotalMinor: 17000,
       taxTreatment: 'not_taxable',
       taxRatePpm: 0,

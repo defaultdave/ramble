@@ -1,11 +1,13 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { BrowseResults } from '@/components/BrowseResults';
+import { samplePhoto } from '@/components/Photo/Photo.fixtures';
 import type { BrowseCard, BrowseView } from '@/lib/browse';
 import styles from './BrowseResults.stories.module.css';
 
 const cards: BrowseCard[] = [
   {
     id: '1',
+    image: null,
     kind: 'bookable',
     title: 'Hand-rolled pasta in a Carroll Gardens kitchen',
     meta: 'Carroll Gardens · 2.5 hr',
@@ -14,6 +16,7 @@ const cards: BrowseCard[] = [
   },
   {
     id: '2',
+    image: null,
     kind: 'bookable',
     title: 'Dumpling folding with a Sunset Park chef',
     meta: 'Sunset Park · 2 hr',
@@ -22,6 +25,7 @@ const cards: BrowseCard[] = [
   },
   {
     id: '3',
+    image: null,
     kind: 'guide-only',
     title: 'Sourdough mornings at Rise Bakery',
     meta: 'Park Slope',
@@ -30,6 +34,7 @@ const cards: BrowseCard[] = [
   },
   {
     id: '4',
+    image: null,
     kind: 'bookable',
     title: 'Fresh mozzarella, stretched by hand',
     meta: 'Bensonhurst · 1.5 hr',
@@ -38,6 +43,7 @@ const cards: BrowseCard[] = [
   },
   {
     id: '5',
+    image: null,
     kind: 'bookable',
     title: 'Knife skills for home cooks',
     meta: 'Gowanus · 2 hr',
@@ -46,6 +52,7 @@ const cards: BrowseCard[] = [
   },
   {
     id: '6',
+    image: null,
     kind: 'bookable',
     title: 'Bao from scratch',
     meta: 'Sunset Park · 2.5 hr',
@@ -90,6 +97,21 @@ export const Results: ResultsStory = {
   args: {
     state: 'results',
     cards,
+    summary: 'Showing 6 experiences',
+    showMore: nextPage,
+    startHref: null,
+  },
+};
+
+// The cover is the first photo of the experience; a card with none keeps its empty frame.
+export const WithCoverPhotos: ResultsStory = {
+  args: {
+    state: 'results',
+    cards: cards.map((card, index) =>
+      index === 2 || index === 4
+        ? card
+        : { ...card, image: samplePhoto(index) },
+    ),
     summary: 'Showing 6 experiences',
     showMore: nextPage,
     startHref: null,

@@ -9,6 +9,9 @@ export type ButtonLinkProps = {
   children: ReactNode;
   variant?: ButtonVariant;
   size?: ButtonSize;
+  iconStart?: ReactNode;
+  /** The address is another site's: it opens in a new tab, and says so to a screen reader. */
+  external?: boolean;
 };
 
 const variantClass = {
@@ -28,19 +31,44 @@ export function ButtonLink({
   children,
   variant = 'ghost',
   size = 'md',
+  iconStart,
+  external = false,
 }: ButtonLinkProps) {
-  return (
+  const className = classNames(
+    styles.button,
+    variantClass[variant],
+    sizeClass[size],
+  );
+  const content = (
+    <span className={styles.content}>
+      {iconStart ? (
+        <span className={styles.icon} aria-hidden="true">
+          {iconStart}
+        </span>
+      ) : null}
+      {children}
+      {external ? (
+        <span className={styles.visuallyHidden}> (opens in a new tab)</span>
+      ) : null}
+    </span>
+  );
+  return external ? (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={className}
+    >
+      {content}
+    </a>
+  ) : (
     <Link
       href={href}
       // These go to a different filter state each; fetching them ahead would load pages nobody asked for.
       prefetch={false}
-      className={classNames(
-        styles.button,
-        variantClass[variant],
-        sizeClass[size],
-      )}
+      className={className}
     >
-      <span className={styles.content}>{children}</span>
+      {content}
     </Link>
   );
 }

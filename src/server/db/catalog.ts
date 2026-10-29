@@ -42,7 +42,6 @@ const RetiredSlugQuerySchema = z.object({
   slug: SlugSchema,
 });
 
-// TODO(U-039): first caller
 /** Null when the ID is malformed, the row is missing, or its status is not visible to guests. */
 export async function getGuestExperience(
   id: string,

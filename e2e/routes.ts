@@ -28,12 +28,6 @@ export const routes: readonly RouteRow[] = [
     noindex: false,
   },
   {
-    path: '/experiences/sample',
-    group: 'guest',
-    heading: 'Experience',
-    noindex: false,
-  },
-  {
     path: '/guide/sample',
     group: 'guest',
     heading: 'Guide entry',
@@ -134,6 +128,16 @@ export const perRequestFallbackPaths: readonly string[] = [
 export const notFoundHeading = "We can't find that page";
 
 export const unprerenderedParamPath = '/picks/not-prerendered';
+
+/**
+ * The experience page has no placeholder: an address that is not a slug and an ID is a not-found,
+ * and a well-formed one asks the database, which the e2e server does not have, so it shows the
+ * error state (and answers 200, as a failure inside a cached read does).
+ */
+export const experiencePaths = {
+  notFound: '/experiences/sample',
+  readFails: '/experiences/sunset-kayak-00000000-0000-4000-8000-000000000001',
+} as const;
 
 export function expectedTitle(heading: string): string {
   return heading === 'Ramble' ? heading : `${heading} | Ramble`;

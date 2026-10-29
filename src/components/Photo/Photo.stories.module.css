@@ -1,0 +1,10 @@
+/* A frame with a fixed shape, as a card or the gallery gives the photo. */
+.frame {
+  position: relative;
+  max-inline-size: 24rem;
+  margin: var(--space-4);
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  aspect-ratio: 3 / 2;
+  background: var(--color-bg-sunken);
+}

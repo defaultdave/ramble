@@ -4,7 +4,15 @@ import { HomeModules } from '@/components/HomeModules';
 import { RichText } from '@/components/RichText';
 import { HomeEmpty, HomeError, HomeTitle } from '@/components/HomeStates';
 import { errorDigest } from '@/lib/errorDigest';
-import { buildHomePage, homeAsOf, venueToday } from '@/lib/home';
+import {
+  buildHomePage,
+  homeAsOf,
+  homeCardIds,
+  venueToday,
+  withHomeCovers,
+} from '@/lib/home';
+import { coverLookupIds, coversByExperience } from '@/lib/photoViews';
+import { getCoverPhotos } from '@/server/coverPhotos';
 import { getHomeContent, getThisWeek } from '@/server/home';
 import { logger } from '@/server/monitoring/logger';
 import { getCachedGuestSettings } from '@/server/siteSettings';
@@ -22,7 +30,9 @@ export async function HomeContent() {
       getThisWeek(homeAsOf(now)),
       getCachedGuestSettings(),
     ]);
-    page = buildHomePage({ ...content, thisWeek, settings });
+    const built = buildHomePage({ ...content, thisWeek, settings });
+    const covers = await getCoverPhotos(coverLookupIds(homeCardIds(built)));
+    page = withHomeCovers(built, coversByExperience(covers));
   } catch (error) {
     // Next.js ends a prerender by throwing; swallowing that would break the render.
     unstable_rethrow(error);

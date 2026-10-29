@@ -68,7 +68,6 @@ export const attemptTransitions = {
   canceled: [],
 } as const satisfies TransitionTable<AttemptStatus>;
 
-// TODO(U-048): first caller, the provider event handler.
 export function canAttemptTransition(
   from: AttemptStatus,
   to: AttemptStatus,
@@ -219,7 +218,7 @@ const hasPlainNumbers = (payload: unknown) =>
     (node) => typeof node !== 'number' || !String(node).includes('e'),
   );
 
-const ProviderEventPayloadSchema = z
+export const ProviderEventPayloadSchema = z
   .record(z.string(), z.unknown())
   .refine(fits, {
     message: `The body is at most ${String(paymentLimits.payloadBytes)} bytes`,
@@ -253,7 +252,6 @@ function providerEventRuleIssues(event: EventRuleFields): RuleIssue[] {
   return issues;
 }
 
-// TODO(U-048): first caller, webhook intake.
 export const ProviderEventSchema = z
   .object({
     id: EntityIdSchema,

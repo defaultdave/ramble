@@ -1,5 +1,6 @@
 import 'server-only';
 import { eq, sql } from 'drizzle-orm';
+import { orderEventsLockKey } from '@/lib/providerEvents';
 import type { Transaction } from './client';
 import {
   experiences,
@@ -13,13 +14,14 @@ import {
  * THE LOCK ORDER (design doc 4.2.3 rule 1, architecture rule B10). Every transaction that takes
  * more than one of these takes them in this order and never the other way round:
  *
+ *   0. the order-events advisory lock (provider events only)  lockOrderEvents
  *   1. the device advisory lock   (reserve only)      lockDevice, then lockClientAddress
  *   2. the session row            FOR UPDATE          lockSessionRow
  *   3. the hold row               FOR UPDATE          lockHoldRow
- *   4. the order row              FOR UPDATE          lockOrderRow
- *   5. the gift row                                   (a later unit)
- *   -  the attempt row            FOR UPDATE          lockAttemptRow, taken alone, by the payment's
+ *   4. the order row              FOR UPDATE          lockOrderRow (by booking key), lockOrderById
+ *   5. the attempt row            FOR UPDATE          lockAttemptRow, taken alone, by the payment's
  *                                                     second transaction only
+ *   6. the gift row                                   (a later unit)
  *
  * A path that starts from a hold, an order, or a provider event reads the ids it needs without a
  * lock, then locks in this order and re-checks what it read. Locks are transaction-level only
@@ -110,6 +112,36 @@ export async function lockOrderRow(tx: Transaction, idempotencyKey: string) {
     .where(eq(orders.idempotencyKey, idempotencyKey))
     .for('update');
   return row;
+}
+
+/**
+ * Lock 4, by the order's id, for the paths that start from a provider event and know the id but
+ * not the key. Same place in the order as `lockOrderRow`; returns the ids the next steps need.
+ * Undefined when there is no such order.
+ */
+export async function lockOrderById(tx: Transaction, orderId: string) {
+  const [row] = await tx
+    .select({
+      id: orders.id,
+      status: orders.status,
+      holdId: orders.holdId,
+      sessionId: orders.sessionId,
+    })
+    .from(orders)
+    .where(eq(orders.id, orderId))
+    .for('update');
+  return row;
+}
+
+/**
+ * Lock 0, before every other lock on a provider event's path (design doc 4.2.3 rule 8): the events
+ * of one order are handled one at a time. The reserve path never takes it, so it cannot meet lock 1.
+ */
+export async function lockOrderEvents(
+  tx: Transaction,
+  orderId: string,
+): Promise<void> {
+  await lockFor(tx, orderEventsLockKey(orderId));
 }
 
 /**

@@ -1,6 +1,10 @@
 import 'server-only';
 import { z } from 'zod';
 import { MaxAttemptsSchema, jobLimits } from '@/lib/jobs';
+import {
+  ProcessProviderEventPayloadSchema,
+  processProviderEventKind,
+} from '@/lib/providerEvents';
 import type { Transaction } from '@/server/db/client';
 import type { Clock } from '@/server/ports/clock';
 import {
@@ -8,11 +12,14 @@ import {
   sendGuestConfirmation,
   sendHostBookingNotice,
 } from './bookingEmails';
+import { handleProviderEvent, prepareProviderEvent } from './providerEvents';
 
 type JobContext<Payload> = {
   /** The transaction the job's own writes belong to; it rolls back if the handler throws. */
   tx: Transaction;
   payload: Payload;
+  /** What the definition's `prepare` returned, or undefined when it has none. */
+  prepared: unknown;
   /** Stable across retries: use it as the idempotency key for any provider call. */
   jobId: string;
   clock: Clock;
@@ -29,6 +36,11 @@ type IdempotentJobHandler<Payload> = (
 export type JobDefinition<Schema extends z.ZodType = z.ZodType> = {
   payload: Schema;
   maxAttempts: number;
+  /**
+   * Runs before the job's transaction opens, for a call that must not hold a connection open (a
+   * provider lookup). A throw is a failed try like a handler's. Its result reaches the handler.
+   */
+  prepare?: (payload: z.output<Schema>) => Promise<unknown>;
   handleIdempotent: IdempotentJobHandler<z.output<Schema>>;
 };
 
@@ -64,6 +76,12 @@ export const jobRegistry = {
     handleIdempotent: async () => {
       // Does nothing, on purpose: the tests and the demo trigger need a kind that always succeeds.
     },
+  }),
+  [processProviderEventKind]: defineJob({
+    payload: ProcessProviderEventPayloadSchema,
+    maxAttempts: jobLimits.defaultMaxAttempts,
+    prepare: (payload) => prepareProviderEvent(payload),
+    handleIdempotent: (context) => handleProviderEvent(context),
   }),
   'guest-confirmation': defineJob({
     payload: BookingEmailPayloadSchema,

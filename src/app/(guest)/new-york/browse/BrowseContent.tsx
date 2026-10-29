@@ -1,17 +1,10 @@
 import { connection } from 'next/server';
 import { BrowseResults } from '@/components/BrowseResults';
 import { FilterBar } from '@/components/FilterBar';
-import {
-  browseCardIds,
-  browseHeading,
-  browseView,
-  errorView,
-  withBrowseCovers,
-} from '@/lib/browse';
+import { browseHeading, browseView, errorView } from '@/lib/browse';
 import { parseFilters, type RawSearchParams } from '@/lib/filters';
 import { minuteAsOf } from '@/lib/time';
 import { venueToday } from '@/lib/venue';
-import { readGuestCovers } from '@/server/guestCovers';
 import {
   getBrowseDates,
   getBrowseResults,
@@ -40,11 +33,7 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
       getBrowseDates(filters, asOf),
       getBrowseResults(query, asOf),
     ]);
-    const covers = await readGuestCovers(
-      'Browse covers could not be read',
-      browseCardIds(page),
-    );
-    loaded = { options, dates, page, covers };
+    loaded = { options, dates, page };
   } catch (error) {
     rethrowOrLog('Browse could not be read', error);
     return (
@@ -55,8 +44,8 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
     );
   }
 
-  const { options, dates, page, covers } = loaded;
-  const view = withBrowseCovers(browseView(query, page, dates), covers);
+  const { options, dates, page } = loaded;
+  const view = browseView(query, page, dates);
   return (
     <>
       {/* Always rendered, so a screen reader hears the text change when the filters do. */}

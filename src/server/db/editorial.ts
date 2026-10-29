@@ -36,8 +36,8 @@ import {
   positioned,
   publishedAtAfter,
   visibleChange,
-  withItems,
   type Collection,
+  type CollectionItem,
   type CollectionInput,
   type HelpArticle,
   type HelpArticleInput,
@@ -72,32 +72,38 @@ async function readCollections(
   where: SQL | undefined,
   forGuest: boolean,
 ): Promise<Collection[]> {
-  const rows = await dbRead
-    .select()
-    .from(collections)
-    .where(where)
-    .orderBy(asc(collections.title), asc(collections.id))
-    .limit(editorialLimits.listed);
-  if (rows.length === 0) return [];
-  const items = await dbRead
+  // One query: the items of each collection come back as an ordered JSON list beside it, so a
+  // collection and its items are read at one moment and in one round trip.
+  const items = dbRead
     .select({
-      collectionId: collectionItems.collectionId,
-      experienceId: collectionItems.experienceId,
-      note: collectionItems.note,
+      list: sql<
+        CollectionItem[]
+      >`coalesce(json_agg(json_build_object('experienceId', ${collectionItems.experienceId}, 'note', ${collectionItems.note}) order by ${collectionItems.position}), '[]'::json)`.as(
+        'list',
+      ),
     })
     .from(collectionItems)
     .innerJoin(experiences, eq(collectionItems.experienceId, experiences.id))
     .where(
       and(
-        inArray(
-          collectionItems.collectionId,
-          rows.map((row) => row.id),
-        ),
+        eq(collectionItems.collectionId, collections.id),
         forGuest ? guestVisible : undefined,
       ),
     )
-    .orderBy(asc(collectionItems.collectionId), asc(collectionItems.position));
-  return CollectionSchema.array().parse(withItems(rows, items));
+    .as('items');
+  const rows = await dbRead
+    .select({ collection: collections, items: items.list })
+    .from(collections)
+    .leftJoinLateral(items, sql`true`)
+    .where(where)
+    .orderBy(asc(collections.title), asc(collections.id))
+    .limit(editorialLimits.listed);
+  return CollectionSchema.array().parse(
+    rows.map(({ collection, items: list }) => ({
+      ...collection,
+      items: list,
+    })),
+  );
 }
 
 const publishedCollection = eq(collections.status, 'published');

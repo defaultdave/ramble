@@ -382,21 +382,19 @@ export function buildHomePage(input: HomeInput): HomePage {
   };
 }
 
-/** The experiences the page's cards show, each once, for one read of their cover photos. */
+/** The experiences on the Picks cards, each once, for one read of their cover photos. The "On this week" cards arrive with theirs. */
 export function homeCardIds(page: HomePage): string[] {
   if (page.kind === 'empty') return [];
   return [
     ...new Set(
       page.modules.flatMap((module) =>
-        module.kind === 'picks' || module.kind === 'this_week'
-          ? module.cards.map((card) => card.id)
-          : [],
+        module.kind === 'picks' ? module.cards.map((card) => card.id) : [],
       ),
     ),
   ];
 }
 
-/** The page with each card's cover photo set. */
+/** The page with each Picks card's cover photo set. */
 export function withHomeCovers(
   page: HomePage,
   covers: ReadonlyMap<string, PhotoView>,
@@ -405,7 +403,7 @@ export function withHomeCovers(
   return {
     ...page,
     modules: page.modules.map((module) =>
-      module.kind === 'picks' || module.kind === 'this_week'
+      module.kind === 'picks'
         ? { ...module, cards: withCovers(module.cards, covers) }
         : module,
     ),

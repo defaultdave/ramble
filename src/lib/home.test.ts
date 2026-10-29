@@ -30,7 +30,7 @@ import { minuteAsOf } from './time';
 // - the first Picks module alone carries the anchor
 // - the page is empty when no module shows, and needs its own title when there is no hero
 // - a card starts with no photo; the page's card IDs are those of its Picks and this-week cards, each once, and none for an empty page
-// - a cover is set on the cards of Picks and this-week modules only, and a card with no cover keeps none
+// - a cover read is set on the Picks cards only; a this-week card keeps the cover it arrived with, and a card with none keeps none
 // - the banner is its trimmed text, or nothing when there is none
 
 const id = (n: number) =>
@@ -640,15 +640,15 @@ describe('covers on the home page', () => {
   };
   const page = buildHomePage({ ...baseInput, ...input });
 
-  it('lists each card experience once, across the Picks and this-week modules', () => {
-    expect(homeCardIds(page)).toEqual([id(1), id(2), id(3)]);
+  it('lists each Picks card experience once, and none from the this-week cards that arrive with theirs', () => {
+    expect(homeCardIds(page)).toEqual([id(1), id(2)]);
   });
 
   it('lists none for an empty page', () => {
     expect(homeCardIds({ kind: 'empty' })).toEqual([]);
   });
 
-  it('sets the cover of each card that has one and leaves the others without', () => {
+  it('sets the cover of each Picks card that has one, and leaves a this-week card as it arrived', () => {
     const covered = withHomeCovers(page, new Map([[id(2), cover]]));
 
     const cards =
@@ -662,7 +662,7 @@ describe('covers on the home page', () => {
     expect(cards.map((card) => [card.id, card.image?.alt ?? null])).toEqual([
       [id(1), null],
       [id(2), 'A kayak at dusk'],
-      [id(2), 'A kayak at dusk'],
+      [id(2), null],
       [id(3), null],
     ]);
   });

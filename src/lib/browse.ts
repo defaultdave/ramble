@@ -12,7 +12,6 @@ import {
   type BrowseFilters,
   type BrowseQuery,
 } from './filters';
-import { withCovers, type PhotoView } from './photoViews';
 import { browsePath } from './routes';
 import { IsoDateSchema, TimeZoneSchema, isKnownTimeZone } from './sessions';
 import { calendarDateFormat, msPerDay } from './time';
@@ -306,21 +305,6 @@ export function browseView(
         : targetFor({ filters, after: page.nextCursor }),
     startHref: after === null ? null : hrefForFilters(filters),
   };
-}
-
-/** The experiences on a page of results, for one read of their cover photos. */
-export function browseCardIds(page: BrowsePage): string[] {
-  return page.ok ? page.items.map((item) => item.id) : [];
-}
-
-/** The view with each card's cover photo set; a view with no cards is returned as it is. */
-export function withBrowseCovers(
-  view: BrowseView,
-  covers: ReadonlyMap<string, PhotoView>,
-): BrowseView {
-  return view.state === 'results'
-    ? { ...view, cards: withCovers(view.cards, covers) }
-    : view;
 }
 
 /** The same address again: a retry reloads exactly what failed. */

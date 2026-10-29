@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
@@ -15,6 +16,7 @@ import {
   experiences,
   hosts,
   neighborhoods,
+  photos,
   priceOptions,
   sessionTemplates,
   sessions,
@@ -30,6 +32,7 @@ import {
 // - a live experience with no price is left out, and a guide-only entry with none is kept
 // - a guide-only row with no link out cannot be stored, by insert or by update, so no browse card lacks its link
 // - a live experience that loses its last price leaves the read, so no browse card lacks a price
+// - a card carries the lowest-position photo as its cover, and an experience with no photo still lists with a null image
 // - results come by name and then id, and the page is cut at the hard size with a cursor
 // - the next page starts after the cursor and no row is shown twice or skipped, including two rows with one name
 // - a row added before the cursor, or hidden after it, between two pages moves nothing already shown
@@ -372,6 +375,7 @@ describe('what a guest sees', () => {
       neighborhoodName: where.neighborhood.name,
       durationMinutes: 150,
       linkOutUrl: null,
+      image: null,
       priceOptions: [
         { priceMinor: 3500, usesSpace: true },
         { priceMinor: 7000, usesSpace: true },
@@ -491,6 +495,45 @@ describe('paging', () => {
     );
 
     expect(read.cursor).toEqual({ id: live.id, name: 'A live' });
+  });
+});
+
+describe('covers', () => {
+  async function insertPhoto(experienceId: string, position: number) {
+    const id = randomUUID();
+    await client.db.insert(photos).values({
+      id,
+      experienceId,
+      position,
+      storageKey: `public/photos/${experienceId}/${id}.jpg`,
+      url: `https://store.example/${experienceId}/${String(position)}.jpg`,
+      width: 1600,
+      height: 1000,
+      byteSize: 1000,
+      decorative: true,
+      blurDataUrl: 'data:image/jpeg;base64,/9j/4AAQ',
+      rightsBasis: 'ramble_owned',
+    });
+  }
+
+  it('carries the lowest-position photo, and a null image for an experience with none', async () => {
+    const where = await scope();
+    const covered = await insertExperience(where, { name: 'A covered' });
+    await insertPhoto(covered.id, 3);
+    await insertPhoto(covered.id, 1);
+    const bare = await insertExperience(where, { name: 'B bare' });
+
+    const page = await list(filtersFor(where));
+
+    expect(page.items.map(({ id }) => id)).toEqual([covered.id, bare.id]);
+    expect(page.items[0]?.image).toEqual({
+      src: `https://store.example/${covered.id}/1.jpg`,
+      width: 1600,
+      height: 1000,
+      alt: '',
+      blurDataUrl: 'data:image/jpeg;base64,/9j/4AAQ',
+    });
+    expect(page.items[1]?.image).toBeNull();
   });
 });
 

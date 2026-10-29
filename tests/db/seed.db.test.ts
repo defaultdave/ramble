@@ -1,7 +1,11 @@
 import { updateTag } from 'next/cache';
 import { and, count, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { browseDays, browseWindowDays, nextBrowseDay } from '@/lib/browse';
+import {
+  browseDays,
+  browseWindowDays,
+  nextBrowseDay,
+} from '@/lib/pages/browse';
 import { upcomingWindow } from '@/lib/sessionWindow';
 import { noFilters } from '@/lib/filters';
 import { minuteAsOf, msPerDay } from '@/lib/time';

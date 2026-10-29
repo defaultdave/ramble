@@ -5,7 +5,7 @@ import {
   browseTitle,
   toBrowsePage,
   type BrowsePage,
-} from '@/lib/browse';
+} from '@/lib/pages/browse';
 import { tags } from '@/lib/cacheTags';
 import type { Category, Neighborhood } from '@/lib/catalog';
 import type { BrowseFilters, BrowseQuery } from '@/lib/filters';

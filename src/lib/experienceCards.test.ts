@@ -8,7 +8,7 @@ import {
   withPriceOptions,
   type CardExperience,
 } from './experienceCards';
-import { homeLimits } from './home';
+import { homeLimits } from './pages/home';
 import { photoLimits } from './photos';
 
 // Behaviours under test, one per decision, branch or risk:

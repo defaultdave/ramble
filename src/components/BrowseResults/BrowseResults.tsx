@@ -2,7 +2,7 @@ import Form from 'next/form';
 import { Alert } from '@/components/Alert';
 import { Button, ButtonLink } from '@/components/Button';
 import { ExperienceCardItem } from '@/components/ExperienceCard';
-import type { BrowseView, FormTarget } from '@/lib/browse';
+import type { BrowseView, FormTarget } from '@/lib/pages/browse';
 import { browsePath } from '@/lib/routes';
 import styles from './BrowseResults.module.css';
 

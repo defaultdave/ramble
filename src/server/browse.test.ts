@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { browseTitle } from '@/lib/browse';
+import { browseTitle } from '@/lib/pages/browse';
 import { noFilters } from '@/lib/filters';
 import {
   getBrowseDates,

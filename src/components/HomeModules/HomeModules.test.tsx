@@ -3,7 +3,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { samplePhoto } from '@/components/Photo/Photo.fixtures';
 import { parseFilters } from '@/lib/filters';
-import { homeCopy, type HomeModuleView } from '@/lib/home';
+import { homeCopy, type HomeModuleView } from '@/lib/pages/home';
 import { HomeModules } from './HomeModules';
 import {
   categoryRail,

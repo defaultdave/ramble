@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ZodError } from 'zod';
-import type { Collection, HomeModule } from './editorial';
-import type { CardExperience } from './experienceCards';
+import type { Collection, HomeModule } from '../editorial';
+import type { CardExperience } from '../experienceCards';
 import {
   buildHomePage,
   collectionModuleCopy,
@@ -16,8 +16,8 @@ import {
   type HomeModuleView,
   type ThisWeekSession,
 } from './home';
-import { paragraphs } from './richText/paragraphs';
-import { upcomingWindow } from './sessionWindow';
+import { paragraphs } from '../richText/paragraphs';
+import { upcomingWindow } from '../sessionWindow';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the browse address writes only the parameters that are set, escaped, in the grammar order

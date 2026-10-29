@@ -2,7 +2,7 @@ import { Calendar } from 'lucide-react';
 import { ButtonLink } from '@/components/Button';
 import { ChipLink } from '@/components/Chip';
 import { DatePicker } from '@/components/DatePicker';
-import { dateChipLabel } from '@/lib/browse';
+import { dateChipLabel } from '@/lib/pages/browse';
 import {
   activeFilterCount,
   chipState,

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { homeLimits } from '@/lib/home';
+import { homeLimits } from '@/lib/pages/home';
 import { upcomingWindow } from '@/lib/sessionWindow';
 import { getHomeContent, getThisWeek } from './home';
 

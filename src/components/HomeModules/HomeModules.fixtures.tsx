@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { ExperienceCard } from '@/lib/experienceCards';
-import { homeCopy, type HomeModuleView } from '@/lib/home';
+import { homeCopy, type HomeModuleView } from '@/lib/pages/home';
 import { paragraphs } from '@/lib/richText/paragraphs';
 import type { RichTextDoc } from '@/lib/richText/format';
 import styles from './HomeModules.stories.module.css';

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { idWithLetters } from '@/lib/experiencePage.fixtures';
+import { idWithLetters } from '@/lib/pages/experience.fixtures';
 import { getExperiencePage } from './experiencePage';
 
 // Behaviours under test, one per decision, branch or risk:

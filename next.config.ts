@@ -1,3 +1,4 @@
+import { withBotId } from 'botid/next/config';
 import type { NextConfig } from 'next';
 import { cacheProfiles } from './src/lib/cacheProfiles';
 import { imageConfigFor } from './src/lib/images';
@@ -26,4 +27,5 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Adds the rewrites that carry BotID's challenge through the site's own origin (ADR 0007).
+export default withBotId(nextConfig);

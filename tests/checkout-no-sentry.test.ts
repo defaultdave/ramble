@@ -89,13 +89,33 @@ describe('the checkout route group', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('is not given a browser SDK by the framework either', () => {
+  it('is not given a Sentry browser SDK by the framework either', () => {
     const clientEntries = readdirSync(src).filter((name) =>
       name.startsWith('instrumentation-client'),
     );
     const nextConfig = readFileSync(path.join(root, 'next.config.ts'), 'utf8');
 
-    expect(clientEntries).toEqual([]);
+    for (const entry of clientEntries) {
+      expect(readFileSync(path.join(src, entry), 'utf8')).not.toMatch(
+        /sentry/i,
+      );
+    }
     expect(nextConfig).not.toMatch(/sentry/i);
+  });
+
+  it('is given BotID only through the guest-page guard in the client entry wrapper', () => {
+    const entry = readFileSync(
+      path.join(src, 'instrumentation-client.ts'),
+      'utf8',
+    );
+
+    const wrapper = readFileSync(
+      path.join(src, 'server', 'ports', 'rate-limit', 'botid-client.ts'),
+      'utf8',
+    );
+
+    expect(entry).toMatch(/startBotChallenge\(window\.location\.pathname\)/);
+    expect(wrapper).toMatch(/if \(!shouldLoadBotId\(pathname\)\) return;/);
+    expect(specifiers.filter((s) => /botid/i.test(s))).toEqual([]);
   });
 });

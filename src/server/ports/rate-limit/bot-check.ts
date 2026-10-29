@@ -17,9 +17,8 @@ async function botIdVerdict(): Promise<BotVerdict> {
   return BotVerdictSchema.parse(await checkBotId());
 }
 
-// TODO(U-014a): first caller, on `reserveSpaces`; U-004a (sign-in request), U-038 and U-043 (forms) follow.
-// TODO(U-014a): the BotID client script (`initBotId`) and `withBotId` in next.config for the
-// protected paths, which exist only once the first caller does.
+// TODO(U-004a): call it on the sign-in request too, and on the guest forms (U-038, U-043). Each adds
+// its path to `botProtectedRoutes` in `src/lib/botChallenge.ts`.
 /**
  * Asks BotID whether the request comes from a person. Call it on reserve, sign-in, and guest
  * forms only: checkout carries no third-party scripts (ADR 0003, ADR 0007), and a test fails the

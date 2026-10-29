@@ -3,6 +3,7 @@
 export * from './catalog';
 export * from './policies';
 export * from './editorial';
+export * from './holds';
 export * from './people';
 export * from './messages';
 export * from './operations';

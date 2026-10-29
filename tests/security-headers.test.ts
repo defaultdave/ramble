@@ -111,10 +111,19 @@ function isGroupName(segment: string): boolean {
 
 describe('next.config headers', () => {
   it('applies the security header set to every path', async () => {
-    const rules = await nextConfig.headers?.();
-    expect(rules).toEqual([
-      { source: '/:path*', headers: [...securityHeaders] },
-    ]);
+    const rules = (await nextConfig.headers?.()) ?? [];
+    expect(rules[0]).toEqual({
+      source: '/:path*',
+      headers: [...securityHeaders],
+    });
+  });
+
+  it('adds nothing else but the BotID challenge proxy rule', async () => {
+    const rules = (await nextConfig.headers?.()) ?? [];
+    const others = rules.slice(1).map((rule) => rule.source);
+
+    expect(others).toHaveLength(1);
+    expect(others[0]).toMatch(/^\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/:path\*$/);
   });
 });
 

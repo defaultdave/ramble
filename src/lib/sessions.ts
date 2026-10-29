@@ -238,15 +238,25 @@ export type UpdateSessionAllocationInput = z.input<
 >;
 
 export type AllocationCheck =
-  { ok: true } | { ok: false; reason: 'below_seats_sold'; seatsSold: number };
+  | { ok: true }
+  | {
+      ok: false;
+      reason: 'below_sold_and_held';
+      seatsSold: number;
+      heldSeats: number;
+    };
 
-/** Capacity may equal the seats already sold, never go under them. */
+/**
+ * Capacity may equal the seats already sold plus the seats in open holds, never go under them
+ * (PRD-41). `heldSeats` is the open holds' seats at the moment the row is locked.
+ */
 export function checkAllocationChange(
   seatsSold: number,
+  heldSeats: number,
   allocation: number,
 ): AllocationCheck {
-  return allocation < seatsSold
-    ? { ok: false, reason: 'below_seats_sold', seatsSold }
+  return allocation < seatsSold + heldSeats
+    ? { ok: false, reason: 'below_sold_and_held', seatsSold, heldSeats }
     : { ok: true };
 }
 

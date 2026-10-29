@@ -137,13 +137,25 @@ async function answer(
   );
 }
 
+const localHostHeader = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
+
 /**
- * Stands in for Neon's HTTP endpoint (`POST /sql`) in front of a plain Postgres, because the Neon
- * driver speaks HTTP and CI and local Docker run ordinary Postgres. Point `url` at the fresh schema.
+ * Starts a stand-in for Neon's HTTP endpoint (`POST /sql`) in front of a plain Postgres, because the
+ * Neon driver speaks HTTP and CI and local Docker run ordinary Postgres. It runs whatever SQL it is
+ * sent, so it listens on loopback only and refuses a request a browser sent (an `Origin` header) or
+ * one addressed to another host name (DNS rebinding).
  */
-export async function serveNeonHttp(url: string) {
+export async function startNeonHttpShim(url: string, port = 0) {
   const pool = new Pool({ connectionString: url, max: 2 });
   const server = createServer((request, response) => {
+    if (
+      request.headers.origin !== undefined ||
+      !localHostHeader.test(request.headers.host ?? '')
+    ) {
+      response.statusCode = 403;
+      response.end();
+      return;
+    }
     answer(pool, request, response).catch((error: unknown) => {
       response.statusCode = 400;
       response.end(
@@ -153,17 +165,29 @@ export async function serveNeonHttp(url: string) {
       );
     });
   });
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const { port } = server.address() as AddressInfo;
-  neonConfig.fetchEndpoint = `http://127.0.0.1:${String(port)}/sql`;
-  return async () => {
-    await new Promise<void>((resolve, reject) => {
-      server.close((error) => {
-        if (error) reject(error);
-        else resolve();
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(port, '127.0.0.1', resolve);
+  });
+  const address = server.address() as AddressInfo;
+  return {
+    endpoint: `http://127.0.0.1:${String(address.port)}/sql`,
+    stop: async () => {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+        server.closeAllConnections();
       });
-      server.closeAllConnections();
-    });
-    await pool.end();
+      await pool.end();
+    },
   };
+}
+
+/** The shim on a free port, with the Neon driver pointed at it for the whole process. */
+export async function serveNeonHttp(url: string) {
+  const { endpoint, stop } = await startNeonHttpShim(url);
+  neonConfig.fetchEndpoint = endpoint;
+  return stop;
 }

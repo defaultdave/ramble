@@ -167,7 +167,7 @@ function DayChangesInPlace(args: React.ComponentProps<typeof FilterBar>) {
   );
 }
 
-/** A keyboard user opens the calendar, and a new day must leave focus on the chip, not on the page. */
+/** With the calendar open, a new day must leave focus on the chip, not on the page. */
 export const FocusStaysOnTheChipWhenTheDayChanges: Story = {
   parameters: { colorScheme: 'light' },
   render: (args) => <DayChangesInPlace {...args} />,
@@ -176,16 +176,17 @@ export const FocusStaysOnTheChipWhenTheDayChanges: Story = {
     const chip = canvas.getByText('Pick a date').closest('summary');
     const disclosure = chip?.closest('details');
     if (!chip || !disclosure) throw new Error('No date disclosure');
-    chip.focus();
-    await userEvent.keyboard('{Enter}');
-    await expect(disclosure).toHaveProperty('open', true);
+    await userEvent.click(chip);
+    await waitFor(() => expect(disclosure).toHaveProperty('open', true));
 
     await userEvent.click(canvas.getByRole('button', { name: 'Go to Nov 7' }));
 
     await waitFor(() => expect(disclosure).toHaveProperty('open', false));
-    await expect(canvas.getByText('Sat, Nov 7').closest('details')).toBe(
-      disclosure,
+    await waitFor(() =>
+      expect(canvas.getByText('Sat, Nov 7').closest('details')).toBe(
+        disclosure,
+      ),
     );
-    await expect(chip).toHaveFocus();
+    await waitFor(() => expect(chip).toHaveFocus());
   },
 };

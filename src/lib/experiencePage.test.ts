@@ -288,6 +288,34 @@ describe('mapsHref', () => {
     );
   });
 
+  const searchFor = (place: string) =>
+    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${place}, New York`)}`;
+
+  it.each([
+    ['W. 23rd St. The door is on the left.', 'W. 23rd St'],
+    ['St. Marks Pl', 'St. Marks Pl'],
+    ['St. Marks Pl. Ring the bell.', 'St. Marks Pl. Ring the bell'],
+    ['Ave. B', 'Ave. B'],
+    ['Meet at 10 Ave. B', 'Meet at 10 Ave. B'],
+    ['Pier 57, 25 11th Ave. Meet at the gate.', 'Pier 57, 25 11th Ave'],
+    ['Gate 5. Meet at the sign.', 'Gate 5'],
+    ['Pier 26! Look for the flag.', 'Pier 26'],
+    ['Where is it? Pier 26.', 'Where is it'],
+    [
+      'Pier 26, Tribeca\nThe exact door is in your confirmation.',
+      'Pier 26, Tribeca',
+    ],
+    ['Pier 26, \t Tribeca. Ring the bell.', 'Pier 26, Tribeca'],
+    ['Pier   26 \t Tribeca', 'Pier 26 Tribeca'],
+    ['123 Main St.', '123 Main St'],
+  ])('searches the first real sentence of %j', (text, place) => {
+    expect(mapsHref(text)).toBe(searchFor(place));
+  });
+
+  it('refuses a first sentence that is long before whitespace collapses, without walking on', () => {
+    expect(mapsHref(`${'a '.repeat(maxMapsQueryLength * 2)}end.`)).toBeNull();
+  });
+
   it.each([null, '', '   ', '. Only a note'])('makes none for %j', (text) => {
     expect(mapsHref(text)).toBeNull();
   });

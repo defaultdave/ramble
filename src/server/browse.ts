@@ -1,12 +1,19 @@
 import 'server-only';
 import { cacheLife, cacheTag } from 'next/cache';
 import { unstable_rethrow } from 'next/navigation';
-import { browseDays, toBrowsePage, type BrowsePage } from '@/lib/browse';
+import {
+  browseDays,
+  browseTitle,
+  toBrowsePage,
+  type BrowsePage,
+} from '@/lib/browse';
 import { tags } from '@/lib/cacheTags';
 import type { Category, Neighborhood } from '@/lib/catalog';
+import { errorDigest } from '@/lib/errorDigest';
 import type { BrowseFilters, BrowseQuery } from '@/lib/filters';
 import { listBrowseDayRows, listBrowseExperiences } from '@/server/db/browse';
 import { listCategories, listNeighborhoods } from '@/server/db/catalog';
+import { logger } from '@/server/monitoring/logger';
 
 /**
  * What leaves a failed read. A database error carries the query and its values, and Next.js logs
@@ -74,4 +81,20 @@ export async function getFilterOptions(): Promise<{
     Promise.all([listCategories(), listNeighborhoods()]),
   );
   return { categories, neighborhoods };
+}
+
+/**
+ * The page title for a filter combination. The title is presentation, so a failed name read costs
+ * the filter names and nothing else; the page's own read shows the error state.
+ */
+export async function getBrowseTitle(filters: BrowseFilters): Promise<string> {
+  try {
+    return browseTitle(filters, await getFilterOptions());
+  } catch (error) {
+    unstable_rethrow(error);
+    logger.error('Browse title could not be read', {
+      digest: errorDigest(error),
+    });
+    return browseTitle(filters, { categories: [], neighborhoods: [] });
+  }
 }

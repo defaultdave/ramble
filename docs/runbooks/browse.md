@@ -38,7 +38,7 @@ Paging is keyset, never `OFFSET`. Results are ordered by name and then id, a pag
 
 Only `live` and `guide_only` experiences are read (the one guest-visibility condition in `src/server/db/catalog.ts`), and a live experience with no price option that takes a space is left out because a card cannot show it. The card price is the lowest price among the options that take a space (`cardPriceLabel` in `src/lib/pricing.ts`, shared with the home cards), "From" only when those prices differ, so a kids class with a free accompanying adult reads the child price. A price of nothing reads "Free". The card is built by `toExperienceCard` in `src/lib/experienceCards.ts`, the same function home uses.
 
-A date matches an experience with a `scheduled` session that starts from `asOf` to 120 days ahead and falls on that day in the host's calendar: the stored `local_date`, or for a session entered by hand the day of `starts_at` in the session's `time_zone`.
+A date matches an experience with a `scheduled` session that starts from `asOf` to 120 days ahead and falls on that day in the host's calendar: the stored `local_date`, or for a session entered by hand the day of `starts_at` in the session's `time_zone`. A day is offered on the calendar, and a date matches an experience, only through a session that day with space left (`hasSpaceLeft` in `src/lib/spaces.ts`; the SQL mirrors it as `seats_sold < allocation`).
 
 ## When a read fails
 

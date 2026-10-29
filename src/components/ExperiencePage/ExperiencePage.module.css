@@ -1,16 +1,18 @@
+/* The gutter sits on .page and the cap on the one grid column, so past the content width the column lines up with the header. */
 .page {
   box-sizing: border-box;
-  display: flex;
-  max-inline-size: var(--size-content-max);
-  flex-direction: column;
-  margin-inline: auto;
+  display: grid;
+  grid-template-columns: minmax(0, var(--size-content-max));
+  justify-content: center;
+  padding-inline: var(--size-gutter);
   font-family: var(--font-family-body);
   color: var(--color-text-primary);
 }
 
-/* On a phone the photos lead the page; from the tablet width the title does. */
+/* On a phone the photos lead the page and run edge to edge past the gutter; from the tablet width the title leads and the photos sit in the column. */
 .gallery {
   order: -1;
+  margin-inline: calc(-1 * var(--size-gutter));
 }
 
 .header {
@@ -18,7 +20,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-4);
-  padding: var(--space-6) var(--space-6) 0;
+  padding: var(--space-6) 0 0;
 }
 
 .breadcrumb,
@@ -88,7 +90,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-8);
-  padding: var(--space-4) var(--space-6) var(--space-8);
+  padding: var(--space-4) 0 var(--space-8);
 }
 
 .facts {
@@ -256,11 +258,12 @@
 @media (min-width: 768px) {
   .gallery {
     order: 0;
+    margin-inline: 0;
   }
 
   .header {
     gap: var(--space-3);
-    padding: var(--space-8) var(--space-6) var(--space-6);
+    padding: var(--space-8) 0 var(--space-6);
   }
 
   .breadcrumb,

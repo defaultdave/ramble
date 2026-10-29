@@ -12,12 +12,17 @@ import {
 import type { CardExperience } from '@/lib/experienceCards';
 import { readOrRefuse } from '@/server/cache/readOrRefuse';
 import { listCategories, listNeighborhoods } from '@/server/db/catalog';
-import { listHomeModules, listPublishedPicks } from '@/server/db/editorial';
+import {
+  getPublishedGiftGuide,
+  listHomeModules,
+  listPublishedPicks,
+} from '@/server/db/editorial';
 import { listHomeExperiences, listThisWeekSessions } from '@/server/db/home';
 
 export type HomeContent = {
   modules: HomeModule[];
   picks: Collection[];
+  giftGuide: Collection | null;
   categories: Category[];
   neighborhoods: Neighborhood[];
   experiences: CardExperience[];
@@ -33,16 +38,25 @@ export async function getHomeContent(): Promise<HomeContent> {
   cacheLife('editorial');
   cacheTag(tags.home, tags.catalog);
   const content = await readOrRefuse('Home', async () => {
-    const [modules, picks, categories, neighborhoods] = await Promise.all([
-      listHomeModules(),
-      listPublishedPicks(),
-      listCategories(),
-      listNeighborhoods(),
-    ]);
+    const [modules, picks, giftGuide, categories, neighborhoods] =
+      await Promise.all([
+        listHomeModules(),
+        listPublishedPicks(),
+        getPublishedGiftGuide(),
+        listCategories(),
+        listNeighborhoods(),
+      ]);
     const experiences = await listHomeExperiences(
       homeExperienceIds(modules, picks),
     );
-    return { modules, picks, categories, neighborhoods, experiences };
+    return {
+      modules,
+      picks,
+      giftGuide,
+      categories,
+      neighborhoods,
+      experiences,
+    };
   });
   for (const experience of content.experiences) {
     cacheTag(tags.experience(experience.id));

@@ -770,6 +770,65 @@ describe('the calendar read', () => {
   });
 });
 
+describe('days with no space left', () => {
+  it('neither offers nor matches a day whose only sessions are sold out, and does both for a day with one space left', async () => {
+    const where = await scope();
+    const exp = await insertExperience(where, { name: 'Sold out day' });
+    await insertSession(exp.id, '2026-11-07T14:00:00Z', {
+      allocation: 4,
+      seatsSold: 4,
+    });
+    await insertSession(exp.id, '2026-11-07T19:00:00Z', {
+      allocation: 0,
+      seatsSold: 0,
+    });
+    await insertSession(exp.id, '2026-11-08T14:00:00Z', {
+      allocation: 4,
+      seatsSold: 3,
+    });
+    const filters = { categories: [where.category.slug], neighborhoods: [] };
+
+    expect(await daysFor(filters)).toEqual(['2026-11-08']);
+    expect(
+      (await list(filtersFor(where, { date: '2026-11-07' }))).items,
+    ).toEqual([]);
+    expect(
+      names(await list(filtersFor(where, { date: '2026-11-08' }))),
+    ).toEqual(['Sold out day']);
+  });
+
+  it('offers a day through its session with space even when another session that day is sold out', async () => {
+    const where = await scope();
+    const exp = await insertExperience(where, { name: 'Mixed day' });
+    await insertSession(exp.id, '2026-11-07T14:00:00Z', {
+      allocation: 4,
+      seatsSold: 4,
+    });
+    await insertSession(exp.id, '2026-11-07T19:00:00Z', {
+      allocation: 4,
+      seatsSold: 0,
+    });
+
+    expect(
+      await daysFor({ categories: [where.category.slug], neighborhoods: [] }),
+    ).toEqual(['2026-11-07']);
+    expect(
+      names(await list(filtersFor(where, { date: '2026-11-07' }))),
+    ).toEqual(['Mixed day']);
+  });
+
+  it('still lists an experience with no space left when no date is chosen', async () => {
+    const where = await scope();
+    const exp = await insertExperience(where, { name: 'Full but listed' });
+    await insertSession(exp.id, '2026-11-07T14:00:00Z', {
+      allocation: 4,
+      seatsSold: 4,
+    });
+
+    expect(names(await list(filtersFor(where)))).toEqual(['Full but listed']);
+  });
+});
+
 describe('the day the calendar shows and the day the date filter matches', () => {
   // Each zone has the minute before local midnight and the minute after, so one side of every pair is the day before.
   it.each([

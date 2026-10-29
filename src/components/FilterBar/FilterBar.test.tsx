@@ -12,6 +12,7 @@ import { FilterBar, type FilterBarProps } from './FilterBar';
 // - the date chip shows the chosen day and is marked chosen; with no day it says "Pick a date"
 // - the calendar is closed until the date chip is opened
 // - a day in the address that has passed does not break the calendar
+// - when the chosen day changes the calendar closes and focus returns to the date chip, without remounting it; the same day changes nothing
 // - picking a day hands it to the route's action
 // - Clear date is there only when a day is chosen, and links to the address without it
 // - Clear all filters is there only when a filter is on, and links to the bare address
@@ -119,6 +120,53 @@ describe('FilterBar', () => {
     await userEvent.click(screen.getByText('Pick a date'));
     expect(details.open).toBe(true);
     expect(screen.getByRole('grid', { name: /Choose a date/ })).toBeVisible();
+  });
+
+  it('closes the calendar and focuses the date chip when the chosen day changes', async () => {
+    const props = {
+      categories,
+      neighborhoods,
+      today: '2026-10-26',
+      availableDates: ['2026-10-26', '2026-11-07'],
+      onPickDate: vi.fn(),
+    };
+    const { rerender, container } = render(
+      <FilterBar {...props} filters={noFilters} />,
+    );
+    const details = container.querySelector('details');
+    if (!details) throw new Error('No calendar disclosure');
+    await userEvent.click(screen.getByText('Pick a date'));
+    expect(details.open).toBe(true);
+
+    rerender(
+      <FilterBar {...props} filters={{ ...noFilters, date: '2026-11-07' }} />,
+    );
+
+    expect(container.querySelector('details')).toBe(details);
+    expect(details.open).toBe(false);
+    expect(screen.getByText('Sat, Nov 7')).toHaveFocus();
+  });
+
+  it('leaves the calendar and focus alone when the day has not changed', async () => {
+    const props = {
+      categories,
+      neighborhoods,
+      today: '2026-10-26',
+      availableDates: ['2026-10-26', '2026-11-07'],
+      onPickDate: vi.fn(),
+    };
+    const filters = { ...noFilters, date: '2026-11-07' };
+    const { rerender, container } = render(
+      <FilterBar {...props} filters={filters} />,
+    );
+    await userEvent.click(screen.getByText('Sat, Nov 7'));
+    rerender(
+      <FilterBar
+        {...props}
+        filters={{ ...filters, categories: ['cooking'] }}
+      />,
+    );
+    expect(container.querySelector('details')?.open).toBe(true);
   });
 
   it('hands the picked day to the route', async () => {

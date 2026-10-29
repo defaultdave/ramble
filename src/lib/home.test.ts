@@ -4,6 +4,7 @@ import type { Collection, HomeModule } from './editorial';
 import type { CardExperience } from './experienceCards';
 import {
   buildHomePage,
+  collectionModuleCopy,
   homeCopy,
   homeCardIds,
   homeExperienceIds,
@@ -217,6 +218,7 @@ function collection(
 const baseInput: HomeInput = {
   modules: [],
   picks: [],
+  giftGuide: null,
   categories: [
     { id: id(700), slug: 'cooking', name: 'Cooking' },
     { id: id(701), slug: 'wine', name: 'Wine and cocktails' },
@@ -439,32 +441,105 @@ describe('buildHomePage picks', () => {
   });
 });
 
+describe('collectionModuleCopy', () => {
+  it.each([
+    ['the module heading wins', 'Mine', 'Mine'],
+    ['the collection title otherwise', null, 'Pick 1'],
+  ])('uses %s', (_name, heading, expected) => {
+    expect(collectionModuleCopy({ heading }, collection(1, [1])).heading).toBe(
+      expected,
+    );
+  });
+
+  it('takes the collection summary, which may be empty', () => {
+    expect(collectionModuleCopy({ heading: null }, collection(1, [1]))).toEqual(
+      { heading: 'Pick 1', summary: 'About pick 1' },
+    );
+    expect(
+      collectionModuleCopy(
+        { heading: null },
+        collection(1, [1], { summary: null }),
+      ).summary,
+    ).toBeNull();
+  });
+});
+
 describe('buildHomePage gift guide', () => {
-  it('shows the sponsor line and a link to the gift guide', () => {
-    const [view] = modulesOf({ modules: [module(1, 'gift_guide')] });
+  const guide = collection(5, [1, 2, 3, 4, 5, 6, 7], {
+    kind: 'gift_guide',
+    title: 'Give a Saturday',
+    summary: 'They pick the date.',
+  });
+  const guideModule = (overrides: Partial<HomeModule> = {}) =>
+    module(1, 'gift_guide', { collectionId: guide.id, ...overrides });
+
+  it('takes its collection title and summary, with a link and the sponsor line', () => {
+    const [view] = modulesOf({
+      modules: [guideModule()],
+      giftGuide: guide,
+    });
     expect(view).toEqual({
       kind: 'gift_guide',
       id: id(901),
       eyebrow: homeCopy.giftGuideEyebrow,
-      heading: homeCopy.giftGuideHeading,
-      body: null,
+      heading: 'Give a Saturday',
+      body: paragraphs('They pick the date.'),
       action: { href: '/gifts', label: homeCopy.giftGuideAction },
       sponsor: homeCopy.giftGuideSponsor,
     });
   });
 
-  it('shows the heading and body staff wrote', () => {
+  it('shows the heading and body staff wrote over the collection copy', () => {
     const body = paragraphs('Give a Saturday.');
     const [view] = modulesOf({
-      modules: [module(1, 'gift_guide', { heading: 'Not a sweater', body })],
+      modules: [guideModule({ heading: 'Not a sweater', body })],
+      giftGuide: guide,
     });
     expect(view).toMatchObject({ heading: 'Not a sweater', body });
+  });
+
+  it('has no body when the collection has no summary', () => {
+    const [view] = modulesOf({
+      modules: [guideModule()],
+      giftGuide: { ...guide, summary: null },
+    });
+    expect(view).toMatchObject({ heading: 'Give a Saturday', body: null });
+  });
+
+  it.each([
+    ['no collection to take copy from', guideModule(), null],
+    [
+      'a module that names another collection',
+      guideModule({ collectionId: id(899) }),
+      guide,
+    ],
+  ])('is left out for %s when it has no heading of its own', (_n, m, g) => {
+    expect(modulesOf({ modules: [m], giftGuide: g })).toEqual([]);
+  });
+
+  it('keeps its own heading when no collection is published', () => {
+    const [view] = modulesOf({
+      modules: [guideModule({ heading: 'Gifts' })],
+    });
+    expect(view).toMatchObject({ heading: 'Gifts', body: null });
+  });
+
+  it('does not change the count the Picks link shows', () => {
+    const [view] = modulesOf({
+      modules: [module(1, 'picks', { collectionId: id(801) })],
+      picks: [collection(1, [1, 2, 3, 4, 5])],
+      experiences: [1, 2, 3].map((n) => experience(n)),
+    });
+    expect(view).toMatchObject({
+      seeAll: { label: 'See all 5 picks' },
+    });
   });
 
   it('is left out while gifts are switched off', () => {
     expect(
       modulesOf({
-        modules: [module(1, 'gift_guide')],
+        modules: [guideModule()],
+        giftGuide: guide,
         settings: { giftsEnabled: false },
       }),
     ).toEqual([]);

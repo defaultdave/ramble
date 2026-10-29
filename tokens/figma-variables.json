@@ -448,6 +448,14 @@
         {
           "name": "size/content-max",
           "value": 1200
+        },
+        {
+          "name": "size/field-height",
+          "value": 52
+        },
+        {
+          "name": "size/gutter",
+          "value": 24
         }
       ]
     },

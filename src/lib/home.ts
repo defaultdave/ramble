@@ -14,7 +14,7 @@ import type { RichTextDoc } from './richText/format';
 import { hasContent, paragraphs } from './richText/paragraphs';
 import { giftGuidePath, picksAnchor, picksPath } from './routes';
 import type { GuestSettings } from './settings';
-import { spacesStatus } from './spaces';
+import { hasSpaceLeft } from './spaces';
 import { msPerDay } from './time';
 
 /** Every bound the home page reads or shows, so a read cannot grow with the catalog. */
@@ -84,7 +84,7 @@ export function thisWeekExperienceIds(
         session.experienceStatus === 'live' &&
         session.startsAt.getTime() > window.from.getTime() &&
         session.startsAt.getTime() <= window.to.getTime() &&
-        spacesStatus(session.allocation - session.seatsSold) !== 'sold-out',
+        hasSpaceLeft(session),
     )
     .toSorted(
       (a, b) =>
@@ -107,7 +107,6 @@ export const homeCopy = {
   categoryHeading: 'Browse by category',
   picksEyebrow: 'Ramble Picks',
   giftGuideEyebrow: 'Gift guide',
-  giftGuideHeading: 'Give an experience',
   giftGuideAction: 'Shop the gift guide',
   /** The sponsor placement under the gift guide. The editorial store has no sponsor field yet, so the line is fixed. */
   giftGuideSponsor: 'Presented by our holiday partner',
@@ -180,6 +179,8 @@ export type HomeInput = {
   /** The enabled modules in order, as the data layer reads them. */
   modules: readonly HomeModule[];
   picks: readonly Collection[];
+  /** The published gift guide, which the gift guide module takes its copy from. */
+  giftGuide: Collection | null;
   categories: readonly Category[];
   neighborhoods: readonly Neighborhood[];
   experiences: readonly CardExperience[];
@@ -190,6 +191,20 @@ export type HomeInput = {
   };
   settings: Pick<GuestSettings, 'giftsEnabled'>;
 };
+
+/**
+ * The one copy rule for a module that shows a collection: the module's own heading wins, else the
+ * collection's title; the collection's summary is what the module says beneath it.
+ */
+export function collectionModuleCopy(
+  module: Pick<HomeModule, 'heading'>,
+  collection: Pick<Collection, 'title' | 'summary'>,
+): { heading: string; summary: string | null } {
+  return {
+    heading: module.heading ?? collection.title,
+    summary: collection.summary,
+  };
+}
 
 function pickModuleIds(
   module: HomeModule,
@@ -263,12 +278,13 @@ function viewOf(
         homeLimits.picksShown,
       );
       if (cards.length === 0) return null;
+      const copy = collectionModuleCopy(module, pick);
       return {
         kind: 'picks',
         id: module.id,
         eyebrow: homeCopy.picksEyebrow,
-        heading: module.heading ?? pick.title,
-        summary: pick.summary,
+        heading: copy.heading,
+        summary: copy.summary,
         cards,
         seeAll: {
           href: picksPath(pick.slug),
@@ -278,12 +294,24 @@ function viewOf(
     }
     case 'gift_guide': {
       if (!context.settings.giftsEnabled) return null;
+      const guide =
+        context.giftGuide?.id === module.collectionId
+          ? context.giftGuide
+          : null;
+      if (module.heading === null && !guide) return null;
+      const copy = guide
+        ? collectionModuleCopy(module, guide)
+        : { heading: module.heading ?? '', summary: null };
       return {
         kind: 'gift_guide',
         id: module.id,
         eyebrow: homeCopy.giftGuideEyebrow,
-        heading: module.heading ?? homeCopy.giftGuideHeading,
-        body: hasContent(module.body) ? module.body : null,
+        heading: copy.heading,
+        body: hasContent(module.body)
+          ? module.body
+          : copy.summary
+            ? paragraphs(copy.summary)
+            : null,
         action: { href: giftGuidePath, label: homeCopy.giftGuideAction },
         sponsor: homeCopy.giftGuideSponsor,
       };

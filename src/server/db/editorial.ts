@@ -128,7 +128,6 @@ export async function getPublishedPick(
   return pick ?? null;
 }
 
-// TODO(U-036): first caller
 export async function getPublishedGiftGuide(): Promise<Collection | null> {
   const [guide] = await readCollections(
     and(publishedCollection, eq(collections.kind, 'gift_guide')),

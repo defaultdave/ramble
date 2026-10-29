@@ -6,7 +6,7 @@ import { withCovers, type PhotoView } from './photoViews';
 import { cardPriceLabel } from './pricing';
 import type { RichTextDoc } from './richText/format';
 import type { GuestSettings } from './settings';
-import { spacesStatus } from './spaces';
+import { hasSpaceLeft } from './spaces';
 
 /** Every bound the home page reads or shows, so a read cannot grow with the catalog. */
 export const homeLimits = {
@@ -235,7 +235,7 @@ export function thisWeekExperienceIds(
         session.experienceStatus === 'live' &&
         session.startsAt.getTime() > window.from.getTime() &&
         session.startsAt.getTime() <= window.to.getTime() &&
-        spacesStatus(session.allocation - session.seatsSold) !== 'sold-out',
+        hasSpaceLeft(session),
     )
     .toSorted(
       (a, b) =>

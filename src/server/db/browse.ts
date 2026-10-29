@@ -102,6 +102,11 @@ function scheduledInWindow(window: BrowseWindow): SQL | undefined {
   );
 }
 
+// Mirrors `hasSpaceLeft` in `src/lib/spaces.ts` (spaces left above zero), for the day queries only: a day
+// is offered, and an experience matches it, through a session that still has space. The database test
+// keeps the two together.
+const hasSpace = sql`${sessions.seatsSold} < ${sessions.allocation}`;
+
 function hasSessionOn(date: string | null, window: BrowseWindow) {
   if (date === null) return undefined;
   return exists(
@@ -112,6 +117,7 @@ function hasSessionOn(date: string | null, window: BrowseWindow) {
         and(
           eq(sessions.experienceId, experiences.id),
           scheduledInWindow(window),
+          hasSpace,
           sql`${sessionLocalDate} = ${date}::date`,
         ),
       ),
@@ -240,6 +246,7 @@ export async function listBrowseDayRows(
     inChosenCategories(chosenCategories),
     inChosenNeighborhoods(chosenNeighborhoods),
     scheduledInWindow(window),
+    hasSpace,
   );
   const [storedDates, handEntered] = await Promise.all([
     dbRead

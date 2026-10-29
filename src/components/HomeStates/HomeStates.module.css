@@ -75,6 +75,10 @@
   margin-inline: auto;
 }
 
+.picksInner {
+  gap: var(--space-3);
+}
+
 .heroRow {
   gap: var(--space-4);
 }
@@ -150,6 +154,7 @@
   flex-direction: column;
   gap: var(--space-4);
   min-width: 0;
+  container-type: inline-size;
 }
 
 .art {
@@ -161,12 +166,40 @@
   animation: pulse 1.5s ease-in-out infinite;
 }
 
+/* The hero's search: a bordered box of two label-and-field blocks and a button, stacked until the copy column is wide enough for a row. */
 .search {
-  box-sizing: border-box;
-  height: calc(var(--space-16) * 4 + var(--space-1));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-lg);
   background: var(--color-bg-surface);
+}
+
+.searchField {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.labelBar {
+  width: 40%;
+  height: var(--font-line-height-label);
+}
+
+/* A field and the large button are the same height, a touch target plus a line of padding. */
+.controlBar,
+.submitBar {
+  min-height: calc(var(--size-touch-target) + var(--space-2));
+}
+
+.picksHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 .pills {
@@ -239,6 +272,10 @@
     gap: var(--space-4);
   }
 
+  .picksInner {
+    gap: var(--space-6);
+  }
+
   .heroRow {
     flex-direction: row;
     align-items: center;
@@ -255,10 +292,6 @@
 
   .bodyLines > .bar:nth-child(3) {
     display: none;
-  }
-
-  .search {
-    height: calc(var(--space-16) + var(--space-12) + var(--space-1) / 2);
   }
 
   .art {
@@ -295,6 +328,19 @@
 @media (min-width: 1024px) {
   .headingLines > .bar:nth-child(4) {
     display: none;
+  }
+}
+
+/* The row waits for the copy column, as the hero's does. */
+@container (min-width: 640px) {
+  .search {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+
+  .submitBar {
+    flex: none;
+    width: calc(var(--space-16) * 3 + var(--space-8));
   }
 }
 

@@ -1,8 +1,6 @@
 import 'server-only';
 import { sql } from 'drizzle-orm';
-import type { db } from './client';
-
-export type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+import type { Transaction } from './client';
 
 /**
  * Serializes writers that could collide on a unique value, until the transaction ends. A loser

@@ -86,7 +86,7 @@
 .bar {
   display: block;
   border-radius: var(--radius-sm);
-  background: var(--color-bg-sunken);
+  background: var(--color-bg-disabled);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -166,7 +166,7 @@
   width: calc(var(--space-10) * 4);
   aspect-ratio: 4 / 3;
   border-radius: var(--radius-lg);
-  background: var(--color-bg-sunken);
+  background: var(--color-bg-disabled);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -250,6 +250,15 @@
 @keyframes pulse {
   50% {
     opacity: 0.5;
+  }
+}
+
+/* Forced colors replaces the fill, so the shape would vanish; an inset outline keeps it visible without changing its size. */
+@media (forced-colors: active) {
+  .art,
+  .bar {
+    outline: 1px solid GrayText;
+    outline-offset: -1px;
   }
 }
 

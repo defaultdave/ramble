@@ -167,7 +167,9 @@
   "space/12": "VariableID:28:11",
   "space/16": "VariableID:28:12",
   "size/touch-target": "VariableID:28:13",
-  "size/content-max": "VariableID:59:153"
+  "size/content-max": "VariableID:59:153",
+  "size/field-height": "VariableID:199:3",
+  "size/gutter": "VariableID:199:4"
  },
  "radiusVariables": {
   "radius/sm": "VariableID:28:15",

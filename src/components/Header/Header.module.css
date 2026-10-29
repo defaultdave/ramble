@@ -1,5 +1,5 @@
 .header {
-  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--size-gutter);
   /* An inset line, not a border, so it sits inside the height as Figma's inside stroke does. */
   box-shadow: inset 0 -1px 0 var(--color-border-default);
   background: var(--color-bg-canvas);
@@ -188,7 +188,7 @@
 
 @media (min-width: 768px) {
   .header {
-    padding: var(--space-3) var(--space-6);
+    padding: var(--space-3) var(--size-gutter);
   }
 
   .nav,

@@ -1,6 +1,6 @@
 .page {
   box-sizing: border-box;
-  padding: var(--space-8) var(--space-6);
+  padding: var(--space-8) var(--size-gutter);
   font-family: var(--font-family-body);
   color: var(--color-text-primary);
 }
@@ -64,7 +64,7 @@
 /* The loading state repeats the hero, the category row and the first row of Picks at the sizes, gaps and gutters of the loaded page (HomeHero and HomeModules), so little moves when they arrive. */
 .band {
   box-sizing: border-box;
-  padding: var(--space-8) var(--space-6);
+  padding: var(--space-8) var(--size-gutter);
 }
 
 .skeletonInner {
@@ -193,7 +193,7 @@
 /* A field and the large button are the same height, a touch target plus a line of padding. */
 .controlBar,
 .submitBar {
-  min-height: calc(var(--size-touch-target) + var(--space-2));
+  min-height: var(--size-field-height);
 }
 
 .picksHead {
@@ -205,8 +205,8 @@
 .pills {
   display: flex;
   gap: var(--space-2);
-  margin-inline: calc(-1 * var(--space-6));
-  padding: var(--space-1) var(--space-6);
+  margin-inline: calc(-1 * var(--size-gutter));
+  padding: var(--space-1) var(--size-gutter);
   overflow: hidden;
 }
 

@@ -94,6 +94,34 @@ describe('environment', () => {
     );
   });
 
+  describe('SEED_HOST', () => {
+    it('accepts a hostname', async () => {
+      vi.stubEnv('SEED_HOST', 'ep-quiet-cell-123.us-east-2.aws.neon.tech');
+
+      const env = await loadEnv();
+
+      expect(env.SEED_HOST).toBe('ep-quiet-cell-123.us-east-2.aws.neon.tech');
+    });
+
+    it.each([undefined, ''])('reads %j as not set', async (value) => {
+      vi.stubEnv('SEED_HOST', value);
+
+      const env = await loadEnv();
+
+      expect(env.SEED_HOST).toBeUndefined();
+    });
+
+    it.each([
+      ['a URL', 'postgres://u:p@host.neon.tech/db'],
+      ['a space', 'host .neon.tech'],
+      ['a host longer than 253 characters', 'a'.repeat(254)],
+    ])('fails at import for %s', async (_name, value) => {
+      vi.stubEnv('SEED_HOST', value);
+
+      await expect(loadEnv()).rejects.toThrow(/SEED_HOST/);
+    });
+  });
+
   describe('database URLs', () => {
     const pooled = 'postgres://u:p@host-pooler.neon.tech/db';
     const direct = 'postgresql://u:p@host.neon.tech/db';

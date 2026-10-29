@@ -9,7 +9,7 @@ docker compose -p ramble up -d --wait     # local Postgres
 pnpm db:migrate                           # the seed needs the migrated schema
 SEED_TARGET=local pnpm db:seed            # the curated coverage set
 SEED_TARGET=local pnpm db:seed --scale    # plus the 400-experience scale fixture
-SEED_TARGET=staging pnpm db:seed --scale=400 --scale-seed=7
+SEED_TARGET=staging SEED_HOST=<the host in DATABASE_URL> pnpm db:seed --scale=400 --scale-seed=7
 ```
 
 `pnpm db:seed` runs `scripts/seed.ts` under Bun (Bun stays the runtime for `scripts/`), with a preload that stands in for `server-only` and `next/cache`, which only work inside Next.js. It needs `DATABASE_URL` and `DATABASE_URL_UNPOOLED` set, like the app.
@@ -25,8 +25,11 @@ The seed fails closed. It runs only when all of these hold, and it checks them b
 - `VERCEL_ENV` is not `production`, unless `SEED_TARGET=production-demo` (see below).
 - The database host and name do not read as production (a whole word `prod` or `production`), unless `SEED_TARGET=production-demo`.
 - With `SEED_TARGET=local`, the database is on this machine.
+- With any other target (`staging`, `load-test`, `production-demo`), `SEED_HOST` is set to the host in `DATABASE_URL`, exactly. A missing or different value refuses with `host_not_confirmed` and names the host the URL points at. This is the guard that stops a staging run from writing to the production database: a production Neon address (`ep-....neon.tech/neondb`) has no production word in it, and `VERCEL_ENV` is unset in a laptop shell, so the name and environment checks alone cannot tell it from staging.
 - `DATABASE_URL` is readable and has no `host`, `hostaddr`, `dbname`, or `database` query parameter and no percent escape in the host or database name, for every target.
 - With `SEED_TARGET=production-demo`, `--scale` is not given.
+
+The seed cannot know which database is production. It refuses the ones that say so (a production word in the name, `VERCEL_ENV`, `NODE_ENV`) and otherwise relies on `SEED_HOST` to make you name the host you mean to write to. Copy the host from the database you intend, not from the refusal message.
 
 A refusal prints the reason and never the connection string.
 
@@ -39,7 +42,8 @@ Run `db-migrate-production` first (the GitHub Actions workflow; the seed needs t
 ```
 vercel env pull .env.production-demo.local --environment=production --yes
 pull() { grep "^$1=" .env.production-demo.local | cut -d= -f2- | tr -d '"'; }
-SEED_TARGET=production-demo DATABASE_URL="$(pull DATABASE_URL)" DATABASE_URL_UNPOOLED="$(pull DATABASE_URL_UNPOOLED)" pnpm db:seed
+SEED_HOST="$(pull DATABASE_URL | sed -E 's|^[a-z]+://[^@]*@([^/:?]+).*|\1|')"
+SEED_TARGET=production-demo SEED_HOST="$SEED_HOST" DATABASE_URL="$(pull DATABASE_URL)" DATABASE_URL_UNPOOLED="$(pull DATABASE_URL_UNPOOLED)" pnpm db:seed
 rm .env.production-demo.local
 ```
 

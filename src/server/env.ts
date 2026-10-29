@@ -25,6 +25,12 @@ const optional = <T extends z.ZodType>(schema: T) =>
     schema.optional(),
   );
 
+// Length first: the pattern walks the string, and zod runs it even after `.max()` fails.
+const hostname = z
+  .string()
+  .max(253)
+  .refine((value) => /^[A-Za-z0-9.-]+$/.test(value), 'not a hostname');
+
 const httpsUrl = z.url({ protocol: /^https$/ });
 
 const schema = z
@@ -40,6 +46,8 @@ const schema = z
     VERCEL_GIT_COMMIT_SHA: optional(z.string().max(64)),
     // Read only by the seed command, which refuses to run unless this says what the database is.
     SEED_TARGET: optional(z.enum(seedTargets)),
+    // The database host the seed may write to; it must equal the DATABASE_URL host for every target but local.
+    SEED_HOST: optional(hostname),
     EMAIL_MODE: z.enum(emailModes).default('sink'),
     EMAIL_PROVIDER: z.enum(emailAdapterNames).default('fake'),
     EMAIL_ALLOWLIST: EmailAllowlistSchema.default([]),

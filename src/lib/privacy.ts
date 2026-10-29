@@ -158,7 +158,7 @@ export const piiColumns: readonly PiiColumn[] = [
     data: 'A SHA-256 of the guest device cookie, which marks one browser across visits',
     location: databaseLocation,
     deletionPath:
-      "Not yet purged: U-014b's upkeep deletes released holds on a schedule, and the privacy-requests work (U-085) adds the step that clears it for an erased guest. The cookie holds a random value, so the hash is a device marker, not an email, but it still singles out one person's browser",
+      "The hold upkeep replaces it with a fixed value 30 days after a hold is released (the row stays, because hold items and later orders point at it). Not yet purged on a converted hold: the privacy-requests work (U-085) adds the step that clears it for an erased guest. The cookie holds a random value, so the hash is a device marker, not an email, but it still singles out one person's browser",
   },
   {
     table: 'holds',
@@ -167,7 +167,7 @@ export const piiColumns: readonly PiiColumn[] = [
     data: "A SHA-256 of the requester's IP address, the second key for hold limits. An address space is small enough to guess, so the hash counts as personal data",
     location: databaseLocation,
     deletionPath:
-      "Not yet purged: U-014b's upkeep deletes released holds on a schedule, and the privacy-requests work (U-085) adds the step that clears it for an erased guest",
+      'The hold upkeep replaces it with a fixed value 30 days after a hold is released. Not yet purged on a converted hold: the privacy-requests work (U-085) adds the step that clears it for an erased guest',
   },
   {
     table: 'orders',

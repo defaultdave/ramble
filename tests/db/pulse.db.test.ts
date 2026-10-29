@@ -9,8 +9,14 @@ import {
   vi,
 } from 'vitest';
 import { createFreshDatabase, type FreshDatabase } from './harness';
+import { clearHolds, insertHold, seedBookable } from './holdFixtures';
 
 const sendHeartbeat = vi.hoisted(() => vi.fn());
+const cache = vi.hoisted(() => ({
+  updateTag: vi.fn<(tag: string) => void>(),
+  revalidateTag: vi.fn<(tag: string, profile: string) => void>(),
+}));
+vi.mock('next/cache', () => cache);
 vi.mock('@/server/monitoring/heartbeat', () => ({ sendHeartbeat }));
 vi.mock('@/server/monitoring/logger', () => ({
   logger: { warn: vi.fn(), info: vi.fn(), error: vi.fn() },
@@ -21,6 +27,7 @@ vi.mock('@/server/monitoring/logger', () => ({
 // - a source past 20 wrong secrets gets 429
 // - the right secret drains a due job, answers counts only, and pings the heartbeat once
 // - the pulse deletes expired rate-limit rows and keeps live ones
+// - the pulse releases lapsed holds and scrubs old released ones at database time, even for a manual asOf
 // - a manual asOf with DEMO_CLOCK on runs a job scheduled for tomorrow, and sends no heartbeat
 // - the same asOf with DEMO_CLOCK off is refused with 400 and the job stays pending
 
@@ -48,6 +55,8 @@ beforeEach(async () => {
   sendHeartbeat.mockReset().mockResolvedValue('sent');
   await client.db.execute(sql`DELETE FROM jobs`);
   await client.db.execute(sql`DELETE FROM rate_limits`);
+  await clearHolds(client.db);
+  cache.revalidateTag.mockClear();
 });
 
 const call = (headers: Record<string, string>, body?: string) =>
@@ -120,6 +129,8 @@ describe('POST /api/pulse against a database', () => {
       unrecorded: 0,
       left: 0,
       purged: 1,
+      holdsReleased: 0,
+      holdsScrubbed: 0,
     });
     expect(await statuses()).toEqual(['succeeded']);
     expect(sendHeartbeat).toHaveBeenCalledOnce();
@@ -127,6 +138,44 @@ describe('POST /api/pulse against a database', () => {
       sql`SELECT key FROM rate_limits WHERE key LIKE 'forms:%'`,
     );
     expect(rows).toEqual([{ key: `forms:${'b'.repeat(64)}` }]);
+  });
+
+  it('releases a lapsed hold and scrubs an old released one, at database time, even for a manual asOf', async () => {
+    const bookable = await seedBookable(client.db);
+    const lapsed = await insertHold(client.db, bookable.session.id, {
+      createdAt: sql`now() - interval '20 minutes'`,
+    });
+    const open = await insertHold(client.db, bookable.session.id);
+    const old = await insertHold(client.db, bookable.session.id, {
+      createdAt: sql`now() - interval '41 days'`,
+      status: 'released',
+      releasedReason: 'expired',
+      updatedAt: sql`now() - interval '40 days'`,
+    });
+    const farFuture = new Date(Date.now() + 25 * 60 * 60 * 1000).toISOString();
+
+    const response = await call(
+      authorized,
+      JSON.stringify({ asOf: farFuture }),
+    );
+
+    expect(await response.json()).toMatchObject({
+      holdsReleased: 1,
+      holdsScrubbed: 1,
+    });
+    const { rows } = await client.db.execute<{
+      id: string;
+      status: string;
+      device_key: string;
+    }>(sql`SELECT id, status, device_key FROM holds`);
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    expect(byId.get(lapsed.id)?.status).toBe('released');
+    expect(byId.get(open.id)?.status).toBe('active');
+    expect(byId.get(old.id)?.device_key).toBe('0'.repeat(64));
+    expect(cache.revalidateTag).toHaveBeenCalledExactlyOnceWith(
+      `session:${bookable.session.id}`,
+      'max',
+    );
   });
 
   it("runs tomorrow's job for a manual asOf, with no heartbeat", async () => {

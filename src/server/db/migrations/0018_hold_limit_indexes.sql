@@ -1,0 +1,3 @@
+CREATE INDEX "holds_device_key_idx" ON "holds" USING btree ("device_key","expires_at");--> statement-breakpoint
+CREATE INDEX "holds_ip_hash_idx" ON "holds" USING btree ("ip_hash","expires_at");--> statement-breakpoint
+CREATE INDEX "holds_released_unscrubbed_idx" ON "holds" USING btree ("updated_at") WHERE "holds"."status" = 'released' AND "holds"."device_key" <> '0000000000000000000000000000000000000000000000000000000000000000';

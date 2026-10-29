@@ -127,6 +127,13 @@
       "when": 1793314560880,
       "tag": "0017_order_parent_foreign_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793315954540,
+      "tag": "0018_hold_limit_indexes",
+      "breakpoints": true
     }
   ]
 }

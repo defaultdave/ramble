@@ -9,42 +9,17 @@ import {
   type BrowseQuery,
 } from './filters';
 import { withCovers, type PhotoView } from './photoViews';
+import { durationLabel } from './duration';
 import { cardPriceLabel } from './pricing';
 import { browsePath, experienceCardPath } from './routes';
 import { IsoDateSchema, TimeZoneSchema, isKnownTimeZone } from './sessions';
+import { calendarDateFormat, msPerDay } from './time';
 
 /** A hard page size: the data layer reads one more row than this to learn whether there is a next page. */
 export const browsePageSize = 12;
 
 /** How far ahead a guest can pick a date. Sessions are generated a year ahead; browse looks a season out. */
 export const browseDateHorizonDays = 120;
-
-/** Every host is in New York today, and "today" on a browse page means a New York calendar date. */
-const venueTimeZone = 'America/New_York';
-
-const MS_PER_MINUTE = 60_000;
-const MS_PER_DAY = 86_400_000;
-
-const venueDate = new Intl.DateTimeFormat('en-CA', {
-  timeZone: venueTimeZone,
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
-
-/** The calendar date in New York at `now`, as YYYY-MM-DD. */
-export function venueToday(now: Date): string {
-  return venueDate.format(now);
-}
-
-/**
- * `now` cut down to the minute, as an ISO string. A cached read takes it as an argument, so two
- * guests inside the same minute share one cache entry instead of each making their own.
- */
-export function browseAsOf(now: Date): string {
-  const cut = Math.floor(now.getTime() / MS_PER_MINUTE) * MS_PER_MINUTE;
-  return new Date(cut).toISOString();
-}
 
 export type BrowseWindow = { from: Date; to: Date };
 
@@ -56,7 +31,7 @@ export function browseWindow(asOf: string): BrowseWindow {
   }
   return {
     from,
-    to: new Date(from.getTime() + (browseDateHorizonDays + 1) * MS_PER_DAY),
+    to: new Date(from.getTime() + (browseDateHorizonDays + 1) * msPerDay),
   };
 }
 
@@ -80,15 +55,6 @@ export const BrowseDayRowsSchema = z.object({
 });
 export type BrowseDayRows = z.infer<typeof BrowseDayRowsSchema>;
 
-function dayInZone(zone: string): Intl.DateTimeFormat {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: zone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-}
-
 /**
  * The calendar days a guest can pick, each once and in order. A generated session already carries its
  * date; a session entered by hand is on the day its start falls on in its own time zone. A zone that
@@ -103,7 +69,7 @@ export function browseDays(rows: BrowseDayRows): string[] {
       if (!isKnownTimeZone(timeZone)) {
         throw new RangeError('A session has a time zone that is not known');
       }
-      format = dayInZone(timeZone);
+      format = calendarDateFormat(timeZone);
       formats.set(timeZone, format);
     }
     days.add(format.format(startsAt));
@@ -195,16 +161,6 @@ export function toBrowsePage(
     return { ok: false, reason: 'cursor_not_found' };
   }
   return { ok: true, items: read.items, nextCursor: read.nextCursor };
-}
-
-/** "2 hr", "2.5 hr", "45 min", "2 hr 15 min". */
-export function durationLabel(minutes: number): string {
-  if (minutes < 60) return `${String(minutes)} min`;
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  if (rest === 0) return `${String(hours)} hr`;
-  if (rest === 30) return `${String(hours)}.5 hr`;
-  return `${String(hours)} hr ${String(rest)} min`;
 }
 
 export type BrowseCard = {

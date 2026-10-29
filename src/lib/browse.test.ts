@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   BrowseDayRowsSchema,
-  browseAsOf,
   browseCardIds,
   browseDays,
   browseDateHorizonDays,
@@ -11,7 +10,6 @@ import {
   browseView,
   browseWindow,
   dateChipLabel,
-  durationLabel,
   errorView,
   maxHandEnteredDayRows,
   maxStoredDayRows,
@@ -21,7 +19,6 @@ import {
   toBrowsePage,
   withPriceOptions,
   toBrowseCard,
-  venueToday,
   withBrowseCovers,
   type BrowseExperience,
   type BrowsePage,
@@ -31,15 +28,13 @@ import {
 import { noFilters, type BrowseFilters } from './filters';
 
 // Behaviours under test, one per decision, branch or risk:
-// - "today" is the New York calendar date, across midnight and both sides of the clock change
-// - the cache time is cut to the minute, and the window runs from it to the horizon
+// - the window runs from the cache time to the horizon
 // - a page is cut from page size plus one rows: the extra row makes the cursor and is not shown
 // - a read becomes a page, and a cursor with no visible row is an outdated page, not an empty one
 // - the calendar days: a generated session keeps its stored date, a hand-entered one is on the day its start falls on in its own zone
 //   (east of UTC, west of UTC, a clock-change day), days are merged, de-duplicated, and sorted, and an unknown zone refuses the read
 // - the raw calendar rows are bounded: too many stored dates or hand-entered sessions, a bad date, or a bad zone is refused
 // - prices are grouped under their experience, lowest first
-// - a duration reads as minutes, hours, or half hours
 // - a card price comes only from options that take a space; a kids class with a free accompanying adult reads the child price, and an experience with no such option has no card
 // - an experience address names the area by status
 // - a card carries neighborhood and duration, links a guide entry out, and refuses a guide entry with no link
@@ -70,39 +65,7 @@ function experience(
   };
 }
 
-describe('venueToday', () => {
-  it.each([
-    [
-      'just before midnight in summer time',
-      '2026-10-26T03:59:59Z',
-      '2026-10-25',
-    ],
-    ['midnight in summer time', '2026-10-26T04:00:00Z', '2026-10-26'],
-    [
-      'just before midnight in winter time',
-      '2026-11-02T04:59:59Z',
-      '2026-11-01',
-    ],
-    ['midnight in winter time', '2026-11-02T05:00:00Z', '2026-11-02'],
-    ['the end of a year', '2027-01-01T04:59:59Z', '2026-12-31'],
-  ])('is the New York date %s', (_name, now, expected) => {
-    expect(venueToday(new Date(now))).toBe(expected);
-  });
-});
-
-describe('browseAsOf and browseWindow', () => {
-  it('cuts the time to the minute', () => {
-    expect(browseAsOf(new Date('2026-10-26T14:05:59.999Z'))).toBe(
-      '2026-10-26T14:05:00.000Z',
-    );
-  });
-
-  it('gives one string to every moment in a minute', () => {
-    expect(browseAsOf(new Date('2026-10-26T14:05:00.000Z'))).toBe(
-      browseAsOf(new Date('2026-10-26T14:05:59.999Z')),
-    );
-  });
-
+describe('browseWindow', () => {
   it('runs from the minute to a day past the horizon', () => {
     const { from, to } = browseWindow('2026-10-26T14:05:00.000Z');
     expect(from.toISOString()).toBe('2026-10-26T14:05:00.000Z');
@@ -219,27 +182,12 @@ describe('withPriceOptions', () => {
   });
 });
 
-describe('durationLabel', () => {
-  it.each([
-    [45, '45 min'],
-    [59, '59 min'],
-    [60, '1 hr'],
-    [90, '1.5 hr'],
-    [120, '2 hr'],
-    [150, '2.5 hr'],
-    [135, '2 hr 15 min'],
-    [1440, '24 hr'],
-  ])('writes %i minutes as %s', (minutes, label) => {
-    expect(durationLabel(minutes)).toBe(label);
-  });
-});
-
 describe('toBrowseCard', () => {
   it('carries the neighborhood, the duration, and the price of a bookable experience', () => {
     expect(toBrowseCard(experience(1))).toEqual({
       id: id(1),
       title: 'Thing 1',
-      meta: 'DUMBO · 2 hr',
+      meta: 'DUMBO · 2\u00a0hr',
       href: `/experiences/thing-1-${id(1)}`,
       image: null,
       kind: 'bookable',

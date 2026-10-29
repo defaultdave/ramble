@@ -1,9 +1,8 @@
 import Form from 'next/form';
 import { Alert } from '@/components/Alert';
 import { Button, ButtonLink } from '@/components/Button';
-import { Card, cardPhotoSizes } from '@/components/Card';
-import { Photo } from '@/components/Photo';
-import type { BrowseCard, BrowseView, FormTarget } from '@/lib/browse';
+import { ExperienceCardItem } from '@/components/ExperienceCard';
+import type { BrowseView, FormTarget } from '@/lib/browse';
 import { browsePath } from '@/lib/routes';
 import styles from './BrowseResults.module.css';
 
@@ -33,32 +32,6 @@ function TargetButton({ target, label, variant }: TargetButtonProps) {
 
 export type BrowseResultsProps = BrowseView;
 
-function ResultCard({ card }: { card: BrowseCard }) {
-  const image = card.image ? (
-    <Photo photo={card.image} sizes={cardPhotoSizes.vertical} />
-  ) : null;
-  return card.kind === 'guide-only' ? (
-    <Card
-      kind="guide-only"
-      headingLevel={2}
-      title={card.title}
-      meta={card.meta}
-      href={card.href}
-      hostHref={card.hostHref}
-      image={image}
-    />
-  ) : (
-    <Card
-      headingLevel={2}
-      title={card.title}
-      meta={card.meta}
-      href={card.href}
-      price={card.price}
-      image={image}
-    />
-  );
-}
-
 export function BrowseResults(props: BrowseResultsProps) {
   switch (props.state) {
     case 'results':
@@ -68,7 +41,11 @@ export function BrowseResults(props: BrowseResultsProps) {
           <ul className={styles.grid}>
             {props.cards.map((card) => (
               <li key={card.id} className={styles.item}>
-                <ResultCard card={card} />
+                <ExperienceCardItem
+                  card={card}
+                  layout="vertical"
+                  headingLevel={2}
+                />
               </li>
             ))}
           </ul>

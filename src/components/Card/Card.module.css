@@ -229,3 +229,11 @@
   font-size: var(--font-size-body-m);
   line-height: var(--font-line-height-body-m);
 }
+
+/* The card's ring is a box-shadow, which forced-colors mode drops. */
+@media (forced-colors: active) {
+  .card:has(.titleLink:focus-visible) {
+    outline: 2px solid CanvasText;
+    outline-offset: 2px;
+  }
+}

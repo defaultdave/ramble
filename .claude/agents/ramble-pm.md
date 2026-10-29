@@ -44,6 +44,7 @@ Dave works one item at a time. Give him the single next action, not a menu.
   - **Prompt:** one ready-to-paste paragraph that names the files to read, the work, what done looks like, and "don't commit".
 - Refresh the roadmap page, every session where state, dates, or decisions changed:
   - update `roadmap/status.json` in `ramble-pm` from `STATUS.md` and `DECISIONS.md`;
+  - write the daily standup (Dave, 2026-10-29): in `standups`, newest first, update today's entry or add one for a new day, keeping earlier days; each holds `done` (what landed), `today` (what is in the works, his items included) and `heldUs` (what held the work up and what it cost). The page's "Needs a decision" column reads `decisionsNeeded`, so decisions are written once;
   - regenerate the schedule with the command in `roadmap/schedule.json` there, writing to that file (its `generated` line holds the current forecast's start, progress, and scenarios; change those when reality moves, and log each refit in `delta-log.md`);
   - rebuild with `bun scripts/plan/roadmap.ts` (writes `index.html` and the README status block in `ramble-pm`);
   - sync the project board's Start date, Target date, and Sprint fields with `bun scripts/plan/board-dates.ts --run`;

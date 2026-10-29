@@ -24,6 +24,9 @@
 
 .home {
   display: inline-flex;
+  /* Padding lifts the 32px wordmark to the 44px target; the negative margin keeps the layout where it was. */
+  padding-block: calc((var(--size-touch-target) - var(--space-8)) / 2);
+  margin-block: calc((var(--size-touch-target) - var(--space-8)) / -2);
   border-radius: var(--radius-sm);
   text-decoration: none;
 }
@@ -55,7 +58,9 @@
 
 .navLink {
   display: inline-block;
-  padding: var(--space-2) 0;
+  /* Padding lifts the 20px line to the 44px target; the negative margin keeps the 36px the nav took before. */
+  padding: var(--space-3) 0;
+  margin-block: calc(var(--space-1) * -1);
   border-radius: var(--radius-sm);
   font-size: var(--font-size-label);
   line-height: var(--font-line-height-label);

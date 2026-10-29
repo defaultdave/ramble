@@ -96,7 +96,6 @@ export type FakePaymentsState = {
   balanceMinor: number;
 };
 
-// TODO(U-045b): first caller
 export function createFakePaymentsState(): FakePaymentsState {
   return {
     payments: new Map(),
@@ -194,7 +193,6 @@ function invalidState(payment: Payment): PaymentsError {
   );
 }
 
-// TODO(U-045b): first caller
 export function createFakePaymentsAdapter(
   options: FakePaymentsOptions,
 ): FakePaymentsAdapter {

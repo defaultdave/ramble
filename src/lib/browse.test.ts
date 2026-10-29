@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   BrowseDayRowsSchema,
-  browseCardIds,
   browseDays,
   browseDateHorizonDays,
   browseHeading,
@@ -17,7 +16,6 @@ import {
   nextBrowseDay,
   splitPage,
   toBrowsePage,
-  withBrowseCovers,
   type BrowsePage,
   type BrowseView,
   type BrowseRead,
@@ -33,8 +31,7 @@ import { noFilters, type BrowseFilters } from './filters';
 //   (east of UTC, west of UTC, a clock-change day), days are merged, de-duplicated, and sorted, and an unknown zone refuses the read
 // - the raw calendar rows are bounded: too many stored dates or hand-entered sessions, a bad date, or a bad zone is refused
 // - the summary line counts the cards
-// - the experiences of a page are its items, and none for an outdated page
-// - a cover is set on the cards of a results view, and any other view is returned as it is
+// - a card shows the cover its experience read carried, and no image when it carried none
 // - each results state is chosen from the page: outdated cursor, empty (filtered or not), results with or without more, later page, error
 // - a dated empty page offers the next day with sessions (other filters kept) and any day; when the window has none it offers only any day
 // - the next day is the first listed day after the chosen one: the day after, a gap, none left, today whose sessions have all started (not listed), a date before every listed day, an empty list
@@ -391,43 +388,25 @@ describe('browseView', () => {
 });
 
 describe('covers on browse results', () => {
-  const cover = {
+  const image = {
     src: 'https://store.example/a.jpg',
     width: 1600,
     height: 1000,
     alt: 'A kayak at dusk',
     blurDataUrl: 'data:image/jpeg;base64,/9j/4AAQ',
   };
-  const page: BrowsePage = {
-    ok: true,
-    items: [experience(1), experience(2)],
-    nextCursor: null,
-  };
 
-  it('lists the experiences of a page, and none for an outdated one', () => {
-    expect(browseCardIds(page)).toEqual([id(1), id(2)]);
-    expect(browseCardIds({ ok: false, reason: 'cursor_not_found' })).toEqual(
-      [],
-    );
-  });
+  it('shows the cover an experience carries, and no image for one without', () => {
+    const page: BrowsePage = {
+      ok: true,
+      items: [experience(1), { ...experience(2), image }],
+      nextCursor: null,
+    };
+    const view = browseView({ filters: noFilters, after: null }, page, []);
 
-  it('sets the cover of each card that has one', () => {
-    const view = withBrowseCovers(
-      browseView({ filters: noFilters, after: null }, page, []),
-      new Map([[id(2), cover]]),
-    );
-
-    expect(view.state === 'results' && view.cards.map((c) => c.image)).toEqual([
-      null,
-      cover,
-    ]);
-  });
-
-  it.each([
-    [{ state: 'empty', filtered: false, dated: null } as const],
-    [{ state: 'outdated', startHref: '/new-york/browse' } as const],
-  ])('returns %j as it is', (view) => {
-    expect(withBrowseCovers(view, new Map([[id(1), cover]]))).toBe(view);
+    expect(
+      view.state === 'results' && view.cards.map((card) => card.image),
+    ).toEqual([null, image]);
   });
 });
 

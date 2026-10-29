@@ -17,6 +17,15 @@ export const CardPriceOptionSchema = z.object({
   usesSpace: z.boolean(),
 }) satisfies z.ZodType<CardPriceOption>;
 
+/** The photo a card draws, as `next/image` takes it. */
+const CardImageSchema = z.object({
+  src: z.string().min(1),
+  width: z.int().positive(),
+  height: z.int().positive(),
+  alt: z.string(),
+  blurDataUrl: z.string(),
+}) satisfies z.ZodType<PhotoView>;
+
 /** The part of an experience a card shows, with nothing a guest may not see. */
 export const CardExperienceSchema = z.object({
   id: EntityIdSchema,
@@ -27,6 +36,8 @@ export const CardExperienceSchema = z.object({
   durationMinutes: z.int().positive().nullable(),
   linkOutUrl: z.string().nullable(),
   priceOptions: z.array(CardPriceOptionSchema),
+  /** The cover, for a read that joins it in; a read that does not leaves it out and the page sets it. */
+  image: CardImageSchema.nullish(),
 });
 export type CardExperience = z.infer<typeof CardExperienceSchema>;
 
@@ -82,7 +93,7 @@ export function toExperienceCard(
     title: experience.name,
     meta,
     href: experienceCardPath(experience),
-    image: null,
+    image: experience.image ?? null,
   };
   if (experience.status === 'guide_only') {
     return experience.linkOutUrl === null

@@ -11,16 +11,22 @@ import {
   type ThisWeekSession,
   type ThisWeekWindow,
 } from '@/lib/home';
+import { GuestPhotoSchema } from '@/lib/photos';
+import { photoView } from '@/lib/photoViews';
 import { guestVisible } from './catalog';
 import { dbRead } from './client';
+import { coverWith } from './photos';
 import { experiences, sessions } from './schema';
 
 /**
  * The experiences with these IDs that a guest can see, with what a card shows. An ID that is
  * missing or hidden is simply not in the answer. Guest-visible rows only, so it takes no caller.
+ * With `covers`, each row also carries its cover (`image`, null without a photo), read in the same
+ * query; without it the page sets the covers.
  */
 export async function listHomeExperiences(
   ids: readonly string[],
+  { covers }: { covers: boolean },
 ): Promise<CardExperience[]> {
   const lookedUp = HomeExperienceIdsSchema.parse(ids);
   const rows = await dbRead.query.experiences.findMany({
@@ -38,15 +44,23 @@ export async function listHomeExperiences(
       priceOptions: {
         columns: { priceMinor: true, usesSpace: true },
       },
+      ...(covers ? { photos: coverWith } : {}),
     },
     orderBy: [asc(experiences.name), asc(experiences.id)],
     limit: homeLimits.maxCardIds,
   });
   return CardExperienceSchema.array().parse(
-    rows.map(({ neighborhood, ...row }) => ({
-      ...row,
-      neighborhoodName: neighborhood.name,
-    })),
+    rows.map(({ neighborhood, photos: coverRows, ...row }) => {
+      // Without `covers` the query did not load photos, so there is no cover row to read.
+      const [cover] = covers ? coverRows : [];
+      return {
+        ...row,
+        neighborhoodName: neighborhood.name,
+        ...(covers
+          ? { image: cover ? photoView(GuestPhotoSchema.parse(cover)) : null }
+          : {}),
+      };
+    }),
   );
 }
 

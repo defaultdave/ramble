@@ -1,5 +1,6 @@
 import { browseWindowDays } from '@/lib/browse';
 import { guestVisibleStatuses } from '@/lib/catalog';
+import { homeLimits } from '@/lib/home';
 import {
   isOpenSession,
   isUpcomingSession,
@@ -85,6 +86,9 @@ export type SeedSnapshot = {
   legal: { doc: string; status: string }[];
   settings: { giftsEnabled: boolean; bookingsPaused: boolean };
 };
+
+/** How far ahead the `bookable-party` probe looks for a session with room for six. */
+const bookablePartyDays = 14;
 
 const kayak = 'sunset-kayak-on-the-hudson';
 const kidsWheel = 'kids-wheel-class';
@@ -282,10 +286,13 @@ export const probes = {
     holds:
       'At least four live experiences have a session in the next seven days (the "On this week" module).',
     check: (s) => {
-      const horizon = s.now.getTime() + 7 * msPerDay;
+      const week = upcomingWindow(minuteAsOf(s.now), homeLimits.thisWeekDays);
       const soon = new Set(
-        upcoming(s)
-          .filter((session) => session.startsAt.getTime() <= horizon)
+        s.sessions
+          .filter(
+            (session) =>
+              session.status === 'scheduled' && isOpenSession(session, week),
+          )
           .map((session) => session.experienceSlug),
       );
       return (
@@ -441,9 +448,9 @@ export const probes = {
     holds:
       'At least one session in the next 14 days has room for six, the most one guest can hold, so the booking flow and every payment state have something to book.',
     check: (s) => {
-      const horizon = s.now.getTime() + 14 * msPerDay;
+      const fortnight = upcomingWindow(minuteAsOf(s.now), bookablePartyDays);
       return upcoming(s).some(
-        (x) => spacesLeft(x) >= 6 && x.startsAt.getTime() <= horizon,
+        (x) => spacesLeft(x) >= 6 && isUpcomingSession(x, fortnight),
       );
     },
   },

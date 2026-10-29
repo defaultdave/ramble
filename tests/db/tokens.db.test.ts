@@ -383,6 +383,47 @@ describe('rotating the secret', () => {
     }
   });
 
+  it('succeeds when the full pages are exactly the batch limit, and throws on one page more', async () => {
+    const before = await loadTokens(oldSecret);
+    const first = await insertConfirmedWithLink(before);
+    const count = async () => {
+      const { rows } = await client.db.execute<{ n: number }>(
+        sql`SELECT count(*)::int AS n FROM orders WHERE manage_token_hash IS NOT NULL`,
+      );
+      return rows[0]?.n ?? 0;
+    };
+    const hashed = await count();
+    const rotated = await loadTokens('q'.repeat(40));
+
+    // Every page holds one row and is full, so hashed pages equal hashed rows.
+    await expect(
+      rotated.rehashTokens('manage', { batchSize: 1, maxBatches: hashed }),
+    ).resolves.toBe(hashed);
+    await expect(
+      rotated.resolveToken(
+        'manage',
+        rotated.capabilityToken('manage', first.row.id, 1),
+      ),
+    ).resolves.toEqual({ id: first.row.id, version: 1 });
+
+    const extra = await insertConfirmedWithLink(rotated);
+    await expect(
+      rotated.rehashTokens('manage', { batchSize: 1, maxBatches: hashed }),
+    ).rejects.toThrow('batch limit');
+    await expect(
+      rotated.rehashTokens('manage', { batchSize: 1, maxBatches: hashed + 1 }),
+    ).resolves.toBe(hashed + 1);
+    expect(extra.row.id).toBeTruthy();
+  });
+
+  it('refuses invalid limits for any kind, before the kind is looked at', async () => {
+    const tokens = await loadTokens(newSecret);
+
+    await expect(
+      tokens.rehashTokens('order' as never, { batchSize: 0 }),
+    ).rejects.toThrow(RangeError);
+  });
+
   it.each([{ batchSize: 0 }, { batchSize: 501 }, { maxBatches: 0 }])(
     'refuses the limits %j before it touches a row',
     async (options) => {

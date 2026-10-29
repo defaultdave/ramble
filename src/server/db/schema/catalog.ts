@@ -67,9 +67,6 @@ export const sessionCancelReasonEnum = pgEnum(
 
 const timestampTz = () => timestamp({ withTimezone: true });
 
-// A row the Zod schema in src/lib/catalog.ts refuses makes a whole list read throw, so a CHECK here
-// must refuse whatever that schema refuses.
-
 // The read schemas test stored links with this same pattern, so the two cannot disagree.
 const isHttpUrlOrNull = (column: AnyPgColumn) =>
   sql`${column} IS NULL OR ${column} ~ ${sql.raw(`'${httpUrlPattern}'`)}`;

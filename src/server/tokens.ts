@@ -140,14 +140,19 @@ export async function rehashTokens(
   kind: HashStoredKind,
   options: RehashOptions = {},
 ): Promise<number> {
-  if (!storesHash(kind)) return 0;
   const { batchSize, maxBatches } = rehashLimits(options);
+  if (!storesHash(kind)) return 0;
   let rewritten = 0;
   let afterId: string | null = null;
-  for (let batch = 0; batch < maxBatches; batch += 1) {
+  // The cap counts pages that returned rows; the empty read that ends the run is free, so exactly
+  // maxBatches full pages succeed and one more non-empty page is an error.
+  for (let pages = 1; ; pages += 1) {
     const page = await readManageTokenPage(afterId, batchSize);
     const last = page.at(-1);
     if (!last) return rewritten;
+    if (pages > maxBatches) {
+      throw new Error('The re-hash did not finish within its batch limit');
+    }
     const rows = page.map((row) => ({
       id: row.id,
       version: row.version,
@@ -157,5 +162,4 @@ export async function rehashTokens(
     if (page.length < batchSize) return rewritten;
     afterId = last.id;
   }
-  throw new Error('The re-hash did not finish within its batch limit');
 }

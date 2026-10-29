@@ -24,3 +24,15 @@ export function calendarDateFormat(zone: string): Intl.DateTimeFormat {
 export function isoDateOf(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
+
+const firstReadableMs = Date.UTC(1000, 0, 1);
+const endReadableMs = Date.UTC(10000, 0, 1);
+
+/**
+ * Whether `date` is a real instant in years 1000 to 9999 UTC, the range the database's `isReadableDate`
+ * CHECKs accept and a JavaScript Date reads back. An invalid Date has a NaN time and fails.
+ */
+export function isReadableInstant(date: Date): boolean {
+  const ms = date.getTime();
+  return ms >= firstReadableMs && ms < endReadableMs;
+}

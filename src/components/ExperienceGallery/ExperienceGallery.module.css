@@ -1,0 +1,173 @@
+.gallery {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* On a phone the photos run edge to edge and scroll sideways, one snapping into place at a time. */
+.strip {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+}
+
+.strip:focus-visible {
+  outline: 2px solid transparent;
+  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+}
+
+.list {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  position: relative;
+  flex: 0 0 100%;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  background: var(--color-bg-sunken);
+  scroll-snap-align: start;
+}
+
+.counter {
+  position: absolute;
+  inset-block-end: var(--space-4);
+  inset-inline-end: var(--space-4);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-inverse);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-caption);
+  line-height: var(--font-line-height-caption);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-inverse);
+}
+
+/* The space the photos take before any arrives, so the page does not move under the guest. */
+.placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  aspect-ratio: 4 / 3;
+  background: var(--color-bg-sunken);
+  font-family: var(--font-family-body);
+  color: var(--color-text-secondary);
+}
+
+.placeholderIcon {
+  width: var(--space-6);
+  height: var(--space-6);
+}
+
+.placeholderText {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  line-height: var(--font-line-height-caption);
+}
+
+.more {
+  display: none;
+}
+
+.summary {
+  display: inline-flex;
+  min-height: var(--size-touch-target);
+  align-items: center;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-label);
+  line-height: var(--font-line-height-label);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-link);
+  cursor: pointer;
+}
+
+.summary:hover {
+  text-decoration: underline;
+}
+
+.summary:focus-visible {
+  outline: 2px solid transparent;
+  box-shadow:
+    0 0 0 2px var(--color-bg-canvas),
+    0 0 0 4px var(--color-focus-ring);
+}
+
+.moreList {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-6);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.moreItem {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  aspect-ratio: 4 / 3;
+  background: var(--color-bg-sunken);
+}
+
+@media (min-width: 768px) {
+  .gallery {
+    max-inline-size: var(--size-content-max);
+    margin-inline: auto;
+    padding-inline: var(--space-6);
+  }
+
+  .strip {
+    overflow: visible;
+    scroll-snap-type: none;
+  }
+
+  /* The lead takes two thirds of the width and both rows; the next two stack beside it. */
+  .list {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    gap: var(--space-6);
+    aspect-ratio: 1200 / 440;
+  }
+
+  .list[data-layout='one'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .item {
+    aspect-ratio: auto;
+    border-radius: var(--radius-lg);
+  }
+
+  .item:first-child {
+    grid-row: 1 / span 2;
+  }
+
+  .list[data-layout='two'] .item:nth-child(2) {
+    grid-row: 1 / span 2;
+  }
+
+  .item:nth-child(n + 4) {
+    display: none;
+  }
+
+  .counter {
+    display: none;
+  }
+
+  .placeholder {
+    aspect-ratio: 1200 / 440;
+    border-radius: var(--radius-lg);
+  }
+
+  .more {
+    display: block;
+  }
+}

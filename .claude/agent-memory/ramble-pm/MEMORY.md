@@ -69,3 +69,30 @@ Full list with reasons in `DECISIONS.md`.
 - Standard-tier units that depend on a critical-tier unit cannot start until that unit is promoted to `main`.
 - Adversarial re-reviews keep finding the same class of defect (unbounded work, the database accepting what Zod rejects). Ask each round to sweep the whole class, not only the reported instance.
 - UI units get an independent Figma-vs-Storybook check (a general-purpose agent with the Figma read tools), beside the a11y audit.
+- Once a unit branch has deployed a Vercel preview, fix a migration with a new migration, never by editing it in place: the edit regenerates the journal timestamps and the preview database tries to re-apply it (U-011, PR 189).
+
+## Lessons from Prototype wave 2 (2026-10-26)
+- Agent reviews do not run the CI-only checks. gitleaks (it scans every commit in the PR, so a fix commit cannot clear a flagged test secret; use low-entropy fake values from the start), CodeQL, and `build` with no database caused four of the wave's rounds. Builders run gitleaks over the branch range and build with `DATABASE_URL` unset before reporting.
+- Run Playwright e2e through a shared lock (`lockf`) with `CI=1` when builders share a machine: the config serves on a fixed port and otherwise reuses any server already there.
+- Launch reviewers from the main checkout. `token-audit` attributes a subagent's cost to the folder the session was in when it launched, so reviewers started from a unit's worktree inflate that builder's cost.
+- Builders sometimes commit on a detached HEAD. Check `git status -sb` in the worktree before pushing, and fast-forward the unit branch if needed.
+- Parallel units that each add a migration collide on the number. The second to land merges the first and regenerates its migration.
+- Haiku narrow checks get stricter between rounds on unchanged code (B2, B6). The PM rules from the standard's text and logs the ruling, rather than sending the builder another round.
+
+## Lessons from the rolling Prototype build (wave 3, 2026-10-26 to 27)
+- Architecture audits surfaced B2 findings (domain decisions left in the data layer) one round at a time; U-012 and U-018 each took four rounds. Builder rules now say every domain decision, including a rule hidden in a write path's SQL `WHERE`, lives in a `src/lib` function with a unit test, and review rules require the full B2 list in round 1.
+- Reviewers and QA must mutate code only in their own scratch worktree (`git worktree add <path> <sha> --detach`); two checks once mutated the builder's worktree at the same time.
+- A data unit owns its tables' read and write contracts, including guest reads its first consumer needs; page units own rendering (DECISIONS 2026-10-26).
+- Builders' sandboxes refuse `gitleaks git --log-opts`; the PM reruns the range scan before every push.
+- Hand-written migration SQL (triggers, seed rows) goes in its own `db:generate --custom` migration, so renumbering after another unit's migration stays mechanical.
+
+## Lessons from the rolling Prototype build (2026-10-28)
+- A session may not edit files in another session's worktree. Fixers therefore run in their own isolated worktree on a `wip/<unit>-r<n>` branch cut from the reviewed head; the PM fast-forwards `unit/<unit>` to the final head and pushes. Merges of `main` that need no hand resolution can be built with `git merge-tree` and `git commit-tree`, with gates run in a scratch checkout.
+- Never type a full commit SHA from memory or by extending a short one; copy it from `git rev-parse` output. Twice a wrong SHA reached a workflow's arguments and the run had to be stopped.
+- After a unit passes review, merging `main` can still break it without a textual conflict (U-031 deleted a read that a newly merged seed test called). Run every gate and a focused four-check re-check on the merge commit before posting checks.
+- A fixer's scope manifest must name every item the PM directs it to change; reviewers fail anything outside the IN SCOPE line, including the PM's own additions.
+- Start PM sessions from the main checkout, not a worktree: from a worktree the PM cannot write its own memory files.
+- Launch workflows whose agents use isolated worktrees from the ramble checkout: the worktree is cut from the current directory, and a launch from the ramble-pm checkout gave the U-010 fixer a ramble-pm worktree (it stopped without changes).
+- Sync PR checks come from reviewer agents that verify the sync (head equals main, a fast-forward or a reviewed conflict resolution, every commit through a merged PR), never from verdicts the PM writes itself; auto mode refuses the latter as self-approval (2026-10-28, PR 212).
+- Audits: after each section or major feature reaches `main`, run an audit pass (architecture, code and DRY, accessibility, visual at six breakpoints against Figma, PRD-68 performance), findings only, and log every item raised anywhere in `audits/` in the ramble-pm repo with an ID and status (owner, 2026-10-28).
+- Reuse before writing is blocking rule B17 in `.claude/standards/architecture.md`; builder and review rules point at it.

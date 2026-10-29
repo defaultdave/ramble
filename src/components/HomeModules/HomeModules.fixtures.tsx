@@ -34,6 +34,7 @@ const bookable = (n: number, title: string, meta: string, price: string) =>
     title,
     meta,
     href: `/experiences/thing-${String(n)}-${id(n)}`,
+    image: null,
     kind: 'bookable',
     price,
   }) satisfies HomeCard;
@@ -44,6 +45,7 @@ const guideOnly = (n: number, title: string, meta: string) =>
     title,
     meta,
     href: `/guide/thing-${String(n)}-${id(n)}`,
+    image: null,
     kind: 'guide-only',
     hostHref: 'https://host.example/walk',
   }) satisfies HomeCard;

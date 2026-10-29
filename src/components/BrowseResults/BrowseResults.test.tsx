@@ -1,11 +1,13 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { samplePhoto } from '@/components/Photo/Photo.fixtures';
 import type { BrowseCard } from '@/lib/browse';
 import { BrowseResults } from './BrowseResults';
 
 // Behaviours under test, one per decision, branch or risk:
 // - a bookable card and a guide-only card each render as their own kind, under level 2 headings
+// - a card with a cover shows it, named by its alt text, for both kinds; a card with none keeps the empty frame
 // - the summary line and the cards are in one list
 // - Show more is a form that sends every field of the next address, and is absent on the last page
 // - the way back to the first results is there only on a later page
@@ -32,6 +34,7 @@ vi.mock('next/form', () => ({
 const cards: BrowseCard[] = [
   {
     id: '1',
+    image: null,
     kind: 'bookable',
     title: 'Hand-rolled pasta',
     meta: 'Carroll Gardens · 2.5 hr',
@@ -40,6 +43,7 @@ const cards: BrowseCard[] = [
   },
   {
     id: '2',
+    image: null,
     kind: 'guide-only',
     title: 'Sourdough mornings',
     meta: 'Park Slope',
@@ -55,6 +59,34 @@ const next = {
     ['after', 'abc'],
   ],
 } as const;
+
+describe('BrowseResults cover photos', () => {
+  const view = (covered: BrowseCard[]) =>
+    ({
+      state: 'results',
+      cards: covered,
+      summary: '2 experiences',
+      showMore: null,
+      startHref: null,
+    }) as const;
+
+  it('shows the cover of a bookable card and of a guide entry, named by its alt text', () => {
+    render(
+      <BrowseResults
+        {...view(
+          cards.map((card, index) => ({ ...card, image: samplePhoto(index) })),
+        )}
+      />,
+    );
+    expect(screen.getByRole('img', { name: 'Photo 1' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Photo 2' })).toBeInTheDocument();
+  });
+
+  it('shows no image for a card with no cover', () => {
+    render(<BrowseResults {...view(cards)} />);
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+});
 
 describe('BrowseResults results', () => {
   const results = {

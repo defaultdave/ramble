@@ -3,6 +3,7 @@ import { EntityIdSchema, SlugSchema, guestVisibleStatuses } from './catalog';
 import type { Category, Neighborhood } from './catalog';
 import type { Collection, HomeModule } from './editorial';
 import { formatPrice } from './money';
+import { withCovers, type PhotoView } from './photoViews';
 import type { RichTextDoc } from './richText/format';
 import type { GuestSettings } from './settings';
 import { spacesStatus } from './spaces';
@@ -175,6 +176,8 @@ export type HomeCard = {
   title: string;
   meta: string;
   href: string;
+  /** The experience's cover photo; null shows the card's missing-image state. */
+  image: PhotoView | null;
 } & (
   { kind: 'bookable'; price: string } | { kind: 'guide-only'; hostHref: string }
 );
@@ -197,6 +200,7 @@ export function toHomeCard(experience: HomeExperience): HomeCard | null {
     title: experience.name,
     meta,
     href: experiencePath(experience),
+    image: null,
   };
   if (experience.status === 'guide_only') {
     return experience.linkOutUrl === null
@@ -521,6 +525,36 @@ export function buildHomePage(input: HomeInput): HomePage {
     kind: 'modules',
     modules,
     needsTitle: !modules.some((view) => view.kind === 'hero_search'),
+  };
+}
+
+/** The experiences the page's cards show, each once, for one read of their cover photos. */
+export function homeCardIds(page: HomePage): string[] {
+  if (page.kind === 'empty') return [];
+  return [
+    ...new Set(
+      page.modules.flatMap((module) =>
+        module.kind === 'picks' || module.kind === 'this_week'
+          ? module.cards.map((card) => card.id)
+          : [],
+      ),
+    ),
+  ];
+}
+
+/** The page with each card's cover photo set. */
+export function withHomeCovers(
+  page: HomePage,
+  covers: ReadonlyMap<string, PhotoView>,
+): HomePage {
+  if (page.kind === 'empty') return page;
+  return {
+    ...page,
+    modules: page.modules.map((module) =>
+      module.kind === 'picks' || module.kind === 'this_week'
+        ? { ...module, cards: withCovers(module.cards, covers) }
+        : module,
+    ),
   };
 }
 

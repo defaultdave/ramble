@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { expect, userEvent, within } from 'storybook/test';
 import { HomeModules } from '@/components/HomeModules';
+import { samplePhoto } from '@/components/Photo/Photo.fixtures';
+import type { HomeModuleView } from '@/lib/home';
 import {
   categoryRail,
   fullPage,
@@ -118,5 +120,30 @@ export const ThisWeekDesktop: Story = {
 };
 export const ReassuranceMobile: Story = {
   args: { modules: [reassurance] },
+  globals: mobile,
+};
+
+// The cover is the first photo of the experience; a card with none keeps its empty frame.
+const withCovers = (module: HomeModuleView): HomeModuleView =>
+  module.kind === 'picks' || module.kind === 'this_week'
+    ? {
+        ...module,
+        cards: module.cards.map((card, index) =>
+          index === 1 ? card : { ...card, image: samplePhoto(index) },
+        ),
+      }
+    : module;
+
+export const PicksWithCoversMobile: Story = {
+  args: { modules: [withCovers(picks)] },
+  globals: mobile,
+};
+export const PicksWithCoversDesktop: Story = {
+  args: { modules: [withCovers(picks)] },
+  globals: desktop,
+  parameters: { ...meta.parameters, ...fullWidth },
+};
+export const ThisWeekWithCoversMobile: Story = {
+  args: { modules: [withCovers(thisWeek)] },
   globals: mobile,
 };

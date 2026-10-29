@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { getFakePayments } from './gateway';
+import { getFakePayments, getPaymentsPort } from './gateway';
+
+describe('getPaymentsPort', () => {
+  it('is the fake gateway until another adapter is configured', () => {
+    expect(getPaymentsPort()).toBe(getFakePayments());
+    expect(getPaymentsPort().provider).toBe('fake');
+  });
+});
 
 describe('getFakePayments', () => {
   it('is one gateway for the whole process', () => {

@@ -1,8 +1,13 @@
 import 'server-only';
 import { z } from 'zod';
-import { MaxAttemptsSchema } from '@/lib/jobs';
+import { MaxAttemptsSchema, jobLimits } from '@/lib/jobs';
+import {
+  ProcessProviderEventPayloadSchema,
+  processProviderEventKind,
+} from '@/lib/providerEvents';
 import type { Transaction } from '@/server/db/client';
 import type { Clock } from '@/server/ports/clock';
+import { handleProviderEvent } from './providerEvents';
 
 type JobContext<Payload> = {
   /** The transaction the job's own writes belong to; it rolls back if the handler throws. */
@@ -59,5 +64,10 @@ export const jobRegistry = {
     handleIdempotent: async () => {
       // Does nothing, on purpose: the tests and the demo trigger need a kind that always succeeds.
     },
+  }),
+  [processProviderEventKind]: defineJob({
+    payload: ProcessProviderEventPayloadSchema,
+    maxAttempts: jobLimits.defaultMaxAttempts,
+    handleIdempotent: (context) => handleProviderEvent(context),
   }),
 } satisfies JobRegistry;

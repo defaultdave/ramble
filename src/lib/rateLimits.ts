@@ -8,6 +8,8 @@ export const rateLimitSurfaces = [
   'forms',
   'email_webhook',
   'email_webhook_failed',
+  'payment_webhook',
+  'payment_webhook_failed',
   'mailbox_unlock_failed',
   'pulse',
   'pulse_failed',
@@ -51,6 +53,13 @@ export const rateLimitPolicies = {
   // Failed webhook verifications, per source address. Kept apart from the counter above so a flood
   // of bad requests can never refuse a real bounce or complaint.
   email_webhook_failed: {
+    limit: 20,
+    windowSeconds: 10 * 60,
+    normalizeSubject: trimmed,
+  },
+  // The same two counters for the payment provider's webhooks, kept apart from the email ones.
+  payment_webhook: { limit: 600, windowSeconds: 60, normalizeSubject: trimmed },
+  payment_webhook_failed: {
     limit: 20,
     windowSeconds: 10 * 60,
     normalizeSubject: trimmed,

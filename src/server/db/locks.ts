@@ -1,7 +1,7 @@
 import 'server-only';
 import { eq, sql } from 'drizzle-orm';
 import type { Transaction } from './client';
-import { experiences, holds, sessions } from './schema';
+import { experiences, holds, orders, sessions } from './schema';
 
 /*
  * THE LOCK ORDER (design doc 4.2.3 rule 1, architecture rule B10). Every transaction that takes
@@ -10,7 +10,7 @@ import { experiences, holds, sessions } from './schema';
  *   1. the device advisory lock   (reserve only)      lockDevice
  *   2. the session row            FOR UPDATE          lockSessionRow
  *   3. the hold row               FOR UPDATE          lockHoldRow
- *   4. the order row                                  (a later unit)
+ *   4. the order row                  FOR UPDATE          lockOrderRow
  *   5. the gift row                                   (a later unit)
  *
  * A path that starts from a hold, an order, or a provider event reads the ids it needs without a
@@ -65,6 +65,25 @@ export async function lockHoldRow(tx: Transaction, holdId: string) {
     .select()
     .from(holds)
     .where(eq(holds.id, holdId))
+    .for('update');
+  return row;
+}
+
+/**
+ * Lock 4. The order row, after its hold's. The ids a caller needs to reach the session and hold
+ * are read without a lock first; this read is the one the decision is made on. Undefined when there
+ * is no such order.
+ */
+export async function lockOrderRow(tx: Transaction, orderId: string) {
+  const [row] = await tx
+    .select({
+      id: orders.id,
+      status: orders.status,
+      holdId: orders.holdId,
+      sessionId: orders.sessionId,
+    })
+    .from(orders)
+    .where(eq(orders.id, orderId))
     .for('update');
   return row;
 }

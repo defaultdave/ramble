@@ -21,7 +21,6 @@ export const maxAmountMinor = 99_999_999;
 /** Stripe caps an Idempotency-Key at 255 characters; the fake keeps the same bound. */
 const maxKeyLength = 255;
 /** A webhook body larger than this is refused before its signature is checked. */
-// TODO(U-048): first caller
 export const maxWebhookBodyLength = 65_536;
 
 const IdempotencyKeySchema = z.string().min(1).max(maxKeyLength);

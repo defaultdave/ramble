@@ -1,6 +1,7 @@
 import 'server-only';
 import { randomBytes } from 'node:crypto';
 import { systemClock } from '@/server/ports/clock';
+import type { PaymentsPort } from '.';
 import {
   createFakePaymentsAdapter,
   createFakePaymentsState,
@@ -39,4 +40,13 @@ export function getFakePayments(): FakePaymentsAdapter {
     state,
   });
   return adapter;
+}
+
+/**
+ * The payments port the webhook route and the event job go through. A stored event of another
+ * provider than the port's is refused by the job, so the port needs no lookup by provider yet.
+ */
+// TODO(U-046): return the Stripe adapter when a Stripe key is configured.
+export function getPaymentsPort(): PaymentsPort {
+  return getFakePayments();
 }

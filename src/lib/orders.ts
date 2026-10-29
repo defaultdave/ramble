@@ -119,7 +119,6 @@ export const orderInitialStatuses = [
   'confirmed',
 ] as const satisfies readonly OrderStatus[];
 
-// TODO(U-049): first caller, confirmOrder.
 export function canOrderTransition(
   from: OrderStatus,
   to: OrderStatus,

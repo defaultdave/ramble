@@ -575,7 +575,7 @@ export type LapseCandidate = HoldTimes & {
  * already lapsed must not clear the block). `superseded`, `session_cancelled`, and
  * `sold_out_after_lapse` are not the device's lapse, and a converted hold is a booking.
  */
-export function lapsedDeadline(hold: LapseCandidate): Date | null {
+function lapsedDeadline(hold: LapseCandidate): Date | null {
   switch (hold.status) {
     case 'active':
       return hold.expiresAt;
@@ -633,7 +633,7 @@ export function blockRefusal(
 }
 
 /** What the cleanup job releases a hold as at `at`, or null when the hold is open or finished. */
-export function cleanupReason(
+function cleanupReason(
   hold: HoldTimes,
   at: Date,
 ): 'expired' | 'payment_abandoned' | null {
@@ -647,6 +647,26 @@ export function cleanupReason(
     case 'released':
       return null;
   }
+}
+
+/**
+ * The ids the cleanup job releases at `at`, split by the reason each is released with: a lapsed
+ * `active` hold as `expired`, a `paying` hold past `paying_until` as `payment_abandoned`. A hold
+ * that is open, converted, or already released is in neither list.
+ */
+export function holdsToRelease(
+  holds: readonly (HoldTimes & { id: string })[],
+  at: Date,
+): { expired: string[]; payment_abandoned: string[] } {
+  const release: { expired: string[]; payment_abandoned: string[] } = {
+    expired: [],
+    payment_abandoned: [],
+  };
+  for (const hold of holds) {
+    const reason = cleanupReason(hold, at);
+    if (reason) release[reason].push(hold.id);
+  }
+  return release;
 }
 
 /**

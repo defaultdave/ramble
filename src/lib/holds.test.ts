@@ -9,11 +9,10 @@ import {
   blockRefusal,
   blockWindowStart,
   cleanupMayContinue,
-  cleanupReason,
   deviceHashPattern,
   exceptSuperseded,
+  holdsToRelease,
   holdsToSupersede,
-  lapsedDeadline,
   requireAtMost,
   scrubCutoff,
   scrubbedHash,
@@ -733,7 +732,7 @@ describe('seatLimitRefusal', () => {
   });
 });
 
-describe('lapsedDeadline', () => {
+describe('which holds lapse, and when (through blockRefusal)', () => {
   const expiresAt = later(-10 * minuteMs);
   const payingUntil = later(-5 * minuteMs);
   const hold = (overrides = {}) => ({
@@ -799,7 +798,19 @@ describe('lapsedDeadline', () => {
       null,
     ],
   ])('%s', (_name, candidate, expected) => {
-    expect(lapsedDeadline(candidate)).toEqual(expected);
+    // Two newer lapses make the candidate the third most recent, so `until` is its deadline plus 15 minutes.
+    const newer = [1, 2].map((minutesAgo) =>
+      hold({ expiresAt: later(-minutesAgo * minuteMs) }),
+    );
+    expect(blockRefusal([candidate, ...newer], at)).toEqual(
+      expected === null
+        ? null
+        : {
+            status: 'blocked',
+            reason: 'too_many_holds',
+            until: new Date(expected.getTime() + 15 * minuteMs).toISOString(),
+          },
+    );
   });
 });
 
@@ -881,7 +892,7 @@ describe('blockWindowStart', () => {
   });
 });
 
-describe('cleanupReason', () => {
+describe('holdsToRelease', () => {
   const times = (overrides = {}) => ({
     status: 'active' as const,
     expiresAt: later(-1),
@@ -910,7 +921,33 @@ describe('cleanupReason', () => {
     ['a converted hold is left alone', times({ status: 'converted' }), null],
     ['a released hold is left alone', times({ status: 'released' }), null],
   ])('%s', (_name, hold, expected) => {
-    expect(cleanupReason(hold, at)).toBe(expected);
+    const sorted = holdsToRelease([{ id: 'h', ...hold }], at);
+    expect(sorted).toEqual({
+      expired: expected === 'expired' ? ['h'] : [],
+      payment_abandoned: expected === 'payment_abandoned' ? ['h'] : [],
+    });
+  });
+
+  it('splits a mixed set by reason and keeps every id once, in order', () => {
+    expect(
+      holdsToRelease(
+        [
+          { id: 'a', ...times() },
+          { id: 'b', ...times({ status: 'paying', payingUntil: at }) },
+          { id: 'c', ...times({ expiresAt: later(1) }) },
+          { id: 'd', ...times({ expiresAt: later(-5) }) },
+          { id: 'e', ...times({ status: 'converted' }) },
+        ],
+        at,
+      ),
+    ).toEqual({ expired: ['a', 'd'], payment_abandoned: ['b'] });
+  });
+
+  it('releases nothing from an empty set', () => {
+    expect(holdsToRelease([], at)).toEqual({
+      expired: [],
+      payment_abandoned: [],
+    });
   });
 });
 

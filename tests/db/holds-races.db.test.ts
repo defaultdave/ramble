@@ -624,6 +624,42 @@ describe('the limits under the locks', () => {
     }
   });
 
+  it('holds twelve devices on one address to six seats across twelve different sessions, in 5 rounds', async () => {
+    for (let round = 0; round < 5; round += 1) {
+      const bookable = await seedBookable(client.db);
+      const sessionIds = [bookable.session.id];
+      for (let index = 1; index < 12; index += 1) {
+        sessionIds.push(
+          (await insertSession(client.db, bookable.experience.id)).id,
+        );
+      }
+      const address = `198.51.100.${String(round + 1)}`;
+      const devices = await Promise.all(
+        sessionIds.map((_, index) =>
+          testDevice(`spread-${String(round)}-${String(index)}`, address),
+        ),
+      );
+
+      const answers = await Promise.all(
+        devices.map((device, index) =>
+          holdData.reserveSpaces(
+            device,
+            request(sessionIds[index] ?? bookable.session.id, bookable),
+          ),
+        ),
+      );
+
+      expect(answers.filter(({ status }) => status === 'held')).toHaveLength(6);
+      expect(answers.filter(({ status }) => status === 'blocked')).toHaveLength(
+        6,
+      );
+      const total = await client.db.execute(
+        sql`SELECT coalesce(sum(seats), 0)::int AS seats FROM holds WHERE ip_hash = ${devices[0]?.ipHash ?? ''} AND status = 'active'`,
+      );
+      expect((total.rows[0] as { seats: number }).seats).toBe(6);
+    }
+  });
+
   it('keeps one device to six seats across sessions when it reserves in all of them at once', async () => {
     const bookable = await seedBookable(client.db, { allocation: 20 });
     const sessionIds = [bookable.session.id];

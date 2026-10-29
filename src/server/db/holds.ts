@@ -8,13 +8,13 @@ import {
   alternativeWindow,
   blockRefusal,
   blockWindowStart,
-  cleanupReason,
   decideRelease,
   exceptSuperseded,
   giftRefusal,
   heldResult,
   holdExpiresAt,
   holdLimits,
+  holdsToRelease,
   holdsToSupersede,
   invalidFromIssues,
   openHeldSeats,
@@ -541,11 +541,10 @@ export async function releaseLapsedHolds(): Promise<number> {
         )
         .orderBy(asc(holds.id))
         .for('update');
+      const release = holdsToRelease(locked, at);
       let count = 0;
       for (const reason of ['expired', 'payment_abandoned'] as const) {
-        const ids = locked
-          .filter((hold) => cleanupReason(hold, at) === reason)
-          .map(({ id }) => id);
+        const ids = release[reason];
         if (ids.length === 0) continue;
         await tx
           .update(holds)

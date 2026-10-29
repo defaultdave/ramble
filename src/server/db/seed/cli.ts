@@ -17,8 +17,8 @@ export type SeedCommand = {
 };
 
 /**
- * The seed command: read the arguments, refuse unless the environment says this is a local,
- * staging, or load-test database, seed, then check the coverage matrix against what the database
+ * The seed command: read the arguments, refuse unless the environment says what this database is
+ * and the target allows it, seed, then check the coverage matrix against what the database
  * holds. Returns the exit code. Nothing touches the database before the refusal check.
  */
 export async function runSeedCommand(command: SeedCommand): Promise<number> {
@@ -28,7 +28,9 @@ export async function runSeedCommand(command: SeedCommand): Promise<number> {
     write(args.message);
     return 2;
   }
-  const verdict = checkSeedTarget(command.target);
+  const verdict = checkSeedTarget(command.target, {
+    scale: args.scale !== undefined,
+  });
   if (!verdict.ok) {
     write(refusalLine(verdict));
     return 1;

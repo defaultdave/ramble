@@ -1,11 +1,17 @@
 import { expect, test } from './fixtures';
-import { routes, unknownPaths, unprerenderedParamPath } from './routes';
+import {
+  experiencePaths,
+  routes,
+  unknownPaths,
+  unprerenderedParamPath,
+} from './routes';
 
 // The CDN stores a response only when it carries no cookie and does not vary on one (ADR 0001).
 const guestPaths = [
   ...routes.filter(({ group }) => group === 'guest').map(({ path }) => path),
   unknownPaths.guest,
   unprerenderedParamPath,
+  ...Object.values(experiencePaths),
 ];
 
 for (const path of guestPaths) {

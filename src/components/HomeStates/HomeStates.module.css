@@ -1,13 +1,17 @@
 .page {
   box-sizing: border-box;
+  padding: var(--space-8) var(--space-6);
+  font-family: var(--font-family-body);
+  color: var(--color-text-primary);
+}
+
+/* The gutter sits on .page and the cap on this column, so past the content width the column lines up with the header and the modules. */
+.pageInner {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   max-width: var(--size-content-max);
   margin-inline: auto;
-  padding: var(--space-8) var(--space-6);
-  font-family: var(--font-family-body);
-  color: var(--color-text-primary);
 }
 
 .title {
@@ -57,42 +61,174 @@
   flex: 1;
 }
 
-/* The loading state holds the hero and the first rows at about their final size, so nothing moves when they arrive. */
-.skeleton {
+/* The loading state repeats the hero, the category row and the first row of Picks at the sizes, gaps and gutters of the loaded page (HomeHero and HomeModules), so little moves when they arrive. */
+.band {
   box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-8);
-  max-width: var(--size-content-max);
-  margin-inline: auto;
   padding: var(--space-8) var(--space-6);
 }
 
-.hero {
+.skeletonInner {
   display: flex;
   flex-direction: column;
+  gap: var(--space-3);
+  max-width: var(--size-content-max);
+  margin-inline: auto;
+}
+
+.picksInner {
+  gap: var(--space-3);
+}
+
+.heroRow {
   gap: var(--space-4);
 }
 
+.bar {
+  display: block;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-sunken);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.eyebrowBar {
+  align-self: flex-start;
+  width: calc(var(--space-16) + var(--space-6));
+  height: var(--space-6);
+  border-radius: var(--radius-pill);
+}
+
+/* Lines of copy: each bar sits in a row as tall as a line of the real text. */
+.lines {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.lines > .bar {
+  margin-block: var(--space-2);
+}
+
+.headingLines {
+  grid-auto-rows: var(--font-line-height-display-l);
+}
+
+.headingLines > .bar:nth-child(4) {
+  display: none;
+}
+
+.headingLines > .bar:nth-child(3) {
+  width: 60%;
+}
+
+.bodyLines {
+  grid-auto-rows: var(--font-line-height-body-l);
+}
+
+.bodyLines > .bar:nth-child(3) {
+  width: 70%;
+}
+
+.railHeadingBar {
+  width: 40%;
+  height: var(--font-line-height-heading-m);
+}
+
+.picksHeadingBar {
+  width: 55%;
+  height: var(--font-line-height-heading-l);
+}
+
+.summaryBar {
+  width: 80%;
+  height: var(--font-line-height-body-m);
+}
+
+.linkBar {
+  align-self: flex-start;
+  width: calc(var(--space-16) + var(--space-8));
+  height: var(--size-touch-target);
+}
+
+.copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  container-type: inline-size;
+}
+
 .art {
+  order: -1;
   width: calc(var(--space-10) * 4);
-  height: calc(var(--space-10) * 3);
+  aspect-ratio: 4 / 3;
   border-radius: var(--radius-lg);
   background: var(--color-bg-sunken);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
+/* The hero's search: a bordered box of two label-and-field blocks and a button, stacked until the copy column is wide enough for a row. */
 .search {
-  min-height: calc(var(--space-16) * 3 + var(--space-8));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-lg);
   background: var(--color-bg-surface);
+}
+
+.searchField {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.labelBar {
+  width: 40%;
+  height: var(--font-line-height-label);
+}
+
+/* A field and the large button are the same height, a touch target plus a line of padding. */
+.controlBar,
+.submitBar {
+  min-height: calc(var(--size-touch-target) + var(--space-2));
+}
+
+.picksHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.pills {
+  display: flex;
+  gap: var(--space-2);
+  margin-inline: calc(-1 * var(--space-6));
+  padding: var(--space-1) var(--space-6);
+  overflow: hidden;
+}
+
+.pillBar {
+  flex: none;
+  width: calc(var(--space-16) * 2);
+  height: var(--size-touch-target);
+  border-radius: var(--radius-pill);
 }
 
 .cards {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
+  box-sizing: border-box;
+  width: 85%;
+  max-width: calc(var(--space-16) * 6);
+  padding-block: var(--space-1);
+}
+
+.cards > :not(:first-child) {
+  display: none;
 }
 
 .visuallyHidden {
@@ -113,35 +249,104 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .art {
+  .art,
+  .bar {
     animation: none;
   }
 }
 
 @media (min-width: 768px) {
-  .page,
-  .skeleton {
+  .page {
     padding-block: var(--space-16);
   }
 
-  .hero {
+  .band {
+    padding-block: var(--space-12);
+  }
+
+  .heroBand {
+    padding-block: var(--space-16) var(--space-12);
+  }
+
+  .skeletonInner {
+    gap: var(--space-4);
+  }
+
+  .picksInner {
+    gap: var(--space-6);
+  }
+
+  .heroRow {
     flex-direction: row;
     align-items: center;
     gap: var(--space-12);
   }
 
-  .hero > :first-child {
-    flex: 1;
+  .copy {
+    gap: var(--space-5);
+  }
+
+  .headingLines > .bar:nth-child(4) {
+    display: block;
+  }
+
+  .bodyLines > .bar:nth-child(3) {
+    display: none;
   }
 
   .art {
-    flex: none;
-    width: calc(var(--space-16) * 6 + var(--space-8));
-    height: calc(var(--space-16) * 4 + var(--space-10) + var(--space-8));
+    order: 0;
+    flex: 0 1 40%;
+    width: auto;
+    max-width: calc(var(--space-16) * 6 + var(--space-8));
+  }
+
+  .pills {
+    flex-wrap: wrap;
+    margin-inline: 0;
+    padding: 0;
   }
 
   .cards {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--space-6);
+    width: auto;
+    max-width: none;
+    padding-block: 0;
+  }
+
+  .cards > :not(:first-child) {
+    display: block;
+  }
+
+  .linkBar {
+    display: none;
+  }
+}
+
+/* With room beside the art the copy wraps onto fewer lines. */
+@media (min-width: 1024px) {
+  .headingLines > .bar:nth-child(4) {
+    display: none;
+  }
+}
+
+/* The row waits for the copy column, as the hero's does. */
+@container (min-width: 736px) {
+  .search {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+
+  .submitBar {
+    flex: none;
+    width: calc(var(--space-16) * 3 + var(--space-8));
+  }
+}
+
+@media (min-width: 1200px) {
+  .headingLines > .bar:nth-child(3),
+  .bodyLines > .bar:nth-child(2) {
+    display: none;
   }
 }

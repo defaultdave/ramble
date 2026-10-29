@@ -19,6 +19,8 @@ export const photoLimits = {
   storedEdge: 2400,
   maxStoredBytes: 5 * 1024 * 1024,
   maxPerExperience: 20,
+  /** The experiences one batch read of cover photos looks up: the most the home page can list (`homeLimits.maxCardIds`). */
+  maxCoverLookups: 240,
   maxAltLength: 300,
   maxRightsTextLength: 200,
   maxUrlLength: 2048,

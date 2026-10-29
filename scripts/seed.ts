@@ -10,6 +10,7 @@ const code = await runSeedCommand({
     vercelEnv: env.VERCEL_ENV,
     seedTarget: env.SEED_TARGET,
     databaseUrl: env.DATABASE_URL,
+    seedHost: env.SEED_HOST,
   },
   now: new Date(),
   write: (line) => {

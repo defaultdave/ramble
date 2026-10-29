@@ -57,7 +57,7 @@ export type ThisWeekContent = {
 };
 
 /**
- * The experiences with an open session in the next week. `asOf` is the minute (`homeAsOf`), so
+ * The experiences with an open session in the next week. `asOf` is the minute (`minuteAsOf`), so
  * guests inside one minute share an entry. A schedule or booking change reaches it through the
  * tag of each experience it lists; a session added to an experience that is not listed waits for
  * the `browse` profile to run out, about a minute.

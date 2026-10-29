@@ -1,11 +1,13 @@
-import { Card, type CardLayout } from '@/components/Card';
+import { Card, cardPhotoSizes, type CardLayout } from '@/components/Card';
+import { Photo } from '@/components/Photo';
 import type { HomeCard } from '@/lib/home';
 
 type HomeCardItemProps = { card: HomeCard; layout: CardLayout };
 
 export function HomeCardItem({ card, layout }: HomeCardItemProps) {
-  // TODO(U-039): the experience's cover photo.
-  const image = null;
+  const image = card.image ? (
+    <Photo photo={card.image} sizes={cardPhotoSizes[layout]} />
+  ) : null;
   return card.kind === 'guide-only' ? (
     <Card
       kind="guide-only"

@@ -5,7 +5,6 @@ import { DatePicker } from '@/components/DatePicker';
 import { dateChipLabel } from '@/lib/browse';
 import {
   activeFilterCount,
-  browsePath,
   chipState,
   hrefForFilters,
   toggleFilterValue,
@@ -13,6 +12,7 @@ import {
   type BrowseFilters,
   type FilterListKey,
 } from '@/lib/filters';
+import { browsePath } from '@/lib/routes';
 import styles from './FilterBar.module.css';
 
 export type FilterOption = { slug: string; name: string };

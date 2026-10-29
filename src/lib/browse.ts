@@ -2,46 +2,23 @@ import { z } from 'zod';
 import { EntityIdSchema, SlugSchema, guestVisibleStatuses } from './catalog';
 import {
   activeFilterCount,
-  browsePath,
   hrefForFilters,
   toQueryEntries,
+  withDate,
   type BrowseQuery,
 } from './filters';
-import { formatPrice } from './money';
+import { withCovers, type PhotoView } from './photoViews';
+import { durationLabel } from './duration';
+import { cardPriceLabel } from './pricing';
+import { browsePath, experienceCardPath } from './routes';
 import { IsoDateSchema, TimeZoneSchema, isKnownTimeZone } from './sessions';
+import { calendarDateFormat, msPerDay } from './time';
 
 /** A hard page size: the data layer reads one more row than this to learn whether there is a next page. */
 export const browsePageSize = 12;
 
 /** How far ahead a guest can pick a date. Sessions are generated a year ahead; browse looks a season out. */
 export const browseDateHorizonDays = 120;
-
-/** Every host is in New York today, and "today" on a browse page means a New York calendar date. */
-const venueTimeZone = 'America/New_York';
-
-const MS_PER_MINUTE = 60_000;
-const MS_PER_DAY = 86_400_000;
-
-const venueDate = new Intl.DateTimeFormat('en-CA', {
-  timeZone: venueTimeZone,
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
-
-/** The calendar date in New York at `now`, as YYYY-MM-DD. */
-export function venueToday(now: Date): string {
-  return venueDate.format(now);
-}
-
-/**
- * `now` cut down to the minute, as an ISO string. A cached read takes it as an argument, so two
- * guests inside the same minute share one cache entry instead of each making their own.
- */
-export function browseAsOf(now: Date): string {
-  const cut = Math.floor(now.getTime() / MS_PER_MINUTE) * MS_PER_MINUTE;
-  return new Date(cut).toISOString();
-}
 
 export type BrowseWindow = { from: Date; to: Date };
 
@@ -53,7 +30,7 @@ export function browseWindow(asOf: string): BrowseWindow {
   }
   return {
     from,
-    to: new Date(from.getTime() + (browseDateHorizonDays + 1) * MS_PER_DAY),
+    to: new Date(from.getTime() + (browseDateHorizonDays + 1) * msPerDay),
   };
 }
 
@@ -77,15 +54,6 @@ export const BrowseDayRowsSchema = z.object({
 });
 export type BrowseDayRows = z.infer<typeof BrowseDayRowsSchema>;
 
-function dayInZone(zone: string): Intl.DateTimeFormat {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: zone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-}
-
 /**
  * The calendar days a guest can pick, each once and in order. A generated session already carries its
  * date; a session entered by hand is on the day its start falls on in its own time zone. A zone that
@@ -100,7 +68,7 @@ export function browseDays(rows: BrowseDayRows): string[] {
       if (!isKnownTimeZone(timeZone)) {
         throw new RangeError('A session has a time zone that is not known');
       }
-      format = dayInZone(timeZone);
+      format = calendarDateFormat(timeZone);
       formats.set(timeZone, format);
     }
     days.add(format.format(startsAt));
@@ -110,6 +78,7 @@ export function browseDays(rows: BrowseDayRows): string[] {
 
 const BrowsePriceOptionSchema = z.object({
   priceMinor: z.int().nonnegative(),
+  usesSpace: z.boolean(),
 });
 export type BrowsePriceOption = z.infer<typeof BrowsePriceOptionSchema>;
 
@@ -126,7 +95,11 @@ export const BrowseExperienceSchema = z.object({
 });
 export type BrowseExperience = z.infer<typeof BrowseExperienceSchema>;
 
-export type PriceRow = { experienceId: string; priceMinor: number };
+export type PriceRow = {
+  experienceId: string;
+  priceMinor: number;
+  usesSpace: boolean;
+};
 
 /** Each experience with the prices that belong to it, lowest first. A price for an experience that is not listed is ignored. */
 export function withPriceOptions<T extends { id: string }>(
@@ -137,7 +110,7 @@ export function withPriceOptions<T extends { id: string }>(
     ...row,
     priceOptions: prices
       .filter((price) => price.experienceId === row.id)
-      .map(({ priceMinor }) => ({ priceMinor }))
+      .map(({ priceMinor, usesSpace }) => ({ priceMinor, usesSpace }))
       .sort((a, b) => a.priceMinor - b.priceMinor),
   }));
 }
@@ -189,52 +162,22 @@ export function toBrowsePage(
   return { ok: true, items: read.items, nextCursor: read.nextCursor };
 }
 
-/** "2 hr", "2.5 hr", "45 min", "2 hr 15 min". */
-export function durationLabel(minutes: number): string {
-  if (minutes < 60) return `${String(minutes)} min`;
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  if (rest === 0) return `${String(hours)} hr`;
-  if (rest === 30) return `${String(hours)}.5 hr`;
-  return `${String(hours)} hr ${String(rest)} min`;
-}
-
-/**
- * The per-person price a card shows: the lowest of the experience's prices. "From" only when the
- * prices differ (an adult and a child price), so a single price reads as that price.
- */
-export function priceLabel(options: readonly BrowsePriceOption[]): string {
-  if (options.length === 0) {
-    throw new RangeError('A bookable experience has at least one price option');
-  }
-  const prices = options.map((option) => option.priceMinor);
-  const lowest = Math.min(...prices);
-  const label = formatPrice(lowest);
-  return prices.some((price) => price !== lowest) ? `From ${label}` : label;
-}
-
-/** The address of an experience page (`/experiences/[slug]-[id]`) or a guide entry (`/guide/[slug]-[id]`). */
-export function experienceAddress(
-  experience: Pick<BrowseExperience, 'id' | 'slug' | 'status'>,
-): string {
-  const area = experience.status === 'guide_only' ? 'guide' : 'experiences';
-  return `/${area}/${experience.slug}-${experience.id}`;
-}
-
 export type BrowseCard = {
   id: string;
   title: string;
   meta: string;
   href: string;
+  /** The experience's cover photo; null shows the card's missing-image state. */
+  image: PhotoView | null;
 } & (
   { kind: 'bookable'; price: string } | { kind: 'guide-only'; hostHref: string }
 );
 
 /**
  * What a card says about an experience, or null when it cannot be shown as one: a bookable experience
- * with no price, or a guide entry with no link out. A card is left out, never repaired. The read
- * keeps both out already, but prices are read after the experiences, so a host who removes the last
- * price between the two reads would otherwise take the whole page down.
+ * with no price option that takes a space, or a guide entry with no link out. A card is left out, never
+ * repaired. The read keeps both out already, but prices are read after the experiences, so a host who
+ * removes the last price between the two reads would otherwise take the whole page down.
  */
 export function toBrowseCard(experience: BrowseExperience): BrowseCard | null {
   const meta = [
@@ -249,18 +192,15 @@ export function toBrowseCard(experience: BrowseExperience): BrowseCard | null {
     id: experience.id,
     title: experience.name,
     meta,
-    href: experienceAddress(experience),
+    href: experienceCardPath(experience),
+    image: null,
   };
   if (experience.status === 'guide_only') {
     if (experience.linkOutUrl === null) return null;
     return { ...base, kind: 'guide-only', hostHref: experience.linkOutUrl };
   }
-  if (experience.priceOptions.length === 0) return null;
-  return {
-    ...base,
-    kind: 'bookable',
-    price: priceLabel(experience.priceOptions),
-  };
+  const price = cardPriceLabel(experience.priceOptions);
+  return price === null ? null : { ...base, kind: 'bookable', price };
 }
 
 const chipDate = new Intl.DateTimeFormat('en-US', {
@@ -287,6 +227,29 @@ export type FormTarget = {
   fields: readonly (readonly [name: string, value: string])[];
 };
 
+/** The way forward from a chosen day with no results. */
+type DatedEmpty = {
+  /** The chosen day, as the date chip words it. */
+  dateLabel: string;
+  /** The next day with experiences for the other filters, or null when the window has none. */
+  nextDay: { label: string; href: string } | null;
+  /** The same filters with no date. */
+  anyDayHref: string;
+  /** The line under the heading: where the next experiences are, or that none are later. */
+  message: string;
+};
+
+/**
+ * The first calendar day after `date` that has sessions, from the days `browseDays` worked out for the
+ * other filters (so only days inside the browse window). Null when the window has no later day.
+ */
+export function nextBrowseDay(
+  days: readonly string[],
+  date: string,
+): string | null {
+  return days.find((day) => day > date) ?? null;
+}
+
 /** What the results area shows: the one state, with the text and addresses it needs. */
 export type BrowseView =
   | {
@@ -298,7 +261,12 @@ export type BrowseView =
       /** Set when the page is not the first, and goes back to the first results with the same filters. */
       startHref: string | null;
     }
-  | { state: 'empty'; filtered: boolean }
+  | {
+      state: 'empty';
+      filtered: boolean;
+      /** Set when the browse has a date: a way out of a day with nothing on it. */
+      dated: DatedEmpty | null;
+    }
   | { state: 'error'; retry: FormTarget }
   | { state: 'outdated'; startHref: string };
 
@@ -306,14 +274,46 @@ function targetFor(query: BrowseQuery): FormTarget {
   return { action: browsePath, fields: toQueryEntries(query) };
 }
 
-export function browseView(query: BrowseQuery, page: BrowsePage): BrowseView {
+function datedEmpty(
+  filters: BrowseQuery['filters'],
+  days: readonly string[],
+): DatedEmpty | null {
+  if (filters.date === null) return null;
+  const next = nextBrowseDay(days, filters.date);
+  return {
+    dateLabel: dateChipLabel(filters.date),
+    nextDay:
+      next === null
+        ? null
+        : {
+            label: dateChipLabel(next),
+            href: hrefForFilters(withDate(filters, next)),
+          },
+    anyDayHref: hrefForFilters(withDate(filters, null)),
+    message:
+      next === null
+        ? 'There are no experiences on later days.'
+        : `The next day with experiences is ${dateChipLabel(next)}.`,
+  };
+}
+
+/** `days` are the calendar days for the category and neighborhood filters (`browseDays`), which the empty state looks in for the next day. */
+export function browseView(
+  query: BrowseQuery,
+  page: BrowsePage,
+  days: readonly string[],
+): BrowseView {
   const { filters, after } = query;
   if (!page.ok) {
     return { state: 'outdated', startHref: hrefForFilters(filters) };
   }
   const cards = page.items.flatMap((item) => toBrowseCard(item) ?? []);
   if (cards.length === 0 && page.nextCursor === null) {
-    return { state: 'empty', filtered: activeFilterCount(filters) > 0 };
+    return {
+      state: 'empty',
+      filtered: activeFilterCount(filters) > 0,
+      dated: datedEmpty(filters, days),
+    };
   }
   return {
     state: 'results',
@@ -325,6 +325,21 @@ export function browseView(query: BrowseQuery, page: BrowsePage): BrowseView {
         : targetFor({ filters, after: page.nextCursor }),
     startHref: after === null ? null : hrefForFilters(filters),
   };
+}
+
+/** The experiences on a page of results, for one read of their cover photos. */
+export function browseCardIds(page: BrowsePage): string[] {
+  return page.ok ? page.items.map((item) => item.id) : [];
+}
+
+/** The view with each card's cover photo set; a view with no cards is returned as it is. */
+export function withBrowseCovers(
+  view: BrowseView,
+  covers: ReadonlyMap<string, PhotoView>,
+): BrowseView {
+  return view.state === 'results'
+    ? { ...view, cards: withCovers(view.cards, covers) }
+    : view;
 }
 
 /** The same address again: a retry reloads exactly what failed. */

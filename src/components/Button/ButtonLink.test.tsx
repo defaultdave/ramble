@@ -28,4 +28,36 @@ describe('ButtonLink', () => {
       expect(screen.getByRole('link').className).toMatch(new RegExp(variant));
     },
   );
+
+  it('draws an icon before its label, hidden from a screen reader', () => {
+    render(
+      <ButtonLink href="/a" iconStart={<svg data-testid="icon" />}>
+        Go
+      </ButtonLink>,
+    );
+    expect(screen.getByTestId('icon').parentElement).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
+    expect(screen.getByRole('link', { name: 'Go' })).toBeInTheDocument();
+  });
+
+  it('opens an external address in a new tab and says so', () => {
+    render(
+      <ButtonLink href="https://maps.example/?q=a" external>
+        Open in Maps
+      </ButtonLink>,
+    );
+    const link = screen.getByRole('link', { name: /Open in Maps/ });
+    expect(link).toHaveTextContent('Open in Maps (opens in a new tab)');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  it('opens an internal address in the same tab, with nothing added to its name', () => {
+    render(<ButtonLink href="/a">Go</ButtonLink>);
+    const link = screen.getByRole('link', { name: 'Go' });
+    expect(link).not.toHaveAttribute('target');
+    expect(link).not.toHaveAttribute('rel');
+  });
 });

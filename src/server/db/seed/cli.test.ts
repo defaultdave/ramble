@@ -9,6 +9,7 @@ import { seedCaller } from './caller';
 // - a bad argument stops with exit code 2 before anything else happens
 // - a refusal (production, no declared target, a remote host declared local) prints why, exits 1, and
 //   never runs the seed, reads the database, or opens a connection
+// - production-demo seeds the curated set against production and refuses --scale before anything runs
 // - a good run seeds with the clock and scale it was given, checks coverage, prints the result, exits 0
 // - a coverage gap exits 1 and names the probe; a scale run holds the scale probe to account
 // - a failure prints only a safe message, exits 1, and still closes the pool
@@ -31,6 +32,7 @@ const command = (overrides: Partial<SeedCommand> = {}): SeedCommand => ({
     vercelEnv: undefined,
     seedTarget: 'local',
     databaseUrl: 'postgres://ramble:ramble@localhost:5432/ramble',
+    seedHost: undefined,
   },
   now,
   write: (line) => lines.push(line),
@@ -95,6 +97,38 @@ describe('runSeedCommand', () => {
     expect(runSeed).not.toHaveBeenCalled();
     expect(readSeedSnapshot).not.toHaveBeenCalled();
     expect(end).not.toHaveBeenCalled();
+  });
+
+  describe('production-demo', () => {
+    const demo = () => ({
+      ...command().target,
+      vercelEnv: 'production',
+      seedTarget: 'production-demo' as const,
+      databaseUrl:
+        'postgres://u:secret@ep-quiet.us-east-2.aws.neon.tech/neondb',
+      seedHost: 'ep-quiet.us-east-2.aws.neon.tech',
+    });
+
+    it('seeds the curated set against production', async () => {
+      expect(await run({ target: demo() })).toBe(0);
+      expect(lines.join('\n')).toContain(
+        'Seeding the production-demo database',
+      );
+      expect(runSeed).toHaveBeenCalledWith(
+        expect.objectContaining({ scale: undefined }),
+      );
+    });
+
+    it('refuses --scale before touching anything', async () => {
+      expect(await run({ target: demo(), argv: ['--scale=5'] })).toBe(1);
+      const output = lines.join('\n');
+      expect(output).toContain('Refusing to seed: ');
+      expect(output).toContain('--scale');
+      expect(output).not.toContain('secret');
+      expect(runSeed).not.toHaveBeenCalled();
+      expect(readSeedSnapshot).not.toHaveBeenCalled();
+      expect(end).not.toHaveBeenCalled();
+    });
   });
 
   it('seeds with the clock given, checks coverage, and exits 0', async () => {

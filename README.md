@@ -111,7 +111,7 @@ scripts/plan/  Bun scripts that compute the plan from units.yaml
 Needs Node 24 (`.nvmrc`) and pnpm 10. Node 25 no longer bundles Corepack, so install it once with `npm install -g corepack` and then run `corepack enable`; it reads the pinned version from `packageManager` in `package.json`.
 
 ```
-pnpm install
+pnpm install                 # also runs `next typegen`, so route and cache-profile types exist from the first open
 docker compose up -d --wait  # local Postgres 17
 cp .env.example .env.local   # APP_URL has a default; the two database URLs do not
 pnpm db:migrate

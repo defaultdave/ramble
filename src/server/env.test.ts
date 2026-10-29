@@ -130,13 +130,16 @@ describe('environment', () => {
   });
 
   describe('SEED_TARGET', () => {
-    it.each(['local', 'staging', 'load-test'])('accepts %s', async (value) => {
-      vi.stubEnv('SEED_TARGET', value);
+    it.each(['local', 'staging', 'load-test', 'production-demo'])(
+      'accepts %s',
+      async (value) => {
+        vi.stubEnv('SEED_TARGET', value);
 
-      const env = await loadEnv();
+        const env = await loadEnv();
 
-      expect(env.SEED_TARGET).toBe(value);
-    });
+        expect(env.SEED_TARGET).toBe(value);
+      },
+    );
 
     it.each([undefined, ''])('reads %j as not declared', async (value) => {
       vi.stubEnv('SEED_TARGET', value);
@@ -146,14 +149,54 @@ describe('environment', () => {
       expect(env.SEED_TARGET).toBeUndefined();
     });
 
-    it.each(['production', 'prod', 'Local'])(
-      'fails at import for %s, since there is no target for production',
+    it.each(['production', 'prod', 'Local', 'production_demo'])(
+      'fails at import for %s, which is not a target',
       async (value) => {
         vi.stubEnv('SEED_TARGET', value);
 
         await expect(loadEnv()).rejects.toThrow(/SEED_TARGET/);
       },
     );
+  });
+
+  describe('SEED_HOST', () => {
+    it('accepts a hostname', async () => {
+      vi.stubEnv('SEED_HOST', 'ep-quiet-cell-123.us-east-2.aws.neon.tech');
+
+      const env = await loadEnv();
+
+      expect(env.SEED_HOST).toBe('ep-quiet-cell-123.us-east-2.aws.neon.tech');
+    });
+
+    it.each([undefined, ''])('reads %j as not set', async (value) => {
+      vi.stubEnv('SEED_HOST', value);
+
+      const env = await loadEnv();
+
+      expect(env.SEED_HOST).toBeUndefined();
+    });
+
+    it.each([
+      ['a URL', 'postgres://u:p@host.neon.tech/db'],
+      ['a space', 'host .neon.tech'],
+      ['a host longer than 253 characters', 'a'.repeat(254)],
+    ])('fails at import for %s', async (_name, value) => {
+      vi.stubEnv('SEED_HOST', value);
+
+      await expect(loadEnv()).rejects.toThrow(/SEED_HOST/);
+    });
+  });
+
+  it('reports only the length issue for an over-long SEED_HOST that also has a bad character', async () => {
+    vi.stubEnv('SEED_HOST', `${'a'.repeat(253)} b`);
+
+    const error = await loadEnv().then(
+      () => new Error('loaded'),
+      (caught: unknown) => (caught instanceof Error ? caught : new Error('?')),
+    );
+
+    expect(error.message.split('✖')).toHaveLength(2);
+    expect(error.message).not.toContain('not a hostname');
   });
 
   describe('database URLs', () => {
@@ -494,6 +537,39 @@ describe('environment', () => {
       await expect(loadEnv()).rejects.toThrow(
         new RegExp(`Invalid environment variables[\\s\\S]*${missing}`),
       );
+    });
+
+    it.each([
+      ['no tokens', undefined, undefined],
+      ['no private token', publicToken, undefined],
+      [
+        'a public token without a store id',
+        'test-public-token',
+        'test-private',
+      ],
+    ])(
+      'refuses vercel-blob in a production deployment with %s',
+      async (_case, publicValue, privateValue) => {
+        vi.stubEnv('VERCEL_ENV', 'production');
+        vi.stubEnv('STORAGE_PROVIDER', 'vercel-blob');
+        vi.stubEnv('BLOB_PUBLIC_READ_WRITE_TOKEN', publicValue);
+        vi.stubEnv('BLOB_PRIVATE_READ_WRITE_TOKEN', privateValue);
+
+        await expect(loadEnv()).rejects.toThrow(
+          /Invalid environment variables[\s\S]*BLOB_(PUBLIC|PRIVATE)_READ_WRITE_TOKEN/,
+        );
+      },
+    );
+
+    it('accepts vercel-blob with both tokens in a production deployment', async () => {
+      vi.stubEnv('VERCEL_ENV', 'production');
+      vi.stubEnv('STORAGE_PROVIDER', 'vercel-blob');
+      vi.stubEnv('BLOB_PUBLIC_READ_WRITE_TOKEN', publicToken);
+      vi.stubEnv('BLOB_PRIVATE_READ_WRITE_TOKEN', 'test-private-token');
+
+      const env = await loadEnv();
+
+      expect(env.STORAGE_PROVIDER).toBe('vercel-blob');
     });
 
     it('accepts vercel-blob with both tokens', async () => {

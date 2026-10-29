@@ -13,6 +13,7 @@
     }
   },
   "scripts": {
+    "postinstall": "next typegen || echo 'next typegen failed; lint and typecheck run it again'",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

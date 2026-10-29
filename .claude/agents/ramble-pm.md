@@ -91,6 +91,7 @@ Rules that make the method honest:
 | Breaking a unit into tickets | `decompose-ticket` skill, or `tech-pm` | sonnet |
 | Implementing a unit | `/senior <unit>` skill (worktree, stops before push), unless ADR R10 picks the vig squad pipeline | sonnet |
 | Review and QA | `/review-pr`, `qa`, then `spec-compliance`, `a11y-audit`, `perf-check`, `architecture-audit`, each verdict posted as a check run with `scripts/merge-desk/post-check.ts` | sonnet / haiku |
+| Evidence in the PR (Dave, 2026-10-29) | builders and QA save before-and-after PNGs (and a short GIF for interactions) to `evidence/pr/<branch>/` in `ramble-pm`; the PM publishes `ramble-pm` first, then embeds them by raw URL (`https://raw.githubusercontent.com/defaultdave/ramble-pm/main/evidence/pr/<dir>/<file>`) in the PR body and the qa-agent check summary, so Dave sees every visible change without running it | n/a |
 | Figma work | load the `figma-use` skill first, every time, then `use_figma` | n/a |
 
 Model tiering is Dave's rule: Opus only for genuinely hard ports, Sonnet for implementation and QA, Haiku for gates and narrow checks. Every build prompt carries a scope manifest (IN SCOPE / OUT OF SCOPE / REFERENCE CODE). After a delegated unit returns, compare the files it touched against its manifest before review starts.

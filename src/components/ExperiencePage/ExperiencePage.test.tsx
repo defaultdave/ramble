@@ -13,6 +13,7 @@ import {
 // - the title is the page's one h1, with the breadcrumb ending at it and the badges and prices under it
 // - the key facts, the about text, the included rows, the host, and each terms section are there under their own headings
 // - the meeting point is text with an "Open in Maps" link that opens in a new tab and says so
+// - the Book link goes to the checkout with the experience
 // - the gift entry goes to the gift checkout, and is absent when gifts are off; the private-session entry is always there and goes to contact
 // - a section with nothing to say is left out whole, and the cancellation terms always stay
 // - two prices name who each is for
@@ -55,7 +56,7 @@ describe('ExperiencePage', () => {
         .map((item) => item.textContent),
     ).toEqual([
       'Tribeca',
-      '2 hr',
+      '2\u00a0hr',
       'Ages 14 and up',
       'Weather call 3 hours before start',
       'Free cancellation up to 24 hours before',
@@ -111,6 +112,14 @@ describe('ExperiencePage', () => {
     expect(
       screen.queryByRole('link', { name: /Open in Maps/ }),
     ).not.toBeInTheDocument();
+  });
+
+  it('has a Book link to the checkout with the experience', () => {
+    render(<ExperiencePage view={sunsetKayak} />);
+    expect(screen.getByRole('link', { name: 'Book' })).toHaveAttribute(
+      'href',
+      sunsetKayak.bookHref,
+    );
   });
 
   it('goes to the gift checkout and to contact for a private session', () => {

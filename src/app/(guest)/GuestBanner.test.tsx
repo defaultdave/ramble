@@ -5,8 +5,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GuestBanner } from './GuestBanner';
 
 // Behaviours under test, one per decision, branch or risk:
-// - a failed read renders nothing and logs only the digest, never the message, query, or values
+// - a failed read renders nothing and logs only the digest and kind, never the message, query, or values
 // - a framework control-flow error is rethrown and not logged
+// - a failed read without a digest logs its kind alone
 // - blank or missing banner text renders nothing
 // - set banner text renders the text as the site notice
 
@@ -24,7 +25,7 @@ beforeEach(() => {
 });
 
 describe('GuestBanner', () => {
-  it('renders nothing for a failed read and logs only its digest', async () => {
+  it('renders nothing for a failed read and logs only its digest and kind', async () => {
     server.settings.mockRejectedValue(
       Object.assign(
         new Error('Failed query: select ... params: secret-value'),
@@ -37,10 +38,22 @@ describe('GuestBanner', () => {
     expect(container).toBeEmptyDOMElement();
     expect(server.logError).toHaveBeenCalledExactlyOnceWith(
       'The site banner could not be read',
-      { digest: '7654321' },
+      { digest: '7654321', kind: 'Error' },
     );
     expect(JSON.stringify(server.logError.mock.calls)).not.toMatch(
       /secret|Failed query/,
+    );
+  });
+
+  it('logs the kind alone for a failed read that carries no digest', async () => {
+    server.settings.mockRejectedValue(new RangeError('secret-value'));
+
+    const { container } = render(await GuestBanner());
+
+    expect(container).toBeEmptyDOMElement();
+    expect(server.logError).toHaveBeenCalledExactlyOnceWith(
+      'The site banner could not be read',
+      { digest: undefined, kind: 'RangeError' },
     );
   });
 

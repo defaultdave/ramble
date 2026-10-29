@@ -1,10 +1,6 @@
 import type { ReactNode } from 'react';
-import {
-  docOfText,
-  homeCopy,
-  type HomeCard,
-  type HomeModuleView,
-} from '@/lib/home';
+import type { ExperienceCard } from '@/lib/experienceCards';
+import { docOfText, homeCopy, type HomeModuleView } from '@/lib/home';
 import type { RichTextDoc } from '@/lib/richText/format';
 import styles from './HomeModules.stories.module.css';
 
@@ -37,7 +33,7 @@ const bookable = (n: number, title: string, meta: string, price: string) =>
     image: null,
     kind: 'bookable',
     price,
-  }) satisfies HomeCard;
+  }) satisfies ExperienceCard;
 
 const guideOnly = (n: number, title: string, meta: string) =>
   ({
@@ -48,29 +44,34 @@ const guideOnly = (n: number, title: string, meta: string) =>
     image: null,
     kind: 'guide-only',
     hostHref: 'https://host.example/walk',
-  }) satisfies HomeCard;
+  }) satisfies ExperienceCard;
 
-const pickCards: HomeCard[] = [
+const pickCards: ExperienceCard[] = [
   bookable(
     1,
     'Hand-rolled pasta in a Carroll Gardens kitchen',
-    'Carroll Gardens · 2.5 hr',
+    'Carroll Gardens · 2.5\u00a0hr',
     'From $85',
   ),
   bookable(
     2,
     'Wheel-throwing for first-timers',
-    'Greenpoint · 2 hr',
+    'Greenpoint · 2\u00a0hr',
     'From $70',
   ),
-  guideOnly(3, 'A harbor walk with a historian', 'Red Hook · 2 hr'),
+  guideOnly(3, 'A harbor walk with a historian', 'Red Hook · 2\u00a0hr'),
 ];
 
-const weekCards: HomeCard[] = [
-  bookable(4, 'Sunset kayak on the Hudson', 'Pier 26 · 2 hr', 'From $65'),
-  bookable(5, 'Natural wine, explained', 'Williamsburg · 1.5 hr', 'From $48'),
-  bookable(6, 'Sourdough for beginners', 'Park Slope · 3 hr', 'From $75'),
-  bookable(7, 'Pottery and pints', 'Bushwick · 2 hr', '$60'),
+const weekCards: ExperienceCard[] = [
+  bookable(4, 'Sunset kayak on the Hudson', 'Pier 26 · 2\u00a0hr', 'From $65'),
+  bookable(
+    5,
+    'Natural wine, explained',
+    'Williamsburg · 1.5\u00a0hr',
+    'From $48',
+  ),
+  bookable(6, 'Sourdough for beginners', 'Park Slope · 3\u00a0hr', 'From $75'),
+  bookable(7, 'Pottery and pints', 'Bushwick · 2\u00a0hr', '$60'),
 ];
 
 export const hero: HomeModuleView = {

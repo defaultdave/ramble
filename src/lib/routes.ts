@@ -73,6 +73,11 @@ export const neighborhoodPath = (slug: string) =>
 export const giftCheckoutPath = (experienceId: string) =>
   `/gifts/checkout/${experienceId}`;
 
+// ---- Checkout and orders ----
+
+export const checkoutPath = (holdId: string) => `/checkout/${holdId}`;
+export const orderPath = (reference: string) => `/orders/${reference}`;
+
 // ---- Help and legal ----
 
 export const contactPath = '/contact';

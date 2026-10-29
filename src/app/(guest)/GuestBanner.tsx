@@ -1,9 +1,7 @@
-import { unstable_rethrow } from 'next/navigation';
 import { connection } from 'next/server';
 import { SiteBanner } from '@/components/GuestShell';
-import { errorDigest } from '@/lib/errorDigest';
 import { bannerText } from '@/lib/home';
-import { logger } from '@/server/monitoring/logger';
+import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
 import { getCachedGuestSettings } from '@/server/siteSettings';
 
 /**
@@ -18,10 +16,7 @@ export async function GuestBanner() {
   try {
     text = bannerText(await getCachedGuestSettings());
   } catch (error) {
-    unstable_rethrow(error);
-    logger.error('The site banner could not be read', {
-      digest: errorDigest(error),
-    });
+    rethrowOrLog('The site banner could not be read', error);
     return null;
   }
   return text === null ? null : <SiteBanner text={text} />;

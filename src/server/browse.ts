@@ -1,38 +1,17 @@
 import 'server-only';
 import { cacheLife, cacheTag } from 'next/cache';
-import { unstable_rethrow } from 'next/navigation';
 import { browseDays, toBrowsePage, type BrowsePage } from '@/lib/browse';
 import { tags } from '@/lib/cacheTags';
 import type { Category, Neighborhood } from '@/lib/catalog';
 import type { BrowseFilters, BrowseQuery } from '@/lib/filters';
+import { readOrRefuse } from '@/server/cache/readOrRefuse';
 import { listBrowseDayRows, listBrowseExperiences } from '@/server/db/browse';
 import { listCategories, listNeighborhoods } from '@/server/db/catalog';
-
-/**
- * What leaves a failed read. A database error carries the query and its values, and Next.js logs
- * whatever a cached function throws, so the cause stays inside and only its kind comes out.
- */
-class BrowseReadError extends Error {
-  constructor(kind: string) {
-    super(`Browse read failed: ${kind}`);
-    this.name = 'BrowseReadError';
-  }
-}
-
-async function readOrRefuse<T>(read: () => Promise<T>): Promise<T> {
-  try {
-    return await read();
-  } catch (error) {
-    // Next.js ends a prerender by throwing; swallowing that breaks the render.
-    unstable_rethrow(error);
-    throw new BrowseReadError(error instanceof Error ? error.name : 'unknown');
-  }
-}
 
 // A schedule change reaches an entry here only through the experiences it lists. A session added to
 // an experience that is not on the page waits for the browse profile to run out (about a minute).
 
-/** One page of results for one filter combination. `asOf` is the minute (`browseAsOf`), so a minute shares one entry. */
+/** One page of results for one filter combination. `asOf` is the minute (`minuteAsOf`), so a minute shares one entry. */
 export async function getBrowseResults(
   query: BrowseQuery,
   asOf: string,
@@ -40,7 +19,9 @@ export async function getBrowseResults(
   'use cache';
   cacheLife('browse');
   cacheTag(tags.catalog);
-  const read = await readOrRefuse(() => listBrowseExperiences(query, asOf));
+  const read = await readOrRefuse('Browse', () =>
+    listBrowseExperiences(query, asOf),
+  );
   const page = toBrowsePage(query.after, read);
   if (page.ok) {
     for (const experience of page.items)
@@ -57,7 +38,7 @@ export async function getBrowseDates(
   'use cache';
   cacheLife('browse');
   cacheTag(tags.catalog);
-  return readOrRefuse(async () =>
+  return readOrRefuse('Browse dates', async () =>
     browseDays(await listBrowseDayRows(filters, asOf)),
   );
 }
@@ -70,7 +51,7 @@ export async function getFilterOptions(): Promise<{
   'use cache';
   cacheLife('catalog');
   cacheTag(tags.catalog);
-  const [categories, neighborhoods] = await readOrRefuse(() =>
+  const [categories, neighborhoods] = await readOrRefuse('Filter options', () =>
     Promise.all([listCategories(), listNeighborhoods()]),
   );
   return { categories, neighborhoods };

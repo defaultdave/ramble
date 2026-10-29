@@ -1,16 +1,17 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { BrowseResults } from '@/components/BrowseResults';
 import { samplePhoto } from '@/components/Photo/Photo.fixtures';
-import type { BrowseCard, BrowseView } from '@/lib/browse';
+import type { BrowseView } from '@/lib/browse';
+import type { ExperienceCard } from '@/lib/experienceCards';
 import styles from './BrowseResults.stories.module.css';
 
-const cards: BrowseCard[] = [
+const cards: ExperienceCard[] = [
   {
     id: '1',
     image: null,
     kind: 'bookable',
     title: 'Hand-rolled pasta in a Carroll Gardens kitchen',
-    meta: 'Carroll Gardens · 2.5 hr',
+    meta: 'Carroll Gardens · 2.5\u00a0hr',
     href: '/experiences/pasta-1',
     price: 'From $60',
   },
@@ -19,7 +20,7 @@ const cards: BrowseCard[] = [
     image: null,
     kind: 'bookable',
     title: 'Dumpling folding with a Sunset Park chef',
-    meta: 'Sunset Park · 2 hr',
+    meta: 'Sunset Park · 2\u00a0hr',
     href: '/experiences/dumplings-2',
     price: '$60',
   },
@@ -37,7 +38,7 @@ const cards: BrowseCard[] = [
     image: null,
     kind: 'bookable',
     title: 'Fresh mozzarella, stretched by hand',
-    meta: 'Bensonhurst · 1.5 hr',
+    meta: 'Bensonhurst · 1.5\u00a0hr',
     href: '/experiences/mozzarella-4',
     price: '$55',
   },
@@ -46,7 +47,7 @@ const cards: BrowseCard[] = [
     image: null,
     kind: 'bookable',
     title: 'Knife skills for home cooks',
-    meta: 'Gowanus · 2 hr',
+    meta: 'Gowanus · 2\u00a0hr',
     href: '/experiences/knives-5',
     price: '$75',
   },
@@ -55,7 +56,7 @@ const cards: BrowseCard[] = [
     image: null,
     kind: 'bookable',
     title: 'Bao from scratch',
-    meta: 'Sunset Park · 2.5 hr',
+    meta: 'Sunset Park · 2.5\u00a0hr',
     href: '/experiences/bao-6',
     price: '$70',
   },

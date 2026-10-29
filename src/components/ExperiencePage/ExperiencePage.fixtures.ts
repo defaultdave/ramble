@@ -9,11 +9,11 @@ export const sunsetKayak: ExperiencePageView = {
     { label: 'Outdoors', href: '/new-york/things-to-do/outdoors' },
   ],
   badges: [{ tone: 'green', label: 'Outdoor', icon: 'outdoor' }],
-  summary: 'Tribeca · 2 hr · Ages 14 and up',
+  summary: 'Tribeca · 2\u00a0hr · Ages 14 and up',
   prices: [{ amount: '$65', unit: 'per person' }],
   keyFacts: [
     { icon: 'place', text: 'Tribeca' },
-    { icon: 'duration', text: '2 hr' },
+    { icon: 'duration', text: '2\u00a0hr' },
     { icon: 'age', text: 'Ages 14 and up' },
     { icon: 'weather', text: 'Weather call 3 hours before start' },
     { icon: 'cancellation', text: 'Free cancellation up to 24 hours before' },
@@ -46,6 +46,8 @@ export const sunsetKayak: ExperiencePageView = {
   cancellation:
     'Free cancellation up to 24 hours before start. After that, no refund. If the host or the weather cancels, you get everything back.',
   giftHref: '/gifts/checkout/00000000-0000-4000-8000-000000000001',
+  bookHref:
+    '/checkout/00000000-0000-4000-8000-0000000000d1?experience=00000000-0000-4000-8000-000000000001',
   privateSessionHref: '/contact',
 };
 
@@ -57,14 +59,14 @@ export const kidsClass: ExperiencePageView = {
     { label: 'Kids', href: '/new-york/things-to-do/kids' },
   ],
   badges: [{ tone: 'yellow', label: 'Kids' }],
-  summary: 'Williamsburg · 1.5 hr · Ages 5 to 10',
+  summary: 'Williamsburg · 1.5\u00a0hr · Ages 5 to 10',
   prices: [
     { amount: 'Free', unit: 'per adult' },
     { amount: '$45', unit: 'per child' },
   ],
   keyFacts: [
     { icon: 'place', text: 'Williamsburg' },
-    { icon: 'duration', text: '1.5 hr' },
+    { icon: 'duration', text: '1.5\u00a0hr' },
     { icon: 'age', text: 'Ages 5 to 10' },
     { icon: 'cancellation', text: 'Free cancellation up to 48 hours before' },
   ],
@@ -84,6 +86,8 @@ export const kidsClass: ExperiencePageView = {
   cancellation:
     'Free cancellation up to 2 days before start. After that, no refund. If the host or the weather cancels, you get everything back.',
   giftHref: null,
+  bookHref:
+    '/checkout/00000000-0000-4000-8000-0000000000d1?experience=00000000-0000-4000-8000-000000000001',
   privateSessionHref: '/contact',
 };
 
@@ -112,5 +116,7 @@ export const bareExperience: ExperiencePageView = {
   cancellation:
     'Free cancellation up to 24 hours before start. After that, no refund. If the host or the weather cancels, you get everything back.',
   giftHref: null,
+  bookHref:
+    '/checkout/00000000-0000-4000-8000-0000000000d1?experience=00000000-0000-4000-8000-000000000001',
   privateSessionHref: '/contact',
 };

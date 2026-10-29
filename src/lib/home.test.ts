@@ -1,14 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { ZodError } from 'zod';
-import { toBrowseCard } from './browse';
 import type { Collection, HomeModule } from './editorial';
+import type { CardExperience } from './experienceCards';
 import {
   buildHomePage,
   bannerText,
-  cardsInOrder,
   docOfText,
-  durationLabel,
-  homeAsOf,
   homeCopy,
   homeCardIds,
   homeExperienceIds,
@@ -16,25 +13,16 @@ import {
   homeLimits,
   thisWeekExperienceIds,
   thisWeekWindow,
-  toHomeCard,
-  venueToday,
   withHomeCovers,
-  type HomeExperience,
   type HomeInput,
   type HomeModuleView,
   type ThisWeekSession,
 } from './home';
+import { minuteAsOf } from './time';
 
 // Behaviours under test, one per decision, branch or risk:
-// - the venue day is the New York calendar day, on both sides of its midnight and across the clock change
-// - the cache key is the minute; the week window runs a week from it; a key that is not the ISO instant homeAsOf writes is refused
+// - the cache key is the minute; the week window runs a week from it; a key that is not the ISO instant minuteAsOf writes is refused
 // - the browse address writes only the parameters that are set, escaped, in the grammar order
-// - an experience address names the area by its status
-// - a duration reads as minutes, hours, or half hours, and falls back to hours and minutes
-// - a card price comes only from options that take a space, so a kids class with a free accompanying adult reads the child price
-// - one experience gets the same price on a home card and a browse card
-// - a card is left out when it cannot be shown: no price to book, or no link out
-// - cards follow the order given, skip what is missing, and stop at the limit
 // - "On this week" lists bookable experiences with an open session in the window, soonest first, once each
 //   (a started, late, full, or guide-only session does not count; the edges of the window are exact)
 // - the experiences a Picks module may show are looked up once, bounded per collection and in all
@@ -50,8 +38,8 @@ const id = (n: number) =>
 
 function experience(
   n: number,
-  overrides: Partial<HomeExperience> = {},
-): HomeExperience {
+  overrides: Partial<CardExperience> = {},
+): CardExperience {
   return {
     id: id(n),
     slug: `thing-${String(n)}`,
@@ -60,7 +48,7 @@ function experience(
     neighborhoodName: 'Greenpoint',
     durationMinutes: 120,
     linkOutUrl: null,
-    priceOptions: [{ kind: 'adult', priceMinor: 7000, usesSpace: true }],
+    priceOptions: [{ priceMinor: 7000, usesSpace: true }],
     ...overrides,
   };
 }
@@ -84,33 +72,7 @@ function session(
 
 const window = thisWeekWindow(date.toISOString());
 
-describe('venueToday', () => {
-  it.each([
-    ['just before New York midnight', '2026-11-03T04:59:00.000Z', '2026-11-02'],
-    [
-      'at UTC midnight, still the evening before in New York',
-      '2026-11-03T00:00:00.000Z',
-      '2026-11-02',
-    ],
-    ['just after New York midnight', '2026-11-03T05:00:00.000Z', '2026-11-03'],
-    ['in summer time', '2026-07-01T03:59:00.000Z', '2026-06-30'],
-    [
-      'on the night the clocks go back',
-      '2026-11-01T05:30:00.000Z',
-      '2026-11-01',
-    ],
-  ])('%s', (_name, instant, expected) => {
-    expect(venueToday(new Date(instant))).toBe(expected);
-  });
-});
-
-describe('homeAsOf and thisWeekWindow', () => {
-  it('cuts the time to the minute', () => {
-    expect(homeAsOf(new Date('2026-11-02T15:00:59.999Z'))).toBe(
-      '2026-11-02T15:00:00.000Z',
-    );
-  });
-
+describe('thisWeekWindow', () => {
   it('runs the window from the key to seven days later', () => {
     expect(window.from.toISOString()).toBe('2026-11-02T15:00:00.000Z');
     expect(window.to.toISOString()).toBe('2026-11-09T15:00:00.000Z');
@@ -126,9 +88,9 @@ describe('homeAsOf and thisWeekWindow', () => {
     expect(() => thisWeekWindow(key)).toThrow(ZodError);
   });
 
-  it('accepts the key homeAsOf writes', () => {
+  it('accepts the key minuteAsOf writes', () => {
     expect(() =>
-      thisWeekWindow(homeAsOf(new Date('2026-11-02T15:00:59.999Z'))),
+      thisWeekWindow(minuteAsOf(new Date('2026-11-02T15:00:59.999Z'))),
     ).not.toThrow();
   });
 });
@@ -156,171 +118,6 @@ describe('homeLimits', () => {
     expect(homeLimits.thisWeekCandidates).toBeGreaterThan(
       homeLimits.thisWeekShown,
     );
-  });
-});
-
-describe('durationLabel', () => {
-  it.each([
-    [45, '45 min'],
-    [59, '59 min'],
-    [60, '1 hr'],
-    [120, '2 hr'],
-    [150, '2.5 hr'],
-    [135, '2 hr 15 min'],
-  ])('%i minutes reads %s', (minutes, label) => {
-    expect(durationLabel(minutes)).toBe(label);
-  });
-});
-
-describe('toHomeCard', () => {
-  it('shows a bookable experience with its neighborhood, length, and price', () => {
-    expect(toHomeCard(experience(1))).toEqual({
-      id: id(1),
-      title: 'Thing 1',
-      meta: 'Greenpoint · 2 hr',
-      href: `/experiences/thing-1-${id(1)}`,
-      image: null,
-      kind: 'bookable',
-      price: '$70',
-    });
-  });
-
-  it('prices a kids class from the child, not from the free accompanying adult', () => {
-    const kidsClass = experience(1, {
-      priceOptions: [
-        { kind: 'adult', priceMinor: 0, usesSpace: false },
-        { kind: 'child', priceMinor: 4500, usesSpace: true },
-      ],
-    });
-    expect(toHomeCard(kidsClass)).toMatchObject({
-      kind: 'bookable',
-      price: '$45',
-    });
-  });
-
-  it('leaves the length out of the meta when there is none', () => {
-    expect(toHomeCard(experience(1, { durationMinutes: null }))?.meta).toBe(
-      'Greenpoint',
-    );
-  });
-
-  it('shows a guide entry with its link out and no price', () => {
-    expect(
-      toHomeCard(
-        experience(1, {
-          status: 'guide_only',
-          linkOutUrl: 'https://host.example/kayak',
-        }),
-      ),
-    ).toEqual({
-      id: id(1),
-      title: 'Thing 1',
-      meta: 'Greenpoint · 2 hr',
-      href: `/guide/thing-1-${id(1)}`,
-      image: null,
-      kind: 'guide-only',
-      hostHref: 'https://host.example/kayak',
-    });
-  });
-
-  it.each([
-    ['a bookable experience with no price', { priceOptions: [] }],
-    [
-      'a bookable experience whose only option takes no space',
-      {
-        priceOptions: [
-          { kind: 'adult' as const, priceMinor: 0, usesSpace: false },
-        ],
-      },
-    ],
-    ['a guide entry with no link out', { status: 'guide_only' as const }],
-  ])('leaves out %s', (_name, overrides) => {
-    expect(toHomeCard(experience(1, overrides))).toBeNull();
-  });
-});
-
-describe('the price on a home card and on a browse card', () => {
-  it.each([
-    [
-      'a kids class with a free accompanying adult',
-      [
-        { kind: 'adult', priceMinor: 0, usesSpace: false },
-        { kind: 'child', priceMinor: 4500, usesSpace: true },
-      ],
-    ],
-    [
-      'an adult and a child price',
-      [
-        { kind: 'adult', priceMinor: 8500, usesSpace: true },
-        { kind: 'child', priceMinor: 4500, usesSpace: true },
-      ],
-    ],
-    ['one price', [{ kind: 'adult', priceMinor: 7000, usesSpace: true }]],
-    [
-      'a free option that takes a space',
-      [
-        { kind: 'adult', priceMinor: 0, usesSpace: true },
-        { kind: 'child', priceMinor: 500, usesSpace: true },
-      ],
-    ],
-    [
-      'no option that takes a space',
-      [{ kind: 'adult', priceMinor: 0, usesSpace: false }],
-    ],
-    ['no option', []],
-  ] satisfies [string, HomeExperience['priceOptions']][])(
-    'agree for %s',
-    (_name, priceOptions) => {
-      const home = toHomeCard(experience(1, { priceOptions }));
-      const browse = toBrowseCard({
-        ...experience(1),
-        priceOptions: priceOptions.map(({ priceMinor, usesSpace }) => ({
-          priceMinor,
-          usesSpace,
-        })),
-      });
-      const priceOf = (card: { kind: string; price?: string } | null) =>
-        card?.kind === 'bookable' ? card.price : null;
-      expect(priceOf(home)).toBe(priceOf(browse));
-    },
-  );
-});
-
-describe('cardsInOrder', () => {
-  const all = [experience(1), experience(2), experience(3), experience(4)];
-
-  it('follows the order of the IDs, not of the experiences', () => {
-    expect(
-      cardsInOrder([id(3), id(1), id(2)], all, 10).map((card) => card.id),
-    ).toEqual([id(3), id(1), id(2)]);
-  });
-
-  it('skips an ID with no experience and one that cannot be a card', () => {
-    const noPrice = experience(5, { priceOptions: [] });
-    expect(
-      cardsInOrder([id(9), id(5), id(2)], [...all, noPrice], 10).map(
-        (card) => card.id,
-      ),
-    ).toEqual([id(2)]);
-  });
-
-  it('stops at the limit', () => {
-    expect(
-      cardsInOrder(
-        all.map((e) => e.id),
-        all,
-        2,
-      ),
-    ).toHaveLength(2);
-  });
-
-  it('takes cards past one that is skipped, to fill the limit', () => {
-    const noPrice = experience(5, { priceOptions: [] });
-    expect(
-      cardsInOrder([id(5), id(1), id(2)], [...all, noPrice], 2).map(
-        (card) => card.id,
-      ),
-    ).toEqual([id(1), id(2)]);
   });
 });
 

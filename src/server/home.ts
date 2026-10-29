@@ -8,8 +8,8 @@ import {
   homeLimits,
   thisWeekExperienceIds,
   thisWeekWindow,
-  type HomeExperience,
 } from '@/lib/home';
+import type { CardExperience } from '@/lib/experienceCards';
 import { readOrRefuse } from '@/server/cache/readOrRefuse';
 import { listCategories, listNeighborhoods } from '@/server/db/catalog';
 import { listHomeModules, listPublishedPicks } from '@/server/db/editorial';
@@ -20,7 +20,7 @@ export type HomeContent = {
   picks: Collection[];
   categories: Category[];
   neighborhoods: Neighborhood[];
-  experiences: HomeExperience[];
+  experiences: CardExperience[];
 };
 
 /**
@@ -53,11 +53,11 @@ export async function getHomeContent(): Promise<HomeContent> {
 export type ThisWeekContent = {
   /** The experiences with an open session, soonest first. */
   experienceIds: string[];
-  experiences: HomeExperience[];
+  experiences: CardExperience[];
 };
 
 /**
- * The experiences with an open session in the next week. `asOf` is the minute (`homeAsOf`), so
+ * The experiences with an open session in the next week. `asOf` is the minute (`minuteAsOf`), so
  * guests inside one minute share an entry. A schedule or booking change reaches it through the
  * tag of each experience it lists; a session added to an experience that is not listed waits for
  * the `browse` profile to run out, about a minute.

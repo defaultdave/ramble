@@ -1,19 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import {
-  chosenPartyLabel,
-  continueLabel,
-  fromPriceLabel,
-  perPersonLabel,
-} from './booking';
+import { chosenPartyLabel, continueLabel, perPersonLabel } from './booking';
 
 describe('booking bar copy', () => {
-  it.each([
-    [8500, 'From $85'],
-    [6550, 'From $65.50'],
-  ])('labels a lowest price of %i', (minor, label) => {
-    expect(fromPriceLabel(minor)).toBe(label);
-  });
-
   it.each([
     ['Sat, Oct 24', 'per person · next Sat, Oct 24'],
     [undefined, 'per person'],

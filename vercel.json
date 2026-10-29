@@ -1,3 +1,12 @@
 {
-  "buildCommand": "sh scripts/vercel-build.sh"
+  "buildCommand": "sh scripts/vercel-build.sh",
+  "git": {
+    "deploymentEnabled": {
+      "main": false,
+      "unit/*": false,
+      "pm/*": false,
+      "sync/*": false,
+      "promote/*": false
+    }
+  }
 }

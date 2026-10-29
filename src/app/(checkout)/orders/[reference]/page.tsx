@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { Alert } from '@/components/Alert';
 import { ButtonLink } from '@/components/Button';
 import { demoSummary } from '@/lib/demoCheckout';
-import { browsePath } from '@/lib/filters';
+import { browsePath } from '@/lib/routes';
 import { DemoOrderSummary } from '../../_demo/DemoOrderSummary';
 import { DemoPage } from '../../_demo/DemoPage';
 

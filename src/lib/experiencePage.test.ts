@@ -287,7 +287,7 @@ describe('buildExperiencePage', () => {
   it('shows the facts in order, with the neighborhood, length, ages, weather, and cancellation', () => {
     expect(build()?.keyFacts).toEqual([
       { icon: 'place', text: 'Tribeca' },
-      { icon: 'duration', text: '2 hr' },
+      { icon: 'duration', text: '2\u00a0hr' },
       { icon: 'age', text: 'Ages 14 and up' },
       { icon: 'weather', text: 'Weather call 3 hours before start' },
       { icon: 'cancellation', text: 'Free cancellation up to 24 hours before' },
@@ -314,7 +314,7 @@ describe('buildExperiencePage', () => {
   });
 
   it('puts where, how long, and who for on one line', () => {
-    expect(build()?.summary).toBe('Tribeca · 2 hr · Ages 14 and up');
+    expect(build()?.summary).toBe('Tribeca · 2\u00a0hr · Ages 14 and up');
   });
 
   it('links the breadcrumb to the neighborhood and the category', () => {

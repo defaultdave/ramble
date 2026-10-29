@@ -287,8 +287,8 @@ type DatedEmpty = {
   nextDay: { label: string; href: string } | null;
   /** The same filters with no date. */
   anyDayHref: string;
-  /** Whether a category or neighborhood is chosen too, so clearing every filter goes further than "any day". */
-  otherFilters: boolean;
+  /** The line under the heading: where the next experiences are, or that none are later. */
+  message: string;
 };
 
 /**
@@ -342,7 +342,10 @@ function datedEmpty(
             href: hrefForFilters(withDate(filters, next)),
           },
     anyDayHref: hrefForFilters(withDate(filters, null)),
-    otherFilters: activeFilterCount(withDate(filters, null)) > 0,
+    message:
+      next === null
+        ? 'There are no experiences on later days.'
+        : `The next day with experiences is ${dateChipLabel(next)}.`,
   };
 }
 

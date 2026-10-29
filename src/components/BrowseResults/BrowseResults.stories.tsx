@@ -168,7 +168,7 @@ export const EmptyOnADay: EmptyStory = {
         href: '/new-york/browse?category=cooking&date=2026-10-29',
       },
       anyDayHref: '/new-york/browse?category=cooking',
-      otherFilters: true,
+      message: 'The next day with experiences is Thu, Oct 29.',
     },
   },
 };
@@ -181,7 +181,7 @@ export const EmptyOnADayWithNoLaterDay: EmptyStory = {
       dateLabel: 'Wed, Feb 24',
       nextDay: null,
       anyDayHref: '/new-york/browse',
-      otherFilters: false,
+      message: 'There are no experiences on later days.',
     },
   },
 };

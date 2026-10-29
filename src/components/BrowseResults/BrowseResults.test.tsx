@@ -191,7 +191,7 @@ describe('BrowseResults empty on a chosen day', () => {
       href: '/new-york/browse?category=cooking&date=2026-11-09',
     },
     anyDayHref: '/new-york/browse?category=cooking',
-    otherFilters: true,
+    message: 'The next day with experiences is Mon, Nov 9.',
   };
 
   it('names the day and links to the next day with experiences and to any day', () => {
@@ -213,8 +213,8 @@ describe('BrowseResults empty on a chosen day', () => {
       '/new-york/browse?category=cooking',
     );
     expect(
-      screen.getByRole('link', { name: 'Clear all filters' }),
-    ).toHaveAttribute('href', '/new-york/browse');
+      screen.queryByRole('link', { name: 'Clear all filters' }),
+    ).not.toBeInTheDocument();
   });
 
   it('offers only any day when no later day has experiences', () => {
@@ -222,7 +222,11 @@ describe('BrowseResults empty on a chosen day', () => {
       <BrowseResults
         state="empty"
         filtered
-        dated={{ ...dated, nextDay: null }}
+        dated={{
+          ...dated,
+          nextDay: null,
+          message: 'There are no experiences on later days.',
+        }}
       />,
     );
     expect(
@@ -230,24 +234,6 @@ describe('BrowseResults empty on a chosen day', () => {
     ).toBeVisible();
     expect(
       screen.queryByRole('link', { name: /^See / }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Any day' })).toBeVisible();
-  });
-
-  it('leaves out Clear all filters when the day is the only filter, because any day already clears it', () => {
-    render(
-      <BrowseResults
-        state="empty"
-        filtered
-        dated={{
-          ...dated,
-          anyDayHref: '/new-york/browse',
-          otherFilters: false,
-        }}
-      />,
-    );
-    expect(
-      screen.queryByRole('link', { name: 'Clear all filters' }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Any day' })).toBeVisible();
   });

@@ -428,12 +428,12 @@ describe('browseView', () => {
             href: '/new-york/browse?category=cooking&neighborhood=dumbo&date=2026-11-09',
           },
           anyDayHref: '/new-york/browse?category=cooking&neighborhood=dumbo',
-          otherFilters: true,
+          message: 'The next day with experiences is Mon, Nov 9.',
         },
       });
     });
 
-    it('offers only any day when the window has no later day, and that is every filter cleared when the date is the only one', () => {
+    it('offers only any day, and says no later day has experiences, when the window has none', () => {
       expect(
         browseView(
           { filters: { ...noFilters, date: '2026-11-12' }, after: null },
@@ -447,7 +447,7 @@ describe('browseView', () => {
           dateLabel: 'Thu, Nov 12',
           nextDay: null,
           anyDayHref: '/new-york/browse',
-          otherFilters: false,
+          message: 'There are no experiences on later days.',
         },
       });
     });

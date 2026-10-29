@@ -1,4 +1,5 @@
 import { taxTreatments, type PriceOption } from './catalog';
+import { fromPriceLabel } from './booking';
 import { formatPrice } from './money';
 
 // Integer minor units (cents) and parts per million only: no float touches an amount.
@@ -177,6 +178,7 @@ export function cardPriceLabel(
     .map((option) => option.priceMinor);
   if (prices.length === 0) return null;
   const lowest = Math.min(...prices);
-  const label = formatPrice(lowest);
-  return prices.some((price) => price !== lowest) ? `From ${label}` : label;
+  return prices.some((price) => price !== lowest)
+    ? fromPriceLabel(lowest)
+    : formatPrice(lowest);
 }

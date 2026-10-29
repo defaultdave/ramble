@@ -84,6 +84,11 @@ const window = thisWeekWindow(date.toISOString());
 describe('venueToday', () => {
   it.each([
     ['just before New York midnight', '2026-11-03T04:59:00.000Z', '2026-11-02'],
+    [
+      'at UTC midnight, still the evening before in New York',
+      '2026-11-03T00:00:00.000Z',
+      '2026-11-02',
+    ],
     ['just after New York midnight', '2026-11-03T05:00:00.000Z', '2026-11-03'],
     ['in summer time', '2026-07-01T03:59:00.000Z', '2026-06-30'],
     [

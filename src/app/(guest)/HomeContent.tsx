@@ -40,7 +40,7 @@ export async function HomeContent() {
       {page.needsTitle ? <HomeTitle /> : null}
       <HomeModules
         modules={page.modules}
-        minDate={venueToday(now)}
+        today={venueToday(now)}
         renderCopy={(doc) => <RichText content={doc} />}
       />
     </>

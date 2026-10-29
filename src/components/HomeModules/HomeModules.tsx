@@ -10,8 +10,8 @@ import { ThisWeekSection } from './ThisWeekSection';
 
 export type HomeModulesProps = {
   modules: readonly HomeModuleView[];
-  /** The earliest day the hero's date field offers, as YYYY-MM-DD. */
-  minDate: string;
+  /** Today in New York as YYYY-MM-DD: the hero search's starting day and the earliest it offers. */
+  today: string;
   /**
    * Draws a module's rich-text copy. The renderer is server-only, so the page hands it in and
    * this component stays free of it.
@@ -21,11 +21,11 @@ export type HomeModulesProps = {
 
 function Module({
   module,
-  minDate,
+  today,
   renderCopy,
 }: {
   module: HomeModuleView;
-  minDate: string;
+  today: string;
   renderCopy: HomeModulesProps['renderCopy'];
 }) {
   switch (module.kind) {
@@ -36,7 +36,7 @@ function Module({
           heading={module.heading}
           body={renderCopy(module.body)}
           neighborhoods={module.neighborhoods}
-          minDate={minDate}
+          today={today}
         />
       );
     case 'category_rail':
@@ -72,18 +72,14 @@ function Module({
 }
 
 /** The home page's modules, in the order staff arranged them. */
-export function HomeModules({
-  modules,
-  minDate,
-  renderCopy,
-}: HomeModulesProps) {
+export function HomeModules({ modules, today, renderCopy }: HomeModulesProps) {
   return (
     <>
       {modules.map((module) => (
         <Module
           key={module.id}
           module={module}
-          minDate={minDate}
+          today={today}
           renderCopy={renderCopy}
         />
       ))}

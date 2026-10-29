@@ -13,20 +13,21 @@ export type HomeHeroProps = {
   /** The module's copy, already rendered. */
   body: ReactNode;
   neighborhoods: readonly { slug: string; name: string }[];
-  /** The earliest day the date field offers, as YYYY-MM-DD. */
-  minDate: string;
+  /** Today in New York as YYYY-MM-DD: the date field's starting day and the earliest it offers. */
+  today: string;
 };
 
 /**
  * The hero and its search. The search is a plain GET form to the browse page, so it works with no
- * script: the neighborhood and day become the `neighborhood` and `date` of the browse address.
+ * script: the neighborhood and day become the `neighborhood` and `date` of the browse address. The day starts as today, and
+ * the guest can clear it to search any day.
  */
 export function HomeHero({
   eyebrow,
   heading,
   body,
   neighborhoods,
-  minDate,
+  today,
 }: HomeHeroProps) {
   const headingId = useId();
   const neighborhoodId = useId();
@@ -68,7 +69,13 @@ export function HomeHero({
               </div>
             </div>
             <div className={styles.field}>
-              <Input type="date" name="date" label="When" min={minDate} />
+              <Input
+                type="date"
+                name="date"
+                label="When"
+                min={today}
+                defaultValue={today}
+              />
             </div>
             <div className={styles.submit}>
               <Button type="submit" iconStart={<Search />}>

@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { samplePhoto } from '@/components/Photo/Photo.fixtures';
 import type { BrowseCard } from '@/lib/browse';
 import { BrowseResults } from './BrowseResults';
@@ -15,6 +15,7 @@ import { BrowseResults } from './BrowseResults';
 // - empty on a chosen day names the day and links to the next day with experiences and to any day, or only to any day when none follows; Clear all filters is offered only when another filter is on
 // - an error is announced as an alert with a Try again form that carries the same address
 // - an outdated cursor says so and links to the first results
+// - the results heading takes focus when the control that was focused has gone, and never on the first paint or while focus is on something that stays
 
 vi.mock('next/form', () => ({
   default: ({
@@ -114,9 +115,11 @@ describe('BrowseResults results', () => {
     ).toHaveAttribute('href', 'https://host.example/sourdough');
   });
 
-  it('shows the summary line', () => {
+  it('shows the summary line as the level 2 heading over the results', () => {
     render(<BrowseResults {...results} />);
-    expect(screen.getByText('Showing 2 experiences')).toBeVisible();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Showing 2 experiences' }),
+    ).toBeVisible();
   });
 
   it('sends the whole next address from Show more', () => {
@@ -270,5 +273,73 @@ describe('BrowseResults outdated', () => {
     expect(
       screen.getByRole('link', { name: 'Back to the first results' }),
     ).toHaveAttribute('href', '/new-york/browse?date=2026-11-07');
+  });
+});
+
+describe('BrowseResults focus', () => {
+  const empty = {
+    state: 'empty',
+    filtered: true,
+    dated: {
+      dateLabel: 'Sat, Nov 7',
+      nextDay: {
+        label: 'Mon, Nov 9',
+        href: '/new-york/browse?date=2026-11-09',
+      },
+      anyDayHref: '/new-york/browse',
+      message: 'The next day with experiences is Mon, Nov 9.',
+    },
+  } as const;
+  const results = {
+    state: 'results',
+    cards: [] as BrowseCard[],
+    summary: '3 experiences',
+    showMore: null,
+    startHref: null,
+  } as const;
+
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  async function load() {
+    return (await import('./BrowseResults')).BrowseResults;
+  }
+
+  it('leaves focus alone on the first paint', async () => {
+    const Results = await load();
+    render(<Results {...empty} />);
+    expect(document.body).toHaveFocus();
+  });
+
+  it('moves focus to the new heading when the focused link went with the old results', async () => {
+    const Results = await load();
+    const { rerender } = render(<Results {...empty} />);
+    const link = screen.getByRole('link', { name: 'See Mon, Nov 9' });
+    link.focus();
+    expect(link).toHaveFocus();
+    rerender(<Results {...results} />);
+    expect(link).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 2, name: '3 experiences' }),
+    ).toHaveFocus();
+  });
+
+  it('keeps focus on a control outside the results', async () => {
+    const Results = await load();
+    const { rerender } = render(
+      <>
+        <button type="button">Chip</button>
+        <Results {...empty} />
+      </>,
+    );
+    screen.getByRole('button', { name: 'Chip' }).focus();
+    rerender(
+      <>
+        <button type="button">Chip</button>
+        <Results {...results} />
+      </>,
+    );
+    expect(screen.getByRole('button', { name: 'Chip' })).toHaveFocus();
   });
 });

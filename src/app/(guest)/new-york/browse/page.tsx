@@ -1,16 +1,39 @@
 import type { Metadata } from 'next';
+import { unstable_rethrow } from 'next/navigation';
 import { Suspense } from 'react';
 import { BrowseSkeleton } from '@/components/BrowseSkeleton';
+import { browseTitle } from '@/lib/browse';
 import { isIndexable, parseFilters } from '@/lib/filters';
+import { getFilterOptions } from '@/server/browse';
 import { BrowseContent } from './BrowseContent';
 import styles from './page.module.css';
+
+/** Chosen filters named in the title. A failed read leaves the names out; the title still has the day. */
+async function filterNames() {
+  try {
+    const { categories, neighborhoods } = await getFilterOptions();
+    const bySlug = (rows: readonly { slug: string; name: string }[]) =>
+      new Map(rows.map(({ slug, name }) => [slug, name]));
+    return {
+      categories: bySlug(categories),
+      neighborhoods: bySlug(neighborhoods),
+    };
+  } catch (error) {
+    // Next.js ends a prerender by throwing; swallowing that would break the render.
+    unstable_rethrow(error);
+    return {
+      categories: new Map<string, string>(),
+      neighborhoods: new Map<string, string>(),
+    };
+  }
+}
 
 export async function generateMetadata({
   searchParams,
 }: PageProps<'/new-york/browse'>): Promise<Metadata> {
   const query = parseFilters(await searchParams);
   return {
-    title: 'Browse experiences',
+    title: browseTitle(query.filters, await filterNames()),
     robots: isIndexable(query) ? undefined : { index: false, follow: true },
   };
 }

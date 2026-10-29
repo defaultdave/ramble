@@ -3,9 +3,15 @@ import { Alert } from '@/components/Alert';
 import { Button, ButtonLink } from '@/components/Button';
 import { Card, cardPhotoSizes } from '@/components/Card';
 import { Photo } from '@/components/Photo';
-import type { BrowseCard, BrowseView, FormTarget } from '@/lib/browse';
+import {
+  browseHeading,
+  type BrowseCard,
+  type BrowseView,
+  type FormTarget,
+} from '@/lib/browse';
 import { browsePath } from '@/lib/routes';
 import styles from './BrowseResults.module.css';
+import { ResultsHeading } from './ResultsHeading';
 
 type TargetButtonProps = {
   target: FormTarget;
@@ -60,11 +66,12 @@ function ResultCard({ card }: { card: BrowseCard }) {
 }
 
 export function BrowseResults(props: BrowseResultsProps) {
+  const heading = browseHeading(props);
   switch (props.state) {
     case 'results':
       return (
         <div className={styles.results}>
-          <p className={styles.summary}>{props.summary}</p>
+          <ResultsHeading className={styles.summary}>{heading}</ResultsHeading>
           <ul className={styles.grid}>
             {props.cards.map((card) => (
               <li key={card.id} className={styles.item}>
@@ -90,10 +97,12 @@ export function BrowseResults(props: BrowseResultsProps) {
       );
     case 'empty':
       if (props.dated) {
-        const { dateLabel, nextDay, anyDayHref, message } = props.dated;
+        const { nextDay, anyDayHref, message } = props.dated;
         return (
           <div className={styles.notice}>
-            <h2 className={styles.noticeTitle}>Nothing on {dateLabel}</h2>
+            <ResultsHeading className={styles.noticeTitle}>
+              {heading}
+            </ResultsHeading>
             <p className={styles.noticeText}>{message}</p>
             <div className={styles.noticeActions}>
               {nextDay ? (
@@ -110,11 +119,9 @@ export function BrowseResults(props: BrowseResultsProps) {
       }
       return (
         <div className={styles.notice}>
-          <h2 className={styles.noticeTitle}>
-            {props.filtered
-              ? 'Nothing matches those filters'
-              : 'Nothing to browse yet'}
-          </h2>
+          <ResultsHeading className={styles.noticeTitle}>
+            {heading}
+          </ResultsHeading>
           <p className={styles.noticeText}>
             {props.filtered
               ? 'Try another day, or take a filter off.'
@@ -143,7 +150,9 @@ export function BrowseResults(props: BrowseResultsProps) {
     case 'outdated':
       return (
         <div className={styles.notice}>
-          <h2 className={styles.noticeTitle}>That page of results has moved</h2>
+          <ResultsHeading className={styles.noticeTitle}>
+            {heading}
+          </ResultsHeading>
           <p className={styles.noticeText}>
             The list changed while you were reading it.
           </p>

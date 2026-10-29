@@ -5,6 +5,7 @@ import { FilterBar } from '@/components/FilterBar';
 import {
   browseAsOf,
   browseCardIds,
+  browseHeading,
   browseView,
   errorView,
   venueToday,
@@ -20,6 +21,8 @@ import {
 } from '@/server/browse';
 import { chooseBrowseDate } from '@/server/actions/browse';
 import { logger } from '@/server/monitoring/logger';
+
+import styles from './page.module.css';
 
 type BrowseContentProps = { searchParams: Promise<RawSearchParams> };
 
@@ -56,8 +59,13 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
   }
 
   const { options, dates, page, covers } = loaded;
+  const view = withBrowseCovers(browseView(query, page, dates), covers);
   return (
     <>
+      {/* Always rendered, so a screen reader hears the text change when the filters do. */}
+      <p role="status" className={styles.announcement}>
+        {browseHeading(view)}
+      </p>
       <FilterBar
         categories={options.categories.map(({ slug, name }) => ({
           slug,
@@ -72,9 +80,7 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
         availableDates={dates}
         onPickDate={chooseBrowseDate.bind(null, filters)}
       />
-      <BrowseResults
-        {...withBrowseCovers(browseView(query, page, dates), covers)}
-      />
+      <BrowseResults {...view} />
     </>
   );
 }

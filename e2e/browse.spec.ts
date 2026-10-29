@@ -67,6 +67,20 @@ test.describe('robots', () => {
   });
 });
 
+test.describe('the page title', () => {
+  test('is plain for the bare address', async ({ page }) => {
+    await page.goto(browse);
+    await expect(page).toHaveTitle('Browse experiences | Ramble');
+  });
+
+  test('names the chosen day, so the route announcer reads something new', async ({
+    page,
+  }) => {
+    await page.goto(`${browse}?date=2026-11-07`);
+    await expect(page).toHaveTitle('Browse experiences on Sat, Nov 7 | Ramble');
+  });
+});
+
 test.describe('when the read fails', () => {
   test('the page keeps its heading and says what happened', async ({
     page,

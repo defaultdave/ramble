@@ -1,5 +1,6 @@
 import type { taxTreatments } from './catalog';
 import { formatMoney } from './money';
+import { MAX_LINES } from './pricing';
 
 export type TaxTreatment = (typeof taxTreatments)[number];
 
@@ -10,9 +11,6 @@ export type OrderSummaryAmounts = {
   tax: { label: string; amount: string } | null;
   total: string;
 };
-
-// A booking has an adult and a child price option at most; the cap keeps a bad caller from rendering an unbounded list.
-const MAX_LINES = 4;
 
 export function guestsLabel(count: number): string {
   if (!Number.isSafeInteger(count) || count < 1) {

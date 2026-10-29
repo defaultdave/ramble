@@ -45,6 +45,15 @@ export const piiColumns: readonly PiiColumn[] = [
       'Rows stay, as the record that a request was made and when; the guest they point at is anonymized',
   },
   {
+    table: 'hosts',
+    column: 'notification_email',
+    kind: 'identifier',
+    data: "The address a host's booking and cancellation notices go to; a host's contact, never a guest's",
+    location: databaseLocation,
+    deletionPath:
+      'Cleared when the host is offboarded (the host tools work); a host is a supplier, so a guest deletion request never reaches it',
+  },
+  {
     table: 'messages',
     column: 'recipient',
     kind: 'identifier',

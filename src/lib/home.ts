@@ -2,9 +2,16 @@ import { z } from 'zod';
 import { EntityIdSchema, SlugSchema, guestVisibleStatuses } from './catalog';
 import type { Category, Neighborhood } from './catalog';
 import type { Collection, HomeModule } from './editorial';
+import { hrefForFilters, noFilters } from './filters';
 import { withCovers, type PhotoView } from './photoViews';
 import { cardPriceLabel } from './pricing';
 import type { RichTextDoc } from './richText/format';
+import {
+  experienceCardPath,
+  giftGuidePath,
+  picksAnchor,
+  picksPath,
+} from './routes';
 import type { GuestSettings } from './settings';
 import { spacesStatus } from './spaces';
 
@@ -103,49 +110,6 @@ export const ThisWeekSessionSchema = z.object({
 });
 export type ThisWeekSession = z.infer<typeof ThisWeekSessionSchema>;
 
-// ---- Addresses ----
-
-export const browsePath = '/new-york/browse';
-
-export type BrowseTarget = {
-  category?: string;
-  neighborhood?: string;
-  date?: string;
-};
-
-/**
- * An address on the browse page, in its grammar: `category`, `neighborhood`, and `date` as query
- * parameters (docs/runbooks/browse.md). Each value is a slug or a date the caller already holds.
- */
-export function browseHref(target: BrowseTarget): string {
-  const query = (['category', 'neighborhood', 'date'] as const)
-    .flatMap((name) => {
-      const value = target[name];
-      return value === undefined || value === ''
-        ? []
-        : [`${name}=${encodeURIComponent(value)}`];
-    })
-    .join('&');
-  return query === '' ? browsePath : `${browsePath}?${query}`;
-}
-
-/** The address of an experience page (`/experiences/[slug]-[id]`) or a guide entry (`/guide/[slug]-[id]`). */
-export function experiencePath(
-  experience: Pick<HomeExperience, 'id' | 'slug' | 'status'>,
-): string {
-  const area = experience.status === 'guide_only' ? 'guide' : 'experiences';
-  return `/${area}/${experience.slug}-${experience.id}`;
-}
-
-function picksPath(slug: string): string {
-  return `/picks/${slug}`;
-}
-
-export const giftGuidePath = '/gifts';
-
-/** The id of the first Ramble Picks module, which the header and footer link to. */
-export const picksAnchor = 'picks';
-
 // ---- Cards ----
 
 /** "2 hr", "2.5 hr", "45 min", "2 hr 15 min". */
@@ -186,7 +150,7 @@ export function toHomeCard(experience: HomeExperience): HomeCard | null {
     id: experience.id,
     title: experience.name,
     meta,
-    href: experiencePath(experience),
+    href: experienceCardPath(experience),
     image: null,
   };
   if (experience.status === 'guide_only') {
@@ -410,7 +374,7 @@ function viewOf(
             categories: context.categories.map(({ slug, name }) => ({
               slug,
               name,
-              href: browseHref({ category: slug }),
+              href: hrefForFilters({ ...noFilters, categories: [slug] }),
             })),
           };
     case 'picks': {

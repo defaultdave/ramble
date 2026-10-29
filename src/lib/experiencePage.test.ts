@@ -4,37 +4,25 @@ import {
   ageLabel,
   buildExperiencePage,
   cancellationTerms,
-  categoryPath,
   experienceHead,
   galleryGridPhotos,
   galleryView,
-  giftCheckoutPath,
   includedItems,
   mapsHref,
-  maxAddressLength,
   maxIncludedItems,
   maxMapsQueryLength,
   maxMetaDescriptionLength,
   metaDescription,
-  neighborhoodPath,
-  parseExperienceAddress,
   placeOf,
   priceLines,
-  privateSessionPath,
   textLines,
   weatherTerms,
   type ExperiencePageInput,
 } from './experiencePage';
-import {
-  experience,
-  id,
-  idWithLetters,
-  place,
-} from './experiencePage.fixtures';
+import { experience, id, place } from './experiencePage.fixtures';
 import type { GuestPhoto } from './photos';
 
 // Behaviours under test, one per decision, branch or risk:
-// - an address is a slug, a hyphen, and a uuid; anything else (no hyphen, a bad slug, a bad uuid, too long) is refused, and the ID comes out lower-case
 // - an age rule reads in words, and a rule missing the age it needs is refused rather than guessed
 // - an indoor experience has no weather terms; rain or shine and a weather call each read their own way; a call with no hours is refused
 // - cancellation names the window in hours, or in days from two up, and a window outside 0 to a year is refused
@@ -69,48 +57,6 @@ const build = (overrides: Partial<ExperiencePageInput> = {}) =>
     giftsEnabled: true,
     ...overrides,
   });
-
-describe('parseExperienceAddress', () => {
-  it('splits a slug and an ID, and lower-cases the ID', () => {
-    expect(
-      parseExperienceAddress(`sunset-kayak-${idWithLetters.toUpperCase()}`),
-    ).toEqual({ slug: 'sunset-kayak', id: idWithLetters });
-  });
-
-  it('takes a one-word slug', () => {
-    expect(parseExperienceAddress(`kayak-${id(1)}`)?.slug).toBe('kayak');
-  });
-
-  it.each([
-    ['sample'],
-    [''],
-    [id(1)],
-    [`-${id(1)}`],
-    [`kayak${id(1)}`],
-    [`Kayak-${id(1)}`],
-    [`kayak--${id(1)}`],
-    [`kayak_-${id(1)}`],
-    ['kayak-00000000-0000-4000-8000-00000000000g'],
-    [`kayak-${id(1)}-extra`],
-    [`${'a'.repeat(maxAddressLength)}-${id(1)}`],
-  ])('refuses %j', (address) => {
-    expect(parseExperienceAddress(address)).toBeNull();
-  });
-
-  it('takes an address at the length limit', () => {
-    const slug = 'a'.repeat(maxAddressLength - 37);
-    expect(parseExperienceAddress(`${slug}-${id(1)}`)?.slug).toBe(slug);
-  });
-});
-
-describe('paths', () => {
-  it('addresses the pages the breadcrumb and entry points go to', () => {
-    expect(categoryPath('outdoors')).toBe('/new-york/things-to-do/outdoors');
-    expect(neighborhoodPath('tribeca')).toBe('/new-york/neighborhoods/tribeca');
-    expect(giftCheckoutPath(id(1))).toBe(`/gifts/checkout/${id(1)}`);
-    expect(privateSessionPath).toBe('/contact');
-  });
-});
 
 describe('ageLabel', () => {
   it.each([

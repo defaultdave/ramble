@@ -1,16 +1,15 @@
 import { z } from 'zod';
 import { EntityIdSchema, SlugSchema } from './catalog';
+import { browsePath } from './routes';
 import { IsoDateSchema } from './sessions';
-
-/** The one place the browse URL grammar lives: `category`, `neighborhood`, `date`, and `after`. */
-export const browsePath = '/new-york/browse';
 
 /** A list parameter with more values than this is refused whole, never cut to fit. */
 export const maxFilterValues = 8;
 const maxSlugLength = 64;
 const maxCursorLength = 36;
 
-const paramNames = {
+/** The one place the browse URL grammar lives: `category`, `neighborhood`, `date`, and `after`. */
+export const browseParamNames = {
   categories: 'category',
   neighborhoods: 'neighborhood',
   date: 'date',
@@ -86,11 +85,13 @@ function parseSingle<T>(
 export function parseFilters(searchParams: RawSearchParams): BrowseQuery {
   return {
     filters: {
-      categories: parseSlugList(searchParams[paramNames.categories]),
-      neighborhoods: parseSlugList(searchParams[paramNames.neighborhoods]),
-      date: parseSingle(searchParams[paramNames.date], IsoDateSchema),
+      categories: parseSlugList(searchParams[browseParamNames.categories]),
+      neighborhoods: parseSlugList(
+        searchParams[browseParamNames.neighborhoods],
+      ),
+      date: parseSingle(searchParams[browseParamNames.date], IsoDateSchema),
     },
-    after: parseSingle(searchParams[paramNames.after], CursorSchema),
+    after: parseSingle(searchParams[browseParamNames.after], CursorSchema),
   };
 }
 
@@ -101,13 +102,13 @@ export function toQueryEntries({
 }: BrowseQuery): [string, string][] {
   const entries: [string, string][] = [];
   for (const slug of [...filters.categories].sort()) {
-    entries.push([paramNames.categories, slug]);
+    entries.push([browseParamNames.categories, slug]);
   }
   for (const slug of [...filters.neighborhoods].sort()) {
-    entries.push([paramNames.neighborhoods, slug]);
+    entries.push([browseParamNames.neighborhoods, slug]);
   }
-  if (filters.date) entries.push([paramNames.date, filters.date]);
-  if (after) entries.push([paramNames.after, after]);
+  if (filters.date) entries.push([browseParamNames.date, filters.date]);
+  if (after) entries.push([browseParamNames.after, after]);
   return entries;
 }
 

@@ -624,23 +624,29 @@ describe('checkAllocationEditable', () => {
 
 describe('checkAllocationChange', () => {
   it.each([
-    { seatsSold: 5, allocation: 6, ok: true },
-    { seatsSold: 5, allocation: 5, ok: true },
-    { seatsSold: 0, allocation: 0, ok: true },
-    { seatsSold: 5, allocation: 4, ok: false },
-    { seatsSold: 5, allocation: 0, ok: false },
+    { seatsSold: 5, heldSeats: 0, allocation: 6, ok: true },
+    { seatsSold: 5, heldSeats: 0, allocation: 5, ok: true },
+    { seatsSold: 0, heldSeats: 0, allocation: 0, ok: true },
+    { seatsSold: 5, heldSeats: 0, allocation: 4, ok: false },
+    { seatsSold: 5, heldSeats: 0, allocation: 0, ok: false },
+    { seatsSold: 5, heldSeats: 3, allocation: 8, ok: true },
+    { seatsSold: 5, heldSeats: 3, allocation: 7, ok: false },
+    { seatsSold: 0, heldSeats: 4, allocation: 3, ok: false },
   ])(
-    '$seatsSold sold, capacity $allocation: ok is $ok',
-    ({ seatsSold, allocation, ok }) => {
-      expect(checkAllocationChange(seatsSold, allocation).ok).toBe(ok);
+    '$seatsSold sold and $heldSeats held, capacity $allocation: ok is $ok',
+    ({ seatsSold, heldSeats, allocation, ok }) => {
+      expect(checkAllocationChange(seatsSold, heldSeats, allocation).ok).toBe(
+        ok,
+      );
     },
   );
 
-  it('names the seats sold when it refuses', () => {
-    expect(checkAllocationChange(5, 4)).toEqual({
+  it('names the seats sold and held when it refuses', () => {
+    expect(checkAllocationChange(5, 2, 6)).toEqual({
       ok: false,
-      reason: 'below_seats_sold',
+      reason: 'below_sold_and_held',
       seatsSold: 5,
+      heldSeats: 2,
     });
   });
 });

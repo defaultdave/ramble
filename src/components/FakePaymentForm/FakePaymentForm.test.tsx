@@ -259,7 +259,10 @@ describe('FakePaymentForm', () => {
     const pay = screen.getByRole('button', { name: 'Pay $130.00' });
     await user.dblClick(pay);
     expect(confirm).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('button', { name: 'Pay $130.00' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Pay $130.00' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
     expect(screen.getByRole('button', { name: 'Apple Pay' })).toBeDisabled();
     expect(screen.getByLabelText('Card number')).toBeDisabled();
     release({ status: 'succeeded' });

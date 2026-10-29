@@ -1,6 +1,6 @@
 import 'server-only';
 import { randomBytes } from 'node:crypto';
-import { systemNow } from '@/server/ports/clock/system';
+import { systemClock } from '@/server/ports/clock';
 import {
   createFakePaymentsAdapter,
   createFakePaymentsState,
@@ -35,7 +35,7 @@ export function getFakePayments(): FakePaymentsAdapter {
   const { state, webhookSecret } = shared();
   adapter ??= createFakePaymentsAdapter({
     webhookSecret,
-    now: systemNow,
+    now: () => systemClock.now(),
     state,
   });
   return adapter;

@@ -15,7 +15,9 @@ const rules = Object.entries(config.git?.deploymentEnabled ?? {});
 const offPatterns = ['main', 'unit/*', 'pm/*', 'sync/*', 'promote/*'];
 const mustDeploy = ['integration', 'production'];
 
-// Vercel documents minimatch globs; in them `*` does not cross a slash.
+// Vercel documents minimatch globs; in them `*` does not cross a slash. This matcher
+// approximates that and supports only `*`: a pattern using `?`, `**`, braces or `!`
+// must extend it.
 function matches(pattern: string, branch: string): boolean {
   const source = pattern
     .split('*')
@@ -24,7 +26,8 @@ function matches(pattern: string, branch: string): boolean {
   return new RegExp(`^${source}$`).test(branch);
 }
 
-// Vercel: a branch deploys when no rule matches it or when any matching rule is true.
+// The Git Configuration page documents: a branch matching several rules deploys if at
+// least one is true, and an unlisted branch deploys. Approximated here.
 function deploys(branch: string): boolean {
   const matching = rules.filter(([pattern]) => matches(pattern, branch));
   return matching.length === 0 || matching.some(([, enabled]) => enabled);

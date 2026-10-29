@@ -16,7 +16,6 @@ import {
   metaDescription,
   placeOf,
   priceLines,
-  textLines,
   weatherTerms,
   type ExperiencePageInput,
 } from './experiencePage';
@@ -294,17 +293,8 @@ describe('mapsHref', () => {
   });
 });
 
-describe('textLines and includedItems', () => {
-  it('has one entry per non-blank line, trimmed', () => {
-    expect(textLines('  one \n\n two\n   \nthree')).toEqual([
-      'one',
-      'two',
-      'three',
-    ]);
-  });
-
+describe('includedItems', () => {
   it('has none for no text', () => {
-    expect(textLines(null)).toEqual([]);
     expect(includedItems('')).toEqual([]);
   });
 

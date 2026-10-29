@@ -5,9 +5,9 @@ import { nonPiiColumns, piiColumns } from '@/lib/privacy';
 import * as schema from '@/server/db/schema';
 
 // Behaviours: the inventory and the schema cannot drift apart.
-// - every table the inventory names exists, and so does every column it names
-// - a table listed with its non-personal columns has every column classified, as personal or not, once
-// - a column that looks like an email address or a person's name in any table is in the inventory
+// - every column of every table in the schema is in the inventory as personal or not, once, so a new column
+//   (or a new table) fails here until someone decides which
+// - nothing in the inventory names a column that is not in the schema
 
 const tables: PgTable[] = [];
 for (const value of Object.values(schema)) {
@@ -24,49 +24,24 @@ const columnsOf = new Map(
   ]),
 );
 
-const classified = [...piiColumns, ...nonPiiColumns];
-const inventoryTables = [...new Set(classified.map(({ table }) => table))];
+const classified = [...piiColumns, ...nonPiiColumns].map(
+  ({ table, column }) => `${table}.${column}`,
+);
+const everyColumn = [...columnsOf].flatMap(([table, columns]) =>
+  columns.map((column) => `${table}.${column}`),
+);
 
 describe('the PII inventory against the schema', () => {
-  it.each(classified.map(({ table, column }) => ({ table, column })))(
-    'finds $table.$column in the schema',
-    ({ table, column }) => {
-      expect(columnsOf.get(table), `no table ${table}`).toContain(column);
-    },
-  );
+  it('classifies every column of every table, as personal or not, exactly once', () => {
+    const counts = new Map<string, number>();
+    for (const name of classified) {
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
 
-  it.each([...new Set(nonPiiColumns.map(({ table }) => table))])(
-    'classifies every column of %s exactly once',
-    (table) => {
-      const listed = classified
-        .filter((row) => row.table === table)
-        .map(({ column }) => column)
-        .sort();
-
-      expect(listed).toEqual([...(columnsOf.get(table) ?? [])].sort());
-    },
-  );
-
-  it('lists each of its tables in the schema', () => {
-    expect(inventoryTables.filter((table) => !columnsOf.has(table))).toEqual(
-      [],
-    );
-  });
-
-  it('inventories every column that holds an email address or a name', () => {
-    const personal = new Set(
-      piiColumns.map(({ table, column }) => `${table}.${column}`),
-    );
-    const suspects = [...columnsOf].flatMap(([table, columns]) =>
-      columns
-        .filter((column) =>
-          /(^|_)(email|recipient|address|first_name|last_name|full_name|phone)($|_)/.test(
-            column,
-          ),
-        )
-        .map((column) => `${table}.${column}`),
-    );
-
-    expect(suspects.filter((name) => !personal.has(name))).toEqual([]);
+    expect({
+      unclassified: everyColumn.filter((name) => !counts.has(name)),
+      twice: [...counts].filter(([, n]) => n > 1).map(([name]) => name),
+      notInSchema: classified.filter((name) => !everyColumn.includes(name)),
+    }).toEqual({ unclassified: [], twice: [], notInSchema: [] });
   });
 });

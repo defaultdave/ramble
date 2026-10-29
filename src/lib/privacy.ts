@@ -80,39 +80,327 @@ export const piiColumns: readonly PiiColumn[] = [
     deletionPath:
       'Kept on purpose after a deletion request, so Ramble never mails an address that complained; the privacy-requests work decides whether it is hashed',
   },
+  {
+    table: 'messages',
+    column: 'idempotency_key',
+    kind: 'link',
+    data: 'A key the sender builds from the ids of the records an email is about',
+    location: databaseLocation,
+    deletionPath:
+      'Holds record ids, not an address or a name; kept with the message row. The privacy-requests work confirms no key embeds an address',
+  },
+  {
+    table: 'messages',
+    column: 'failure_reason',
+    kind: 'identifier',
+    data: "A provider's error text for a failed send, cut to 500 characters, which can repeat the recipient address",
+    location: databaseLocation,
+    deletionPath:
+      "Not yet anonymized: the privacy-requests work adds the message log's step, which clears it",
+  },
+  {
+    table: 'rate_limits',
+    column: 'key',
+    kind: 'identifier',
+    data: 'A surface name and a SHA-256 of the subject: an email for sign-in links, an address plus a form name for forms, a device key, hold id, or token for the others. A hash of an email can be reversed by guessing, so it counts as personal data',
+    location: databaseLocation,
+    deletionPath:
+      'No anonymize step: a row is dead at expires_at (windows are at most one hour) and the purge removes it, so nothing outlives its window',
+  },
+  {
+    table: 'jobs',
+    column: 'payload',
+    kind: 'link',
+    data: 'The ids of the rows a job works on (an order id for the guest and host emails); a handler reads any address from the row',
+    location: databaseLocation,
+    deletionPath:
+      'Finished jobs are purged on a schedule; a job kind that puts an address or a name in its payload must be added here with its own step',
+  },
+  {
+    table: 'jobs',
+    column: 'dedupe_key',
+    kind: 'link',
+    data: 'A key built from record ids so a job is queued once',
+    location: databaseLocation,
+    deletionPath: 'Removed with the job when finished jobs are purged',
+  },
+  {
+    table: 'legal_acceptances',
+    column: 'subject_id',
+    kind: 'link',
+    data: 'The order or host that accepted a document',
+    location: databaseLocation,
+    deletionPath:
+      'Rows stay as the proof of acceptance (the records a deletion request may not remove); the order or host they point at is anonymized by its own step',
+  },
+  {
+    table: 'photos',
+    column: 'rights_holder',
+    kind: 'identifier',
+    data: 'The name of the photographer or company that holds the rights to a host photo',
+    location: databaseLocation,
+    deletionPath:
+      'Not a guest. Kept as the rights record while the photo is published; ops edits or removes it with the photo',
+  },
 ];
 
+const notPersonal = (
+  table: string,
+  reason: string,
+  columns: readonly string[],
+) => columns.map((column) => ({ table, column, reason }));
+
+const aRandomId = 'A random uuid';
+const aFixedList = 'A fixed list of values';
+const aTime = 'A time';
+const aCountOrTime = 'A count or a time';
+const publishedCopy =
+  'Copy written by Ramble staff and published to every guest';
+const structure =
+  'A reference to another row, or a number or flag, with no text';
+
 /**
- * The columns that hold no personal data, each with the reason, for the tables whose every column
- * is classified. A table listed only in `piiColumns` has its personal columns inventoried and the
- * rest not yet classified.
+ * Every column that holds no personal data, with the reason. A test requires every column of every
+ * table in the schema to be here or in `piiColumns`, once, so a new column fails until it is
+ * classified.
  */
 export const nonPiiColumns: readonly {
   table: string;
   column: string;
   reason: string;
 }[] = [
-  { table: 'guests', column: 'id', reason: 'A random uuid' },
-  {
-    table: 'guests',
-    column: 'created_at',
-    reason: 'A time, with no link to a person once the email is anonymized',
-  },
-  {
-    table: 'guests',
-    column: 'anonymized_at',
-    reason: 'The time of the erasure',
-  },
-  { table: 'consents', column: 'id', reason: 'A random uuid' },
-  { table: 'consents', column: 'kind', reason: 'A fixed list' },
-  { table: 'consents', column: 'status', reason: 'A fixed list' },
-  { table: 'consents', column: 'source', reason: 'A fixed list' },
-  { table: 'consents', column: 'recorded_at', reason: 'A time' },
-  { table: 'privacy_requests', column: 'id', reason: 'A random uuid' },
-  { table: 'privacy_requests', column: 'kind', reason: 'A fixed list' },
-  { table: 'privacy_requests', column: 'status', reason: 'A fixed list' },
-  { table: 'privacy_requests', column: 'created_at', reason: 'A time' },
-  { table: 'privacy_requests', column: 'resolved_at', reason: 'A time' },
+  ...notPersonal('guests', aRandomId, ['id']),
+  ...notPersonal(
+    'guests',
+    'A time, with no link to a person once the email is anonymized',
+    ['created_at'],
+  ),
+  ...notPersonal('guests', 'The time of the erasure', ['anonymized_at']),
+  ...notPersonal('consents', aRandomId, ['id']),
+  ...notPersonal('consents', aFixedList, ['kind', 'status', 'source']),
+  ...notPersonal('consents', aTime, ['recorded_at']),
+  ...notPersonal('privacy_requests', aRandomId, ['id']),
+  ...notPersonal('privacy_requests', aFixedList, ['kind', 'status']),
+  ...notPersonal('privacy_requests', aTime, ['created_at', 'resolved_at']),
+  ...notPersonal('messages', aRandomId, ['id']),
+  ...notPersonal(
+    'messages',
+    'Fixed per template today: the subject line takes no data. A template that puts a name in it moves this column to the personal list',
+    ['subject'],
+  ),
+  ...notPersonal('messages', aFixedList, ['template', 'status', 'adapter']),
+  ...notPersonal('messages', "The provider's own id for the message", [
+    'provider_message_id',
+  ]),
+  ...notPersonal('messages', 'A count', ['attempts']),
+  ...notPersonal('messages', aTime, ['created_at', 'updated_at']),
+  ...notPersonal('email_suppressions', aFixedList, ['reason']),
+  ...notPersonal('email_suppressions', structure, ['source_message_id']),
+  ...notPersonal('email_suppressions', aTime, ['created_at']),
+  ...notPersonal('rate_limits', aCountOrTime, [
+    'count',
+    'window_started_at',
+    'expires_at',
+  ]),
+  ...notPersonal('jobs', aRandomId, ['id']),
+  ...notPersonal('jobs', 'The job type, from a registry in code', ['kind']),
+  ...notPersonal('jobs', aFixedList, ['status']),
+  ...notPersonal('jobs', aCountOrTime, [
+    'attempts',
+    'max_attempts',
+    'run_after',
+    'locked_until',
+    'created_at',
+    'finished_at',
+  ]),
+  ...notPersonal(
+    'jobs',
+    'The error kind and a message the logger redaction list has cleaned, cut to 2000 characters',
+    ['last_error'],
+  ),
+  ...notPersonal('legal_acceptances', aRandomId, ['id']),
+  ...notPersonal('legal_acceptances', structure, ['legal_document_id']),
+  ...notPersonal('legal_acceptances', aFixedList, ['subject_kind']),
+  ...notPersonal('legal_acceptances', aTime, ['accepted_at']),
+  ...notPersonal('legal_documents', publishedCopy, ['doc', 'title', 'body']),
+  ...notPersonal('legal_documents', aRandomId, ['id']),
+  ...notPersonal('legal_documents', 'A number, a fixed list, or a time', [
+    'version',
+    'status',
+    'published_at',
+    'created_at',
+  ]),
+  ...notPersonal('settings', 'Ops switches and numbers; a single row', [
+    'id',
+    'banner_text',
+    'bookings_paused',
+    'gifts_enabled',
+    'checkout_maintenance',
+    'hold_minutes',
+    'payment_grace_minutes',
+    'gift_validity_months',
+    'gift_expiry_action',
+    'tax_rate_ppm',
+    'updated_at',
+  ]),
+  ...notPersonal('cancellation_tiers', 'Policy configuration', [
+    'id',
+    'key',
+    'name',
+    'full_refund_hours_before',
+    'is_default',
+  ]),
+  ...notPersonal(
+    'hosts',
+    'A host business as published on its listings; hosts are suppliers, and no guest data lives here',
+    ['id', 'slug', 'name', 'description', 'time_zone', 'created_at'],
+  ),
+  ...notPersonal('categories', publishedCopy, ['id', 'slug', 'name']),
+  ...notPersonal('neighborhoods', publishedCopy, ['id', 'slug', 'name']),
+  ...notPersonal('experiences', publishedCopy, [
+    'slug',
+    'name',
+    'description',
+    'meeting_point',
+    'included',
+    'accessibility_notes',
+    'link_out_url',
+    'affiliate_url',
+  ]),
+  ...notPersonal('experiences', structure, [
+    'id',
+    'host_id',
+    'category_id',
+    'neighborhood_id',
+    'cancellation_tier_id',
+    'duration_minutes',
+    'outdoor',
+    'weather_decision_hours',
+    'min_age',
+    'max_age',
+    'waiver_required',
+    'waiver_document_id',
+    'created_at',
+  ]),
+  ...notPersonal('experiences', aFixedList, [
+    'status',
+    'weather_policy',
+    'age_rule',
+    'tax_treatment',
+  ]),
+  ...notPersonal('price_options', structure, [
+    'id',
+    'experience_id',
+    'kind',
+    'price_minor',
+    'uses_space',
+  ]),
+  ...notPersonal('photos', publishedCopy, ['alt_text', 'url', 'storage_key']),
+  ...notPersonal('photos', structure, [
+    'id',
+    'experience_id',
+    'position',
+    'width',
+    'height',
+    'byte_size',
+    'decorative',
+    'blur_data_url',
+    'created_at',
+  ]),
+  ...notPersonal('photos', 'The rights record of a photo, not a person', [
+    'rights_basis',
+    'rights_license',
+    'rights_source_url',
+  ]),
+  ...notPersonal('slug_history', 'A retired public address of a page', [
+    'id',
+    'entity_kind',
+    'entity_id',
+    'slug',
+    'retired_at',
+  ]),
+  ...notPersonal('session_templates', structure, [
+    'id',
+    'experience_id',
+    'weekday',
+    'start_time',
+    'duration_minutes',
+    'allocation',
+    'source',
+    'created_at',
+  ]),
+  ...notPersonal('sessions', structure, [
+    'id',
+    'experience_id',
+    'template_id',
+    'local_date',
+    'starts_at',
+    'ends_at',
+    'time_zone',
+    'allocation',
+    'seats_sold',
+    'status',
+    'source',
+    'version',
+  ]),
+  ...notPersonal(
+    'sessions',
+    'A reason ops gives for cancelling a session, written about the session and not a guest',
+    ['cancel_reason'],
+  ),
+  ...notPersonal('collections', publishedCopy, [
+    'id',
+    'kind',
+    'slug',
+    'title',
+    'summary',
+    'intro',
+    'status',
+    'published_at',
+    'created_at',
+    'updated_at',
+  ]),
+  ...notPersonal('collection_items', publishedCopy, [
+    'id',
+    'collection_id',
+    'experience_id',
+    'position',
+    'note',
+  ]),
+  ...notPersonal('help_articles', publishedCopy, [
+    'id',
+    'slug',
+    'title',
+    'summary',
+    'body',
+    'position',
+    'status',
+    'published_at',
+    'created_at',
+    'updated_at',
+  ]),
+  ...notPersonal('home_modules', publishedCopy, [
+    'id',
+    'position',
+    'kind',
+    'enabled',
+    'heading',
+    'body',
+    'collection_id',
+    'collection_kind',
+  ]),
+  ...notPersonal('pages', publishedCopy, [
+    'id',
+    'category_id',
+    'neighborhood_id',
+    'heading',
+    'meta_description',
+    'intro',
+    'body',
+    'status',
+    'published_at',
+    'updated_at',
+  ]),
 ];
 
 export type PiiVendor = {

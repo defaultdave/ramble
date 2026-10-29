@@ -1,7 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { ExperienceError } from './ExperienceError';
 import { ExperiencePage } from './ExperiencePage';
 import {
   bareExperience,
@@ -167,26 +166,5 @@ describe('ExperiencePage', () => {
   it('shows the gallery placeholder when there is no photo', () => {
     render(<ExperiencePage view={bareExperience} />);
     expect(screen.getByText('Photos are on their way')).toBeInTheDocument();
-  });
-});
-
-describe('ExperienceError', () => {
-  it('keeps a heading and says what went wrong', () => {
-    render(<ExperienceError retryHref="/experiences/kayak-1" />);
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      'Experience',
-    );
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      "We couldn't load this experience",
-    );
-  });
-
-  it('retries with a GET form to the same address', () => {
-    render(<ExperienceError retryHref="/experiences/kayak-1" />);
-    const button = screen.getByRole('button', { name: 'Try again' });
-    const form = button.closest('form');
-    expect(form).toHaveAttribute('action', '/experiences/kayak-1');
-    expect(form).toHaveAttribute('method', 'get');
-    expect(button).toHaveAttribute('type', 'submit');
   });
 });

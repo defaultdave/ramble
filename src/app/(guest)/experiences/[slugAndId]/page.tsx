@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { ExperienceError, ExperiencePage } from '@/components/ExperiencePage';
+import { ExperiencePage } from '@/components/ExperiencePage';
+import { PageError } from '@/components/PageError';
 import {
   buildExperiencePage,
   experienceHead,
@@ -49,7 +50,14 @@ export default async function ExperienceRoute({
       : null;
   } catch (error) {
     rethrowOrLog('The experience page could not be read', error);
-    return <ExperienceError retryHref={experiencePath(address)} />;
+    return (
+      <PageError
+        title="Experience"
+        alertTitle="We couldn't load this experience"
+        alertBody="Something went wrong on our side. Try again in a moment."
+        retryHref={experiencePath(address)}
+      />
+    );
   }
 
   if (!view) notFound();

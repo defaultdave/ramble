@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { ExperienceError, ExperiencePage } from '@/components/ExperiencePage';
+import { ExperiencePage } from '@/components/ExperiencePage';
 import {
   bareExperience,
   kidsClass,
@@ -7,7 +7,6 @@ import {
 } from './ExperiencePage.fixtures';
 
 // One story per state of the experience page, on a phone (Figma 03) and from the tablet width (D03),
-// plus the error state (S3) beside the listing pages' own.
 const meta = {
   title: 'Experience/ExperiencePage',
   component: ExperiencePage,
@@ -56,22 +55,4 @@ export const BareDesktop: Story = {
   args: { view: bareExperience },
   globals: desktop,
   parameters: fullWidth,
-};
-
-type ErrorStory = StoryObj<typeof ExperienceError>;
-
-export const ErrorMobile: ErrorStory = {
-  render: () => <ExperienceError retryHref="/experiences/sunset-kayak-1" />,
-  globals: mobile,
-  parameters: {
-    a11y: { config: { rules: [{ id: 'landmark-unique', enabled: false }] } },
-  },
-};
-export const ErrorDesktop: ErrorStory = {
-  render: () => <ExperienceError retryHref="/experiences/sunset-kayak-1" />,
-  globals: desktop,
-  parameters: {
-    colorScheme: 'light',
-    a11y: { config: { rules: [{ id: 'landmark-unique', enabled: false }] } },
-  },
 };

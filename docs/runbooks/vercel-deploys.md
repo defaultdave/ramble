@@ -22,11 +22,11 @@ The PM measured the previous 24 hours on 2026-10-29 with `vercel ls --json`:
 | Previews on `promote/*` | 2 |
 | Previews, total | 129 |
 
-That is 45 + 129 = 174 against a cap of 100. The cap blocked a needed production redeploy.
+That is 45 + 129 = 174 against a cap of 100. The cap blocked a needed production redeploy, per the owner's CLI error above.
 
 An Ignored Build Step does not help: Vercel's [Project settings](https://vercel.com/docs/project-configuration/project-settings#ignored-build-step) page says canceled builds are counted as full deployments toward the deployment quota. So the route is to not create the deployment, using `git.deploymentEnabled` ([Git Configuration](https://vercel.com/docs/project-configuration/git-configuration#git.deploymentenabled)). That page says the setting stops listed branches from triggering a deployment on commits. It does not state the effect on the quota, so "disabled branches no longer count" is (unverified). Measure it after merge: push a `unit/*` branch, confirm no deployment row appears in Vercel, and watch the day's count.
 
-`vercel.json` turns automatic deployments off for `main`, `unit/*`, `pm/*`, `sync/*`, and `promote/*`. Other branches keep Vercel's default of deploying. Two stay on, and `tests/vercel-config.test.ts` fails if a later edit turns them off or covers them with a wildcard:
+`vercel.json` turns automatic deployments off for `main`, `unit/*`, `pm/*`, `sync/*`, and `promote/*`. Other branches keep Vercel's default of deploying (Git Configuration page: default `true`, "any unspecified branch is set to `true`"). Two stay on, and `tests/vercel-config.test.ts` fails if a later edit turns them off or covers them with a wildcard:
 
 - `integration`: kept on so its build can still be opened on demand, and because the Vercel and Neon integration wires its Preview environment variables to the `staging` Neon branch (see `docs/runbooks/secret-rotation.md`, Neon database URLs). The nightly smoke does not use it: `.github/workflows/nightly-smoke.yml` checks out the sha and runs `pnpm run smoke` against a local `next start` (`playwright.config.ts`, port 3100).
 - `production`: the Production Branch, below.
@@ -35,15 +35,15 @@ The Git Configuration page documents the combining rule: patterns are minimatch 
 
 ## Neon preview branches for disabled branches
 
-A disabled branch has no preview deployment, so the integration creates no Neon preview branch for it (unverified). The `expire preview branch` job in `.github/workflows/neon-preview-branch.yml` waits 5 minutes for that Neon branch and then fails, so on PRs from `unit/*`, `pm/*`, `sync/*`, and `promote/*` it would fail. A companion change (branch `unit/U-001-neon-skip`, file `.github/workflows/neon-preview-branch.yml`) skips the job for those branches. It lands separately under the owner's login because `.github/` is protected, and it must merge before this change; otherwise the `expire preview branch` job fails on unit, pm, sync, and promote PRs until it lands. Until this change and that one both merge, those PRs still get previews and Neon branches, and the `delete` job removes the branch on close; only the 7-day expiry is skipped for them.
+A disabled branch has no preview deployment (unverified, derived from the setting), so the integration creates no Neon preview branch for it (unverified). The integration names that branch `preview/<git branch>` (header comment of `neon-preview-branch.yml`). The `expire preview branch` job in `.github/workflows/neon-preview-branch.yml` waits 5 minutes for that Neon branch and then fails, so on PRs from `unit/*`, `pm/*`, `sync/*`, and `promote/*` it would fail. A companion change (branch `unit/U-001-neon-skip`, file `.github/workflows/neon-preview-branch.yml`) skips the job for those branches. It lands separately under the owner's login because `.github/` is protected, and it must merge before this change; otherwise the `expire preview branch` job fails on unit, pm, sync, and promote PRs until it lands. Until this change and that one both merge, those PRs still get previews (current setting, unverified) and Neon branches (per the same header comment), and the `delete` job removes the branch on close; only the 7-day expiry is skipped for them.
 
 ## Seeing a unit's change on demand
 
-Storybook and the PR evidence images are the default way to review a change. When a real deployment is needed, run `vercel deploy` from the unit's branch (not `--prod`). That creates a preview, and each one is expected to use one of the day's 100 (unverified). A push to a disabled branch is expected to create none (unverified, see above).
+Storybook and the PR evidence images are the default way to review a change. When a real deployment is needed, run `vercel deploy` from the unit's branch (not `--prod`). That creates a preview (Vercel [Environments](https://vercel.com/docs/deployments/environments#preview-environment-pre-production): deploying with the CLI without `--prod`), and each one is expected to use one of the day's 100 (unverified). A push to a disabled branch is expected to create none (unverified, see above).
 
 ## Production flow
 
-Production deploys when `production` is pushed. Dave refreshes it under his own login:
+Once `production` is the Production Branch, a push to it creates a production deployment ([Git docs](https://vercel.com/docs/git#production-branch): a production deployment is created each time you merge to the production branch). Before that setting is switched this does not hold (see the setup steps). Dave refreshes it under his own login:
 
 ```
 git fetch origin && git push origin origin/main:refs/heads/production
@@ -58,21 +58,21 @@ Agents cannot push `production` in practice: `scripts/merge-desk/agent-git.ts` o
 Do these in order.
 
 1. Check which rules apply to the `production` branch: run `gh api repos/defaultdave/ramble/rules/branches/production`. Look for any rule of type `creation`, `update`, `deletion`, `non_fast_forward`, or `required_status_checks`; an empty list `[]` means no rule applies. If one applies, your login must be able to bypass it, or the push in step 2 fails. To list the rulesets themselves (id, name, target, enforcement only), run `gh api repos/defaultdave/ramble/rulesets`. Adding a rule that limits who may push `production` is Dave's decision.
-2. Create the branch first: `git fetch origin && git push origin origin/main:refs/heads/production`. While the Production Branch setting is still `main`, Vercel builds this push as a preview (unverified). Expect one preview deployment; the integration will probably create a `preview/production` Neon branch with no expiry (unverified), and `scripts/vercel-build.sh` runs `db:migrate` on it. Delete that Neon preview branch afterwards in the Neon console.
+2. Create the branch first: `git fetch origin && git push origin origin/main:refs/heads/production`. While the Production Branch setting is still `main`, Vercel builds this push as a preview (unverified; the Environments page says pushes to a non-production branch create previews, and `production` is not the Production Branch yet). Expect one preview deployment; the integration will probably create a `preview/production` Neon branch with no expiry (unverified), and `scripts/vercel-build.sh` runs `db:migrate` on it. Delete that Neon preview branch afterwards in the Neon console.
 3. Set the Production Branch to `production`. Vercel's Git docs ([Production branch](https://vercel.com/docs/git#production-branch)) say: Project Settings, Environments, click Production, Branch Tracking, change the branch name, Save. Verify in the current Vercel UI, since the dashboard layout changes.
-4. Trigger the first production deployment. Switching the setting builds nothing by itself, so until this step the live site stays stale. Which command applies depends on `main`:
+4. Trigger the first production deployment. Switching the setting is expected to build nothing by itself (unverified), so until this step the live site is expected to stay stale (unverified). Which command applies depends on `main`:
    - `main` has moved since step 2: run `git fetch origin && git push origin origin/main:refs/heads/production` again. Once the setting is switched, that push is expected to create a Production deployment (unverified). If Vercel instead builds it as a preview, `scripts/vercel-build.sh` runs `db:migrate` when `VERCEL_ENV` is `preview`, so watch this first push and check which environment it used.
-   - Nothing new to push (git prints "Everything up-to-date" and no event fires): in the Vercel dashboard use Deployments, Create Deployment, with the branch `production` ([Git docs](https://vercel.com/docs/git#creating-a-deployment-from-a-git-reference)), or run `vercel deploy --prod` from a checkout of `production` ([Environments](https://vercel.com/docs/deployments/environments#production-environment)). Whether either one targets Production for a branch just made the Production Branch is (unverified).
-   - `vercel redeploy <latest production deployment URL> --environment production` is a last resort: the latest production deployment predates the switch, so a redeploy rebuilds that old commit and does not pick up code merged since. The flags are not confirmed in the docs I read (unverified); check `vercel redeploy --help`.
+   - Nothing new to push (git prints "Everything up-to-date" and sends nothing, so Vercel is expected to get no event, unverified): in the Vercel dashboard use Deployments, Create Deployment, with the branch `production` ([Git docs](https://vercel.com/docs/git#creating-a-deployment-from-a-git-reference)), or run `vercel deploy --prod` from a checkout of `production` ([Environments](https://vercel.com/docs/deployments/environments#production-environment)). Whether either one targets Production for a branch just made the Production Branch is (unverified).
+   - `vercel redeploy <latest production deployment URL> --environment production` is a last resort: the latest production deployment predates the switch, so a redeploy is expected to rebuild that old commit and not pick up code merged since (unverified). The flags are not confirmed in the docs I read (unverified); check `vercel redeploy --help`.
 
-Check that Production-scoped environment variables (database, Blob) are present: builds of `production` read Production-scoped variables.
+Check that Production-scoped environment variables (database, Blob) are present: builds of `production` are expected to read Production-scoped variables (unverified; the Environments page says only that the first deployment builds with Production variables).
 
 ## Warning: until step 4, production goes stale
 
-Merges to `main` are expected to create no deployment at all, since `main` is disabled (unverified, derived from the setting). Until Dave switches the Production Branch and triggers the first production deployment, the live demo does not update after a merge. After the switch it updates only when `git fetch origin && git push origin origin/main:refs/heads/production` runs.
+Merges to `main` are expected to create no deployment at all, since `main` is disabled (unverified, derived from the setting). Until Dave switches the Production Branch and triggers the first production deployment, the live demo does not update after a merge. After the switch it is expected to update only when `git fetch origin && git push origin origin/main:refs/heads/production` runs (unverified, derived from the setting).
 
 ## Still to be confirmed
 
 - Whether disabled branches stay out of the daily deployment count (to be measured after merge).
-- What the Vercel dashboard and the GitHub commit status show for a disabled branch. The GitHub page lists deployed, failed, and skipped statuses and says nothing about disabled branches.
+- What the Vercel dashboard and the GitHub commit status show for a disabled branch. The Vercel for GitHub page ([Commit status](https://vercel.com/docs/git/vercel-for-github#commit-status)) lists deployed, failed, and skipped statuses and says nothing about disabled branches.
 - Whether `vercel.json` is read from the pushed commit's own tree. The setting is keyed by branch name, so `production` is unaffected either way.

@@ -1,7 +1,8 @@
 import { updateTag } from 'next/cache';
 import { and, count, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { browseDays, browseWindow, nextBrowseDay } from '@/lib/browse';
+import { browseDays, browseWindowDays, nextBrowseDay } from '@/lib/browse';
+import { upcomingWindow } from '@/lib/sessionWindow';
 import { noFilters } from '@/lib/filters';
 import { minuteAsOf, msPerDay } from '@/lib/time';
 import {
@@ -232,7 +233,7 @@ describe('the curated seed', () => {
 
   it('yields zero browse results for kids in Williamsburg on every weeknight of the window, and the wheel class on a weekend', async () => {
     const asOf = minuteAsOf(now);
-    const { from, to } = browseWindow(asOf);
+    const { from, to } = upcomingWindow(asOf, browseWindowDays);
     const last = Date.parse(to.toISOString().slice(0, 10));
     const dates: string[] = [];
     for (

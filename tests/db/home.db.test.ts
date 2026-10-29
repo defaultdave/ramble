@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ZodError } from 'zod';
-import { homeLimits, thisWeekWindow } from '@/lib/home';
+import { homeLimits } from '@/lib/home';
+import { upcomingWindow } from '@/lib/sessionWindow';
 import {
   categories,
   cancellationTiers,
@@ -27,7 +28,7 @@ import {
 // - without covers asked for, the rows carry no image
 // - an unbounded list of IDs, or an ID that is not a uuid, is refused before the database is asked
 // - the session read returns scheduled sessions that start after the window opens and up to its end, soonest first
-//   (the opening instant is outside, the closing instant inside)
+//   (the opening instant is inside, the closing instant outside)
 // - the session read leaves out cancelled and completed sessions and those of an experience a guest cannot see
 // - the session read never returns more than its limit
 
@@ -107,7 +108,7 @@ async function insertExperience(
 }
 
 const opens = new Date('2026-11-02T15:00:00.000Z');
-const window = thisWeekWindow(opens.toISOString());
+const window = upcomingWindow(opens.toISOString(), homeLimits.thisWeekDays);
 
 async function insertSession(
   experienceId: string,
@@ -334,10 +335,10 @@ describe('listThisWeekSessions', () => {
     });
   });
 
-  it('leaves out the opening instant and keeps the closing one', async () => {
+  it('keeps the opening instant and leaves out the closing one', async () => {
     const experience = await insertExperience();
-    await insertSession(experience.id, window.from);
-    const atEnd = await insertSession(experience.id, window.to);
+    const atStart = await insertSession(experience.id, window.from);
+    await insertSession(experience.id, window.to);
     await insertSession(experience.id, new Date(window.to.getTime() + 1000));
 
     const found = (await home.listThisWeekSessions(window)).filter(
@@ -345,7 +346,7 @@ describe('listThisWeekSessions', () => {
     );
 
     expect(found.map((row) => row.startsAt.getTime())).toEqual([
-      atEnd.startsAt.getTime(),
+      atStart.startsAt.getTime(),
     ]);
   });
 

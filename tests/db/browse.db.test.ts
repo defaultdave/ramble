@@ -1,15 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { ZodError } from 'zod';
 import {
   browseDays,
   browsePageSize,
+  browseWindowDays,
   maxHandEnteredDayRows,
   maxStoredDayRows,
   toBrowsePage,
   type BrowsePage,
 } from '@/lib/browse';
 import { noFilters, type BrowseFilters } from '@/lib/filters';
+import { msPerDay } from '@/lib/time';
 import {
   cancellationTiers,
   categories,
@@ -40,6 +43,7 @@ import {
 // - category and neighborhood filters match any value of their list and both must hold; an unknown slug matches nothing
 // - the date filter matches a scheduled session that starts that day in the host's own calendar, from the
 //   stored date or, for a session entered by hand, from its time zone
+// - a session starting exactly at asOf is offered and matches; one starting exactly at the window's end does neither
 // - a cancelled session, a session already started, and a session past the window never match
 // - the calendar read returns raw stored values only (stored dates, and start and zone of hand-entered sessions) and decides no day
 // - each calendar list has a hard cap
@@ -813,6 +817,39 @@ describe('the calendar read', () => {
   });
 });
 
+describe('the window edges', () => {
+  const opening = asOf;
+  const closing = new Date(
+    new Date(asOf).getTime() + browseWindowDays * msPerDay,
+  ).toISOString();
+
+  it('offers and matches a session starting exactly when the window opens', async () => {
+    const where = await scope();
+    const exp = await insertExperience(where, { name: 'At the opening' });
+    await insertSession(exp.id, opening);
+
+    expect(
+      await daysFor({ categories: [where.category.slug], neighborhoods: [] }),
+    ).toEqual([opening.slice(0, 10)]);
+    expect(
+      names(await list(filtersFor(where, { date: opening.slice(0, 10) }))),
+    ).toEqual(['At the opening']);
+  });
+
+  it('neither offers nor matches a session starting exactly when the window ends', async () => {
+    const where = await scope();
+    const exp = await insertExperience(where, { name: 'At the closing' });
+    await insertSession(exp.id, closing);
+
+    expect(
+      await daysFor({ categories: [where.category.slug], neighborhoods: [] }),
+    ).toEqual([]);
+    expect(
+      (await list(filtersFor(where, { date: closing.slice(0, 10) }))).items,
+    ).toEqual([]);
+  });
+});
+
 describe('days with no space left', () => {
   it('neither offers nor matches a day whose only sessions are sold out, and does both for a day with one space left', async () => {
     const where = await scope();
@@ -939,9 +976,9 @@ describe('input the schema refuses', () => {
   it('refuses a time it cannot read', async () => {
     await expect(
       browse.listBrowseExperiences({ filters: noFilters, after: null }, 'soon'),
-    ).rejects.toThrow(RangeError);
+    ).rejects.toThrow(ZodError);
     await expect(
       browse.listBrowseDayRows({ categories: [], neighborhoods: [] }, 'soon'),
-    ).rejects.toThrow(RangeError);
+    ).rejects.toThrow(ZodError);
   });
 });

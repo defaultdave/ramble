@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 import { BrowseSkeleton } from '@/components/BrowseSkeleton';
 import { browseTitle } from '@/lib/browse';
 import { isIndexable, parseFilters } from '@/lib/filters';
-import { getFilterOptionsOrEmpty } from '@/server/browse';
+import { getFilterOptions } from '@/server/browse';
 import { BrowseContent } from './BrowseContent';
 import styles from './page.module.css';
 
@@ -12,7 +12,7 @@ export async function generateMetadata({
 }: PageProps<'/new-york/browse'>): Promise<Metadata> {
   const query = parseFilters(await searchParams);
   return {
-    title: browseTitle(query.filters, await getFilterOptionsOrEmpty()),
+    title: browseTitle(query.filters, await getFilterOptions()),
     robots: isIndexable(query) ? undefined : { index: false, follow: true },
   };
 }

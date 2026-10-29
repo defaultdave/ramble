@@ -9,6 +9,7 @@ import {
   errorView,
   withBrowseCovers,
 } from '@/lib/browse';
+import { errorDigest } from '@/lib/errorDigest';
 import { parseFilters, type RawSearchParams } from '@/lib/filters';
 import { coverLookupIds, coversByExperience } from '@/lib/photoViews';
 import { minuteAsOf } from '@/lib/time';
@@ -50,10 +51,7 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
     // Only the digest is logged. Next.js strips the message of an error that crosses a cached
     // function, and the digest finds the line it logged there, which names the kind of failure.
     logger.error('Browse could not be read', {
-      digest:
-        error instanceof Error && 'digest' in error
-          ? String(error.digest)
-          : undefined,
+      digest: errorDigest(error),
     });
     return (
       <>

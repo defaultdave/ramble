@@ -7,7 +7,6 @@ import type { Category, Neighborhood } from '@/lib/catalog';
 import type { BrowseFilters, BrowseQuery } from '@/lib/filters';
 import { listBrowseDayRows, listBrowseExperiences } from '@/server/db/browse';
 import { listCategories, listNeighborhoods } from '@/server/db/catalog';
-import { logger } from '@/server/monitoring/logger';
 
 /**
  * What leaves a failed read. A database error carries the query and its values, and Next.js logs
@@ -75,26 +74,4 @@ export async function getFilterOptions(): Promise<{
     Promise.all([listCategories(), listNeighborhoods()]),
   );
   return { categories, neighborhoods };
-}
-
-/**
- * The filter options for the page title, which can do without them: a failed read gives empty lists
- * and the title loses the names. Only the digest is logged, as `BrowseContent` does, never the error.
- */
-export async function getFilterOptionsOrEmpty(): Promise<
-  Awaited<ReturnType<typeof getFilterOptions>>
-> {
-  try {
-    return await getFilterOptions();
-  } catch (error) {
-    // Next.js ends a prerender by throwing; swallowing that would break the render.
-    unstable_rethrow(error);
-    logger.error('Browse filter names could not be read', {
-      digest:
-        error instanceof Error && 'digest' in error
-          ? String(error.digest)
-          : undefined,
-    });
-    return { categories: [], neighborhoods: [] };
-  }
 }

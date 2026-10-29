@@ -13,7 +13,7 @@ export type HomeHeroProps = {
   /** The module's copy, already rendered. */
   body: ReactNode;
   neighborhoods: readonly { slug: string; name: string }[];
-  /** The earliest day the date field offers, as YYYY-MM-DD. */
+  /** The earliest day the date field offers, as YYYY-MM-DD. It is the venue's today, and the field starts on it. */
   minDate: string;
 };
 
@@ -68,7 +68,13 @@ export function HomeHero({
               </div>
             </div>
             <div className={styles.field}>
-              <Input type="date" name="date" label="When" min={minDate} />
+              <Input
+                type="date"
+                name="date"
+                label="When"
+                min={minDate}
+                defaultValue={minDate}
+              />
             </div>
             <div className={styles.submit}>
               <Button type="submit" iconStart={<Search />}>

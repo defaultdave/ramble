@@ -23,7 +23,7 @@ The page has no hero when staff switch it off. Then a visually hidden h1 stands 
 
 ### The search
 
-The hero's search is a plain GET form to `/new-york/browse`. It sends `neighborhood` (a slug) and `date` (`YYYY-MM-DD`) in the address grammar of `docs/runbooks/browse.md`, and nothing else: the grammar has no party size, so the design's Guests field is not built. A field left empty is sent empty, and the browse page drops an empty value.
+The hero's search is a plain GET form to `/new-york/browse`. It sends `neighborhood` (a slug) and `date` (`YYYY-MM-DD`) in the address grammar of `docs/runbooks/browse.md`, and nothing else: the grammar has no party size, so the design's Guests field is not built. The day field starts on today in New York (`venueToday`), which is also the earliest day it offers, so a guest who submits at once browses today. A field the guest clears is sent empty, and the browse page drops an empty value.
 
 ## Reads and cache
 

@@ -16,7 +16,7 @@ import {
 
 // Behaviours under test, one per decision, branch or risk:
 // - the hero is the page's one h1, with its copy, and its search is a GET form to the browse page
-// - the search offers every neighborhood after "Anywhere", a date no earlier than today, and a submit
+// - the search offers every neighborhood after "Anywhere", a date no earlier than today that starts on today, and a submit
 // - each category links to the browse page filtered by it
 // - Ramble Picks shows its cards under an h2 with an h3 each, links to the whole Pick, and carries the anchor
 // - a guide-only card links out and says it is not bookable
@@ -82,6 +82,13 @@ describe('hero search', () => {
     render_([hero]);
     expect(screen.getByLabelText('When')).toHaveAttribute('min', '2026-11-02');
     expect(screen.getByLabelText('When')).toHaveAttribute('type', 'date');
+  });
+});
+
+describe('hero search date', () => {
+  it('starts on the day it was given, which is the earliest it offers', () => {
+    render_([hero]);
+    expect(screen.getByLabelText('When')).toHaveValue('2026-11-02');
   });
 });
 

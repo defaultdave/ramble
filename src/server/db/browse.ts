@@ -156,13 +156,28 @@ async function attachPriceOptions(
   );
 }
 
+/** The experience an `after` id names, if a guest can see it. Its columns are in the page order, which `pastCursor` compares them by. */
+function visibleCursor(after: string) {
+  return dbRead
+    .select({ name: experiences.name, id: experiences.id })
+    .from(experiences)
+    .where(and(eq(experiences.id, after), shownInBrowse()));
+}
+
+/** Every row past the cursor in the page order. When the subquery finds no experience the comparison is NULL, so no row passes. */
+function pastCursor(after: string | null): SQL | undefined {
+  if (after === null) return undefined;
+  return sql`(${experiences.name}, ${experiences.id}) > (${visibleCursor(after)})`;
+}
+
 /**
  * One page of the experiences a guest can see that match the filters, by name and then id, with the
  * row `after` names. A category or neighborhood list matches any of its values, and the date matches
  * an experience with a scheduled session that starts on that day in the window. `after` is the id
  * of the last experience on the previous page: the next page is every row past it in the same order,
  * so a row that appears or goes between pages moves nothing that was already shown. When no visible
- * experience has the `after` id there is no place to start from, so no page is read.
+ * experience has the `after` id, the page is empty and `cursor` is null; `toBrowsePage` decides what
+ * that means, this function only reports what it found.
  */
 export async function listBrowseExperiences(
   query: BrowseQuery,
@@ -171,18 +186,10 @@ export async function listBrowseExperiences(
   const { filters, after } = BrowseQuerySchema.parse(query);
   const window = browseWindow(asOf);
 
-  let cursor: BrowseCursorRow | null = null;
-  let pastCursor: SQL | undefined;
-  if (after !== null) {
-    [cursor = null] = await dbRead
-      .select({ id: experiences.id, name: experiences.name })
-      .from(experiences)
-      .where(and(eq(experiences.id, after), shownInBrowse()));
-    if (!cursor) return { cursor, items: [], nextCursor: null };
-    pastCursor = sql`(${experiences.name}, ${experiences.id}) > (${cursor.name}::text, ${cursor.id}::uuid)`;
-  }
+  const cursorRows: Promise<BrowseCursorRow[]> =
+    after === null ? Promise.resolve([]) : visibleCursor(after);
 
-  const rows = await dbRead
+  const pageRows = dbRead
     .select({
       id: experiences.id,
       slug: experiences.slug,
@@ -200,12 +207,13 @@ export async function listBrowseExperiences(
         inChosenCategories(filters.categories),
         inChosenNeighborhoods(filters.neighborhoods),
         hasSessionOn(filters.date, window),
-        pastCursor,
+        pastCursor(after),
       ),
     )
     .orderBy(asc(experiences.name), asc(experiences.id))
     .limit(browsePageSize + 1);
 
+  const [[cursor = null], rows] = await Promise.all([cursorRows, pageRows]);
   const { items, nextCursor } = splitPage(rows, browsePageSize);
   return { cursor, items: await attachPriceOptions(items), nextCursor };
 }

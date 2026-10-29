@@ -167,6 +167,15 @@ describe('toBrowsePage', () => {
       reason: 'cursor_not_found',
     });
   });
+
+  it('is outdated, not empty, for the read the data layer gives a cursor it cannot find', () => {
+    // No row, no items, no next page: what listBrowseExperiences answers for a hidden or unknown `after`.
+    const notFound = read({ cursor: null, items: [], nextCursor: null });
+    expect(toBrowsePage(id(9), notFound)).toEqual({
+      ok: false,
+      reason: 'cursor_not_found',
+    });
+  });
 });
 
 describe('withPriceOptions', () => {

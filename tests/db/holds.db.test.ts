@@ -27,6 +27,7 @@ import {
 } from './harness';
 import { testDevice } from '../deviceFixture';
 import {
+  clearHolds,
   day,
   hash,
   insertHold,
@@ -51,6 +52,11 @@ import {
 // - a capacity edit is refused below seats sold plus open holds, allowed at exactly that, and lapsed holds
 //   do not block it
 
+const cache = vi.hoisted(() => ({
+  updateTag: vi.fn<(tag: string) => void>(),
+  revalidateTag: vi.fn<(tag: string, profile: string) => void>(),
+}));
+vi.mock('next/cache', () => cache);
 vi.mock(
   'next/headers',
   async () => (await import('../deviceFixture')).nextHeadersMock,
@@ -83,6 +89,10 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  // The limits count a device's holds in every session, so a test starts with none.
+  await clearHolds(client.db);
+  cache.updateTag.mockClear();
+  cache.revalidateTag.mockClear();
   await client.db
     .update(settings)
     .set({ bookingsPaused: false, holdMinutes: 10, taxRatePpm: 88_750 });
@@ -346,6 +356,8 @@ describe('constraints on hold_items', () => {
   let hold: Awaited<ReturnType<typeof insertHold>>;
   beforeAll(async () => {
     bookable = await seedBookable(client.db);
+  });
+  beforeEach(async () => {
     hold = await insertHold(client.db, bookable.session.id);
   });
 
@@ -551,7 +563,7 @@ describe('reserveSpaces answers held', () => {
     );
   });
 
-  it('gives a device two holds on two sessions, because supersede is not built', async () => {
+  it('gives a device a hold on each of two sessions', async () => {
     const bookable = await seedBookable(client.db);
     const other = await insertSession(client.db, bookable.experience.id);
 
@@ -562,6 +574,7 @@ describe('reserveSpaces answers held', () => {
     });
 
     expect(second.status).toBe('held');
+    expect(await totalHolds()).toBe(2);
   });
 });
 
@@ -1299,6 +1312,20 @@ describe('capacity edits count open holds', () => {
       ok: true,
       session: { allocation: 7 },
     });
+  });
+
+  it('invalidates the session spaces tag on a saved edit and on no refusal', async () => {
+    const bookable = await seedBookable(client.db, { allocation: 8 });
+    await reserveHeld(bookable, 4);
+    cache.updateTag.mockClear();
+
+    await edit(bookable, 3);
+    expect(cache.updateTag).not.toHaveBeenCalled();
+
+    await edit(bookable, 9);
+    expect(cache.updateTag.mock.calls).toEqual([
+      [`session:${bookable.session.id}`],
+    ]);
   });
 
   it('counts a paying hold that is still inside paying_until', async () => {

@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { holdLimits } from '@/lib/holds';
+import { releaseLapsedHolds, scrubReleasedHolds } from '@/server/db/holds';
 import { PURGE_BATCH, purgeExpiredRateLimits } from '@/server/db/rateLimits';
 import { drainJobs } from '@/server/jobs/drain';
 import { sendHeartbeat } from '@/server/monitoring/heartbeat';
@@ -12,6 +14,10 @@ vi.mock('@/server/db/rateLimits', () => ({
   PURGE_BATCH: 1000,
   purgeExpiredRateLimits: vi.fn(),
 }));
+vi.mock('@/server/db/holds', () => ({
+  releaseLapsedHolds: vi.fn(),
+  scrubReleasedHolds: vi.fn(),
+}));
 vi.mock('@/server/monitoring/heartbeat', () => ({ sendHeartbeat: vi.fn() }));
 vi.mock('@/server/ports/rate-limit', () => ({ consumeRateLimit: vi.fn() }));
 
@@ -24,6 +30,8 @@ vi.mock('@/server/ports/rate-limit', () => ({ consumeRateLimit: vi.fn() }));
 // - a limiter store failure is thrown, not let through
 // - a body over 1 KB (declared or streamed) gets 413, and a body that is not { asOf } gets 400, before any work
 // - asOf while DEMO_CLOCK is off, or beyond 400 days, gets 400 and no work
+// - the pulse releases lapsed holds and scrubs old ones in batches until a short batch or the batch cap, on a
+//   manual time as well (holds are judged at database time), and a failed cleanup is thrown with no heartbeat
 // - a plain pulse drains on the system clock, purges until a short batch, pings the heartbeat once, and answers counts only
 // - asOf with DEMO_CLOCK on drains on a clock fixed at asOf and sends no heartbeat
 // - a drain or purge failure is thrown and sends no heartbeat
@@ -69,6 +77,8 @@ beforeEach(() => {
   vi.mocked(consumeRateLimit).mockReset().mockResolvedValue(allowed);
   vi.mocked(drainJobs).mockReset().mockResolvedValue(report);
   vi.mocked(purgeExpiredRateLimits).mockReset().mockResolvedValue(0);
+  vi.mocked(releaseLapsedHolds).mockReset().mockResolvedValue(0);
+  vi.mocked(scrubReleasedHolds).mockReset().mockResolvedValue(0);
   vi.mocked(sendHeartbeat).mockReset().mockResolvedValue('sent');
 });
 
@@ -242,7 +252,12 @@ describe('a good pulse', () => {
     const response = await pulseResponse(post());
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ...report, purged: 2017 });
+    expect(await response.json()).toEqual({
+      ...report,
+      purged: 2017,
+      holdsReleased: 0,
+      holdsScrubbed: 0,
+    });
     expect(purgeExpiredRateLimits).toHaveBeenCalledTimes(3);
     expect(sendHeartbeat).toHaveBeenCalledExactlyOnceWith(
       'https://uptime.example/h/abc',
@@ -262,6 +277,54 @@ describe('a good pulse', () => {
 
     expect(purgeExpiredRateLimits).toHaveBeenCalledOnce();
     clockReads.mockRestore();
+  });
+
+  it('releases lapsed holds and scrubs old ones in batches until a short batch, and counts both', async () => {
+    const full = holdLimits.cleanupBatch;
+    vi.mocked(releaseLapsedHolds)
+      .mockResolvedValueOnce(full)
+      .mockResolvedValueOnce(3);
+    vi.mocked(scrubReleasedHolds)
+      .mockResolvedValueOnce(full)
+      .mockResolvedValueOnce(full)
+      .mockResolvedValueOnce(1);
+
+    const counts: unknown = await (await pulseResponse(post())).json();
+
+    expect(counts).toMatchObject({
+      holdsReleased: full + 3,
+      holdsScrubbed: 2 * full + 1,
+    });
+    expect(releaseLapsedHolds).toHaveBeenCalledTimes(2);
+    expect(scrubReleasedHolds).toHaveBeenCalledTimes(3);
+  });
+
+  it('stops cleaning at the batch cap, whatever the batches return', async () => {
+    vi.mocked(releaseLapsedHolds).mockResolvedValue(holdLimits.cleanupBatch);
+
+    await pulseResponse(post());
+
+    expect(releaseLapsedHolds).toHaveBeenCalledTimes(
+      holdLimits.cleanupMaxBatches,
+    );
+  });
+
+  it('cleans up holds on a manual time too, because holds are judged at database time', async () => {
+    testEnv.DEMO_CLOCK = 'on';
+    const near = new Date(realNowMs() + 24 * 3600 * 1000);
+
+    await pulseResponse(post(JSON.stringify({ asOf: near.toISOString() })));
+
+    expect(releaseLapsedHolds).toHaveBeenCalledOnce();
+    expect(releaseLapsedHolds).toHaveBeenCalledWith();
+    expect(scrubReleasedHolds).toHaveBeenCalledOnce();
+  });
+
+  it('throws a failed cleanup and sends no heartbeat', async () => {
+    vi.mocked(releaseLapsedHolds).mockRejectedValue(new Error('boom'));
+
+    await expect(pulseResponse(post())).rejects.toThrow('boom');
+    expect(sendHeartbeat).not.toHaveBeenCalled();
   });
 
   it('runs a manual time on a fixed clock and sends no heartbeat', async () => {
@@ -288,6 +351,8 @@ describe('a good pulse', () => {
       ...report,
       unrecorded: 1,
       purged: 0,
+      holdsReleased: 0,
+      holdsScrubbed: 0,
     });
     expect(purgeExpiredRateLimits).toHaveBeenCalled();
     expect(sendHeartbeat).not.toHaveBeenCalled();

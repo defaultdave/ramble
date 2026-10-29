@@ -18,6 +18,7 @@ import {
   holdPurposes,
   holdReleasedReasons,
   holdStatuses,
+  scrubbedHash,
 } from '@/lib/holds';
 import { MAX_UNIT_PRICE_MINOR } from '@/lib/pricing';
 import { priceOptions, sessions } from './catalog';
@@ -72,6 +73,15 @@ export const holds = pgTable(
     index('holds_session_open_idx')
       .on(table.sessionId)
       .where(sql`${table.status} IN ('active', 'paying')`),
+    // The device limit and the block look up a device's and an address's recent holds.
+    index('holds_device_key_idx').on(table.deviceKey, table.expiresAt),
+    index('holds_ip_hash_idx').on(table.ipHash, table.expiresAt),
+    // The cleanup job finds released holds whose hashes are still to be scrubbed.
+    index('holds_released_unscrubbed_idx')
+      .on(table.updatedAt)
+      .where(
+        sql`${table.status} = 'released' AND ${table.deviceKey} <> ${sql.raw(`'${scrubbedHash}'`)}`,
+      ),
     check(
       'holds_gift_matches_purpose',
       sql`(${table.purpose} = 'gift_redemption') = (${table.giftId} IS NOT NULL)`,

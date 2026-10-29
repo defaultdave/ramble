@@ -21,6 +21,7 @@ import { testDevice } from '../deviceFixture';
 // - two first calls on one hold at once make one order and one attempt, in each of 5 rounds
 // - payments, reserves, and releases on one session in parallel, 20 rounds: no deadlock and no error
 
+vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 vi.mock(
   'next/headers',
   async () => (await import('../deviceFixture')).nextHeadersMock,
@@ -193,13 +194,15 @@ describe('the lock order', () => {
       });
 
     for (let round = 0; round < 20; round += 1) {
-      const held = await reserve(guestA);
+      // A paying hold counts toward the device limit of six seats, so each round pays as a new device.
+      const payer = await testDevice(`checkout-race-payer-${String(round)}`);
+      const held = await reserve(payer);
       if (held.status !== 'held') throw new Error(`not held: ${held.status}`);
       const results = await Promise.allSettled([
-        pay(held.holdId),
-        pay(held.holdId),
+        pay(held.holdId, payer),
+        pay(held.holdId, payer),
         reserve(guestB),
-        holdData.releaseHold(guestA, { holdId: held.holdId }),
+        holdData.releaseHold(payer, { holdId: held.holdId }),
       ]);
 
       expect(

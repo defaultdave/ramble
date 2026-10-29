@@ -1,6 +1,7 @@
 import 'server-only';
 import { clientAddress } from '@/lib/clientAddress';
 import { declaredLengthExceeds } from '@/lib/email/message';
+import { cleanupMayContinue } from '@/lib/holds';
 import { bearerToken } from '@/lib/http';
 import {
   chooseClock,
@@ -12,6 +13,7 @@ import {
   purgeMayContinue,
 } from '@/lib/jobs';
 import { readBodyText } from '@/server/boundedBody';
+import { releaseLapsedHolds, scrubReleasedHolds } from '@/server/db/holds';
 import { PURGE_BATCH, purgeExpiredRateLimits } from '@/server/db/rateLimits';
 import { env } from '@/server/env';
 import { drainJobs } from '@/server/jobs/drain';
@@ -20,27 +22,67 @@ import { fixedClock, systemClock } from '@/server/ports/clock';
 import { consumeRateLimit } from '@/server/ports/rate-limit';
 import { secureEqual } from '@/server/secureEqual';
 
+type PulseCounts = DrainReport & {
+  purged: number;
+  holdsReleased: number;
+  holdsScrubbed: number;
+};
+
 type PulseResult =
-  | { status: 200; counts: DrainReport & { purged: number } }
+  | { status: 200; counts: PulseCounts }
   | { status: 400 | 401 | 413 }
   | { status: 429; retryAfterSeconds: number };
 
-/** Deletes expired rate-limit rows in batches until a short batch or the call's time budget ends. */
-async function purgeRateLimits(startedAt: number): Promise<number> {
+type Progress = { done: number; batches: number; elapsedMs: number };
+
+/** Runs a batch function, summing what it did, until `mayContinue` says the work is done or out of budget. */
+async function runBatches(
+  startedAt: number,
+  batch: () => Promise<number>,
+  mayContinue: (progress: Progress) => boolean,
+): Promise<number> {
   let total = 0;
-  for (;;) {
-    const purged = await purgeExpiredRateLimits();
-    total += purged;
+  for (let batches = 1; ; batches += 1) {
+    const done = await batch();
+    total += done;
     if (
-      !purgeMayContinue({
-        purged,
-        batchSize: PURGE_BATCH,
-        elapsedMs: performance.now() - startedAt,
-      })
+      !mayContinue({ done, batches, elapsedMs: performance.now() - startedAt })
     ) {
       return total;
     }
   }
+}
+
+/** Deletes expired rate-limit rows in batches until a short batch or the call's time budget ends. */
+function purgeRateLimits(startedAt: number): Promise<number> {
+  return runBatches(startedAt, purgeExpiredRateLimits, (progress) =>
+    purgeMayContinue({
+      purged: progress.done,
+      batchSize: PURGE_BATCH,
+      elapsedMs: progress.elapsedMs,
+    }),
+  );
+}
+
+/**
+ * Releases lapsed holds, then scrubs the hashes of long-released ones, each in capped batches. Holds
+ * are judged at database time inside each batch, so a demo `asOf` clock never releases one early.
+ */
+async function cleanUpHolds(
+  startedAt: number,
+): Promise<{ holdsReleased: number; holdsScrubbed: number }> {
+  return {
+    holdsReleased: await runBatches(
+      startedAt,
+      releaseLapsedHolds,
+      cleanupMayContinue,
+    ),
+    holdsScrubbed: await runBatches(
+      startedAt,
+      scrubReleasedHolds,
+      cleanupMayContinue,
+    ),
+  };
 }
 
 /**
@@ -50,16 +92,17 @@ async function purgeRateLimits(startedAt: number): Promise<number> {
 async function runPulse(
   asOf: Date | undefined,
   heartbeat: boolean,
-): Promise<DrainReport & { purged: number }> {
+): Promise<PulseCounts> {
   const startedAt = performance.now();
   const report = await drainJobs(asOf ? fixedClock(asOf) : systemClock);
   const purged = await purgeRateLimits(startedAt);
+  const { holdsReleased, holdsScrubbed } = await cleanUpHolds(startedAt);
   if (
     heartbeatDue({ sendHeartbeat: heartbeat, unrecorded: report.unrecorded })
   ) {
     await sendHeartbeat(env.BETTERSTACK_HEARTBEAT_URL);
   }
-  return { ...report, purged };
+  return { ...report, purged, holdsReleased, holdsScrubbed };
 }
 
 async function handlePulse(request: Request): Promise<PulseResult> {

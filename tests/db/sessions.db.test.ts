@@ -24,6 +24,8 @@ import {
   type FreshDatabase,
 } from './harness';
 
+vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
+
 // Behaviours under test, one per decision, branch or risk:
 // - every CHECK, foreign key and unique index on the two tables refuses its bad row; the
 //   seats_sold CHECK refuses an insert and a later capacity drop alike

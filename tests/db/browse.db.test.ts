@@ -37,6 +37,7 @@ import {
 // - the next page starts after the cursor and no row is shown twice or skipped, including two rows with one name
 // - a row added before the cursor, or hidden after it, between two pages moves nothing already shown
 // - a cursor for a hidden or unknown experience finds no row and reads no page; a visible one returns its row
+// - the cursor row is read once per request, as its own query, and the page query does not read it again
 // - category and neighborhood filters match any value of their list and both must hold; an unknown slug matches nothing
 // - the date filter matches a scheduled session that starts that day in the host's own calendar, from the
 //   stored date or, for a session entered by hand, from its time zone
@@ -943,5 +944,51 @@ describe('input the schema refuses', () => {
     await expect(
       browse.listBrowseDayRows({ categories: [], neighborhoods: [] }, 'soon'),
     ).rejects.toThrow(RangeError);
+  });
+
+  describe('queries sent for a cursor', () => {
+    async function sentQueries(after: string, where: Scope) {
+      const send = vi.spyOn(globalThis, 'fetch');
+      try {
+        await browse.listBrowseExperiences(
+          { filters: filtersFor(where), after },
+          asOf,
+        );
+        return send.mock.calls.map(
+          ([, init]) =>
+            JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+              query: string;
+            },
+        );
+      } finally {
+        send.mockRestore();
+      }
+    }
+
+    it('sends one query for a cursor nobody can see', async () => {
+      const where = await scope();
+      await insertExperience(where, { name: 'A live' });
+
+      const sent = await sentQueries(
+        '00000000-0000-4000-8000-0000000000aa',
+        where,
+      );
+
+      expect(sent).toHaveLength(1);
+    });
+
+    it('reads the cursor row once, and the page query only compares against it', async () => {
+      const where = await scope();
+      const first = await insertExperience(where, { name: 'A first' });
+      await insertExperience(where, { name: 'B second' });
+
+      const sent = await sentQueries(first.id, where);
+
+      const readsCursor = sent.filter(({ query }) =>
+        query.includes('"experiences"."id" = $1'),
+      );
+      expect(readsCursor).toHaveLength(1);
+      expect(sent.length).toBeGreaterThan(1);
+    });
   });
 });

@@ -1,8 +1,17 @@
 import { connection } from 'next/server';
 import { BrowseResults } from '@/components/BrowseResults';
 import { FilterBar } from '@/components/FilterBar';
-import { browseHeading, browseView, errorView } from '@/lib/browse';
-import { parseFilters, type RawSearchParams } from '@/lib/filters';
+import {
+  browseHeading,
+  browseView,
+  emptyBrowsePage,
+  errorView,
+} from '@/lib/browse';
+import {
+  knownFilters,
+  parseFilters,
+  type RawSearchParams,
+} from '@/lib/filters';
 import { minuteAsOf } from '@/lib/time';
 import { venueToday } from '@/lib/venue';
 import {
@@ -28,11 +37,15 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
 
   let loaded;
   try {
-    const [options, dates, page] = await Promise.all([
-      getFilterOptions(),
-      getBrowseDates(filters, asOf),
-      getBrowseResults(query, asOf),
-    ]);
+    const options = await getFilterOptions();
+    // Only slugs the catalog has reach a cache key or the database; the view below keeps the address as it was.
+    const known = knownFilters(filters, options);
+    const [dates, page] = known.matchesNothing
+      ? [[], emptyBrowsePage]
+      : await Promise.all([
+          getBrowseDates(known.filters, asOf),
+          getBrowseResults({ ...query, filters: known.filters }, asOf),
+        ]);
     loaded = { options, dates, page };
   } catch (error) {
     rethrowOrLog('Browse could not be read', error);

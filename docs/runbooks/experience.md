@@ -33,7 +33,7 @@ The cancellation terms are stated by window (`cancellationTerms`). The deadline 
 | `getExperiencePage(id)` | `src/server/experiencePage.ts` | `catalog` | `experience:<id>`, `catalog` |
 | `getCachedGuestSettings()` | `src/server/siteSettings.ts` | `settings` | `settings` |
 
-Both are inside the prerendered shell (their `expire` is over five minutes). A hidden or missing experience is cached as `null`. Publishing, editing, or taking an experience down reaches the entry through `tagsForChange`.
+Both are inside the prerendered shell (their `expire` is over five minutes). A hidden or missing experience, and an ID that is no guid, return `null` under the `uncached` profile (`expire: 0`), so Next.js keeps nothing and made-up IDs fill no cache; each such request reads the database once. Publishing, editing, or taking an experience down reaches the entry through `tagsForChange`.
 
 The lead photo goes through `next/image` preloaded (`next/image`'s `preload`) with its blur placeholder; every photo sits in a frame with a fixed aspect ratio, so nothing shifts when it loads (PRD-68). There is no client island: the phone gallery is a scroll-snap strip, and "See all" is a native `<details>`.
 

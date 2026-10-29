@@ -41,7 +41,20 @@ export const orderCancelledBys = [
 export const orderCurrency = 'USD';
 
 /** Crockford base32 leaves out I, L, O, and U, so a reference read aloud or typed from paper is unambiguous. */
-export const orderReferencePattern = String.raw`^RMB-[0-9A-HJKMNP-TV-Z]{6}$`;
+const referenceCharacterClass = '0-9A-HJKMNP-TV-Z';
+export const orderReferencePattern = `^RMB-[${referenceCharacterClass}]{6}$`;
+
+/** The characters the class spells out, in order, for code that makes a reference. */
+export const crockfordAlphabet = Array.from(
+  referenceCharacterClass.matchAll(/(.)-(.)|(.)/g),
+  ([, from, to, single]) =>
+    from !== undefined && to !== undefined
+      ? Array.from(
+          { length: to.charCodeAt(0) - from.charCodeAt(0) + 1 },
+          (_, step) => String.fromCharCode(from.charCodeAt(0) + step),
+        ).join('')
+      : (single ?? ''),
+).join('');
 const orderReferenceRegex = new RegExp(orderReferencePattern);
 const maxReferenceLength = 10;
 

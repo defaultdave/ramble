@@ -21,6 +21,7 @@ import {
 import {
   bookingIdempotencyKey,
   canOrderTransition,
+  crockfordAlphabet,
   isOrderReference,
   orderAmountDueMinor,
   orderCurrency,
@@ -369,8 +370,6 @@ export function orderItemRows(orderId: string, priced: PricingLines) {
   }));
 }
 
-/** Crockford base32 leaves out I, L, O, and U. */
-const crockfordAlphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 const referenceCharacters = 6;
 /** Tries at a reference that does not clash with an existing one, before the insert gives up. */
 export const referenceTries = 3;
@@ -478,7 +477,7 @@ export type StartDecision =
   | { kind: 'in_flight'; attemptId: string; providerPaymentId: string }
   | { kind: 'resume'; attemptId: string }
   | { kind: 'next_attempt'; attemptNo: number }
-  | { kind: 'create' };
+  | { kind: 'create'; attemptNo: number };
 
 const refuse = (result: StartPaymentResult): StartDecision => ({
   kind: 'refuse',
@@ -561,7 +560,7 @@ export function startPaymentDecision(state: DecisionState): StartDecision {
   const attemptNo = (latestAttempt?.attemptNo ?? 0) + 1;
   if (attemptNo > paymentLimits.maxAttemptNo) return refuse(tooManyTries);
   return order === null
-    ? { kind: 'create' }
+    ? { kind: 'create', attemptNo }
     : { kind: 'next_attempt', attemptNo };
 }
 
@@ -655,10 +654,43 @@ export function providerStep(attempt: {
 export function storeProviderPayment(
   attempt: { status: AttemptStatus; providerPaymentId: string | null },
   paymentId: string,
-): 'store' | 'already_stored' | 'refuse' {
-  if (attempt.providerPaymentId === paymentId) return 'already_stored';
-  if (attempt.providerPaymentId !== null || !isLiveAttempt(attempt.status)) {
-    return 'refuse';
+): { write: boolean; stored: boolean } {
+  if (attempt.providerPaymentId === paymentId) {
+    return { write: false, stored: true };
   }
-  return 'store';
+  if (attempt.providerPaymentId !== null || !isLiveAttempt(attempt.status)) {
+    return { write: false, stored: false };
+  }
+  return { write: true, stored: true };
+}
+
+/**
+ * What a lookup at the provider means for a step: use the payment found; create one when an
+ * earlier call's attempt has none at the provider, or when the attempt is new; and refuse when a
+ * payment id Ramble stored is gone from the provider, because making another would leave the
+ * guest paying for a payment Ramble cannot match.
+ */
+export function lookupVerdict(
+  step: ProviderStep,
+  found: boolean,
+): 'use' | 'create' | 'refuse' {
+  if (found) return 'use';
+  return step.step === 'retrieve' ? 'refuse' : 'create';
+}
+
+/** Only a payment the attempt did not already hold is written to it. */
+export function storesPayment(step: ProviderStep): boolean {
+  return step.step !== 'retrieve';
+}
+
+/** The newsletter consent a checkout records: a grant, only when the box was ticked. */
+export function newsletterConsent(guestId: string, optIn: boolean) {
+  return optIn
+    ? {
+        guestId,
+        kind: 'newsletter' as const,
+        status: 'granted' as const,
+        source: 'checkout' as const,
+      }
+    : null;
 }

@@ -13,6 +13,7 @@ import {
   invalidStartPayment,
   lapsedOutcome,
   newOrderReference,
+  newsletterConsent,
   orderFields,
   orderItemRows,
   orderSnapshot,
@@ -24,6 +25,7 @@ import {
   storeProviderPayment,
   unknownHold,
   type HeldItem,
+  type StartDecision,
   type StartPaymentInput,
   type StartPaymentResult,
 } from '@/lib/checkout';
@@ -51,7 +53,12 @@ import {
   getPublishedLegalDocument,
   recordOrderAcceptances,
 } from './legal';
-import { lockHoldRow, lockOrderRow, lockSessionRow } from './locks';
+import {
+  lockAttemptRow,
+  lockHoldRow,
+  lockOrderRow,
+  lockSessionRow,
+} from './locks';
 import {
   cancellationTiers,
   holdItems,
@@ -261,13 +268,9 @@ async function placePayment(
   if (guest.status !== 'ok') {
     throw new Error('The checkout email was refused after it passed the form');
   }
-  if (request.newsletterOptIn) {
-    const consent = await recordConsent(tx, {
-      guestId: guest.guest.id,
-      kind: 'newsletter',
-      status: 'granted',
-      source: 'checkout',
-    });
+  const grant = newsletterConsent(guest.guest.id, request.newsletterOptIn);
+  if (grant) {
+    const consent = await recordConsent(tx, grant);
     if (
       consent.status === 'invalid' ||
       consent.status === 'guest_unavailable'
@@ -378,7 +381,10 @@ async function insertOrder(
   throw new Error(`No free order reference in ${String(referenceTries)} tries`);
 }
 
-type Decision = ReturnType<typeof startPaymentDecision>;
+type Decision = Exclude<
+  StartDecision,
+  { kind: 'refuse' | 'already_confirmed' | 'lapsed' }
+>;
 
 /** The attempt the provider step works on: the live one the decision found, or the next one. */
 async function attemptFor(
@@ -398,7 +404,7 @@ async function attemptFor(
       existed: true,
     };
   }
-  const attemptNo = decision.kind === 'next_attempt' ? decision.attemptNo : 1;
+  const { attemptNo } = decision;
   const [row] = await tx
     .insert(paymentAttempts)
     .values({
@@ -436,17 +442,11 @@ export async function recordProviderPayment(
     .object({ attemptId: WriteIdSchema, providerPaymentId: ProviderIdSchema })
     .parse({ attemptId, providerPaymentId });
   return db.transaction(async (tx) => {
-    const [row] = await tx
-      .select({ attempt: paymentAttempts, deviceKey: holds.deviceKey })
-      .from(paymentAttempts)
-      .innerJoin(orders, eq(orders.id, paymentAttempts.orderId))
-      .innerJoin(holds, eq(holds.id, orders.holdId))
-      .where(eq(paymentAttempts.id, ids.attemptId))
-      .for('update', { of: paymentAttempts });
+    const row = await lockAttemptRow(tx, ids.attemptId);
     if (!isHoldOfDevice(row, device.deviceKey)) return false;
     const attempt = PaymentAttemptSchema.parse(row.attempt);
     const verdict = storeProviderPayment(attempt, ids.providerPaymentId);
-    if (verdict === 'store') {
+    if (verdict.write) {
       await tx
         .update(paymentAttempts)
         .set({
@@ -455,6 +455,6 @@ export async function recordProviderPayment(
         })
         .where(eq(paymentAttempts.id, attempt.id));
     }
-    return verdict !== 'refuse';
+    return verdict.stored;
   });
 }

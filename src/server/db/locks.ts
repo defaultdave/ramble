@@ -1,7 +1,13 @@
 import 'server-only';
 import { eq, sql } from 'drizzle-orm';
 import type { Transaction } from './client';
-import { experiences, holds, orders, sessions } from './schema';
+import {
+  experiences,
+  holds,
+  orders,
+  paymentAttempts,
+  sessions,
+} from './schema';
 
 /*
  * THE LOCK ORDER (design doc 4.2.3 rule 1, architecture rule B10). Every transaction that takes
@@ -12,6 +18,8 @@ import { experiences, holds, orders, sessions } from './schema';
  *   3. the hold row               FOR UPDATE          lockHoldRow
  *   4. the order row              FOR UPDATE          lockOrderRow
  *   5. the gift row                                   (a later unit)
+ *   -  the attempt row            FOR UPDATE          lockAttemptRow, taken alone, by the payment's
+ *                                                     second transaction only
  *
  * A path that starts from a hold, an order, or a provider event reads the ids it needs without a
  * lock, then locks in this order and re-checks what it read. Locks are transaction-level only
@@ -89,5 +97,22 @@ export async function lockOrderRow(tx: Transaction, idempotencyKey: string) {
     .from(orders)
     .where(eq(orders.idempotencyKey, idempotencyKey))
     .for('update');
+  return row;
+}
+
+/**
+ * The payment attempt, with the device key of its order's hold, for the payment's second
+ * transaction. Taken alone: that transaction holds no other lock of the order, so it sits outside
+ * the order above and cannot wait on, or be waited on in a cycle by, the paths that follow it.
+ * Undefined when there is no such attempt.
+ */
+export async function lockAttemptRow(tx: Transaction, attemptId: string) {
+  const [row] = await tx
+    .select({ attempt: paymentAttempts, deviceKey: holds.deviceKey })
+    .from(paymentAttempts)
+    .innerJoin(orders, eq(orders.id, paymentAttempts.orderId))
+    .innerJoin(holds, eq(holds.id, orders.holdId))
+    .where(eq(paymentAttempts.id, attemptId))
+    .for('update', { of: paymentAttempts });
   return row;
 }

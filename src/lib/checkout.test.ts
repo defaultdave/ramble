@@ -22,6 +22,9 @@ import {
   startPaymentDecision,
   statusOnRetry,
   storeProviderPayment,
+  lookupVerdict,
+  storesPayment,
+  newsletterConsent,
   tooManyTries,
   unknownHold,
   type DecisionState,
@@ -965,7 +968,10 @@ describe('the decision', () => {
   });
 
   it('creates the order for a hold with none', () => {
-    expect(startPaymentDecision(baseState())).toEqual({ kind: 'create' });
+    expect(startPaymentDecision(baseState())).toEqual({
+      kind: 'create',
+      attemptNo: 1,
+    });
   });
 
   it('resumes a live attempt that has no provider payment yet', () => {
@@ -1147,28 +1153,28 @@ describe('the provider step', () => {
       'created',
       null,
       'pay_1',
-      'store',
+      'write',
     ],
     [
       'stores on an attempt that failed a try',
       'failed_try',
       null,
       'pay_1',
-      'store',
+      'write',
     ],
     [
       'treats the same id again as stored',
       'created',
       'pay_1',
       'pay_1',
-      'already_stored',
+      'repeat',
     ],
     [
       'treats the same id on a finished attempt as stored',
       'succeeded',
       'pay_1',
       'pay_1',
-      'already_stored',
+      'repeat',
     ],
     ['never replaces a different id', 'created', 'pay_1', 'pay_2', 'refuse'],
     [
@@ -1182,6 +1188,60 @@ describe('the provider step', () => {
   ] as const)('%s', (_name, status, stored, paymentId, expected) => {
     expect(
       storeProviderPayment({ status, providerPaymentId: stored }, paymentId),
-    ).toBe(expected);
+    ).toEqual(
+      {
+        write: { write: true, stored: true },
+        repeat: { write: false, stored: true },
+        refuse: { write: false, stored: false },
+      }[expected],
+    );
+  });
+
+  it.each([
+    [
+      'a payment found by id is used',
+      { step: 'retrieve', paymentId: 'p' },
+      true,
+      'use',
+    ],
+    [
+      'a payment found by Ramble’s ids is used',
+      { step: 'find_or_create' },
+      true,
+      'use',
+    ],
+    [
+      'a stored payment the provider lost is refused',
+      { step: 'retrieve', paymentId: 'p' },
+      false,
+      'refuse',
+    ],
+    [
+      'an earlier attempt with no provider payment creates one',
+      { step: 'find_or_create' },
+      false,
+      'create',
+    ],
+    ['a new attempt creates one', { step: 'create' }, false, 'create'],
+  ] as const)('%s', (_name, step, found, expected) => {
+    expect(lookupVerdict(step, found)).toBe(expected);
+  });
+
+  it('writes the payment id only for a payment the attempt did not hold', () => {
+    expect(storesPayment({ step: 'retrieve', paymentId: 'p' })).toBe(false);
+    expect(storesPayment({ step: 'find_or_create' })).toBe(true);
+    expect(storesPayment({ step: 'create' })).toBe(true);
+  });
+});
+
+describe('the newsletter consent', () => {
+  it('is a checkout grant when ticked, and nothing when not', () => {
+    expect(newsletterConsent('g1', true)).toEqual({
+      guestId: 'g1',
+      kind: 'newsletter',
+      status: 'granted',
+      source: 'checkout',
+    });
+    expect(newsletterConsent('g1', false)).toBeNull();
   });
 });

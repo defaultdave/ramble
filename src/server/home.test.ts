@@ -19,6 +19,7 @@ vi.mock('next/cache', () => ({
 const db = vi.hoisted(() => ({
   modules: vi.fn(),
   picks: vi.fn(),
+  giftGuide: vi.fn(),
   categories: vi.fn(),
   neighborhoods: vi.fn(),
   experiences: vi.fn(),
@@ -27,6 +28,7 @@ const db = vi.hoisted(() => ({
 vi.mock('@/server/db/editorial', () => ({
   listHomeModules: db.modules,
   listPublishedPicks: db.picks,
+  getPublishedGiftGuide: db.giftGuide,
 }));
 vi.mock('@/server/db/catalog', () => ({
   listCategories: db.categories,
@@ -54,6 +56,7 @@ beforeEach(() => {
   db.picks.mockResolvedValue([
     { id: id(800), items: [{ experienceId: id(1) }, { experienceId: id(2) }] },
   ]);
+  db.giftGuide.mockResolvedValue({ id: id(802), items: [] });
   db.categories.mockResolvedValue([]);
   db.neighborhoods.mockResolvedValue([]);
   db.experiences.mockImplementation((ids: string[]) =>
@@ -72,6 +75,12 @@ describe('getHomeContent', () => {
       `experience:${id(1)}`,
       `experience:${id(2)}`,
     ]);
+  });
+
+  it('hands over the published gift guide', async () => {
+    const content = await getHomeContent();
+
+    expect(content.giftGuide).toEqual({ id: id(802), items: [] });
   });
 
   it('looks up the experiences the Picks modules might show, and no others', async () => {

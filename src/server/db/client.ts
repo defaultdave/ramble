@@ -1,5 +1,5 @@
 import 'server-only';
-import { neon } from '@neondatabase/serverless';
+import { neon, neonConfig } from '@neondatabase/serverless';
 import { attachDatabasePool } from '@vercel/functions';
 import { drizzle as drizzleHttp } from 'drizzle-orm/neon-http';
 import { drizzle as drizzlePool } from 'drizzle-orm/node-postgres';
@@ -31,6 +31,11 @@ type ReadDb = Omit<
 >;
 
 function createReadDb(): ReadDb {
+  // The driver takes its endpoint from process-wide config only. env.ts has already refused a
+  // non-local value and any value in a deployed environment.
+  if (env.NEON_HTTP_ENDPOINT) {
+    neonConfig.fetchEndpoint = env.NEON_HTTP_ENDPOINT;
+  }
   return drizzleHttp(neon(requireUrl()), { schema, casing: 'snake_case' });
 }
 

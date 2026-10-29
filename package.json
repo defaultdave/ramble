@@ -30,6 +30,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:check": "drizzle-kit check",
+    "db:http": "bun scripts/dev/neon-http.ts",
     "db:seed": "bun --preload ./scripts/seed-preload.ts scripts/seed.ts",
     "storybook": "storybook dev -p 6006",
     "storybook:build": "storybook build -o node_modules/.cache/storybook-static",

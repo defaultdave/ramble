@@ -16,6 +16,25 @@ SEED_TARGET=staging SEED_HOST=<the host in DATABASE_URL> pnpm db:seed --scale=40
 
 It ends by reading the database back and running every probe of the coverage matrix. A gap exits with code 1 and names the probe.
 
+## Reading the seeded data in a local app
+
+The seed writes through `pg`, but guest pages (home, browse, experience) read through Neon's HTTP driver, which cannot reach the Docker Postgres. Without help, a local `pnpm dev` or `pnpm build && pnpm start` shows the error state on those pages. Run an HTTP stand-in for Neon's endpoint in front of the local database:
+
+```
+pnpm db:http        # needs DATABASE_URL (from .env.local, or the shell); prints the line to set
+```
+
+Put the printed line in `.env.local` and restart the app:
+
+```
+NEON_HTTP_ENDPOINT=http://127.0.0.1:4444/sql
+```
+
+- `pnpm db:http` is the same shim the database tests use (`tests/db/harness.ts`). It listens on `127.0.0.1` only, port 4444 unless `NEON_HTTP_PORT` says otherwise, and refuses a `DATABASE_URL` that is not on this machine. It runs any SQL it is sent, so stop it when you are done; it also refuses requests that carry an `Origin` header or a non-local `Host`, which keeps a web page from driving it.
+- `NEON_HTTP_ENDPOINT` is validated in `src/server/env.ts`: an `http` URL on `localhost`, `127.0.0.1`, or `::1`. Any other host fails at startup, and so does any value when `VERCEL_ENV` is `production` or `preview`. The refusal never prints the value. Leave it unset everywhere else.
+- When set, `dbRead` sends its queries to that address through `neonConfig.fetchEndpoint`. The pooled `db` writer is unchanged.
+- Pages cached by a running server keep serving until they expire (see Caches); restart the app after seeding.
+
 ## What it refuses
 
 The seed fails closed. It runs only when all of these hold, and it checks them before it opens a connection:

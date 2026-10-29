@@ -7,7 +7,7 @@ import { experiences, holds, sessions } from './schema';
  * THE LOCK ORDER (design doc 4.2.3 rule 1, architecture rule B10). Every transaction that takes
  * more than one of these takes them in this order and never the other way round:
  *
- *   1. the device advisory lock   (reserve only)      lockDevice
+ *   1. the device advisory lock   (reserve only)      lockDevice, then lockClientAddress
  *   2. the session row            FOR UPDATE          lockSessionRow
  *   3. the hold row               FOR UPDATE          lockHoldRow
  *   4. the order row                                  (a later unit)
@@ -37,6 +37,18 @@ export async function lockDevice(
   deviceKey: string,
 ): Promise<void> {
   await lockFor(tx, `hold-device:${deviceKey}`);
+}
+
+/**
+ * Lock 1, after the device's. The limits count a device's holds and the holds from its address, so
+ * two devices on one address are judged against each other in order too. Always taken second, so
+ * two reserves cannot wait on each other's locks in opposite orders.
+ */
+export async function lockClientAddress(
+  tx: Transaction,
+  ipHash: string,
+): Promise<void> {
+  await lockFor(tx, `hold-address:${ipHash}`);
 }
 
 /**

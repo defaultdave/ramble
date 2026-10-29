@@ -27,6 +27,7 @@ import {
   requireRole,
   type Caller,
 } from '@/server/auth/caller';
+import { updateTagsForChanges } from '@/server/cache/invalidate';
 import { db } from './client';
 import { readOpenHeldSeats } from './holds';
 import { lockSessionRow } from './locks';
@@ -214,7 +215,8 @@ export type UpdateSessionAllocationResult =
  * Sets a scheduled session's capacity. The caller is checked before the row is locked. Under the
  * lock the row is read again, so a booking that confirms at the same moment is counted, and so
  * are the open holds, judged at database time taken after the lock. The database CHECK on
- * `seats_sold` stays the backstop under it.
+ * `seats_sold` stays the backstop under it. A saved edit invalidates the session's spaces-left tag,
+ * so this runs in a Server Action only.
  * `expectedVersion` is the version the editor read; a different one means another edit came first.
  */
 export async function updateSessionAllocation(
@@ -233,34 +235,43 @@ export async function updateSessionAllocation(
   }
   requireSessionEditor(caller, found.hostId, found.source);
 
-  return db.transaction(async (tx) => {
-    const row = await lockSessionRow(tx, data.sessionId);
-    if (!row) return { ok: false, reason: 'session_not_found' };
-    const current = SessionSchema.parse(row.session);
-    requireSessionEditor(caller, row.hostId, current.source);
-    const editable = checkAllocationEditable(current.status);
-    if (!editable.ok) return editable;
-    const version = checkExpectedVersion(current.version, data.expectedVersion);
-    if (!version.ok) return version;
-    const heldSeats = await readOpenHeldSeats(
-      tx,
-      current.id,
-      await readDatabaseTime(tx),
-    );
-    const check = checkAllocationChange(
-      current.seatsSold,
-      heldSeats,
-      data.allocation,
-    );
-    if (!check.ok) return check;
-    const [updated] = await tx
-      .update(sessions)
-      .set({
-        allocation: data.allocation,
-        version: sql`${sessions.version} + 1`,
-      })
-      .where(eq(sessions.id, current.id))
-      .returning();
-    return { ok: true, session: SessionSchema.parse(updated) };
-  });
+  const result = await db.transaction(
+    async (tx): Promise<UpdateSessionAllocationResult> => {
+      const row = await lockSessionRow(tx, data.sessionId);
+      if (!row) return { ok: false, reason: 'session_not_found' };
+      const current = SessionSchema.parse(row.session);
+      requireSessionEditor(caller, row.hostId, current.source);
+      const editable = checkAllocationEditable(current.status);
+      if (!editable.ok) return editable;
+      const version = checkExpectedVersion(
+        current.version,
+        data.expectedVersion,
+      );
+      if (!version.ok) return version;
+      const heldSeats = await readOpenHeldSeats(
+        tx,
+        current.id,
+        await readDatabaseTime(tx),
+      );
+      const check = checkAllocationChange(
+        current.seatsSold,
+        heldSeats,
+        data.allocation,
+      );
+      if (!check.ok) return check;
+      const [updated] = await tx
+        .update(sessions)
+        .set({
+          allocation: data.allocation,
+          version: sql`${sessions.version} + 1`,
+        })
+        .where(eq(sessions.id, current.id))
+        .returning();
+      return { ok: true, session: SessionSchema.parse(updated) };
+    },
+  );
+  if (result.ok) {
+    updateTagsForChanges([{ kind: 'spaces', sessionId: result.session.id }]);
+  }
+  return result;
 }

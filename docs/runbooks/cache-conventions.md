@@ -27,6 +27,8 @@ Do not build a correctness rule on `revalidateTag(tag, { expire: 0 })` serving f
 
 `'use cache: remote'` is for short-lived shared reads such as spaces left. Keep the remote function private to its file and export a function that calls it through `readRemoteOrFallback(remote, fallback)` from `src/server/cache/remote.ts`. The convention test rejects an exported, default-exported, or method remote function, and any use of a remote function outside the first argument of `readRemoteOrFallback`. The fallback is a direct Postgres read, which is authoritative at reserve (ADR 0002).
 
+The one such read today is `getSpacesLeft(sessionId)` in `src/server/spacesLeft.ts` (profile `spacesLeft`, tag `session:<id>`). It answers `null` for an ID that is no guid (no cache key is made) and for a session guests cannot see, and a number as it is (zero or less reads as sold out). Every write that changes a session's spaces invalidates its tag: a hold placed, released, or superseded and a saved capacity edit call `updateTagsForChanges` (Server Actions only), and the hold upkeep job calls `revalidateTagsForChanges` after it releases holds. A deadline passing changes the count with no write, so the entry's few seconds of life cover that. Valid but unknown session IDs are cached as `null` for up to the profile's `expire` (60 seconds).
+
 ## Degraded modes
 
 | Failure | What the guest sees | Where it is handled |

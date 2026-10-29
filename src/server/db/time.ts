@@ -1,8 +1,7 @@
 import 'server-only';
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from './client';
-import type { Transaction } from './client';
 
 // The driver hands timestamps back as text, so the time travels as whole milliseconds since the epoch.
 const TimeRowSchema = z.object({ atMs: z.coerce.number().int() });
@@ -13,9 +12,9 @@ const TimeRowSchema = z.object({ atMs: z.coerce.number().int() });
  * read after the lock: a `clock_timestamp()` in the locking SELECT's own column list could be
  * evaluated before the lock wait ends.
  */
-export async function readDatabaseTime(
-  executor: Pick<Transaction, 'execute'>,
-): Promise<Date> {
+export async function readDatabaseTime(executor: {
+  execute: (query: SQL) => PromiseLike<{ rows: unknown[] }>;
+}): Promise<Date> {
   const result = await executor.execute(
     sql`SELECT floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint AS "atMs"`,
   );

@@ -3,6 +3,7 @@ import type { BotCheckResult } from './botCheck';
 import { WriteIdSchema, experienceStatuses, priceKinds } from './catalog';
 import { MAX_LINES, type PricedOption, type PricingLines } from './pricing';
 import { maxAllocation, sessionStatuses } from './sessions';
+import { jobLimits } from './jobs';
 import { sha256HexDigits, type RateLimitDecision } from './rateLimits';
 import { settingsBounds } from './settings';
 
@@ -25,6 +26,7 @@ export const holdReleasedReasons = [
 ] as const;
 
 type HoldStatus = (typeof holdStatuses)[number];
+type ReleasedReason = (typeof holdReleasedReasons)[number];
 
 export const holdLimits = {
   minSeats: 1,
@@ -37,7 +39,21 @@ export const holdLimits = {
   alternatives: 3,
   alternativeDays: 14,
   alternativeCandidates: 20,
+  /** Seats across the open holds of one device, or one address, plus the new hold (PRD-17). */
+  deviceSeatLimit: 6,
+  /** This many lapsed holds inside the window block new holds (PRD-17). */
+  blockLapses: 3,
+  blockMinutes: 15,
+  /** Most lapsed-hold rows one reserve reads for the block; more than this is a table that is wrong. */
+  blockScan: 100,
+  /** Rows one cleanup batch releases or scrubs, and how long a released hold keeps its hashes. */
+  cleanupBatch: 100,
+  cleanupMaxBatches: 20,
+  releasedRetentionDays: 30,
 } as const;
+
+/** Stands in for the device and address hashes of a hold whose retention ended. It is a valid hash, and no cookie produces it. */
+export const scrubbedHash = '0'.repeat(64);
 
 /** sha-256 in hex, the shape `rate_limits` keys already use. The database CHECKs on `holds` spell the same pattern. */
 export const deviceHashPattern = `^${sha256HexDigits}$`;
@@ -477,4 +493,181 @@ export function pickAlternatives(
     }
   }
   return summaries;
+}
+
+/**
+ * Fails closed when a read that should be small is not: more rows than `max` means the table
+ * disagrees with the rule that bounds it, so the reserve throws instead of deciding on a part.
+ */
+export function requireAtMost<T>(
+  rows: readonly T[],
+  max: number,
+  what: string,
+): readonly T[] {
+  if (rows.length > max) {
+    throw new RangeError(`More ${what} than the rules allow (${String(max)})`);
+  }
+  return rows;
+}
+
+/**
+ * The device's own open `active` holds on the session a new hold is placed on. Each is released as
+ * `superseded` in the new hold's transaction (design doc 4.2.3). A `paying` hold is never
+ * superseded, because a payment is in flight, and another device's hold never is. Read after the
+ * session row is locked, so a hold that moved to `paying` or was released in the meantime is
+ * judged as it now stands.
+ */
+export function holdsToSupersede(
+  holds: readonly (HoldTimes & { id: string; deviceKey: string })[],
+  deviceKey: string,
+  at: Date,
+): string[] {
+  return holds
+    .filter(
+      (hold) =>
+        hold.deviceKey === deviceKey &&
+        hold.status === 'active' &&
+        isOpenHold(hold, at),
+    )
+    .map((hold) => hold.id);
+}
+
+/** The holds that still count once the ones being superseded leave. */
+export function exceptSuperseded<T extends { id: string }>(
+  holds: readonly T[],
+  superseded: readonly string[],
+): T[] {
+  return holds.filter((hold) => !superseded.includes(hold.id));
+}
+
+/**
+ * Refuses a party when the seats in the device's (or address's) other open holds, plus the party,
+ * pass the limit (PRD-17). The answer is the same whichever key matched, so a refusal does not say
+ * which one did.
+ */
+export function seatLimitRefusal(
+  otherHolds: readonly (HoldTimes & { seats: number })[],
+  partySeats: number,
+  at: Date,
+): ReserveResult | null {
+  return openHeldSeats(otherHolds, at) + partySeats > holdLimits.deviceSeatLimit
+    ? { status: 'blocked', reason: 'device_limit' }
+    : null;
+}
+
+/** A lapse older than this no longer counts toward the block; the query pre-filters on it and `blockRefusal` decides. */
+export function blockWindowStart(at: Date): Date {
+  return new Date(
+    at.getTime() - holdLimits.blockMinutes * millisecondsPerMinute,
+  );
+}
+
+export type LapseCandidate = HoldTimes & {
+  releasedReason: ReleasedReason | null;
+  updatedAt: Date;
+};
+
+/**
+ * When a hold stopped counting without becoming a booking, or null when it did not lapse. An
+ * `active` hold lapses at `expires_at`, a `paying` one at `paying_until`. Once the cleanup job or
+ * the guest has released it, the reason says what it was: `expired` and `payment_abandoned` are
+ * lapses, and `guest_left` is one only when it came after the deadline (releasing a hold that
+ * already lapsed must not clear the block). `superseded`, `session_cancelled`, and
+ * `sold_out_after_lapse` are not the device's lapse, and a converted hold is a booking.
+ */
+export function lapsedDeadline(hold: LapseCandidate): Date | null {
+  switch (hold.status) {
+    case 'active':
+      return hold.expiresAt;
+    case 'paying':
+      return hold.payingUntil;
+    case 'converted':
+      return null;
+    case 'released':
+      switch (hold.releasedReason) {
+        case 'expired':
+          return hold.expiresAt;
+        case 'payment_abandoned':
+          return hold.payingUntil ?? hold.expiresAt;
+        case 'guest_left':
+          return hold.updatedAt.getTime() >= hold.expiresAt.getTime()
+            ? hold.expiresAt
+            : null;
+        case 'sold_out_after_lapse':
+        case 'session_cancelled':
+        case 'superseded':
+        case null:
+          return null;
+      }
+  }
+}
+
+/**
+ * Blocks new holds while three holds of the device (or address) lapsed inside the last 15 minutes
+ * (design doc 4.2.3 Limits). Counted from the deadlines, never from when the cleanup job ran, so a
+ * slow job neither hides nor invents a lapse. The block ends when the third most recent deadline
+ * leaves the window, so a retry at `until` finds two and goes through.
+ */
+export function blockRefusal(
+  holds: readonly LapseCandidate[],
+  at: Date,
+): ReserveResult | null {
+  const blockMs = holdLimits.blockMinutes * millisecondsPerMinute;
+  const windowStart = blockWindowStart(at);
+  const deadlines = holds
+    .map(lapsedDeadline)
+    .filter(
+      (deadline): deadline is Date =>
+        deadline !== null &&
+        deadline.getTime() <= at.getTime() &&
+        deadline.getTime() > windowStart.getTime(),
+    )
+    .toSorted((a, b) => b.getTime() - a.getTime());
+  const third = deadlines[holdLimits.blockLapses - 1];
+  if (!third) return null;
+  return {
+    status: 'blocked',
+    reason: 'too_many_holds',
+    until: new Date(third.getTime() + blockMs).toISOString(),
+  };
+}
+
+/** What the cleanup job releases a hold as at `at`, or null when the hold is open or finished. */
+export function cleanupReason(
+  hold: HoldTimes,
+  at: Date,
+): 'expired' | 'payment_abandoned' | null {
+  if (isOpenHold(hold, at)) return null;
+  switch (hold.status) {
+    case 'active':
+      return 'expired';
+    case 'paying':
+      return 'payment_abandoned';
+    case 'converted':
+    case 'released':
+      return null;
+  }
+}
+
+/**
+ * Whether the pulse runs another cleanup batch: the last one was full (so more may wait), and the
+ * call is inside its batch and time caps. A short batch means nothing lapsed is left.
+ */
+export function cleanupMayContinue(input: {
+  done: number;
+  batches: number;
+  elapsedMs: number;
+}): boolean {
+  return (
+    input.done >= holdLimits.cleanupBatch &&
+    input.batches < holdLimits.cleanupMaxBatches &&
+    input.elapsedMs < jobLimits.drainMaxMillis
+  );
+}
+
+/** Released holds last updated before this keep no device or address hash (the PII inventory's deletion path). */
+export function scrubCutoff(at: Date): Date {
+  return new Date(
+    at.getTime() - holdLimits.releasedRetentionDays * millisecondsPerDay,
+  );
 }

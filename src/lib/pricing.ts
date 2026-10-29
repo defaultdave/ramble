@@ -1,4 +1,6 @@
 import { taxTreatments, type PriceOption } from './catalog';
+import { fromPriceLabel } from './booking';
+import { formatPrice } from './money';
 
 // Integer minor units (cents) and parts per million only: no float touches an amount.
 export const PPM = 1_000_000;
@@ -157,4 +159,26 @@ export function lines(
     taxMinor,
     totalMinor: ticketSubtotalMinor + taxMinor,
   };
+}
+
+/** What a card knows of a price option: its amount, and whether a guest holding it takes a space. */
+export type CardPriceOption = Pick<PriceOption, 'priceMinor' | 'usesSpace'>;
+
+/**
+ * The per-person price a browse or home card shows: the lowest price among the options that take a
+ * space, with "From" only when those prices differ (an adult and a child price). An option that
+ * takes no space, such as the free adult who goes with a child, is not a price a guest pays to
+ * come, so it never sets the card price. Null when no option takes a space.
+ */
+export function cardPriceLabel(
+  options: readonly CardPriceOption[],
+): string | null {
+  const prices = options
+    .filter((option) => option.usesSpace)
+    .map((option) => option.priceMinor);
+  if (prices.length === 0) return null;
+  const lowest = Math.min(...prices);
+  return prices.some((price) => price !== lowest)
+    ? fromPriceLabel(lowest)
+    : formatPrice(lowest);
 }

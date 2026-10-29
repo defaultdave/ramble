@@ -41,7 +41,7 @@ const item = (n: number) => ({
   neighborhoodName: 'DUMBO',
   durationMinutes: 120,
   linkOutUrl: null,
-  priceOptions: [{ priceMinor: 8500 }],
+  priceOptions: [{ priceMinor: 8500, usesSpace: true }],
 });
 
 const photo = {
@@ -112,6 +112,29 @@ describe('BrowseContent', () => {
     );
     expect(screen.getByRole('alert')).toHaveTextContent(
       "We couldn't load experiences",
+    );
+  });
+
+  it('offers the next day from the calendar days when a dated browse has no results', async () => {
+    server.dates.mockResolvedValue(['2026-11-02', '2026-11-09']);
+    server.results.mockResolvedValue({
+      ok: true,
+      items: [],
+      nextCursor: null,
+    });
+
+    render(
+      await BrowseContent({
+        searchParams: Promise.resolve({ date: '2026-11-07' }),
+      }),
+    );
+
+    expect(
+      screen.getByRole('link', { name: 'See Mon, Nov 9' }),
+    ).toHaveAttribute('href', '/new-york/browse?date=2026-11-09');
+    expect(screen.getByRole('link', { name: 'Any day' })).toHaveAttribute(
+      'href',
+      '/new-york/browse',
     );
   });
 });

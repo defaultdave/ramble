@@ -89,6 +89,25 @@ export function BrowseResults(props: BrowseResultsProps) {
         </div>
       );
     case 'empty':
+      if (props.dated) {
+        const { dateLabel, nextDay, anyDayHref, message } = props.dated;
+        return (
+          <div className={styles.notice}>
+            <h2 className={styles.noticeTitle}>Nothing on {dateLabel}</h2>
+            <p className={styles.noticeText}>{message}</p>
+            <div className={styles.noticeActions}>
+              {nextDay ? (
+                <ButtonLink href={nextDay.href} variant="primary">
+                  See {nextDay.label}
+                </ButtonLink>
+              ) : null}
+              <ButtonLink href={anyDayHref} variant="secondary">
+                Any day
+              </ButtonLink>
+            </div>
+          </div>
+        );
+      }
       return (
         <div className={styles.notice}>
           <h2 className={styles.noticeTitle}>

@@ -149,11 +149,41 @@ export const SingleResult: ResultsStory = {
 };
 
 export const EmptyWithFilters: EmptyStory = {
-  args: { state: 'empty', filtered: true },
+  args: { state: 'empty', filtered: true, dated: null },
 };
 
 export const EmptyWithoutFilters: EmptyStory = {
-  args: { state: 'empty', filtered: false },
+  args: { state: 'empty', filtered: false, dated: null },
+};
+
+// A chosen day with nothing on it: the next day that has experiences, and the same filters with any day.
+export const EmptyOnADay: EmptyStory = {
+  args: {
+    state: 'empty',
+    filtered: true,
+    dated: {
+      dateLabel: 'Wed, Oct 28',
+      nextDay: {
+        label: 'Thu, Oct 29',
+        href: '/new-york/browse?category=cooking&date=2026-10-29',
+      },
+      anyDayHref: '/new-york/browse?category=cooking',
+      message: 'The next day with experiences is Thu, Oct 29.',
+    },
+  },
+};
+
+export const EmptyOnADayWithNoLaterDay: EmptyStory = {
+  args: {
+    state: 'empty',
+    filtered: true,
+    dated: {
+      dateLabel: 'Wed, Feb 24',
+      nextDay: null,
+      anyDayHref: '/new-york/browse',
+      message: 'There are no experiences on later days.',
+    },
+  },
 };
 
 export const ErrorWithRetry: ErrorStory = {

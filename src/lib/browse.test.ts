@@ -14,8 +14,8 @@ import {
   maxHandEnteredDayRows,
   maxStoredDayRows,
   experienceAddress,
-  priceLabel,
   resultsSummary,
+  nextBrowseDay,
   splitPage,
   toBrowsePage,
   withPriceOptions,
@@ -38,13 +38,15 @@ import { noFilters } from './filters';
 // - the raw calendar rows are bounded: too many stored dates or hand-entered sessions, a bad date, or a bad zone is refused
 // - prices are grouped under their experience, lowest first
 // - a duration reads as minutes, hours, or half hours
-// - a card price is the lowest price, with "From" only when prices differ; no price is a refusal
+// - a card price comes only from options that take a space; a kids class with a free accompanying adult reads the child price, and an experience with no such option has no card
 // - an experience address names the area by status
 // - a card carries neighborhood and duration, links a guide entry out, and refuses a guide entry with no link
 // - the summary line counts the cards
 // - the experiences of a page are its items, and none for an outdated page
 // - a cover is set on the cards of a results view, and any other view is returned as it is
 // - each results state is chosen from the page: outdated cursor, empty (filtered or not), results with or without more, later page, error
+// - a dated empty page offers the next day with sessions (other filters kept) and any day; when the window has none it offers only any day
+// - the next day is the first listed day after the chosen one: the day after, a gap, none left, today whose sessions have all started (not listed), a date before every listed day, an empty list
 
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -61,7 +63,7 @@ function experience(
     neighborhoodName: 'DUMBO',
     durationMinutes: 120,
     linkOutUrl: null,
-    priceOptions: [{ priceMinor: 8500 }],
+    priceOptions: [{ priceMinor: 8500, usesSpace: true }],
     ...overrides,
   };
 }
@@ -172,6 +174,15 @@ describe('toBrowsePage', () => {
       reason: 'cursor_not_found',
     });
   });
+
+  it('is outdated, not empty, for the read the data layer gives a cursor it cannot find', () => {
+    // No row, no items, no next page: what listBrowseExperiences answers for a hidden or unknown `after`.
+    const notFound = read({ cursor: null, items: [], nextCursor: null });
+    expect(toBrowsePage(id(9), notFound)).toEqual({
+      ok: false,
+      reason: 'cursor_not_found',
+    });
+  });
 });
 
 describe('withPriceOptions', () => {
@@ -180,15 +191,21 @@ describe('withPriceOptions', () => {
       withPriceOptions(
         [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
         [
-          { experienceId: 'a', priceMinor: 7000 },
-          { experienceId: 'b', priceMinor: 500 },
-          { experienceId: 'a', priceMinor: 3500 },
-          { experienceId: 'zzz', priceMinor: 1 },
+          { experienceId: 'a', priceMinor: 7000, usesSpace: true },
+          { experienceId: 'b', priceMinor: 500, usesSpace: false },
+          { experienceId: 'a', priceMinor: 3500, usesSpace: true },
+          { experienceId: 'zzz', priceMinor: 1, usesSpace: true },
         ],
       ),
     ).toEqual([
-      { id: 'a', priceOptions: [{ priceMinor: 3500 }, { priceMinor: 7000 }] },
-      { id: 'b', priceOptions: [{ priceMinor: 500 }] },
+      {
+        id: 'a',
+        priceOptions: [
+          { priceMinor: 3500, usesSpace: true },
+          { priceMinor: 7000, usesSpace: true },
+        ],
+      },
+      { id: 'b', priceOptions: [{ priceMinor: 500, usesSpace: false }] },
       { id: 'c', priceOptions: [] },
     ]);
   });
@@ -212,24 +229,6 @@ describe('durationLabel', () => {
     [1440, '24 hr'],
   ])('writes %i minutes as %s', (minutes, label) => {
     expect(durationLabel(minutes)).toBe(label);
-  });
-});
-
-describe('priceLabel', () => {
-  it.each([
-    ['one price', [8500], '$85'],
-    ['the same price twice', [4000, 4000], '$40'],
-    ['prices that differ', [6000, 3000], 'From $30'],
-    ['a price with cents', [1250], '$12.50'],
-    ['a free option beside a paid one', [0, 5000], 'From $0'],
-  ])('reads %s', (_name, prices, label) => {
-    expect(priceLabel(prices.map((priceMinor) => ({ priceMinor })))).toBe(
-      label,
-    );
-  });
-
-  it('refuses an experience with no price', () => {
-    expect(() => priceLabel([])).toThrow(RangeError);
   });
 });
 
@@ -258,6 +257,29 @@ describe('toBrowseCard', () => {
       kind: 'bookable',
       price: '$85',
     });
+  });
+
+  it('prices a kids class from the child, not from the free accompanying adult', () => {
+    const kidsClass = experience(1, {
+      priceOptions: [
+        { priceMinor: 0, usesSpace: false },
+        { priceMinor: 4500, usesSpace: true },
+      ],
+    });
+    expect(toBrowseCard(kidsClass)).toMatchObject({
+      kind: 'bookable',
+      price: '$45',
+    });
+  });
+
+  it('keeps a free option that takes a space as the card price', () => {
+    const freeTour = experience(1, {
+      priceOptions: [
+        { priceMinor: 0, usesSpace: true },
+        { priceMinor: 2000, usesSpace: true },
+      ],
+    });
+    expect(toBrowseCard(freeTour)).toMatchObject({ price: 'From $0' });
   });
 
   it('leaves the duration out when there is none', () => {
@@ -291,6 +313,10 @@ describe('toBrowseCard', () => {
       'a bookable experience with no price',
       experience(3, { priceOptions: [] }),
     ],
+    [
+      'a bookable experience whose only option takes no space',
+      experience(4, { priceOptions: [{ priceMinor: 0, usesSpace: false }] }),
+    ],
   ])('leaves out %s', (_name, input) => {
     expect(toBrowseCard(input)).toBeNull();
   });
@@ -317,6 +343,29 @@ describe('dateChipLabel', () => {
   });
 });
 
+describe('nextBrowseDay', () => {
+  const days = ['2026-10-29', '2026-11-02', '2026-11-03'];
+
+  it.each([
+    ['the day after', '2026-10-29', '2026-11-02'],
+    ['across a gap', '2026-10-31', '2026-11-02'],
+    [
+      'today with every session already started, so it is not listed',
+      '2026-10-28',
+      '2026-10-29',
+    ],
+    ['a day before every listed day', '2026-01-01', '2026-10-29'],
+    ['the last listed day', '2026-11-03', null],
+    ['a day past the window', '2027-03-01', null],
+  ])('%s', (_name, date, expected) => {
+    expect(nextBrowseDay(days, date)).toBe(expected);
+  });
+
+  it('is null when no day is listed', () => {
+    expect(nextBrowseDay([], '2026-10-28')).toBeNull();
+  });
+});
+
 describe('browseView', () => {
   const cursor = id(99);
   const firstPage = { filters: noFilters, after: null };
@@ -327,6 +376,7 @@ describe('browseView', () => {
       browseView(
         { filters: { ...noFilters, categories: ['cooking'] }, after: cursor },
         page,
+        [],
       ),
     ).toEqual({
       state: 'outdated',
@@ -336,23 +386,78 @@ describe('browseView', () => {
 
   it('is empty and unfiltered when nothing is listed and no filter is on', () => {
     expect(
-      browseView(firstPage, { ok: true, items: [], nextCursor: null }),
-    ).toEqual({ state: 'empty', filtered: false });
+      browseView(firstPage, { ok: true, items: [], nextCursor: null }, []),
+    ).toEqual({ state: 'empty', filtered: false, dated: null });
   });
 
-  it('is empty and filtered when a filter is on', () => {
+  it('is empty and filtered, with no way forward by day, when a category is on and no date', () => {
     expect(
       browseView(
-        { filters: { ...noFilters, date: '2026-11-07' }, after: null },
+        { filters: { ...noFilters, categories: ['cooking'] }, after: null },
         { ok: true, items: [], nextCursor: null },
+        ['2026-11-09'],
       ),
-    ).toEqual({ state: 'empty', filtered: true });
+    ).toEqual({ state: 'empty', filtered: true, dated: null });
+  });
+
+  describe('a dated empty page', () => {
+    const empty: BrowsePage = { ok: true, items: [], nextCursor: null };
+    const days = ['2026-11-05', '2026-11-09', '2026-11-12'];
+
+    it('offers the next day with sessions and any day, keeping the other filters', () => {
+      expect(
+        browseView(
+          {
+            filters: {
+              categories: ['cooking'],
+              neighborhoods: ['dumbo'],
+              date: '2026-11-07',
+            },
+            after: null,
+          },
+          empty,
+          days,
+        ),
+      ).toEqual({
+        state: 'empty',
+        filtered: true,
+        dated: {
+          dateLabel: 'Sat, Nov 7',
+          nextDay: {
+            label: 'Mon, Nov 9',
+            href: '/new-york/browse?category=cooking&neighborhood=dumbo&date=2026-11-09',
+          },
+          anyDayHref: '/new-york/browse?category=cooking&neighborhood=dumbo',
+          message: 'The next day with experiences is Mon, Nov 9.',
+        },
+      });
+    });
+
+    it('offers only any day, and says no later day has experiences, when the window has none', () => {
+      expect(
+        browseView(
+          { filters: { ...noFilters, date: '2026-11-12' }, after: null },
+          empty,
+          days,
+        ),
+      ).toEqual({
+        state: 'empty',
+        filtered: true,
+        dated: {
+          dateLabel: 'Thu, Nov 12',
+          nextDay: null,
+          anyDayHref: '/new-york/browse',
+          message: 'There are no experiences on later days.',
+        },
+      });
+    });
   });
 
   it('shows the cards and a Show more that carries the filters and the next cursor', () => {
     const view = browseView(
       { filters: { ...noFilters, categories: ['cooking'] }, after: null },
       { ok: true, items: [experience(1), experience(2)], nextCursor: id(2) },
+      [],
     );
     expect(view).toMatchObject({
       state: 'results',
@@ -370,15 +475,19 @@ describe('browseView', () => {
   });
 
   it('leaves out a card that cannot be built and counts only the ones shown', () => {
-    const view = browseView(firstPage, {
-      ok: true,
-      items: [
-        experience(1),
-        experience(2, { priceOptions: [] }),
-        experience(3),
-      ],
-      nextCursor: null,
-    });
+    const view = browseView(
+      firstPage,
+      {
+        ok: true,
+        items: [
+          experience(1),
+          experience(2, { priceOptions: [] }),
+          experience(3),
+        ],
+        nextCursor: null,
+      },
+      [],
+    );
     expect(view).toMatchObject({ state: 'results', summary: '2 experiences' });
     expect(view.state === 'results' && view.cards.map((c) => c.id)).toEqual([
       id(1),
@@ -388,31 +497,43 @@ describe('browseView', () => {
 
   it('is empty when no card on the last page can be built', () => {
     expect(
-      browseView(firstPage, {
-        ok: true,
-        items: [experience(2, { priceOptions: [] })],
-        nextCursor: null,
-      }),
-    ).toEqual({ state: 'empty', filtered: false });
+      browseView(
+        firstPage,
+        {
+          ok: true,
+          items: [experience(2, { priceOptions: [] })],
+          nextCursor: null,
+        },
+        [],
+      ),
+    ).toEqual({ state: 'empty', filtered: false, dated: null });
   });
 
   it('keeps Show more when a full page has no buildable card but another page follows', () => {
-    const view = browseView(firstPage, {
-      ok: true,
-      items: [experience(2, { priceOptions: [] })],
-      nextCursor: id(2),
-    });
+    const view = browseView(
+      firstPage,
+      {
+        ok: true,
+        items: [experience(2, { priceOptions: [] })],
+        nextCursor: id(2),
+      },
+      [],
+    );
     expect(view).toMatchObject({ state: 'results', cards: [] });
     expect(view.state === 'results' && view.showMore).not.toBeNull();
   });
 
   it('has no Show more on the last page', () => {
     expect(
-      browseView(firstPage, {
-        ok: true,
-        items: [experience(1)],
-        nextCursor: null,
-      }),
+      browseView(
+        firstPage,
+        {
+          ok: true,
+          items: [experience(1)],
+          nextCursor: null,
+        },
+        [],
+      ),
     ).toMatchObject({
       state: 'results',
       summary: '1 experience',
@@ -425,6 +546,7 @@ describe('browseView', () => {
       browseView(
         { filters: { ...noFilters, neighborhoods: ['dumbo'] }, after: cursor },
         { ok: true, items: [experience(1)], nextCursor: null },
+        [],
       ),
     ).toMatchObject({ startHref: '/new-york/browse?neighborhood=dumbo' });
   });
@@ -433,11 +555,15 @@ describe('browseView', () => {
     const rows = Array.from({ length: browsePageSize }, (_, i) =>
       experience(i + 1),
     );
-    const view = browseView(firstPage, {
-      ok: true,
-      items: rows,
-      nextCursor: rows[rows.length - 1]?.id ?? null,
-    });
+    const view = browseView(
+      firstPage,
+      {
+        ok: true,
+        items: rows,
+        nextCursor: rows[rows.length - 1]?.id ?? null,
+      },
+      [],
+    );
     expect(view.state === 'results' && view.cards).toHaveLength(browsePageSize);
   });
 });
@@ -465,7 +591,7 @@ describe('covers on browse results', () => {
 
   it('sets the cover of each card that has one', () => {
     const view = withBrowseCovers(
-      browseView({ filters: noFilters, after: null }, page),
+      browseView({ filters: noFilters, after: null }, page, []),
       new Map([[id(2), cover]]),
     );
 
@@ -476,7 +602,7 @@ describe('covers on browse results', () => {
   });
 
   it.each([
-    [{ state: 'empty', filtered: false } as const],
+    [{ state: 'empty', filtered: false, dated: null } as const],
     [{ state: 'outdated', startHref: '/new-york/browse' } as const],
   ])('returns %j as it is', (view) => {
     expect(withBrowseCovers(view, new Map([[id(1), cover]]))).toBe(view);

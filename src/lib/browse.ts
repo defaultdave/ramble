@@ -5,10 +5,11 @@ import {
   browsePath,
   hrefForFilters,
   toQueryEntries,
+  withDate,
   type BrowseQuery,
 } from './filters';
-import { formatPrice } from './money';
 import { withCovers, type PhotoView } from './photoViews';
+import { cardPriceLabel } from './pricing';
 import { IsoDateSchema, TimeZoneSchema, isKnownTimeZone } from './sessions';
 
 /** A hard page size: the data layer reads one more row than this to learn whether there is a next page. */
@@ -111,6 +112,7 @@ export function browseDays(rows: BrowseDayRows): string[] {
 
 const BrowsePriceOptionSchema = z.object({
   priceMinor: z.int().nonnegative(),
+  usesSpace: z.boolean(),
 });
 export type BrowsePriceOption = z.infer<typeof BrowsePriceOptionSchema>;
 
@@ -127,7 +129,11 @@ export const BrowseExperienceSchema = z.object({
 });
 export type BrowseExperience = z.infer<typeof BrowseExperienceSchema>;
 
-export type PriceRow = { experienceId: string; priceMinor: number };
+export type PriceRow = {
+  experienceId: string;
+  priceMinor: number;
+  usesSpace: boolean;
+};
 
 /** Each experience with the prices that belong to it, lowest first. A price for an experience that is not listed is ignored. */
 export function withPriceOptions<T extends { id: string }>(
@@ -138,7 +144,7 @@ export function withPriceOptions<T extends { id: string }>(
     ...row,
     priceOptions: prices
       .filter((price) => price.experienceId === row.id)
-      .map(({ priceMinor }) => ({ priceMinor }))
+      .map(({ priceMinor, usesSpace }) => ({ priceMinor, usesSpace }))
       .sort((a, b) => a.priceMinor - b.priceMinor),
   }));
 }
@@ -200,20 +206,6 @@ export function durationLabel(minutes: number): string {
   return `${String(hours)} hr ${String(rest)} min`;
 }
 
-/**
- * The per-person price a card shows: the lowest of the experience's prices. "From" only when the
- * prices differ (an adult and a child price), so a single price reads as that price.
- */
-export function priceLabel(options: readonly BrowsePriceOption[]): string {
-  if (options.length === 0) {
-    throw new RangeError('A bookable experience has at least one price option');
-  }
-  const prices = options.map((option) => option.priceMinor);
-  const lowest = Math.min(...prices);
-  const label = formatPrice(lowest);
-  return prices.some((price) => price !== lowest) ? `From ${label}` : label;
-}
-
 /** The address of an experience page (`/experiences/[slug]-[id]`) or a guide entry (`/guide/[slug]-[id]`). */
 export function experienceAddress(
   experience: Pick<BrowseExperience, 'id' | 'slug' | 'status'>,
@@ -235,9 +227,9 @@ export type BrowseCard = {
 
 /**
  * What a card says about an experience, or null when it cannot be shown as one: a bookable experience
- * with no price, or a guide entry with no link out. A card is left out, never repaired. The read
- * keeps both out already, but prices are read after the experiences, so a host who removes the last
- * price between the two reads would otherwise take the whole page down.
+ * with no price option that takes a space, or a guide entry with no link out. A card is left out, never
+ * repaired. The read keeps both out already, but prices are read after the experiences, so a host who
+ * removes the last price between the two reads would otherwise take the whole page down.
  */
 export function toBrowseCard(experience: BrowseExperience): BrowseCard | null {
   const meta = [
@@ -259,12 +251,8 @@ export function toBrowseCard(experience: BrowseExperience): BrowseCard | null {
     if (experience.linkOutUrl === null) return null;
     return { ...base, kind: 'guide-only', hostHref: experience.linkOutUrl };
   }
-  if (experience.priceOptions.length === 0) return null;
-  return {
-    ...base,
-    kind: 'bookable',
-    price: priceLabel(experience.priceOptions),
-  };
+  const price = cardPriceLabel(experience.priceOptions);
+  return price === null ? null : { ...base, kind: 'bookable', price };
 }
 
 const chipDate = new Intl.DateTimeFormat('en-US', {
@@ -291,6 +279,29 @@ export type FormTarget = {
   fields: readonly (readonly [name: string, value: string])[];
 };
 
+/** The way forward from a chosen day with no results. */
+type DatedEmpty = {
+  /** The chosen day, as the date chip words it. */
+  dateLabel: string;
+  /** The next day with experiences for the other filters, or null when the window has none. */
+  nextDay: { label: string; href: string } | null;
+  /** The same filters with no date. */
+  anyDayHref: string;
+  /** The line under the heading: where the next experiences are, or that none are later. */
+  message: string;
+};
+
+/**
+ * The first calendar day after `date` that has sessions, from the days `browseDays` worked out for the
+ * other filters (so only days inside the browse window). Null when the window has no later day.
+ */
+export function nextBrowseDay(
+  days: readonly string[],
+  date: string,
+): string | null {
+  return days.find((day) => day > date) ?? null;
+}
+
 /** What the results area shows: the one state, with the text and addresses it needs. */
 export type BrowseView =
   | {
@@ -302,7 +313,12 @@ export type BrowseView =
       /** Set when the page is not the first, and goes back to the first results with the same filters. */
       startHref: string | null;
     }
-  | { state: 'empty'; filtered: boolean }
+  | {
+      state: 'empty';
+      filtered: boolean;
+      /** Set when the browse has a date: a way out of a day with nothing on it. */
+      dated: DatedEmpty | null;
+    }
   | { state: 'error'; retry: FormTarget }
   | { state: 'outdated'; startHref: string };
 
@@ -310,14 +326,46 @@ function targetFor(query: BrowseQuery): FormTarget {
   return { action: browsePath, fields: toQueryEntries(query) };
 }
 
-export function browseView(query: BrowseQuery, page: BrowsePage): BrowseView {
+function datedEmpty(
+  filters: BrowseQuery['filters'],
+  days: readonly string[],
+): DatedEmpty | null {
+  if (filters.date === null) return null;
+  const next = nextBrowseDay(days, filters.date);
+  return {
+    dateLabel: dateChipLabel(filters.date),
+    nextDay:
+      next === null
+        ? null
+        : {
+            label: dateChipLabel(next),
+            href: hrefForFilters(withDate(filters, next)),
+          },
+    anyDayHref: hrefForFilters(withDate(filters, null)),
+    message:
+      next === null
+        ? 'There are no experiences on later days.'
+        : `The next day with experiences is ${dateChipLabel(next)}.`,
+  };
+}
+
+/** `days` are the calendar days for the category and neighborhood filters (`browseDays`), which the empty state looks in for the next day. */
+export function browseView(
+  query: BrowseQuery,
+  page: BrowsePage,
+  days: readonly string[],
+): BrowseView {
   const { filters, after } = query;
   if (!page.ok) {
     return { state: 'outdated', startHref: hrefForFilters(filters) };
   }
   const cards = page.items.flatMap((item) => toBrowseCard(item) ?? []);
   if (cards.length === 0 && page.nextCursor === null) {
-    return { state: 'empty', filtered: activeFilterCount(filters) > 0 };
+    return {
+      state: 'empty',
+      filtered: activeFilterCount(filters) > 0,
+      dated: datedEmpty(filters, days),
+    };
   }
   return {
     state: 'results',

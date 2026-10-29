@@ -222,7 +222,7 @@
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
   box-sizing: border-box;
-  width: 85%;
+  width: 100%;
   max-width: calc(var(--space-16) * 6);
   padding-block: var(--space-1);
 }

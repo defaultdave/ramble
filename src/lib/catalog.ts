@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { addRuleIssues } from './rules';
 
 export const experienceStatuses = [
   'draft',
@@ -234,17 +235,14 @@ function guideOnlyIssues(value: RuleFields): RuleIssue[] {
 
 /** Rules that tie fields together. The database CHECKs on `experiences` state the same rules. */
 function checkExperienceRules(value: RuleFields, ctx: z.RefinementCtx) {
-  for (const issue of [
-    ...ageRuleIssues(value),
-    ...weatherIssues(value),
-    ...guideOnlyIssues(value),
-  ]) {
-    ctx.addIssue({
-      code: 'custom',
-      path: [issue.path],
-      message: issue.message,
-    });
-  }
+  addRuleIssues(
+    [
+      ...ageRuleIssues(value),
+      ...weatherIssues(value),
+      ...guideOnlyIssues(value),
+    ],
+    ctx,
+  );
 }
 
 /**

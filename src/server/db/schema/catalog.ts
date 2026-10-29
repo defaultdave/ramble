@@ -43,6 +43,7 @@ import {
   sessionStatuses,
 } from '@/lib/sessions';
 import { cancellationTiers, legalDocuments } from './policies';
+import { notBlank } from './shared';
 
 export const experienceStatusEnum = pgEnum(
   'experience_status',
@@ -68,7 +69,6 @@ const timestampTz = () => timestamp({ withTimezone: true });
 
 // A row the Zod schema in src/lib/catalog.ts refuses makes a whole list read throw, so a CHECK here
 // must refuse whatever that schema refuses.
-const notBlank = (column: AnyPgColumn) => sql`${column} ~ '[^[:space:]]'`;
 
 // The read schemas test stored links with this same pattern, so the two cannot disagree.
 const isHttpUrlOrNull = (column: AnyPgColumn) =>

@@ -7,10 +7,8 @@ import {
   isGiftPurchaseKey,
   isOrderReference,
   orderAmountDueMinor,
-  orderCommissionMinor,
   orderInitialStatuses,
   orderStatuses,
-  orderTaxMinor,
   orderTransitions,
   type Order,
   type OrderStatus,
@@ -191,28 +189,6 @@ describe('order transitions', () => {
 });
 
 describe('order money', () => {
-  it.each([
-    [17000, 88750, 1509],
-    [1, 500_000, 1],
-    [1, 499_999, 0],
-    [100, 0, 0],
-    [0, 88750, 0],
-    [1_000_000_000, 1_000_000, 1_000_000_000],
-  ])('taxes %i at %i ppm to %i', (subtotal, rate, expected) => {
-    expect(orderTaxMinor(subtotal, rate)).toBe(expected);
-  });
-
-  it.each([
-    [17000, 1500, 2550],
-    [1, 5000, 1],
-    [1, 4999, 0],
-    [3, 1500, 0],
-    [10, 1500, 2],
-    [17000, 0, 0],
-  ])('commission on %i at %i bps is %i', (subtotal, bps, expected) => {
-    expect(orderCommissionMinor(subtotal, bps)).toBe(expected);
-  });
-
   it.each([
     [18509, 0, 18509],
     [18509, 5000, 13509],

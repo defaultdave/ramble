@@ -56,11 +56,25 @@ function requireInt(
  * `round_half_up(amountMinor * ratePpm / 1_000_000)` (design doc 4.2.3) on integers: the quotient
  * is exact because the remainder is taken first, and a remainder of exactly half rounds up.
  */
-export function roundHalfUpPpm(amountMinor: number, ratePpm: number): number {
+function roundHalfUpPpm(amountMinor: number, ratePpm: number): number {
   const scaled = amountMinor * ratePpm;
   const remainder = scaled % PPM;
   const quotient = (scaled - remainder) / PPM;
   return remainder * 2 >= PPM ? quotient + 1 : quotient;
+}
+
+/** The tax on a ticket subtotal: `round_half_up(subtotal * rate / 1_000_000)` (PRD-19). */
+export function taxMinor(ticketSubtotalMinor: number, ratePpm: number): number {
+  return roundHalfUpPpm(ticketSubtotalMinor, ratePpm);
+}
+
+/** `round_half_up(subtotal * bps / 10_000)`, on the ticket before tax (Q-03). A basis point is 100 ppm. */
+// TODO(U-047a): first caller, the order snapshot in startPayment (the order row check reads it today).
+export function commissionMinor(
+  ticketSubtotalMinor: number,
+  commissionRateBps: number,
+): number {
+  return roundHalfUpPpm(ticketSubtotalMinor, commissionRateBps * 100);
 }
 
 /**
@@ -151,13 +165,13 @@ export function lines(
     });
   }
 
-  const taxMinor = roundHalfUpPpm(ticketSubtotalMinor, ratePpm);
+  const tax = taxMinor(ticketSubtotalMinor, ratePpm);
   return {
     lines: priced,
     ticketSubtotalMinor,
     taxRatePpm: ratePpm,
-    taxMinor,
-    totalMinor: ticketSubtotalMinor + taxMinor,
+    taxMinor: tax,
+    totalMinor: ticketSubtotalMinor + tax,
   };
 }
 

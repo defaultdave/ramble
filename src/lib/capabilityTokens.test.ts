@@ -4,9 +4,13 @@ import {
   capabilityTokenMessage,
   isCapabilityTokenShape,
   isTokenHash,
+  manageHashAfterBump,
+  maxRehashBatches,
   maxTokenVersion,
   nextTokenVersion,
   pickCapabilityTokenSecret,
+  rehashBatchSize,
+  rehashLimits,
   storesHash,
 } from './capabilityTokens';
 
@@ -117,4 +121,41 @@ describe('pickCapabilityTokenSecret', () => {
       expect(pickCapabilityTokenSecret('', nodeEnv)).toBeNull();
     },
   );
+});
+
+describe('manageHashAfterBump', () => {
+  it('rewrites the hash of an order that has one', () => {
+    expect(manageHashAfterBump(true, 'new')).toBe('new');
+  });
+
+  it('keeps none for an order that has none, so its manage link stays dead', () => {
+    expect(manageHashAfterBump(false, 'new')).toBeNull();
+  });
+});
+
+describe('rehashLimits', () => {
+  it('defaults to the full batch size and batch limit', () => {
+    expect(rehashLimits()).toEqual({
+      batchSize: rehashBatchSize,
+      maxBatches: maxRehashBatches,
+    });
+  });
+
+  it('takes smaller values', () => {
+    expect(rehashLimits({ batchSize: 2, maxBatches: 3 })).toEqual({
+      batchSize: 2,
+      maxBatches: 3,
+    });
+  });
+
+  it.each([
+    { batchSize: 0 },
+    { batchSize: rehashBatchSize + 1 },
+    { batchSize: 1.5 },
+    { maxBatches: 0 },
+    { maxBatches: maxRehashBatches + 1 },
+    { maxBatches: Number.NaN },
+  ])('refuses %j', (options) => {
+    expect(() => rehashLimits(options)).toThrow(RangeError);
+  });
 });

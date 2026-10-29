@@ -351,4 +351,46 @@ describe('rotating the secret', () => {
 
     await expect(tokens.rehashTokens('manage')).resolves.toBe(total);
   });
+
+  it('re-hashes every order across several pages, and a page missed is an error, not a silent skip', async () => {
+    const before = await loadTokens(oldSecret);
+    const made = [];
+    for (let i = 0; i < 7; i += 1) {
+      made.push(await insertConfirmedWithLink(before));
+    }
+    const { rows } = await client.db.execute<{ n: number }>(
+      sql`SELECT count(*)::int AS n FROM orders WHERE manage_token_hash IS NOT NULL`,
+    );
+    const hashed = rows[0]?.n ?? 0;
+    expect(hashed).toBeGreaterThanOrEqual(7);
+    const rotated = await loadTokens('p'.repeat(40));
+
+    await expect(
+      rotated.rehashTokens('manage', { batchSize: 2, maxBatches: 1 }),
+    ).rejects.toThrow('batch limit');
+
+    const pages = Math.ceil(hashed / 2);
+    await expect(
+      rotated.rehashTokens('manage', { batchSize: 2, maxBatches: pages }),
+    ).resolves.toBe(hashed);
+    for (const { row } of made) {
+      await expect(
+        rotated.resolveToken(
+          'manage',
+          rotated.capabilityToken('manage', row.id, 1),
+        ),
+      ).resolves.toEqual({ id: row.id, version: 1 });
+    }
+  });
+
+  it.each([{ batchSize: 0 }, { batchSize: 501 }, { maxBatches: 0 }])(
+    'refuses the limits %j before it touches a row',
+    async (options) => {
+      const tokens = await loadTokens(newSecret);
+
+      await expect(tokens.rehashTokens('manage', options)).rejects.toThrow(
+        RangeError,
+      );
+    },
+  );
 });

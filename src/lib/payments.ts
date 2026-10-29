@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import { EntityIdSchema } from './catalog';
 import { orderCurrency, orderLimits } from './orders';
-import { isStorableJson, optionalText, requiredText } from './text';
+import {
+  everyJsonNode,
+  isStorableJson,
+  optionalText,
+  requiredText,
+} from './text';
 import { addRuleIssues, type RuleIssue } from './rules';
 import { canTransition, type TransitionTable } from './transitions';
 
@@ -10,6 +15,7 @@ import { canTransition, type TransitionTable } from './transitions';
 // (design doc 4.2.3, Payment in flight).
 
 export const paymentProviders = ['fake', 'stripe'] as const;
+export type PaymentProvider = (typeof paymentProviders)[number];
 
 export const paymentMethods = ['card', 'apple_pay', 'google_pay'] as const;
 
@@ -181,6 +187,7 @@ export const providerEventTypes = [
   'dispute.won',
   'dispute.lost',
 ] as const;
+export type ProviderEventType = (typeof providerEventTypes)[number];
 
 /** An ISO currency code as a provider reports it, which can differ from ours: the mismatch is the thing to catch. */
 export const providerCurrencyPattern = '^[A-Z]{3}$';
@@ -192,19 +199,38 @@ export function isProviderCurrency(value: string): boolean {
 
 const textEncoder = new TextEncoder();
 
+function compactBytes(payload: unknown): number {
+  return textEncoder.encode(JSON.stringify(payload)).length;
+}
+
+/** The checks that walk the body run only on one that fits, so an oversize body is refused without being walked. */
+const fits = (payload: unknown) =>
+  compactBytes(payload) <= paymentLimits.payloadBytes;
+
+/**
+ * jsonb prints a number out in full where `JSON.stringify` writes an exponent (`1e-300` is stored
+ * as 300 digits), so a small body could outgrow the stored-size CHECK. A number that needs an
+ * exponent is refused; every other number is stored as it is written. Apart from that, jsonb adds
+ * only a space after each colon and comma, at most half again the compact size, which the stored
+ * limit (twice the compact one) covers.
+ */
+const hasPlainNumbers = (payload: unknown) =>
+  everyJsonNode(
+    payload,
+    (node) => typeof node !== 'number' || !String(node).includes('e'),
+  );
+
 const ProviderEventPayloadSchema = z
   .record(z.string(), z.unknown())
-  .refine(isStorableJson, {
+  .refine(fits, {
+    message: `The body is at most ${String(paymentLimits.payloadBytes)} bytes`,
+  })
+  .refine((payload) => !fits(payload) || isStorableJson(payload), {
     message: 'The body holds a character that cannot be stored',
   })
-  .refine(
-    (payload) =>
-      textEncoder.encode(JSON.stringify(payload)).length <=
-      paymentLimits.payloadBytes,
-    {
-      message: `The body is at most ${String(paymentLimits.payloadBytes)} bytes`,
-    },
-  );
+  .refine((payload) => !fits(payload) || hasPlainNumbers(payload), {
+    message: 'The body holds a number that needs an exponent',
+  });
 
 type EventRuleFields = {
   amountMinor: number | null;

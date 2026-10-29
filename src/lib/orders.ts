@@ -6,7 +6,8 @@ import {
   MAX_QUANTITY,
   MAX_UNIT_PRICE_MINOR,
   PPM,
-  roundHalfUpPpm,
+  commissionMinor,
+  taxMinor,
 } from './pricing';
 import { addRuleIssues, type RuleIssue } from './rules';
 import { optionalText, requiredText } from './text';
@@ -126,24 +127,8 @@ export function canOrderTransition(
   return canTransition(orderTransitions, from, to);
 }
 
-/** `round_half_up(subtotal * rate / 1_000_000)`, the tax on a ticket subtotal (PRD-19). */
-// TODO(U-047a): first caller, the order snapshot in startPayment.
-export function orderTaxMinor(
-  ticketSubtotalMinor: number,
-  taxRatePpm: number,
-): number {
-  return roundHalfUpPpm(ticketSubtotalMinor, taxRatePpm);
-}
-
-/** `round_half_up(subtotal * bps / 10_000)`, on the ticket before tax (Q-03). A basis point is 100 ppm. */
-export function orderCommissionMinor(
-  ticketSubtotalMinor: number,
-  commissionRateBps: number,
-): number {
-  return roundHalfUpPpm(ticketSubtotalMinor, commissionRateBps * 100);
-}
-
 /** What the guest pays: the total less the gift applied, never below zero. */
+// TODO(U-047a): first caller, the order snapshot in startPayment.
 export function orderAmountDueMinor(
   totalMinor: number,
   giftAppliedMinor: number,
@@ -205,8 +190,7 @@ function moneyIssues(order: OrderRuleFields): RuleIssue[] {
     order.ticketSubtotalMinor <= orderLimits.maxSubtotalMinor
   ) {
     if (
-      order.taxMinor !==
-      orderTaxMinor(order.ticketSubtotalMinor, order.taxRatePpm)
+      order.taxMinor !== taxMinor(order.ticketSubtotalMinor, order.taxRatePpm)
     ) {
       add('taxMinor', 'The tax is the rounded rate on the ticket subtotal');
     }
@@ -233,7 +217,7 @@ function moneyIssues(order: OrderRuleFields): RuleIssue[] {
     order.ticketSubtotalMinor >= 0 &&
     order.ticketSubtotalMinor <= orderLimits.maxSubtotalMinor &&
     order.commissionMinor !==
-      orderCommissionMinor(order.ticketSubtotalMinor, order.commissionRateBps)
+      commissionMinor(order.ticketSubtotalMinor, order.commissionRateBps)
   ) {
     add(
       'commissionMinor',

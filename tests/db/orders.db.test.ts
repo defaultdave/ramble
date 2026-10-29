@@ -1535,3 +1535,62 @@ describe('transfers', () => {
     ).rejects.toMatchObject(constraint('transfers_host_id_hosts_id_fk'));
   });
 });
+
+describe('text that only looks blank', () => {
+  // Postgres [[:space:]] takes these as text; JavaScript \s does not.
+  it.each([
+    ['U+00A0', ' '],
+    ['U+FEFF', '﻿'],
+    ['U+2028', ' '],
+    ['a mix', '  ﻿\t'],
+  ])('refuses a lead guest name of only %s', async (_name, value) => {
+    await expect(
+      insert('orders', orderRow({ lead_guest_name: value })),
+    ).rejects.toMatchObject(constraint('orders_lead_guest_name_text'));
+  });
+
+  it.each([
+    ['U+00A0', ' '],
+    ['U+FEFF', '﻿'],
+  ])('refuses a provider event id of only %s', async (_name, value) => {
+    await expect(
+      insert('provider_events', {
+        provider: 'stripe',
+        provider_event_id: value,
+        type: 'payment.succeeded',
+        object_id: 'pi_1',
+        occurred_at: created,
+        received_at: created,
+        payload: {},
+      }),
+    ).rejects.toMatchObject(constraint('provider_events_event_id_text'));
+  });
+});
+
+describe('provider event bodies', () => {
+  const body = (payload: unknown) =>
+    insert('provider_events', {
+      provider: 'stripe',
+      provider_event_id: `evt_${randomUUID()}`,
+      type: 'payment.succeeded',
+      object_id: 'pi_1',
+      occurred_at: created,
+      received_at: created,
+      payload,
+    });
+
+  it('stores the largest body the contract accepts, mostly separators, within the stored limit', async () => {
+    await body({ a: new Array<number>(8187).fill(1) });
+  });
+
+  it('refuses a small body of exponent numbers that jsonb would print in full', async () => {
+    // The contract refuses these first (src/lib/payments.test.ts); this is the backstop under it.
+    const payload = Object.fromEntries(
+      Array.from({ length: 1000 }, (_, i) => [`k${String(i)}`, 1e-300]),
+    );
+
+    await expect(body(payload)).rejects.toMatchObject(
+      constraint('provider_events_payload_object'),
+    );
+  });
+});

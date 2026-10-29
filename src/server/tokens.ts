@@ -3,13 +3,14 @@ import { createHash, createHmac } from 'node:crypto';
 import {
   capabilityTokenMessage,
   isCapabilityTokenShape,
-  maxRehashBatches,
+  manageHashAfterBump,
   nextTokenVersion,
   pickCapabilityTokenSecret,
-  rehashBatchSize,
+  rehashLimits,
   storesHash,
   type CapabilityTokenKind,
   type HashStoredKind,
+  type RehashOptions,
 } from '@/lib/capabilityTokens';
 import { WriteIdSchema } from '@/lib/catalog';
 import { isOrderReference } from '@/lib/orders';
@@ -121,9 +122,10 @@ export async function bumpTokenVersion(
   const state = await lockOrderTokenState(tx, parsed.data);
   if (state === null) return null;
   const version = nextTokenVersion(state.version);
-  const hash = state.hasManageHash
-    ? hashToken(capabilityToken('manage', parsed.data, version))
-    : null;
+  const hash = manageHashAfterBump(
+    state.hasManageHash,
+    hashToken(capabilityToken('manage', parsed.data, version)),
+  );
   await writeOrderTokenVersion(tx, parsed.data, version, hash);
   return { version };
 }
@@ -134,12 +136,16 @@ export async function bumpTokenVersion(
  * gives for the row's current version. Runs in batches by id, each its own transaction, and stops
  * with an error rather than loop past the cap. Returns how many hashes it rewrote.
  */
-export async function rehashTokens(kind: HashStoredKind): Promise<number> {
+export async function rehashTokens(
+  kind: HashStoredKind,
+  options: RehashOptions = {},
+): Promise<number> {
   if (!storesHash(kind)) return 0;
+  const { batchSize, maxBatches } = rehashLimits(options);
   let rewritten = 0;
   let afterId: string | null = null;
-  for (let batch = 0; batch < maxRehashBatches; batch += 1) {
-    const page = await readManageTokenPage(afterId, rehashBatchSize);
+  for (let batch = 0; batch < maxBatches; batch += 1) {
+    const page = await readManageTokenPage(afterId, batchSize);
     const last = page.at(-1);
     if (!last) return rewritten;
     const rows = page.map((row) => ({
@@ -148,6 +154,7 @@ export async function rehashTokens(kind: HashStoredKind): Promise<number> {
       hash: hashToken(capabilityToken(kind, row.id, row.version)),
     }));
     rewritten += await db.transaction((tx) => writeManageHashes(tx, rows));
+    if (page.length < batchSize) return rewritten;
     afterId = last.id;
   }
   throw new Error('The re-hash did not finish within its batch limit');

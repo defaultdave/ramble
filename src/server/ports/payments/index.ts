@@ -1,12 +1,16 @@
 import 'server-only';
 import { z } from 'zod';
+import { orderCurrency } from '@/lib/orders';
+import {
+  attemptStatuses,
+  paymentMethods,
+  paymentProviders,
+  providerEventTypes,
+  type PaymentProvider,
+} from '@/lib/payments';
 
-const paymentProviders = ['fake', 'stripe'] as const;
-type PaymentProvider = (typeof paymentProviders)[number];
-
-export const currency = 'USD';
-const CurrencySchema = z.literal(currency);
-type Currency = typeof currency;
+const CurrencySchema = z.literal(orderCurrency);
+type Currency = typeof orderCurrency;
 
 /** The smallest charge the provider accepts, in cents (Stripe's USD minimum). */
 // TODO(U-047a): first caller
@@ -32,16 +36,9 @@ const RambleMetadataSchema = z.object({
 });
 export type RambleMetadata = z.infer<typeof RambleMetadataSchema>;
 
-export const paymentMethods = ['card', 'apple_pay', 'google_pay'] as const;
 type PaymentMethod = (typeof paymentMethods)[number];
 
-type PaymentStatus =
-  | 'created'
-  | 'requires_action'
-  | 'processing'
-  | 'failed_try'
-  | 'succeeded'
-  | 'canceled';
+type PaymentStatus = (typeof attemptStatuses)[number];
 
 export type Payment = {
   id: string;
@@ -164,23 +161,6 @@ export const WebhookDeliverySchema = z.object({
   signature: z.string().min(1).max(1_024),
 });
 export type WebhookDelivery = z.infer<typeof WebhookDeliverySchema>;
-
-/** The normalized event types of design doc 4.2.3. */
-export const providerEventTypes = [
-  'payment.succeeded',
-  'payment.failed',
-  'payment.requires_action',
-  'payment.canceled',
-  'refund.succeeded',
-  'refund.failed',
-  'transfer.paid',
-  'transfer.failed',
-  'transfer.reversed',
-  'dispute.opened',
-  'dispute.won',
-  'dispute.lost',
-] as const;
-export type ProviderEventType = (typeof providerEventTypes)[number];
 
 export const ProviderEventSchema = z.object({
   /** Unique with `provider`; a repeat delivery carries the same id. */

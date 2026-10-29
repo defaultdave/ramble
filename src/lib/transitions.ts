@@ -11,6 +11,7 @@ export function canTransition<S extends string>(
   return table[from].includes(to);
 }
 
+// TODO(U-049): first caller, the terminal-state guard in confirmOrder.
 export function isTerminal<S extends string>(
   table: TransitionTable<S>,
   status: S,

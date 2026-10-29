@@ -89,8 +89,49 @@ export function pickCapabilityTokenSecret(
   return nodeEnv === 'test' ? TEST_CAPABILITY_TOKEN_SECRET : null;
 }
 
+/**
+ * The manage hash an order holds after a bump: the rebuilt one, but only if it held one. An order
+ * that is not confirmed has none yet, and a bump must not make its manage link live.
+ */
+export function manageHashAfterBump(
+  hadManageHash: boolean,
+  rebuiltHash: string,
+): string | null {
+  return hadManageHash ? rebuiltHash : null;
+}
+
 /** A secret rotation re-hashes this many orders per transaction, so no statement or lock grows with the table. */
 export const rehashBatchSize = 500;
 
 /** The most batches one rotation runs (a million orders); more than that stops with an error instead of looping on. */
 export const maxRehashBatches = 2000;
+
+export type RehashOptions = { batchSize?: number; maxBatches?: number };
+
+/** The re-hash limits to use: the defaults, or smaller ones a caller passes (a test, an ops run). Larger or non-integer values are refused. */
+export function rehashLimits(options: RehashOptions = {}): {
+  batchSize: number;
+  maxBatches: number;
+} {
+  const batchSize = options.batchSize ?? rehashBatchSize;
+  const maxBatches = options.maxBatches ?? maxRehashBatches;
+  if (
+    !Number.isInteger(batchSize) ||
+    batchSize < 1 ||
+    batchSize > rehashBatchSize
+  ) {
+    throw new RangeError(
+      `The batch size is an integer from 1 to ${String(rehashBatchSize)}`,
+    );
+  }
+  if (
+    !Number.isInteger(maxBatches) ||
+    maxBatches < 1 ||
+    maxBatches > maxRehashBatches
+  ) {
+    throw new RangeError(
+      `The batch limit is an integer from 1 to ${String(maxRehashBatches)}`,
+    );
+  }
+  return { batchSize, maxBatches };
+}

@@ -233,6 +233,14 @@ describe('ProviderEventSchema', () => {
     ],
     ['a handled event', { ...event, processedAt: later, attempts: 1 }],
     [
+      'a body of the largest size that is mostly separators',
+      { ...event, payload: { a: new Array<number>(8187).fill(1) } },
+    ],
+    [
+      'a body with ordinary decimals and big integers',
+      { ...event, payload: { a: 0.000001, b: 123456789012345680000, c: -1.5 } },
+    ],
+    [
       'a provider currency that differs from ours, so the mismatch can be seen',
       { ...event, currency: 'EUR' },
     ],
@@ -263,6 +271,22 @@ describe('ProviderEventSchema', () => {
     [
       'a body with a character Postgres cannot store',
       { payload: { text: 'a\u0000b' } },
+    ],
+    [
+      'a small body of 1000 numbers that jsonb would store as 300 digits each',
+      {
+        payload: Object.fromEntries(
+          Array.from({ length: 1000 }, (_, i) => [`k${String(i)}`, 1e-300]),
+        ),
+      },
+    ],
+    [
+      'a number that needs an exponent, nested',
+      { payload: { a: [{ b: 1e21 }] } },
+    ],
+    [
+      'a 130,000-element array, without throwing',
+      { payload: { data: new Array<number>(130_000).fill(1) } },
     ],
   ])('refuses %s', (_name, change) => {
     expect(ProviderEventSchema.safeParse({ ...event, ...change }).success).toBe(

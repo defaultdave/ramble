@@ -1,6 +1,6 @@
 .hero {
   box-sizing: border-box;
-  padding: var(--space-8) var(--space-6);
+  padding: var(--space-8) var(--size-gutter);
   font-family: var(--font-family-body);
   color: var(--color-text-primary);
 }

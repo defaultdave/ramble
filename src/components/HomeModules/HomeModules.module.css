@@ -1,7 +1,7 @@
 /* Every module is a full-width band with an inner column capped at the content width. */
 .section {
   box-sizing: border-box;
-  padding: var(--space-8) var(--space-6);
+  padding: var(--space-8) var(--size-gutter);
   font-family: var(--font-family-body);
   color: var(--color-text-primary);
 }
@@ -95,12 +95,12 @@
 .pills {
   display: flex;
   gap: var(--space-4);
-  margin: 0 calc(-1 * var(--space-6));
-  padding: var(--space-1) var(--space-6);
+  margin: 0 calc(-1 * var(--size-gutter));
+  padding: var(--space-1) var(--size-gutter);
   list-style: none;
   overflow-x: auto;
   scroll-snap-type: x proximity;
-  scroll-padding-inline: var(--space-6);
+  scroll-padding-inline: var(--size-gutter);
 }
 
 .rail > li,

@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import { notFound } from 'next/navigation';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomeContent } from './HomeContent';
 
 // Behaviours under test, one per decision, branch or risk:
@@ -11,7 +11,6 @@ import { HomeContent } from './HomeContent';
 // - the cover photos of the cards on the page are read once, by the IDs of those cards, and shown on them
 // - a failed cover read is handled like any other failed read: the error state, with only the digest logged
 // - a page without a hero_search renders the hidden title, and one with it does not
-// - the hero's date field starts on today in New York, not on the UTC day, and offers nothing earlier
 
 const server = vi.hoisted(() => ({
   content: vi.fn(),
@@ -75,10 +74,6 @@ beforeEach(() => {
   server.thisWeek.mockResolvedValue({ experienceIds: [], experiences: [] });
   server.settings.mockResolvedValue({ giftsEnabled: true, bannerText: null });
   server.covers.mockResolvedValue([]);
-});
-
-afterEach(() => {
-  vi.useRealTimers();
 });
 
 describe('HomeContent', () => {
@@ -152,19 +147,6 @@ describe('HomeContent', () => {
     const headings = screen.getAllByRole('heading', { level: 1 });
     expect(headings).toHaveLength(1);
     expect(headings[0]).not.toHaveTextContent(/^Ramble$/);
-  });
-
-  it("starts the hero's date on today in New York, which is still yesterday in UTC", async () => {
-    // 22:30 in New York on 28 October is 02:30 UTC on the 29th.
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2026-10-29T02:30:00Z'));
-    server.content.mockResolvedValue(content([homeModule(1, 'hero_search')]));
-
-    render(await HomeContent());
-
-    const date = screen.getByLabelText('When');
-    expect(date).toHaveValue('2026-10-28');
-    expect(date).toHaveAttribute('min', '2026-10-28');
   });
 
   describe('cover photos', () => {

@@ -268,8 +268,8 @@ export function resultsSummary(shown: number, hasMore: boolean): string {
 
 /**
  * The heading over the results for what the page shows now: the count, or the words of the empty
- * or moved state. The live region and the heading both read it, so they cannot drift apart. The
- * error state has its own alert and no heading.
+ * or moved state, for the live region that announces a change of filters. The error state has its
+ * own alert and no heading.
  */
 export function browseHeading(view: BrowseView): string | null {
   switch (view.state) {
@@ -287,6 +287,8 @@ export function browseHeading(view: BrowseView): string | null {
   }
 }
 
+type TitleOption = { slug: string; name: string };
+
 const titleList = new Intl.ListFormat('en-US', {
   style: 'long',
   type: 'conjunction',
@@ -295,21 +297,22 @@ const titleList = new Intl.ListFormat('en-US', {
 /**
  * The page title for the filters, so the route announcer reads something new after each change:
  * "Browse Cooking experiences in DUMBO on Sat, Nov 7". Names are the chosen categories and
- * neighborhoods, in the order of the filters; a slug with no name is left out.
+ * neighborhoods, in the order of the filters, looked up in the options; a slug with no option is
+ * left out.
  */
 export function browseTitle(
   filters: BrowseFilters,
-  names: {
-    categories: ReadonlyMap<string, string>;
-    neighborhoods: ReadonlyMap<string, string>;
+  options: {
+    categories: readonly TitleOption[];
+    neighborhoods: readonly TitleOption[];
   },
 ): string {
-  const named = (
-    slugs: readonly string[],
-    lookup: ReadonlyMap<string, string>,
-  ) => slugs.flatMap((slug) => lookup.get(slug) ?? []);
-  const categories = named(filters.categories, names.categories);
-  const neighborhoods = named(filters.neighborhoods, names.neighborhoods);
+  const named = (slugs: readonly string[], rows: readonly TitleOption[]) => {
+    const lookup = new Map(rows.map(({ slug, name }) => [slug, name]));
+    return slugs.flatMap((slug) => lookup.get(slug) ?? []);
+  };
+  const categories = named(filters.categories, options.categories);
+  const neighborhoods = named(filters.neighborhoods, options.neighborhoods);
   return [
     'Browse',
     categories.length > 0 ? titleList.format(categories) : null,

@@ -850,13 +850,14 @@ describe('browseHeading', () => {
 
 describe('browseTitle', () => {
   const names = {
-    categories: new Map([
-      ['cooking', 'Cooking'],
-      ['wine', 'Wine'],
-      ['tours', 'Tours'],
-    ]),
-    neighborhoods: new Map([['dumbo', 'DUMBO']]),
+    categories: [
+      { slug: 'cooking', name: 'Cooking' },
+      { slug: 'wine', name: 'Wine' },
+      { slug: 'tours', name: 'Tours' },
+    ],
+    neighborhoods: [{ slug: 'dumbo', name: 'DUMBO' }],
   };
+  const empty = { categories: [], neighborhoods: [] };
   const filters = (over: Partial<BrowseFilters>): BrowseFilters => ({
     ...noFilters,
     ...over,
@@ -885,7 +886,9 @@ describe('browseTitle', () => {
       { categories: ['unknown'], neighborhoods: ['gone'] },
       'Browse experiences',
     ],
-  ])('words %s', (_name, over, title) => {
-    expect(browseTitle(filters(over), names)).toBe(title);
+    ['no options at all', { categories: ['cooking'] }, 'Browse experiences'],
+  ])('words %s', (name, over, title) => {
+    const options = name === 'no options at all' ? empty : names;
+    expect(browseTitle(filters(over), options)).toBe(title);
   });
 });

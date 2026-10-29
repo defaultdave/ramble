@@ -55,7 +55,12 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
           ? String(error.digest)
           : undefined,
     });
-    return <BrowseResults {...errorView(query)} />;
+    return (
+      <>
+        <p role="status" className={styles.announcement} />
+        <BrowseResults {...errorView(query)} />
+      </>
+    );
   }
 
   const { options, dates, page, covers } = loaded;

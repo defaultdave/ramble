@@ -7,6 +7,7 @@ import { BrowseContent } from './BrowseContent';
 // - the cover photos of the experiences on the page are read once, by their IDs in one order, and shown on their cards
 // - a page with no result asks for no cover
 // - a polite live region carries the count, or the empty heading, for the current filters
+// - the live region is on the page and empty when the read failed
 // - a failed cover read logs only the digest and renders the error state, which keeps the filters
 
 const server = vi.hoisted(() => ({
@@ -114,6 +115,14 @@ describe('BrowseContent', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       "We couldn't load experiences",
     );
+  });
+
+  it('renders the live region empty on the error path, so a recovery updates the same node', async () => {
+    server.covers.mockRejectedValue(driverError);
+
+    await render_();
+
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
   });
 
   it('offers the next day from the calendar days when a dated browse has no results', async () => {

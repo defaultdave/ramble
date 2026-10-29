@@ -3,6 +3,7 @@ import {
   activeFilterCount,
   BrowseQuerySchema,
   browseHref,
+  browseParamNames,
   canAddFilterValue,
   chipState,
   hrefForFilters,
@@ -30,6 +31,17 @@ import {
 // - the unfiltered first page is the only indexable one
 
 const cursor = '0b1c2d3e-4f50-4a61-8b72-93a4b5c6d7e8';
+
+describe('browseParamNames', () => {
+  it('names the query parameters of the grammar', () => {
+    expect(browseParamNames).toEqual({
+      categories: 'category',
+      neighborhoods: 'neighborhood',
+      date: 'date',
+      after: 'after',
+    });
+  });
+});
 
 describe('parseFilters', () => {
   it('parses an address with no filters to none', () => {

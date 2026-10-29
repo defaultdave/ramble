@@ -2,6 +2,7 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { EntityIdSchema, guestVisibleStatuses } from '@/lib/catalog';
+import { CoverLookupSchema } from '@/lib/photoViews';
 import {
   GuestPhotoSchema,
   NewPhotoSchema,
@@ -214,7 +215,6 @@ async function removeOrphan(
   await storage.delete({ key: storageKey });
 }
 
-// TODO(U-039): first caller
 /**
  * The photos of one experience in gallery order, only while the experience is visible to guests.
  * A malformed ID, a missing experience, and a hidden one each return an empty list.
@@ -236,5 +236,31 @@ export async function listGuestPhotos(
     )
     .orderBy(asc(photos.position))
     .limit(photoLimits.maxPerExperience);
+  return GuestPhotoSchema.array().parse(rows);
+}
+
+/**
+ * The first photo of each of these experiences (the one with the lowest position), only while the
+ * experience is visible to guests. An ID that is missing, hidden, or has no photo is simply not in
+ * the answer. At most `maxCoverLookups` IDs and one row each, so the read cannot grow with the page;
+ * a longer list is refused. A malformed ID is refused too, since the caller built the list from rows.
+ */
+export async function listGuestCoverPhotos(
+  experienceIds: readonly string[],
+): Promise<GuestPhoto[]> {
+  const ids = CoverLookupSchema.parse(experienceIds);
+  if (ids.length === 0) return [];
+  const rows = await dbRead
+    .selectDistinctOn([photos.experienceId], photoColumns)
+    .from(photos)
+    .innerJoin(experiences, eq(experiences.id, photos.experienceId))
+    .where(
+      and(
+        inArray(photos.experienceId, ids),
+        inArray(experiences.status, [...guestVisibleStatuses]),
+      ),
+    )
+    .orderBy(asc(photos.experienceId), asc(photos.position))
+    .limit(photoLimits.maxCoverLookups);
   return GuestPhotoSchema.array().parse(rows);
 }

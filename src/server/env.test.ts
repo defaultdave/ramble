@@ -130,13 +130,16 @@ describe('environment', () => {
   });
 
   describe('SEED_TARGET', () => {
-    it.each(['local', 'staging', 'load-test'])('accepts %s', async (value) => {
-      vi.stubEnv('SEED_TARGET', value);
+    it.each(['local', 'staging', 'load-test', 'production-demo'])(
+      'accepts %s',
+      async (value) => {
+        vi.stubEnv('SEED_TARGET', value);
 
-      const env = await loadEnv();
+        const env = await loadEnv();
 
-      expect(env.SEED_TARGET).toBe(value);
-    });
+        expect(env.SEED_TARGET).toBe(value);
+      },
+    );
 
     it.each([undefined, ''])('reads %j as not declared', async (value) => {
       vi.stubEnv('SEED_TARGET', value);
@@ -146,8 +149,8 @@ describe('environment', () => {
       expect(env.SEED_TARGET).toBeUndefined();
     });
 
-    it.each(['production', 'prod', 'Local'])(
-      'fails at import for %s, since there is no target for production',
+    it.each(['production', 'prod', 'Local', 'production_demo'])(
+      'fails at import for %s, which is not a target',
       async (value) => {
         vi.stubEnv('SEED_TARGET', value);
 
@@ -494,6 +497,39 @@ describe('environment', () => {
       await expect(loadEnv()).rejects.toThrow(
         new RegExp(`Invalid environment variables[\\s\\S]*${missing}`),
       );
+    });
+
+    it.each([
+      ['no tokens', undefined, undefined],
+      ['no private token', publicToken, undefined],
+      [
+        'a public token without a store id',
+        'test-public-token',
+        'test-private',
+      ],
+    ])(
+      'refuses vercel-blob in a production deployment with %s',
+      async (_case, publicValue, privateValue) => {
+        vi.stubEnv('VERCEL_ENV', 'production');
+        vi.stubEnv('STORAGE_PROVIDER', 'vercel-blob');
+        vi.stubEnv('BLOB_PUBLIC_READ_WRITE_TOKEN', publicValue);
+        vi.stubEnv('BLOB_PRIVATE_READ_WRITE_TOKEN', privateValue);
+
+        await expect(loadEnv()).rejects.toThrow(
+          /Invalid environment variables[\s\S]*BLOB_(PUBLIC|PRIVATE)_READ_WRITE_TOKEN/,
+        );
+      },
+    );
+
+    it('accepts vercel-blob with both tokens in a production deployment', async () => {
+      vi.stubEnv('VERCEL_ENV', 'production');
+      vi.stubEnv('STORAGE_PROVIDER', 'vercel-blob');
+      vi.stubEnv('BLOB_PUBLIC_READ_WRITE_TOKEN', publicToken);
+      vi.stubEnv('BLOB_PRIVATE_READ_WRITE_TOKEN', 'test-private-token');
+
+      const env = await loadEnv();
+
+      expect(env.STORAGE_PROVIDER).toBe('vercel-blob');
     });
 
     it('accepts vercel-blob with both tokens', async () => {

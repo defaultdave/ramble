@@ -8,11 +8,8 @@ const meta = {
   parameters: {
     a11y: {
       config: {
-        // Every story renders the state twice, once per color scheme, and the loading state has no h1 of its own.
-        rules: [
-          { id: 'landmark-unique', enabled: false },
-          { id: 'page-has-heading-one', enabled: false },
-        ],
+        // Every story renders the state twice, once per color scheme.
+        rules: [{ id: 'landmark-unique', enabled: false }],
       },
     },
   },
@@ -60,6 +57,11 @@ export const ErrorDesktop: Story = {
 export const EmptyMobile: Story = {
   render: () => <HomeEmpty />,
   globals: mobile,
+};
+export const EmptyDesktop: Story = {
+  render: () => <HomeEmpty />,
+  globals: desktop,
+  parameters: { ...meta.parameters, ...fullWidth },
 };
 export const TitleOnly: Story = {
   render: () => <HomeTitle />,

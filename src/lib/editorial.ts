@@ -154,10 +154,6 @@ function collectionNotAllowed(module: CollectionTarget): boolean {
   );
 }
 
-/**
- * A picks module shows a Pick and a gift_guide module shows the gift guide. The database holds
- * the same rule as a composite foreign key from `home_modules` to `collections (id, kind)`.
- */
 /** A collection never changes kind: a save names the kind the stored collection has. */
 export function isSameCollectionKind(
   storedKind: (typeof collectionKinds)[number],
@@ -166,6 +162,10 @@ export function isSameCollectionKind(
   return storedKind === requestedKind;
 }
 
+/**
+ * A picks module shows a Pick and a gift_guide module shows the gift guide. The database holds
+ * the same rule as a composite foreign key from `home_modules` to `collections (id, kind)`.
+ */
 export function hasCollectionKindMismatch(
   modules: readonly CollectionTarget[],
   collectionKindById: ReadonlyMap<string, (typeof collectionKinds)[number]>,

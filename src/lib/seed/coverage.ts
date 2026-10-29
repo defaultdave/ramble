@@ -1,6 +1,7 @@
-import { browseAsOf, browseWindow } from '@/lib/browse';
+import { browseWindow } from '@/lib/browse';
 import { guestVisibleStatuses } from '@/lib/catalog';
 import { spacesStatus } from '@/lib/spaces';
+import { isoDateOf, minuteAsOf, msPerDay } from '@/lib/time';
 
 // The coverage matrix (ADR 0008): every state in the signed-off Figma file (the mobile screens 01 to
 // 08 with their variants, and the States page S1 to S10) mapped to the seed rows that produce it.
@@ -82,7 +83,6 @@ export type SeedSnapshot = {
 
 const kayak = 'sunset-kayak-on-the-hudson';
 const kidsWheel = 'kids-wheel-class';
-const dayMs = 86_400_000;
 
 const isLive = (e: SnapshotExperience) => e.status === 'live';
 const isVisible = (e: SnapshotExperience) =>
@@ -125,16 +125,16 @@ const isWeekend = (localDate: string) =>
 
 /** The window browse reads for a seed taken at `now`, cut down the way a browse read cuts it. */
 function seedBrowseWindow(snapshot: SeedSnapshot) {
-  return browseWindow(browseAsOf(snapshot.now));
+  return browseWindow(minuteAsOf(snapshot.now));
 }
 
 /** Every calendar date a browse date filter can match: from the day before now's date to the day after the window ends. */
 function browseDates(snapshot: SeedSnapshot): string[] {
   const { from, to } = seedBrowseWindow(snapshot);
-  const first = Date.parse(from.toISOString().slice(0, 10)) - dayMs;
-  const last = Date.parse(to.toISOString().slice(0, 10)) + dayMs;
-  return Array.from({ length: (last - first) / dayMs + 1 }, (_, i) =>
-    new Date(first + i * dayMs).toISOString().slice(0, 10),
+  const first = Date.parse(isoDateOf(from)) - msPerDay;
+  const last = Date.parse(isoDateOf(to)) + msPerDay;
+  return Array.from({ length: (last - first) / msPerDay + 1 }, (_, i) =>
+    isoDateOf(new Date(first + i * msPerDay)),
   );
 }
 
@@ -278,7 +278,7 @@ export const probes = {
     holds:
       'At least four live experiences have a session in the next seven days (the "On this week" module).',
     check: (s) => {
-      const horizon = s.now.getTime() + 7 * dayMs;
+      const horizon = s.now.getTime() + 7 * msPerDay;
       const soon = new Set(
         upcoming(s)
           .filter((session) => session.startsAt.getTime() <= horizon)
@@ -425,7 +425,7 @@ export const probes = {
     holds:
       'At least three kayak sessions more than a day away have room for two (the "other dates for 2 guests" list, and a booking that can still be cancelled with a full refund).',
     check: (s) => {
-      const dayAway = s.now.getTime() + dayMs;
+      const dayAway = s.now.getTime() + msPerDay;
       return (
         upcoming(s, kayak).filter(
           (x) => spacesLeft(x) >= 2 && x.startsAt.getTime() > dayAway,
@@ -437,7 +437,7 @@ export const probes = {
     holds:
       'At least one session in the next 14 days has room for six, the most one guest can hold, so the booking flow and every payment state have something to book.',
     check: (s) => {
-      const horizon = s.now.getTime() + 14 * dayMs;
+      const horizon = s.now.getTime() + 14 * msPerDay;
       return upcoming(s).some(
         (x) => spacesLeft(x) >= 6 && x.startsAt.getTime() <= horizon,
       );
@@ -661,7 +661,8 @@ export const coverage: CoverageEntry[] = [
     title: 'Experience',
     probes: ['kayak-page', 'kayak-session-states', 'neighbors'],
     trigger: 'Open the kayak page.',
-    gap: 'Photos are not seeded (U-010 is not in main); the gallery shows its placeholder.',
+    // TODO(U-021b): seed the photo pool, then drop this gap.
+    gap: 'The seed writes no photo rows yet; the gallery shows its placeholder.',
   },
   {
     id: '03b',

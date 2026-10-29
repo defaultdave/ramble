@@ -186,6 +186,21 @@ describe('collection input', () => {
     ).toBe(false);
   });
 
+  it('refuses two experience ids that differ only in case, as the same id', () => {
+    const lower = '0a0b0c0d-0000-4000-8000-00000000abcd';
+    const upper = lower.toUpperCase();
+
+    expect(
+      CollectionInputSchema.safeParse({
+        ...baseCollection,
+        items: [
+          { experienceId: upper, note: null },
+          { experienceId: lower, note: null },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
   it('refuses more entries than the limit and accepts exactly the limit', () => {
     const entries = (count: number) =>
       Array.from({ length: count }, (_, index) => item(index + 1));

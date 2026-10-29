@@ -2,8 +2,17 @@ import { unstable_rethrow } from 'next/navigation';
 import { connection } from 'next/server';
 import { BrowseResults } from '@/components/BrowseResults';
 import { FilterBar } from '@/components/FilterBar';
-import { browseAsOf, browseView, errorView, venueToday } from '@/lib/browse';
+import {
+  browseCardIds,
+  browseView,
+  errorView,
+  withBrowseCovers,
+} from '@/lib/browse';
 import { parseFilters, type RawSearchParams } from '@/lib/filters';
+import { coverLookupIds, coversByExperience } from '@/lib/photoViews';
+import { minuteAsOf } from '@/lib/time';
+import { venueToday } from '@/lib/venue';
+import { getCoverPhotos } from '@/server/coverPhotos';
 import {
   getBrowseDates,
   getBrowseResults,
@@ -21,7 +30,7 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
   await connection();
   // TODO(U-005): read the time from the Clock port once it exists.
   const now = new Date();
-  const asOf = browseAsOf(now);
+  const asOf = minuteAsOf(now);
 
   let loaded;
   try {
@@ -30,7 +39,8 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
       getBrowseDates(filters, asOf),
       getBrowseResults(query, asOf),
     ]);
-    loaded = { options, dates, page };
+    const covers = await getCoverPhotos(coverLookupIds(browseCardIds(page)));
+    loaded = { options, dates, page, covers: coversByExperience(covers) };
   } catch (error) {
     // Next.js ends a prerender by throwing; swallowing that would break the render.
     unstable_rethrow(error);
@@ -45,7 +55,7 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
     return <BrowseResults {...errorView(query)} />;
   }
 
-  const { options, dates, page } = loaded;
+  const { options, dates, page, covers } = loaded;
   return (
     <>
       <FilterBar
@@ -62,7 +72,9 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
         availableDates={dates}
         onPickDate={chooseBrowseDate.bind(null, filters)}
       />
-      <BrowseResults {...browseView(query, page)} />
+      <BrowseResults
+        {...withBrowseCovers(browseView(query, page, dates), covers)}
+      />
     </>
   );
 }

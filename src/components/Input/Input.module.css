@@ -27,7 +27,7 @@
 .input {
   box-sizing: border-box;
   width: 100%;
-  min-height: var(--size-touch-target);
+  min-height: 52px;
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);

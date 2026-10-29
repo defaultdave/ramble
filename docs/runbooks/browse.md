@@ -4,7 +4,7 @@ How `/new-york/browse` works: the address grammar, what each part of it does, th
 
 ## The address
 
-`src/lib/filters.ts` is the one place the grammar lives. `parseFilters(searchParams)` reads it and `toQuery` / `browseHref` write it; nothing else builds a browse address.
+`src/lib/filters.ts` is the one place the grammar lives. `parseFilters(searchParams)` reads it and `toQuery` / `browseHref` write it. `src/lib/routes.ts` owns the path, `browsePath`; nothing else builds a browse address.
 
 | Parameter | Meaning | Rule |
 |---|---|---|
@@ -32,11 +32,11 @@ A filter change always starts again from the first results: `hrefForFilters` lea
 
 `getBrowseDates` passes the rows from `listBrowseDayRows` to `browseDays` in `src/lib/browse.ts`, which decides the days: the data layer fetches, the lib decides.
 
-The cache key includes `asOf`, the current time cut to the minute (`browseAsOf`), so guests inside one minute share an entry. A change that reaches an entry through `tagsForChange` is seen at once; a session added to an experience that is not on a cached page waits out the 60 seconds.
+The cache key includes `asOf`, the current time cut to the minute (`minuteAsOf`), so guests inside one minute share an entry. A change that reaches an entry through `tagsForChange` is seen at once; a session added to an experience that is not on a cached page waits out the 60 seconds.
 
-Paging is keyset, never `OFFSET`. Results are ordered by name and then id, a page is read as 13 rows and shown as 12 (`browsePageSize`), and `after` is the id of the last row shown. The next page is every row past that name and id. If the row behind `after` is hidden or gone, the read answers `cursor_not_found` and the page says so and links back to the first results.
+Paging is keyset, never `OFFSET`. Results are ordered by name and then id, a page is read as 13 rows and shown as 12 (`browsePageSize`), and `after` is the id of the last row shown. The next page is every row past that name and id. If the row behind `after` is hidden or gone, the data layer returns an empty page and no cursor row, and `toBrowsePage` in `src/lib/browse.ts` turns that into `cursor_not_found`: the page says so and links back to the first results.
 
-Only `live` and `guide_only` experiences are read (the one guest-visibility condition in `src/server/db/catalog.ts`), and a live experience with no price option is left out because a card cannot show it.
+Only `live` and `guide_only` experiences are read (the one guest-visibility condition in `src/server/db/catalog.ts`), and a live experience with no price option that takes a space is left out because a card cannot show it. The card price is the lowest price among the options that take a space (`cardPriceLabel` in `src/lib/pricing.ts`, shared with the home cards), "From" only when those prices differ, so a kids class with a free accompanying adult reads the child price.
 
 A date matches an experience with a `scheduled` session that starts from `asOf` to 120 days ahead and falls on that day in the host's calendar: the stored `local_date`, or for a session entered by hand the day of `starts_at` in the session's `time_zone`.
 
@@ -47,3 +47,9 @@ The three cached reads throw a `BrowseReadError` that carries the kind of the fa
 ## What the e2e run covers
 
 The e2e server has no database. `e2e/browse.spec.ts` covers the robots rule, the grammar (dropped values keep the page indexable), the error state, and Try again. The results grid, the chips, Show more, and the calendar days are covered by the component tests, the stories, and `tests/db/browse.db.test.ts`.
+
+## Empty results
+
+The page with no filters lists every guest-visible experience that can be shown as a card. No session decides it: only a date narrows by sessions. `tests/db/seed.db.test.ts` pins this on the seeded set, at the seed time and after every session.
+
+A browse with a date and no results does not stop there. The empty state names the day and links to the next day after it that has sessions for the other filters (`nextBrowseDay` in `src/lib/browse.ts`, over the same calendar days the date picker uses, so only days inside the browse window), and to "Any day", the same filters with no date. With no later day in the window it offers only "Any day". Both are plain links. The home search starts on today, so a guest who submits it at once on a day with no session left lands here with a way forward.

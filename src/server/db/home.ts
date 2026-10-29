@@ -33,7 +33,9 @@ export async function listHomeExperiences(
     },
     with: {
       neighborhood: { columns: { name: true } },
-      priceOptions: { columns: { kind: true, priceMinor: true } },
+      priceOptions: {
+        columns: { kind: true, priceMinor: true, usesSpace: true },
+      },
     },
     orderBy: [asc(experiences.name), asc(experiences.id)],
     limit: homeLimits.maxCardIds,

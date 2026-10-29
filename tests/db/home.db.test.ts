@@ -136,7 +136,12 @@ describe('listHomeExperiences', () => {
     });
     await client.db.insert(priceOptions).values([
       { experienceId: live.id, kind: 'child', priceMinor: 4000 },
-      { experienceId: live.id, kind: 'adult', priceMinor: 8500 },
+      {
+        experienceId: live.id,
+        kind: 'adult',
+        priceMinor: 8500,
+        usesSpace: false,
+      },
     ]);
     const guide = await insertExperience({
       name: 'Harbor walk',
@@ -160,9 +165,12 @@ describe('listHomeExperiences', () => {
     });
     expect(
       pasta?.priceOptions
-        .map((option) => `${option.kind}:${String(option.priceMinor)}`)
+        .map(
+          (option) =>
+            `${option.kind}:${String(option.priceMinor)}:${String(option.usesSpace)}`,
+        )
         .toSorted(),
-    ).toEqual(['adult:8500', 'child:4000']);
+    ).toEqual(['adult:8500:false', 'child:4000:true']);
     expect(found.find((row) => row.id === guide.id)).toMatchObject({
       status: 'guide_only',
       linkOutUrl: 'https://host.example/walk',

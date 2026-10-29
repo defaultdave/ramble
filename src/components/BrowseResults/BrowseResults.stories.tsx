@@ -1,27 +1,31 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { BrowseResults } from '@/components/BrowseResults';
+import { samplePhoto } from '@/components/Photo/Photo.fixtures';
 import type { BrowseCard, BrowseView } from '@/lib/browse';
 import styles from './BrowseResults.stories.module.css';
 
 const cards: BrowseCard[] = [
   {
     id: '1',
+    image: null,
     kind: 'bookable',
     title: 'Hand-rolled pasta in a Carroll Gardens kitchen',
-    meta: 'Carroll Gardens · 2.5 hr',
+    meta: 'Carroll Gardens · 2.5\u00a0hr',
     href: '/experiences/pasta-1',
     price: 'From $60',
   },
   {
     id: '2',
+    image: null,
     kind: 'bookable',
     title: 'Dumpling folding with a Sunset Park chef',
-    meta: 'Sunset Park · 2 hr',
+    meta: 'Sunset Park · 2\u00a0hr',
     href: '/experiences/dumplings-2',
     price: '$60',
   },
   {
     id: '3',
+    image: null,
     kind: 'guide-only',
     title: 'Sourdough mornings at Rise Bakery',
     meta: 'Park Slope',
@@ -30,25 +34,28 @@ const cards: BrowseCard[] = [
   },
   {
     id: '4',
+    image: null,
     kind: 'bookable',
     title: 'Fresh mozzarella, stretched by hand',
-    meta: 'Bensonhurst · 1.5 hr',
+    meta: 'Bensonhurst · 1.5\u00a0hr',
     href: '/experiences/mozzarella-4',
     price: '$55',
   },
   {
     id: '5',
+    image: null,
     kind: 'bookable',
     title: 'Knife skills for home cooks',
-    meta: 'Gowanus · 2 hr',
+    meta: 'Gowanus · 2\u00a0hr',
     href: '/experiences/knives-5',
     price: '$75',
   },
   {
     id: '6',
+    image: null,
     kind: 'bookable',
     title: 'Bao from scratch',
-    meta: 'Sunset Park · 2.5 hr',
+    meta: 'Sunset Park · 2.5\u00a0hr',
     href: '/experiences/bao-6',
     price: '$70',
   },
@@ -96,6 +103,21 @@ export const Results: ResultsStory = {
   },
 };
 
+// The cover is the first photo of the experience; a card with none keeps its empty frame.
+export const WithCoverPhotos: ResultsStory = {
+  args: {
+    state: 'results',
+    cards: cards.map((card, index) =>
+      index === 2 || index === 4
+        ? card
+        : { ...card, image: samplePhoto(index) },
+    ),
+    summary: 'Showing 6 experiences',
+    showMore: nextPage,
+    startHref: null,
+  },
+};
+
 export const LastPage: ResultsStory = {
   args: {
     state: 'results',
@@ -127,11 +149,41 @@ export const SingleResult: ResultsStory = {
 };
 
 export const EmptyWithFilters: EmptyStory = {
-  args: { state: 'empty', filtered: true },
+  args: { state: 'empty', filtered: true, dated: null },
 };
 
 export const EmptyWithoutFilters: EmptyStory = {
-  args: { state: 'empty', filtered: false },
+  args: { state: 'empty', filtered: false, dated: null },
+};
+
+// A chosen day with nothing on it: the next day that has experiences, and the same filters with any day.
+export const EmptyOnADay: EmptyStory = {
+  args: {
+    state: 'empty',
+    filtered: true,
+    dated: {
+      dateLabel: 'Wed, Oct 28',
+      nextDay: {
+        label: 'Thu, Oct 29',
+        href: '/new-york/browse?category=cooking&date=2026-10-29',
+      },
+      anyDayHref: '/new-york/browse?category=cooking',
+      message: 'The next day with experiences is Thu, Oct 29.',
+    },
+  },
+};
+
+export const EmptyOnADayWithNoLaterDay: EmptyStory = {
+  args: {
+    state: 'empty',
+    filtered: true,
+    dated: {
+      dateLabel: 'Wed, Feb 24',
+      nextDay: null,
+      anyDayHref: '/new-york/browse',
+      message: 'There are no experiences on later days.',
+    },
+  },
 };
 
 export const ErrorWithRetry: ErrorStory = {

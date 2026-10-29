@@ -22,7 +22,9 @@ import {
   pages,
 } from '@/server/db/schema';
 import {
+  aFewMoments,
   createFreshDatabase,
+  raceAgainstOpenTransaction as race,
   serveNeonHttp,
   type FreshDatabase,
 } from './harness';
@@ -87,43 +89,11 @@ function doc(text = 'Hello') {
 
 type Tx = Parameters<Parameters<typeof client.db.transaction>[0]>[0];
 
-const aFewMoments = () => new Promise((resolve) => setTimeout(resolve, 300));
-
-/**
- * Runs `holder` in a transaction that stays open, starts `challenger` on another connection,
- * checks the challenger is still waiting, then commits the holder and returns what the challenger
- * answered. A challenger that does not wait was not serialized by the lock.
- */
-async function raceAgainstOpenTransaction<T>(
+function raceAgainstOpenTransaction<T>(
   holder: (tx: Tx) => Promise<void>,
   challenger: () => Promise<T>,
 ): Promise<T> {
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  let held!: () => void;
-  const holding = new Promise<void>((resolve) => {
-    held = resolve;
-  });
-  const holderDone = client.db.transaction(async (tx) => {
-    await holder(tx);
-    held();
-    await gate;
-  });
-  await holding;
-
-  let settled = false;
-  const answer = challenger().finally(() => {
-    settled = true;
-  });
-  answer.catch(() => undefined);
-  await aFewMoments();
-  const waited = !settled;
-  release();
-  await holderDone;
-  expect(waited, 'the challenger waited for the holder').toBe(true);
-  return answer;
+  return race<Tx, T>((body) => client.db.transaction(body), holder, challenger);
 }
 
 const draftOf = (docKey: string, title = 'Draft') =>

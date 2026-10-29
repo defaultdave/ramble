@@ -44,6 +44,13 @@ export const slugEntityKinds = [
 export const EntityIdSchema = z.guid();
 
 /**
+ * An ID in a write. `z.guid()` accepts upper case and Postgres returns lower case, so an ID
+ * written in capitals is lower-cased here: compared against what the database found, it is the
+ * same ID, not a missing one.
+ */
+export const WriteIdSchema = EntityIdSchema.transform((id) => id.toLowerCase());
+
+/**
  * Lower-case words joined by single hyphens. The database CHECK on every slug column spells the
  * pattern `^[a-z0-9]+(-[a-z0-9]+)*$`; this states it without a repeated group, because V8 matches
  * a repeated group by recursion and a slug of a few million characters overflows the stack.

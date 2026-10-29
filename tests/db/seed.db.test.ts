@@ -1,7 +1,12 @@
 import { updateTag } from 'next/cache';
 import { and, count, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { browseAsOf, browseDays, browseWindow } from '@/lib/browse';
+import {
+  browseAsOf,
+  browseDays,
+  browseWindow,
+  nextBrowseDay,
+} from '@/lib/browse';
 import { noFilters } from '@/lib/filters';
 import {
   coverage,
@@ -47,8 +52,8 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 // - the zero-results state (S2) holds through browse's own query: kids in Williamsburg return nothing on
 //   every weeknight of browse's window and the wheel class on a weekend
 // - browse with no filters lists every seeded experience a guest can see, whatever the clock says, because
-//   no session decides it; a day with no session left lists none, and that is the only way a seeded
-//   browse page reads empty
+//   no session decides it; a day with no session left lists none, that is the only way a seeded
+//   browse page reads empty, and the next listed day after it has experiences
 // - the guest reads the app will use parse the seeded rows and show what a guest may see: live and
 //   guide-only experiences, published Picks without the paused entry, the gift guide, six home
 //   modules in order, copy for every category and neighborhood, the published legal documents
@@ -325,9 +330,9 @@ describe('the curated seed', () => {
     const days = browseDays(
       await browseReads.listBrowseDayRows(noFilters, afterEverySession),
     );
-    const [nextDay] = days;
-    expect(nextDay).toBeDefined();
-    expect(nextDay).not.toBe(lastSeededDay);
+    // The empty page's way forward: the first listed day after the empty one has experiences.
+    const nextDay = nextBrowseDay(days, lastSeededDay);
+    expect(nextDay).not.toBeNull();
     const onNextDay = await browseReads.listBrowseExperiences(
       { filters: { ...noFilters, date: nextDay ?? null }, after: null },
       afterEverySession,

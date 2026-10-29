@@ -12,6 +12,7 @@ import { BrowseResults } from './BrowseResults';
 // - Show more is a form that sends every field of the next address, and is absent on the last page
 // - the way back to the first results is there only on a later page
 // - empty says whether a filter is on and offers Clear all filters only then
+// - empty on a chosen day names the day and links to the next day with experiences and to any day, or only to any day when none follows; Clear all filters is offered only when another filter is on
 // - an error is announced as an alert with a Try again form that carries the same address
 // - an outdated cursor says so and links to the first results
 
@@ -162,7 +163,7 @@ describe('BrowseResults results', () => {
 
 describe('BrowseResults empty', () => {
   it('says nothing matches and offers to clear when a filter is on', () => {
-    render(<BrowseResults state="empty" filtered />);
+    render(<BrowseResults state="empty" filtered dated={null} />);
     expect(
       screen.getByRole('heading', { name: 'Nothing matches those filters' }),
     ).toBeVisible();
@@ -172,13 +173,83 @@ describe('BrowseResults empty', () => {
   });
 
   it('says there is nothing yet, with nothing to clear, when no filter is on', () => {
-    render(<BrowseResults state="empty" filtered={false} />);
+    render(<BrowseResults state="empty" filtered={false} dated={null} />);
     expect(
       screen.getByRole('heading', { name: 'Nothing to browse yet' }),
     ).toBeVisible();
     expect(
       screen.queryByRole('link', { name: 'Clear all filters' }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('BrowseResults empty on a chosen day', () => {
+  const dated = {
+    dateLabel: 'Sat, Nov 7',
+    nextDay: {
+      label: 'Mon, Nov 9',
+      href: '/new-york/browse?category=cooking&date=2026-11-09',
+    },
+    anyDayHref: '/new-york/browse?category=cooking',
+    otherFilters: true,
+  };
+
+  it('names the day and links to the next day with experiences and to any day', () => {
+    render(<BrowseResults state="empty" filtered dated={dated} />);
+    expect(
+      screen.getByRole('heading', { name: 'Nothing on Sat, Nov 7' }),
+    ).toBeVisible();
+    expect(
+      screen.getByText('The next day with experiences is Mon, Nov 9.'),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: 'See Mon, Nov 9' }),
+    ).toHaveAttribute(
+      'href',
+      '/new-york/browse?category=cooking&date=2026-11-09',
+    );
+    expect(screen.getByRole('link', { name: 'Any day' })).toHaveAttribute(
+      'href',
+      '/new-york/browse?category=cooking',
+    );
+    expect(
+      screen.getByRole('link', { name: 'Clear all filters' }),
+    ).toHaveAttribute('href', '/new-york/browse');
+  });
+
+  it('offers only any day when no later day has experiences', () => {
+    render(
+      <BrowseResults
+        state="empty"
+        filtered
+        dated={{ ...dated, nextDay: null }}
+      />,
+    );
+    expect(
+      screen.getByText('There are no experiences on later days.'),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('link', { name: /^See / }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Any day' })).toBeVisible();
+  });
+
+  it('leaves out Clear all filters when the day is the only filter, because any day already clears it', () => {
+    render(
+      <BrowseResults
+        state="empty"
+        filtered
+        dated={{
+          ...dated,
+          anyDayHref: '/new-york/browse',
+          otherFilters: false,
+        }}
+      />,
+    );
+    expect(
+      screen.queryByRole('link', { name: 'Clear all filters' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Any day' })).toBeVisible();
   });
 });
 

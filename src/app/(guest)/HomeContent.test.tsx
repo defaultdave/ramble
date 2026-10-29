@@ -189,9 +189,7 @@ describe('HomeContent', () => {
           neighborhoodName: 'Greenpoint',
           durationMinutes: 120,
           linkOutUrl: null,
-          priceOptions: [
-            { kind: 'adult', priceMinor: 7000, usesSpace: true },
-          ],
+          priceOptions: [{ kind: 'adult', priceMinor: 7000, usesSpace: true }],
         })),
       };
     };

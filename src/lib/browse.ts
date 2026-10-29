@@ -5,6 +5,7 @@ import {
   browsePath,
   hrefForFilters,
   toQueryEntries,
+  withDate,
   type BrowseQuery,
 } from './filters';
 import { withCovers, type PhotoView } from './photoViews';
@@ -278,6 +279,29 @@ export type FormTarget = {
   fields: readonly (readonly [name: string, value: string])[];
 };
 
+/** The way forward from a chosen day with no results. */
+type DatedEmpty = {
+  /** The chosen day, as the date chip words it. */
+  dateLabel: string;
+  /** The next day with experiences for the other filters, or null when the window has none. */
+  nextDay: { label: string; href: string } | null;
+  /** The same filters with no date. */
+  anyDayHref: string;
+  /** Whether a category or neighborhood is chosen too, so clearing every filter goes further than "any day". */
+  otherFilters: boolean;
+};
+
+/**
+ * The first calendar day after `date` that has sessions, from the days `browseDays` worked out for the
+ * other filters (so only days inside the browse window). Null when the window has no later day.
+ */
+export function nextBrowseDay(
+  days: readonly string[],
+  date: string,
+): string | null {
+  return days.find((day) => day > date) ?? null;
+}
+
 /** What the results area shows: the one state, with the text and addresses it needs. */
 export type BrowseView =
   | {
@@ -289,7 +313,12 @@ export type BrowseView =
       /** Set when the page is not the first, and goes back to the first results with the same filters. */
       startHref: string | null;
     }
-  | { state: 'empty'; filtered: boolean }
+  | {
+      state: 'empty';
+      filtered: boolean;
+      /** Set when the browse has a date: a way out of a day with nothing on it. */
+      dated: DatedEmpty | null;
+    }
   | { state: 'error'; retry: FormTarget }
   | { state: 'outdated'; startHref: string };
 
@@ -297,14 +326,43 @@ function targetFor(query: BrowseQuery): FormTarget {
   return { action: browsePath, fields: toQueryEntries(query) };
 }
 
-export function browseView(query: BrowseQuery, page: BrowsePage): BrowseView {
+function datedEmpty(
+  filters: BrowseQuery['filters'],
+  days: readonly string[],
+): DatedEmpty | null {
+  if (filters.date === null) return null;
+  const next = nextBrowseDay(days, filters.date);
+  return {
+    dateLabel: dateChipLabel(filters.date),
+    nextDay:
+      next === null
+        ? null
+        : {
+            label: dateChipLabel(next),
+            href: hrefForFilters(withDate(filters, next)),
+          },
+    anyDayHref: hrefForFilters(withDate(filters, null)),
+    otherFilters: activeFilterCount(withDate(filters, null)) > 0,
+  };
+}
+
+/** `days` are the calendar days for the category and neighborhood filters (`browseDays`), which the empty state looks in for the next day. */
+export function browseView(
+  query: BrowseQuery,
+  page: BrowsePage,
+  days: readonly string[],
+): BrowseView {
   const { filters, after } = query;
   if (!page.ok) {
     return { state: 'outdated', startHref: hrefForFilters(filters) };
   }
   const cards = page.items.flatMap((item) => toBrowseCard(item) ?? []);
   if (cards.length === 0 && page.nextCursor === null) {
-    return { state: 'empty', filtered: activeFilterCount(filters) > 0 };
+    return {
+      state: 'empty',
+      filtered: activeFilterCount(filters) > 0,
+      dated: datedEmpty(filters, days),
+    };
   }
   return {
     state: 'results',

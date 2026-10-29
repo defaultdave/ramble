@@ -92,6 +92,32 @@ export function BrowseResults(props: BrowseResultsProps) {
         </div>
       );
     case 'empty':
+      if (props.dated) {
+        const { dateLabel, nextDay, anyDayHref, otherFilters } = props.dated;
+        return (
+          <div className={styles.notice}>
+            <h2 className={styles.noticeTitle}>Nothing on {dateLabel}</h2>
+            <p className={styles.noticeText}>
+              {nextDay
+                ? `The next day with experiences is ${nextDay.label}.`
+                : 'There are no experiences on later days.'}
+            </p>
+            <div className={styles.noticeActions}>
+              {nextDay ? (
+                <ButtonLink href={nextDay.href} variant="primary">
+                  See {nextDay.label}
+                </ButtonLink>
+              ) : null}
+              <ButtonLink href={anyDayHref} variant="secondary">
+                Any day
+              </ButtonLink>
+              {otherFilters ? (
+                <ButtonLink href={browsePath}>Clear all filters</ButtonLink>
+              ) : null}
+            </div>
+          </div>
+        );
+      }
       return (
         <div className={styles.notice}>
           <h2 className={styles.noticeTitle}>

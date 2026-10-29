@@ -72,7 +72,9 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
         availableDates={dates}
         onPickDate={chooseBrowseDate.bind(null, filters)}
       />
-      <BrowseResults {...withBrowseCovers(browseView(query, page), covers)} />
+      <BrowseResults
+        {...withBrowseCovers(browseView(query, page, dates), covers)}
+      />
     </>
   );
 }

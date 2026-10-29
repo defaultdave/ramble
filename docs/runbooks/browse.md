@@ -48,8 +48,8 @@ The three cached reads throw a `BrowseReadError` that carries the kind of the fa
 
 The e2e server has no database. `e2e/browse.spec.ts` covers the robots rule, the grammar (dropped values keep the page indexable), the error state, and Try again. The results grid, the chips, Show more, and the calendar days are covered by the component tests, the stories, and `tests/db/browse.db.test.ts`.
 
-## Reading what a guest sees
+## Empty results
 
-The page with no filters lists every guest-visible experience that can be shown as a card. No session decides it: only a date narrows by sessions. `tests/db/seed.db.test.ts` seeds the curated set and reads browse with no filters at the time of the seed, after the last session of the seed day, and after every seeded session, and each read returns the same experiences. The same file shows the one way a seeded page reads empty: a day with no session left (the seed run of 2026-10-28 made none before 2026-10-29, so `?date=2026-10-28` said "Nothing matches those filters"). The calendar disables such a day, and the home search starts on today (`docs/runbooks/home.md`), so a guest who submits it at once on a day with no session left reaches that empty state.
+The page with no filters lists every guest-visible experience that can be shown as a card. No session decides it: only a date narrows by sessions. `tests/db/seed.db.test.ts` pins this on the seeded set, at the seed time and after every session.
 
-Results stream into a `Suspense` boundary and show once the browser runs React's inline swap script, which the report-only policy allows. A page cached before a seed catches up within the next minute, because the cache key carries the minute (`browseAsOf`).
+A browse with a date and no results does not stop there. The empty state names the day and links to the next day after it that has sessions for the other filters (`nextBrowseDay` in `src/lib/browse.ts`, over the same calendar days the date picker uses, so only days inside the browse window), and to "Any day", the same filters with no date. With no later day in the window it offers only "Any day". Both are plain links. The home search starts on today, so a guest who submits it at once on a day with no session left lands here with a way forward.

@@ -46,6 +46,14 @@ export const GuestSettingsSchema = SettingsSchema.pick({
 });
 export type GuestSettings = z.infer<typeof GuestSettingsSchema>;
 
+/** What the hold path reads inside its transaction: the pause switch, the hold length, and the tax rate. */
+export const HoldSettingsSchema = SettingsSchema.pick({
+  bookingsPaused: true,
+  holdMinutes: true,
+  taxRatePpm: true,
+});
+export type HoldSettings = z.infer<typeof HoldSettingsSchema>;
+
 /** A change names only the settings it sets, and sets at least one. */
 export const SettingsChangeSchema = z
   .strictObject(settingFields)

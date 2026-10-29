@@ -1,5 +1,5 @@
 {
-  "id": "f85e2e67-0f76-4d2f-8494-4337906eeffa",
+  "id": "3f20a1f2-4a01-4e60-875c-4053f22bf427",
   "prevId": "f891272c-1da8-4b1c-8523-a0974d83eeef",
   "version": "7",
   "dialect": "postgresql",
@@ -2352,6 +2352,302 @@
       },
       "isRLSEnabled": false
     },
+    "public.hold_items": {
+      "name": "hold_items",
+      "schema": "",
+      "columns": {
+        "hold_id": {
+          "name": "hold_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "price_option_id": {
+          "name": "price_option_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unit_price_minor": {
+          "name": "unit_price_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "uses_space": {
+          "name": "uses_space",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "hold_items_hold_id_holds_id_fk": {
+          "name": "hold_items_hold_id_holds_id_fk",
+          "tableFrom": "hold_items",
+          "tableTo": "holds",
+          "columnsFrom": [
+            "hold_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "hold_items_price_option_id_price_options_id_fk": {
+          "name": "hold_items_price_option_id_price_options_id_fk",
+          "tableFrom": "hold_items",
+          "tableTo": "price_options",
+          "columnsFrom": [
+            "price_option_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "hold_items_hold_id_price_option_id_pk": {
+          "name": "hold_items_hold_id_price_option_id_pk",
+          "columns": [
+            "hold_id",
+            "price_option_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "hold_items_quantity_in_range": {
+          "name": "hold_items_quantity_in_range",
+          "value": "\"hold_items\".\"quantity\" BETWEEN 1 AND 6"
+        },
+        "hold_items_unit_price_in_range": {
+          "name": "hold_items_unit_price_in_range",
+          "value": "\"hold_items\".\"unit_price_minor\" BETWEEN 0 AND 10000000"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.holds": {
+      "name": "holds",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "session_id": {
+          "name": "session_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "hold_purpose",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "gift_id": {
+          "name": "gift_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "hold_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "seats": {
+          "name": "seats",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_key": {
+          "name": "device_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ip_hash": {
+          "name": "ip_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "paying_until": {
+          "name": "paying_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "released_reason": {
+          "name": "released_reason",
+          "type": "hold_released_reason",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "superseded_by": {
+          "name": "superseded_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "holds_session_open_idx": {
+          "name": "holds_session_open_idx",
+          "columns": [
+            {
+              "expression": "session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"holds\".\"status\" IN ('active', 'paying')",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "holds_session_id_sessions_id_fk": {
+          "name": "holds_session_id_sessions_id_fk",
+          "tableFrom": "holds",
+          "tableTo": "sessions",
+          "columnsFrom": [
+            "session_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "holds_superseded_by_fk": {
+          "name": "holds_superseded_by_fk",
+          "tableFrom": "holds",
+          "tableTo": "holds",
+          "columnsFrom": [
+            "superseded_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "holds_gift_matches_purpose": {
+          "name": "holds_gift_matches_purpose",
+          "value": "(\"holds\".\"purpose\" = 'gift_redemption') = (\"holds\".\"gift_id\" IS NOT NULL)"
+        },
+        "holds_seats_in_range": {
+          "name": "holds_seats_in_range",
+          "value": "\"holds\".\"seats\" BETWEEN 1 AND 6"
+        },
+        "holds_device_key_sha256": {
+          "name": "holds_device_key_sha256",
+          "value": "\"holds\".\"device_key\" ~ '^[0-9a-f]{64}$'"
+        },
+        "holds_ip_hash_sha256": {
+          "name": "holds_ip_hash_sha256",
+          "value": "\"holds\".\"ip_hash\" ~ '^[0-9a-f]{64}$'"
+        },
+        "holds_released_reason_matches_status": {
+          "name": "holds_released_reason_matches_status",
+          "value": "(\"holds\".\"status\" = 'released') = (\"holds\".\"released_reason\" IS NOT NULL)"
+        },
+        "holds_superseded_by_matches_reason": {
+          "name": "holds_superseded_by_matches_reason",
+          "value": "coalesce(\"holds\".\"released_reason\" = 'superseded', false) = (\"holds\".\"superseded_by\" IS NOT NULL)"
+        },
+        "holds_not_superseded_by_itself": {
+          "name": "holds_not_superseded_by_itself",
+          "value": "\"holds\".\"superseded_by\" IS NULL OR \"holds\".\"superseded_by\" <> \"holds\".\"id\""
+        },
+        "holds_paying_has_deadline": {
+          "name": "holds_paying_has_deadline",
+          "value": "\"holds\".\"status\" <> 'paying' OR \"holds\".\"paying_until\" IS NOT NULL"
+        },
+        "holds_paying_until_not_before_expiry": {
+          "name": "holds_paying_until_not_before_expiry",
+          "value": "\"holds\".\"paying_until\" IS NULL OR \"holds\".\"paying_until\" >= \"holds\".\"expires_at\""
+        },
+        "holds_expiry_window": {
+          "name": "holds_expiry_window",
+          "value": "\"holds\".\"expires_at\" > \"holds\".\"created_at\" AND \"holds\".\"expires_at\" <= \"holds\".\"created_at\" + make_interval(mins => 60)"
+        },
+        "holds_updated_not_before_created": {
+          "name": "holds_updated_not_before_created",
+          "value": "\"holds\".\"updated_at\" >= \"holds\".\"created_at\""
+        },
+        "holds_expires_at_in_range": {
+          "name": "holds_expires_at_in_range",
+          "value": "\"holds\".\"expires_at\" >= '1000-01-01 00:00:00+00' AND \"holds\".\"expires_at\" < '10000-01-01 00:00:00+00'"
+        },
+        "holds_paying_until_in_range": {
+          "name": "holds_paying_until_in_range",
+          "value": "\"holds\".\"paying_until\" >= '1000-01-01 00:00:00+00' AND \"holds\".\"paying_until\" < '10000-01-01 00:00:00+00'"
+        },
+        "holds_created_at_in_range": {
+          "name": "holds_created_at_in_range",
+          "value": "\"holds\".\"created_at\" >= '1000-01-01 00:00:00+00' AND \"holds\".\"created_at\" < '10000-01-01 00:00:00+00'"
+        },
+        "holds_updated_at_in_range": {
+          "name": "holds_updated_at_in_range",
+          "value": "\"holds\".\"updated_at\" >= '1000-01-01 00:00:00+00' AND \"holds\".\"updated_at\" < '10000-01-01 00:00:00+00'"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.consents": {
       "name": "consents",
       "schema": "",
@@ -4639,311 +4935,6 @@
         }
       },
       "isRLSEnabled": false
-    },
-    "public.ledger_entries": {
-      "name": "ledger_entries",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "bigint",
-          "primaryKey": true,
-          "notNull": true,
-          "identity": {
-            "type": "always",
-            "name": "ledger_entries_id_seq",
-            "schema": "public",
-            "increment": "1",
-            "startWith": "1",
-            "minValue": "1",
-            "maxValue": "9223372036854775807",
-            "cache": "1",
-            "cycle": false
-          }
-        },
-        "occurred_at": {
-          "name": "occurred_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "recorded_at": {
-          "name": "recorded_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "clock_timestamp()"
-        },
-        "entry_type": {
-          "name": "entry_type",
-          "type": "ledger_entry_type",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "debit_account": {
-          "name": "debit_account",
-          "type": "ledger_account",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "credit_account": {
-          "name": "credit_account",
-          "type": "ledger_account",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "amount_minor": {
-          "name": "amount_minor",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "currency": {
-          "name": "currency",
-          "type": "char(3)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'USD'"
-        },
-        "order_id": {
-          "name": "order_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "gift_id": {
-          "name": "gift_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "host_id": {
-          "name": "host_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "payment_attempt_id": {
-          "name": "payment_attempt_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "refund_id": {
-          "name": "refund_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "transfer_id": {
-          "name": "transfer_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "dispute_id": {
-          "name": "dispute_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "provider_object_id": {
-          "name": "provider_object_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "simulated": {
-          "name": "simulated",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "memo": {
-          "name": "memo",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "ledger_entries_cash_event_unique": {
-          "name": "ledger_entries_cash_event_unique",
-          "columns": [
-            {
-              "expression": "entry_type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "provider_object_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"ledger_entries\".\"provider_object_id\" IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "ledger_entries_host_occurred_idx": {
-          "name": "ledger_entries_host_occurred_idx",
-          "columns": [
-            {
-              "expression": "host_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "occurred_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "ledger_entries_order_id_idx": {
-          "name": "ledger_entries_order_id_idx",
-          "columns": [
-            {
-              "expression": "order_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "ledger_entries_order_id_orders_id_fk": {
-          "name": "ledger_entries_order_id_orders_id_fk",
-          "tableFrom": "ledger_entries",
-          "tableTo": "orders",
-          "columnsFrom": [
-            "order_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "ledger_entries_host_id_hosts_id_fk": {
-          "name": "ledger_entries_host_id_hosts_id_fk",
-          "tableFrom": "ledger_entries",
-          "tableTo": "hosts",
-          "columnsFrom": [
-            "host_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "ledger_entries_payment_attempt_id_payment_attempts_id_fk": {
-          "name": "ledger_entries_payment_attempt_id_payment_attempts_id_fk",
-          "tableFrom": "ledger_entries",
-          "tableTo": "payment_attempts",
-          "columnsFrom": [
-            "payment_attempt_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "ledger_entries_refund_id_refunds_id_fk": {
-          "name": "ledger_entries_refund_id_refunds_id_fk",
-          "tableFrom": "ledger_entries",
-          "tableTo": "refunds",
-          "columnsFrom": [
-            "refund_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "ledger_entries_transfer_id_transfers_id_fk": {
-          "name": "ledger_entries_transfer_id_transfers_id_fk",
-          "tableFrom": "ledger_entries",
-          "tableTo": "transfers",
-          "columnsFrom": [
-            "transfer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "ledger_entries_accounts_differ": {
-          "name": "ledger_entries_accounts_differ",
-          "value": "\"ledger_entries\".\"debit_account\" <> \"ledger_entries\".\"credit_account\""
-        },
-        "ledger_entries_amount_in_range": {
-          "name": "ledger_entries_amount_in_range",
-          "value": "\"ledger_entries\".\"amount_minor\" BETWEEN 1 AND 2000000000"
-        },
-        "ledger_entries_currency_usd": {
-          "name": "ledger_entries_currency_usd",
-          "value": "\"ledger_entries\".\"currency\" = 'USD'"
-        },
-        "ledger_entries_names_a_subject": {
-          "name": "ledger_entries_names_a_subject",
-          "value": "num_nonnulls(\"ledger_entries\".\"order_id\", \"ledger_entries\".\"gift_id\", \"ledger_entries\".\"host_id\") >= 1 OR \"ledger_entries\".\"entry_type\" = 'ramble_payout'"
-        },
-        "ledger_entries_provider_id_on_cash": {
-          "name": "ledger_entries_provider_id_on_cash",
-          "value": "(\"ledger_entries\".\"provider_object_id\" IS NOT NULL) = (\"ledger_entries\".\"debit_account\" = 'platform_cash' OR \"ledger_entries\".\"credit_account\" = 'platform_cash')"
-        },
-        "ledger_entries_provider_id_text": {
-          "name": "ledger_entries_provider_id_text",
-          "value": "\"ledger_entries\".\"provider_object_id\" IS NULL OR (\"ledger_entries\".\"provider_object_id\" ~ '[^\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]' AND char_length(\"ledger_entries\".\"provider_object_id\") <= 255)"
-        },
-        "ledger_entries_memo_text": {
-          "name": "ledger_entries_memo_text",
-          "value": "\"ledger_entries\".\"memo\" IS NULL OR (\"ledger_entries\".\"memo\" ~ '[^\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]' AND char_length(\"ledger_entries\".\"memo\") <= 500)"
-        },
-        "ledger_entries_occurred_at_in_range": {
-          "name": "ledger_entries_occurred_at_in_range",
-          "value": "\"ledger_entries\".\"occurred_at\" >= '1000-01-01 00:00:00+00' AND \"ledger_entries\".\"occurred_at\" < '10000-01-01 00:00:00+00'"
-        },
-        "ledger_entries_recorded_at_in_range": {
-          "name": "ledger_entries_recorded_at_in_range",
-          "value": "\"ledger_entries\".\"recorded_at\" >= '1000-01-01 00:00:00+00' AND \"ledger_entries\".\"recorded_at\" < '10000-01-01 00:00:00+00'"
-        }
-      },
-      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -5081,6 +5072,36 @@
         "gift_guide",
         "this_week",
         "reassurance"
+      ]
+    },
+    "public.hold_purpose": {
+      "name": "hold_purpose",
+      "schema": "public",
+      "values": [
+        "booking",
+        "gift_redemption"
+      ]
+    },
+    "public.hold_released_reason": {
+      "name": "hold_released_reason",
+      "schema": "public",
+      "values": [
+        "expired",
+        "guest_left",
+        "payment_abandoned",
+        "sold_out_after_lapse",
+        "session_cancelled",
+        "superseded"
+      ]
+    },
+    "public.hold_status": {
+      "name": "hold_status",
+      "schema": "public",
+      "values": [
+        "active",
+        "paying",
+        "converted",
+        "released"
       ]
     },
     "public.consent_kind": {
@@ -5283,50 +5304,6 @@
         "reversed",
         "skipped",
         "simulated"
-      ]
-    },
-    "public.ledger_account": {
-      "name": "ledger_account",
-      "schema": "public",
-      "values": [
-        "platform_cash",
-        "host_payable",
-        "ramble_commission",
-        "processing_fees",
-        "gift_liability",
-        "refunds_pending",
-        "dispute_hold",
-        "dispute_losses",
-        "ramble_payouts"
-      ]
-    },
-    "public.ledger_entry_type": {
-      "name": "ledger_entry_type",
-      "schema": "public",
-      "values": [
-        "charge_host_share",
-        "charge_commission",
-        "charge_tax",
-        "processing_fee",
-        "transfer_to_host",
-        "transfer_reversal",
-        "refund_host_share",
-        "commission_returned",
-        "refund_tax",
-        "refund_cash_out",
-        "refund_reversal",
-        "gift_liability_in",
-        "gift_to_host_share",
-        "gift_to_commission",
-        "gift_to_tax",
-        "gift_refund",
-        "gift_reinstated",
-        "ramble_payout",
-        "dispute_withdrawal",
-        "dispute_fee",
-        "dispute_reinstated",
-        "dispute_to_host",
-        "dispute_loss"
       ]
     }
   },

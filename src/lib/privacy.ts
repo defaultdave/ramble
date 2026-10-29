@@ -143,6 +143,24 @@ export const piiColumns: readonly PiiColumn[] = [
       'Not a guest. Kept as the rights record while the photo is published; ops edits or removes it with the photo',
   },
   {
+    table: 'holds',
+    column: 'device_key',
+    kind: 'identifier',
+    data: 'A SHA-256 of the guest device cookie, which marks one browser across visits',
+    location: databaseLocation,
+    deletionPath:
+      "Not yet purged: U-014b's upkeep deletes released holds on a schedule, and the privacy-requests work (U-085) adds the step that clears it for an erased guest. The cookie holds a random value, so the hash is a device marker, not an email, but it still singles out one person's browser",
+  },
+  {
+    table: 'holds',
+    column: 'ip_hash',
+    kind: 'identifier',
+    data: "A SHA-256 of the requester's IP address, the second key for hold limits. An address space is small enough to guess, so the hash counts as personal data",
+    location: databaseLocation,
+    deletionPath:
+      "Not yet purged: U-014b's upkeep deletes released holds on a schedule, and the privacy-requests work (U-085) adds the step that clears it for an erased guest",
+  },
+  {
     table: 'orders',
     column: 'guest_id',
     kind: 'link',
@@ -272,6 +290,27 @@ export const nonPiiColumns: readonly {
     'The error kind and a message the logger redaction list has cleaned, cut to 2000 characters',
     ['last_error'],
   ),
+  ...notPersonal('holds', aRandomId, ['id']),
+  ...notPersonal('holds', structure, [
+    'session_id',
+    'gift_id',
+    'seats',
+    'superseded_by',
+  ]),
+  ...notPersonal('holds', aFixedList, ['purpose', 'status', 'released_reason']),
+  ...notPersonal('holds', aTime, [
+    'expires_at',
+    'paying_until',
+    'created_at',
+    'updated_at',
+  ]),
+  ...notPersonal('hold_items', structure, [
+    'hold_id',
+    'price_option_id',
+    'quantity',
+    'unit_price_minor',
+    'uses_space',
+  ]),
   ...notPersonal('legal_acceptances', aRandomId, ['id']),
   ...notPersonal('legal_acceptances', structure, ['legal_document_id']),
   ...notPersonal('legal_acceptances', aFixedList, ['subject_kind']),

@@ -77,12 +77,15 @@ export const maxSubjectLength = 512;
 export const maxLimit = 10_000;
 export const maxWindowSeconds = 24 * 60 * 60;
 
+/** A sha-256 digest in lowercase hex, the shape every hashed key in the database takes. */
+export const sha256HexDigits = String.raw`[0-9a-f]{64}`;
+
 /**
  * `<surface>:<sha-256 of the subject, hex>`. Hashing bounds the length whatever the subject was and
  * keeps email addresses out of the table. The database CHECK on `rate_limits.key` spells the same
  * pattern, case-sensitively, so the two cannot disagree.
  */
-export const rateLimitKeyPattern = String.raw`^[a-z][a-z_]{0,31}:[0-9a-f]{64}$`;
+export const rateLimitKeyPattern = `^[a-z][a-z_]{0,31}:${sha256HexDigits}$`;
 
 export const RateLimitKeySchema = z
   .string()

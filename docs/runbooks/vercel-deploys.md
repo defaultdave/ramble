@@ -43,7 +43,7 @@ Storybook and the PR evidence images are the default way to review a change. Whe
 
 ## Production flow
 
-Once `production` is the Production Branch, a push to it creates a production deployment ([Git docs](https://vercel.com/docs/git#production-branch): a production deployment is created each time you merge to the production branch). Before that setting is switched this does not hold (see the setup steps). Dave refreshes it under his own login:
+Once `production` is the Production Branch, a push to it creates a production deployment ([Git docs](https://vercel.com/docs/git#production-branch): a production deployment is created each time you merge to the production branch). Before that setting is switched this does not hold (unverified; see the setup steps). Dave refreshes it under his own login:
 
 ```
 git fetch origin && git push origin origin/main:refs/heads/production
@@ -58,18 +58,18 @@ Agents cannot push `production` in practice: `scripts/merge-desk/agent-git.ts` o
 Do these in order.
 
 1. Check which rules apply to the `production` branch: run `gh api repos/defaultdave/ramble/rules/branches/production`. Look for any rule of type `creation`, `update`, `deletion`, `non_fast_forward`, or `required_status_checks`; an empty list `[]` means no rule applies. If one applies, your login must be able to bypass it, or the push in step 2 fails. To list the rulesets themselves (id, name, target, enforcement only), run `gh api repos/defaultdave/ramble/rulesets`. Adding a rule that limits who may push `production` is Dave's decision.
-2. Create the branch first: `git fetch origin && git push origin origin/main:refs/heads/production`. While the Production Branch setting is still `main`, Vercel builds this push as a preview (unverified; the Environments page says pushes to a non-production branch create previews, and `production` is not the Production Branch yet). Expect one preview deployment; the integration will probably create a `preview/production` Neon branch with no expiry (unverified), and `scripts/vercel-build.sh` runs `db:migrate` on it. Delete that Neon preview branch afterwards in the Neon console.
+2. Create the branch first: `git fetch origin && git push origin origin/main:refs/heads/production`. While the Production Branch setting is still `main`, Vercel builds this push as a preview (unverified; the Environments page says pushes to a non-production branch create previews, and `production` is not the Production Branch yet). Expect one preview deployment (unverified); the integration will probably create a `preview/production` Neon branch with no expiry (unverified), and `scripts/vercel-build.sh` runs `db:migrate` on it. Delete that Neon preview branch afterwards in the Neon console.
 3. Set the Production Branch to `production`. Vercel's Git docs ([Production branch](https://vercel.com/docs/git#production-branch)) say: Project Settings, Environments, click Production, Branch Tracking, change the branch name, Save. Verify in the current Vercel UI, since the dashboard layout changes.
 4. Trigger the first production deployment. Switching the setting is expected to build nothing by itself (unverified), so until this step the live site is expected to stay stale (unverified). Which command applies depends on `main`:
-   - `main` has moved since step 2: run `git fetch origin && git push origin origin/main:refs/heads/production` again. Once the setting is switched, that push is expected to create a Production deployment (unverified). If Vercel instead builds it as a preview, `scripts/vercel-build.sh` runs `db:migrate` when `VERCEL_ENV` is `preview`, so watch this first push and check which environment it used.
+   - `main` has moved since step 2: run `git fetch origin && git push origin origin/main:refs/heads/production` again. Once the setting is switched, that push is expected to create a Production deployment (unverified). If Vercel instead builds it as a preview (unverified), `scripts/vercel-build.sh` runs `db:migrate` when `VERCEL_ENV` is `preview`, so watch this first push and check which environment it used.
    - Nothing new to push (git prints "Everything up-to-date" and sends nothing, so Vercel is expected to get no event, unverified): in the Vercel dashboard use Deployments, Create Deployment, with the branch `production` ([Git docs](https://vercel.com/docs/git#creating-a-deployment-from-a-git-reference)), or run `vercel deploy --prod` from a checkout of `production` ([Environments](https://vercel.com/docs/deployments/environments#production-environment)). Whether either one targets Production for a branch just made the Production Branch is (unverified).
    - `vercel redeploy <latest production deployment URL> --environment production` is a last resort: the latest production deployment predates the switch, so a redeploy is expected to rebuild that old commit and not pick up code merged since (unverified). The flags are not confirmed in the docs I read (unverified); check `vercel redeploy --help`.
 
 Check that Production-scoped environment variables (database, Blob) are present: builds of `production` are expected to read Production-scoped variables (unverified; the Environments page says only that the first deployment builds with Production variables).
 
-## Warning: until step 4, production goes stale
+## Warning: until step 4, production is expected to go stale (unverified)
 
-Merges to `main` are expected to create no deployment at all, since `main` is disabled (unverified, derived from the setting). Until Dave switches the Production Branch and triggers the first production deployment, the live demo does not update after a merge. After the switch it is expected to update only when `git fetch origin && git push origin origin/main:refs/heads/production` runs (unverified, derived from the setting).
+Merges to `main` are expected to create no deployment at all, since `main` is disabled (unverified, derived from the setting). Until Dave switches the Production Branch and triggers the first production deployment, the live demo is expected not to update after a merge (unverified). After the switch it is expected to update only when `git fetch origin && git push origin origin/main:refs/heads/production` runs (unverified, derived from the setting).
 
 ## Still to be confirmed
 

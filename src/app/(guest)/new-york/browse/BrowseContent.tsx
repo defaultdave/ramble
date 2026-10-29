@@ -1,4 +1,3 @@
-import { unstable_rethrow } from 'next/navigation';
 import { connection } from 'next/server';
 import { BrowseResults } from '@/components/BrowseResults';
 import { FilterBar } from '@/components/FilterBar';
@@ -19,7 +18,7 @@ import {
   getFilterOptions,
 } from '@/server/browse';
 import { chooseBrowseDate } from '@/server/actions/browse';
-import { logger } from '@/server/monitoring/logger';
+import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
 
 type BrowseContentProps = { searchParams: Promise<RawSearchParams> };
 
@@ -42,16 +41,7 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
     const covers = await getCoverPhotos(coverLookupIds(browseCardIds(page)));
     loaded = { options, dates, page, covers: coversByExperience(covers) };
   } catch (error) {
-    // Next.js ends a prerender by throwing; swallowing that would break the render.
-    unstable_rethrow(error);
-    // Only the digest is logged. Next.js strips the message of an error that crosses a cached
-    // function, and the digest finds the line it logged there, which names the kind of failure.
-    logger.error('Browse could not be read', {
-      digest:
-        error instanceof Error && 'digest' in error
-          ? String(error.digest)
-          : undefined,
-    });
+    rethrowOrLog('Browse could not be read', error);
     return <BrowseResults {...errorView(query)} />;
   }
 

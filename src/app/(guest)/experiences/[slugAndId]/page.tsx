@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
-import { notFound, unstable_rethrow } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import { ExperienceError, ExperiencePage } from '@/components/ExperiencePage';
-import { errorDigest } from '@/lib/errorDigest';
 import {
   buildExperiencePage,
   experienceHead,
@@ -9,7 +8,7 @@ import {
 } from '@/lib/experiencePage';
 import { experiencePath, parseExperienceAddress } from '@/lib/routes';
 import { getExperiencePage } from '@/server/experiencePage';
-import { logger } from '@/server/monitoring/logger';
+import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
 import { getCachedGuestSettings } from '@/server/siteSettings';
 
 export function generateStaticParams() {
@@ -27,8 +26,7 @@ export async function generateMetadata({
     );
     return description === null ? { title } : { title, description };
   } catch (error) {
-    // Next.js ends a prerender by throwing; swallowing that would break the render.
-    unstable_rethrow(error);
+    rethrowOrLog('The experience head could not be read', error);
     // The page reads the same entry and shows the error state; the head only falls back to the plain title.
     return { title: fallbackTitle };
   }
@@ -50,13 +48,7 @@ export default async function ExperienceRoute({
       ? buildExperiencePage({ ...data, giftsEnabled: settings.giftsEnabled })
       : null;
   } catch (error) {
-    // Next.js ends a prerender by throwing; swallowing that would break the render.
-    unstable_rethrow(error);
-    // Only the digest is logged. Next.js strips the message of an error that crosses a cached
-    // function, and the digest finds the line it logged there, which names the kind of failure.
-    logger.error('The experience page could not be read', {
-      digest: errorDigest(error),
-    });
+    rethrowOrLog('The experience page could not be read', error);
     return <ExperienceError retryHref={experiencePath(address)} />;
   }
 

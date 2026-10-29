@@ -5,11 +5,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomeContent } from './HomeContent';
 
 // Behaviours under test, one per decision, branch or risk:
-// - a read that throws an Error carrying query text and params logs only its digest and renders the error state
+// - a read that throws an Error carrying query text and params logs only its digest and kind and renders the error state
 // - a framework control-flow error is rethrown and not logged
 // - a page with no module to show renders the empty state
 // - the cover photos of the cards on the page are read once, by the IDs of those cards, and shown on them
-// - a failed cover read is handled like any other failed read: the error state, with only the digest logged
+// - a failed cover read is handled like any other failed read: the error state, with only the digest and kind logged
 // - a page without a hero_search renders the hidden title, and one with it does not
 
 const server = vi.hoisted(() => ({
@@ -77,14 +77,14 @@ beforeEach(() => {
 });
 
 describe('HomeContent', () => {
-  it('logs only the digest of a failed read and renders the error state', async () => {
+  it('logs only the digest and kind of a failed read and renders the error state', async () => {
     server.content.mockRejectedValue(driverError);
 
     render(await HomeContent());
 
     expect(server.logError).toHaveBeenCalledExactlyOnceWith(
       'The home page could not be read',
-      { digest: undefined },
+      { digest: undefined, kind: 'Error' },
     );
     expect(JSON.stringify(server.logError.mock.calls)).not.toMatch(
       /secret|Failed query/,
@@ -94,7 +94,7 @@ describe('HomeContent', () => {
     );
   });
 
-  it('logs the digest a cached read carries', async () => {
+  it('logs the digest and kind a cached read carries', async () => {
     server.thisWeek.mockRejectedValue(
       Object.assign(new Error('secret-slug'), { digest: '1234567' }),
     );
@@ -103,7 +103,7 @@ describe('HomeContent', () => {
 
     expect(server.logError).toHaveBeenCalledExactlyOnceWith(
       'The home page could not be read',
-      { digest: '1234567' },
+      { digest: '1234567', kind: 'Error' },
     );
   });
 
@@ -206,7 +206,7 @@ describe('HomeContent', () => {
       expect(server.covers).toHaveBeenCalledExactlyOnceWith([]);
     });
 
-    it('logs only the digest of a failed cover read and renders the error state', async () => {
+    it('logs only the digest and kind of a failed cover read and renders the error state', async () => {
       server.content.mockResolvedValue(picksPage());
       server.covers.mockRejectedValue(driverError);
 
@@ -214,7 +214,7 @@ describe('HomeContent', () => {
 
       expect(server.logError).toHaveBeenCalledExactlyOnceWith(
         'The home page could not be read',
-        { digest: undefined },
+        { digest: undefined, kind: 'Error' },
       );
       expect(JSON.stringify(server.logError.mock.calls)).not.toMatch(
         /secret|Failed query/,

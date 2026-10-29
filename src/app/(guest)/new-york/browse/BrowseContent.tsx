@@ -6,7 +6,7 @@ import {
   browseView,
   emptyBrowsePage,
   errorView,
-} from '@/lib/browse';
+} from '@/lib/pages/browse';
 import {
   knownFilters,
   parseFilters,

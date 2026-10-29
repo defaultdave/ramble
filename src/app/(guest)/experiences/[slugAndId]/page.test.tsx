@@ -7,7 +7,7 @@ import {
   id,
   idWithLetters,
   place,
-} from '@/lib/experiencePage.fixtures';
+} from '@/lib/pages/experience.fixtures';
 import ExperienceRoute, {
   generateMetadata,
   generateStaticParams,

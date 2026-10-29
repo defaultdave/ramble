@@ -2,7 +2,7 @@ import 'server-only';
 import { cacheLife, cacheTag } from 'next/cache';
 import { tags } from '@/lib/cacheTags';
 import { EntityIdSchema, type GuestExperience } from '@/lib/catalog';
-import { placeOf, type Place } from '@/lib/experiencePage';
+import { placeOf, type Place } from '@/lib/pages/experience';
 import type { GuestPhoto } from '@/lib/photos';
 import { readOrRefuse } from '@/server/cache/readOrRefuse';
 import {

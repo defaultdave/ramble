@@ -1,23 +1,23 @@
-import { durationLabel } from './duration';
+import { durationLabel } from '../duration';
 import {
   type CancellationTier,
   type Category,
   type GuestExperience,
   type Neighborhood,
-} from './catalog';
-import { MAX_FULL_REFUND_HOURS } from './cancellation';
-import { demoCheckoutPath } from './demoCheckout';
-import { presentText, textLines } from './displayText';
-import type { GuestPhoto } from './photos';
-import { photoView, type PhotoView } from './photoViews';
-import { perPersonAmount } from './pricing';
+} from '../catalog';
+import { MAX_FULL_REFUND_HOURS } from '../cancellation';
+import { demoCheckoutPath } from '../demoCheckout';
+import { presentText, textLines } from '../displayText';
+import type { GuestPhoto } from '../photos';
+import { photoView, type PhotoView } from '../photoViews';
+import { perPersonAmount } from '../pricing';
 import {
   categoryPath,
   giftCheckoutPath,
   neighborhoodPath,
   privateSessionPath,
-} from './routes';
-import { venueCity } from './venue';
+} from '../routes';
+import { venueCity } from '../venue';
 
 // ---- Words ----
 

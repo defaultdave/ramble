@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { expect, within } from 'storybook/test';
 import { ExperienceGallery } from '@/components/ExperienceGallery';
 import { samplePhotos } from '@/components/Photo/Photo.fixtures';
-import { galleryView } from '@/lib/experiencePage';
+import { galleryView } from '@/lib/pages/experience';
 
 // One story per state of the gallery: no photo, one, two, three, and many, on a phone and from the tablet width.
 const meta = {

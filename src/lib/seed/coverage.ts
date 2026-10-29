@@ -1,6 +1,6 @@
-import { browseWindowDays } from '@/lib/browse';
+import { browseWindowDays } from '@/lib/pages/browse';
 import { guestVisibleStatuses } from '@/lib/catalog';
-import { homeLimits } from '@/lib/home';
+import { homeLimits } from '@/lib/pages/home';
 import {
   isOpenSession,
   isUpcomingSession,

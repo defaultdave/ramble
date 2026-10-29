@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { useId } from 'react';
-import type { HomeCategory } from '@/lib/home';
+import type { HomeCategory } from '@/lib/pages/home';
 import styles from './HomeModules.module.css';
 
 export type CategoryRailProps = {

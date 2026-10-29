@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { BrowseResults } from '@/components/BrowseResults';
 import { samplePhoto } from '@/components/Photo/Photo.fixtures';
-import type { BrowseView } from '@/lib/browse';
+import type { BrowseView } from '@/lib/pages/browse';
 import type { ExperienceCard } from '@/lib/experienceCards';
 import styles from './BrowseResults.stories.module.css';
 

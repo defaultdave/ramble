@@ -1,20 +1,20 @@
 import { z } from 'zod';
-import { EntityIdSchema, guestVisibleStatuses } from './catalog';
-import type { Category, Neighborhood } from './catalog';
-import type { Collection, HomeModule } from './editorial';
+import { EntityIdSchema, guestVisibleStatuses } from '../catalog';
+import type { Category, Neighborhood } from '../catalog';
+import type { Collection, HomeModule } from '../editorial';
 import {
   cardLookupLimit,
   cardsInOrder,
   type CardExperience,
   type ExperienceCard,
-} from './experienceCards';
-import { hrefForFilters, noFilters } from './filters';
-import { withCovers, type PhotoView } from './photoViews';
-import type { RichTextDoc } from './richText/format';
-import { hasContent, paragraphs } from './richText/paragraphs';
-import { giftGuidePath, picksAnchor, picksPath } from './routes';
-import type { GuestSettings } from './settings';
-import { isOpenSession, type SessionWindow } from './sessionWindow';
+} from '../experienceCards';
+import { hrefForFilters, noFilters } from '../filters';
+import { withCovers, type PhotoView } from '../photoViews';
+import type { RichTextDoc } from '../richText/format';
+import { hasContent, paragraphs } from '../richText/paragraphs';
+import { giftGuidePath, picksAnchor, picksPath } from '../routes';
+import type { GuestSettings } from '../settings';
+import { isOpenSession, type SessionWindow } from '../sessionWindow';
 
 /** Every bound the home page reads or shows, so a read cannot grow with the catalog. */
 export const homeLimits = {

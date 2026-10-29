@@ -7,7 +7,7 @@ import {
   homeExperienceIds,
   homeLimits,
   thisWeekExperienceIds,
-} from '@/lib/home';
+} from '@/lib/pages/home';
 import type { CardExperience } from '@/lib/experienceCards';
 import { upcomingWindow } from '@/lib/sessionWindow';
 import { readOrRefuse } from '@/server/cache/readOrRefuse';

@@ -3,7 +3,7 @@ import { render, screen, within } from '@testing-library/react';
 import type { ImageProps } from 'next/image';
 import { describe, expect, it, vi } from 'vitest';
 import { samplePhotos } from '@/components/Photo/Photo.fixtures';
-import { galleryView } from '@/lib/experiencePage';
+import { galleryView } from '@/lib/pages/experience';
 import type { PhotoView } from '@/lib/photoViews';
 import { ExperienceGallery } from './ExperienceGallery';
 

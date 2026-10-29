@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { expect, userEvent, within } from 'storybook/test';
 import { HomeModules } from '@/components/HomeModules';
 import { samplePhoto } from '@/components/Photo/Photo.fixtures';
-import type { HomeModuleView } from '@/lib/home';
+import type { HomeModuleView } from '@/lib/pages/home';
 import {
   categoryRail,
   fullPage,

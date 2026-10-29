@@ -13,7 +13,7 @@ import { useId, type ReactNode } from 'react';
 import { Badge } from '@/components/Badge';
 import { ButtonLink } from '@/components/Button';
 import { ExperienceGallery } from '@/components/ExperienceGallery';
-import type { ExperiencePageView, KeyFactIcon } from '@/lib/experiencePage';
+import type { ExperiencePageView, KeyFactIcon } from '@/lib/pages/experience';
 import styles from './ExperiencePage.module.css';
 
 export type ExperiencePageProps = { view: ExperiencePageView };

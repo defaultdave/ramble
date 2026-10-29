@@ -6,7 +6,7 @@ import {
   helpPath,
   homePicksHref,
   legalPath,
-} from './routes';
+} from '../routes';
 
 export type SiteLink = { label: string; href: string };
 export type SiteLinkGroup = { title: string; links: SiteLink[] };

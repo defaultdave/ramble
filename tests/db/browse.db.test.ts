@@ -10,7 +10,7 @@ import {
   maxStoredDayRows,
   toBrowsePage,
   type BrowsePage,
-} from '@/lib/browse';
+} from '@/lib/pages/browse';
 import { noFilters, type BrowseFilters } from '@/lib/filters';
 import { msPerDay } from '@/lib/time';
 import {

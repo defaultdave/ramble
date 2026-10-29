@@ -9,7 +9,7 @@ import {
   ThisWeekSessionSchema,
   homeLimits,
   type ThisWeekSession,
-} from '@/lib/home';
+} from '@/lib/pages/home';
 import { GuestPhotoSchema } from '@/lib/photos';
 import { photoView } from '@/lib/photoViews';
 import type { SessionWindow } from '@/lib/sessionWindow';

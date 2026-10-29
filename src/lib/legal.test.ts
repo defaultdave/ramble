@@ -3,6 +3,7 @@ import {
   LegalDocSchema,
   isDraft,
   LegalDraftInputSchema,
+  OrderAcceptancesInputSchema,
   legalChange,
   isSuperseded,
   legalKindOf,
@@ -14,6 +15,7 @@ import { tagsForChanges } from './cacheTags';
 // - a document key is one of the three fixed keys or waiver- and a slug, and nothing else
 // - the kind of a document follows from its key, and a malformed key has none
 // - publishing a document reaches the tag of its page
+// - a checkout's acceptances name an order and one or two versions, ids lower-cased, and nothing else
 
 describe('document keys', () => {
   it.each([
@@ -129,5 +131,38 @@ describe('a document key of millions of characters', () => {
     ['letters', 'a'.repeat(6_000_000)],
   ])('is refused for %s without throwing', (_name, value) => {
     expect(LegalDocSchema.safeParse(value).success).toBe(false);
+  });
+});
+
+describe('the acceptances a checkout records', () => {
+  const orderId = '3f2504e0-4f89-41d3-9a0c-0305e82c3301';
+  const termsId = '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d';
+  const waiverId = '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed';
+
+  it('lower-cases the ids', () => {
+    expect(
+      OrderAcceptancesInputSchema.parse({
+        orderId: orderId.toUpperCase(),
+        legalDocumentIds: [termsId.toUpperCase()],
+      }),
+    ).toEqual({ orderId, legalDocumentIds: [termsId] });
+  });
+
+  it.each([
+    ['no versions', { orderId, legalDocumentIds: [] }],
+    [
+      'three versions',
+      { orderId, legalDocumentIds: [termsId, waiverId, orderId] },
+    ],
+    [
+      'an order id that is not an id',
+      { orderId: 'nope', legalDocumentIds: [termsId] },
+    ],
+    [
+      'a field it does not know',
+      { orderId, legalDocumentIds: [termsId], subjectKind: 'host' },
+    ],
+  ])('refuses %s', (_name, input) => {
+    expect(OrderAcceptancesInputSchema.safeParse(input).success).toBe(false);
   });
 });

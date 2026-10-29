@@ -18,6 +18,7 @@ import {
 } from './harness';
 import { testDevice } from '../deviceFixture';
 import {
+  clearHolds,
   hash,
   insertHold,
   insertSession,
@@ -81,7 +82,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  await client.db.execute(sql`TRUNCATE hold_items, holds CASCADE`);
+  await clearHolds(client.db);
   cache.updateTag.mockClear();
   cache.revalidateTag.mockClear();
   await client.db.execute(
@@ -427,7 +428,7 @@ describe('the block after three lapses in 15 minutes', () => {
     const bookable = await seedBookable(client.db);
     const before = await reserve(guestA, bookable, 1);
     expect(before.status).toBe('held');
-    await client.db.execute(sql`TRUNCATE hold_items, holds CASCADE`);
+    await clearHolds(client.db);
     await threeLapses(bookable);
     const unswept = await reserve(guestA, bookable, 1);
     await holdData.releaseLapsedHolds();

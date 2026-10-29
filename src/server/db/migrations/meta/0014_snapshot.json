@@ -1,5 +1,5 @@
 {
-  "id": "17725c9d-e15f-41bd-93b1-c6df8c016820",
+  "id": "c91009ec-099e-45c6-9cee-1743d2f2f7da",
   "prevId": "3f20a1f2-4a01-4e60-875c-4053f22bf427",
   "version": "7",
   "dialect": "postgresql",
@@ -415,6 +415,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "notification_email": {
+          "name": "notification_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -436,6 +442,10 @@
         "hosts_name_not_blank": {
           "name": "hosts_name_not_blank",
           "value": "\"hosts\".\"name\" ~ '[^\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]'"
+        },
+        "hosts_notification_email_shape": {
+          "name": "hosts_notification_email_shape",
+          "value": "\"hosts\".\"notification_email\" IS NULL OR (\"hosts\".\"notification_email\" ~ '^[a-z0-9._%+-]+@[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$' AND char_length(\"hosts\".\"notification_email\") <= 254)"
         },
         "hosts_created_at_in_range": {
           "name": "hosts_created_at_in_range",
@@ -2548,64 +2558,6 @@
           ],
           "isUnique": false,
           "where": "\"holds\".\"status\" IN ('active', 'paying')",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "holds_device_key_idx": {
-          "name": "holds_device_key_idx",
-          "columns": [
-            {
-              "expression": "device_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "holds_ip_hash_idx": {
-          "name": "holds_ip_hash_idx",
-          "columns": [
-            {
-              "expression": "ip_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "holds_released_unscrubbed_idx": {
-          "name": "holds_released_unscrubbed_idx",
-          "columns": [
-            {
-              "expression": "updated_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"holds\".\"status\" = 'released' AND \"holds\".\"device_key\" <> '0000000000000000000000000000000000000000000000000000000000000000'",
           "concurrently": false,
           "method": "btree",
           "with": {}

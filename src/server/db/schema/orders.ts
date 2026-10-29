@@ -28,8 +28,15 @@ import {
   orderStatuses,
 } from '@/lib/orders';
 import { MAX_QUANTITY, MAX_UNIT_PRICE_MINOR, PPM } from '@/lib/pricing';
-import { cancellationTiers } from './policies';
-import { experiences, hosts, priceOptions, taxTreatmentEnum } from './catalog';
+import {
+  experiences,
+  hosts,
+  priceOptions,
+  sessions,
+  taxTreatmentEnum,
+} from './catalog';
+import { holds } from './holds';
+import { cancellationTiers, legalDocuments } from './policies';
 import { guests } from './people';
 import { isReadableDate, optionalText, requiredText } from './shared';
 
@@ -55,9 +62,8 @@ const childAges = sql.raw(
 
 /**
  * One order per booking or gift purchase (design doc 4.2.3, Orders). Time columns that order
- * records come from `clock_timestamp()`. `hold_id`, `session_id`, `waiver_document_id`,
- * `terms_document_id`, and `gift_id` are uuid columns with no foreign key yet: the tables they point
- * to are built by units that depend on this one.
+ * records come from `clock_timestamp()`. `gift_id` is a uuid column with no foreign key yet: the
+ * gifts table is built by a unit that depends on this one.
  */
 export const orders = pgTable(
   'orders',
@@ -67,10 +73,8 @@ export const orders = pgTable(
     kind: orderKindEnum().notNull(),
     status: orderStatusEnum().notNull(),
     idempotencyKey: text().notNull(),
-    // TODO(U-047a): foreign key to holds.
-    holdId: uuid(),
-    // TODO(U-047a): foreign key to sessions.
-    sessionId: uuid(),
+    holdId: uuid().references(() => holds.id, { onDelete: 'restrict' }),
+    sessionId: uuid().references(() => sessions.id, { onDelete: 'restrict' }),
     experienceId: uuid()
       .notNull()
       .references(() => experiences.id, { onDelete: 'restrict' }),
@@ -89,10 +93,12 @@ export const orders = pgTable(
     childrenAges: integer().array(),
     guardianName: text(),
     guardianContact: text(),
-    // TODO(U-047a): foreign key to legal_documents.
-    waiverDocumentId: uuid(),
-    // TODO(U-047a): foreign key to legal_documents.
-    termsDocumentId: uuid().notNull(),
+    waiverDocumentId: uuid().references(() => legalDocuments.id, {
+      onDelete: 'restrict',
+    }),
+    termsDocumentId: uuid()
+      .notNull()
+      .references(() => legalDocuments.id, { onDelete: 'restrict' }),
     currency: char({ length: 3 }).notNull().default(orderCurrency),
     ticketSubtotalMinor: integer().notNull(),
     taxTreatment: taxTreatmentEnum().notNull(),

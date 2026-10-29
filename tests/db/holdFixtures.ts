@@ -17,6 +17,22 @@ type ExperienceInsert = typeof experiences.$inferInsert;
 type SessionInsert = typeof sessions.$inferInsert;
 type HoldInsert = typeof holds.$inferInsert;
 
+/**
+ * Deletes every hold and its items. TRUNCATE ... CASCADE would reach the append-only ledger, and a
+ * plain DELETE trips the restricting `superseded_by` key, so each pass deletes the holds no other
+ * hold points at.
+ */
+export async function clearHolds(db: Pick<Database, 'execute'>) {
+  await db.execute(sql`
+    DO $$ BEGIN
+      LOOP
+        DELETE FROM hold_items;
+        DELETE FROM holds WHERE id NOT IN (SELECT superseded_by FROM holds WHERE superseded_by IS NOT NULL);
+        EXIT WHEN NOT EXISTS (SELECT 1 FROM holds);
+      END LOOP;
+    END $$`);
+}
+
 let counter = 0;
 function unique(prefix: string) {
   counter += 1;

@@ -161,7 +161,6 @@ export const ReserveResultSchema = z.discriminatedUnion('status', [
   }),
 ]);
 export type ReserveResult = z.infer<typeof ReserveResultSchema>;
-type FieldErrors = Extract<ReserveResult, { status: 'invalid' }>['fieldErrors'];
 
 export type ReleaseResult = {
   status: 'released' | 'payment_in_progress' | 'not_found';
@@ -171,16 +170,30 @@ type Issue = { path: readonly PropertyKey[]; message: string };
 
 /**
  * One stable code per field from a failed parse: the field's first issue, `required` when a rule
- * said so, `invalid` for everything else. The parse's own messages never reach the guest.
+ * said so, `invalid` for everything else. The parse's own messages never reach the guest. `fieldOf`
+ * names the field an issue is reported on, so a form with nested fields can key by the whole path.
  */
-export function invalidFromIssues(issues: readonly Issue[]): ReserveResult {
-  const fieldErrors: FieldErrors = {};
+export function fieldErrorsFromIssues(
+  issues: readonly Issue[],
+  fieldOf: (path: readonly PropertyKey[]) => string,
+): Record<string, 'required' | 'invalid'> {
+  const fieldErrors: Record<string, 'required' | 'invalid'> = {};
   for (const issue of issues) {
-    const field = typeof issue.path[0] === 'string' ? issue.path[0] : 'input';
-    fieldErrors[field] ??=
+    fieldErrors[fieldOf(issue.path)] ??=
       issue.message === 'required' ? 'required' : 'invalid';
   }
-  return { status: 'invalid', fieldErrors };
+  return fieldErrors;
+}
+
+const firstField = (path: readonly PropertyKey[]) =>
+  typeof path[0] === 'string' ? path[0] : 'input';
+
+/** A failed parse of the reserve input, one code per top-level field. */
+export function invalidFromIssues(issues: readonly Issue[]): ReserveResult {
+  return {
+    status: 'invalid',
+    fieldErrors: fieldErrorsFromIssues(issues, firstField),
+  };
 }
 
 export type HoldTimes = {
@@ -220,15 +233,23 @@ export function openHeldSeats(
 }
 
 /**
- * Spaces left at `at` (design doc 4.2.2), returned as is: zero or less reads as sold out, and a
- * lowered capacity can leave it negative.
+ * Spaces left once `openSeats` are held (design doc 4.2.2), returned as is: zero or less reads as
+ * sold out, and a lowered capacity can leave it negative.
  */
+export function remainingSpaces(
+  session: { allocation: number; seatsSold: number },
+  openSeats: number,
+): number {
+  return session.allocation - session.seatsSold - openSeats;
+}
+
+/** Spaces left at `at`, from the open holds among `holds`. */
 export function spacesLeft(
   session: { allocation: number; seatsSold: number },
   holds: readonly (HoldTimes & { seats: number })[],
   at: Date,
 ): number {
-  return session.allocation - session.seatsSold - openHeldSeats(holds, at);
+  return remainingSpaces(session, openHeldSeats(holds, at));
 }
 
 /**
@@ -290,6 +311,43 @@ export function holdExpiresAt(at: Date, holdMinutes: number): Date {
     throw new RangeError('The hold length is outside the settings bounds');
   }
   return new Date(at.getTime() + holdMinutes * millisecondsPerMinute);
+}
+
+/**
+ * When a hold that starts to pay at `at` stops counting: `greatest(expires_at, now()) + grace`
+ * (design doc 4.2.3), so a guest who pays at the last second still has the grace, and the deadline
+ * never falls before `expires_at`. A grace outside the settings bounds throws, like the hold length.
+ */
+export function payingUntil(
+  expiresAt: Date,
+  at: Date,
+  graceMinutes: number,
+): Date {
+  if (
+    !Number.isInteger(graceMinutes) ||
+    graceMinutes < settingsBounds.paymentGraceMinutes.min ||
+    graceMinutes > settingsBounds.paymentGraceMinutes.max
+  ) {
+    throw new RangeError('The payment grace is outside the settings bounds');
+  }
+  return new Date(
+    Math.max(expiresAt.getTime(), at.getTime()) +
+      graceMinutes * millisecondsPerMinute,
+  );
+}
+
+/**
+ * The write that makes a hold `paying`, or null when there is nothing to write: a hold that is not
+ * open at `at` is never revived, and one already `paying` keeps its deadline (it is extended only
+ * by the provider's `requires_action`). An `active` hold that is open moves to `paying`.
+ */
+export function payingHold(
+  hold: HoldTimes,
+  at: Date,
+  graceMinutes: number,
+): { payingUntil: Date } | null {
+  if (hold.status !== 'active' || !isOpenHold(hold, at)) return null;
+  return { payingUntil: payingUntil(hold.expiresAt, at, graceMinutes) };
 }
 
 /** Bookings paused by ops (PRD-16 switch): nothing is held, and nothing is written. */
@@ -392,6 +450,18 @@ export function reserveBlock(
   return tried === null || tried.allowed
     ? null
     : blockedForRateLimit(tried.retryAfterSeconds, at);
+}
+
+/**
+ * Whether a hold is the calling device's. A guest's device-keyed rows (a hold, and what is made
+ * under it) carry the sha-256 of the device cookie, so a plain comparison reveals nothing a
+ * guesser could use. A missing hold is nobody's.
+ */
+export function isHoldOfDevice<T extends { deviceKey: string }>(
+  hold: T | null | undefined,
+  deviceKey: string,
+): hold is T {
+  return hold !== null && hold !== undefined && hold.deviceKey === deviceKey;
 }
 
 type ReleaseSubject = {
@@ -525,7 +595,7 @@ export function holdsToSupersede(
   return holds
     .filter(
       (hold) =>
-        hold.deviceKey === deviceKey &&
+        isHoldOfDevice(hold, deviceKey) &&
         hold.status === 'active' &&
         isOpenHold(hold, at),
     )

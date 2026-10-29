@@ -48,6 +48,11 @@ export function createPostmarkAdapter(options: {
           Subject: email.subject,
           HtmlBody: email.html,
           TextBody: email.text,
+          Attachments: email.attachments.map((file) => ({
+            Name: file.filename,
+            Content: Buffer.from(file.content, 'utf8').toString('base64'),
+            ContentType: file.contentType,
+          })),
           MessageStream: 'outbound',
         },
       });

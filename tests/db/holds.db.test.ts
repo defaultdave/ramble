@@ -27,6 +27,7 @@ import {
 } from './harness';
 import { testDevice } from '../deviceFixture';
 import {
+  clearHolds,
   day,
   hash,
   insertHold,
@@ -89,7 +90,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   // The limits count a device's holds in every session, so a test starts with none.
-  await client.db.execute(sql`TRUNCATE hold_items, holds CASCADE`);
+  await clearHolds(client.db);
   cache.updateTag.mockClear();
   cache.revalidateTag.mockClear();
   await client.db

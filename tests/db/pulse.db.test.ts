@@ -9,7 +9,7 @@ import {
   vi,
 } from 'vitest';
 import { createFreshDatabase, type FreshDatabase } from './harness';
-import { insertHold, seedBookable } from './holdFixtures';
+import { clearHolds, insertHold, seedBookable } from './holdFixtures';
 
 const sendHeartbeat = vi.hoisted(() => vi.fn());
 const cache = vi.hoisted(() => ({
@@ -55,7 +55,7 @@ beforeEach(async () => {
   sendHeartbeat.mockReset().mockResolvedValue('sent');
   await client.db.execute(sql`DELETE FROM jobs`);
   await client.db.execute(sql`DELETE FROM rate_limits`);
-  await client.db.execute(sql`TRUNCATE hold_items, holds CASCADE`);
+  await clearHolds(client.db);
   cache.revalidateTag.mockClear();
 });
 

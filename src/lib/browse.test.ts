@@ -8,7 +8,7 @@ import {
   browseTitle,
   browsePageSize,
   browseView,
-  browseWindow,
+  browseWindowDays,
   dateChipLabel,
   errorView,
   maxHandEnteredDayRows,
@@ -59,17 +59,9 @@ function experience(
   };
 }
 
-describe('browseWindow', () => {
-  it('runs from the minute to a day past the horizon', () => {
-    const { from, to } = browseWindow('2026-10-26T14:05:00.000Z');
-    expect(from.toISOString()).toBe('2026-10-26T14:05:00.000Z');
-    expect((to.getTime() - from.getTime()) / 86_400_000).toBe(
-      browseDateHorizonDays + 1,
-    );
-  });
-
-  it('refuses a time it cannot read', () => {
-    expect(() => browseWindow('soon')).toThrow(RangeError);
+describe('browseWindowDays', () => {
+  it('covers the horizon and the whole last day', () => {
+    expect(browseWindowDays).toBe(browseDateHorizonDays + 1);
   });
 });
 

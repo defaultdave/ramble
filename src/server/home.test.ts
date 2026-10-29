@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { homeLimits, thisWeekWindow } from '@/lib/home';
+import { homeLimits } from '@/lib/home';
+import { upcomingWindow } from '@/lib/sessionWindow';
 import { getHomeContent, getThisWeek } from './home';
 
 // Behaviours under test, one per decision, branch or risk:
@@ -128,7 +129,9 @@ describe('getThisWeek', () => {
 
     await getThisWeek(asOf);
 
-    expect(db.sessions).toHaveBeenCalledExactlyOnceWith(thisWeekWindow(asOf));
+    expect(db.sessions).toHaveBeenCalledExactlyOnceWith(
+      upcomingWindow(asOf, homeLimits.thisWeekDays),
+    );
   });
 
   it('looks up only the experiences with an open session', async () => {

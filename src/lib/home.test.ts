@@ -13,19 +13,17 @@ import {
   HomeExperienceIdsSchema,
   homeLimits,
   thisWeekExperienceIds,
-  thisWeekWindow,
   withHomeCovers,
   type HomeInput,
   type HomeModuleView,
   type ThisWeekSession,
 } from './home';
-import { minuteAsOf } from './time';
+import { upcomingWindow } from './sessionWindow';
 
 // Behaviours under test, one per decision, branch or risk:
-// - the cache key is the minute; the week window runs a week from it; a key that is not the ISO instant minuteAsOf writes is refused
 // - the browse address writes only the parameters that are set, escaped, in the grammar order
 // - "On this week" lists bookable experiences with an open session in the window, soonest first, once each
-//   (a started, late, full, or guide-only session does not count; the edges of the window are exact)
+//   (a started, late, full, or guide-only session does not count; a start exactly at the window's opening counts and one exactly at its end does not)
 // - the experiences a Picks module may show are looked up once, bounded per collection and in all
 // - each module shows its own copy or the default, and is left out whole when it has nothing to show
 // - the first Picks module alone carries the anchor
@@ -71,30 +69,7 @@ function session(
   };
 }
 
-const window = thisWeekWindow(date.toISOString());
-
-describe('thisWeekWindow', () => {
-  it('runs the window from the key to seven days later', () => {
-    expect(window.from.toISOString()).toBe('2026-11-02T15:00:00.000Z');
-    expect(window.to.toISOString()).toBe('2026-11-09T15:00:00.000Z');
-  });
-
-  it.each([
-    ['text', 'not a date'],
-    ['a date with no time', '2026-11-02'],
-    ['a time with an offset', '2026-11-02T15:00:00.000+02:00'],
-    ['an empty key', ''],
-    ['a month that does not exist', '2026-13-02T15:00:00.000Z'],
-  ])('refuses a key that is %s', (_name, key) => {
-    expect(() => thisWeekWindow(key)).toThrow(ZodError);
-  });
-
-  it('accepts the key minuteAsOf writes', () => {
-    expect(() =>
-      thisWeekWindow(minuteAsOf(new Date('2026-11-02T15:00:59.999Z'))),
-    ).not.toThrow();
-  });
-});
+const window = upcomingWindow(date.toISOString(), homeLimits.thisWeekDays);
 
 describe('HomeExperienceIdsSchema', () => {
   it('accepts up to the limit of IDs', () => {
@@ -145,8 +120,8 @@ describe('thisWeekExperienceIds', () => {
 
   it.each([
     ['one that has started', session(1, -1)],
-    ['one that starts exactly now', session(1, 0)],
     ['one past the end of the week', session(1, 7 * 24 * 60 + 1)],
+    ['one that starts exactly at the end of the week', session(1, 7 * 24 * 60)],
     ['one with no space left', session(1, 60, { seatsSold: 10 })],
     ['one oversold', session(1, 60, { seatsSold: 12 })],
     [
@@ -159,7 +134,7 @@ describe('thisWeekExperienceIds', () => {
 
   it.each([
     ['one a minute from now', session(1, 1)],
-    ['one that starts exactly at the end of the week', session(1, 7 * 24 * 60)],
+    ['one that starts exactly now', session(1, 0)],
     ['one with a single space left', session(1, 60, { seatsSold: 9 })],
   ])('counts %s', (_name, included) => {
     expect(thisWeekExperienceIds([included], window, 10)).toEqual([id(1)]);

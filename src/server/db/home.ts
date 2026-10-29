@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, asc, eq, gt, inArray, lte } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, lt } from 'drizzle-orm';
 import {
   CardExperienceSchema,
   type CardExperience,
@@ -9,8 +9,8 @@ import {
   ThisWeekSessionSchema,
   homeLimits,
   type ThisWeekSession,
-  type ThisWeekWindow,
 } from '@/lib/home';
+import type { SessionWindow } from '@/lib/sessionWindow';
 import { guestVisible } from './catalog';
 import { dbRead } from './client';
 import { experiences, sessions } from './schema';
@@ -51,12 +51,12 @@ export async function listHomeExperiences(
 }
 
 /**
- * The scheduled sessions that start after the window opens, up to the window's end, of the
+ * The scheduled sessions that start from the window's opening up to, not including, its end, of the
  * experiences a guest can see: soonest first, at most `thisWeekSessions`. Whether a session still
  * has space is decided by the caller, from the counts.
  */
 export async function listThisWeekSessions(
-  window: ThisWeekWindow,
+  window: SessionWindow,
 ): Promise<ThisWeekSession[]> {
   const rows = await dbRead
     .select({
@@ -72,8 +72,8 @@ export async function listThisWeekSessions(
       and(
         guestVisible,
         eq(sessions.status, 'scheduled'),
-        gt(sessions.startsAt, window.from),
-        lte(sessions.startsAt, window.to),
+        gte(sessions.startsAt, window.from),
+        lt(sessions.startsAt, window.to),
       ),
     )
     .orderBy(asc(sessions.startsAt), asc(sessions.id))

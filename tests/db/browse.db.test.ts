@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { ZodError } from 'zod';
 import {
   browseDays,
   browsePageSize,
@@ -896,9 +897,9 @@ describe('input the schema refuses', () => {
   it('refuses a time it cannot read', async () => {
     await expect(
       browse.listBrowseExperiences({ filters: noFilters, after: null }, 'soon'),
-    ).rejects.toThrow(RangeError);
+    ).rejects.toThrow(ZodError);
     await expect(
       browse.listBrowseDayRows({ categories: [], neighborhoods: [] }, 'soon'),
-    ).rejects.toThrow(RangeError);
+    ).rejects.toThrow(ZodError);
   });
 });

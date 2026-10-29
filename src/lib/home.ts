@@ -13,8 +13,7 @@ import { withCovers, type PhotoView } from './photoViews';
 import type { RichTextDoc } from './richText/format';
 import { giftGuidePath, picksAnchor, picksPath } from './routes';
 import type { GuestSettings } from './settings';
-import { hasSpaceLeft } from './spaces';
-import { msPerDay } from './time';
+import { isOpenSession, type SessionWindow } from './sessionWindow';
 
 /** Every bound the home page reads or shows, so a read cannot grow with the catalog. */
 export const homeLimits = {
@@ -39,20 +38,6 @@ export const HomeExperienceIdsSchema = z
   .array(EntityIdSchema)
   .max(homeLimits.maxCardIds);
 
-/** The minute key a cached read takes, as `minuteAsOf` writes it. */
-const AsOfSchema = z.iso.datetime();
-
-export type ThisWeekWindow = { from: Date; to: Date };
-
-/** The sessions "On this week" looks at: those that start after `asOf`, up to a week ahead. */
-export function thisWeekWindow(asOf: string): ThisWeekWindow {
-  const from = new Date(AsOfSchema.parse(asOf));
-  return {
-    from,
-    to: new Date(from.getTime() + homeLimits.thisWeekDays * msPerDay),
-  };
-}
-
 // ---- What the data layer hands over ----
 
 /** The part of a session "On this week" decides from. */
@@ -70,20 +55,17 @@ export type ThisWeekSession = z.infer<typeof ThisWeekSessionSchema>;
 /**
  * The bookable experiences with a session still open in the next week, the one that starts
  * soonest first, each once. A session that has started, that starts after the window, or that has
- * no space left is not open, and a guide entry is not bookable. A start exactly at `from` has started.
+ * no space left is not open, and a guide entry is not bookable. A start exactly at `from` is in the window, one exactly at `to` is not.
  */
 export function thisWeekExperienceIds(
   sessions: readonly ThisWeekSession[],
-  window: ThisWeekWindow,
+  window: SessionWindow,
   limit: number,
 ): string[] {
   const open = sessions
     .filter(
       (session) =>
-        session.experienceStatus === 'live' &&
-        session.startsAt.getTime() > window.from.getTime() &&
-        session.startsAt.getTime() <= window.to.getTime() &&
-        hasSpaceLeft(session),
+        session.experienceStatus === 'live' && isOpenSession(session, window),
     )
     .toSorted(
       (a, b) =>

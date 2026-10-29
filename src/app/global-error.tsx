@@ -1,6 +1,8 @@
 'use client';
 
 import { ErrorNotice } from '@/components/ErrorNotice';
+import '@/styles/base.css';
+import '@/styles/tokens.css';
 
 export default function GlobalError({ retry }: { retry: () => void }) {
   return (

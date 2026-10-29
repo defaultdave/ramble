@@ -253,6 +253,47 @@ describe('what a guest sees', () => {
     ]);
   });
 
+  it('leaves out a live experience whose only price option takes no space', async () => {
+    const where = await scope();
+    await insertExperience(where, { name: 'A priced' });
+    const accompanyingOnly = await insertExperience(where, {
+      name: 'B accompanying only',
+      price: null,
+    });
+    await client.db.insert(priceOptions).values({
+      experienceId: accompanyingOnly.id,
+      kind: 'adult',
+      priceMinor: 0,
+      usesSpace: false,
+    });
+
+    expect(names(await list(filtersFor(where)))).toEqual(['A priced']);
+  });
+
+  it('keeps a kids class whose free accompanying adult sits beside a paid child, and says which option takes a space', async () => {
+    const where = await scope();
+    const kidsClass = await insertExperience(where, {
+      name: 'A kids class',
+      price: null,
+    });
+    await client.db.insert(priceOptions).values([
+      {
+        experienceId: kidsClass.id,
+        kind: 'adult',
+        priceMinor: 0,
+        usesSpace: false,
+      },
+      { experienceId: kidsClass.id, kind: 'child', priceMinor: 4500 },
+    ]);
+
+    const [item] = (await list(filtersFor(where))).items;
+
+    expect(item?.priceOptions).toEqual([
+      { priceMinor: 0, usesSpace: false },
+      { priceMinor: 4500, usesSpace: true },
+    ]);
+  });
+
   it('leaves out a live experience once its last price is removed', async () => {
     const where = await scope();
     const kept = await insertExperience(where, { name: 'A kept' });
@@ -331,7 +372,10 @@ describe('what a guest sees', () => {
       neighborhoodName: where.neighborhood.name,
       durationMinutes: 150,
       linkOutUrl: null,
-      priceOptions: [{ priceMinor: 3500 }, { priceMinor: 7000 }],
+      priceOptions: [
+        { priceMinor: 3500, usesSpace: true },
+        { priceMinor: 7000, usesSpace: true },
+      ],
     });
   });
 });

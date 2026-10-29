@@ -7,6 +7,13 @@ import { ratingDescription, ratingLabel, type Rating } from '@/lib/rating';
 import styles from './Card.module.css';
 
 export type CardLayout = 'vertical' | 'horizontal';
+
+// The width a card's photo takes, for Photo's `sizes`: the card's column on a vertical card (at most
+// 384px from the tablet width, the whole page on a phone), a fixed square beside the text on a horizontal one.
+export const cardPhotoSizes = {
+  vertical: '(min-width: 768px) 384px, 100vw',
+  horizontal: '168px',
+} as const satisfies Record<CardLayout, string>;
 export type CardHeadingLevel = 2 | 3 | 4 | 5;
 export type CardTag = {
   label: string;

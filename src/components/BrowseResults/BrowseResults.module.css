@@ -77,6 +77,14 @@
   color: var(--color-text-secondary);
 }
 
+/* The ways forward from an empty day, side by side where they fit and wrapping below that. */
+.noticeActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-block-start: var(--space-2);
+}
+
 @media (min-width: 768px) {
   .more {
     align-items: center;

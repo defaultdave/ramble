@@ -1,9 +1,10 @@
 import Form from 'next/form';
 import { Alert } from '@/components/Alert';
 import { Button, ButtonLink } from '@/components/Button';
-import { Card } from '@/components/Card';
+import { Card, cardPhotoSizes } from '@/components/Card';
+import { Photo } from '@/components/Photo';
 import type { BrowseCard, BrowseView, FormTarget } from '@/lib/browse';
-import { browsePath } from '@/lib/filters';
+import { browsePath } from '@/lib/routes';
 import styles from './BrowseResults.module.css';
 
 type TargetButtonProps = {
@@ -33,6 +34,9 @@ function TargetButton({ target, label, variant }: TargetButtonProps) {
 export type BrowseResultsProps = BrowseView;
 
 function ResultCard({ card }: { card: BrowseCard }) {
+  const image = card.image ? (
+    <Photo photo={card.image} sizes={cardPhotoSizes.vertical} />
+  ) : null;
   return card.kind === 'guide-only' ? (
     <Card
       kind="guide-only"
@@ -41,8 +45,7 @@ function ResultCard({ card }: { card: BrowseCard }) {
       meta={card.meta}
       href={card.href}
       hostHref={card.hostHref}
-      // TODO(U-039): the experience's cover photo.
-      image={null}
+      image={image}
     />
   ) : (
     <Card
@@ -51,8 +54,7 @@ function ResultCard({ card }: { card: BrowseCard }) {
       meta={card.meta}
       href={card.href}
       price={card.price}
-      // TODO(U-039): the experience's cover photo.
-      image={null}
+      image={image}
     />
   );
 }
@@ -87,6 +89,25 @@ export function BrowseResults(props: BrowseResultsProps) {
         </div>
       );
     case 'empty':
+      if (props.dated) {
+        const { dateLabel, nextDay, anyDayHref, message } = props.dated;
+        return (
+          <div className={styles.notice}>
+            <h2 className={styles.noticeTitle}>Nothing on {dateLabel}</h2>
+            <p className={styles.noticeText}>{message}</p>
+            <div className={styles.noticeActions}>
+              {nextDay ? (
+                <ButtonLink href={nextDay.href} variant="primary">
+                  See {nextDay.label}
+                </ButtonLink>
+              ) : null}
+              <ButtonLink href={anyDayHref} variant="secondary">
+                Any day
+              </ButtonLink>
+            </div>
+          </div>
+        );
+      }
       return (
         <div className={styles.notice}>
           <h2 className={styles.noticeTitle}>

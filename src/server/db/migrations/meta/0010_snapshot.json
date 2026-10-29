@@ -1,5 +1,5 @@
 {
-  "id": "fcd8e0dc-f515-4c2b-b755-98a6faf699cf",
+  "id": "7a258933-a335-4195-937a-3fef18a89754",
   "prevId": "760825b9-610b-4293-9df9-67166d3c1e95",
   "version": "7",
   "dialect": "postgresql",
@@ -2352,95 +2352,8 @@
       },
       "isRLSEnabled": false
     },
-    "public.hold_items": {
-      "name": "hold_items",
-      "schema": "",
-      "columns": {
-        "hold_id": {
-          "name": "hold_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "price_option_id": {
-          "name": "price_option_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "quantity": {
-          "name": "quantity",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "unit_price_minor": {
-          "name": "unit_price_minor",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "uses_space": {
-          "name": "uses_space",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "hold_items_hold_id_holds_id_fk": {
-          "name": "hold_items_hold_id_holds_id_fk",
-          "tableFrom": "hold_items",
-          "tableTo": "holds",
-          "columnsFrom": [
-            "hold_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "hold_items_price_option_id_price_options_id_fk": {
-          "name": "hold_items_price_option_id_price_options_id_fk",
-          "tableFrom": "hold_items",
-          "tableTo": "price_options",
-          "columnsFrom": [
-            "price_option_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "hold_items_hold_id_price_option_id_pk": {
-          "name": "hold_items_hold_id_price_option_id_pk",
-          "columns": [
-            "hold_id",
-            "price_option_id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "hold_items_quantity_in_range": {
-          "name": "hold_items_quantity_in_range",
-          "value": "\"hold_items\".\"quantity\" BETWEEN 1 AND 6"
-        },
-        "hold_items_unit_price_in_range": {
-          "name": "hold_items_unit_price_in_range",
-          "value": "\"hold_items\".\"unit_price_minor\" BETWEEN 0 AND 10000000"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.holds": {
-      "name": "holds",
+    "public.consents": {
+      "name": "consents",
       "schema": "",
       "columns": {
         "id": {
@@ -2450,129 +2363,83 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "session_id": {
-          "name": "session_id",
+        "guest_id": {
+          "name": "guest_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "purpose": {
-          "name": "purpose",
-          "type": "hold_purpose",
+        "kind": {
+          "name": "kind",
+          "type": "consent_kind",
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
-        },
-        "gift_id": {
-          "name": "gift_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
         },
         "status": {
           "name": "status",
-          "type": "hold_status",
+          "type": "consent_status",
           "typeSchema": "public",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'active'"
-        },
-        "seats": {
-          "name": "seats",
-          "type": "integer",
-          "primaryKey": false,
           "notNull": true
         },
-        "device_key": {
-          "name": "device_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "ip_hash": {
-          "name": "ip_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "paying_until": {
-          "name": "paying_until",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "released_reason": {
-          "name": "released_reason",
-          "type": "hold_released_reason",
+        "source": {
+          "name": "source",
+          "type": "consent_source",
           "typeSchema": "public",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
-        "superseded_by": {
-          "name": "superseded_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
+        "recorded_at": {
+          "name": "recorded_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
+          "default": "clock_timestamp()"
         }
       },
       "indexes": {
-        "holds_session_open_idx": {
-          "name": "holds_session_open_idx",
+        "consents_guest_kind_recorded_idx": {
+          "name": "consents_guest_kind_recorded_idx",
           "columns": [
             {
-              "expression": "session_id",
+              "expression": "guest_id",
               "isExpression": false,
               "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "recorded_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": false,
               "nulls": "last"
             }
           ],
           "isUnique": false,
-          "where": "\"holds\".\"status\" IN ('active', 'paying')",
           "concurrently": false,
           "method": "btree",
           "with": {}
         }
       },
       "foreignKeys": {
-        "holds_session_id_sessions_id_fk": {
-          "name": "holds_session_id_sessions_id_fk",
-          "tableFrom": "holds",
-          "tableTo": "sessions",
+        "consents_guest_id_guests_id_fk": {
+          "name": "consents_guest_id_guests_id_fk",
+          "tableFrom": "consents",
+          "tableTo": "guests",
           "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "holds_superseded_by_fk": {
-          "name": "holds_superseded_by_fk",
-          "tableFrom": "holds",
-          "tableTo": "holds",
-          "columnsFrom": [
-            "superseded_by"
+            "guest_id"
           ],
           "columnsTo": [
             "id"
@@ -2585,65 +2452,89 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "holds_gift_matches_purpose": {
-          "name": "holds_gift_matches_purpose",
-          "value": "(\"holds\".\"purpose\" = 'gift_redemption') = (\"holds\".\"gift_id\" IS NOT NULL)"
+        "consents_source_allows_status": {
+          "name": "consents_source_allows_status",
+          "value": "(\"consents\".\"source\" = 'checkout' AND \"consents\".\"status\" IN ('granted')) OR (\"consents\".\"source\" = 'unsubscribe' AND \"consents\".\"status\" IN ('withdrawn')) OR (\"consents\".\"source\" = 'ops' AND \"consents\".\"status\" IN ('granted', 'withdrawn')) OR (\"consents\".\"source\" = 'erasure' AND \"consents\".\"status\" IN ('withdrawn'))"
         },
-        "holds_seats_in_range": {
-          "name": "holds_seats_in_range",
-          "value": "\"holds\".\"seats\" BETWEEN 1 AND 6"
+        "consents_recorded_at_in_range": {
+          "name": "consents_recorded_at_in_range",
+          "value": "\"consents\".\"recorded_at\" >= '1000-01-01 00:00:00+00' AND \"consents\".\"recorded_at\" < '10000-01-01 00:00:00+00'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.guests": {
+      "name": "guests",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
         },
-        "holds_device_key_sha256": {
-          "name": "holds_device_key_sha256",
-          "value": "\"holds\".\"device_key\" ~ '^[0-9a-f]{64}$'"
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
         },
-        "holds_ip_hash_sha256": {
-          "name": "holds_ip_hash_sha256",
-          "value": "\"holds\".\"ip_hash\" ~ '^[0-9a-f]{64}$'"
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "clock_timestamp()"
         },
-        "holds_released_reason_matches_status": {
-          "name": "holds_released_reason_matches_status",
-          "value": "(\"holds\".\"status\" = 'released') = (\"holds\".\"released_reason\" IS NOT NULL)"
+        "anonymized_at": {
+          "name": "anonymized_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "guests_email_unique": {
+          "name": "guests_email_unique",
+          "columns": [
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "guests_email_shape": {
+          "name": "guests_email_shape",
+          "value": "\"guests\".\"email\" ~ '^[a-z0-9._%+-]+@[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$' AND char_length(\"guests\".\"email\") <= 254"
         },
-        "holds_superseded_by_matches_reason": {
-          "name": "holds_superseded_by_matches_reason",
-          "value": "coalesce(\"holds\".\"released_reason\" = 'superseded', false) = (\"holds\".\"superseded_by\" IS NOT NULL)"
+        "guests_reserved_domain_iff_anonymized": {
+          "name": "guests_reserved_domain_iff_anonymized",
+          "value": "(\"guests\".\"anonymized_at\" IS NOT NULL) = (\"guests\".\"email\" ~ '@anonymized\\.invalid$')"
         },
-        "holds_not_superseded_by_itself": {
-          "name": "holds_not_superseded_by_itself",
-          "value": "\"holds\".\"superseded_by\" IS NULL OR \"holds\".\"superseded_by\" <> \"holds\".\"id\""
+        "guests_anonymized_email_from_id": {
+          "name": "guests_anonymized_email_from_id",
+          "value": "\"guests\".\"anonymized_at\" IS NULL OR \"guests\".\"email\" = 'erased-' || \"guests\".\"id\"::text || '@anonymized.invalid'"
         },
-        "holds_paying_has_deadline": {
-          "name": "holds_paying_has_deadline",
-          "value": "\"holds\".\"status\" <> 'paying' OR \"holds\".\"paying_until\" IS NOT NULL"
+        "guests_created_at_in_range": {
+          "name": "guests_created_at_in_range",
+          "value": "\"guests\".\"created_at\" >= '1000-01-01 00:00:00+00' AND \"guests\".\"created_at\" < '10000-01-01 00:00:00+00'"
         },
-        "holds_paying_until_not_before_expiry": {
-          "name": "holds_paying_until_not_before_expiry",
-          "value": "\"holds\".\"paying_until\" IS NULL OR \"holds\".\"paying_until\" >= \"holds\".\"expires_at\""
-        },
-        "holds_expiry_window": {
-          "name": "holds_expiry_window",
-          "value": "\"holds\".\"expires_at\" > \"holds\".\"created_at\" AND \"holds\".\"expires_at\" <= \"holds\".\"created_at\" + make_interval(mins => 60)"
-        },
-        "holds_updated_not_before_created": {
-          "name": "holds_updated_not_before_created",
-          "value": "\"holds\".\"updated_at\" >= \"holds\".\"created_at\""
-        },
-        "holds_expires_at_in_range": {
-          "name": "holds_expires_at_in_range",
-          "value": "\"holds\".\"expires_at\" >= '1000-01-01 00:00:00+00' AND \"holds\".\"expires_at\" < '10000-01-01 00:00:00+00'"
-        },
-        "holds_paying_until_in_range": {
-          "name": "holds_paying_until_in_range",
-          "value": "\"holds\".\"paying_until\" >= '1000-01-01 00:00:00+00' AND \"holds\".\"paying_until\" < '10000-01-01 00:00:00+00'"
-        },
-        "holds_created_at_in_range": {
-          "name": "holds_created_at_in_range",
-          "value": "\"holds\".\"created_at\" >= '1000-01-01 00:00:00+00' AND \"holds\".\"created_at\" < '10000-01-01 00:00:00+00'"
-        },
-        "holds_updated_at_in_range": {
-          "name": "holds_updated_at_in_range",
-          "value": "\"holds\".\"updated_at\" >= '1000-01-01 00:00:00+00' AND \"holds\".\"updated_at\" < '10000-01-01 00:00:00+00'"
+        "guests_anonymized_at_in_range": {
+          "name": "guests_anonymized_at_in_range",
+          "value": "\"guests\".\"anonymized_at\" IS NULL OR (\"guests\".\"anonymized_at\" >= '1000-01-01 00:00:00+00' AND \"guests\".\"anonymized_at\" < '10000-01-01 00:00:00+00' AND \"guests\".\"anonymized_at\" >= \"guests\".\"created_at\")"
         }
       },
       "isRLSEnabled": false
@@ -2906,6 +2797,125 @@
         "messages_created_at_in_range": {
           "name": "messages_created_at_in_range",
           "value": "\"messages\".\"created_at\" >= '1000-01-01 00:00:00+00' AND \"messages\".\"created_at\" < '10000-01-01 00:00:00+00'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.privacy_requests": {
+      "name": "privacy_requests",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "guest_id": {
+          "name": "guest_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "privacy_request_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "privacy_request_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'open'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "clock_timestamp()"
+        },
+        "resolved_at": {
+          "name": "resolved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "privacy_requests_one_open_per_kind": {
+          "name": "privacy_requests_one_open_per_kind",
+          "columns": [
+            {
+              "expression": "guest_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"privacy_requests\".\"status\" = 'open'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "privacy_requests_guest_idx": {
+          "name": "privacy_requests_guest_idx",
+          "columns": [
+            {
+              "expression": "guest_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "privacy_requests_guest_id_guests_id_fk": {
+          "name": "privacy_requests_guest_id_guests_id_fk",
+          "tableFrom": "privacy_requests",
+          "tableTo": "guests",
+          "columnsFrom": [
+            "guest_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "privacy_requests_resolved_iff_not_open": {
+          "name": "privacy_requests_resolved_iff_not_open",
+          "value": "(\"privacy_requests\".\"status\" = 'open') = (\"privacy_requests\".\"resolved_at\" IS NULL)"
+        },
+        "privacy_requests_created_at_in_range": {
+          "name": "privacy_requests_created_at_in_range",
+          "value": "\"privacy_requests\".\"created_at\" >= '1000-01-01 00:00:00+00' AND \"privacy_requests\".\"created_at\" < '10000-01-01 00:00:00+00'"
+        },
+        "privacy_requests_resolved_at_in_range": {
+          "name": "privacy_requests_resolved_at_in_range",
+          "value": "\"privacy_requests\".\"resolved_at\" IS NULL OR (\"privacy_requests\".\"resolved_at\" >= '1000-01-01 00:00:00+00' AND \"privacy_requests\".\"resolved_at\" < '10000-01-01 00:00:00+00' AND \"privacy_requests\".\"resolved_at\" >= \"privacy_requests\".\"created_at\")"
         }
       },
       "isRLSEnabled": false
@@ -3282,34 +3292,30 @@
         "reassurance"
       ]
     },
-    "public.hold_purpose": {
-      "name": "hold_purpose",
+    "public.consent_kind": {
+      "name": "consent_kind",
       "schema": "public",
       "values": [
-        "booking",
-        "gift_redemption"
+        "newsletter",
+        "attribution"
       ]
     },
-    "public.hold_released_reason": {
-      "name": "hold_released_reason",
+    "public.consent_source": {
+      "name": "consent_source",
       "schema": "public",
       "values": [
-        "expired",
-        "guest_left",
-        "payment_abandoned",
-        "sold_out_after_lapse",
-        "session_cancelled",
-        "superseded"
+        "checkout",
+        "unsubscribe",
+        "ops",
+        "erasure"
       ]
     },
-    "public.hold_status": {
-      "name": "hold_status",
+    "public.consent_status": {
+      "name": "consent_status",
       "schema": "public",
       "values": [
-        "active",
-        "paying",
-        "converted",
-        "released"
+        "granted",
+        "withdrawn"
       ]
     },
     "public.email_adapter": {
@@ -3341,6 +3347,23 @@
       "values": [
         "hard_bounce",
         "complaint"
+      ]
+    },
+    "public.privacy_request_kind": {
+      "name": "privacy_request_kind",
+      "schema": "public",
+      "values": [
+        "access",
+        "deletion"
+      ]
+    },
+    "public.privacy_request_status": {
+      "name": "privacy_request_status",
+      "schema": "public",
+      "values": [
+        "open",
+        "completed",
+        "declined"
       ]
     },
     "public.job_status": {

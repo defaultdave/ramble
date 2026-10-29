@@ -111,6 +111,26 @@ describe('storageSettingIssues', () => {
     ).toEqual(['BLOB_PUBLIC_READ_WRITE_TOKEN']);
   });
 
+  it('still asks for both tokens of vercel-blob in a production deployment, where only the fake is relaxed', () => {
+    expect(
+      names({ STORAGE_PROVIDER: 'vercel-blob', VERCEL_ENV: 'production' }),
+    ).toEqual([
+      'BLOB_PUBLIC_READ_WRITE_TOKEN',
+      'BLOB_PRIVATE_READ_WRITE_TOKEN',
+    ]);
+  });
+
+  it('still refuses a public token without a store id in a production deployment', () => {
+    expect(
+      names({
+        STORAGE_PROVIDER: 'vercel-blob',
+        VERCEL_ENV: 'production',
+        BLOB_PUBLIC_READ_WRITE_TOKEN: 'not-a-blob-token',
+        BLOB_PRIVATE_READ_WRITE_TOKEN: 'y',
+      }),
+    ).toEqual(['BLOB_PUBLIC_READ_WRITE_TOKEN']);
+  });
+
   it.each(['production', 'preview', undefined] as const)(
     'is satisfied by both tokens when VERCEL_ENV is %s',
     (VERCEL_ENV) => {

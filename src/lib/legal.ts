@@ -75,12 +75,12 @@ export function legalChange(doc: string): CacheChange {
   return { kind: 'legalDocument', doc };
 }
 
-/** The number of the next version of a document, given the highest version written so far, if any. */
 /** Only a draft can be edited or published. */
 export function isDraft(status: (typeof legalStatuses)[number]): boolean {
   return status === 'draft';
 }
 
+/** The number of the next version of a document, given the highest version written so far, if any. */
 export function nextLegalVersion(latestVersion: number | undefined): number {
   return (latestVersion ?? 0) + 1;
 }

@@ -32,7 +32,7 @@ async function readOrRefuse<T>(read: () => Promise<T>): Promise<T> {
 // A schedule change reaches an entry here only through the experiences it lists. A session added to
 // an experience that is not on the page waits for the browse profile to run out (about a minute).
 
-/** One page of results for one filter combination. `asOf` is the minute (`browseAsOf`), so a minute shares one entry. */
+/** One page of results for one filter combination. `asOf` is the minute (`minuteAsOf`), so a minute shares one entry. */
 export async function getBrowseResults(
   query: BrowseQuery,
   asOf: string,

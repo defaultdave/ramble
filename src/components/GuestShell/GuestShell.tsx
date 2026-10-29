@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Footer } from '@/components/Footer';
 import { Header } from '@/components/Header';
-import { browsePath, giftGuidePath } from '@/lib/home';
+import { browsePath, giftGuidePath } from '@/lib/routes';
 import { footerGroups, mainLinks, siteChrome } from '@/lib/siteNav';
 import styles from './GuestShell.module.css';
 import { SiteMenu } from './SiteMenu';

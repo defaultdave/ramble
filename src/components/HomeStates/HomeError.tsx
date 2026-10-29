@@ -9,17 +9,19 @@ import styles from './HomeStates.module.css';
 export function HomeError() {
   return (
     <div className={styles.page}>
-      <h1 className={styles.title}>Ramble</h1>
-      <Alert
-        tone="danger"
-        title="We couldn't load the home page"
-        body="Something went wrong on our side. Try again in a moment."
-      />
-      <form className={styles.retry} action="/" method="get">
-        <Button type="submit" variant="secondary">
-          Try again
-        </Button>
-      </form>
+      <div className={styles.pageInner}>
+        <h1 className={styles.title}>Ramble</h1>
+        <Alert
+          tone="danger"
+          title="We couldn't load the home page"
+          body="Something went wrong on our side. Try again in a moment."
+        />
+        <form className={styles.retry} action="/" method="get">
+          <Button type="submit" variant="secondary">
+            Try again
+          </Button>
+        </form>
+      </div>
     </div>
   );
 }

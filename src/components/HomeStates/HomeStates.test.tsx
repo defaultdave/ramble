@@ -5,6 +5,7 @@ import { HomeEmpty, HomeError, HomeSkeleton, HomeTitle } from '.';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the loading state says so to a screen reader and hides its bars
+// - the loading state has the page's h1, so the page has a heading while it loads
 // - the error state keeps the page heading, says what happened as an alert, and retries with a GET form to the same page
 // - the empty state keeps the heading and links to browse
 // - the title for a page with no hero is a heading and nothing else
@@ -14,6 +15,13 @@ describe('HomeSkeleton', () => {
     render(<HomeSkeleton />);
     expect(screen.getByRole('status')).toHaveTextContent(
       'Loading the home page',
+    );
+  });
+
+  it('has the page heading, out of sight', () => {
+    render(<HomeSkeleton />);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'Ramble',
     );
   });
 

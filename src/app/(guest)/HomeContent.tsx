@@ -4,7 +4,11 @@ import { HomeModules } from '@/components/HomeModules';
 import { RichText } from '@/components/RichText';
 import { HomeEmpty, HomeError, HomeTitle } from '@/components/HomeStates';
 import { errorDigest } from '@/lib/errorDigest';
-import { buildHomePage, homeAsOf, venueToday } from '@/lib/home';
+import { buildHomePage, homeCardIds, withHomeCovers } from '@/lib/home';
+import { coverLookupIds, coversByExperience } from '@/lib/photoViews';
+import { minuteAsOf } from '@/lib/time';
+import { venueToday } from '@/lib/venue';
+import { getCoverPhotos } from '@/server/coverPhotos';
 import { getHomeContent, getThisWeek } from '@/server/home';
 import { logger } from '@/server/monitoring/logger';
 import { getCachedGuestSettings } from '@/server/siteSettings';
@@ -19,10 +23,12 @@ export async function HomeContent() {
   try {
     const [content, thisWeek, settings] = await Promise.all([
       getHomeContent(),
-      getThisWeek(homeAsOf(now)),
+      getThisWeek(minuteAsOf(now)),
       getCachedGuestSettings(),
     ]);
-    page = buildHomePage({ ...content, thisWeek, settings });
+    const built = buildHomePage({ ...content, thisWeek, settings });
+    const covers = await getCoverPhotos(coverLookupIds(homeCardIds(built)));
+    page = withHomeCovers(built, coversByExperience(covers));
   } catch (error) {
     // Next.js ends a prerender by throwing; swallowing that would break the render.
     unstable_rethrow(error);
@@ -40,7 +46,7 @@ export async function HomeContent() {
       {page.needsTitle ? <HomeTitle /> : null}
       <HomeModules
         modules={page.modules}
-        minDate={venueToday(now)}
+        today={venueToday(now)}
         renderCopy={(doc) => <RichText content={doc} />}
       />
     </>

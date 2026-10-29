@@ -1,5 +1,6 @@
 import { updateTag } from 'next/cache';
 import { eq, sql } from 'drizzle-orm';
+import pg from 'pg';
 import {
   afterAll,
   beforeAll,
@@ -9,6 +10,7 @@ import {
   it,
   vi,
 } from 'vitest';
+import { editorialLimits } from '@/lib/editorial';
 import { Role } from '@/server/auth/caller';
 import { testCaller } from '@/server/auth/test-caller';
 import {
@@ -20,7 +22,9 @@ import {
   pages,
 } from '@/server/db/schema';
 import {
+  aFewMoments,
   createFreshDatabase,
+  raceAgainstOpenTransaction as race,
   serveNeonHttp,
   type FreshDatabase,
 } from './harness';
@@ -32,6 +36,8 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 // commit and checks the challenger answers from what the holder committed:
 // - the publish trigger takes its per-document lock: a lower version cannot publish while a higher one is mid-publish
 // - publishLegalDocument loses that race with `superseded`, and a second publish of the same draft with `not_a_draft`
+// - editing a legal draft that a publish committed after the read is `not_a_draft`, and the row keeps its title
+// - the publish lookup of published versions is bounded by the listed limit
 // - a second collection with the same slug is `slug_taken`, a second gift guide is `gift_guide_exists`
 // - a second help article with the same slug is `slug_taken`
 // - a first save of page copy that races another replaces it, and two replacements of the home page both save
@@ -83,43 +89,11 @@ function doc(text = 'Hello') {
 
 type Tx = Parameters<Parameters<typeof client.db.transaction>[0]>[0];
 
-const aFewMoments = () => new Promise((resolve) => setTimeout(resolve, 300));
-
-/**
- * Runs `holder` in a transaction that stays open, starts `challenger` on another connection,
- * checks the challenger is still waiting, then commits the holder and returns what the challenger
- * answered. A challenger that does not wait was not serialized by the lock.
- */
-async function raceAgainstOpenTransaction<T>(
+function raceAgainstOpenTransaction<T>(
   holder: (tx: Tx) => Promise<void>,
   challenger: () => Promise<T>,
 ): Promise<T> {
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  let held!: () => void;
-  const holding = new Promise<void>((resolve) => {
-    held = resolve;
-  });
-  const holderDone = client.db.transaction(async (tx) => {
-    await holder(tx);
-    held();
-    await gate;
-  });
-  await holding;
-
-  let settled = false;
-  const answer = challenger().finally(() => {
-    settled = true;
-  });
-  answer.catch(() => undefined);
-  await aFewMoments();
-  const waited = !settled;
-  release();
-  await holderDone;
-  expect(waited, 'the challenger waited for the holder').toBe(true);
-  return answer;
+  return race<Tx, T>((body) => client.db.transaction(body), holder, challenger);
 }
 
 const draftOf = (docKey: string, title = 'Draft') =>
@@ -288,6 +262,64 @@ describe('publishing a legal version', () => {
     ]);
 
     expect(made.map((entry) => entry.version).toSorted()).toEqual([1, 2, 3]);
+  });
+});
+
+describe('editing a legal draft', () => {
+  it('answers not_a_draft when a publish commits between the read and the update', async () => {
+    const draft = await draftOf('waiver-race-edit');
+
+    // The holder has the row locked with an uncommitted publish, so the editor's first read still
+    // sees a draft and its update waits on the row lock. Removing the status predicate from the
+    // update would let the edit through (or hit the trigger on a published row).
+    const outcome = await raceAgainstOpenTransaction(
+      async (tx) => {
+        await tx
+          .update(legalDocuments)
+          .set({ status: 'published' })
+          .where(eq(legalDocuments.id, draft.id));
+      },
+      () =>
+        legal.editLegalDraft(ops, draft.id, {
+          title: 'Edited too late',
+          body: doc('Too late'),
+        }),
+    );
+
+    expect(outcome).toEqual({ status: 'not_a_draft' });
+    const [stored] = await client.db
+      .select()
+      .from(legalDocuments)
+      .where(eq(legalDocuments.id, draft.id));
+    expect(stored?.status).toBe('published');
+    expect(stored?.title).toBe('Draft');
+  });
+});
+
+describe('the lookup a legal publish makes of published versions', () => {
+  it('asks for at most the listed limit of rows', async () => {
+    const draft = await draftOf('waiver-publish-cap');
+    const query = vi.spyOn(pg.Client.prototype, 'query');
+
+    try {
+      await legal.publishLegalDocument(ops, draft.id);
+      const lookups = query.mock.calls.flatMap((call) => {
+        const [config, values] = call as unknown as [
+          { text?: string },
+          unknown[] | undefined,
+        ];
+        return config.text?.includes('order by') &&
+          config.text.includes('limit')
+          ? [values ?? []]
+          : [];
+      });
+      expect(lookups).toHaveLength(1);
+      expect(
+        lookups.some((values) => values.includes(editorialLimits.listed)),
+      ).toBe(true);
+    } finally {
+      query.mockRestore();
+    }
   });
 });
 

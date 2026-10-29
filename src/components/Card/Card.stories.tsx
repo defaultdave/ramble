@@ -27,7 +27,7 @@ type GuideOnlyStory = StoryObj<GuideOnlyCardProps>;
 
 const bookable = {
   title: 'Sunset kayak on the Hudson',
-  meta: 'Pier 26 · 2 hr',
+  meta: 'Pier 26 · 2\u00a0hr',
   href: '/experiences/sunset-kayak-on-the-hudson-1',
   image: null,
   price: 'From $65',
@@ -35,7 +35,7 @@ const bookable = {
 
 const guideOnly = {
   title: 'Sunset kayak on the Hudson',
-  meta: 'Pier 26 · 2 hr',
+  meta: 'Pier 26 · 2\u00a0hr',
   href: '/guide/sunset-kayak-on-the-hudson-1',
   image: null,
   kind: 'guide-only',

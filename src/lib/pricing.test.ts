@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  cardPriceLabel,
   lines,
   MAX_LINES,
   MAX_QUANTITY,
@@ -322,5 +323,71 @@ describe('lines', () => {
         expect(result.taxMinor).toBeLessThanOrEqual(lineSum);
       }
     });
+  });
+});
+
+describe('cardPriceLabel', () => {
+  it.each([
+    ['no option', [], null],
+    ['one price', [{ priceMinor: 8500, usesSpace: true }], '$85'],
+    [
+      'prices that are the same',
+      [
+        { priceMinor: 8500, usesSpace: true },
+        { priceMinor: 8500, usesSpace: true },
+      ],
+      '$85',
+    ],
+    [
+      'prices that differ, lowest first',
+      [
+        { priceMinor: 6500, usesSpace: true },
+        { priceMinor: 8500, usesSpace: true },
+      ],
+      'From $65',
+    ],
+    [
+      'prices that differ, lowest last',
+      [
+        { priceMinor: 8500, usesSpace: true },
+        { priceMinor: 1250, usesSpace: true },
+      ],
+      'From $12.50',
+    ],
+    [
+      'a free option that takes a space',
+      [
+        { priceMinor: 0, usesSpace: true },
+        { priceMinor: 500, usesSpace: true },
+      ],
+      'From $0',
+    ],
+    [
+      'a free accompanying adult beside a paid child',
+      [
+        { priceMinor: 0, usesSpace: false },
+        { priceMinor: 4500, usesSpace: true },
+      ],
+      '$45',
+    ],
+    [
+      'a cheaper option that takes no space beside two that do',
+      [
+        { priceMinor: 500, usesSpace: false },
+        { priceMinor: 4500, usesSpace: true },
+        { priceMinor: 6500, usesSpace: true },
+      ],
+      'From $45',
+    ],
+    [
+      'only options that take no space',
+      [
+        { priceMinor: 0, usesSpace: false },
+        { priceMinor: 900, usesSpace: false },
+      ],
+      null,
+    ],
+  ])('%s', (_name, options, label) => {
+    expect(cardPriceLabel(options)).toBe(label);
   });
 });

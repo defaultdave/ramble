@@ -26,7 +26,7 @@ export const cacheProfiles = {
   browse: { stale: 30, revalidate: 60, expire: 600 },
   /** The site banner and other ops switches that guest pages show. */
   settings: { stale: 60, revalidate: 300, expire: 3_600 },
-  /** A read that found nothing: a missing experience or a cursor nobody can see. Next.js drops the entry at once, so a stream of made-up addresses fills nothing. */
+  /** A read that found nothing: a missing experience or a cursor nobody can see. A production build stores nothing for it (dev keeps it), so a stream of made-up addresses fills nothing. */
   uncached: { stale: 0, revalidate: 0, expire: 0 },
   // TODO(U-040): first caller
   /** Spaces left for one session, read through the runtime cache. Postgres decides at reserve. */

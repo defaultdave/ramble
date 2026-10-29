@@ -1,10 +1,14 @@
 import { formatPrice } from './money';
-import { guestsLabel, type OrderSummaryLine } from './orderSummary';
+import {
+  guestsLabel,
+  type OrderSummaryLine,
+  type TaxTreatment,
+} from './orderSummary';
 import { checkoutPath, orderPath } from './routes';
 
 // TODO(U-047b): replaced by the checkout page; the hold id, the order reference, and this module go with it.
-export const demoHoldId = '00000000-0000-4000-8000-0000000000d1';
-export const demoOrderReference = 'RMB-DEMO01';
+const demoHoldId = '00000000-0000-4000-8000-0000000000d1';
+const demoOrderReference = 'RMB-DEMO01';
 
 /**
  * The checkout a Book button leads to. The experience rides along for the real checkout; the stub
@@ -18,7 +22,13 @@ export const demoOrderPath = orderPath(demoOrderReference);
 
 export type DemoSummary = {
   title: string;
+  dateLabel: string;
+  timeLabel: string;
   guests: number;
+  where: string;
+  terms: string;
+  taxTreatment: TaxTreatment;
+  taxMinor: number;
   lines: OrderSummaryLine[];
   totalMinor: number;
 };
@@ -28,8 +38,14 @@ const pricePerPersonMinor = 8500;
 
 /** The one line the demo checkout and confirmation show. */
 export const demoSummary: DemoSummary = {
-  title: 'Hand-rolled pasta class',
+  title: 'Your experience (demo)',
+  dateLabel: 'Sat, Nov 14',
+  timeLabel: '2:00 PM',
   guests,
+  where: 'Demo order. The real meeting point arrives with the booking.',
+  terms: 'Demo order. Nothing is charged and nothing is booked.',
+  taxTreatment: 'not_taxable',
+  taxMinor: 0,
   lines: [
     {
       label: `${formatPrice(pricePerPersonMinor)} × ${guestsLabel(guests)}`,

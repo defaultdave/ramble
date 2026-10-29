@@ -4,8 +4,9 @@
 // needs SEED_HOST to name the database host exactly, because a production Neon address carries no
 // production word and the shell the runbook uses has no VERCEL_ENV. `production-demo` is the one
 // explicit way to seed production, for the Prototype demo: it allows VERCEL_ENV=production and skips
-// the production-name and local-host checks (SEED_HOST still applies), and it still refuses NODE_ENV=production (the seed never
-// runs inside the deployed app), an unreadable address, and the scale fixture.
+// the production-name and local-host checks (SEED_HOST still applies), and it still refuses
+// NODE_ENV=production (the seed never runs inside the deployed app), an unreadable address, and the
+// scale fixture.
 
 export const seedTargets = [
   'local',

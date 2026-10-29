@@ -29,7 +29,7 @@ The seed fails closed. It runs only when all of these hold, and it checks them b
 - `DATABASE_URL` is readable and has no `host`, `hostaddr`, `dbname`, or `database` query parameter and no percent escape in the host or database name, for every target.
 - With `SEED_TARGET=production-demo`, `--scale` is not given.
 
-The seed cannot know which database is production. It refuses the ones that say so (a production word in the name, `VERCEL_ENV`, `NODE_ENV`) and otherwise relies on `SEED_HOST` to make you name the host you mean to write to. Copy the host from the database you intend, not from the refusal message.
+The seed cannot know which database is production. It refuses the ones that say so (a production word in the name, `VERCEL_ENV`, `NODE_ENV`) and otherwise relies on `SEED_HOST` to make you name the host you mean to write to. Check that the host a refusal prints is the database you meant to write to, and take `SEED_HOST` from where you know that database's address (the Neon console), not from the refusal.
 
 A refusal prints the reason and never the connection string.
 
@@ -42,10 +42,11 @@ Run `db-migrate-production` first (the GitHub Actions workflow; the seed needs t
 ```
 vercel env pull .env.production-demo.local --environment=production --yes
 pull() { grep "^$1=" .env.production-demo.local | cut -d= -f2- | tr -d '"'; }
-SEED_HOST="$(pull DATABASE_URL | sed -E 's|^[a-z]+://[^@]*@([^/:?]+).*|\1|')"
-SEED_TARGET=production-demo SEED_HOST="$SEED_HOST" DATABASE_URL="$(pull DATABASE_URL)" DATABASE_URL_UNPOOLED="$(pull DATABASE_URL_UNPOOLED)" pnpm db:seed
+SEED_TARGET=production-demo SEED_HOST=<the production host from the Neon console> DATABASE_URL="$(pull DATABASE_URL)" DATABASE_URL_UNPOOLED="$(pull DATABASE_URL_UNPOOLED)" pnpm db:seed
 rm .env.production-demo.local
 ```
+
+Type `SEED_HOST` by hand from the Neon console (Project, the production branch, Connect, the host of the connection string). Deriving it from the pulled `DATABASE_URL` would make the guard confirm the URL against itself.
 
 `.env*` is gitignored (only `.env.example` is tracked), so the pulled file is never committed. The seed gets only the two database URLs from it; nothing else in the file is passed on. If `vercel env pull` leaves either value empty, the seed refuses with `DATABASE_URL is not set`. Delete the file even when the seed fails. A successful run prints `Seeding the production-demo database on <host>` and ends with the coverage line.
 

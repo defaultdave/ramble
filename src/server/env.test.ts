@@ -122,6 +122,18 @@ describe('environment', () => {
     });
   });
 
+  it('reports only the length issue for an over-long SEED_HOST that also has a bad character', async () => {
+    vi.stubEnv('SEED_HOST', `${'a'.repeat(253)} b`);
+
+    const error = await loadEnv().then(
+      () => new Error('loaded'),
+      (caught: unknown) => (caught instanceof Error ? caught : new Error('?')),
+    );
+
+    expect(error.message.split('✖')).toHaveLength(2);
+    expect(error.message).not.toContain('not a hostname');
+  });
+
   describe('database URLs', () => {
     const pooled = 'postgres://u:p@host-pooler.neon.tech/db';
     const direct = 'postgresql://u:p@host.neon.tech/db';

@@ -25,11 +25,15 @@ const optional = <T extends z.ZodType>(schema: T) =>
     schema.optional(),
   );
 
-// Length first: the pattern walks the string, and zod runs it even after `.max()` fails.
+// Zod runs every check even after `.max()` fails, so the pattern check passes an over-long value
+// without walking it: only the length issue is reported.
 const hostname = z
   .string()
   .max(253)
-  .refine((value) => /^[A-Za-z0-9.-]+$/.test(value), 'not a hostname');
+  .refine(
+    (value) => value.length > 253 || /^[A-Za-z0-9.-]+$/.test(value),
+    'not a hostname',
+  );
 
 const httpsUrl = z.url({ protocol: /^https$/ });
 

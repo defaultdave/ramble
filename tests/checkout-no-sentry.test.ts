@@ -103,15 +103,19 @@ describe('the checkout route group', () => {
     expect(nextConfig).not.toMatch(/sentry/i);
   });
 
-  it('is given BotID only through the guest-page guard in the framework client entry', () => {
+  it('is given BotID only through the guest-page guard in the client entry wrapper', () => {
     const entry = readFileSync(
       path.join(src, 'instrumentation-client.ts'),
       'utf8',
     );
 
-    expect(entry).toMatch(
-      /if \(shouldLoadBotId\(window\.location\.pathname\)\)/,
+    const wrapper = readFileSync(
+      path.join(src, 'server', 'ports', 'rate-limit', 'botid-client.ts'),
+      'utf8',
     );
+
+    expect(entry).toMatch(/startBotChallenge\(window\.location\.pathname\)/);
+    expect(wrapper).toMatch(/if \(!shouldLoadBotId\(pathname\)\) return;/);
     expect(specifiers.filter((s) => /botid/i.test(s))).toEqual([]);
   });
 });

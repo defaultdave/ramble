@@ -123,7 +123,7 @@ describe('getDevice', () => {
     expect(second.ipHash).not.toBe(first.ipHash);
   });
 
-  it.each([null, '', 'not an address', `${'1'.repeat(46)}`])(
+  it.each([null, '', 'not an address', '1'.repeat(46)])(
     'hashes %j as the shared unknown address',
     async (header) => {
       state.cookie = minted;

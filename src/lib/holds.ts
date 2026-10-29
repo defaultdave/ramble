@@ -79,7 +79,6 @@ export const ReserveInputSchema = z
       });
     }
   });
-export type ReserveInput = z.infer<typeof ReserveInputSchema>;
 export type ReserveSpacesInput = z.input<typeof ReserveInputSchema>;
 
 export const ReleaseInputSchema = z.object({ holdId: WriteIdSchema });
@@ -144,10 +143,9 @@ export const ReserveResultSchema = z.discriminatedUnion('status', [
 export type ReserveResult = z.infer<typeof ReserveResultSchema>;
 type FieldErrors = Extract<ReserveResult, { status: 'invalid' }>['fieldErrors'];
 
-export const ReleaseResultSchema = z.object({
-  status: z.enum(['released', 'payment_in_progress', 'not_found']),
-});
-export type ReleaseResult = z.infer<typeof ReleaseResultSchema>;
+export type ReleaseResult = {
+  status: 'released' | 'payment_in_progress' | 'not_found';
+};
 
 type Issue = { path: readonly PropertyKey[]; message: string };
 

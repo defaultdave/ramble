@@ -1,5 +1,5 @@
 import { samplePhotos } from '@/components/Photo/Photo.fixtures';
-import { galleryView, type ExperiencePageView } from '@/lib/experiencePage';
+import { galleryView, type ExperiencePageView } from '@/lib/pages/experience';
 
 /** The experience of Figma frame 03: outdoor, with a weather call, a host, a meeting point, and fifteen photos. */
 export const sunsetKayak: ExperiencePageView = {
@@ -46,6 +46,8 @@ export const sunsetKayak: ExperiencePageView = {
   cancellation:
     'Free cancellation up to 24 hours before start. After that, no refund. If the host or the weather cancels, you get everything back.',
   giftHref: '/gifts/checkout/00000000-0000-4000-8000-000000000001',
+  bookHref:
+    '/checkout/00000000-0000-4000-8000-0000000000d1?experience=00000000-0000-4000-8000-000000000001',
   privateSessionHref: '/contact',
 };
 
@@ -84,6 +86,8 @@ export const kidsClass: ExperiencePageView = {
   cancellation:
     'Free cancellation up to 2 days before start. After that, no refund. If the host or the weather cancels, you get everything back.',
   giftHref: null,
+  bookHref:
+    '/checkout/00000000-0000-4000-8000-0000000000d1?experience=00000000-0000-4000-8000-000000000001',
   privateSessionHref: '/contact',
 };
 
@@ -112,5 +116,7 @@ export const bareExperience: ExperiencePageView = {
   cancellation:
     'Free cancellation up to 24 hours before start. After that, no refund. If the host or the weather cancels, you get everything back.',
   giftHref: null,
+  bookHref:
+    '/checkout/00000000-0000-4000-8000-0000000000d1?experience=00000000-0000-4000-8000-000000000001',
   privateSessionHref: '/contact',
 };

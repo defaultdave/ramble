@@ -7,20 +7,25 @@ import {
   homeExperienceIds,
   homeLimits,
   thisWeekExperienceIds,
-  thisWeekWindow,
-  type HomeExperience,
-} from '@/lib/home';
+} from '@/lib/pages/home';
+import type { CardExperience } from '@/lib/experienceCards';
+import { upcomingWindow } from '@/lib/sessionWindow';
 import { readOrRefuse } from '@/server/cache/readOrRefuse';
 import { listCategories, listNeighborhoods } from '@/server/db/catalog';
-import { listHomeModules, listPublishedPicks } from '@/server/db/editorial';
+import {
+  getPublishedGiftGuide,
+  listHomeModules,
+  listPublishedPicks,
+} from '@/server/db/editorial';
 import { listHomeExperiences, listThisWeekSessions } from '@/server/db/home';
 
 export type HomeContent = {
   modules: HomeModule[];
   picks: Collection[];
+  giftGuide: Collection | null;
   categories: Category[];
   neighborhoods: Neighborhood[];
-  experiences: HomeExperience[];
+  experiences: CardExperience[];
 };
 
 /**
@@ -33,16 +38,26 @@ export async function getHomeContent(): Promise<HomeContent> {
   cacheLife('editorial');
   cacheTag(tags.home, tags.catalog);
   const content = await readOrRefuse('Home', async () => {
-    const [modules, picks, categories, neighborhoods] = await Promise.all([
-      listHomeModules(),
-      listPublishedPicks(),
-      listCategories(),
-      listNeighborhoods(),
-    ]);
+    const [modules, picks, giftGuide, categories, neighborhoods] =
+      await Promise.all([
+        listHomeModules(),
+        listPublishedPicks(),
+        getPublishedGiftGuide(),
+        listCategories(),
+        listNeighborhoods(),
+      ]);
     const experiences = await listHomeExperiences(
       homeExperienceIds(modules, picks),
+      { covers: false },
     );
-    return { modules, picks, categories, neighborhoods, experiences };
+    return {
+      modules,
+      picks,
+      giftGuide,
+      categories,
+      neighborhoods,
+      experiences,
+    };
   });
   for (const experience of content.experiences) {
     cacheTag(tags.experience(experience.id));
@@ -53,7 +68,7 @@ export async function getHomeContent(): Promise<HomeContent> {
 export type ThisWeekContent = {
   /** The experiences with an open session, soonest first. */
   experienceIds: string[];
-  experiences: HomeExperience[];
+  experiences: CardExperience[];
 };
 
 /**
@@ -67,14 +82,16 @@ export async function getThisWeek(asOf: string): Promise<ThisWeekContent> {
   cacheLife('browse');
   cacheTag(tags.catalog);
   const content = await readOrRefuse('This week', async () => {
-    const window = thisWeekWindow(asOf);
+    const window = upcomingWindow(asOf, homeLimits.thisWeekDays);
     const sessions = await listThisWeekSessions(window);
     const experienceIds = thisWeekExperienceIds(
       sessions,
       window,
       homeLimits.thisWeekCandidates,
     );
-    const experiences = await listHomeExperiences(experienceIds);
+    const experiences = await listHomeExperiences(experienceIds, {
+      covers: true,
+    });
     return { experienceIds, experiences };
   });
   for (const experience of content.experiences) {

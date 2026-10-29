@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bannerText,
   GuestSettingsSchema,
   HoldSettingsSchema,
   SettingsChangeSchema,
@@ -71,6 +72,17 @@ describe('the banner', () => {
     expect(SettingsChangeSchema.safeParse({ bannerText }).success).toBe(
       accepted,
     );
+  });
+});
+
+describe('bannerText', () => {
+  it.each([
+    ['text', 'Closed Monday for weather', 'Closed Monday for weather'],
+    ['padded text', '  Closed Monday  ', 'Closed Monday'],
+    ['blank text', '   ', null],
+    ['no text', null, null],
+  ])('%s', (_name, banner, expected) => {
+    expect(bannerText({ bannerText: banner })).toBe(expected);
   });
 });
 

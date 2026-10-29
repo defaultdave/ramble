@@ -1,8 +1,9 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { EntityIdSchema, guestVisibleStatuses } from '@/lib/catalog';
-import { CoverLookupSchema } from '@/lib/photoViews';
+import { CoverLookupSchema, photoView, type PhotoView } from '@/lib/photoViews';
 import {
   GuestPhotoSchema,
   NewPhotoSchema,
@@ -11,7 +12,6 @@ import {
   photoActorFor,
   photoLimits,
   photoStorageKey,
-  storedPhotoContentType,
   type GuestPhoto,
 } from '@/lib/photos';
 import {
@@ -22,7 +22,9 @@ import {
 } from '@/server/auth/caller';
 import { logger } from '@/server/monitoring/logger';
 import { ingestPhoto } from '@/server/photos/ingest';
+import { storeIngestedPhoto } from '@/server/photos/store';
 import type { StoragePort } from '@/server/ports/storage';
+import { guestVisible } from './catalog';
 import { db, dbRead } from './client';
 import { experiences, photos } from './schema';
 
@@ -53,6 +55,65 @@ const photoColumns = {
   altText: photos.altText,
   blurDataUrl: photos.blurDataUrl,
 };
+
+// The guest cover rule, written once: of an experience's photos, the one with the lowest position.
+const coverOrder = asc(photos.position);
+
+/**
+ * The cover as a relational `with` entry, for reads that load an experience with `findMany`. It
+ * names its columns so the storage key and the rights record never reach a cached page.
+ */
+export const coverWith = {
+  columns: {
+    id: true,
+    experienceId: true,
+    position: true,
+    url: true,
+    width: true,
+    height: true,
+    decorative: true,
+    altText: true,
+    blurDataUrl: true,
+  },
+  orderBy: coverOrder,
+  limit: 1,
+} as const;
+
+/**
+ * The cover of the experience whose ID column is given, to join laterally: one row, or none for an
+ * experience without a photo. The caller decides whether the experience is visible to guests.
+ */
+export function guestCoverOf(experienceId: AnyPgColumn) {
+  return dbRead
+    .select(photoColumns)
+    .from(photos)
+    .where(eq(photos.experienceId, experienceId))
+    .orderBy(coverOrder)
+    .limit(1)
+    .as('cover');
+}
+
+type CoverJoin = ReturnType<typeof guestCoverOf>;
+
+/** The columns of a joined cover, to select from the read that joins it. */
+export function coverSelection(cover: CoverJoin) {
+  return {
+    id: cover.id,
+    experienceId: cover.experienceId,
+    position: cover.position,
+    url: cover.url,
+    width: cover.width,
+    height: cover.height,
+    decorative: cover.decorative,
+    altText: cover.altText,
+    blurDataUrl: cover.blurDataUrl,
+  };
+}
+
+/** What a card draws from a left-joined cover: null when the experience has no photo. */
+export function coverImage(cover: object | null): PhotoView | null {
+  return cover === null ? null : photoView(GuestPhotoSchema.parse(cover));
+}
 
 /** What was left behind when a photo's file could not be removed; it carries the kind of the failure, never its message. */
 class PhotoCleanupError extends Error {
@@ -125,14 +186,7 @@ export async function addPhoto(
   const ingested = await ingestPhoto(upload);
   const id = randomUUID();
   const storageKey = photoStorageKey(photo.experienceId, id);
-  const stored = await storage.put({
-    key: storageKey,
-    body: ingested.bytes,
-    contentType: storedPhotoContentType,
-  });
-  if (!stored.url)
-    throw new Error('A public photo came back without an address');
-  const url = stored.url;
+  const url = await storeIngestedPhoto(storage, storageKey, ingested);
 
   let row;
   try {
@@ -250,17 +304,13 @@ export async function listGuestCoverPhotos(
 ): Promise<GuestPhoto[]> {
   const ids = CoverLookupSchema.parse(experienceIds);
   if (ids.length === 0) return [];
+  const cover = guestCoverOf(experiences.id);
   const rows = await dbRead
-    .selectDistinctOn([photos.experienceId], photoColumns)
-    .from(photos)
-    .innerJoin(experiences, eq(experiences.id, photos.experienceId))
-    .where(
-      and(
-        inArray(photos.experienceId, ids),
-        inArray(experiences.status, [...guestVisibleStatuses]),
-      ),
-    )
-    .orderBy(asc(photos.experienceId), asc(photos.position))
+    .select(coverSelection(cover))
+    .from(experiences)
+    .innerJoinLateral(cover, sql`true`)
+    .where(and(inArray(experiences.id, ids), guestVisible))
+    .orderBy(asc(experiences.id))
     .limit(photoLimits.maxCoverLookups);
   return GuestPhotoSchema.array().parse(rows);
 }

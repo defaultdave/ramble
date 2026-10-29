@@ -2,7 +2,7 @@ import { Calendar } from 'lucide-react';
 import { ButtonLink } from '@/components/Button';
 import { ChipLink } from '@/components/Chip';
 import { DatePicker } from '@/components/DatePicker';
-import { dateChipLabel } from '@/lib/browse';
+import { dateChipLabel } from '@/lib/pages/browse';
 import {
   activeFilterCount,
   chipState,
@@ -14,6 +14,7 @@ import {
 } from '@/lib/filters';
 import { browsePath } from '@/lib/routes';
 import styles from './FilterBar.module.css';
+import { WhenDetails } from './WhenDetails';
 
 export type FilterOption = { slug: string; name: string };
 
@@ -71,17 +72,19 @@ export function FilterBar({
     <div className={styles.bar}>
       <fieldset className={styles.group}>
         <legend className={styles.legend}>When</legend>
-        {/* The browser opens and closes the calendar, so the chip needs no script. The key closes it again once a day is chosen. */}
-        <details key={filters.date ?? 'none'} className={styles.when}>
-          <summary
-            className={styles.dateChip}
-            aria-current={filters.date ? 'true' : undefined}
-          >
-            <span className={styles.icon} aria-hidden="true">
-              <Calendar />
-            </span>
-            {filters.date ? dateChipLabel(filters.date) : 'Pick a date'}
-          </summary>
+        <WhenDetails
+          summaryClassName={styles.dateChip}
+          className={styles.when}
+          summary={
+            <>
+              <span className={styles.icon} aria-hidden="true">
+                <Calendar />
+              </span>
+              {filters.date ? dateChipLabel(filters.date) : 'Pick a date'}
+            </>
+          }
+          date={filters.date}
+        >
           <div className={styles.calendar}>
             <DatePicker
               label="Choose a date"
@@ -96,7 +99,7 @@ export function FilterBar({
               </ButtonLink>
             ) : null}
           </div>
-        </details>
+        </WhenDetails>
       </fieldset>
       <ChipGroup
         legend="Neighborhood"

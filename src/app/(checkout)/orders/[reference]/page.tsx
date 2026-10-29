@@ -1,18 +1,26 @@
 import type { Metadata } from 'next';
-import { use } from 'react';
-import { RoutePlaceholder } from '@/components/RoutePlaceholder';
+import { Alert } from '@/components/Alert';
+import { ButtonLink } from '@/components/Button';
+import { demoSummary } from '@/lib/demoCheckout';
+import { browsePath } from '@/lib/routes';
+import { DemoOrderSummary } from '../../_demo/DemoOrderSummary';
+import { DemoPage } from '../../_demo/DemoPage';
 
 export const metadata: Metadata = { title: 'Order confirmation' };
 
-export default function OrderConfirmationPage({
-  params,
-}: PageProps<'/orders/[reference]'>) {
-  const { reference } = use(params);
+// TODO(U-050): replaced by the confirmation page.
+export default function OrderConfirmationPage() {
   return (
-    <RoutePlaceholder
-      name="Order confirmation"
-      covers="PRD-25"
-      param={reference}
-    />
+    <DemoPage title="Order confirmation">
+      <Alert
+        tone="success"
+        title="Your demo order is confirmed"
+        body="This was a demo: nothing was charged and nothing was booked."
+      />
+      <DemoOrderSummary summary={demoSummary} />
+      <ButtonLink href={browsePath} variant="secondary">
+        Browse more experiences
+      </ButtonLink>
+    </DemoPage>
   );
 }

@@ -1,0 +1,5 @@
+/* PageHeading supplies the padding, gap, and type; this only keeps the stub to its narrower column. */
+.page {
+  max-inline-size: 40rem;
+  margin-inline: auto;
+}

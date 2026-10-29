@@ -1,5 +1,4 @@
-import { taxTreatments, type PriceOption } from './catalog';
-import { fromPriceLabel } from './booking';
+import type { PriceOption, taxTreatments } from './catalog';
 import { formatPrice } from './money';
 
 // Integer minor units (cents) and parts per million only: no float touches an amount.
@@ -197,5 +196,15 @@ export function cardPriceLabel(
   const lowest = Math.min(...prices);
   return prices.some((price) => price !== lowest)
     ? fromPriceLabel(lowest)
-    : formatPrice(lowest);
+    : perPersonAmount(lowest);
+}
+
+/** A per-person price as a guest reads it: "$85", "$12.50", and "Free" for nothing. */
+export function perPersonAmount(priceMinor: number): string {
+  return priceMinor === 0 ? 'Free' : formatPrice(priceMinor);
+}
+
+/** The lowest of several per-person prices: "From $85". A lowest price of nothing reads "Free", never "From Free". */
+export function fromPriceLabel(priceMinor: number): string {
+  return priceMinor === 0 ? 'Free' : `From ${formatPrice(priceMinor)}`;
 }

@@ -1,5 +1,15 @@
 import 'server-only';
-import { and, asc, eq, inArray, ne, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  eq,
+  inArray,
+  isNull,
+  ne,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import type { CacheChange } from '@/lib/cacheTags';
 import { SlugSchema } from '@/lib/catalog';
 import {
@@ -139,7 +149,10 @@ export async function listHomeModules(): Promise<HomeModule[]> {
     .where(
       and(
         eq(homeModules.enabled, true),
-        sql`${homeModules.collectionId} IS NULL OR ${collections.status} = 'published'`,
+        or(
+          isNull(homeModules.collectionId),
+          eq(collections.status, 'published'),
+        ),
       ),
     )
     .orderBy(asc(homeModules.position))

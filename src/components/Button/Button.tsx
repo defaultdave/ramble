@@ -1,5 +1,11 @@
+'use client';
+
 import { LoaderCircle } from 'lucide-react';
-import type { ComponentPropsWithoutRef, ReactNode } from 'react';
+import type {
+  ComponentPropsWithoutRef,
+  MouseEventHandler,
+  ReactNode,
+} from 'react';
 import { classNames } from '@/lib/classNames';
 import styles from './Button.module.css';
 
@@ -34,15 +40,26 @@ export function Button({
   iconStart,
   disabled = false,
   type = 'button',
+  onClick,
   children,
   ...rest
 }: ButtonProps) {
+  // Loading blocks activation in the handler, not with native disabled, so the button keeps focus.
+  const handleClick: MouseEventHandler<HTMLButtonElement> = (event) => {
+    if (loading) {
+      event.preventDefault();
+      return;
+    }
+    onClick?.(event);
+  };
+
   return (
     <button
       {...rest}
       type={type}
-      // A native disabled button also blocks form submission while loading.
-      disabled={disabled || loading}
+      disabled={disabled}
+      aria-disabled={loading || undefined}
+      onClick={handleClick}
       aria-busy={loading || undefined}
       data-loading={loading || undefined}
       className={classNames(

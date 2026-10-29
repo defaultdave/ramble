@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { samplePhoto } from '@/components/Photo/Photo.fixtures';
-import type { BrowseCard } from '@/lib/browse';
+import type { ExperienceCard } from '@/lib/experienceCards';
 import { BrowseResults } from './BrowseResults';
 
 // Behaviours under test, one per decision, branch or risk:
@@ -32,7 +32,7 @@ vi.mock('next/form', () => ({
   ),
 }));
 
-const cards: BrowseCard[] = [
+const cards: ExperienceCard[] = [
   {
     id: '1',
     image: null,
@@ -62,7 +62,7 @@ const next = {
 } as const;
 
 describe('BrowseResults cover photos', () => {
-  const view = (covered: BrowseCard[]) =>
+  const view = (covered: ExperienceCard[]) =>
     ({
       state: 'results',
       cards: covered,

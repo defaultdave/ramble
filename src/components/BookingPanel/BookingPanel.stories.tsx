@@ -120,6 +120,10 @@ export const DateChosen: DefaultStory = { args: { ...defaults, total } };
 export const NothingChosenYet: DefaultStory = {
   args: { ...defaults, children: datePicker(null) },
 };
+// A price of nothing reads "Free per person", not "$0".
+export const FreeExperience: DefaultStory = {
+  args: { ...defaults, priceMinor: 0, children: datePicker(null) },
+};
 export const PlacingHold: DefaultStory = {
   args: { ...defaults, total, loading: true },
 };

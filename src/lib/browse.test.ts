@@ -15,13 +15,11 @@ import {
   nextBrowseDay,
   splitPage,
   toBrowsePage,
-  withPriceOptions,
-  toBrowseCard,
   withBrowseCovers,
-  type BrowseExperience,
   type BrowsePage,
   type BrowseRead,
 } from './browse';
+import type { CardExperience } from './experienceCards';
 import { noFilters } from './filters';
 
 // Behaviours under test, one per decision, branch or risk:
@@ -31,10 +29,6 @@ import { noFilters } from './filters';
 // - the calendar days: a generated session keeps its stored date, a hand-entered one is on the day its start falls on in its own zone
 //   (east of UTC, west of UTC, a clock-change day), days are merged, de-duplicated, and sorted, and an unknown zone refuses the read
 // - the raw calendar rows are bounded: too many stored dates or hand-entered sessions, a bad date, or a bad zone is refused
-// - prices are grouped under their experience, lowest first
-// - a card price comes only from options that take a space; a kids class with a free accompanying adult reads the child price, and an experience with no such option has no card
-// - an experience address names the area by status
-// - a card carries neighborhood and duration, links a guide entry out, and refuses a guide entry with no link
 // - the summary line counts the cards
 // - the experiences of a page are its items, and none for an outdated page
 // - a cover is set on the cards of a results view, and any other view is returned as it is
@@ -47,8 +41,8 @@ const id = (n: number) =>
 
 function experience(
   n: number,
-  overrides: Partial<BrowseExperience> = {},
-): BrowseExperience {
+  overrides: Partial<CardExperience> = {},
+): CardExperience {
   return {
     id: id(n),
     slug: `thing-${String(n)}`,
@@ -144,114 +138,6 @@ describe('toBrowsePage', () => {
       ok: false,
       reason: 'cursor_not_found',
     });
-  });
-});
-
-describe('withPriceOptions', () => {
-  it('gives each row its own prices, lowest first, and ignores prices of unlisted rows', () => {
-    expect(
-      withPriceOptions(
-        [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
-        [
-          { experienceId: 'a', priceMinor: 7000, usesSpace: true },
-          { experienceId: 'b', priceMinor: 500, usesSpace: false },
-          { experienceId: 'a', priceMinor: 3500, usesSpace: true },
-          { experienceId: 'zzz', priceMinor: 1, usesSpace: true },
-        ],
-      ),
-    ).toEqual([
-      {
-        id: 'a',
-        priceOptions: [
-          { priceMinor: 3500, usesSpace: true },
-          { priceMinor: 7000, usesSpace: true },
-        ],
-      },
-      { id: 'b', priceOptions: [{ priceMinor: 500, usesSpace: false }] },
-      { id: 'c', priceOptions: [] },
-    ]);
-  });
-
-  it('keeps the other fields of a row', () => {
-    expect(withPriceOptions([{ id: 'a', name: 'Thing' }], [])).toEqual([
-      { id: 'a', name: 'Thing', priceOptions: [] },
-    ]);
-  });
-});
-
-describe('toBrowseCard', () => {
-  it('carries the neighborhood, the duration, and the price of a bookable experience', () => {
-    expect(toBrowseCard(experience(1))).toEqual({
-      id: id(1),
-      title: 'Thing 1',
-      meta: 'DUMBO · 2\u00a0hr',
-      href: `/experiences/thing-1-${id(1)}`,
-      image: null,
-      kind: 'bookable',
-      price: '$85',
-    });
-  });
-
-  it('prices a kids class from the child, not from the free accompanying adult', () => {
-    const kidsClass = experience(1, {
-      priceOptions: [
-        { priceMinor: 0, usesSpace: false },
-        { priceMinor: 4500, usesSpace: true },
-      ],
-    });
-    expect(toBrowseCard(kidsClass)).toMatchObject({
-      kind: 'bookable',
-      price: '$45',
-    });
-  });
-
-  it('keeps a free option that takes a space as the card price', () => {
-    const freeTour = experience(1, {
-      priceOptions: [
-        { priceMinor: 0, usesSpace: true },
-        { priceMinor: 2000, usesSpace: true },
-      ],
-    });
-    expect(toBrowseCard(freeTour)).toMatchObject({ price: 'From $0' });
-  });
-
-  it('leaves the duration out when there is none', () => {
-    expect(toBrowseCard(experience(1, { durationMinutes: null }))?.meta).toBe(
-      'DUMBO',
-    );
-  });
-
-  it('links a guide entry out to the host', () => {
-    expect(
-      toBrowseCard(
-        experience(2, {
-          status: 'guide_only',
-          linkOutUrl: 'https://host.example/class',
-          priceOptions: [],
-        }),
-      ),
-    ).toMatchObject({
-      kind: 'guide-only',
-      hostHref: 'https://host.example/class',
-      href: `/guide/thing-2-${id(2)}`,
-    });
-  });
-
-  it.each([
-    [
-      'a guide entry that has nowhere to link',
-      experience(2, { status: 'guide_only', priceOptions: [] }),
-    ],
-    [
-      'a bookable experience with no price',
-      experience(3, { priceOptions: [] }),
-    ],
-    [
-      'a bookable experience whose only option takes no space',
-      experience(4, { priceOptions: [{ priceMinor: 0, usesSpace: false }] }),
-    ],
-  ])('leaves out %s', (_name, input) => {
-    expect(toBrowseCard(input)).toBeNull();
   });
 });
 

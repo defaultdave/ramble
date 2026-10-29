@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { ZodError } from 'zod';
-import { toBrowseCard } from './browse';
 import type { Collection, HomeModule } from './editorial';
+import type { CardExperience } from './experienceCards';
 import {
   buildHomePage,
   bannerText,
-  cardsInOrder,
   docOfText,
   homeCopy,
   homeCardIds,
@@ -14,9 +13,7 @@ import {
   homeLimits,
   thisWeekExperienceIds,
   thisWeekWindow,
-  toHomeCard,
   withHomeCovers,
-  type HomeExperience,
   type HomeInput,
   type HomeModuleView,
   type ThisWeekSession,
@@ -26,11 +23,6 @@ import { minuteAsOf } from './time';
 // Behaviours under test, one per decision, branch or risk:
 // - the cache key is the minute; the week window runs a week from it; a key that is not the ISO instant minuteAsOf writes is refused
 // - the browse address writes only the parameters that are set, escaped, in the grammar order
-// - an experience address names the area by its status
-// - a card price comes only from options that take a space, so a kids class with a free accompanying adult reads the child price
-// - one experience gets the same price on a home card and a browse card
-// - a card is left out when it cannot be shown: no price to book, or no link out
-// - cards follow the order given, skip what is missing, and stop at the limit
 // - "On this week" lists bookable experiences with an open session in the window, soonest first, once each
 //   (a started, late, full, or guide-only session does not count; the edges of the window are exact)
 // - the experiences a Picks module may show are looked up once, bounded per collection and in all
@@ -46,8 +38,8 @@ const id = (n: number) =>
 
 function experience(
   n: number,
-  overrides: Partial<HomeExperience> = {},
-): HomeExperience {
+  overrides: Partial<CardExperience> = {},
+): CardExperience {
   return {
     id: id(n),
     slug: `thing-${String(n)}`,
@@ -56,7 +48,7 @@ function experience(
     neighborhoodName: 'Greenpoint',
     durationMinutes: 120,
     linkOutUrl: null,
-    priceOptions: [{ kind: 'adult', priceMinor: 7000, usesSpace: true }],
+    priceOptions: [{ priceMinor: 7000, usesSpace: true }],
     ...overrides,
   };
 }
@@ -126,158 +118,6 @@ describe('homeLimits', () => {
     expect(homeLimits.thisWeekCandidates).toBeGreaterThan(
       homeLimits.thisWeekShown,
     );
-  });
-});
-
-describe('toHomeCard', () => {
-  it('shows a bookable experience with its neighborhood, length, and price', () => {
-    expect(toHomeCard(experience(1))).toEqual({
-      id: id(1),
-      title: 'Thing 1',
-      meta: 'Greenpoint · 2\u00a0hr',
-      href: `/experiences/thing-1-${id(1)}`,
-      image: null,
-      kind: 'bookable',
-      price: '$70',
-    });
-  });
-
-  it('prices a kids class from the child, not from the free accompanying adult', () => {
-    const kidsClass = experience(1, {
-      priceOptions: [
-        { kind: 'adult', priceMinor: 0, usesSpace: false },
-        { kind: 'child', priceMinor: 4500, usesSpace: true },
-      ],
-    });
-    expect(toHomeCard(kidsClass)).toMatchObject({
-      kind: 'bookable',
-      price: '$45',
-    });
-  });
-
-  it('leaves the length out of the meta when there is none', () => {
-    expect(toHomeCard(experience(1, { durationMinutes: null }))?.meta).toBe(
-      'Greenpoint',
-    );
-  });
-
-  it('shows a guide entry with its link out and no price', () => {
-    expect(
-      toHomeCard(
-        experience(1, {
-          status: 'guide_only',
-          linkOutUrl: 'https://host.example/kayak',
-        }),
-      ),
-    ).toEqual({
-      id: id(1),
-      title: 'Thing 1',
-      meta: 'Greenpoint · 2\u00a0hr',
-      href: `/guide/thing-1-${id(1)}`,
-      image: null,
-      kind: 'guide-only',
-      hostHref: 'https://host.example/kayak',
-    });
-  });
-
-  it.each([
-    ['a bookable experience with no price', { priceOptions: [] }],
-    [
-      'a bookable experience whose only option takes no space',
-      {
-        priceOptions: [
-          { kind: 'adult' as const, priceMinor: 0, usesSpace: false },
-        ],
-      },
-    ],
-    ['a guide entry with no link out', { status: 'guide_only' as const }],
-  ])('leaves out %s', (_name, overrides) => {
-    expect(toHomeCard(experience(1, overrides))).toBeNull();
-  });
-});
-
-describe('the price on a home card and on a browse card', () => {
-  it.each([
-    [
-      'a kids class with a free accompanying adult',
-      [
-        { kind: 'adult', priceMinor: 0, usesSpace: false },
-        { kind: 'child', priceMinor: 4500, usesSpace: true },
-      ],
-    ],
-    [
-      'an adult and a child price',
-      [
-        { kind: 'adult', priceMinor: 8500, usesSpace: true },
-        { kind: 'child', priceMinor: 4500, usesSpace: true },
-      ],
-    ],
-    ['one price', [{ kind: 'adult', priceMinor: 7000, usesSpace: true }]],
-    [
-      'a free option that takes a space',
-      [
-        { kind: 'adult', priceMinor: 0, usesSpace: true },
-        { kind: 'child', priceMinor: 500, usesSpace: true },
-      ],
-    ],
-    [
-      'no option that takes a space',
-      [{ kind: 'adult', priceMinor: 0, usesSpace: false }],
-    ],
-    ['no option', []],
-  ] satisfies [string, HomeExperience['priceOptions']][])(
-    'agree for %s',
-    (_name, priceOptions) => {
-      const home = toHomeCard(experience(1, { priceOptions }));
-      const browse = toBrowseCard({
-        ...experience(1),
-        priceOptions: priceOptions.map(({ priceMinor, usesSpace }) => ({
-          priceMinor,
-          usesSpace,
-        })),
-      });
-      const priceOf = (card: { kind: string; price?: string } | null) =>
-        card?.kind === 'bookable' ? card.price : null;
-      expect(priceOf(home)).toBe(priceOf(browse));
-    },
-  );
-});
-
-describe('cardsInOrder', () => {
-  const all = [experience(1), experience(2), experience(3), experience(4)];
-
-  it('follows the order of the IDs, not of the experiences', () => {
-    expect(
-      cardsInOrder([id(3), id(1), id(2)], all, 10).map((card) => card.id),
-    ).toEqual([id(3), id(1), id(2)]);
-  });
-
-  it('skips an ID with no experience and one that cannot be a card', () => {
-    const noPrice = experience(5, { priceOptions: [] });
-    expect(
-      cardsInOrder([id(9), id(5), id(2)], [...all, noPrice], 10).map(
-        (card) => card.id,
-      ),
-    ).toEqual([id(2)]);
-  });
-
-  it('stops at the limit', () => {
-    expect(
-      cardsInOrder(
-        all.map((e) => e.id),
-        all,
-        2,
-      ),
-    ).toHaveLength(2);
-  });
-
-  it('takes cards past one that is skipped, to fill the limit', () => {
-    const noPrice = experience(5, { priceOptions: [] });
-    expect(
-      cardsInOrder([id(5), id(1), id(2)], [...all, noPrice], 2).map(
-        (card) => card.id,
-      ),
-    ).toEqual([id(1), id(2)]);
   });
 });
 

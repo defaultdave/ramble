@@ -167,10 +167,10 @@ describe('listHomeExperiences', () => {
       pasta?.priceOptions
         .map(
           (option) =>
-            `${option.kind}:${String(option.priceMinor)}:${String(option.usesSpace)}`,
+            `${String(option.priceMinor)}:${String(option.usesSpace)}`,
         )
         .toSorted(),
-    ).toEqual(['adult:8500:false', 'child:4000:true']);
+    ).toEqual(['4000:true', '8500:false']);
     expect(found.find((row) => row.id === guide.id)).toMatchObject({
       status: 'guide_only',
       linkOutUrl: 'https://host.example/walk',

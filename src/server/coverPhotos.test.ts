@@ -5,7 +5,7 @@ import { getCoverPhotos } from './coverPhotos';
 // Behaviours under test, one per decision, branch or risk:
 // - the cover read uses the catalog profile and tags the experience of every ID it was asked about
 // - the list is checked before anything is tagged or read: a list past the limit and an ID that is no uuid are refused by kind alone, with no tag and no read
-// - the tag of an experience is its lower-case ID, the one an upload invalidates
+// - the tag of an experience is its lower-case ID
 // - it reads exactly the IDs it was given and returns what the data layer found
 // - a failed read throws only the kind of the failure, never the query or its values
 

@@ -1,6 +1,6 @@
 {
-  "id": "4197f991-409a-48b4-aca0-8aa1ba116e99",
-  "prevId": "040195d6-2571-4387-8bca-e8b8bef8e699",
+  "id": "7e6b9277-d024-439d-8881-353f791f1be2",
+  "prevId": "364d3a24-74a1-45b8-b98c-6de2e653acae",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -5205,6 +5205,10 @@
         "ledger_entries_accounts_differ": {
           "name": "ledger_entries_accounts_differ",
           "value": "\"ledger_entries\".\"debit_account\" <> \"ledger_entries\".\"credit_account\""
+        },
+        "ledger_entries_entry_type_accounts": {
+          "name": "ledger_entries_entry_type_accounts",
+          "value": "(\"ledger_entries\".\"entry_type\", \"ledger_entries\".\"debit_account\", \"ledger_entries\".\"credit_account\") IN (('charge_host_share', 'platform_cash', 'host_payable'), ('charge_commission', 'platform_cash', 'ramble_commission'), ('charge_tax', 'platform_cash', 'host_payable'), ('processing_fee', 'processing_fees', 'platform_cash'), ('transfer_to_host', 'host_payable', 'platform_cash'), ('transfer_reversal', 'platform_cash', 'host_payable'), ('refund_host_share', 'host_payable', 'refunds_pending'), ('commission_returned', 'ramble_commission', 'refunds_pending'), ('refund_tax', 'host_payable', 'refunds_pending'), ('refund_cash_out', 'refunds_pending', 'platform_cash'), ('refund_reversal', 'refunds_pending', 'host_payable'), ('refund_reversal', 'refunds_pending', 'ramble_commission'), ('gift_liability_in', 'platform_cash', 'gift_liability'), ('gift_to_host_share', 'gift_liability', 'host_payable'), ('gift_to_commission', 'gift_liability', 'ramble_commission'), ('gift_to_tax', 'gift_liability', 'host_payable'), ('gift_refund', 'gift_liability', 'refunds_pending'), ('gift_reinstated', 'host_payable', 'gift_liability'), ('gift_reinstated', 'ramble_commission', 'gift_liability'), ('ramble_payout', 'ramble_payouts', 'platform_cash'), ('dispute_withdrawal', 'dispute_hold', 'platform_cash'), ('dispute_fee', 'processing_fees', 'platform_cash'), ('dispute_reinstated', 'platform_cash', 'dispute_hold'), ('dispute_to_host', 'host_payable', 'dispute_hold'), ('dispute_loss', 'dispute_losses', 'dispute_hold'))"
         },
         "ledger_entries_amount_in_range": {
           "name": "ledger_entries_amount_in_range",

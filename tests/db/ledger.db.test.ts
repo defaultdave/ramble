@@ -24,6 +24,7 @@ import { createLedgerParents, type LedgerParents } from './ledgerParents';
 // The table and its CHECKs (each bad row is refused by the database, with the constraint named):
 // - a cash row and a non-cash row are accepted; the defaults are USD and a recording time from clock_timestamp()
 // - the debit and credit accounts differ; the amount is 1 to the cap; the currency is USD
+// - the accounts are ones the entry type moves money between (a row inserted around Zod with a wrong pair is refused; the two legs of a multi-leg type are accepted)
 // - an order, gift, or host is named, except on Ramble's own payout
 // - a provider id is present exactly on rows that touch platform_cash, and is not blank or over 255 characters
 // - a memo is not blank and at most 500 characters; times are in range
@@ -166,6 +167,26 @@ describe('ledger_entries', () => {
       'ledger_entries_accounts_differ',
     ],
     [
+      'accounts the entry type never moves money between',
+      () =>
+        cashRow({
+          entry_type: 'charge_commission',
+          debit_account: 'ramble_payouts',
+          credit_account: 'platform_cash',
+        }),
+      'ledger_entries_entry_type_accounts',
+    ],
+    [
+      'a leg of the right accounts under the wrong entry type',
+      () =>
+        plainRow({
+          entry_type: 'refund_reversal',
+          debit_account: 'host_payable',
+          credit_account: 'refunds_pending',
+        }),
+      'ledger_entries_entry_type_accounts',
+    ],
+    [
       'an amount of zero',
       () => cashRow({ amount_minor: 0 }),
       'ledger_entries_amount_in_range',
@@ -241,6 +262,21 @@ describe('ledger_entries', () => {
     await expect(insert(row())).rejects.toMatchObject(constraint(name));
   });
 
+  it.each([
+    ['refund_reversal', 'refunds_pending', 'host_payable'],
+    ['refund_reversal', 'refunds_pending', 'ramble_commission'],
+    ['gift_reinstated', 'host_payable', 'gift_liability'],
+    ['gift_reinstated', 'ramble_commission', 'gift_liability'],
+  ])('accepts the %s leg %s to %s', async (entryType, debit, credit) => {
+    await insert(
+      plainRow({
+        entry_type: entryType,
+        debit_account: debit,
+        credit_account: credit,
+      }),
+    );
+  });
+
   it('accepts the bounds: an amount of 1 and of the cap, 255 and 500 characters', async () => {
     await insert(cashRow({ amount_minor: 1 }));
     await insert(cashRow({ amount_minor: 2_000_000_000 }));
@@ -261,7 +297,13 @@ describe('ledger_entries', () => {
     };
     await insert(cashRow(payout));
     await expect(
-      insert(cashRow({ ...payout, entry_type: 'processing_fee' })),
+      insert(
+        cashRow({
+          ...payout,
+          entry_type: 'processing_fee',
+          debit_account: 'processing_fees',
+        }),
+      ),
     ).rejects.toMatchObject(constraint('ledger_entries_names_a_subject'));
   });
 

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  LedgerEntrySchema,
   accountBalances,
   bookingPaid,
   cardFee,
@@ -20,7 +19,9 @@ import {
   transferPaid,
   transferReversed,
   type LedgerAccount,
+  type LedgerEntry,
   type LedgerEntryInput,
+  parseLedgerEvent,
   type PostingSplit,
 } from './ledger';
 import { commissionMinor, taxMinor } from './pricing';
@@ -34,6 +35,10 @@ import { fakeCardFeeMinor } from './fakeCardFee';
 // - money held equals host_payable + gift_liability + refunds_pending
 // - every row the builders emit parses
 // When every pending thing is resolved at the end: refunds_pending and dispute_hold are zero.
+
+const LedgerEntrySchema = {
+  parse: (row: LedgerEntryInput) => parseLedgerEvent([row])[0] as LedgerEntry,
+};
 
 const seeds = Array.from({ length: 150 }, (_, index) => index + 1);
 const eventsPerRun = 40;

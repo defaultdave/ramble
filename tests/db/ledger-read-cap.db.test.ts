@@ -19,6 +19,10 @@ vi.mock('@/lib/ledger', async (importOriginal) => {
   return {
     ...original,
     ledgerLimits: { ...original.ledgerLimits, maxReadGroups: 2 },
+    // The real check reads the module's own limit, so it is restated here at the lowered cap.
+    assertWithinReadCap: (groupCount: number) => {
+      if (groupCount > 2) throw new RangeError('over the lowered cap');
+    },
   };
 });
 

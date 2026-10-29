@@ -13,7 +13,12 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { ledgerAccounts, ledgerEntryTypes, ledgerLimits } from '@/lib/ledger';
+import {
+  ledgerAccounts,
+  ledgerEntryTypes,
+  ledgerLimits,
+  ledgerPostings,
+} from '@/lib/ledger';
 import { orderCurrency, orderLimits } from '@/lib/orders';
 import { paymentLimits } from '@/lib/payments';
 import { hosts } from './catalog';
@@ -29,6 +34,15 @@ export const ledgerAccountEnum = pgEnum('ledger_account', ledgerAccounts);
 export const ledgerEntryTypeEnum = pgEnum(
   'ledger_entry_type',
   ledgerEntryTypes,
+);
+
+const allowedPostings = sql.join(
+  Object.entries(ledgerPostings).flatMap(([entryType, pairs]) =>
+    pairs.map(([debit, credit]) =>
+      sql.raw(`('${entryType}', '${debit}', '${credit}')`),
+    ),
+  ),
+  sql`, `,
 );
 
 const timestampTz = () => timestamp({ withTimezone: true });
@@ -83,6 +97,10 @@ export const ledgerEntries = pgTable(
     check(
       'ledger_entries_accounts_differ',
       sql`${table.debitAccount} <> ${table.creditAccount}`,
+    ),
+    check(
+      'ledger_entries_entry_type_accounts',
+      sql`(${table.entryType}, ${table.debitAccount}, ${table.creditAccount}) IN (${allowedPostings})`,
     ),
     check(
       'ledger_entries_amount_in_range',

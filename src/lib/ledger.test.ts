@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { fakeCardFeeMinor } from './fakeCardFee';
 import {
-  LedgerEntrySchema,
-  LedgerEventSchema,
   LedgerWindowSchema,
   accountBalances,
+  assertWithinReadCap,
   bookingPaid,
   cardFee,
   disputeLost,
@@ -15,10 +14,10 @@ import {
   giftRefundedOrExpired,
   giftReinstated,
   hostStatement,
-  isCashPosting,
   ledgerAccounts,
   ledgerEntryTypes,
   ledgerLimits,
+  ledgerPostings,
   moneyHeld,
   orderLedgerSummaries,
   parseLedgerEvent,
@@ -29,6 +28,8 @@ import {
   refundSucceeded,
   transferPaid,
   transferReversed,
+  type LedgerAccount,
+  type LedgerEntry,
   type LedgerEntryInput,
   type OrderFlow,
   type PostingSplit,
@@ -45,6 +46,8 @@ import { commissionMinor, taxMinor } from './pricing';
 //   over-long memo, an invalid or out-of-range time, an unknown entry type or account
 // - an event of cash rows or of non-cash rows is accepted; a mix, an empty list, and a list over the
 //   cap are refused, and the oversized list is refused before its rows are parsed
+// - each entry type accepts exactly its design-doc account pairs (every type, every other pair refused), including the multi-leg ones
+// - a read over the group cap is refused, at the cap it is not
 // - a half-posted event is a bug: none new is a repeat, all new is a post, anything between throws
 // balances
 // - an empty ledger has every balance at zero; a balance counts its normal side (cash and expenses
@@ -112,6 +115,27 @@ function plainRow(over: Partial<LedgerEntryInput> = {}): LedgerEntryInput {
     ...over,
   });
 }
+
+// The schemas are private to the module, so the tests reach them through `parseLedgerEvent`.
+const safe = (rows: LedgerEntryInput[]) => {
+  try {
+    parseLedgerEvent(rows);
+    return { success: true };
+  } catch {
+    return { success: false };
+  }
+};
+const LedgerEntrySchema = {
+  parse: (row: LedgerEntryInput) => parseLedgerEvent([row])[0] as LedgerEntry,
+  safeParse: (row: LedgerEntryInput) => safe([row]),
+};
+const LedgerEventSchema = { safeParse: safe };
+const isCashPosting = (entry: {
+  debitAccount: string;
+  creditAccount: string;
+}) =>
+  entry.debitAccount === 'platform_cash' ||
+  entry.creditAccount === 'platform_cash';
 
 const balancesOf = (...events: LedgerEntryInput[][]) =>
   accountBalances(events.flat().map((row) => LedgerEntrySchema.parse(row)));
@@ -183,7 +207,7 @@ describe('the worked example from the design doc', () => {
   });
 });
 
-describe('LedgerEntrySchema', () => {
+describe('the entry rules', () => {
   it('accepts a cash row with a provider id and a non-cash row without one', () => {
     expect(LedgerEntrySchema.safeParse(cashRow()).success).toBe(true);
     expect(LedgerEntrySchema.safeParse(plainRow()).success).toBe(true);
@@ -276,13 +300,114 @@ describe('LedgerEntrySchema', () => {
   });
 });
 
-describe('isCashPosting', () => {
+describe('which rows are cash', () => {
   it.each([
-    ['debits platform_cash', 'platform_cash', 'host_payable', true],
-    ['credits platform_cash', 'host_payable', 'platform_cash', true],
-    ['touches neither side', 'host_payable', 'refunds_pending', false],
-  ] as const)('a row that %s', (_name, debitAccount, creditAccount, cash) => {
-    expect(isCashPosting({ debitAccount, creditAccount })).toBe(cash);
+    ['debits platform_cash', 'charge_host_share'],
+    ['credits platform_cash', 'transfer_to_host'],
+  ] as const)('a row that %s needs a provider id', (_name, entryType) => {
+    const [debitAccount, creditAccount] = ledgerPostings[entryType][0];
+    const row = cashRow({ entryType, debitAccount, creditAccount });
+    expect(LedgerEntrySchema.safeParse(row).success).toBe(true);
+    expect(
+      LedgerEntrySchema.safeParse({ ...row, providerObjectId: null }).success,
+    ).toBe(false);
+  });
+
+  it('a row that touches neither side takes no provider id', () => {
+    expect(LedgerEntrySchema.safeParse(plainRow()).success).toBe(true);
+    expect(
+      LedgerEntrySchema.safeParse(plainRow({ providerObjectId: 'pi_1' }))
+        .success,
+    ).toBe(false);
+  });
+});
+
+type LedgerEntryType = (typeof ledgerEntryTypes)[number];
+
+describe('which accounts each entry type moves money between', () => {
+  const pairsOf = (entryType: LedgerEntryType) =>
+    ledgerPostings[entryType] as readonly (readonly [
+      LedgerAccount,
+      LedgerAccount,
+    ])[];
+  const rowFor = (
+    entryType: LedgerEntryType,
+    debitAccount: LedgerAccount,
+    creditAccount: LedgerAccount,
+  ) =>
+    cashRow({
+      entryType,
+      debitAccount,
+      creditAccount,
+      providerObjectId:
+        debitAccount === 'platform_cash' || creditAccount === 'platform_cash'
+          ? 'pi_1'
+          : null,
+    });
+
+  it('lists every entry type, once', () => {
+    expect(Object.keys(ledgerPostings).toSorted()).toEqual(
+      [...ledgerEntryTypes].toSorted(),
+    );
+  });
+
+  it.each(ledgerEntryTypes)('%s accepts each of its pairs', (entryType) => {
+    for (const [debit, credit] of pairsOf(entryType)) {
+      expect(
+        LedgerEntrySchema.safeParse(rowFor(entryType, debit, credit)).success,
+        `${entryType} ${debit} ${credit}`,
+      ).toBe(true);
+    }
+  });
+
+  it.each(ledgerEntryTypes)('%s refuses every other pair', (entryType) => {
+    for (const debit of ledgerAccounts) {
+      for (const credit of ledgerAccounts) {
+        if (debit === credit) continue;
+        const allowed = pairsOf(entryType).some(
+          ([d, c]) => d === debit && c === credit,
+        );
+        if (allowed) continue;
+        expect(
+          LedgerEntrySchema.safeParse(rowFor(entryType, debit, credit)).success,
+          `${entryType} ${debit} ${credit}`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it('refuses a commission charge that debits ramble_payouts', () => {
+    expect(
+      LedgerEntrySchema.safeParse(
+        rowFor('charge_commission', 'ramble_payouts', 'platform_cash'),
+      ).success,
+    ).toBe(false);
+  });
+
+  it('gives the multi-leg types both legs and the single-leg types one', () => {
+    const legs = Object.fromEntries(
+      ledgerEntryTypes.map((type) => [type, pairsOf(type).length]),
+    );
+    expect(legs.refund_reversal).toBe(2);
+    expect(legs.gift_reinstated).toBe(2);
+    expect(legs.gift_to_host_share).toBe(1);
+    expect(legs.dispute_to_host).toBe(1);
+    expect(legs.dispute_loss).toBe(1);
+  });
+});
+
+describe('assertWithinReadCap', () => {
+  it('accepts a count at the cap and below', () => {
+    expect(() => {
+      assertWithinReadCap(0);
+      assertWithinReadCap(ledgerLimits.maxReadGroups);
+    }).not.toThrow();
+  });
+
+  it('refuses a count over the cap', () => {
+    expect(() => {
+      assertWithinReadCap(ledgerLimits.maxReadGroups + 1);
+    }).toThrow(RangeError);
   });
 });
 

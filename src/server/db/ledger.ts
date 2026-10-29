@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { EntityIdSchema } from '@/lib/catalog';
 import {
   LedgerWindowSchema,
+  assertWithinReadCap,
   accountBalances,
   hostStatement,
   ledgerAccounts,
@@ -28,6 +29,7 @@ import { requireStaff } from './staff';
 export type PostResult =
   { status: 'posted'; count: number } | { status: 'already_posted' };
 
+// TODO(U-049): first caller, confirmOrder.
 /**
  * Writes the rows of one event, all or none. It takes no locks: the caller has locked in the one
  * lock order (design doc 4.2.3 rule 1) and passes its transaction, so the rows commit with the
@@ -135,9 +137,7 @@ async function readOrderFlows(
       asc(ledgerEntries.orderId),
     )
     .limit(ledgerLimits.maxReadGroups + 1);
-  if (rows.length > ledgerLimits.maxReadGroups) {
-    throw new RangeError('That window holds too many ledger rows; narrow it');
-  }
+  assertWithinReadCap(rows.length);
   return rows.map((row) => OrderFlowSchema.parse(row));
 }
 

@@ -65,9 +65,60 @@ const cashAccount = 'platform_cash' satisfies LedgerAccount;
 type Accounts = { debitAccount: LedgerAccount; creditAccount: LedgerAccount };
 
 /** Rule 5 of design doc 4.2.3: a cash posting is written only on the provider's success event, so it carries that event's object id. */
-export function isCashPosting(entry: Accounts): boolean {
+function isCashPosting(entry: Accounts): boolean {
   return (
     entry.debitAccount === cashAccount || entry.creditAccount === cashAccount
+  );
+}
+
+/**
+ * The accounts each entry type moves money between, from the postings table in design doc 4.2.3.
+ * A type with two pairs is posted one row per leg. Zod and a CHECK on `ledger_entries` both refuse
+ * any other pair, so the views (which read the type) and the balances (which read the accounts)
+ * cannot disagree.
+ */
+export const ledgerPostings = {
+  charge_host_share: [['platform_cash', 'host_payable']],
+  charge_commission: [['platform_cash', 'ramble_commission']],
+  charge_tax: [['platform_cash', 'host_payable']],
+  processing_fee: [['processing_fees', 'platform_cash']],
+  transfer_to_host: [['host_payable', 'platform_cash']],
+  transfer_reversal: [['platform_cash', 'host_payable']],
+  refund_host_share: [['host_payable', 'refunds_pending']],
+  commission_returned: [['ramble_commission', 'refunds_pending']],
+  refund_tax: [['host_payable', 'refunds_pending']],
+  refund_cash_out: [['refunds_pending', 'platform_cash']],
+  refund_reversal: [
+    ['refunds_pending', 'host_payable'],
+    ['refunds_pending', 'ramble_commission'],
+  ],
+  gift_liability_in: [['platform_cash', 'gift_liability']],
+  gift_to_host_share: [['gift_liability', 'host_payable']],
+  gift_to_commission: [['gift_liability', 'ramble_commission']],
+  gift_to_tax: [['gift_liability', 'host_payable']],
+  gift_refund: [['gift_liability', 'refunds_pending']],
+  gift_reinstated: [
+    ['host_payable', 'gift_liability'],
+    ['ramble_commission', 'gift_liability'],
+  ],
+  ramble_payout: [['ramble_payouts', 'platform_cash']],
+  dispute_withdrawal: [['dispute_hold', 'platform_cash']],
+  dispute_fee: [['processing_fees', 'platform_cash']],
+  dispute_reinstated: [['platform_cash', 'dispute_hold']],
+  dispute_to_host: [['host_payable', 'dispute_hold']],
+  dispute_loss: [['dispute_losses', 'dispute_hold']],
+} as const satisfies Record<
+  LedgerEntryType,
+  readonly (readonly [LedgerAccount, LedgerAccount])[]
+>;
+
+function isAllowedPosting(
+  entryType: LedgerEntryType,
+  accounts: Accounts,
+): boolean {
+  return ledgerPostings[entryType].some(
+    ([debit, credit]) =>
+      debit === accounts.debitAccount && credit === accounts.creditAccount,
   );
 }
 
@@ -112,6 +163,13 @@ function entryRuleIssues(entry: {
       message: 'The debit and credit accounts differ',
     });
   }
+  if (!isAllowedPosting(entry.entryType, entry)) {
+    issues.push({
+      path: 'debitAccount',
+      message:
+        'These accounts are not the ones this entry type moves money between',
+    });
+  }
   // Ramble's own payout belongs to no order, gift, or host, so the design doc's "at least one set"
   // cannot hold for it.
   if (
@@ -135,7 +193,7 @@ function entryRuleIssues(entry: {
 }
 
 /** One row of the ledger as the data layer writes it; the CHECKs on `ledger_entries` state the same rules. */
-export const LedgerEntrySchema = z
+const LedgerEntrySchema = z
   .object({
     occurredAt: instant,
     entryType: LedgerEntryTypeSchema,
@@ -176,7 +234,7 @@ function eventRuleIssues(entries: readonly LedgerEntry[]): RuleIssue[] {
 }
 
 /** The rows of one event, posted together: between one and the cap, all cash or all non-cash. */
-export const LedgerEventSchema = z
+const LedgerEventSchema = z
   .array(LedgerEntrySchema)
   .min(1)
   .max(ledgerLimits.maxEntriesPerPost)
@@ -197,6 +255,13 @@ export function parseLedgerEvent(
     );
   }
   return LedgerEventSchema.parse(entries);
+}
+
+/** A statement or export over more grouped rows than the cap is refused, never cut short: a total over part of the rows would be wrong. */
+export function assertWithinReadCap(groupCount: number): void {
+  if (groupCount > ledgerLimits.maxReadGroups) {
+    throw new RangeError('That window holds too many ledger rows; narrow it');
+  }
 }
 
 export type PostOutcome = 'posted' | 'already_posted';
@@ -669,7 +734,7 @@ export function rambleSelfPayout(
   );
 }
 
-// TODO(U-079b): first caller, the dispute handlers.
+// TODO(U-081): first caller, the dispute handlers.
 /** A dispute opened: the provider withdrew the amount and charged a fee, both under the dispute's id. */
 export function disputeOpened(
   input: Common &
@@ -699,7 +764,7 @@ export function disputeOpened(
   );
 }
 
-// TODO(U-079b): first caller, the dispute handlers.
+// TODO(U-081): first caller, the dispute handlers.
 /** A dispute won: the withdrawn amount returns to cash. */
 export function disputeWon(
   input: Common &
@@ -722,7 +787,7 @@ export function disputeWon(
   );
 }
 
-// TODO(U-079b): first caller, the dispute handlers.
+// TODO(U-081): first caller, the dispute handlers.
 /** A dispute lost: what the host can cover comes from the host payable (Q-18) and the rest is Ramble's loss. */
 export function disputeLost(
   input: Common &

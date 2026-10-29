@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { EntityIdSchema, SlugSchema, guestVisibleStatuses } from './catalog';
 import {
   activeFilterCount,
-  browsePath,
   hrefForFilters,
   toQueryEntries,
   withDate,
@@ -10,6 +9,7 @@ import {
 } from './filters';
 import { withCovers, type PhotoView } from './photoViews';
 import { cardPriceLabel } from './pricing';
+import { browsePath, experienceCardPath } from './routes';
 import { IsoDateSchema, TimeZoneSchema, isKnownTimeZone } from './sessions';
 
 /** A hard page size: the data layer reads one more row than this to learn whether there is a next page. */
@@ -206,14 +206,6 @@ export function durationLabel(minutes: number): string {
   return `${String(hours)} hr ${String(rest)} min`;
 }
 
-/** The address of an experience page (`/experiences/[slug]-[id]`) or a guide entry (`/guide/[slug]-[id]`). */
-export function experienceAddress(
-  experience: Pick<BrowseExperience, 'id' | 'slug' | 'status'>,
-): string {
-  const area = experience.status === 'guide_only' ? 'guide' : 'experiences';
-  return `/${area}/${experience.slug}-${experience.id}`;
-}
-
 export type BrowseCard = {
   id: string;
   title: string;
@@ -244,7 +236,7 @@ export function toBrowseCard(experience: BrowseExperience): BrowseCard | null {
     id: experience.id,
     title: experience.name,
     meta,
-    href: experienceAddress(experience),
+    href: experienceCardPath(experience),
     image: null,
   };
   if (experience.status === 'guide_only') {

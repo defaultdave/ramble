@@ -3,13 +3,11 @@ import { ZodError } from 'zod';
 import { toBrowseCard } from './browse';
 import type { Collection, HomeModule } from './editorial';
 import {
-  browseHref,
   buildHomePage,
   bannerText,
   cardsInOrder,
   docOfText,
   durationLabel,
-  experiencePath,
   homeAsOf,
   homeCopy,
   homeCardIds,
@@ -157,45 +155,6 @@ describe('homeLimits', () => {
   it('looks up more candidates for "On this week" than it shows', () => {
     expect(homeLimits.thisWeekCandidates).toBeGreaterThan(
       homeLimits.thisWeekShown,
-    );
-  });
-});
-
-describe('browseHref', () => {
-  it.each([
-    ['no filter', {}, '/new-york/browse'],
-    [
-      'a category',
-      { category: 'cooking' },
-      '/new-york/browse?category=cooking',
-    ],
-    [
-      'all three, in grammar order',
-      { date: '2026-11-07', neighborhood: 'dumbo', category: 'cooking' },
-      '/new-york/browse?category=cooking&neighborhood=dumbo&date=2026-11-07',
-    ],
-    [
-      'an empty value, which is left out',
-      { category: 'cooking', neighborhood: '' },
-      '/new-york/browse?category=cooking',
-    ],
-    [
-      'a value that needs escaping',
-      { category: 'a&b=c' },
-      '/new-york/browse?category=a%26b%3Dc',
-    ],
-  ])('writes %s', (_name, target, expected) => {
-    expect(browseHref(target)).toBe(expected);
-  });
-});
-
-describe('experiencePath', () => {
-  it.each([
-    ['live', 'experiences'],
-    ['guide_only', 'guide'],
-  ] as const)('puts a %s entry under /%s', (status, area) => {
-    expect(experiencePath(experience(1, { status }))).toBe(
-      `/${area}/thing-1-${id(1)}`,
     );
   });
 });

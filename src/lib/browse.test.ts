@@ -13,7 +13,6 @@ import {
   errorView,
   maxHandEnteredDayRows,
   maxStoredDayRows,
-  experienceAddress,
   resultsSummary,
   nextBrowseDay,
   splitPage,
@@ -229,20 +228,6 @@ describe('durationLabel', () => {
     [1440, '24 hr'],
   ])('writes %i minutes as %s', (minutes, label) => {
     expect(durationLabel(minutes)).toBe(label);
-  });
-});
-
-describe('experienceAddress', () => {
-  it('addresses a live experience by slug and id', () => {
-    expect(experienceAddress(experience(7))).toBe(
-      `/experiences/thing-7-${id(7)}`,
-    );
-  });
-
-  it('addresses a guide entry in the guide area', () => {
-    expect(experienceAddress(experience(7, { status: 'guide_only' }))).toBe(
-      `/guide/thing-7-${id(7)}`,
-    );
   });
 });
 

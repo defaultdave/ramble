@@ -4,7 +4,7 @@ How `/experiences/[slug]-[id]` is built, what it shows and when a section hides,
 
 ## The address
 
-The address ends with the experience's ID after a hyphen. `parseExperienceAddress` (`src/lib/experiencePage.ts`) splits it; the ID is the key, and the slug is checked for shape only, so a slug that has changed still finds its experience. An address that is not a slug and an ID is a 404 before anything is read. A guide entry (`guide_only`) has its own page and is a 404 here. `generateStaticParams` returns `sample`, which is not an address, so the build prerenders a 404 shell and never reads the database.
+The address ends with the experience's ID after a hyphen. `parseExperienceAddress` (`src/lib/routes.ts`, beside `experiencePath`, which writes it) splits it; the ID is the key, and the slug is checked for shape only, so a slug that has changed still finds its experience. An address that is not a slug and an ID is a 404 before anything is read. A guide entry (`guide_only`) has its own page and is a 404 here. `generateStaticParams` returns `sample`, which is not an address, so the build prerenders a 404 shell and never reads the database.
 
 ## What is shown
 

@@ -1,4 +1,4 @@
-import { taxTreatments, type PriceOption } from './catalog';
+import type { PriceOption, taxTreatments } from './catalog';
 import { formatPrice } from './money';
 
 // Integer minor units (cents) and parts per million only: no float touches an amount.

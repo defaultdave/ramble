@@ -13,7 +13,6 @@ import {
   maxHandEnteredDayRows,
   maxStoredDayRows,
   experienceAddress,
-  priceLabel,
   resultsSummary,
   splitPage,
   toBrowsePage,
@@ -36,7 +35,7 @@ import { noFilters } from './filters';
 // - the raw calendar rows are bounded: too many stored dates or hand-entered sessions, a bad date, or a bad zone is refused
 // - prices are grouped under their experience, lowest first
 // - a duration reads as minutes, hours, or half hours
-// - a card price is the lowest price, with "From" only when prices differ; no price is a refusal
+// - a card price comes only from options that take a space; a kids class with a free accompanying adult reads the child price, and an experience with no such option has no card
 // - an experience address names the area by status
 // - a card carries neighborhood and duration, links a guide entry out, and refuses a guide entry with no link
 // - the summary line counts the cards
@@ -57,7 +56,7 @@ function experience(
     neighborhoodName: 'DUMBO',
     durationMinutes: 120,
     linkOutUrl: null,
-    priceOptions: [{ priceMinor: 8500 }],
+    priceOptions: [{ priceMinor: 8500, usesSpace: true }],
     ...overrides,
   };
 }
@@ -176,15 +175,21 @@ describe('withPriceOptions', () => {
       withPriceOptions(
         [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
         [
-          { experienceId: 'a', priceMinor: 7000 },
-          { experienceId: 'b', priceMinor: 500 },
-          { experienceId: 'a', priceMinor: 3500 },
-          { experienceId: 'zzz', priceMinor: 1 },
+          { experienceId: 'a', priceMinor: 7000, usesSpace: true },
+          { experienceId: 'b', priceMinor: 500, usesSpace: false },
+          { experienceId: 'a', priceMinor: 3500, usesSpace: true },
+          { experienceId: 'zzz', priceMinor: 1, usesSpace: true },
         ],
       ),
     ).toEqual([
-      { id: 'a', priceOptions: [{ priceMinor: 3500 }, { priceMinor: 7000 }] },
-      { id: 'b', priceOptions: [{ priceMinor: 500 }] },
+      {
+        id: 'a',
+        priceOptions: [
+          { priceMinor: 3500, usesSpace: true },
+          { priceMinor: 7000, usesSpace: true },
+        ],
+      },
+      { id: 'b', priceOptions: [{ priceMinor: 500, usesSpace: false }] },
       { id: 'c', priceOptions: [] },
     ]);
   });
@@ -208,24 +213,6 @@ describe('durationLabel', () => {
     [1440, '24 hr'],
   ])('writes %i minutes as %s', (minutes, label) => {
     expect(durationLabel(minutes)).toBe(label);
-  });
-});
-
-describe('priceLabel', () => {
-  it.each([
-    ['one price', [8500], '$85'],
-    ['the same price twice', [4000, 4000], '$40'],
-    ['prices that differ', [6000, 3000], 'From $30'],
-    ['a price with cents', [1250], '$12.50'],
-    ['a free option beside a paid one', [0, 5000], 'From $0'],
-  ])('reads %s', (_name, prices, label) => {
-    expect(priceLabel(prices.map((priceMinor) => ({ priceMinor })))).toBe(
-      label,
-    );
-  });
-
-  it('refuses an experience with no price', () => {
-    expect(() => priceLabel([])).toThrow(RangeError);
   });
 });
 
@@ -253,6 +240,29 @@ describe('toBrowseCard', () => {
       kind: 'bookable',
       price: '$85',
     });
+  });
+
+  it('prices a kids class from the child, not from the free accompanying adult', () => {
+    const kidsClass = experience(1, {
+      priceOptions: [
+        { priceMinor: 0, usesSpace: false },
+        { priceMinor: 4500, usesSpace: true },
+      ],
+    });
+    expect(toBrowseCard(kidsClass)).toMatchObject({
+      kind: 'bookable',
+      price: '$45',
+    });
+  });
+
+  it('keeps a free option that takes a space as the card price', () => {
+    const freeTour = experience(1, {
+      priceOptions: [
+        { priceMinor: 0, usesSpace: true },
+        { priceMinor: 2000, usesSpace: true },
+      ],
+    });
+    expect(toBrowseCard(freeTour)).toMatchObject({ price: 'From $0' });
   });
 
   it('leaves the duration out when there is none', () => {
@@ -285,6 +295,10 @@ describe('toBrowseCard', () => {
     [
       'a bookable experience with no price',
       experience(3, { priceOptions: [] }),
+    ],
+    [
+      'a bookable experience whose only option takes no space',
+      experience(4, { priceOptions: [{ priceMinor: 0, usesSpace: false }] }),
     ],
   ])('leaves out %s', (_name, input) => {
     expect(toBrowseCard(input)).toBeNull();

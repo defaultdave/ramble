@@ -17,7 +17,7 @@ How `/` is built from the modules staff arrange, what each module shows and when
 
 The first `picks` module that shows carries the id `picks`, which the header and footer link to (`/#picks`).
 
-A card is left out, never repaired, when it cannot be shown: a bookable experience with no price, or a guide entry with no link out. Cards show no photo until U-039 adds cover photos (a `TODO(U-039)` marks the place); the empty frame is the missing-image state the `Card` already has.
+A card is left out, never repaired, when it cannot be shown: a bookable experience with no price option that takes a space, or a guide entry with no link out. The price on a card is the lowest price among the options that take a space (`cardPriceLabel` in `src/lib/pricing.ts`, the same function browse uses), so the free adult who goes with a child never makes a kids class read "From $0". Cards show no photo until U-039 adds cover photos (a `TODO(U-039)` marks the place); the empty frame is the missing-image state the `Card` already has.
 
 The page has no hero when staff switch it off. Then a visually hidden h1 stands in, so the page always has one. With no module at all, the page says so and links to browse.
 

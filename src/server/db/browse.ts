@@ -45,7 +45,7 @@ import {
   sessions,
 } from './schema';
 
-// A bookable experience with no price cannot be shown on a card, so it stays out of browse until it has one.
+// A bookable experience with no price option that takes a space cannot be shown on a card, so it stays out of browse until it has one.
 // Built per call: the database client is lazy, and building it at import would need a database to import this file.
 function shownInBrowse(): SQL | undefined {
   return and(
@@ -56,7 +56,12 @@ function shownInBrowse(): SQL | undefined {
         dbRead
           .select({ one: sql`1` })
           .from(priceOptions)
-          .where(eq(priceOptions.experienceId, experiences.id)),
+          .where(
+            and(
+              eq(priceOptions.experienceId, experiences.id),
+              eq(priceOptions.usesSpace, true),
+            ),
+          ),
       ),
     ),
   );
@@ -117,6 +122,7 @@ const PriceRowsSchema = z.array(
   z.object({
     experienceId: z.guid(),
     priceMinor: z.int().nonnegative(),
+    usesSpace: z.boolean(),
   }),
 );
 
@@ -134,6 +140,7 @@ async function attachPriceOptions(
       .select({
         experienceId: priceOptions.experienceId,
         priceMinor: priceOptions.priceMinor,
+        usesSpace: priceOptions.usesSpace,
       })
       .from(priceOptions)
       .where(

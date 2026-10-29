@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { EntityIdSchema, SlugSchema, guestVisibleStatuses } from './catalog';
 import type { Category, Neighborhood } from './catalog';
 import type { Collection, HomeModule } from './editorial';
-import { formatPrice } from './money';
+import { cardPriceLabel } from './pricing';
 import type { RichTextDoc } from './richText/format';
 import type { GuestSettings } from './settings';
 import { spacesStatus } from './spaces';
@@ -76,6 +76,7 @@ export function thisWeekWindow(asOf: string): ThisWeekWindow {
 const HomePriceOptionSchema = z.object({
   kind: z.enum(['adult', 'child']),
   priceMinor: z.int().nonnegative(),
+  usesSpace: z.boolean(),
 });
 
 /** The part of an experience a home card shows, with nothing a guest may not see. */
@@ -156,20 +157,6 @@ export function durationLabel(minutes: number): string {
   return `${String(hours)} hr ${String(rest)} min`;
 }
 
-/**
- * The per-person price a card shows: the lowest of the experience's prices, with "From" only when
- * the prices differ (an adult and a child price). Null when there is no price to show.
- */
-export function priceLabel(
-  options: readonly { priceMinor: number }[],
-): string | null {
-  if (options.length === 0) return null;
-  const prices = options.map((option) => option.priceMinor);
-  const lowest = Math.min(...prices);
-  const label = formatPrice(lowest);
-  return prices.some((price) => price !== lowest) ? `From ${label}` : label;
-}
-
 export type HomeCard = {
   id: string;
   title: string;
@@ -203,7 +190,7 @@ export function toHomeCard(experience: HomeExperience): HomeCard | null {
       ? null
       : { ...base, kind: 'guide-only', hostHref: experience.linkOutUrl };
   }
-  const price = priceLabel(experience.priceOptions);
+  const price = cardPriceLabel(experience.priceOptions);
   return price === null ? null : { ...base, kind: 'bookable', price };
 }
 

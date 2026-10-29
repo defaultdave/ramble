@@ -36,7 +36,7 @@ The cache key includes `asOf`, the current time cut to the minute (`browseAsOf`)
 
 Paging is keyset, never `OFFSET`. Results are ordered by name and then id, a page is read as 13 rows and shown as 12 (`browsePageSize`), and `after` is the id of the last row shown. The next page is every row past that name and id. If the row behind `after` is hidden or gone, the read answers `cursor_not_found` and the page says so and links back to the first results.
 
-Only `live` and `guide_only` experiences are read (the one guest-visibility condition in `src/server/db/catalog.ts`), and a live experience with no price option is left out because a card cannot show it.
+Only `live` and `guide_only` experiences are read (the one guest-visibility condition in `src/server/db/catalog.ts`), and a live experience with no price option that takes a space is left out because a card cannot show it. The card price is the lowest price among the options that take a space (`cardPriceLabel` in `src/lib/pricing.ts`, shared with the home cards), "From" only when those prices differ, so a kids class with a free accompanying adult reads the child price.
 
 A date matches an experience with a `scheduled` session that starts from `asOf` to 120 days ahead and falls on that day in the host's calendar: the stored `local_date`, or for a session entered by hand the day of `starts_at` in the session's `time_zone`.
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ZodError } from 'zod';
+import { toBrowseCard } from './browse';
 import type { Collection, HomeModule } from './editorial';
 import {
   browseHref,
@@ -14,7 +15,6 @@ import {
   homeExperienceIds,
   HomeExperienceIdsSchema,
   homeLimits,
-  priceLabel,
   thisWeekExperienceIds,
   thisWeekWindow,
   toHomeCard,
@@ -31,7 +31,8 @@ import {
 // - the browse address writes only the parameters that are set, escaped, in the grammar order
 // - an experience address names the area by its status
 // - a duration reads as minutes, hours, or half hours, and falls back to hours and minutes
-// - a price is the lowest, with "From" only when the prices differ; no price is no label
+// - a card price comes only from options that take a space, so a kids class with a free accompanying adult reads the child price
+// - one experience gets the same price on a home card and a browse card
 // - a card is left out when it cannot be shown: no price to book, or no link out
 // - cards follow the order given, skip what is missing, and stop at the limit
 // - "On this week" lists bookable experiences with an open session in the window, soonest first, once each
@@ -57,7 +58,7 @@ function experience(
     neighborhoodName: 'Greenpoint',
     durationMinutes: 120,
     linkOutUrl: null,
-    priceOptions: [{ kind: 'adult', priceMinor: 7000 }],
+    priceOptions: [{ kind: 'adult', priceMinor: 7000, usesSpace: true }],
     ...overrides,
   };
 }
@@ -203,31 +204,6 @@ describe('durationLabel', () => {
   });
 });
 
-describe('priceLabel', () => {
-  it.each([
-    ['no price', [], null],
-    ['one price', [{ priceMinor: 8500 }], '$85'],
-    [
-      'prices that are the same',
-      [{ priceMinor: 8500 }, { priceMinor: 8500 }],
-      '$85',
-    ],
-    [
-      'prices that differ, lowest first',
-      [{ priceMinor: 6500 }, { priceMinor: 8500 }],
-      'From $65',
-    ],
-    [
-      'prices that differ, lowest last',
-      [{ priceMinor: 8500 }, { priceMinor: 1250 }],
-      'From $12.50',
-    ],
-    ['a free option', [{ priceMinor: 0 }, { priceMinor: 500 }], 'From $0'],
-  ])('%s', (_name, options, label) => {
-    expect(priceLabel(options)).toBe(label);
-  });
-});
-
 describe('toHomeCard', () => {
   it('shows a bookable experience with its neighborhood, length, and price', () => {
     expect(toHomeCard(experience(1))).toEqual({
@@ -237,6 +213,19 @@ describe('toHomeCard', () => {
       href: `/experiences/thing-1-${id(1)}`,
       kind: 'bookable',
       price: '$70',
+    });
+  });
+
+  it('prices a kids class from the child, not from the free accompanying adult', () => {
+    const kidsClass = experience(1, {
+      priceOptions: [
+        { kind: 'adult', priceMinor: 0, usesSpace: false },
+        { kind: 'child', priceMinor: 4500, usesSpace: true },
+      ],
+    });
+    expect(toHomeCard(kidsClass)).toMatchObject({
+      kind: 'bookable',
+      price: '$45',
     });
   });
 
@@ -266,10 +255,65 @@ describe('toHomeCard', () => {
 
   it.each([
     ['a bookable experience with no price', { priceOptions: [] }],
+    [
+      'a bookable experience whose only option takes no space',
+      {
+        priceOptions: [
+          { kind: 'adult' as const, priceMinor: 0, usesSpace: false },
+        ],
+      },
+    ],
     ['a guide entry with no link out', { status: 'guide_only' as const }],
   ])('leaves out %s', (_name, overrides) => {
     expect(toHomeCard(experience(1, overrides))).toBeNull();
   });
+});
+
+describe('the price on a home card and on a browse card', () => {
+  it.each([
+    [
+      'a kids class with a free accompanying adult',
+      [
+        { kind: 'adult', priceMinor: 0, usesSpace: false },
+        { kind: 'child', priceMinor: 4500, usesSpace: true },
+      ],
+    ],
+    [
+      'an adult and a child price',
+      [
+        { kind: 'adult', priceMinor: 8500, usesSpace: true },
+        { kind: 'child', priceMinor: 4500, usesSpace: true },
+      ],
+    ],
+    ['one price', [{ kind: 'adult', priceMinor: 7000, usesSpace: true }]],
+    [
+      'a free option that takes a space',
+      [
+        { kind: 'adult', priceMinor: 0, usesSpace: true },
+        { kind: 'child', priceMinor: 500, usesSpace: true },
+      ],
+    ],
+    [
+      'no option that takes a space',
+      [{ kind: 'adult', priceMinor: 0, usesSpace: false }],
+    ],
+    ['no option', []],
+  ] satisfies [string, HomeExperience['priceOptions']][])(
+    'agree for %s',
+    (_name, priceOptions) => {
+      const home = toHomeCard(experience(1, { priceOptions }));
+      const browse = toBrowseCard({
+        ...experience(1),
+        priceOptions: priceOptions.map(({ priceMinor, usesSpace }) => ({
+          priceMinor,
+          usesSpace,
+        })),
+      });
+      const priceOf = (card: { kind: string; price?: string } | null) =>
+        card?.kind === 'bookable' ? card.price : null;
+      expect(priceOf(home)).toBe(priceOf(browse));
+    },
+  );
 });
 
 describe('cardsInOrder', () => {

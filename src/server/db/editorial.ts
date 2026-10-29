@@ -149,10 +149,7 @@ export async function listHomeModules(): Promise<HomeModule[]> {
     .where(
       and(
         eq(homeModules.enabled, true),
-        or(
-          isNull(homeModules.collectionId),
-          eq(collections.status, 'published'),
-        ),
+        or(isNull(homeModules.collectionId), publishedCollection),
       ),
     )
     .orderBy(asc(homeModules.position))

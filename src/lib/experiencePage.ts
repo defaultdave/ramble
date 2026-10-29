@@ -6,6 +6,7 @@ import {
   type Neighborhood,
 } from './catalog';
 import { MAX_FULL_REFUND_HOURS } from './cancellation';
+import { demoCheckoutPath } from './demoCheckout';
 import type { GuestPhoto } from './photos';
 import { photoView, type PhotoView } from './photoViews';
 import { perPersonAmount } from './pricing';
@@ -360,6 +361,8 @@ export type ExperiencePageView = {
   cancellation: string;
   /** Goes to the gift checkout, or null while gifts are switched off. */
   giftHref: string | null;
+  /** Goes to the checkout. TODO(U-041): replaced by the booking bar and panel, which hold a session first. */
+  bookHref: string;
   privateSessionHref: string;
 };
 
@@ -451,6 +454,7 @@ export function buildExperiencePage(
     weather: weather?.detail ?? null,
     cancellation: cancellation.detail,
     giftHref: giftsEnabled ? giftCheckoutPath(experience.id) : null,
+    bookHref: demoCheckoutPath(experience.id),
     privateSessionHref: privateSessionPath,
   };
 }

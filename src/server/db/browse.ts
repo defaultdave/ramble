@@ -17,14 +17,13 @@ import { z } from 'zod';
 import {
   BrowseDayRowsSchema,
   browsePageSize,
-  browseWindow,
+  browseWindowDays,
   maxHandEnteredDayRows,
   maxStoredDayRows,
   splitPage,
   type BrowseCursorRow,
   type BrowseDayRows,
   type BrowseRead,
-  type BrowseWindow,
 } from '@/lib/browse';
 import {
   CardExperienceSchema,
@@ -38,6 +37,7 @@ import {
   type BrowseFilters,
   type BrowseQuery,
 } from '@/lib/filters';
+import { upcomingWindow, type SessionWindow } from '@/lib/sessionWindow';
 import { guestVisible } from './catalog';
 import { dbRead } from './client';
 import { coverImage, coverSelection, guestCoverOf } from './photos';
@@ -98,7 +98,7 @@ function inChosenNeighborhoods(slugs: readonly string[]): SQL | undefined {
   );
 }
 
-function scheduledInWindow(window: BrowseWindow): SQL | undefined {
+function scheduledInWindow(window: SessionWindow): SQL | undefined {
   return and(
     eq(sessions.status, 'scheduled'),
     gte(sessions.startsAt, window.from),
@@ -106,12 +106,12 @@ function scheduledInWindow(window: BrowseWindow): SQL | undefined {
   );
 }
 
-// Mirrors `hasSpaceLeft` in `src/lib/spaces.ts` (spaces left above zero), for the day queries only: a day
-// is offered, and an experience matches it, through a session that still has space. The database test
-// keeps the two together.
+// With `scheduledInWindow`, this mirrors `isOpenSession` in `src/lib/sessionWindow.ts` (spaces left above
+// zero), for the day queries only: a day is offered, and an experience matches it, through a session that is
+// open. The database test keeps the two together.
 const hasSpace = sql`${sessions.seatsSold} < ${sessions.allocation}`;
 
-function hasSessionOn(date: string | null, window: BrowseWindow) {
+function hasSessionOn(date: string | null, window: SessionWindow) {
   if (date === null) return undefined;
   return exists(
     dbRead
@@ -190,7 +190,7 @@ export async function listBrowseExperiences(
   asOf: string,
 ): Promise<BrowseRead> {
   const { filters, after } = BrowseQuerySchema.parse(query);
-  const window = browseWindow(asOf);
+  const window = upcomingWindow(asOf, browseWindowDays);
 
   const [cursor = null] = after === null ? [] : await visibleCursor(after);
   // A cursor nobody can see leaves nothing past it, so the page is not read.
@@ -249,7 +249,7 @@ export async function listBrowseDayRows(
       categories: true,
       neighborhoods: true,
     }).parse(filters);
-  const window = browseWindow(asOf);
+  const window = upcomingWindow(asOf, browseWindowDays);
   const shown = and(
     shownInBrowse(),
     inChosenCategories(chosenCategories),

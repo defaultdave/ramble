@@ -37,6 +37,8 @@ The hero's search is a plain GET form to `/new-york/browse`. It sends `neighborh
 
 The page and the banner read after `connection()`, inside `<Suspense>`. The build therefore never reads the database (CI builds with none), and a prefetch stops at the skeleton. The cached reads still hold the data between requests.
 
+"On this week" counts a session that is open in the next seven days: it starts from `asOf` up to, not including, seven days later, and has a space left. The window and that rule are `upcomingWindow` and `isOpenSession` in `src/lib/sessionWindow.ts`, the same ones browse uses.
+
 The reads are `listHomeExperiences` and `listThisWeekSessions` in `src/server/db/home.ts`. Both are bounded (`homeLimits`) and read guest-visible rows only, so they take no caller.
 
 ## Cover photos

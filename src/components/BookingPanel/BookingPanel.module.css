@@ -100,7 +100,11 @@
   align-self: flex-start;
   min-block-size: var(--size-touch-target);
   margin-block: calc(
-    (var(--font-line-height-label) - var(--size-touch-target)) / 2
+    (
+        var(--font-size-label) * var(--font-line-height-label) -
+          var(--size-touch-target)
+      ) /
+      2
   );
   color: var(--color-text-link);
   font-size: var(--font-size-label);

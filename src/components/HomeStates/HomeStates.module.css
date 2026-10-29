@@ -108,7 +108,9 @@
 }
 
 .headingLines {
-  grid-auto-rows: var(--font-line-height-display-l);
+  grid-auto-rows: calc(
+    var(--font-size-display-l) * var(--font-line-height-display-l)
+  );
 }
 
 .headingLines > .bar:nth-child(4) {
@@ -120,7 +122,9 @@
 }
 
 .bodyLines {
-  grid-auto-rows: var(--font-line-height-body-l);
+  grid-auto-rows: calc(
+    var(--font-size-body-l) * var(--font-line-height-body-l)
+  );
 }
 
 .bodyLines > .bar:nth-child(3) {
@@ -129,17 +133,17 @@
 
 .railHeadingBar {
   width: 40%;
-  height: var(--font-line-height-heading-m);
+  height: calc(var(--font-size-heading-m) * var(--font-line-height-heading-m));
 }
 
 .picksHeadingBar {
   width: 55%;
-  height: var(--font-line-height-heading-l);
+  height: calc(var(--font-size-heading-l) * var(--font-line-height-heading-l));
 }
 
 .summaryBar {
   width: 80%;
-  height: var(--font-line-height-body-m);
+  height: calc(var(--font-size-body-m) * var(--font-line-height-body-m));
 }
 
 .linkBar {
@@ -187,7 +191,7 @@
 
 .labelBar {
   width: 40%;
-  height: var(--font-line-height-label);
+  height: calc(var(--font-size-label) * var(--font-line-height-label));
 }
 
 /* A field and the large button are the same height, a touch target plus a line of padding. */

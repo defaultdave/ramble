@@ -1,11 +1,13 @@
 import 'server-only';
 import { and, asc, eq, gt, inArray, lte } from 'drizzle-orm';
 import {
+  CardExperienceSchema,
+  type CardExperience,
+} from '@/lib/experienceCards';
+import {
   HomeExperienceIdsSchema,
-  HomeExperienceSchema,
   ThisWeekSessionSchema,
   homeLimits,
-  type HomeExperience,
   type ThisWeekSession,
   type ThisWeekWindow,
 } from '@/lib/home';
@@ -19,7 +21,7 @@ import { experiences, sessions } from './schema';
  */
 export async function listHomeExperiences(
   ids: readonly string[],
-): Promise<HomeExperience[]> {
+): Promise<CardExperience[]> {
   const lookedUp = HomeExperienceIdsSchema.parse(ids);
   const rows = await dbRead.query.experiences.findMany({
     where: and(guestVisible, inArray(experiences.id, lookedUp)),
@@ -34,13 +36,13 @@ export async function listHomeExperiences(
     with: {
       neighborhood: { columns: { name: true } },
       priceOptions: {
-        columns: { kind: true, priceMinor: true, usesSpace: true },
+        columns: { priceMinor: true, usesSpace: true },
       },
     },
     orderBy: [asc(experiences.name), asc(experiences.id)],
     limit: homeLimits.maxCardIds,
   });
-  return HomeExperienceSchema.array().parse(
+  return CardExperienceSchema.array().parse(
     rows.map(({ neighborhood, ...row }) => ({
       ...row,
       neighborhoodName: neighborhood.name,

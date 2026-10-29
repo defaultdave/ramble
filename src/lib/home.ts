@@ -1,18 +1,17 @@
 import { z } from 'zod';
-import { EntityIdSchema, SlugSchema, guestVisibleStatuses } from './catalog';
+import { EntityIdSchema, guestVisibleStatuses } from './catalog';
 import type { Category, Neighborhood } from './catalog';
 import type { Collection, HomeModule } from './editorial';
-import { durationLabel } from './duration';
+import {
+  cardLookupLimit,
+  cardsInOrder,
+  type CardExperience,
+  type ExperienceCard,
+} from './experienceCards';
 import { hrefForFilters, noFilters } from './filters';
 import { withCovers, type PhotoView } from './photoViews';
-import { cardPriceLabel } from './pricing';
 import type { RichTextDoc } from './richText/format';
-import {
-  experienceCardPath,
-  giftGuidePath,
-  picksAnchor,
-  picksPath,
-} from './routes';
+import { giftGuidePath, picksAnchor, picksPath } from './routes';
 import type { GuestSettings } from './settings';
 import { spacesStatus } from './spaces';
 import { msPerDay } from './time';
@@ -32,7 +31,7 @@ export const homeLimits = {
   /** How far ahead "On this week" looks. */
   thisWeekDays: 7,
   /** Experiences one home read looks up by ID: 20 modules at most, each with `picksCandidates` entries. */
-  maxCardIds: 240,
+  maxCardIds: cardLookupLimit,
 } as const;
 
 /** The experience IDs one home read looks up, by the bound the page is built for. */
@@ -56,25 +55,6 @@ export function thisWeekWindow(asOf: string): ThisWeekWindow {
 
 // ---- What the data layer hands over ----
 
-const HomePriceOptionSchema = z.object({
-  kind: z.enum(['adult', 'child']),
-  priceMinor: z.int().nonnegative(),
-  usesSpace: z.boolean(),
-});
-
-/** The part of an experience a home card shows, with nothing a guest may not see. */
-export const HomeExperienceSchema = z.object({
-  id: EntityIdSchema,
-  slug: SlugSchema,
-  name: z.string().min(1),
-  status: z.enum(guestVisibleStatuses),
-  neighborhoodName: z.string().min(1),
-  durationMinutes: z.int().positive().nullable(),
-  linkOutUrl: z.string().nullable(),
-  priceOptions: z.array(HomePriceOptionSchema),
-});
-export type HomeExperience = z.infer<typeof HomeExperienceSchema>;
-
 /** The part of a session "On this week" decides from. */
 export const ThisWeekSessionSchema = z.object({
   experienceId: EntityIdSchema,
@@ -84,67 +64,6 @@ export const ThisWeekSessionSchema = z.object({
   seatsSold: z.int().nonnegative(),
 });
 export type ThisWeekSession = z.infer<typeof ThisWeekSessionSchema>;
-
-// ---- Cards ----
-
-export type HomeCard = {
-  id: string;
-  title: string;
-  meta: string;
-  href: string;
-  /** The experience's cover photo; null shows the card's missing-image state. */
-  image: PhotoView | null;
-} & (
-  { kind: 'bookable'; price: string } | { kind: 'guide-only'; hostHref: string }
-);
-
-/**
- * What a card says about an experience, or null when it cannot be shown as one: a bookable
- * experience with no price, or a guide entry with no link out. A card is left out, never repaired.
- */
-export function toHomeCard(experience: HomeExperience): HomeCard | null {
-  const meta = [
-    experience.neighborhoodName,
-    experience.durationMinutes === null
-      ? null
-      : durationLabel(experience.durationMinutes),
-  ]
-    .filter((part) => part !== null)
-    .join(' · ');
-  const base = {
-    id: experience.id,
-    title: experience.name,
-    meta,
-    href: experienceCardPath(experience),
-    image: null,
-  };
-  if (experience.status === 'guide_only') {
-    return experience.linkOutUrl === null
-      ? null
-      : { ...base, kind: 'guide-only', hostHref: experience.linkOutUrl };
-  }
-  const price = cardPriceLabel(experience.priceOptions);
-  return price === null ? null : { ...base, kind: 'bookable', price };
-}
-
-/** The cards for `ids`, in that order. An ID with no experience, or one that cannot be a card, is skipped. */
-export function cardsInOrder(
-  ids: readonly string[],
-  experiences: readonly HomeExperience[],
-  limit: number,
-): HomeCard[] {
-  const byId = new Map(
-    experiences.map((experience) => [experience.id, experience]),
-  );
-  const cards: HomeCard[] = [];
-  for (const id of ids) {
-    if (cards.length >= limit) break;
-    const experience = byId.get(id);
-    const card = experience ? toHomeCard(experience) : null;
-    if (card) cards.push(card);
-  }
-  return cards;
-}
 
 // ---- On this week ----
 
@@ -248,7 +167,7 @@ export type HomeModuleView =
       eyebrow: string;
       heading: string;
       summary: string | null;
-      cards: HomeCard[];
+      cards: ExperienceCard[];
       seeAll: { href: string; label: string };
     }
   | {
@@ -264,7 +183,7 @@ export type HomeModuleView =
       kind: 'this_week';
       id: string;
       heading: string;
-      cards: HomeCard[];
+      cards: ExperienceCard[];
     }
   | { kind: 'reassurance'; id: string; facts: readonly ReassuranceFact[] };
 
@@ -274,11 +193,11 @@ export type HomeInput = {
   picks: readonly Collection[];
   categories: readonly Category[];
   neighborhoods: readonly Neighborhood[];
-  experiences: readonly HomeExperience[];
+  experiences: readonly CardExperience[];
   /** The experiences with an open session this week, soonest first, and what their cards need. */
   thisWeek: {
     experienceIds: readonly string[];
-    experiences: readonly HomeExperience[];
+    experiences: readonly CardExperience[];
   };
   settings: Pick<GuestSettings, 'giftsEnabled'>;
 };
@@ -309,7 +228,7 @@ export function homeExperienceIds(
 }
 
 type ModuleContext = Omit<HomeInput, 'modules' | 'thisWeek'> & {
-  thisWeek: readonly HomeCard[];
+  thisWeek: readonly ExperienceCard[];
 };
 
 function viewOf(

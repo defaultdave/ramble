@@ -7,9 +7,9 @@ import {
 } from './catalog';
 import { MAX_FULL_REFUND_HOURS } from './cancellation';
 import { demoCheckoutPath } from './demoCheckout';
-import { formatPrice } from './money';
 import type { GuestPhoto } from './photos';
 import { photoView, type PhotoView } from './photoViews';
+import { perPersonAmount } from './pricing';
 import {
   categoryPath,
   giftCheckoutPath,
@@ -153,7 +153,7 @@ export function priceLines(
     (a, b) => kindOrder[a.kind] - kindOrder[b.kind],
   );
   return sorted.map((option) => ({
-    amount: option.priceMinor === 0 ? 'Free' : formatPrice(option.priceMinor),
+    amount: perPersonAmount(option.priceMinor),
     unit: sorted.length === 1 ? 'per person' : `per ${option.kind}`,
   }));
 }

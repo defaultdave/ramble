@@ -12,7 +12,9 @@ const total = {
 };
 
 function setup(
-  props: Partial<Pick<DefaultBookingPanelProps, 'total' | 'loading'>> = {},
+  props: Partial<
+    Pick<DefaultBookingPanelProps, 'total' | 'loading' | 'priceMinor'>
+  > = {},
 ) {
   const onContinue = vi.fn();
   render(
@@ -37,6 +39,13 @@ describe('BookingPanel', () => {
     ).toBeVisible();
     expect(screen.getByText('$65')).toBeVisible();
     expect(screen.getByText('per person')).toBeVisible();
+  });
+
+  it('reads a free experience as Free per person', () => {
+    setup({ priceMinor: 0 });
+    expect(screen.getByText('Free')).toBeVisible();
+    expect(screen.getByText('per person')).toBeVisible();
+    expect(screen.queryByText('$0')).not.toBeInTheDocument();
   });
 
   it('shows the mode switch and the choices', () => {

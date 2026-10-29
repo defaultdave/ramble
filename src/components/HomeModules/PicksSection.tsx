@@ -1,10 +1,10 @@
 import { Star } from 'lucide-react';
 import Link from 'next/link';
 import { useId } from 'react';
+import { ExperienceCardItem } from '@/components/ExperienceCard';
 import { classNames } from '@/lib/classNames';
-import type { HomeCard } from '@/lib/home';
+import type { ExperienceCard } from '@/lib/experienceCards';
 import { Eyebrow } from './Eyebrow';
-import { HomeCardItem } from './HomeCardItem';
 import styles from './HomeModules.module.css';
 
 export type PicksSectionProps = {
@@ -13,7 +13,7 @@ export type PicksSectionProps = {
   eyebrow: string;
   heading: string;
   summary: string | null;
-  cards: readonly HomeCard[];
+  cards: readonly ExperienceCard[];
   seeAll: { href: string; label: string };
 };
 
@@ -40,7 +40,11 @@ export function PicksSection({
         <ul className={classNames(styles.rail, styles.picksCards)} role="list">
           {cards.map((card) => (
             <li key={card.id}>
-              <HomeCardItem card={card} layout="vertical" />
+              <ExperienceCardItem
+                card={card}
+                layout="vertical"
+                headingLevel={3}
+              />
             </li>
           ))}
         </ul>

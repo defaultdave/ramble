@@ -4,7 +4,8 @@ import { Alert } from '@/components/Alert';
 import { Button } from '@/components/Button';
 import { SimilarLink } from '@/components/BookingBar/SimilarLink';
 import { continueLabel } from '@/lib/booking';
-import { formatMoney, formatPrice } from '@/lib/money';
+import { formatMoney } from '@/lib/money';
+import { perPersonAmount } from '@/lib/pricing';
 import styles from './BookingPanel.module.css';
 
 type BookingPanelBaseProps = Omit<
@@ -134,7 +135,9 @@ function Shell({
       data-state={state}
     >
       <p className={styles.price}>
-        <span className={styles.priceAmount}>{formatPrice(priceMinor)}</span>{' '}
+        <span className={styles.priceAmount}>
+          {perPersonAmount(priceMinor)}
+        </span>{' '}
         <span className={styles.priceUnit}>per person</span>
       </p>
       {children}

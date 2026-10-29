@@ -1,4 +1,5 @@
-import { blocks, paragraphs } from '../richText';
+import { paragraphs } from '@/lib/richText/paragraphs';
+import { blocks } from '../richText';
 import type {
   CollectionFixture,
   HomeModuleFixture,

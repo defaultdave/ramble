@@ -1,13 +1,16 @@
+import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ZodError } from 'zod';
-import { homeLimits, thisWeekWindow } from '@/lib/home';
+import { homeLimits } from '@/lib/home';
+import { upcomingWindow } from '@/lib/sessionWindow';
 import {
   categories,
   cancellationTiers,
   experiences,
   hosts,
   neighborhoods,
+  photos,
   priceOptions,
   sessions,
 } from '@/server/db/schema';
@@ -21,9 +24,11 @@ import {
 // - the experience read returns live and guide-only experiences with the card's fields, and never a draft, one in review, or a paused one
 // - the experience read returns only the IDs asked for, and nothing for an empty list
 // - the experience read carries the neighborhood name and every price option, and nothing the card does not show
+// - with covers asked for, each experience carries its lowest-position photo, or a null image when it has none and still lists
+// - without covers asked for, the rows carry no image
 // - an unbounded list of IDs, or an ID that is not a uuid, is refused before the database is asked
 // - the session read returns scheduled sessions that start after the window opens and up to its end, soonest first
-//   (the opening instant is outside, the closing instant inside)
+//   (the opening instant is inside, the closing instant outside)
 // - the session read leaves out cancelled and completed sessions and those of an experience a guest cannot see
 // - the session read never returns more than its limit
 
@@ -103,7 +108,7 @@ async function insertExperience(
 }
 
 const opens = new Date('2026-11-02T15:00:00.000Z');
-const window = thisWeekWindow(opens.toISOString());
+const window = upcomingWindow(opens.toISOString(), homeLimits.thisWeekDays);
 
 async function insertSession(
   experienceId: string,
@@ -124,6 +129,27 @@ async function insertSession(
     .returning();
   if (!row) throw new Error('insert returned no session');
   return row;
+}
+
+const noCovers = { covers: false };
+const withCovers = { covers: true };
+
+async function insertPhoto(experienceId: string, position: number) {
+  const id = randomUUID();
+  await client.db.insert(photos).values({
+    id,
+    experienceId,
+    position,
+    storageKey: `public/photos/${experienceId}/${id}.jpg`,
+    url: `https://store.example/${experienceId}/${String(position)}.jpg`,
+    width: 1600,
+    height: 1000,
+    byteSize: 1000,
+    decorative: false,
+    altText: `Photo ${String(position)}`,
+    blurDataUrl: 'data:image/jpeg;base64,/9j/4AAQ',
+    rightsBasis: 'ramble_owned',
+  });
 }
 
 describe('listHomeExperiences', () => {
@@ -149,7 +175,7 @@ describe('listHomeExperiences', () => {
       linkOutUrl: 'https://host.example/walk',
     });
 
-    const found = await home.listHomeExperiences([live.id, guide.id]);
+    const found = await home.listHomeExperiences([live.id, guide.id], noCovers);
 
     expect(found.map((row) => row.name)).toEqual([
       'Harbor walk',
@@ -167,15 +193,50 @@ describe('listHomeExperiences', () => {
       pasta?.priceOptions
         .map(
           (option) =>
-            `${option.kind}:${String(option.priceMinor)}:${String(option.usesSpace)}`,
+            `${String(option.priceMinor)}:${String(option.usesSpace)}`,
         )
         .toSorted(),
-    ).toEqual(['adult:8500:false', 'child:4000:true']);
+    ).toEqual(['4000:true', '8500:false']);
     expect(found.find((row) => row.id === guide.id)).toMatchObject({
       status: 'guide_only',
       linkOutUrl: 'https://host.example/walk',
       priceOptions: [],
     });
+  });
+
+  it('carries the lowest-position photo as the cover when covers are asked for', async () => {
+    const covered = await insertExperience();
+    await insertPhoto(covered.id, 2);
+    await insertPhoto(covered.id, 0);
+    await insertPhoto(covered.id, 1);
+
+    const [found] = await home.listHomeExperiences([covered.id], withCovers);
+
+    expect(found?.image).toEqual({
+      src: `https://store.example/${covered.id}/0.jpg`,
+      width: 1600,
+      height: 1000,
+      alt: 'Photo 0',
+      blurDataUrl: 'data:image/jpeg;base64,/9j/4AAQ',
+    });
+  });
+
+  it('still lists an experience with no photo, with a null image', async () => {
+    const bare = await insertExperience();
+
+    const [found] = await home.listHomeExperiences([bare.id], withCovers);
+
+    expect(found?.id).toBe(bare.id);
+    expect(found?.image).toBeNull();
+  });
+
+  it('leaves the cover out when covers are not asked for', async () => {
+    const covered = await insertExperience();
+    await insertPhoto(covered.id, 0);
+
+    const [found] = await home.listHomeExperiences([covered.id], noCovers);
+
+    expect(found).not.toHaveProperty('image');
   });
 
   it('carries nothing a card does not show', async () => {
@@ -184,7 +245,7 @@ describe('listHomeExperiences', () => {
       meetingPoint: 'Pier 26',
     });
 
-    const [found] = await home.listHomeExperiences([live.id]);
+    const [found] = await home.listHomeExperiences([live.id], noCovers);
 
     expect(Object.keys(found ?? {}).toSorted()).toEqual([
       'durationMinutes',
@@ -204,7 +265,10 @@ describe('listHomeExperiences', () => {
       const hidden = await insertExperience({ status });
       const live = await insertExperience();
 
-      const found = await home.listHomeExperiences([hidden.id, live.id]);
+      const found = await home.listHomeExperiences(
+        [hidden.id, live.id],
+        noCovers,
+      );
 
       expect(found.map((row) => row.id)).toEqual([live.id]);
     },
@@ -214,13 +278,13 @@ describe('listHomeExperiences', () => {
     const asked = await insertExperience();
     await insertExperience();
 
-    const found = await home.listHomeExperiences([asked.id]);
+    const found = await home.listHomeExperiences([asked.id], noCovers);
 
     expect(found.map((row) => row.id)).toEqual([asked.id]);
   });
 
   it('answers an empty list with nothing', async () => {
-    await expect(home.listHomeExperiences([])).resolves.toEqual([]);
+    await expect(home.listHomeExperiences([], noCovers)).resolves.toEqual([]);
   });
 
   it('refuses more IDs than a home read looks up', async () => {
@@ -229,13 +293,15 @@ describe('listHomeExperiences', () => {
       (_, n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`,
     );
 
-    await expect(home.listHomeExperiences(tooMany)).rejects.toThrow(ZodError);
+    await expect(home.listHomeExperiences(tooMany, noCovers)).rejects.toThrow(
+      ZodError,
+    );
   });
 
   it('refuses an ID that is not a uuid', async () => {
-    await expect(home.listHomeExperiences(['not-a-uuid'])).rejects.toThrow(
-      ZodError,
-    );
+    await expect(
+      home.listHomeExperiences(['not-a-uuid'], noCovers),
+    ).rejects.toThrow(ZodError);
   });
 });
 
@@ -269,10 +335,10 @@ describe('listThisWeekSessions', () => {
     });
   });
 
-  it('leaves out the opening instant and keeps the closing one', async () => {
+  it('keeps the opening instant and leaves out the closing one', async () => {
     const experience = await insertExperience();
-    await insertSession(experience.id, window.from);
-    const atEnd = await insertSession(experience.id, window.to);
+    const atStart = await insertSession(experience.id, window.from);
+    await insertSession(experience.id, window.to);
     await insertSession(experience.id, new Date(window.to.getTime() + 1000));
 
     const found = (await home.listThisWeekSessions(window)).filter(
@@ -280,7 +346,7 @@ describe('listThisWeekSessions', () => {
     );
 
     expect(found.map((row) => row.startsAt.getTime())).toEqual([
-      atEnd.startsAt.getTime(),
+      atStart.startsAt.getTime(),
     ]);
   });
 

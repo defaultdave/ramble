@@ -1,10 +1,24 @@
-import { Card, cardPhotoSizes, type CardLayout } from '@/components/Card';
+import {
+  Card,
+  cardPhotoSizes,
+  type CardHeadingLevel,
+  type CardLayout,
+} from '@/components/Card';
 import { Photo } from '@/components/Photo';
-import type { HomeCard } from '@/lib/home';
+import type { ExperienceCard } from '@/lib/experienceCards';
 
-type HomeCardItemProps = { card: HomeCard; layout: CardLayout };
+export type ExperienceCardItemProps = {
+  card: ExperienceCard;
+  layout: CardLayout;
+  /** The surface decides the level: its own heading sits one level above. */
+  headingLevel: CardHeadingLevel;
+};
 
-export function HomeCardItem({ card, layout }: HomeCardItemProps) {
+export function ExperienceCardItem({
+  card,
+  layout,
+  headingLevel,
+}: ExperienceCardItemProps) {
   const image = card.image ? (
     <Photo photo={card.image} sizes={cardPhotoSizes[layout]} />
   ) : null;
@@ -12,7 +26,7 @@ export function HomeCardItem({ card, layout }: HomeCardItemProps) {
     <Card
       kind="guide-only"
       layout={layout}
-      headingLevel={3}
+      headingLevel={headingLevel}
       title={card.title}
       meta={card.meta}
       href={card.href}
@@ -22,7 +36,7 @@ export function HomeCardItem({ card, layout }: HomeCardItemProps) {
   ) : (
     <Card
       layout={layout}
-      headingLevel={3}
+      headingLevel={headingLevel}
       title={card.title}
       meta={card.meta}
       href={card.href}

@@ -1,0 +1,256 @@
+/* Mobile first: one column at every width. The checkout page decides how wide it is. */
+.form {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  inline-size: 100%;
+  font-family: var(--font-family-body);
+  color: var(--color-text-primary);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.heading {
+  margin: 0;
+  font-size: var(--font-size-heading-s);
+  line-height: var(--font-line-height-heading-s);
+  font-weight: var(--font-weight-semibold);
+}
+
+.caption {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  line-height: var(--font-line-height-caption);
+  color: var(--color-text-secondary);
+}
+
+.wallets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.wallet {
+  box-sizing: border-box;
+  min-block-size: var(--space-12);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-inverse);
+  color: var(--color-text-inverse);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.wallet:focus-visible {
+  outline: 2px solid transparent;
+  box-shadow:
+    0 0 0 2px var(--color-bg-canvas),
+    0 0 0 4px var(--color-focus-ring);
+}
+
+.wallet:disabled {
+  background: var(--color-bg-disabled);
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+}
+
+/* One bordered field in two rows, as the Figma PaymentElement draws it. */
+.group {
+  display: flex;
+  flex-direction: column;
+  overflow: clip;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+}
+
+.numberRow {
+  display: flex;
+  border-block-end: 1px solid var(--color-border-default);
+}
+
+.details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.details > :not(:last-child) {
+  border-inline-end: 1px solid var(--color-border-default);
+}
+
+.input {
+  box-sizing: border-box;
+  inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: var(--space-12);
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  color: var(--color-text-primary);
+}
+
+/* Three cells share a 320px screen, so they give up some side padding. */
+.details .input {
+  padding-inline: var(--space-3);
+}
+
+.input::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 1;
+}
+
+/* The ring sits inside the cell, because the group clips what spills past its border. */
+.input:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: calc(var(--space-1) / -2);
+}
+
+.input[aria-invalid='true'] {
+  box-shadow: inset 0 0 0 2px var(--color-status-danger-text);
+}
+
+.input:disabled {
+  background: var(--color-bg-disabled);
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+}
+
+.errors {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--font-size-body-s);
+  line-height: var(--font-line-height-body-s);
+  color: var(--color-status-danger-text);
+}
+
+.errorIcon {
+  flex: none;
+  inline-size: var(--space-4);
+  block-size: var(--space-4);
+  margin-block-start: calc(var(--space-1) / 2);
+}
+
+.testCards {
+  font-size: var(--font-size-body-s);
+  line-height: var(--font-line-height-body-s);
+}
+
+.testCardsSummary {
+  display: flex;
+  align-items: center;
+  min-block-size: var(--size-touch-target);
+  color: var(--color-text-link);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.testCardsSummary:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: calc(var(--space-1) / 2);
+  border-radius: var(--radius-sm);
+}
+
+.testCardsNote {
+  margin: 0 0 var(--space-3);
+  color: var(--color-text-secondary);
+}
+
+.testCardsTable {
+  inline-size: 100%;
+  border-collapse: collapse;
+  text-align: start;
+}
+
+.testCardsTable th,
+.testCardsTable td {
+  padding: var(--space-2) var(--space-2) var(--space-2) 0;
+  border-block-end: 1px solid var(--color-border-default);
+  vertical-align: top;
+  text-align: start;
+}
+
+.testCardsTable th {
+  font-weight: var(--font-weight-semibold);
+}
+
+.testCardNumber {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+}
+
+.sheetHeading {
+  margin: 0;
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-heading-m);
+  line-height: var(--font-line-height-heading-m);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* A heading focused by script needs no ring of its own: the sheet it names is the cue. */
+.sheetHeading:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: calc(var(--space-1) / 2);
+  border-radius: var(--radius-sm);
+}
+
+.sheetBody {
+  margin: 0;
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  color: var(--color-text-secondary);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Focus lands here after a sheet closes. */
+.notice:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: calc(var(--space-1) / 2);
+  border-radius: var(--radius-md);
+}

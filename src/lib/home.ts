@@ -1,21 +1,20 @@
 import { z } from 'zod';
-import { EntityIdSchema, SlugSchema, guestVisibleStatuses } from './catalog';
+import { EntityIdSchema, guestVisibleStatuses } from './catalog';
 import type { Category, Neighborhood } from './catalog';
 import type { Collection, HomeModule } from './editorial';
-import { durationLabel } from './duration';
+import {
+  cardLookupLimit,
+  cardsInOrder,
+  type CardExperience,
+  type ExperienceCard,
+} from './experienceCards';
 import { hrefForFilters, noFilters } from './filters';
 import { withCovers, type PhotoView } from './photoViews';
-import { cardPriceLabel } from './pricing';
 import type { RichTextDoc } from './richText/format';
-import {
-  experienceCardPath,
-  giftGuidePath,
-  picksAnchor,
-  picksPath,
-} from './routes';
+import { hasContent, paragraphs } from './richText/paragraphs';
+import { giftGuidePath, picksAnchor, picksPath } from './routes';
 import type { GuestSettings } from './settings';
-import { spacesStatus } from './spaces';
-import { msPerDay } from './time';
+import { isOpenSession, type SessionWindow } from './sessionWindow';
 
 /** Every bound the home page reads or shows, so a read cannot grow with the catalog. */
 export const homeLimits = {
@@ -32,7 +31,7 @@ export const homeLimits = {
   /** How far ahead "On this week" looks. */
   thisWeekDays: 7,
   /** Experiences one home read looks up by ID: 20 modules at most, each with `picksCandidates` entries. */
-  maxCardIds: 240,
+  maxCardIds: cardLookupLimit,
 } as const;
 
 /** The experience IDs one home read looks up, by the bound the page is built for. */
@@ -40,40 +39,7 @@ export const HomeExperienceIdsSchema = z
   .array(EntityIdSchema)
   .max(homeLimits.maxCardIds);
 
-/** The minute key a cached read takes, as `minuteAsOf` writes it. */
-const AsOfSchema = z.iso.datetime();
-
-export type ThisWeekWindow = { from: Date; to: Date };
-
-/** The sessions "On this week" looks at: those that start after `asOf`, up to a week ahead. */
-export function thisWeekWindow(asOf: string): ThisWeekWindow {
-  const from = new Date(AsOfSchema.parse(asOf));
-  return {
-    from,
-    to: new Date(from.getTime() + homeLimits.thisWeekDays * msPerDay),
-  };
-}
-
 // ---- What the data layer hands over ----
-
-const HomePriceOptionSchema = z.object({
-  kind: z.enum(['adult', 'child']),
-  priceMinor: z.int().nonnegative(),
-  usesSpace: z.boolean(),
-});
-
-/** The part of an experience a home card shows, with nothing a guest may not see. */
-export const HomeExperienceSchema = z.object({
-  id: EntityIdSchema,
-  slug: SlugSchema,
-  name: z.string().min(1),
-  status: z.enum(guestVisibleStatuses),
-  neighborhoodName: z.string().min(1),
-  durationMinutes: z.int().positive().nullable(),
-  linkOutUrl: z.string().nullable(),
-  priceOptions: z.array(HomePriceOptionSchema),
-});
-export type HomeExperience = z.infer<typeof HomeExperienceSchema>;
 
 /** The part of a session "On this week" decides from. */
 export const ThisWeekSessionSchema = z.object({
@@ -85,86 +51,22 @@ export const ThisWeekSessionSchema = z.object({
 });
 export type ThisWeekSession = z.infer<typeof ThisWeekSessionSchema>;
 
-// ---- Cards ----
-
-export type HomeCard = {
-  id: string;
-  title: string;
-  meta: string;
-  href: string;
-  /** The experience's cover photo; null shows the card's missing-image state. */
-  image: PhotoView | null;
-} & (
-  { kind: 'bookable'; price: string } | { kind: 'guide-only'; hostHref: string }
-);
-
-/**
- * What a card says about an experience, or null when it cannot be shown as one: a bookable
- * experience with no price, or a guide entry with no link out. A card is left out, never repaired.
- */
-export function toHomeCard(experience: HomeExperience): HomeCard | null {
-  const meta = [
-    experience.neighborhoodName,
-    experience.durationMinutes === null
-      ? null
-      : durationLabel(experience.durationMinutes),
-  ]
-    .filter((part) => part !== null)
-    .join(' · ');
-  const base = {
-    id: experience.id,
-    title: experience.name,
-    meta,
-    href: experienceCardPath(experience),
-    image: null,
-  };
-  if (experience.status === 'guide_only') {
-    return experience.linkOutUrl === null
-      ? null
-      : { ...base, kind: 'guide-only', hostHref: experience.linkOutUrl };
-  }
-  const price = cardPriceLabel(experience.priceOptions);
-  return price === null ? null : { ...base, kind: 'bookable', price };
-}
-
-/** The cards for `ids`, in that order. An ID with no experience, or one that cannot be a card, is skipped. */
-export function cardsInOrder(
-  ids: readonly string[],
-  experiences: readonly HomeExperience[],
-  limit: number,
-): HomeCard[] {
-  const byId = new Map(
-    experiences.map((experience) => [experience.id, experience]),
-  );
-  const cards: HomeCard[] = [];
-  for (const id of ids) {
-    if (cards.length >= limit) break;
-    const experience = byId.get(id);
-    const card = experience ? toHomeCard(experience) : null;
-    if (card) cards.push(card);
-  }
-  return cards;
-}
-
 // ---- On this week ----
 
 /**
  * The bookable experiences with a session still open in the next week, the one that starts
  * soonest first, each once. A session that has started, that starts after the window, or that has
- * no space left is not open, and a guide entry is not bookable. A start exactly at `from` has started.
+ * no space left is not open, and a guide entry is not bookable. A start exactly at `from` is in the window, one exactly at `to` is not.
  */
 export function thisWeekExperienceIds(
   sessions: readonly ThisWeekSession[],
-  window: ThisWeekWindow,
+  window: SessionWindow,
   limit: number,
 ): string[] {
   const open = sessions
     .filter(
       (session) =>
-        session.experienceStatus === 'live' &&
-        session.startsAt.getTime() > window.from.getTime() &&
-        session.startsAt.getTime() <= window.to.getTime() &&
-        spacesStatus(session.allocation - session.seatsSold) !== 'sold-out',
+        session.experienceStatus === 'live' && isOpenSession(session, window),
     )
     .toSorted(
       (a, b) =>
@@ -187,7 +89,6 @@ export const homeCopy = {
   categoryHeading: 'Browse by category',
   picksEyebrow: 'Ramble Picks',
   giftGuideEyebrow: 'Gift guide',
-  giftGuideHeading: 'Give an experience',
   giftGuideAction: 'Shop the gift guide',
   /** The sponsor placement under the gift guide. The editorial store has no sponsor field yet, so the line is fixed. */
   giftGuideSponsor: 'Presented by our holiday partner',
@@ -204,18 +105,6 @@ export const homeCopy = {
     { icon: 'info', text: 'Pay with card, Apple Pay, or Google Pay' },
   ] as const satisfies readonly ReassuranceFact[],
 } as const;
-
-/** A plain sentence as a rich-text document, so default copy and edited copy render the same way. */
-export function docOfText(text: string): RichTextDoc {
-  return {
-    type: 'doc',
-    content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
-  };
-}
-
-function hasText(doc: RichTextDoc | null): doc is RichTextDoc {
-  return doc !== null && doc.content.length > 0;
-}
 
 /** One reassurance row; the Figma rows pair each fact with its own icon. */
 export type ReassuranceFact = {
@@ -248,7 +137,7 @@ export type HomeModuleView =
       eyebrow: string;
       heading: string;
       summary: string | null;
-      cards: HomeCard[];
+      cards: ExperienceCard[];
       seeAll: { href: string; label: string };
     }
   | {
@@ -264,7 +153,7 @@ export type HomeModuleView =
       kind: 'this_week';
       id: string;
       heading: string;
-      cards: HomeCard[];
+      cards: ExperienceCard[];
     }
   | { kind: 'reassurance'; id: string; facts: readonly ReassuranceFact[] };
 
@@ -272,16 +161,32 @@ export type HomeInput = {
   /** The enabled modules in order, as the data layer reads them. */
   modules: readonly HomeModule[];
   picks: readonly Collection[];
+  /** The published gift guide, which the gift guide module takes its copy from. */
+  giftGuide: Collection | null;
   categories: readonly Category[];
   neighborhoods: readonly Neighborhood[];
-  experiences: readonly HomeExperience[];
+  experiences: readonly CardExperience[];
   /** The experiences with an open session this week, soonest first, and what their cards need. */
   thisWeek: {
     experienceIds: readonly string[];
-    experiences: readonly HomeExperience[];
+    experiences: readonly CardExperience[];
   };
   settings: Pick<GuestSettings, 'giftsEnabled'>;
 };
+
+/**
+ * The one copy rule for a module that shows a collection: the module's own heading wins, else the
+ * collection's title; the collection's summary is what the module says beneath it.
+ */
+export function collectionModuleCopy(
+  module: Pick<HomeModule, 'heading'>,
+  collection: Pick<Collection, 'title' | 'summary'>,
+): { heading: string; summary: string | null } {
+  return {
+    heading: module.heading ?? collection.title,
+    summary: collection.summary,
+  };
+}
 
 function pickModuleIds(
   module: HomeModule,
@@ -309,7 +214,7 @@ export function homeExperienceIds(
 }
 
 type ModuleContext = Omit<HomeInput, 'modules' | 'thisWeek'> & {
-  thisWeek: readonly HomeCard[];
+  thisWeek: readonly ExperienceCard[];
 };
 
 function viewOf(
@@ -323,7 +228,9 @@ function viewOf(
         id: module.id,
         eyebrow: homeCopy.heroEyebrow,
         heading: module.heading ?? homeCopy.heroHeading,
-        body: hasText(module.body) ? module.body : docOfText(homeCopy.heroBody),
+        body: hasContent(module.body)
+          ? module.body
+          : paragraphs(homeCopy.heroBody),
         neighborhoods: context.neighborhoods.map(({ slug, name }) => ({
           slug,
           name,
@@ -353,12 +260,13 @@ function viewOf(
         homeLimits.picksShown,
       );
       if (cards.length === 0) return null;
+      const copy = collectionModuleCopy(module, pick);
       return {
         kind: 'picks',
         id: module.id,
         eyebrow: homeCopy.picksEyebrow,
-        heading: module.heading ?? pick.title,
-        summary: pick.summary,
+        heading: copy.heading,
+        summary: copy.summary,
         cards,
         seeAll: {
           href: picksPath(pick.slug),
@@ -368,12 +276,24 @@ function viewOf(
     }
     case 'gift_guide': {
       if (!context.settings.giftsEnabled) return null;
+      const guide =
+        context.giftGuide?.id === module.collectionId
+          ? context.giftGuide
+          : null;
+      if (module.heading === null && !guide) return null;
+      const copy = guide
+        ? collectionModuleCopy(module, guide)
+        : { heading: module.heading ?? '', summary: null };
       return {
         kind: 'gift_guide',
         id: module.id,
         eyebrow: homeCopy.giftGuideEyebrow,
-        heading: module.heading ?? homeCopy.giftGuideHeading,
-        body: hasText(module.body) ? module.body : null,
+        heading: copy.heading,
+        body: hasContent(module.body)
+          ? module.body
+          : copy.summary
+            ? paragraphs(copy.summary)
+            : null,
         action: { href: giftGuidePath, label: homeCopy.giftGuideAction },
         sponsor: homeCopy.giftGuideSponsor,
       };
@@ -444,21 +364,19 @@ export function buildHomePage(input: HomeInput): HomePage {
   };
 }
 
-/** The experiences the page's cards show, each once, for one read of their cover photos. */
+/** The experiences on the Picks cards, each once, for one read of their cover photos. The "On this week" cards arrive with theirs. */
 export function homeCardIds(page: HomePage): string[] {
   if (page.kind === 'empty') return [];
   return [
     ...new Set(
       page.modules.flatMap((module) =>
-        module.kind === 'picks' || module.kind === 'this_week'
-          ? module.cards.map((card) => card.id)
-          : [],
+        module.kind === 'picks' ? module.cards.map((card) => card.id) : [],
       ),
     ),
   ];
 }
 
-/** The page with each card's cover photo set. */
+/** The page with each Picks card's cover photo set. */
 export function withHomeCovers(
   page: HomePage,
   covers: ReadonlyMap<string, PhotoView>,
@@ -467,17 +385,9 @@ export function withHomeCovers(
   return {
     ...page,
     modules: page.modules.map((module) =>
-      module.kind === 'picks' || module.kind === 'this_week'
+      module.kind === 'picks'
         ? { ...module, cards: withCovers(module.cards, covers) }
         : module,
     ),
   };
-}
-
-/** The site banner: its text, or null when there is none or it is blank. */
-export function bannerText(
-  settings: Pick<GuestSettings, 'bannerText'>,
-): string | null {
-  const text = settings.bannerText?.trim() ?? '';
-  return text === '' ? null : text;
 }

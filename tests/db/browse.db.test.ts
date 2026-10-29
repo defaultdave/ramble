@@ -1,20 +1,25 @@
+import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { ZodError } from 'zod';
 import {
   browseDays,
   browsePageSize,
+  browseWindowDays,
   maxHandEnteredDayRows,
   maxStoredDayRows,
   toBrowsePage,
   type BrowsePage,
 } from '@/lib/browse';
 import { noFilters, type BrowseFilters } from '@/lib/filters';
+import { msPerDay } from '@/lib/time';
 import {
   cancellationTiers,
   categories,
   experiences,
   hosts,
   neighborhoods,
+  photos,
   priceOptions,
   sessionTemplates,
   sessions,
@@ -30,13 +35,16 @@ import {
 // - a live experience with no price is left out, and a guide-only entry with none is kept
 // - a guide-only row with no link out cannot be stored, by insert or by update, so no browse card lacks its link
 // - a live experience that loses its last price leaves the read, so no browse card lacks a price
+// - a card carries the lowest-position photo as its cover, and an experience with no photo still lists with a null image
 // - results come by name and then id, and the page is cut at the hard size with a cursor
 // - the next page starts after the cursor and no row is shown twice or skipped, including two rows with one name
 // - a row added before the cursor, or hidden after it, between two pages moves nothing already shown
 // - a cursor for a hidden or unknown experience finds no row and reads no page; a visible one returns its row
+// - the cursor row is read once per request, as its own query, and the page query does not read it again
 // - category and neighborhood filters match any value of their list and both must hold; an unknown slug matches nothing
 // - the date filter matches a scheduled session that starts that day in the host's own calendar, from the
 //   stored date or, for a session entered by hand, from its time zone
+// - a session starting exactly at asOf is offered and matches; one starting exactly at the window's end does neither
 // - a cancelled session, a session already started, and a session past the window never match
 // - the calendar read returns raw stored values only (stored dates, and start and zone of hand-entered sessions) and decides no day
 // - each calendar list has a hard cap
@@ -372,6 +380,7 @@ describe('what a guest sees', () => {
       neighborhoodName: where.neighborhood.name,
       durationMinutes: 150,
       linkOutUrl: null,
+      image: null,
       priceOptions: [
         { priceMinor: 3500, usesSpace: true },
         { priceMinor: 7000, usesSpace: true },
@@ -491,6 +500,45 @@ describe('paging', () => {
     );
 
     expect(read.cursor).toEqual({ id: live.id, name: 'A live' });
+  });
+});
+
+describe('covers', () => {
+  async function insertPhoto(experienceId: string, position: number) {
+    const id = randomUUID();
+    await client.db.insert(photos).values({
+      id,
+      experienceId,
+      position,
+      storageKey: `public/photos/${experienceId}/${id}.jpg`,
+      url: `https://store.example/${experienceId}/${String(position)}.jpg`,
+      width: 1600,
+      height: 1000,
+      byteSize: 1000,
+      decorative: true,
+      blurDataUrl: 'data:image/jpeg;base64,/9j/4AAQ',
+      rightsBasis: 'ramble_owned',
+    });
+  }
+
+  it('carries the lowest-position photo, and a null image for an experience with none', async () => {
+    const where = await scope();
+    const covered = await insertExperience(where, { name: 'A covered' });
+    await insertPhoto(covered.id, 3);
+    await insertPhoto(covered.id, 1);
+    const bare = await insertExperience(where, { name: 'B bare' });
+
+    const page = await list(filtersFor(where));
+
+    expect(page.items.map(({ id }) => id)).toEqual([covered.id, bare.id]);
+    expect(page.items[0]?.image).toEqual({
+      src: `https://store.example/${covered.id}/1.jpg`,
+      width: 1600,
+      height: 1000,
+      alt: '',
+      blurDataUrl: 'data:image/jpeg;base64,/9j/4AAQ',
+    });
+    expect(page.items[1]?.image).toBeNull();
   });
 });
 
@@ -770,6 +818,98 @@ describe('the calendar read', () => {
   });
 });
 
+describe('the window edges', () => {
+  const opening = asOf;
+  const closing = new Date(
+    new Date(asOf).getTime() + browseWindowDays * msPerDay,
+  ).toISOString();
+
+  it('offers and matches a session starting exactly when the window opens', async () => {
+    const where = await scope();
+    const exp = await insertExperience(where, { name: 'At the opening' });
+    await insertSession(exp.id, opening);
+
+    expect(
+      await daysFor({ categories: [where.category.slug], neighborhoods: [] }),
+    ).toEqual([opening.slice(0, 10)]);
+    expect(
+      names(await list(filtersFor(where, { date: opening.slice(0, 10) }))),
+    ).toEqual(['At the opening']);
+  });
+
+  it('neither offers nor matches a session starting exactly when the window ends', async () => {
+    const where = await scope();
+    const exp = await insertExperience(where, { name: 'At the closing' });
+    await insertSession(exp.id, closing);
+
+    expect(
+      await daysFor({ categories: [where.category.slug], neighborhoods: [] }),
+    ).toEqual([]);
+    expect(
+      (await list(filtersFor(where, { date: closing.slice(0, 10) }))).items,
+    ).toEqual([]);
+  });
+});
+
+describe('days with no space left', () => {
+  it('neither offers nor matches a day whose only sessions are sold out, and does both for a day with one space left', async () => {
+    const where = await scope();
+    const exp = await insertExperience(where, { name: 'Sold out day' });
+    await insertSession(exp.id, '2026-11-07T14:00:00Z', {
+      allocation: 4,
+      seatsSold: 4,
+    });
+    await insertSession(exp.id, '2026-11-07T19:00:00Z', {
+      allocation: 0,
+      seatsSold: 0,
+    });
+    await insertSession(exp.id, '2026-11-08T14:00:00Z', {
+      allocation: 4,
+      seatsSold: 3,
+    });
+    const filters = { categories: [where.category.slug], neighborhoods: [] };
+
+    expect(await daysFor(filters)).toEqual(['2026-11-08']);
+    expect(
+      (await list(filtersFor(where, { date: '2026-11-07' }))).items,
+    ).toEqual([]);
+    expect(
+      names(await list(filtersFor(where, { date: '2026-11-08' }))),
+    ).toEqual(['Sold out day']);
+  });
+
+  it('offers a day through its session with space even when another session that day is sold out', async () => {
+    const where = await scope();
+    const exp = await insertExperience(where, { name: 'Mixed day' });
+    await insertSession(exp.id, '2026-11-07T14:00:00Z', {
+      allocation: 4,
+      seatsSold: 4,
+    });
+    await insertSession(exp.id, '2026-11-07T19:00:00Z', {
+      allocation: 4,
+      seatsSold: 0,
+    });
+
+    expect(
+      await daysFor({ categories: [where.category.slug], neighborhoods: [] }),
+    ).toEqual(['2026-11-07']);
+    expect(
+      names(await list(filtersFor(where, { date: '2026-11-07' }))),
+    ).toEqual(['Mixed day']);
+  });
+
+  it('still lists an experience with no space left when no date is chosen', async () => {
+    const where = await scope();
+    const exp = await insertExperience(where, { name: 'Full but listed' });
+    await insertSession(exp.id, '2026-11-07T14:00:00Z', {
+      allocation: 4,
+      seatsSold: 4,
+    });
+
+    expect(names(await list(filtersFor(where)))).toEqual(['Full but listed']);
+  });
+});
+
 describe('the day the calendar shows and the day the date filter matches', () => {
   // Each zone has the minute before local midnight and the minute after, so one side of every pair is the day before.
   it.each([
@@ -837,9 +977,55 @@ describe('input the schema refuses', () => {
   it('refuses a time it cannot read', async () => {
     await expect(
       browse.listBrowseExperiences({ filters: noFilters, after: null }, 'soon'),
-    ).rejects.toThrow(RangeError);
+    ).rejects.toThrow(ZodError);
     await expect(
       browse.listBrowseDayRows({ categories: [], neighborhoods: [] }, 'soon'),
-    ).rejects.toThrow(RangeError);
+    ).rejects.toThrow(ZodError);
+  });
+
+  describe('queries sent for a cursor', () => {
+    async function sentQueries(after: string, where: Scope) {
+      const send = vi.spyOn(globalThis, 'fetch');
+      try {
+        await browse.listBrowseExperiences(
+          { filters: filtersFor(where), after },
+          asOf,
+        );
+        return send.mock.calls.map(
+          ([, init]) =>
+            JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
+              query: string;
+            },
+        );
+      } finally {
+        send.mockRestore();
+      }
+    }
+
+    it('sends one query for a cursor nobody can see', async () => {
+      const where = await scope();
+      await insertExperience(where, { name: 'A live' });
+
+      const sent = await sentQueries(
+        '00000000-0000-4000-8000-0000000000aa',
+        where,
+      );
+
+      expect(sent).toHaveLength(1);
+    });
+
+    it('reads the cursor row once, and the page query only compares against it', async () => {
+      const where = await scope();
+      const first = await insertExperience(where, { name: 'A first' });
+      await insertExperience(where, { name: 'B second' });
+
+      const sent = await sentQueries(first.id, where);
+
+      const readsCursor = sent.filter(({ query }) =>
+        query.includes('"experiences"."id" = $1'),
+      );
+      expect(readsCursor).toHaveLength(1);
+      expect(sent.length).toBeGreaterThan(1);
+    });
   });
 });

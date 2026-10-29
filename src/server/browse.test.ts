@@ -1,11 +1,18 @@
 import { notFound } from 'next/navigation';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { browseTitle } from '@/lib/browse';
 import { noFilters } from '@/lib/filters';
-import { getBrowseDates, getBrowseResults, getFilterOptions } from './browse';
+import {
+  getBrowseDates,
+  getBrowseResults,
+  getBrowseTitle,
+  getFilterOptions,
+} from './browse';
 
 // Behaviours under test, one per decision, branch or risk:
 // - each cached read names its cache profile and tags itself, results with the catalog and every experience they list
-// - a failed read throws only the kind of the failure, never the query, its values, or the cause
+// - a cursor nobody can see is not kept: the uncached profile is named; a page that was found names no other
+// - a failed read throws only the name of the read and the kind of the failure, never the query, its values, or the cause
 // - a framework control-flow error passes through unchanged
 
 const cache = vi.hoisted(() => ({ life: vi.fn(), tag: vi.fn() }));
@@ -28,6 +35,9 @@ vi.mock('@/server/db/catalog', () => ({
   listCategories: db.categories,
   listNeighborhoods: db.neighborhoods,
 }));
+
+const log = vi.hoisted(() => ({ error: vi.fn() }));
+vi.mock('@/server/monitoring/logger', () => ({ logger: log }));
 
 const asOf = '2026-10-26T12:00:00.000Z';
 const query = { filters: noFilters, after: null };
@@ -71,6 +81,7 @@ describe('getBrowseResults', () => {
     });
 
     expect(cache.tag.mock.calls.flat()).toEqual(['catalog']);
+    expect(cache.life).toHaveBeenLastCalledWith('uncached');
   });
 
   it('throws the kind of a failed read and not the query or its values', async () => {
@@ -81,7 +92,7 @@ describe('getBrowseResults', () => {
     );
 
     expect(failure).toMatchObject({
-      name: 'BrowseReadError',
+      name: 'CachedReadError',
       message: 'Browse read failed: Error',
     });
     expect(JSON.stringify(failure)).not.toContain('secret-slug');
@@ -121,7 +132,7 @@ describe('getBrowseDates', () => {
 
     await expect(
       getBrowseDates({ categories: [], neighborhoods: [] }, asOf),
-    ).rejects.toThrow('Browse read failed: Error');
+    ).rejects.toThrow('Browse dates read failed: Error');
   });
 });
 
@@ -140,8 +151,8 @@ describe('getBrowseDates with a session the calendar cannot place', () => {
     ).catch((error: unknown) => error);
 
     expect(failure).toMatchObject({
-      name: 'BrowseReadError',
-      message: 'Browse read failed: RangeError',
+      name: 'CachedReadError',
+      message: 'Browse dates read failed: RangeError',
     });
     expect(JSON.stringify(failure)).not.toContain('Phobos');
   });
@@ -168,7 +179,7 @@ describe('getFilterOptions', () => {
     db.neighborhoods.mockResolvedValue([]);
 
     await expect(getFilterOptions()).rejects.toThrow(
-      'Browse read failed: Error',
+      'Filter options read failed: Error',
     );
   });
 
@@ -177,7 +188,48 @@ describe('getFilterOptions', () => {
     db.neighborhoods.mockResolvedValue([]);
 
     await expect(getFilterOptions()).rejects.toThrow(
-      'Browse read failed: unknown',
+      'Filter options read failed: unknown',
     );
+  });
+});
+
+describe('getBrowseTitle', () => {
+  const cooking = { id: '1', slug: 'cooking', name: 'Cooking' };
+  const filtered = { ...noFilters, categories: ['cooking'] };
+
+  it('names the filters in the title', async () => {
+    db.categories.mockResolvedValue([cooking]);
+    db.neighborhoods.mockResolvedValue([]);
+
+    await expect(getBrowseTitle(filtered)).resolves.toBe(
+      browseTitle(filtered, { categories: [cooking], neighborhoods: [] }),
+    );
+  });
+
+  it('returns the title without filter names, logs only the digest and kind, and does not throw when the read fails', async () => {
+    db.categories.mockRejectedValue(driverError);
+    db.neighborhoods.mockResolvedValue([]);
+
+    await expect(getBrowseTitle(filtered)).resolves.toBe(
+      browseTitle(filtered, { categories: [], neighborhoods: [] }),
+    );
+
+    expect(log.error).toHaveBeenCalledExactlyOnceWith(
+      'Browse title could not be read',
+      { digest: undefined, kind: 'CachedReadError' },
+    );
+    expect(JSON.stringify(log.error.mock.calls)).not.toContain('secret-slug');
+  });
+
+  it('passes a framework control-flow error through', async () => {
+    db.categories.mockImplementation(() => {
+      notFound();
+    });
+    db.neighborhoods.mockResolvedValue([]);
+
+    await expect(getBrowseTitle(filtered)).rejects.toMatchObject({
+      digest: expect.stringContaining('NEXT_HTTP_ERROR_FALLBACK') as string,
+    });
+    expect(log.error).not.toHaveBeenCalled();
   });
 });

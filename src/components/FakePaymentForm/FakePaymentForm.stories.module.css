@@ -1,0 +1,5 @@
+/* The checkout page decides the form's width; the stories give it a phone-sized column. */
+.frame {
+  max-inline-size: calc(var(--space-16) * 6);
+  margin-inline: auto;
+}

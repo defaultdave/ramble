@@ -25,6 +25,18 @@ const optional = <T extends z.ZodType>(schema: T) =>
     schema.optional(),
   );
 
+// Zod runs every check even after `.max()` fails, so the pattern check passes an over-long value
+// without walking it: only the length issue is reported.
+const hostname = z
+  .string()
+  .max(253)
+  .refine(
+    (value) => value.length > 253 || /^[A-Za-z0-9.-]+$/.test(value),
+    'not a hostname',
+  );
+
+const loopbackHosts = ['localhost', '127.0.0.1', '[::1]', '::1'];
+
 const httpsUrl = z.url({ protocol: /^https$/ });
 
 const schema = z
@@ -40,6 +52,11 @@ const schema = z
     VERCEL_GIT_COMMIT_SHA: optional(z.string().max(64)),
     // Read only by the seed command, which refuses to run unless this says what the database is.
     SEED_TARGET: optional(z.enum(seedTargets)),
+    // The database host the seed may write to; it must equal the DATABASE_URL host for every target but local.
+    SEED_HOST: optional(hostname),
+    // Sends the Neon HTTP driver (dbRead) to a local stand-in for Neon's endpoint, so a local build can
+    // read the docker-compose database (`pnpm db:http`). Refused in a Vercel production or preview deployment.
+    NEON_HTTP_ENDPOINT: optional(z.url({ protocol: /^http$/ })),
     EMAIL_MODE: z.enum(emailModes).default('sink'),
     EMAIL_PROVIDER: z.enum(emailAdapterNames).default('fake'),
     EMAIL_ALLOWLIST: EmailAllowlistSchema.default([]),
@@ -58,6 +75,8 @@ const schema = z
     AXIOM_DATASET: optional(z.string().regex(/^[A-Za-z0-9_-]{1,128}$/)),
     // Signs the form-guard token. Read only when a guest form renders or is submitted, which throws if it is unset outside development and test.
     FORM_GUARD_SECRET: z.string().min(32).optional(),
+    // Derives every capability link (manage, confirmation). Read when a link is made or checked, which throws if it is unset outside test: a token opens a booking, so there is no stand-in in development.
+    CAPABILITY_TOKEN_SECRET: optional(sharedSecret),
     // Bearer secret for POST /api/pulse. Unset, the route refuses everyone.
     PULSE_SECRET: optional(sharedSecret),
     // Lets the pulse take a manual time (`asOf`) so the demo can show tomorrow's jobs. Off unless set to "on".
@@ -73,6 +92,24 @@ const schema = z
   .superRefine((value, ctx) => {
     for (const { name, message } of storageSettingIssues(value)) {
       ctx.addIssue({ code: 'custom', path: [name], message });
+    }
+  })
+  .superRefine((value, ctx) => {
+    if (!value.NEON_HTTP_ENDPOINT) return;
+    // The messages never repeat the value: it may carry credentials.
+    if (value.VERCEL_ENV === 'production' || value.VERCEL_ENV === 'preview') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['NEON_HTTP_ENDPOINT'],
+        message: 'Must not be set in a production or preview deployment',
+      });
+    }
+    if (!loopbackHosts.includes(new URL(value.NEON_HTTP_ENDPOINT).hostname)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['NEON_HTTP_ENDPOINT'],
+        message: 'Must point at localhost, 127.0.0.1, or ::1',
+      });
     }
   })
   .superRefine((value, ctx) => {

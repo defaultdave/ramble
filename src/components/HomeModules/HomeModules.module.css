@@ -1,7 +1,7 @@
 /* Every module is a full-width band with an inner column capped at the content width. */
 .section {
   box-sizing: border-box;
-  padding: var(--space-8) var(--space-6);
+  padding: var(--space-8) var(--size-gutter);
   font-family: var(--font-family-body);
   color: var(--color-text-primary);
 }
@@ -95,20 +95,25 @@
 .pills {
   display: flex;
   gap: var(--space-4);
-  margin: 0 calc(-1 * var(--space-6));
-  padding: var(--space-1) var(--space-6);
+  margin: 0 calc(-1 * var(--size-gutter));
+  padding: var(--space-1) var(--size-gutter);
   list-style: none;
   overflow-x: auto;
   scroll-snap-type: x proximity;
-  scroll-padding-inline: var(--space-6);
+  scroll-padding-inline: var(--size-gutter);
 }
 
 .rail > li,
 .pills > li {
-  flex: 0 0 85%;
   min-width: 0;
   max-width: calc(var(--space-16) * 6);
   scroll-snap-align: start;
+}
+
+/* One card fills the column and --space-2 of the next shows past the gutter. The percentage is the
+   rail's content box (the column); the gutter is added back because the rail bleeds into it. */
+.rail > li {
+  flex: 0 0 calc(100% + var(--size-gutter) - var(--space-4) - var(--space-2));
 }
 
 .pills {

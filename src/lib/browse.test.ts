@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   BrowseDayRowsSchema,
-  browseCardIds,
   browseDays,
   browseDateHorizonDays,
+  browseHeading,
+  browseTitle,
   browsePageSize,
   browseView,
-  browseWindow,
+  browseWindowDays,
   dateChipLabel,
   errorView,
   maxHandEnteredDayRows,
@@ -15,14 +16,12 @@ import {
   nextBrowseDay,
   splitPage,
   toBrowsePage,
-  withPriceOptions,
-  toBrowseCard,
-  withBrowseCovers,
-  type BrowseExperience,
   type BrowsePage,
+  type BrowseView,
   type BrowseRead,
 } from './browse';
-import { noFilters } from './filters';
+import type { CardExperience } from './experienceCards';
+import { noFilters, type BrowseFilters } from './filters';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the window runs from the cache time to the horizon
@@ -31,13 +30,8 @@ import { noFilters } from './filters';
 // - the calendar days: a generated session keeps its stored date, a hand-entered one is on the day its start falls on in its own zone
 //   (east of UTC, west of UTC, a clock-change day), days are merged, de-duplicated, and sorted, and an unknown zone refuses the read
 // - the raw calendar rows are bounded: too many stored dates or hand-entered sessions, a bad date, or a bad zone is refused
-// - prices are grouped under their experience, lowest first
-// - a card price comes only from options that take a space; a kids class with a free accompanying adult reads the child price, and an experience with no such option has no card
-// - an experience address names the area by status
-// - a card carries neighborhood and duration, links a guide entry out, and refuses a guide entry with no link
 // - the summary line counts the cards
-// - the experiences of a page are its items, and none for an outdated page
-// - a cover is set on the cards of a results view, and any other view is returned as it is
+// - a card shows the cover its experience read carried, and no image when it carried none
 // - each results state is chosen from the page: outdated cursor, empty (filtered or not), results with or without more, later page, error
 // - a dated empty page offers the next day with sessions (other filters kept) and any day; when the window has none it offers only any day
 // - the next day is the first listed day after the chosen one: the day after, a gap, none left, today whose sessions have all started (not listed), a date before every listed day, an empty list
@@ -47,8 +41,8 @@ const id = (n: number) =>
 
 function experience(
   n: number,
-  overrides: Partial<BrowseExperience> = {},
-): BrowseExperience {
+  overrides: Partial<CardExperience> = {},
+): CardExperience {
   return {
     id: id(n),
     slug: `thing-${String(n)}`,
@@ -62,17 +56,9 @@ function experience(
   };
 }
 
-describe('browseWindow', () => {
-  it('runs from the minute to a day past the horizon', () => {
-    const { from, to } = browseWindow('2026-10-26T14:05:00.000Z');
-    expect(from.toISOString()).toBe('2026-10-26T14:05:00.000Z');
-    expect((to.getTime() - from.getTime()) / 86_400_000).toBe(
-      browseDateHorizonDays + 1,
-    );
-  });
-
-  it('refuses a time it cannot read', () => {
-    expect(() => browseWindow('soon')).toThrow(RangeError);
+describe('browseWindowDays', () => {
+  it('covers the horizon and the whole last day', () => {
+    expect(browseWindowDays).toBe(browseDateHorizonDays + 1);
   });
 });
 
@@ -144,114 +130,6 @@ describe('toBrowsePage', () => {
       ok: false,
       reason: 'cursor_not_found',
     });
-  });
-});
-
-describe('withPriceOptions', () => {
-  it('gives each row its own prices, lowest first, and ignores prices of unlisted rows', () => {
-    expect(
-      withPriceOptions(
-        [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
-        [
-          { experienceId: 'a', priceMinor: 7000, usesSpace: true },
-          { experienceId: 'b', priceMinor: 500, usesSpace: false },
-          { experienceId: 'a', priceMinor: 3500, usesSpace: true },
-          { experienceId: 'zzz', priceMinor: 1, usesSpace: true },
-        ],
-      ),
-    ).toEqual([
-      {
-        id: 'a',
-        priceOptions: [
-          { priceMinor: 3500, usesSpace: true },
-          { priceMinor: 7000, usesSpace: true },
-        ],
-      },
-      { id: 'b', priceOptions: [{ priceMinor: 500, usesSpace: false }] },
-      { id: 'c', priceOptions: [] },
-    ]);
-  });
-
-  it('keeps the other fields of a row', () => {
-    expect(withPriceOptions([{ id: 'a', name: 'Thing' }], [])).toEqual([
-      { id: 'a', name: 'Thing', priceOptions: [] },
-    ]);
-  });
-});
-
-describe('toBrowseCard', () => {
-  it('carries the neighborhood, the duration, and the price of a bookable experience', () => {
-    expect(toBrowseCard(experience(1))).toEqual({
-      id: id(1),
-      title: 'Thing 1',
-      meta: 'DUMBO · 2\u00a0hr',
-      href: `/experiences/thing-1-${id(1)}`,
-      image: null,
-      kind: 'bookable',
-      price: '$85',
-    });
-  });
-
-  it('prices a kids class from the child, not from the free accompanying adult', () => {
-    const kidsClass = experience(1, {
-      priceOptions: [
-        { priceMinor: 0, usesSpace: false },
-        { priceMinor: 4500, usesSpace: true },
-      ],
-    });
-    expect(toBrowseCard(kidsClass)).toMatchObject({
-      kind: 'bookable',
-      price: '$45',
-    });
-  });
-
-  it('keeps a free option that takes a space as the card price', () => {
-    const freeTour = experience(1, {
-      priceOptions: [
-        { priceMinor: 0, usesSpace: true },
-        { priceMinor: 2000, usesSpace: true },
-      ],
-    });
-    expect(toBrowseCard(freeTour)).toMatchObject({ price: 'From $0' });
-  });
-
-  it('leaves the duration out when there is none', () => {
-    expect(toBrowseCard(experience(1, { durationMinutes: null }))?.meta).toBe(
-      'DUMBO',
-    );
-  });
-
-  it('links a guide entry out to the host', () => {
-    expect(
-      toBrowseCard(
-        experience(2, {
-          status: 'guide_only',
-          linkOutUrl: 'https://host.example/class',
-          priceOptions: [],
-        }),
-      ),
-    ).toMatchObject({
-      kind: 'guide-only',
-      hostHref: 'https://host.example/class',
-      href: `/guide/thing-2-${id(2)}`,
-    });
-  });
-
-  it.each([
-    [
-      'a guide entry that has nowhere to link',
-      experience(2, { status: 'guide_only', priceOptions: [] }),
-    ],
-    [
-      'a bookable experience with no price',
-      experience(3, { priceOptions: [] }),
-    ],
-    [
-      'a bookable experience whose only option takes no space',
-      experience(4, { priceOptions: [{ priceMinor: 0, usesSpace: false }] }),
-    ],
-  ])('leaves out %s', (_name, input) => {
-    expect(toBrowseCard(input)).toBeNull();
   });
 });
 
@@ -502,43 +380,25 @@ describe('browseView', () => {
 });
 
 describe('covers on browse results', () => {
-  const cover = {
+  const image = {
     src: 'https://store.example/a.jpg',
     width: 1600,
     height: 1000,
     alt: 'A kayak at dusk',
     blurDataUrl: 'data:image/jpeg;base64,/9j/4AAQ',
   };
-  const page: BrowsePage = {
-    ok: true,
-    items: [experience(1), experience(2)],
-    nextCursor: null,
-  };
 
-  it('lists the experiences of a page, and none for an outdated one', () => {
-    expect(browseCardIds(page)).toEqual([id(1), id(2)]);
-    expect(browseCardIds({ ok: false, reason: 'cursor_not_found' })).toEqual(
-      [],
-    );
-  });
+  it('shows the cover an experience carries, and no image for one without', () => {
+    const page: BrowsePage = {
+      ok: true,
+      items: [experience(1), { ...experience(2), image }],
+      nextCursor: null,
+    };
+    const view = browseView({ filters: noFilters, after: null }, page, []);
 
-  it('sets the cover of each card that has one', () => {
-    const view = withBrowseCovers(
-      browseView({ filters: noFilters, after: null }, page, []),
-      new Map([[id(2), cover]]),
-    );
-
-    expect(view.state === 'results' && view.cards.map((c) => c.image)).toEqual([
-      null,
-      cover,
-    ]);
-  });
-
-  it.each([
-    [{ state: 'empty', filtered: false, dated: null } as const],
-    [{ state: 'outdated', startHref: '/new-york/browse' } as const],
-  ])('returns %j as it is', (view) => {
-    expect(withBrowseCovers(view, new Map([[id(1), cover]]))).toBe(view);
+    expect(
+      view.state === 'results' && view.cards.map((card) => card.image),
+    ).toEqual([null, image]);
   });
 });
 
@@ -741,5 +601,99 @@ describe('BrowseDayRowsSchema', () => {
     ],
   ])('refuses %s', (_name, rows) => {
     expect(BrowseDayRowsSchema.safeParse(rows).success).toBe(false);
+  });
+});
+
+describe('browseHeading', () => {
+  const dated = {
+    dateLabel: 'Sat, Nov 7',
+    nextDay: null,
+    anyDayHref: '/new-york/browse',
+    message: '',
+  };
+  it.each([
+    [
+      'the count on results',
+      {
+        state: 'results',
+        cards: [],
+        summary: 'Showing 12 experiences',
+        showMore: null,
+        startHref: null,
+      },
+      'Showing 12 experiences',
+    ],
+    [
+      'the day on an empty chosen day',
+      { state: 'empty', filtered: true, dated },
+      'Nothing on Sat, Nov 7',
+    ],
+    [
+      'filters on an empty filtered page',
+      { state: 'empty', filtered: true, dated: null },
+      'Nothing matches those filters',
+    ],
+    [
+      'an empty catalog',
+      { state: 'empty', filtered: false, dated: null },
+      'Nothing to browse yet',
+    ],
+    [
+      'a moved page',
+      { state: 'outdated', startHref: '/new-york/browse' },
+      'That page of results has moved',
+    ],
+    [
+      'nothing on error, which has its own alert',
+      { state: 'error', retry: { action: '/new-york/browse', fields: [] } },
+      null,
+    ],
+  ] as const)('says %s', (_name, view, text) => {
+    expect(browseHeading(view as unknown as BrowseView)).toBe(text);
+  });
+});
+
+describe('browseTitle', () => {
+  const names = {
+    categories: [
+      { slug: 'cooking', name: 'Cooking' },
+      { slug: 'wine', name: 'Wine' },
+      { slug: 'tours', name: 'Tours' },
+    ],
+    neighborhoods: [{ slug: 'dumbo', name: 'DUMBO' }],
+  };
+  const empty = { categories: [], neighborhoods: [] };
+  const filters = (over: Partial<BrowseFilters>): BrowseFilters => ({
+    ...noFilters,
+    ...over,
+  });
+  it.each([
+    ['no filters', {}, 'Browse experiences'],
+    ['a day', { date: '2026-10-31' }, 'Browse experiences on Sat, Oct 31'],
+    ['a category', { categories: ['cooking'] }, 'Browse Cooking experiences'],
+    [
+      'two categories',
+      { categories: ['cooking', 'wine'] },
+      'Browse Cooking and Wine experiences',
+    ],
+    [
+      'three categories',
+      { categories: ['cooking', 'tours', 'wine'] },
+      'Browse Cooking, Tours, and Wine experiences',
+    ],
+    [
+      'everything',
+      { categories: ['cooking'], neighborhoods: ['dumbo'], date: '2026-11-07' },
+      'Browse Cooking experiences in DUMBO on Sat, Nov 7',
+    ],
+    [
+      'a slug with no name',
+      { categories: ['unknown'], neighborhoods: ['gone'] },
+      'Browse experiences',
+    ],
+    ['no options at all', { categories: ['cooking'] }, 'Browse experiences'],
+  ])('words %s', (name, over, title) => {
+    const options = name === 'no options at all' ? empty : names;
+    expect(browseTitle(filters(over), options)).toBe(title);
   });
 });

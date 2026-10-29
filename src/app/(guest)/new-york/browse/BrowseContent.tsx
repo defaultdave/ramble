@@ -1,25 +1,28 @@
-import { unstable_rethrow } from 'next/navigation';
 import { connection } from 'next/server';
 import { BrowseResults } from '@/components/BrowseResults';
 import { FilterBar } from '@/components/FilterBar';
 import {
-  browseCardIds,
+  browseHeading,
   browseView,
+  emptyBrowsePage,
   errorView,
-  withBrowseCovers,
 } from '@/lib/browse';
-import { parseFilters, type RawSearchParams } from '@/lib/filters';
-import { coverLookupIds, coversByExperience } from '@/lib/photoViews';
+import {
+  knownFilters,
+  parseFilters,
+  type RawSearchParams,
+} from '@/lib/filters';
 import { minuteAsOf } from '@/lib/time';
 import { venueToday } from '@/lib/venue';
-import { getCoverPhotos } from '@/server/coverPhotos';
 import {
   getBrowseDates,
   getBrowseResults,
   getFilterOptions,
 } from '@/server/browse';
 import { chooseBrowseDate } from '@/server/actions/browse';
-import { logger } from '@/server/monitoring/logger';
+import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
+
+import styles from './page.module.css';
 
 type BrowseContentProps = { searchParams: Promise<RawSearchParams> };
 
@@ -34,30 +37,34 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
 
   let loaded;
   try {
-    const [options, dates, page] = await Promise.all([
-      getFilterOptions(),
-      getBrowseDates(filters, asOf),
-      getBrowseResults(query, asOf),
-    ]);
-    const covers = await getCoverPhotos(coverLookupIds(browseCardIds(page)));
-    loaded = { options, dates, page, covers: coversByExperience(covers) };
+    const options = await getFilterOptions();
+    // Only slugs the catalog has reach a cache key or the database; the view below keeps the address as it was.
+    const known = knownFilters(filters, options);
+    const [dates, page] = known.matchesNothing
+      ? [[], emptyBrowsePage]
+      : await Promise.all([
+          getBrowseDates(known.filters, asOf),
+          getBrowseResults({ ...query, filters: known.filters }, asOf),
+        ]);
+    loaded = { options, dates, page };
   } catch (error) {
-    // Next.js ends a prerender by throwing; swallowing that would break the render.
-    unstable_rethrow(error);
-    // Only the digest is logged. Next.js strips the message of an error that crosses a cached
-    // function, and the digest finds the line it logged there, which names the kind of failure.
-    logger.error('Browse could not be read', {
-      digest:
-        error instanceof Error && 'digest' in error
-          ? String(error.digest)
-          : undefined,
-    });
-    return <BrowseResults {...errorView(query)} />;
+    rethrowOrLog('Browse could not be read', error);
+    return (
+      <>
+        <p role="status" className={styles.announcement} />
+        <BrowseResults {...errorView(query)} />
+      </>
+    );
   }
 
-  const { options, dates, page, covers } = loaded;
+  const { options, dates, page } = loaded;
+  const view = browseView(query, page, dates);
   return (
     <>
+      {/* Always rendered, so a screen reader hears the text change when the filters do. */}
+      <p role="status" className={styles.announcement}>
+        {browseHeading(view)}
+      </p>
       <FilterBar
         categories={options.categories.map(({ slug, name }) => ({
           slug,
@@ -72,9 +79,7 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
         availableDates={dates}
         onPickDate={chooseBrowseDate.bind(null, filters)}
       />
-      <BrowseResults
-        {...withBrowseCovers(browseView(query, page, dates), covers)}
-      />
+      <BrowseResults {...view} />
     </>
   );
 }

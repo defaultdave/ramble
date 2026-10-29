@@ -1,18 +1,20 @@
 import { z } from 'zod';
-import { EntityIdSchema, SlugSchema, guestVisibleStatuses } from './catalog';
+import {
+  toExperienceCard,
+  type CardExperience,
+  type ExperienceCard,
+} from './experienceCards';
 import {
   activeFilterCount,
   hrefForFilters,
   toQueryEntries,
   withDate,
+  type BrowseFilters,
   type BrowseQuery,
 } from './filters';
-import { withCovers, type PhotoView } from './photoViews';
-import { durationLabel } from './duration';
-import { cardPriceLabel } from './pricing';
-import { browsePath, experienceCardPath } from './routes';
+import { browsePath } from './routes';
 import { IsoDateSchema, TimeZoneSchema, isKnownTimeZone } from './sessions';
-import { calendarDateFormat, msPerDay } from './time';
+import { calendarDateFormat } from './time';
 
 /** A hard page size: the data layer reads one more row than this to learn whether there is a next page. */
 export const browsePageSize = 12;
@@ -20,19 +22,8 @@ export const browsePageSize = 12;
 /** How far ahead a guest can pick a date. Sessions are generated a year ahead; browse looks a season out. */
 export const browseDateHorizonDays = 120;
 
-export type BrowseWindow = { from: Date; to: Date };
-
-/** The sessions a browse read looks at: those that start from `asOf` up to the horizon. */
-export function browseWindow(asOf: string): BrowseWindow {
-  const from = new Date(asOf);
-  if (Number.isNaN(from.getTime())) {
-    throw new RangeError('asOf must be an ISO date and time');
-  }
-  return {
-    from,
-    to: new Date(from.getTime() + (browseDateHorizonDays + 1) * msPerDay),
-  };
-}
+/** How long a browse read's window runs: the horizon and the whole last day, so the last pickable date is in it. */
+export const browseWindowDays = browseDateHorizonDays + 1;
 
 /**
  * The most distinct stored dates a window can hold. The window is one day longer than the horizon,
@@ -76,45 +67,6 @@ export function browseDays(rows: BrowseDayRows): string[] {
   return [...days].sort();
 }
 
-const BrowsePriceOptionSchema = z.object({
-  priceMinor: z.int().nonnegative(),
-  usesSpace: z.boolean(),
-});
-export type BrowsePriceOption = z.infer<typeof BrowsePriceOptionSchema>;
-
-/** The part of an experience a browse card shows, with nothing a guest may not see. */
-export const BrowseExperienceSchema = z.object({
-  id: EntityIdSchema,
-  slug: SlugSchema,
-  name: z.string().min(1),
-  status: z.enum(guestVisibleStatuses),
-  neighborhoodName: z.string().min(1),
-  durationMinutes: z.int().positive().nullable(),
-  linkOutUrl: z.string().nullable(),
-  priceOptions: z.array(BrowsePriceOptionSchema),
-});
-export type BrowseExperience = z.infer<typeof BrowseExperienceSchema>;
-
-export type PriceRow = {
-  experienceId: string;
-  priceMinor: number;
-  usesSpace: boolean;
-};
-
-/** Each experience with the prices that belong to it, lowest first. A price for an experience that is not listed is ignored. */
-export function withPriceOptions<T extends { id: string }>(
-  rows: readonly T[],
-  prices: readonly PriceRow[],
-): (T & { priceOptions: BrowsePriceOption[] })[] {
-  return rows.map((row) => ({
-    ...row,
-    priceOptions: prices
-      .filter((price) => price.experienceId === row.id)
-      .map(({ priceMinor, usesSpace }) => ({ priceMinor, usesSpace }))
-      .sort((a, b) => a.priceMinor - b.priceMinor),
-  }));
-}
-
 /**
  * One page from a read that fetched `pageSize + 1` rows. The extra row is not shown; its
  * presence is what says there is more, and the last shown row is where the next page starts.
@@ -132,8 +84,15 @@ export function splitPage<T extends { id: string }>(
 }
 
 export type BrowsePage =
-  | { ok: true; items: BrowseExperience[]; nextCursor: string | null }
+  | { ok: true; items: CardExperience[]; nextCursor: string | null }
   | { ok: false; reason: 'cursor_not_found' };
+
+/** The page for filters that match nothing, which needs no read. */
+export const emptyBrowsePage: BrowsePage = {
+  ok: true,
+  items: [],
+  nextCursor: null,
+};
 
 /** The row a page cursor names, as the data layer found it. */
 export type BrowseCursorRow = { id: string; name: string };
@@ -144,7 +103,7 @@ export type BrowseCursorRow = { id: string; name: string };
  */
 export type BrowseRead = {
   cursor: BrowseCursorRow | null;
-  items: BrowseExperience[];
+  items: CardExperience[];
   nextCursor: string | null;
 };
 
@@ -160,47 +119,6 @@ export function toBrowsePage(
     return { ok: false, reason: 'cursor_not_found' };
   }
   return { ok: true, items: read.items, nextCursor: read.nextCursor };
-}
-
-export type BrowseCard = {
-  id: string;
-  title: string;
-  meta: string;
-  href: string;
-  /** The experience's cover photo; null shows the card's missing-image state. */
-  image: PhotoView | null;
-} & (
-  { kind: 'bookable'; price: string } | { kind: 'guide-only'; hostHref: string }
-);
-
-/**
- * What a card says about an experience, or null when it cannot be shown as one: a bookable experience
- * with no price option that takes a space, or a guide entry with no link out. A card is left out, never
- * repaired. The read keeps both out already, but prices are read after the experiences, so a host who
- * removes the last price between the two reads would otherwise take the whole page down.
- */
-export function toBrowseCard(experience: BrowseExperience): BrowseCard | null {
-  const meta = [
-    experience.neighborhoodName,
-    experience.durationMinutes === null
-      ? null
-      : durationLabel(experience.durationMinutes),
-  ]
-    .filter((part) => part !== null)
-    .join(' · ');
-  const base = {
-    id: experience.id,
-    title: experience.name,
-    meta,
-    href: experienceCardPath(experience),
-    image: null,
-  };
-  if (experience.status === 'guide_only') {
-    if (experience.linkOutUrl === null) return null;
-    return { ...base, kind: 'guide-only', hostHref: experience.linkOutUrl };
-  }
-  const price = cardPriceLabel(experience.priceOptions);
-  return price === null ? null : { ...base, kind: 'bookable', price };
 }
 
 const chipDate = new Intl.DateTimeFormat('en-US', {
@@ -219,6 +137,64 @@ export function dateChipLabel(date: string): string {
 export function resultsSummary(shown: number, hasMore: boolean): string {
   const count = `${String(shown)} ${shown === 1 ? 'experience' : 'experiences'}`;
   return hasMore ? `Showing ${count}` : count;
+}
+
+/**
+ * The heading over the results for what the page shows now: the count, or the words of the empty
+ * or moved state, for the live region that announces a change of filters. The error state has its
+ * own alert and no heading.
+ */
+export function browseHeading(view: BrowseView): string | null {
+  switch (view.state) {
+    case 'results':
+      return view.summary;
+    case 'empty':
+      if (view.dated) return `Nothing on ${view.dated.dateLabel}`;
+      return view.filtered
+        ? 'Nothing matches those filters'
+        : 'Nothing to browse yet';
+    case 'outdated':
+      return 'That page of results has moved';
+    case 'error':
+      return null;
+  }
+}
+
+type TitleOption = { slug: string; name: string };
+
+const titleList = new Intl.ListFormat('en-US', {
+  style: 'long',
+  type: 'conjunction',
+});
+
+/**
+ * The page title for the filters, so the route announcer reads something new after each change:
+ * "Browse Cooking experiences in DUMBO on Sat, Nov 7". Names are the chosen categories and
+ * neighborhoods, in the order of the filters, looked up in the options; a slug with no option is
+ * left out.
+ */
+export function browseTitle(
+  filters: BrowseFilters,
+  options: {
+    categories: readonly TitleOption[];
+    neighborhoods: readonly TitleOption[];
+  },
+): string {
+  const named = (slugs: readonly string[], rows: readonly TitleOption[]) => {
+    const lookup = new Map(rows.map(({ slug, name }) => [slug, name]));
+    return slugs.flatMap((slug) => lookup.get(slug) ?? []);
+  };
+  const categories = named(filters.categories, options.categories);
+  const neighborhoods = named(filters.neighborhoods, options.neighborhoods);
+  return [
+    'Browse',
+    categories.length > 0 ? titleList.format(categories) : null,
+    'experiences',
+    neighborhoods.length > 0 ? `in ${titleList.format(neighborhoods)}` : null,
+    filters.date ? `on ${dateChipLabel(filters.date)}` : null,
+  ]
+    .filter((part) => part !== null)
+    .join(' ');
 }
 
 /** A GET form that goes to `action` with `fields` in its query, so a button can carry a whole address. */
@@ -254,7 +230,7 @@ export function nextBrowseDay(
 export type BrowseView =
   | {
       state: 'results';
-      cards: BrowseCard[];
+      cards: ExperienceCard[];
       summary: string;
       /** Goes to the next page, or null on the last. */
       showMore: FormTarget | null;
@@ -307,7 +283,7 @@ export function browseView(
   if (!page.ok) {
     return { state: 'outdated', startHref: hrefForFilters(filters) };
   }
-  const cards = page.items.flatMap((item) => toBrowseCard(item) ?? []);
+  const cards = page.items.flatMap((item) => toExperienceCard(item) ?? []);
   if (cards.length === 0 && page.nextCursor === null) {
     return {
       state: 'empty',
@@ -325,21 +301,6 @@ export function browseView(
         : targetFor({ filters, after: page.nextCursor }),
     startHref: after === null ? null : hrefForFilters(filters),
   };
-}
-
-/** The experiences on a page of results, for one read of their cover photos. */
-export function browseCardIds(page: BrowsePage): string[] {
-  return page.ok ? page.items.map((item) => item.id) : [];
-}
-
-/** The view with each card's cover photo set; a view with no cards is returned as it is. */
-export function withBrowseCovers(
-  view: BrowseView,
-  covers: ReadonlyMap<string, PhotoView>,
-): BrowseView {
-  return view.state === 'results'
-    ? { ...view, cards: withCovers(view.cards, covers) }
-    : view;
 }
 
 /** The same address again: a retry reloads exactly what failed. */

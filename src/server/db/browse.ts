@@ -16,27 +16,31 @@ import {
 import { z } from 'zod';
 import {
   BrowseDayRowsSchema,
-  BrowseExperienceSchema,
   browsePageSize,
-  browseWindow,
+  browseWindowDays,
   maxHandEnteredDayRows,
   maxStoredDayRows,
   splitPage,
-  withPriceOptions,
   type BrowseCursorRow,
   type BrowseDayRows,
-  type BrowseExperience,
   type BrowseRead,
-  type BrowseWindow,
 } from '@/lib/browse';
+import {
+  CardExperienceSchema,
+  CardPriceOptionSchema,
+  withPriceOptions,
+  type CardExperience,
+} from '@/lib/experienceCards';
 import {
   BrowseFiltersSchema,
   BrowseQuerySchema,
   type BrowseFilters,
   type BrowseQuery,
 } from '@/lib/filters';
+import { upcomingWindow, type SessionWindow } from '@/lib/sessionWindow';
 import { guestVisible } from './catalog';
 import { dbRead } from './client';
+import { coverImage, coverSelection, guestCoverOf } from './photos';
 import {
   categories,
   experiences,
@@ -94,7 +98,7 @@ function inChosenNeighborhoods(slugs: readonly string[]): SQL | undefined {
   );
 }
 
-function scheduledInWindow(window: BrowseWindow): SQL | undefined {
+function scheduledInWindow(window: SessionWindow): SQL | undefined {
   return and(
     eq(sessions.status, 'scheduled'),
     gte(sessions.startsAt, window.from),
@@ -102,7 +106,12 @@ function scheduledInWindow(window: BrowseWindow): SQL | undefined {
   );
 }
 
-function hasSessionOn(date: string | null, window: BrowseWindow) {
+// With `scheduledInWindow`, this mirrors `isOpenSession` in `src/lib/sessionWindow.ts` (spaces left above
+// zero), for the day queries only: a day is offered, and an experience matches it, through a session that is
+// open. The database test keeps the two together.
+const hasSpace = sql`${sessions.seatsSold} < ${sessions.allocation}`;
+
+function hasSessionOn(date: string | null, window: SessionWindow) {
   if (date === null) return undefined;
   return exists(
     dbRead
@@ -112,6 +121,7 @@ function hasSessionOn(date: string | null, window: BrowseWindow) {
         and(
           eq(sessions.experienceId, experiences.id),
           scheduledInWindow(window),
+          hasSpace,
           sql`${sessionLocalDate} = ${date}::date`,
         ),
       ),
@@ -119,21 +129,17 @@ function hasSessionOn(date: string | null, window: BrowseWindow) {
 }
 
 const PriceRowsSchema = z.array(
-  z.object({
-    experienceId: z.guid(),
-    priceMinor: z.int().nonnegative(),
-    usesSpace: z.boolean(),
-  }),
+  CardPriceOptionSchema.extend({ experienceId: z.guid() }),
 );
 
 // The status is checked by the parse below, which refuses a row the guest condition let through.
-type ExperienceRow = Omit<BrowseExperience, 'priceOptions' | 'status'> & {
+type ExperienceRow = Omit<CardExperience, 'priceOptions' | 'status'> & {
   status: string;
 };
 
 async function attachPriceOptions(
   rows: readonly ExperienceRow[],
-): Promise<BrowseExperience[]> {
+): Promise<CardExperience[]> {
   if (rows.length === 0) return [];
   const prices = PriceRowsSchema.parse(
     await dbRead
@@ -152,7 +158,7 @@ async function attachPriceOptions(
       .orderBy(asc(priceOptions.priceMinor)),
   );
   return withPriceOptions(rows, prices).map((row) =>
-    BrowseExperienceSchema.parse(row),
+    CardExperienceSchema.parse(row),
   );
 }
 
@@ -164,10 +170,10 @@ function visibleCursor(after: string) {
     .where(and(eq(experiences.id, after), shownInBrowse()));
 }
 
-/** Every row past the cursor in the page order. When the subquery finds no experience the comparison is NULL, so no row passes. */
-function pastCursor(after: string | null): SQL | undefined {
-  if (after === null) return undefined;
-  return sql`(${experiences.name}, ${experiences.id}) > (${visibleCursor(after)})`;
+/** Every row past the cursor in the page order. */
+function pastCursor(cursor: BrowseCursorRow | null): SQL | undefined {
+  if (cursor === null) return undefined;
+  return sql`(${experiences.name}, ${experiences.id}) > (${cursor.name}, ${cursor.id})`;
 }
 
 /**
@@ -176,19 +182,23 @@ function pastCursor(after: string | null): SQL | undefined {
  * an experience with a scheduled session that starts on that day in the window. `after` is the id
  * of the last experience on the previous page: the next page is every row past it in the same order,
  * so a row that appears or goes between pages moves nothing that was already shown. When no visible
- * experience has the `after` id, the page is empty and `cursor` is null; `toBrowsePage` decides what
- * that means, this function only reports what it found.
+ * experience has the `after` id, the page is empty and `cursor` is null, and only the cursor is read;
+ * `toBrowsePage` decides what that means, this function only reports what it found.
  */
 export async function listBrowseExperiences(
   query: BrowseQuery,
   asOf: string,
 ): Promise<BrowseRead> {
   const { filters, after } = BrowseQuerySchema.parse(query);
-  const window = browseWindow(asOf);
+  const window = upcomingWindow(asOf, browseWindowDays);
 
-  const cursorRows: Promise<BrowseCursorRow[]> =
-    after === null ? Promise.resolve([]) : visibleCursor(after);
+  const [cursor = null] = after === null ? [] : await visibleCursor(after);
+  // A cursor nobody can see leaves nothing past it, so the page is not read.
+  if (after !== null && cursor === null) {
+    return { cursor: null, items: [], nextCursor: null };
+  }
 
+  const cover = guestCoverOf(experiences.id);
   const pageRows = dbRead
     .select({
       id: experiences.id,
@@ -198,24 +208,29 @@ export async function listBrowseExperiences(
       neighborhoodName: neighborhoods.name,
       durationMinutes: experiences.durationMinutes,
       linkOutUrl: experiences.linkOutUrl,
+      cover: coverSelection(cover),
     })
     .from(experiences)
     .innerJoin(neighborhoods, eq(neighborhoods.id, experiences.neighborhoodId))
+    .leftJoinLateral(cover, sql`true`)
     .where(
       and(
         shownInBrowse(),
         inChosenCategories(filters.categories),
         inChosenNeighborhoods(filters.neighborhoods),
         hasSessionOn(filters.date, window),
-        pastCursor(after),
+        pastCursor(cursor),
       ),
     )
     .orderBy(asc(experiences.name), asc(experiences.id))
     .limit(browsePageSize + 1);
 
-  const [[cursor = null], rows] = await Promise.all([cursorRows, pageRows]);
-  const { items, nextCursor } = splitPage(rows, browsePageSize);
-  return { cursor, items: await attachPriceOptions(items), nextCursor };
+  const { items, nextCursor } = splitPage(await pageRows, browsePageSize);
+  const withImages = items.map(({ cover: joined, ...row }) => ({
+    ...row,
+    image: coverImage(joined),
+  }));
+  return { cursor, items: await attachPriceOptions(withImages), nextCursor };
 }
 
 /**
@@ -234,12 +249,13 @@ export async function listBrowseDayRows(
       categories: true,
       neighborhoods: true,
     }).parse(filters);
-  const window = browseWindow(asOf);
+  const window = upcomingWindow(asOf, browseWindowDays);
   const shown = and(
     shownInBrowse(),
     inChosenCategories(chosenCategories),
     inChosenNeighborhoods(chosenNeighborhoods),
     scheduledInWindow(window),
+    hasSpace,
   );
   const [storedDates, handEntered] = await Promise.all([
     dbRead

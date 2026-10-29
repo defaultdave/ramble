@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { addRuleIssues } from './rules';
 
 export const experienceStatuses = [
   'draft',
@@ -42,6 +43,13 @@ export const slugEntityKinds = [
 
 // A guid, not a strict RFC uuid: the column accepts any uuid, and a seeded id outside the RFC variants must still read.
 export const EntityIdSchema = z.guid();
+
+/**
+ * An ID in a write. `z.guid()` accepts upper case and Postgres returns lower case, so an ID
+ * written in capitals is lower-cased here: compared against what the database found, it is the
+ * same ID, not a missing one.
+ */
+export const WriteIdSchema = EntityIdSchema.transform((id) => id.toLowerCase());
 
 /**
  * Lower-case words joined by single hyphens. The database CHECK on every slug column spells the
@@ -227,17 +235,14 @@ function guideOnlyIssues(value: RuleFields): RuleIssue[] {
 
 /** Rules that tie fields together. The database CHECKs on `experiences` state the same rules. */
 function checkExperienceRules(value: RuleFields, ctx: z.RefinementCtx) {
-  for (const issue of [
-    ...ageRuleIssues(value),
-    ...weatherIssues(value),
-    ...guideOnlyIssues(value),
-  ]) {
-    ctx.addIssue({
-      code: 'custom',
-      path: [issue.path],
-      message: issue.message,
-    });
-  }
+  addRuleIssues(
+    [
+      ...ageRuleIssues(value),
+      ...weatherIssues(value),
+      ...guideOnlyIssues(value),
+    ],
+    ctx,
+  );
 }
 
 /**

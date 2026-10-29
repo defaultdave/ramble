@@ -6,9 +6,11 @@ import {
   type Neighborhood,
 } from './catalog';
 import { MAX_FULL_REFUND_HOURS } from './cancellation';
-import { formatPrice } from './money';
+import { demoCheckoutPath } from './demoCheckout';
+import { presentText, textLines } from './displayText';
 import type { GuestPhoto } from './photos';
 import { photoView, type PhotoView } from './photoViews';
+import { perPersonAmount } from './pricing';
 import {
   categoryPath,
   giftCheckoutPath,
@@ -21,20 +23,6 @@ import { venueCity } from './venue';
 
 function hoursLabel(hours: number): string {
   return `${String(hours)} ${hours === 1 ? 'hour' : 'hours'}`;
-}
-
-/** The text with its ends trimmed, or null when nothing is left. */
-function presentText(value: string | null): string | null {
-  const text = value?.trim() ?? '';
-  return text === '' ? null : text;
-}
-
-/** One entry per non-blank line, so a description written in paragraphs or a list keeps its shape. */
-export function textLines(value: string | null): string[] {
-  return (value ?? '')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line !== '');
 }
 
 /** The most rows "What's included" shows; the rest of a longer list is not drawn. */
@@ -152,7 +140,7 @@ export function priceLines(
     (a, b) => kindOrder[a.kind] - kindOrder[b.kind],
   );
   return sorted.map((option) => ({
-    amount: option.priceMinor === 0 ? 'Free' : formatPrice(option.priceMinor),
+    amount: perPersonAmount(option.priceMinor),
     unit: sorted.length === 1 ? 'per person' : `per ${option.kind}`,
   }));
 }
@@ -360,6 +348,8 @@ export type ExperiencePageView = {
   cancellation: string;
   /** Goes to the gift checkout, or null while gifts are switched off. */
   giftHref: string | null;
+  /** Goes to the checkout. TODO(U-041): replaced by the booking bar and panel, which hold a session first. */
+  bookHref: string;
   privateSessionHref: string;
 };
 
@@ -451,6 +441,7 @@ export function buildExperiencePage(
     weather: weather?.detail ?? null,
     cancellation: cancellation.detail,
     giftHref: giftsEnabled ? giftCheckoutPath(experience.id) : null,
+    bookHref: demoCheckoutPath(experience.id),
     privateSessionHref: privateSessionPath,
   };
 }

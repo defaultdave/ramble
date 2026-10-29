@@ -1,10 +1,7 @@
 import type { ComponentPropsWithoutRef } from 'react';
 import { Button } from '@/components/Button';
-import {
-  chosenPartyLabel,
-  fromPriceLabel,
-  perPersonLabel,
-} from '@/lib/booking';
+import { chosenPartyLabel, perPersonLabel } from '@/lib/booking';
+import { fromPriceLabel } from '@/lib/pricing';
 import { SimilarLink } from './SimilarLink';
 import styles from './BookingBar.module.css';
 

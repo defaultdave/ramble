@@ -9,12 +9,31 @@ docker compose -p ramble up -d --wait     # local Postgres
 pnpm db:migrate                           # the seed needs the migrated schema
 SEED_TARGET=local pnpm db:seed            # the curated coverage set
 SEED_TARGET=local pnpm db:seed --scale    # plus the 400-experience scale fixture
-SEED_TARGET=staging pnpm db:seed --scale=400 --scale-seed=7
+SEED_TARGET=staging SEED_HOST=<the host in DATABASE_URL> pnpm db:seed --scale=400 --scale-seed=7
 ```
 
 `pnpm db:seed` runs `scripts/seed.ts` under Bun (Bun stays the runtime for `scripts/`), with a preload that stands in for `server-only` and `next/cache`, which only work inside Next.js. It needs `DATABASE_URL` and `DATABASE_URL_UNPOOLED` set, like the app.
 
 It ends by reading the database back and running every probe of the coverage matrix. A gap exits with code 1 and names the probe.
+
+## Reading the seeded data in a local app
+
+The seed writes through `pg`, but guest pages (home, browse, experience) read through Neon's HTTP driver, which cannot reach the Docker Postgres. Without help, a local `pnpm dev` or `pnpm build && pnpm start` shows the error state on those pages. Run an HTTP stand-in for Neon's endpoint in front of the local database:
+
+```
+pnpm db:http        # needs DATABASE_URL (from .env.local, or the shell); prints the line to set
+```
+
+Put the printed line in `.env.local` and restart the app:
+
+```
+NEON_HTTP_ENDPOINT=http://127.0.0.1:4444/sql
+```
+
+- `pnpm db:http` is the same shim the database tests use (`tests/db/harness.ts`). It listens on `127.0.0.1` only, port 4444 unless `NEON_HTTP_PORT` says otherwise, and refuses a `DATABASE_URL` that is not on this machine. It runs any SQL it is sent, so stop it when you are done; it also refuses requests that carry an `Origin` header or a non-local `Host`, which keeps a web page from driving it.
+- `NEON_HTTP_ENDPOINT` is validated in `src/server/env.ts`: an `http` URL on `localhost`, `127.0.0.1`, or `::1`. Any other host fails at startup, and so does any value when `VERCEL_ENV` is `production` or `preview`. The refusal never prints the value. Leave it unset everywhere else.
+- When set, `dbRead` sends its queries to that address through `neonConfig.fetchEndpoint`. The pooled `db` writer is unchanged.
+- Pages cached by a running server keep serving until they expire (see Caches); restart the app after seeding.
 
 ## What it refuses
 
@@ -25,8 +44,11 @@ The seed fails closed. It runs only when all of these hold, and it checks them b
 - `VERCEL_ENV` is not `production`, unless `SEED_TARGET=production-demo` (see below).
 - The database host and name do not read as production (a whole word `prod` or `production`), unless `SEED_TARGET=production-demo`.
 - With `SEED_TARGET=local`, the database is on this machine.
+- With any other target (`staging`, `load-test`, `production-demo`), `SEED_HOST` is set to the host in `DATABASE_URL`, exactly. A missing or different value refuses with `host_not_confirmed` and names the host the URL points at. This is the guard that stops a staging run from writing to the production database: a production Neon address (`ep-....neon.tech/neondb`) has no production word in it, and `VERCEL_ENV` is unset in a laptop shell, so the name and environment checks alone cannot tell it from staging.
 - `DATABASE_URL` is readable and has no `host`, `hostaddr`, `dbname`, or `database` query parameter and no percent escape in the host or database name, for every target.
 - With `SEED_TARGET=production-demo`, `--scale` is not given.
+
+The seed cannot know which database is production. It refuses the ones that say so (a production word in the name, `VERCEL_ENV`, `NODE_ENV`) and otherwise relies on `SEED_HOST` to make you name the host you mean to write to. Check that the host a refusal prints is the database you meant to write to, and take `SEED_HOST` from where you know that database's address (the Neon console), not from the refusal.
 
 A refusal prints the reason and never the connection string.
 
@@ -39,9 +61,11 @@ Run `db-migrate-production` first (the GitHub Actions workflow; the seed needs t
 ```
 vercel env pull .env.production-demo.local --environment=production --yes
 pull() { grep "^$1=" .env.production-demo.local | cut -d= -f2- | tr -d '"'; }
-SEED_TARGET=production-demo DATABASE_URL="$(pull DATABASE_URL)" DATABASE_URL_UNPOOLED="$(pull DATABASE_URL_UNPOOLED)" pnpm db:seed
+SEED_TARGET=production-demo SEED_HOST=<the production host from the Neon console> DATABASE_URL="$(pull DATABASE_URL)" DATABASE_URL_UNPOOLED="$(pull DATABASE_URL_UNPOOLED)" pnpm db:seed
 rm .env.production-demo.local
 ```
+
+Type `SEED_HOST` by hand from the Neon console (Project, the production branch, Connect, the host of the connection string). Deriving it from the pulled `DATABASE_URL` would make the guard confirm the URL against itself.
 
 `.env*` is gitignored (only `.env.example` is tracked), so the pulled file is never committed. The seed gets only the two database URLs from it; nothing else in the file is passed on. If `vercel env pull` leaves either value empty, the seed refuses with `DATABASE_URL is not set`. Delete the file even when the seed fails. A successful run prints `Seeding the production-demo database on <host>` and ends with the coverage line.
 
@@ -57,7 +81,26 @@ The seed still refuses `NODE_ENV=production`, an unreadable `DATABASE_URL`, and 
 | Categories, neighborhoods, hosts, experiences, price options | Written to the schema directly: the data layer has no write contract for them yet. The Zod schemas the app reads with validate every fixture first, and the database CHECKs backstop them |
 | Seats sold on the few sessions that must be nearly full or sold out | Written to the schema directly: seats sold otherwise move only with orders, which do not exist yet. A session that has sold more than the plan is never lowered |
 
-It writes no photo rows yet (U-021b seeds the photo pool), never touches the settings row (so the tax rate the settings migration seeds stays as it is), and writes no help articles.
+Generated test photos for the curated experiences are written as the last step (see Test photos). It never touches the settings row (so the tax rate the settings migration seeds stays as it is), and writes no help articles.
+
+## Test photos
+
+After the coverage matrix, the seed gives each curated experience 3 to 5 generated photos: a labelled colour gradient, drawn by the code, with no third-party art. Position 0 is the cover. Every experience holds one source of each size class (1,600, 1,920, and 2,400 px on the long edge) in its first three positions, and the fourth and fifth are portrait. Ingest refuses a source under 1,600 px (PRD-50), so 1,600 px is the smallest source. Each image goes through the same ingest and storage port an upload uses, then a `photos` row is written with alt text and the `ramble_owned` rights basis. The scale fixture gets no photos.
+
+A rerun writes only what is missing, under the same ids and keys: a row that exists is left alone, whoever wrote it, and a file left without its row by a stopped run is replaced, unless a row owns its key. Each experience's files are stored first and its rows written in one transaction, and only rows the database took are counted. Do not run the seed concurrently with itself: two photo steps can race for the same positions, and the one that loses removes its file. The step ends with a coverage line, and a curated experience with no cover, fewer than 3 photos, or a photo without alt text exits the seed with code 1 and names it.
+
+Only `STORAGE_PROVIDER=vercel-blob` seeds photos, on any target. With `fake` (the default) the step is skipped with a line saying so, on every target, `local` included: the fake's addresses are not displayable, and `next/image` throws on a host it is not configured for, so a row pointing at one would break every page that draws the photo in `next dev`. The fake stays for the unit and database tests, which hand it to the step directly.
+
+Creating the store and running the step, once:
+
+```
+vercel blob create-store ramble-photos --access public
+# In the target Vercel environment set STORAGE_PROVIDER=vercel-blob and BLOB_PUBLIC_READ_WRITE_TOKEN
+# (BLOB_PRIVATE_READ_WRITE_TOKEN is required with it), then redeploy: the store id is read at build.
+# Run the seed as above with the same two storage variables in the shell, passed on the command line.
+```
+
+The seed refuses production as it always does, so a production run needs `SEED_TARGET=production-demo`. Photos are served from `<storeId>.public.blob.vercel-storage.com/public/photos/` through `/_next/image`.
 
 ## Rerunning
 

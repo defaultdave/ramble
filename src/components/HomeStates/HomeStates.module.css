@@ -1,6 +1,6 @@
 .page {
   box-sizing: border-box;
-  padding: var(--space-8) var(--space-6);
+  padding: var(--space-8) var(--size-gutter);
   font-family: var(--font-family-body);
   color: var(--color-text-primary);
 }
@@ -64,7 +64,7 @@
 /* The loading state repeats the hero, the category row and the first row of Picks at the sizes, gaps and gutters of the loaded page (HomeHero and HomeModules), so little moves when they arrive. */
 .band {
   box-sizing: border-box;
-  padding: var(--space-8) var(--space-6);
+  padding: var(--space-8) var(--size-gutter);
 }
 
 .skeletonInner {
@@ -86,7 +86,7 @@
 .bar {
   display: block;
   border-radius: var(--radius-sm);
-  background: var(--color-bg-sunken);
+  background: var(--color-bg-disabled);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -108,7 +108,9 @@
 }
 
 .headingLines {
-  grid-auto-rows: var(--font-line-height-display-l);
+  grid-auto-rows: calc(
+    var(--font-size-display-l) * var(--font-line-height-display-l)
+  );
 }
 
 .headingLines > .bar:nth-child(4) {
@@ -120,7 +122,9 @@
 }
 
 .bodyLines {
-  grid-auto-rows: var(--font-line-height-body-l);
+  grid-auto-rows: calc(
+    var(--font-size-body-l) * var(--font-line-height-body-l)
+  );
 }
 
 .bodyLines > .bar:nth-child(3) {
@@ -129,17 +133,17 @@
 
 .railHeadingBar {
   width: 40%;
-  height: var(--font-line-height-heading-m);
+  height: calc(var(--font-size-heading-m) * var(--font-line-height-heading-m));
 }
 
 .picksHeadingBar {
   width: 55%;
-  height: var(--font-line-height-heading-l);
+  height: calc(var(--font-size-heading-l) * var(--font-line-height-heading-l));
 }
 
 .summaryBar {
   width: 80%;
-  height: var(--font-line-height-body-m);
+  height: calc(var(--font-size-body-m) * var(--font-line-height-body-m));
 }
 
 .linkBar {
@@ -162,7 +166,7 @@
   width: calc(var(--space-10) * 4);
   aspect-ratio: 4 / 3;
   border-radius: var(--radius-lg);
-  background: var(--color-bg-sunken);
+  background: var(--color-bg-disabled);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -187,13 +191,13 @@
 
 .labelBar {
   width: 40%;
-  height: var(--font-line-height-label);
+  height: calc(var(--font-size-label) * var(--font-line-height-label));
 }
 
 /* A field and the large button are the same height, a touch target plus a line of padding. */
 .controlBar,
 .submitBar {
-  min-height: calc(var(--size-touch-target) + var(--space-2));
+  min-height: var(--size-field-height);
 }
 
 .picksHead {
@@ -205,8 +209,8 @@
 .pills {
   display: flex;
   gap: var(--space-2);
-  margin-inline: calc(-1 * var(--space-6));
-  padding: var(--space-1) var(--space-6);
+  margin-inline: calc(-1 * var(--size-gutter));
+  padding: var(--space-1) var(--size-gutter);
   overflow: hidden;
 }
 
@@ -218,17 +222,18 @@
 }
 
 .cards {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  display: flex;
   gap: var(--space-4);
-  box-sizing: border-box;
-  width: 85%;
-  max-width: calc(var(--space-16) * 6);
-  padding-block: var(--space-1);
+  margin-inline: calc(-1 * var(--size-gutter));
+  padding: var(--space-1) var(--size-gutter);
+  overflow: hidden;
 }
 
-.cards > :not(:first-child) {
-  display: none;
+/* The loaded rail's card size, so the first card matches it and --space-2 of the second shows. */
+.cards > * {
+  flex: 0 0 calc(100% + var(--size-gutter) - var(--space-4) - var(--space-2));
+  min-width: 0;
+  max-width: calc(var(--space-16) * 6);
 }
 
 .visuallyHidden {
@@ -245,6 +250,15 @@
 @keyframes pulse {
   50% {
     opacity: 0.5;
+  }
+}
+
+/* Forced colors replaces the fill, so the shape would vanish; an inset outline keeps it visible without changing its size. */
+@media (forced-colors: active) {
+  .art,
+  .bar {
+    outline: 1px solid GrayText;
+    outline-offset: -1px;
   }
 }
 
@@ -308,15 +322,16 @@
   }
 
   .cards {
+    display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--space-6);
-    width: auto;
-    max-width: none;
-    padding-block: 0;
+    margin-inline: 0;
+    padding: 0;
+    overflow: visible;
   }
 
-  .cards > :not(:first-child) {
-    display: block;
+  .cards > * {
+    max-width: none;
   }
 
   .linkBar {
@@ -332,7 +347,7 @@
 }
 
 /* The row waits for the copy column, as the hero's does. */
-@container (min-width: 640px) {
+@container (min-width: 736px) {
   .search {
     flex-direction: row;
     align-items: flex-end;

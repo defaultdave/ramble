@@ -1,8 +1,13 @@
 import 'server-only';
 import { z } from 'zod';
-import { MaxAttemptsSchema } from '@/lib/jobs';
+import { MaxAttemptsSchema, jobLimits } from '@/lib/jobs';
 import type { Transaction } from '@/server/db/client';
 import type { Clock } from '@/server/ports/clock';
+import {
+  BookingEmailPayloadSchema,
+  sendGuestConfirmation,
+  sendHostBookingNotice,
+} from './bookingEmails';
 
 type JobContext<Payload> = {
   /** The transaction the job's own writes belong to; it rolls back if the handler throws. */
@@ -50,7 +55,7 @@ export function findJob(
 
 /**
  * Every kind of job. A later unit adds an entry and its handler here; the table needs no change.
- * Real handlers (emails, reminders, gift delivery, transfers, provider events) belong to those units.
+ * Handlers for reminders, gift delivery, transfers, and provider events belong to those units.
  */
 export const jobRegistry = {
   noop: defineJob({
@@ -59,5 +64,15 @@ export const jobRegistry = {
     handleIdempotent: async () => {
       // Does nothing, on purpose: the tests and the demo trigger need a kind that always succeeds.
     },
+  }),
+  'guest-confirmation': defineJob({
+    payload: BookingEmailPayloadSchema,
+    maxAttempts: jobLimits.defaultMaxAttempts,
+    handleIdempotent: sendGuestConfirmation,
+  }),
+  'host-booking-notice': defineJob({
+    payload: BookingEmailPayloadSchema,
+    maxAttempts: jobLimits.defaultMaxAttempts,
+    handleIdempotent: sendHostBookingNotice,
   }),
 } satisfies JobRegistry;

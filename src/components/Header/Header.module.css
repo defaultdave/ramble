@@ -1,5 +1,5 @@
 .header {
-  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--size-gutter);
   /* An inset line, not a border, so it sits inside the height as Figma's inside stroke does. */
   box-shadow: inset 0 -1px 0 var(--color-border-default);
   background: var(--color-bg-canvas);
@@ -24,6 +24,9 @@
 
 .home {
   display: inline-flex;
+  /* Padding lifts the 32px wordmark to the 44px target; the negative margin keeps the layout where it was. */
+  padding-block: calc((var(--size-touch-target) - var(--space-8)) / 2);
+  margin-block: calc((var(--size-touch-target) - var(--space-8)) / -2);
   border-radius: var(--radius-sm);
   text-decoration: none;
 }
@@ -55,7 +58,9 @@
 
 .navLink {
   display: inline-block;
-  padding: var(--space-2) 0;
+  /* Padding lifts the 20px line to the 44px target; the negative margin keeps the 36px the nav took before. */
+  padding: var(--space-3) 0;
+  margin-block: calc(var(--space-1) * -1);
   border-radius: var(--radius-sm);
   font-size: var(--font-size-label);
   line-height: var(--font-line-height-label);
@@ -188,7 +193,7 @@
 
 @media (min-width: 768px) {
   .header {
-    padding: var(--space-3) var(--space-6);
+    padding: var(--space-3) var(--size-gutter);
   }
 
   .nav,

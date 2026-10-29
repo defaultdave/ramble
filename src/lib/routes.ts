@@ -73,6 +73,11 @@ export const neighborhoodPath = (slug: string) =>
 export const giftCheckoutPath = (experienceId: string) =>
   `/gifts/checkout/${experienceId}`;
 
+// ---- Checkout and orders ----
+
+export const checkoutPath = (holdId: string) => `/checkout/${holdId}`;
+export const orderPath = (reference: string) => `/orders/${reference}`;
+
 // ---- Help and legal ----
 
 export const contactPath = '/contact';
@@ -80,6 +85,11 @@ export const helpPath = '/help';
 export const accessibilityPath = '/accessibility';
 
 export const legalPath = (doc: 'terms' | 'privacy') => `/legal/${doc}`;
+
+// ---- Post-booking ----
+
+/** The manage page a booking email links to. The token is a capability: it is never logged or stored. */
+export const managePath = (token: string) => `/manage/${token}`;
 
 /**
  * Where a guest asks about a private session until the private-request form exists.

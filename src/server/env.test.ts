@@ -64,6 +64,29 @@ describe('environment', () => {
     });
   });
 
+  describe('CAPABILITY_TOKEN_SECRET', () => {
+    it.each([undefined, ''])('reads %j as not configured', async (value) => {
+      vi.stubEnv('CAPABILITY_TOKEN_SECRET', value);
+
+      expect((await loadEnv()).CAPABILITY_TOKEN_SECRET).toBeUndefined();
+    });
+
+    it('is read when long enough', async () => {
+      vi.stubEnv('CAPABILITY_TOKEN_SECRET', 's'.repeat(32));
+
+      expect((await loadEnv()).CAPABILITY_TOKEN_SECRET).toBe('s'.repeat(32));
+    });
+
+    it.each([
+      ['too short', 's'.repeat(31)],
+      ['too long', 's'.repeat(257)],
+    ])('fails at import when %s', async (_name, value) => {
+      vi.stubEnv('CAPABILITY_TOKEN_SECRET', value);
+
+      await expect(loadEnv()).rejects.toThrow(/CAPABILITY_TOKEN_SECRET/);
+    });
+  });
+
   describe('PULSE_SECRET', () => {
     it.each([undefined, ''])('reads %j as not configured', async (value) => {
       vi.stubEnv('PULSE_SECRET', value);
@@ -157,6 +180,46 @@ describe('environment', () => {
         await expect(loadEnv()).rejects.toThrow(/SEED_TARGET/);
       },
     );
+  });
+
+  describe('SEED_HOST', () => {
+    it('accepts a hostname', async () => {
+      vi.stubEnv('SEED_HOST', 'ep-quiet-cell-123.us-east-2.aws.neon.tech');
+
+      const env = await loadEnv();
+
+      expect(env.SEED_HOST).toBe('ep-quiet-cell-123.us-east-2.aws.neon.tech');
+    });
+
+    it.each([undefined, ''])('reads %j as not set', async (value) => {
+      vi.stubEnv('SEED_HOST', value);
+
+      const env = await loadEnv();
+
+      expect(env.SEED_HOST).toBeUndefined();
+    });
+
+    it.each([
+      ['a URL', 'postgres://u:p@host.neon.tech/db'],
+      ['a space', 'host .neon.tech'],
+      ['a host longer than 253 characters', 'a'.repeat(254)],
+    ])('fails at import for %s', async (_name, value) => {
+      vi.stubEnv('SEED_HOST', value);
+
+      await expect(loadEnv()).rejects.toThrow(/SEED_HOST/);
+    });
+  });
+
+  it('reports only the length issue for an over-long SEED_HOST that also has a bad character', async () => {
+    vi.stubEnv('SEED_HOST', `${'a'.repeat(253)} b`);
+
+    const error = await loadEnv().then(
+      () => new Error('loaded'),
+      (caught: unknown) => (caught instanceof Error ? caught : new Error('?')),
+    );
+
+    expect(error.message.split('✖')).toHaveLength(2);
+    expect(error.message).not.toContain('not a hostname');
   });
 
   describe('database URLs', () => {
@@ -540,6 +603,85 @@ describe('environment', () => {
       const env = await loadEnv();
 
       expect(env.STORAGE_PROVIDER).toBe('vercel-blob');
+    });
+  });
+
+  describe('NEON_HTTP_ENDPOINT', () => {
+    it.each([
+      ['unset', undefined],
+      ['empty', ''],
+    ])('is absent when %s', async (_name, value) => {
+      vi.stubEnv('NEON_HTTP_ENDPOINT', value);
+
+      const env = await loadEnv();
+
+      expect(env.NEON_HTTP_ENDPOINT).toBeUndefined();
+    });
+
+    it.each([
+      'http://localhost:4444/sql',
+      'http://127.0.0.1:4444/sql',
+      'http://[::1]:4444/sql',
+    ])('accepts the local address %s', async (value) => {
+      vi.stubEnv('NEON_HTTP_ENDPOINT', value);
+
+      const env = await loadEnv();
+
+      expect(env.NEON_HTTP_ENDPOINT).toBe(value);
+    });
+
+    it.each(['production', 'preview'])(
+      'is refused in a %s deployment',
+      async (vercelEnv) => {
+        vi.stubEnv('VERCEL_ENV', vercelEnv);
+        vi.stubEnv('NEON_HTTP_ENDPOINT', 'http://localhost:4444/sql');
+
+        await expect(loadEnv()).rejects.toThrow(
+          /Invalid environment variables[\s\S]*production or preview deployment[\s\S]*NEON_HTTP_ENDPOINT/,
+        );
+      },
+    );
+
+    it('is accepted in a Vercel development environment', async () => {
+      vi.stubEnv('VERCEL_ENV', 'development');
+      vi.stubEnv('NEON_HTTP_ENDPOINT', 'http://localhost:4444/sql');
+
+      const env = await loadEnv();
+
+      expect(env.NEON_HTTP_ENDPOINT).toBe('http://localhost:4444/sql');
+    });
+
+    it.each([
+      'https://ep-example-123.us-east-2.aws.neon.tech/sql',
+      'http://localhost.evil.example/sql',
+      'http://10.0.0.5:4444/sql',
+    ])('is refused for the non-local host in %s', async (value) => {
+      vi.stubEnv('NEON_HTTP_ENDPOINT', value);
+
+      await expect(loadEnv()).rejects.toThrow(
+        /Invalid environment variables[\s\S]*NEON_HTTP_ENDPOINT/,
+      );
+    });
+
+    it('is refused when it is not a url, without printing the value', async () => {
+      vi.stubEnv('NEON_HTTP_ENDPOINT', 'user:secret-pass@nowhere');
+
+      const failure = await loadEnv().catch((error: unknown) => error);
+
+      expect(String(failure)).toMatch(/NEON_HTTP_ENDPOINT/);
+      expect(String(failure)).not.toContain('secret-pass');
+    });
+
+    it('does not print a refused value that carries credentials', async () => {
+      vi.stubEnv(
+        'NEON_HTTP_ENDPOINT',
+        'http://user:secret-pass@db.example/sql',
+      );
+
+      const failure = await loadEnv().catch((error: unknown) => error);
+
+      expect(String(failure)).toMatch(/NEON_HTTP_ENDPOINT/);
+      expect(String(failure)).not.toContain('secret-pass');
     });
   });
 });

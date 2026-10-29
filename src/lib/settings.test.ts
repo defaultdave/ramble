@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bannerText,
   GuestSettingsSchema,
+  HoldSettingsSchema,
   SettingsChangeSchema,
   SettingsSchema,
   settingsBounds,
@@ -73,6 +75,17 @@ describe('the banner', () => {
   });
 });
 
+describe('bannerText', () => {
+  it.each([
+    ['text', 'Closed Monday for weather', 'Closed Monday for weather'],
+    ['padded text', '  Closed Monday  ', 'Closed Monday'],
+    ['blank text', '   ', null],
+    ['no text', null, null],
+  ])('%s', (_name, banner, expected) => {
+    expect(bannerText({ bannerText: banner })).toBe(expected);
+  });
+});
+
 describe('a change', () => {
   it('may set the switches and the gift expiry action', () => {
     expect(
@@ -109,5 +122,25 @@ describe('what a guest sees', () => {
       giftsEnabled: true,
       checkoutMaintenance: false,
     });
+  });
+});
+
+describe('what the hold path reads', () => {
+  it('is the pause switch, the hold length, and the tax rate, with the rest stripped from a full row', () => {
+    expect(HoldSettingsSchema.parse(fullSettings)).toEqual({
+      bookingsPaused: false,
+      holdMinutes: 10,
+      taxRatePpm: 88_750,
+    });
+  });
+
+  it.each([
+    ['a hold length of 0', { holdMinutes: 0 }],
+    ['a hold length of 61', { holdMinutes: 61 }],
+    ['a rate over 25 percent', { taxRatePpm: 250_001 }],
+  ])('refuses %s', (_name, change) => {
+    expect(
+      HoldSettingsSchema.safeParse({ ...fullSettings, ...change }).success,
+    ).toBe(false);
   });
 });

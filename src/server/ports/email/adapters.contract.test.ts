@@ -14,6 +14,7 @@ import type { EmailAdapter, OutboundEmail } from './types';
 //
 // Behaviours under test, one per decision, branch, or risk:
 // - send returns the provider's message ID and carries the recipient, subject, both bodies, and reply-to
+// - an attachment goes as base64 under its name and content type, never as plain text
 // - send authenticates with the provider credential, and Resend also forwards the idempotency key
 // - a 4xx refusal is not retryable; 429, 5xx, and a dropped connection are
 // - a 200 with no message ID, with a non-JSON body, over 64 KB, or (Postmark) with an error code is not retryable
@@ -39,6 +40,7 @@ const email: OutboundEmail = {
   subject: 'Your booking',
   html: '<p>See you soon</p>',
   text: 'See you soon',
+  attachments: [],
   idempotencyKey: 'order-7:confirmation',
 };
 
@@ -383,6 +385,33 @@ describe.each(sendCases)('$name send', (c) => {
     const { result } = await sendCapturing();
 
     expect(result).toEqual({ providerMessageId: c.okId });
+  });
+
+  it('sends an attachment as base64 under its name and type', async () => {
+    let captured = '';
+    server.use(
+      http.post(c.url, async ({ request }) => {
+        captured = await request.text();
+        return c.ok();
+      }),
+    );
+    const content = 'BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n';
+
+    await c.adapter.send({
+      ...email,
+      attachments: [
+        {
+          filename: 'ramble-booking.ics',
+          contentType: 'text/calendar; charset=utf-8',
+          content,
+        },
+      ],
+    });
+
+    expect(captured).toContain('ramble-booking.ics');
+    expect(captured).toContain(Buffer.from(content).toString('base64'));
+    expect(captured).toContain('text/calendar; charset=utf-8');
+    expect(captured).not.toContain('BEGIN:VCALENDAR');
   });
 
   it('carries the recipient, subject, both bodies, and reply-to', async () => {

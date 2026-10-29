@@ -116,6 +116,7 @@ export async function sendEmail(input: EmailRequest): Promise<SendEmailResult> {
       subject: rendered.subject,
       html: rendered.html,
       text: rendered.text,
+      attachments: rendered.attachments,
       idempotencyKey: request.idempotencyKey,
     }));
   } catch (error) {

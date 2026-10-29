@@ -117,12 +117,6 @@
 }
 
 @media (min-width: 768px) {
-  .gallery {
-    max-inline-size: var(--size-content-max);
-    margin-inline: auto;
-    padding-inline: var(--space-6);
-  }
-
   .strip {
     overflow: visible;
     scroll-snap-type: none;

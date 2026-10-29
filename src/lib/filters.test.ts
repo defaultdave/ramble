@@ -8,6 +8,7 @@ import {
   chipState,
   hrefForFilters,
   isIndexable,
+  knownFilters,
   maxFilterValues,
   noFilters,
   parseFilters,
@@ -29,6 +30,7 @@ import {
 // - toQuery writes a fixed order, and parsing what it wrote gives the same query back
 // - toggling adds in order, removes a chosen value, and refuses a new value on a full list
 // - the unfiltered first page is the only indexable one
+// - slugs the catalog has no row for are dropped, and a list with slugs of which none is known matches nothing
 
 const cursor = '0b1c2d3e-4f50-4a61-8b72-93a4b5c6d7e8';
 
@@ -374,5 +376,63 @@ describe('isIndexable', () => {
     ['a later page of the unfiltered list', noFilters, cursor, false],
   ])('%s', (_name, filters, after, indexable) => {
     expect(isIndexable({ filters, after })).toBe(indexable);
+  });
+});
+
+describe('knownFilters', () => {
+  const options = {
+    categories: [{ slug: 'cooking' }, { slug: 'outdoors' }],
+    neighborhoods: [{ slug: 'dumbo' }],
+  };
+  const filters = (partial: Partial<BrowseQuery['filters']>) => ({
+    ...noFilters,
+    ...partial,
+  });
+
+  it.each([
+    [
+      'keeps known slugs and the date',
+      filters({
+        categories: ['cooking', 'outdoors'],
+        neighborhoods: ['dumbo'],
+        date: '2026-11-07',
+      }),
+      filters({
+        categories: ['cooking', 'outdoors'],
+        neighborhoods: ['dumbo'],
+        date: '2026-11-07',
+      }),
+      false,
+    ],
+    ['has nothing to drop without filters', noFilters, noFilters, false],
+    [
+      'drops an unknown slug beside a known one, in order',
+      filters({ categories: ['cooking', 'junk', 'outdoors'] }),
+      filters({ categories: ['cooking', 'outdoors'] }),
+      false,
+    ],
+    [
+      'matches nothing when a list has only unknown slugs',
+      filters({ categories: ['junk', 'more-junk'], date: '2026-11-07' }),
+      filters({ date: '2026-11-07' }),
+      true,
+    ],
+    [
+      'matches nothing when one list is all unknown and the other is known',
+      filters({ categories: ['cooking'], neighborhoods: ['junk'] }),
+      filters({ categories: ['cooking'] }),
+      true,
+    ],
+    [
+      'does not read a category slug as a neighborhood',
+      filters({ neighborhoods: ['cooking'] }),
+      noFilters,
+      true,
+    ],
+  ])('%s', (_name, input, expected, matchesNothing) => {
+    expect(knownFilters(input, options)).toEqual({
+      filters: expected,
+      matchesNothing,
+    });
   });
 });

@@ -58,6 +58,12 @@ const schema = z
     AXIOM_DATASET: optional(z.string().regex(/^[A-Za-z0-9_-]{1,128}$/)),
     // Signs the form-guard token. Read only when a guest form renders or is submitted, which throws if it is unset outside development and test.
     FORM_GUARD_SECRET: z.string().min(32).optional(),
+    // Bearer secret for POST /api/pulse. Unset, the route refuses everyone.
+    PULSE_SECRET: optional(sharedSecret),
+    // Lets the pulse take a manual time (`asOf`) so the demo can show tomorrow's jobs. Off unless set to "on".
+    DEMO_CLOCK: optional(z.enum(['on', 'off'])).default('off'),
+    // Better Stack heartbeat the pulse pings after a clean run. The URL carries a token, so it is never logged.
+    BETTERSTACK_HEARTBEAT_URL: optional(httpsUrl),
   })
   .superRefine((value, ctx) => {
     for (const { name, message } of emailSettingIssues(value)) {

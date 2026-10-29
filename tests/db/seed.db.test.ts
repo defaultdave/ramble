@@ -1,7 +1,8 @@
 import { updateTag } from 'next/cache';
 import { and, count, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { browseAsOf, browseWindow } from '@/lib/browse';
+import { browseAsOf, browseDays, browseWindow } from '@/lib/browse';
+import { noFilters } from '@/lib/filters';
 import {
   coverage,
   coverageGaps,
@@ -45,6 +46,9 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 //   are the ones the plan says, with the planned seats sold
 // - the zero-results state (S2) holds through browse's own query: kids in Williamsburg return nothing on
 //   every weeknight of browse's window and the wheel class on a weekend
+// - browse with no filters lists every seeded experience a guest can see, whatever the clock says, because
+//   no session decides it; a day with no session left lists none, and that is the only way a seeded
+//   browse page reads empty
 // - the guest reads the app will use parse the seeded rows and show what a guest may see: live and
 //   guide-only experiences, published Picks without the paused entry, the gift guide, six home
 //   modules in order, copy for every category and neighborhood, the published legal documents
@@ -266,6 +270,72 @@ describe('the curated seed', () => {
           isWeekend(date) && slugs.includes('kids-wheel-class'),
       ),
     ).toBe(true);
+  });
+
+  const afterEverySession = '2026-10-29T03:00:00.000Z';
+
+  /** Every page of browse with no filters, followed by its cursor. A page is twelve, so a few pages cover the curated set. */
+  async function unfilteredSlugs(asOf: string): Promise<string[]> {
+    const slugs: string[] = [];
+    let after: string | null = null;
+    for (let page = 0; page < 5; page += 1) {
+      const read = await browseReads.listBrowseExperiences(
+        { filters: noFilters, after },
+        asOf,
+      );
+      slugs.push(...read.items.map((item) => item.slug));
+      if (read.nextCursor === null) break;
+      after = read.nextCursor;
+    }
+    return slugs.sort();
+  }
+
+  it.each([
+    ['when it was seeded', browseAsOf(now)],
+    ['after the last session of the seed day', afterEverySession],
+    ['after every seeded session', '2027-03-01T00:00:00.000Z'],
+  ])(
+    'lists every seeded experience a guest can see on browse with no filters, %s',
+    async (_when, asOf) => {
+      const shown = curated.experiences
+        .filter(
+          (experience) =>
+            experience.status === 'guide_only' ||
+            (experience.status === 'live' &&
+              experience.prices.some((price) => price.usesSpace)),
+        )
+        .map((experience) => experience.slug)
+        .sort();
+      expect(shown.length).toBeGreaterThan(0);
+      expect(await unfilteredSlugs(asOf)).toEqual(shown);
+    },
+  );
+
+  it('lists nothing for a day with no session left, while the page with no day still lists every experience', async () => {
+    const lastSeededDay = '2026-10-28';
+    const onLastSeededDay = await browseReads.listBrowseExperiences(
+      {
+        filters: { ...noFilters, date: lastSeededDay },
+        after: null,
+      },
+      afterEverySession,
+    );
+    expect(onLastSeededDay.items).toEqual([]);
+
+    const days = browseDays(
+      await browseReads.listBrowseDayRows(noFilters, afterEverySession),
+    );
+    const [nextDay] = days;
+    expect(nextDay).toBeDefined();
+    expect(nextDay).not.toBe(lastSeededDay);
+    const onNextDay = await browseReads.listBrowseExperiences(
+      { filters: { ...noFilters, date: nextDay ?? null }, after: null },
+      afterEverySession,
+    );
+    expect(onNextDay.items.length).toBeGreaterThan(0);
+    expect((await unfilteredSlugs(afterEverySession)).length).toBeGreaterThan(
+      onNextDay.items.length,
+    );
   });
 
   it('holds the sessions the plan says, with the planned seats sold', async () => {

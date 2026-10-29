@@ -16,7 +16,7 @@ import { createOrderParents } from './orderParents';
 // - text, email, children ages, and guardian rules
 // - money: ranges, tax rate zero unless taxable, tax and commission rounding, total, gift, amount due, refund caps
 // - status and time rules; times in range
-// - foreign keys to guests, experiences, hosts, and cancellation tiers; none yet on hold, session, gift, or document ids
+// - foreign keys to guests, experiences, hosts, cancellation tiers, holds, sessions, and the terms and waiver documents; none yet on gift ids
 // order items: key, quantity, price, line total, label, foreign keys
 // payment attempts: order and number unique, one live attempt per order, key from order and number, tries, failure code, times
 // provider events: provider and event id unique, amount with currency, currency shape, body object within its size, tries, times
@@ -32,6 +32,8 @@ const parents = {
   tierId: '',
   guestId: '',
   priceOptionId: '',
+  sessionId: '',
+  termsDocumentId: '',
 };
 
 beforeAll(async () => {
@@ -59,7 +61,17 @@ function valueOf(column: string, value: unknown) {
   return sql`${value}`;
 }
 
-function insert(table: string, row: Row) {
+/** A hold row for an order to point at, written straight to the table; one that exists already is left alone. */
+async function ensureHold(holdId: string) {
+  await client.db.execute(
+    sql`INSERT INTO holds (id, session_id, purpose, status, seats, device_key, ip_hash, expires_at)
+      VALUES (${holdId}, ${parents.sessionId}, 'booking', 'active', 1, ${'a'.repeat(64)}, ${'b'.repeat(64)}, now() + interval '10 minutes')
+      ON CONFLICT (id) DO NOTHING`,
+  );
+}
+
+/** Writes the row as given, with no parent made for it. */
+function insertAsGiven(table: string, row: Row) {
   const columns = Object.keys(row);
   return client.db.execute(
     sql`INSERT INTO ${sql.identifier(table)} (${sql.join(
@@ -70,6 +82,13 @@ function insert(table: string, row: Row) {
       sql`, `,
     )})`,
   );
+}
+
+async function insert(table: string, row: Row) {
+  if (table === 'orders' && typeof row.hold_id === 'string') {
+    await ensureHold(row.hold_id);
+  }
+  return insertAsGiven(table, row);
 }
 
 const constraint = (name: string) => ({ cause: { constraint: name } });
@@ -94,13 +113,13 @@ function orderRow(over: Row = {}): Row {
     status: 'pending_payment',
     idempotency_key: `book:${holdId}`,
     hold_id: holdId,
-    session_id: randomUUID(),
+    session_id: parents.sessionId,
     experience_id: parents.experienceId,
     host_id: parents.hostId,
     guest_id: parents.guestId,
     contact_email: 'pat@example.com',
     lead_guest_name: 'Pat Smith',
-    terms_document_id: randomUUID(),
+    terms_document_id: parents.termsDocumentId,
     ticket_subtotal_minor: 17000,
     tax_treatment: 'taxable',
     tax_rate_ppm: 88750,
@@ -297,6 +316,7 @@ describe('orders', () => {
     // what is left, and it is the one that frees a hold whose order went void.
     it('refuses a second live order and frees the hold when the first is void', async () => {
       const holdId = randomUUID();
+      await ensureHold(holdId);
       const connection = await client.db.$client.connect();
       const insertOrder = (key: string, status: string) => {
         const row = orderRow({
@@ -776,23 +796,58 @@ describe('orders', () => {
       ).rejects.toMatchObject(notNull);
     });
 
-    it('keeps no foreign key yet on the hold, session, gift, and document ids', async () => {
-      const { rows } = await client.db.execute<{ column_name: string }>(
-        sql`SELECT a.attname AS column_name
-          FROM pg_constraint c
-          JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
-          WHERE c.contype = 'f' AND c.conrelid = (${`${fresh.schema}.orders`})::regclass`,
-      );
-      const withKeys = rows.map((row) => row.column_name);
-      for (const column of [
-        'hold_id',
-        'session_id',
-        'gift_id',
+    it.each([
+      ['hold', 'hold_id', 'orders_hold_id_holds_id_fk'],
+      ['session', 'session_id', 'orders_session_id_sessions_id_fk'],
+      [
+        'waiver document',
         'waiver_document_id',
+        'orders_waiver_document_id_legal_documents_id_fk',
+      ],
+      [
+        'terms document',
         'terms_document_id',
-      ]) {
-        expect(withKeys).not.toContain(column);
-      }
+        'orders_terms_document_id_legal_documents_id_fk',
+      ],
+    ])(
+      'refuses an order pointing at a missing %s',
+      async (_name, column, name) => {
+        const holdId = randomUUID();
+        if (column !== 'hold_id') await ensureHold(holdId);
+        const row = orderRow({
+          hold_id: holdId,
+          idempotency_key: `book:${holdId}`,
+          ...(column === 'hold_id' ? {} : { [column]: randomUUID() }),
+        });
+        await expect(insertAsGiven('orders', row)).rejects.toMatchObject(
+          constraint(name),
+        );
+      },
+    );
+
+    it('accepts a waiver document that exists, and keeps no foreign key yet on the gift id', async () => {
+      await newOrder({ waiver_document_id: parents.termsDocumentId });
+      await expect(newOrder({ gift_id: randomUUID() })).resolves.toBeTypeOf(
+        'string',
+      );
+    });
+
+    it('restricts deleting a hold, a session, or a document an order points at', async () => {
+      const holdId = randomUUID();
+      await newOrder({ hold_id: holdId, idempotency_key: `book:${holdId}` });
+      await expect(
+        client.db.execute(sql`DELETE FROM holds WHERE id = ${holdId}`),
+      ).rejects.toMatchObject(constraint('orders_hold_id_holds_id_fk'));
+      await expect(
+        client.db.execute(
+          sql`DELETE FROM sessions WHERE id = ${parents.sessionId}`,
+        ),
+      ).rejects.toMatchObject({ cause: { code: '23503' } });
+      await expect(
+        client.db.execute(
+          sql`DELETE FROM legal_documents WHERE id = ${parents.termsDocumentId}`,
+        ),
+      ).rejects.toMatchObject({ cause: { code: '23503' } });
     });
   });
 });

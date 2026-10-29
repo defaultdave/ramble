@@ -7,6 +7,7 @@ import {
   PriceOptionSchema,
   SlugSchema,
   isSlug,
+  priceKindLabel,
   type PriceOption,
 } from './catalog';
 
@@ -285,5 +286,14 @@ describe('isSlug', () => {
     ['a long run of hyphens', '-'.repeat(6_000_000), false],
   ])('answers for %s without throwing', (_name, value, expected) => {
     expect(SlugSchema.safeParse(value).success).toBe(expected);
+  });
+});
+
+describe('price kind labels', () => {
+  it.each([
+    ['adult', 'Adult'],
+    ['child', 'Child'],
+  ] as const)('names %s as %s on an order line', (kind, label) => {
+    expect(priceKindLabel(kind)).toBe(label);
   });
 });

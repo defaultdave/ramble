@@ -38,7 +38,6 @@ export async function lockGuestRow(
 export type FindOrCreateGuestResult =
   { status: 'ok'; guest: Guest } | { status: 'invalid_email' };
 
-// TODO(U-047a): first caller, inside startPayment's transaction after its device check.
 /**
  * The guest with this email, created if there is none. Joins the checkout's open transaction, so
  * the guest, the order, and the consents commit together. One statement takes the row's lock and
@@ -69,7 +68,6 @@ export type RecordConsentResult =
   | { status: 'invalid' }
   | { status: 'guest_unavailable' };
 
-// TODO(U-047a): first caller, inside startPayment's transaction after its device check.
 /**
  * Appends a consent change for a guest. A change to the status the guest already has writes
  * nothing, so the first grant keeps its time and source. The guest row lock makes the latest-row

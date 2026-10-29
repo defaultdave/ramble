@@ -207,7 +207,7 @@ export async function reserveSpaces(
  * display only (a later reserve decides again under the lock). The candidates are bounded, and so
  * are their open holds.
  */
-async function readAlternatives(request: {
+export async function readAlternatives(request: {
   experienceId: string;
   sessionId: string;
   seats: number;

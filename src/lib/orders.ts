@@ -79,7 +79,6 @@ const bookingKeyPrefix = 'book:';
 const uuidLength = 36;
 
 /** Two tabs or a refresh on one hold reach one order (design doc 4.2.3). */
-// TODO(U-047a): first caller, the order insert in startPayment.
 export function bookingIdempotencyKey(holdId: string): string {
   return `${bookingKeyPrefix}${holdId.toLowerCase()}`;
 }
@@ -128,7 +127,6 @@ export function canOrderTransition(
 }
 
 /** What the guest pays: the total less the gift applied, never below zero. */
-// TODO(U-047a): first caller, the order snapshot in startPayment.
 export function orderAmountDueMinor(
   totalMinor: number,
   giftAppliedMinor: number,
@@ -409,7 +407,6 @@ const orderFields = z.object({
   cancelledAt: z.date().nullable(),
 });
 
-// TODO(U-047a): first caller, the order read in startPayment.
 export const OrderSchema = orderFields.superRefine((order, ctx) => {
   addRuleIssues(orderRuleIssues(order), ctx);
 });
@@ -422,7 +419,6 @@ function orderItemLineTotalMinor(
   return quantity * unitPriceMinor;
 }
 
-// TODO(U-047a): first caller, the order items read in startPayment.
 export const OrderItemSchema = z
   .object({
     orderId: EntityIdSchema,

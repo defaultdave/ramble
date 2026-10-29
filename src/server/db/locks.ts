@@ -1,7 +1,7 @@
 import 'server-only';
 import { eq, sql } from 'drizzle-orm';
 import type { Transaction } from './client';
-import { experiences, holds, sessions } from './schema';
+import { experiences, holds, orders, sessions } from './schema';
 
 /*
  * THE LOCK ORDER (design doc 4.2.3 rule 1, architecture rule B10). Every transaction that takes
@@ -10,15 +10,17 @@ import { experiences, holds, sessions } from './schema';
  *   1. the device advisory lock   (reserve only)      lockDevice
  *   2. the session row            FOR UPDATE          lockSessionRow
  *   3. the hold row               FOR UPDATE          lockHoldRow
- *   4. the order row                                  (a later unit)
+ *   4. the order row              FOR UPDATE          lockOrderRow
  *   5. the gift row                                   (a later unit)
  *
  * A path that starts from a hold, an order, or a provider event reads the ids it needs without a
  * lock, then locks in this order and re-checks what it read. Locks are transaction-level only
  * (`pg_advisory_xact_lock`, `FOR UPDATE`), because app traffic goes through the pooler in
  * transaction mode (ADR 0002 amendment; the pooler keeps `FOR UPDATE`, see docs/adr/research/u-013-neon-concurrency-spike.md). The settings
- * row is read with a plain SELECT, so it is not a lock and sits outside the order. Later units add
- * their lockers here, below the one they follow.
+ * row is read with a plain SELECT, so it is not a lock and sits outside the order. A guest row,
+ * taken by the checkout's guest upsert and consent write, comes after the order row, and no path
+ * locks a guest and then a session, hold, or order. Later units add their lockers here, below the
+ * one they follow.
  */
 
 /**
@@ -40,9 +42,10 @@ export async function lockDevice(
 }
 
 /**
- * Lock 2. The session row, with what the hold path needs to know about its experience: the owner
- * (for the capacity editor's check), the status a guest may book, and the tax treatment. Undefined
- * when there is no such session. The lock is on `sessions` only, never on the experience.
+ * Lock 2. The session row, with what the hold and payment paths need to know about its experience:
+ * the owner (for the capacity editor's check), the status a guest may book, the tax treatment,
+ * the age and waiver rules, and the cancellation tier. Undefined when there is no such session.
+ * The lock is on `sessions` only, never on the experience.
  */
 export async function lockSessionRow(tx: Transaction, sessionId: string) {
   const [row] = await tx
@@ -51,6 +54,12 @@ export async function lockSessionRow(tx: Transaction, sessionId: string) {
       hostId: experiences.hostId,
       experienceStatus: experiences.status,
       taxTreatment: experiences.taxTreatment,
+      ageRule: experiences.ageRule,
+      minAge: experiences.minAge,
+      maxAge: experiences.maxAge,
+      waiverRequired: experiences.waiverRequired,
+      waiverDocumentId: experiences.waiverDocumentId,
+      cancellationTierId: experiences.cancellationTierId,
     })
     .from(sessions)
     .innerJoin(experiences, eq(experiences.id, sessions.experienceId))
@@ -65,6 +74,20 @@ export async function lockHoldRow(tx: Transaction, holdId: string) {
     .select()
     .from(holds)
     .where(eq(holds.id, holdId))
+    .for('update');
+  return row;
+}
+
+/**
+ * Lock 4. The order a booking's key names, after its hold's: two tabs on one hold reach the same
+ * row. Undefined when the hold has no order yet; the session lock, taken first, is what makes two
+ * first calls take turns to create it.
+ */
+export async function lockOrderRow(tx: Transaction, idempotencyKey: string) {
+  const [row] = await tx
+    .select()
+    .from(orders)
+    .where(eq(orders.idempotencyKey, idempotencyKey))
     .for('update');
   return row;
 }

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { CacheChange } from './cacheTags';
 import { requiredText } from './text';
-import { EntityIdSchema } from './catalog';
+import { EntityIdSchema, WriteIdSchema } from './catalog';
 import {
   editorialLimits,
   RichTextInputSchema,
@@ -68,8 +68,16 @@ export type LegalDraftInput = z.infer<typeof LegalDraftInputSchema>;
 export const LegalDraftEditSchema = LegalDraftInputSchema.omit({ doc: true });
 export type LegalDraftEdit = z.infer<typeof LegalDraftEditSchema>;
 
-// TODO(U-047a): the acceptance input contract and the insert that runs inside the checkout transaction.
 export const acceptanceSubjectKinds = ['order', 'host'] as const;
+
+/** The most versions one checkout accepts: the marketplace terms, and the host's waiver where one is required. */
+const maxOrderAcceptances = 2;
+
+/** What a checkout records for its order: each published version the guest accepted, once. */
+export const OrderAcceptancesInputSchema = z.strictObject({
+  orderId: WriteIdSchema,
+  legalDocumentIds: z.array(WriteIdSchema).min(1).max(maxOrderAcceptances),
+});
 
 export function legalChange(doc: string): CacheChange {
   return { kind: 'legalDocument', doc };

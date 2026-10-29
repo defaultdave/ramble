@@ -5,13 +5,18 @@ import {
   experiences,
   guests,
   hosts,
+  legalDocuments,
   neighborhoods,
   priceOptions,
 } from '@/server/db/schema';
+import { insertSession } from './holdFixtures';
 
 type Client = typeof import('@/server/db/client');
 
-/** The rows an order points at, made once per test file: a host, an experience with one price option, a guest, and the default tier. */
+/**
+ * The rows an order points at, made once per test file: a host, an experience with one price option,
+ * a session, a guest, the default tier, and a terms document (a draft: a foreign key needs only the row).
+ */
 export async function createOrderParents(db: Client['db'], tag: string) {
   const [host] = await db
     .insert(hosts)
@@ -53,11 +58,24 @@ export async function createOrderParents(db: Client['db'], tag: string) {
     .values({ experienceId: experience.id, kind: 'adult', priceMinor: 8500 })
     .returning();
   if (!option) throw new Error('missing price option');
+  const session = await insertSession(db, experience.id);
+  const [terms] = await db
+    .insert(legalDocuments)
+    .values({
+      doc: 'terms',
+      version: 1,
+      title: 'Terms',
+      body: { type: 'doc', content: [] },
+    })
+    .returning();
+  if (!terms) throw new Error('missing terms document');
   return {
     hostId: host.id,
     experienceId: experience.id,
     tierId: tier.id,
     guestId: guest.id,
     priceOptionId: option.id,
+    sessionId: session.id,
+    termsDocumentId: terms.id,
   };
 }

@@ -8,8 +8,10 @@ import { listGuestCoverPhotos } from '@/server/db/photos';
 
 /**
  * The cover photo of each listed experience, for the cards of one page. Pass the IDs through
- * `coverLookupIds` so two pages that list the same experiences share an entry. A new photo reaches
- * it through the tag of each experience it was asked about, which is the tag an upload invalidates.
+ * `coverLookupIds` so two pages that list the same experiences share an entry. The entry carries the
+ * tag of each experience it was asked about, but `addPhoto` publishes no tag, so a new cover shows
+ * only when the `catalog` revalidate runs out, or when a listing change publishes the experience tag.
+ * TODO(U-074b): publish the experience tag after a photo commit
  */
 export async function getCoverPhotos(
   experienceIds: string[],

@@ -66,7 +66,6 @@ function roundHalfUpPpm(amountMinor: number, ratePpm: number): number {
  * when it is not taxable or unknown (unknown is charged as not taxable until Q-12 is answered).
  * The configured rate is checked in every case so a broken setting fails loudly instead of
  * waiting for the first taxable experience.
- * TODO(U-014a): first caller, the held total in `reserveSpaces`.
  */
 export function taxRatePpm(
   taxTreatment: TaxTreatment,
@@ -94,7 +93,6 @@ export function taxRatePpm(
  *
  * Bad input is refused, never repaired: a quantity or price that is negative, fractional, or out
  * of range, an unknown or repeated price option, or too many lines throws a RangeError.
- * TODO(U-014a): first caller, the held total in `reserveSpaces`.
  */
 export function lines(
   items: readonly PricingItem[],

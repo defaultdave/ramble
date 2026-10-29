@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   botCheckIsLive,
+  botProtectedRoutes,
   BotVerdictSchema,
   judgeBotVerdict,
+  shouldLoadBotId,
   type BotCheckResult,
   type BotVerdict,
 } from './botCheck';
@@ -85,5 +87,30 @@ describe('botCheckIsLive', () => {
     ['', false],
   ])('is %j -> %s', (vercel, expected) => {
     expect(botCheckIsLive(vercel)).toBe(expected);
+  });
+});
+
+describe('shouldLoadBotId', () => {
+  it.each([
+    ['/', true],
+    ['/experiences/sunrise-kayak', true],
+    ['/browse', true],
+    ['/checkout', false],
+    ['/checkout/abc', false],
+    ['/gifts/checkout', false],
+    ['/manage/token', false],
+    ['/orders/1', false],
+    ['/ops', false],
+    ['/host/sessions', false],
+  ])('on %s: %s', (pathname, expected) => {
+    expect(shouldLoadBotId(pathname)).toBe(expected);
+  });
+});
+
+describe('botProtectedRoutes', () => {
+  it('signs POSTs to experience pages and nothing under checkout', () => {
+    expect(botProtectedRoutes).toEqual([
+      { path: '/experiences/*', method: 'POST' },
+    ]);
   });
 });

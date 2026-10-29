@@ -1259,8 +1259,9 @@ describe('updateSessionAllocation', () => {
 
     expect(result).toEqual({
       ok: false,
-      reason: 'below_seats_sold',
+      reason: 'below_sold_and_held',
       seatsSold: 5,
+      heldSeats: 0,
     });
     expect(await stored(session.id)).toMatchObject({
       allocation: 8,
@@ -1334,8 +1335,9 @@ describe('updateSessionAllocation', () => {
 
       await expect(pending).resolves.toEqual({
         ok: false,
-        reason: 'below_seats_sold',
+        reason: 'below_sold_and_held',
         seatsSold: 3,
+        heldSeats: 0,
       });
     } finally {
       booking.release();

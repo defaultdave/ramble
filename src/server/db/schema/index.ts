@@ -3,6 +3,7 @@
 export * from './catalog';
 export * from './policies';
 export * from './editorial';
+export * from './holds';
 export * from './messages';
 export * from './operations';
 export { publishStatusEnum } from './shared';

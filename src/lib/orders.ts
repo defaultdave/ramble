@@ -8,6 +8,7 @@ import {
   PPM,
   roundHalfUpPpm,
 } from './pricing';
+import { addRuleIssues, type RuleIssue } from './rules';
 import { optionalText, requiredText } from './text';
 import { canTransition, type TransitionTable } from './transitions';
 
@@ -16,7 +17,7 @@ import { canTransition, type TransitionTable } from './transitions';
 // tuples and constants, so the database refuses what these schemas refuse (design doc 4.2.3, Orders).
 
 export const orderKinds = ['booking', 'gift_purchase'] as const;
-export type OrderKind = (typeof orderKinds)[number];
+type OrderKind = (typeof orderKinds)[number];
 
 export const orderStatuses = [
   'pending_payment',
@@ -44,12 +45,10 @@ const orderReferenceRegex = new RegExp(orderReferencePattern);
 const maxReferenceLength = 10;
 
 export function isOrderReference(value: string): boolean {
-  return (
-    value.length <= maxReferenceLength && orderReferenceRegex.test(value)
-  );
+  return value.length <= maxReferenceLength && orderReferenceRegex.test(value);
 }
 
-export const OrderReferenceSchema = z
+const OrderReferenceSchema = z
   .string()
   .max(maxReferenceLength)
   .refine(isOrderReference, { message: 'Not an order reference' });
@@ -79,6 +78,7 @@ const bookingKeyPrefix = 'book:';
 const uuidLength = 36;
 
 /** Two tabs or a refresh on one hold reach one order (design doc 4.2.3). */
+// TODO(U-047a): first caller, the order insert in startPayment.
 export function bookingIdempotencyKey(holdId: string): string {
   return `${bookingKeyPrefix}${holdId.toLowerCase()}`;
 }
@@ -100,7 +100,12 @@ export const orderTransitions = {
     'void',
     'refunded_after_lapse',
   ],
-  payment_failed: ['pending_payment', 'confirmed', 'void', 'refunded_after_lapse'],
+  payment_failed: [
+    'pending_payment',
+    'confirmed',
+    'void',
+    'refunded_after_lapse',
+  ],
   void: ['confirmed', 'refunded_after_lapse'],
   confirmed: ['cancelled'],
   cancelled: [],
@@ -113,6 +118,7 @@ export const orderInitialStatuses = [
   'confirmed',
 ] as const satisfies readonly OrderStatus[];
 
+// TODO(U-049): first caller, confirmOrder.
 export function canOrderTransition(
   from: OrderStatus,
   to: OrderStatus,
@@ -121,6 +127,7 @@ export function canOrderTransition(
 }
 
 /** `round_half_up(subtotal * rate / 1_000_000)`, the tax on a ticket subtotal (PRD-19). */
+// TODO(U-047a): first caller, the order snapshot in startPayment.
 export function orderTaxMinor(
   ticketSubtotalMinor: number,
   taxRatePpm: number,
@@ -143,8 +150,6 @@ export function orderAmountDueMinor(
 ): number {
   return Math.max(0, totalMinor - giftAppliedMinor);
 }
-
-export type OrderIssue = { path: string; message: string };
 
 type OrderRuleFields = {
   kind: OrderKind;
@@ -177,8 +182,8 @@ type OrderRuleFields = {
 
 const confirmedStatuses: readonly OrderStatus[] = ['confirmed', 'cancelled'];
 
-function moneyIssues(order: OrderRuleFields): OrderIssue[] {
-  const issues: OrderIssue[] = [];
+function moneyIssues(order: OrderRuleFields): RuleIssue[] {
+  const issues: RuleIssue[] = [];
   const add = (path: string, message: string) => {
     issues.push({ path, message });
   };
@@ -247,8 +252,8 @@ function moneyIssues(order: OrderRuleFields): OrderIssue[] {
   return issues;
 }
 
-function kindIssues(order: OrderRuleFields): OrderIssue[] {
-  const issues: OrderIssue[] = [];
+function kindIssues(order: OrderRuleFields): RuleIssue[] {
+  const issues: RuleIssue[] = [];
   if (order.kind === 'booking') {
     if (order.holdId === null) {
       issues.push({ path: 'holdId', message: 'A booking has a hold' });
@@ -294,8 +299,8 @@ function kindIssues(order: OrderRuleFields): OrderIssue[] {
   return issues;
 }
 
-function guardianIssues(order: OrderRuleFields): OrderIssue[] {
-  const issues: OrderIssue[] = [];
+function guardianIssues(order: OrderRuleFields): RuleIssue[] {
+  const issues: RuleIssue[] = [];
   if (order.childrenAges !== null) {
     if (order.guardianName === null || order.guardianContact === null) {
       issues.push({
@@ -313,13 +318,14 @@ function guardianIssues(order: OrderRuleFields): OrderIssue[] {
   return issues;
 }
 
-function statusIssues(order: OrderRuleFields): OrderIssue[] {
-  const issues: OrderIssue[] = [];
+function statusIssues(order: OrderRuleFields): RuleIssue[] {
+  const issues: RuleIssue[] = [];
   const confirmed = confirmedStatuses.includes(order.status);
   if ((order.confirmedAt !== null) !== confirmed) {
     issues.push({
       path: 'confirmedAt',
-      message: 'Set exactly when the order was confirmed (confirmed or cancelled)',
+      message:
+        'Set exactly when the order was confirmed (confirmed or cancelled)',
     });
   }
   const cancelled = order.status === 'cancelled';
@@ -343,13 +349,16 @@ function statusIssues(order: OrderRuleFields): OrderIssue[] {
     order.confirmedAt !== null &&
     order.cancelledAt < order.confirmedAt
   ) {
-    issues.push({ path: 'cancelledAt', message: 'Not before it was confirmed' });
+    issues.push({
+      path: 'cancelledAt',
+      message: 'Not before it was confirmed',
+    });
   }
   return issues;
 }
 
 /** Every rule that ties an order's fields together; the CHECKs on `orders` state the same rules. */
-export function orderRuleIssues(order: OrderRuleFields): OrderIssue[] {
+function orderRuleIssues(order: OrderRuleFields): RuleIssue[] {
   return [
     ...kindIssues(order),
     ...moneyIssues(order),
@@ -416,25 +425,20 @@ const orderFields = z.object({
   cancelledAt: z.date().nullable(),
 });
 
+// TODO(U-047a): first caller, the order read in startPayment.
 export const OrderSchema = orderFields.superRefine((order, ctx) => {
-  for (const issue of orderRuleIssues(order)) {
-    ctx.addIssue({
-      code: 'custom',
-      path: [issue.path],
-      message: issue.message,
-    });
-  }
+  addRuleIssues(orderRuleIssues(order), ctx);
 });
 export type Order = z.infer<typeof OrderSchema>;
 
-
-export function orderItemLineTotalMinor(
+function orderItemLineTotalMinor(
   quantity: number,
   unitPriceMinor: number,
 ): number {
   return quantity * unitPriceMinor;
 }
 
+// TODO(U-047a): first caller, the order items read in startPayment.
 export const OrderItemSchema = z
   .object({
     orderId: EntityIdSchema,
@@ -449,6 +453,8 @@ export const OrderItemSchema = z
     (item) =>
       item.lineTotalMinor ===
       orderItemLineTotalMinor(item.quantity, item.unitPriceMinor),
-    { message: 'The line total is the quantity times the unit price', path: ['lineTotalMinor'] },
+    {
+      message: 'The line total is the quantity times the unit price',
+      path: ['lineTotalMinor'],
+    },
   );
-export type OrderItem = z.infer<typeof OrderItemSchema>;

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { EntityIdSchema } from './catalog';
 import { orderLimits } from './orders';
 import { ProviderIdSchema } from './payments';
+import { addRuleIssues, type RuleIssue } from './rules';
 import { canTransition, type TransitionTable } from './transitions';
 
 // What a refund is and the rules around it. The pgEnums and CHECKs on `refunds` are built from
@@ -22,7 +23,6 @@ export const refundReasons = [
   'gift_exchange_difference',
   'ops_adjustment',
 ] as const;
-export type RefundReason = (typeof refundReasons)[number];
 
 export const refundStatuses = [
   'pending',
@@ -49,6 +49,7 @@ export const refundInitialStatuses = [
   'gift_reinstated',
 ] as const satisfies readonly RefundStatus[];
 
+// TODO(U-056): first caller, the refund event handler.
 export function canRefundTransition(
   from: RefundStatus,
   to: RefundStatus,
@@ -60,8 +61,6 @@ export function canRefundTransition(
 export function refundProviderKey(refundId: string): string {
   return `refund:${refundId.toLowerCase()}`;
 }
-
-type RuleIssue = { path: string; message: string };
 
 type RefundRuleFields = {
   id: string;
@@ -78,7 +77,7 @@ type RefundRuleFields = {
 };
 
 /** Rules that tie a refund's fields together; the CHECKs on `refunds` state the same rules. */
-export function refundRuleIssues(refund: RefundRuleFields): RuleIssue[] {
+function refundRuleIssues(refund: RefundRuleFields): RuleIssue[] {
   const issues: RuleIssue[] = [];
   if (refund.amountMinor !== refund.ticketMinor + refund.taxMinor) {
     issues.push({
@@ -121,6 +120,7 @@ export function refundRuleIssues(refund: RefundRuleFields): RuleIssue[] {
 
 const refundMinor = z.int().min(0).max(orderLimits.maxMinor);
 
+// TODO(U-056): first caller, the refund path.
 export const RefundSchema = z
   .object({
     id: EntityIdSchema,
@@ -139,12 +139,5 @@ export const RefundSchema = z
     succeededAt: z.date().nullable(),
   })
   .superRefine((refund, ctx) => {
-    for (const issue of refundRuleIssues(refund)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: [issue.path],
-        message: issue.message,
-      });
-    }
+    addRuleIssues(refundRuleIssues(refund), ctx);
   });
-export type Refund = z.infer<typeof RefundSchema>;

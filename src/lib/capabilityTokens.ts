@@ -9,7 +9,7 @@ export const capabilityTokenKinds = ['manage', 'order'] as const;
 export type CapabilityTokenKind = (typeof capabilityTokenKinds)[number];
 
 /** The kinds whose hash is stored on the row. An `order` token is checked by recomputing it. */
-export const hashStoredKinds = ['manage'] as const;
+const hashStoredKinds = ['manage'] as const;
 export type HashStoredKind = (typeof hashStoredKinds)[number];
 
 export function storesHash(kind: CapabilityTokenKind): kind is HashStoredKind {
@@ -26,7 +26,7 @@ export function isTokenHash(value: string): boolean {
 }
 
 /** Base64url of a 32-byte HMAC-SHA256. */
-export const capabilityTokenLength = 43;
+const capabilityTokenLength = 43;
 const tokenShapeRegex = /^[A-Za-z0-9_-]+$/;
 
 /** Checked before any lookup, so a token of any other shape does no work and reaches no query. */
@@ -88,3 +88,9 @@ export function pickCapabilityTokenSecret(
   if (configured) return configured;
   return nodeEnv === 'test' ? TEST_CAPABILITY_TOKEN_SECRET : null;
 }
+
+/** A secret rotation re-hashes this many orders per transaction, so no statement or lock grows with the table. */
+export const rehashBatchSize = 500;
+
+/** The most batches one rotation runs (a million orders); more than that stops with an error instead of looping on. */
+export const maxRehashBatches = 2000;

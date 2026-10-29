@@ -64,6 +64,29 @@ describe('environment', () => {
     });
   });
 
+  describe('CAPABILITY_TOKEN_SECRET', () => {
+    it.each([undefined, ''])('reads %j as not configured', async (value) => {
+      vi.stubEnv('CAPABILITY_TOKEN_SECRET', value);
+
+      expect((await loadEnv()).CAPABILITY_TOKEN_SECRET).toBeUndefined();
+    });
+
+    it('is read when long enough', async () => {
+      vi.stubEnv('CAPABILITY_TOKEN_SECRET', 's'.repeat(32));
+
+      expect((await loadEnv()).CAPABILITY_TOKEN_SECRET).toBe('s'.repeat(32));
+    });
+
+    it.each([
+      ['too short', 's'.repeat(31)],
+      ['too long', 's'.repeat(257)],
+    ])('fails at import when %s', async (_name, value) => {
+      vi.stubEnv('CAPABILITY_TOKEN_SECRET', value);
+
+      await expect(loadEnv()).rejects.toThrow(/CAPABILITY_TOKEN_SECRET/);
+    });
+  });
+
   describe('PULSE_SECRET', () => {
     it.each([undefined, ''])('reads %j as not configured', async (value) => {
       vi.stubEnv('PULSE_SECRET', value);

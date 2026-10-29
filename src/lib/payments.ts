@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { EntityIdSchema } from './catalog';
 import { orderCurrency, orderLimits } from './orders';
 import { isStorableJson, optionalText, requiredText } from './text';
+import { addRuleIssues, type RuleIssue } from './rules';
 import { canTransition, type TransitionTable } from './transitions';
 
 // What a payment attempt and a provider event are, and the rules around them. The pgEnums and
@@ -9,7 +10,6 @@ import { canTransition, type TransitionTable } from './transitions';
 // (design doc 4.2.3, Payment in flight).
 
 export const paymentProviders = ['fake', 'stripe'] as const;
-export type PaymentProvider = (typeof paymentProviders)[number];
 
 export const paymentMethods = ['card', 'apple_pay', 'google_pay'] as const;
 
@@ -42,7 +42,13 @@ export const maxFailedTries = 5;
  * second failure on the same attempt is another `failed_try`.
  */
 export const attemptTransitions = {
-  created: ['requires_action', 'processing', 'failed_try', 'succeeded', 'canceled'],
+  created: [
+    'requires_action',
+    'processing',
+    'failed_try',
+    'succeeded',
+    'canceled',
+  ],
   requires_action: ['processing', 'failed_try', 'succeeded', 'canceled'],
   processing: ['requires_action', 'failed_try', 'succeeded', 'canceled'],
   failed_try: [
@@ -56,6 +62,7 @@ export const attemptTransitions = {
   canceled: [],
 } as const satisfies TransitionTable<AttemptStatus>;
 
+// TODO(U-048): first caller, the provider event handler.
 export function canAttemptTransition(
   from: AttemptStatus,
   to: AttemptStatus,
@@ -78,10 +85,7 @@ export const paymentLimits = {
 } as const;
 
 /** `pay:{order_id}:{attempt_no}` (FORM-8): the provider's idempotency key for this attempt. */
-export function attemptProviderKey(
-  orderId: string,
-  attemptNo: number,
-): string {
+export function attemptProviderKey(orderId: string, attemptNo: number): string {
   return `pay:${orderId.toLowerCase()}:${String(attemptNo)}`;
 }
 
@@ -90,7 +94,9 @@ export const failureCodePattern = String.raw`^[a-z0-9_]+$`;
 const failureCodeRegex = new RegExp(failureCodePattern);
 
 export function isFailureCode(value: string): boolean {
-  return value.length <= paymentLimits.failureCode && failureCodeRegex.test(value);
+  return (
+    value.length <= paymentLimits.failureCode && failureCodeRegex.test(value)
+  );
 }
 
 export const ProviderIdSchema = requiredText(paymentLimits.providerId);
@@ -106,12 +112,13 @@ type AttemptRuleFields = {
   updatedAt: Date;
 };
 
-type RuleIssue = { path: string; message: string };
-
 /** Rules that tie an attempt's fields together; the CHECKs on `payment_attempts` state the same rules. */
-export function attemptRuleIssues(attempt: AttemptRuleFields): RuleIssue[] {
+function attemptRuleIssues(attempt: AttemptRuleFields): RuleIssue[] {
   const issues: RuleIssue[] = [];
-  if (attempt.providerKey !== attemptProviderKey(attempt.orderId, attempt.attemptNo)) {
+  if (
+    attempt.providerKey !==
+    attemptProviderKey(attempt.orderId, attempt.attemptNo)
+  ) {
     issues.push({
       path: 'providerKey',
       message: 'The key is pay: with the order id and the attempt number',
@@ -135,6 +142,7 @@ export function attemptRuleIssues(attempt: AttemptRuleFields): RuleIssue[] {
   return issues;
 }
 
+// TODO(U-047a): first caller, the attempt read in startPayment.
 export const PaymentAttemptSchema = z
   .object({
     id: EntityIdSchema,
@@ -156,15 +164,8 @@ export const PaymentAttemptSchema = z
     updatedAt: z.date(),
   })
   .superRefine((attempt, ctx) => {
-    for (const issue of attemptRuleIssues(attempt)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: [issue.path],
-        message: issue.message,
-      });
-    }
+    addRuleIssues(attemptRuleIssues(attempt), ctx);
   });
-export type PaymentAttempt = z.infer<typeof PaymentAttemptSchema>;
 
 export const providerEventTypes = [
   'payment.succeeded',
@@ -180,7 +181,6 @@ export const providerEventTypes = [
   'dispute.won',
   'dispute.lost',
 ] as const;
-export type ProviderEventType = (typeof providerEventTypes)[number];
 
 /** An ISO currency code as a provider reports it, which can differ from ours: the mismatch is the thing to catch. */
 export const providerCurrencyPattern = '^[A-Z]{3}$';
@@ -192,7 +192,7 @@ export function isProviderCurrency(value: string): boolean {
 
 const textEncoder = new TextEncoder();
 
-export const ProviderEventPayloadSchema = z
+const ProviderEventPayloadSchema = z
   .record(z.string(), z.unknown())
   .refine(isStorableJson, {
     message: 'The body holds a character that cannot be stored',
@@ -201,7 +201,9 @@ export const ProviderEventPayloadSchema = z
     (payload) =>
       textEncoder.encode(JSON.stringify(payload)).length <=
       paymentLimits.payloadBytes,
-    { message: `The body is at most ${String(paymentLimits.payloadBytes)} bytes` },
+    {
+      message: `The body is at most ${String(paymentLimits.payloadBytes)} bytes`,
+    },
   );
 
 type EventRuleFields = {
@@ -212,7 +214,7 @@ type EventRuleFields = {
 };
 
 /** Rules that tie a provider event's fields together; the CHECKs on `provider_events` state the same rules. */
-export function providerEventRuleIssues(event: EventRuleFields): RuleIssue[] {
+function providerEventRuleIssues(event: EventRuleFields): RuleIssue[] {
   const issues: RuleIssue[] = [];
   if ((event.amountMinor === null) !== (event.currency === null)) {
     issues.push({
@@ -226,6 +228,7 @@ export function providerEventRuleIssues(event: EventRuleFields): RuleIssue[] {
   return issues;
 }
 
+// TODO(U-048): first caller, webhook intake.
 export const ProviderEventSchema = z
   .object({
     id: EntityIdSchema,
@@ -248,12 +251,5 @@ export const ProviderEventSchema = z
     payload: ProviderEventPayloadSchema,
   })
   .superRefine((event, ctx) => {
-    for (const issue of providerEventRuleIssues(event)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: [issue.path],
-        message: issue.message,
-      });
-    }
+    addRuleIssues(providerEventRuleIssues(event), ctx);
   });
-export type ProviderEvent = z.infer<typeof ProviderEventSchema>;

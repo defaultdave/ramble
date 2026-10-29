@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { EntityIdSchema } from './catalog';
 import { orderLimits } from './orders';
 import { ProviderIdSchema } from './payments';
+import { addRuleIssues, type RuleIssue } from './rules';
 import { canTransition, type TransitionTable } from './transitions';
 
 // What a transfer to a host is and the rules around it. The pgEnum and CHECKs on `transfers` are
@@ -34,6 +35,7 @@ export const transferTransitions = {
   simulated: [],
 } as const satisfies TransitionTable<TransferStatus>;
 
+// TODO(U-079a): first caller, the weekly release job.
 export function canTransferTransition(
   from: TransferStatus,
   to: TransferStatus,
@@ -55,8 +57,6 @@ export function transferProviderKey(orderId: string): string {
   return `transfer:${orderId.toLowerCase()}`;
 }
 
-type RuleIssue = { path: string; message: string };
-
 type TransferRuleFields = {
   orderId: string;
   amountMinor: number | null;
@@ -66,7 +66,7 @@ type TransferRuleFields = {
 };
 
 /** Rules that tie a transfer's fields together; the CHECKs on `transfers` state the same rules. */
-export function transferRuleIssues(transfer: TransferRuleFields): RuleIssue[] {
+function transferRuleIssues(transfer: TransferRuleFields): RuleIssue[] {
   const issues: RuleIssue[] = [];
   const amountSet = (amountSetStatuses as readonly string[]).includes(
     transfer.status,
@@ -101,6 +101,7 @@ export function transferRuleIssues(transfer: TransferRuleFields): RuleIssue[] {
   return issues;
 }
 
+// TODO(U-079a): first caller, the weekly release job.
 export const TransferSchema = z
   .object({
     id: EntityIdSchema,
@@ -114,12 +115,5 @@ export const TransferSchema = z
     status: z.enum(transferStatuses),
   })
   .superRefine((transfer, ctx) => {
-    for (const issue of transferRuleIssues(transfer)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: [issue.path],
-        message: issue.message,
-      });
-    }
+    addRuleIssues(transferRuleIssues(transfer), ctx);
   });
-export type Transfer = z.infer<typeof TransferSchema>;

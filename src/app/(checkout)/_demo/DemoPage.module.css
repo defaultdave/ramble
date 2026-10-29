@@ -1,19 +1,5 @@
+/* PageHeading supplies the padding, gap, and type; this only keeps the stub to its narrower column. */
 .page {
-  box-sizing: border-box;
-  display: flex;
   max-inline-size: 40rem;
-  flex-direction: column;
-  gap: var(--space-4);
   margin-inline: auto;
-  padding: var(--space-8) var(--space-6);
-  font-family: var(--font-family-body);
-  color: var(--color-text-primary);
-}
-
-.title {
-  margin: 0;
-  font-family: var(--font-family-display);
-  font-size: var(--font-size-display-m);
-  line-height: var(--font-line-height-display-m);
-  font-weight: var(--font-weight-semibold);
 }

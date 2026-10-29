@@ -12,6 +12,7 @@ import {
   experiencePath,
   homeAsOf,
   homeCopy,
+  homeCardIds,
   homeExperienceIds,
   HomeExperienceIdsSchema,
   homeLimits,
@@ -19,6 +20,7 @@ import {
   thisWeekWindow,
   toHomeCard,
   venueToday,
+  withHomeCovers,
   type HomeExperience,
   type HomeInput,
   type HomeModuleView,
@@ -41,6 +43,8 @@ import {
 // - each module shows its own copy or the default, and is left out whole when it has nothing to show
 // - the first Picks module alone carries the anchor
 // - the page is empty when no module shows, and needs its own title when there is no hero
+// - a card starts with no photo; the page's card IDs are those of its Picks and this-week cards, each once, and none for an empty page
+// - a cover is set on the cards of Picks and this-week modules only, and a card with no cover keeps none
 // - the banner is its trimmed text, or nothing when there is none
 
 const id = (n: number) =>
@@ -211,6 +215,7 @@ describe('toHomeCard', () => {
       title: 'Thing 1',
       meta: 'Greenpoint · 2 hr',
       href: `/experiences/thing-1-${id(1)}`,
+      image: null,
       kind: 'bookable',
       price: '$70',
     });
@@ -248,6 +253,7 @@ describe('toHomeCard', () => {
       title: 'Thing 1',
       meta: 'Greenpoint · 2 hr',
       href: `/guide/thing-1-${id(1)}`,
+      image: null,
       kind: 'guide-only',
       hostHref: 'https://host.example/kayak',
     });
@@ -772,6 +778,71 @@ describe('buildHomePage page', () => {
     expect(buildHomePage({ ...baseInput, modules })).toMatchObject({
       needsTitle,
     });
+  });
+});
+
+describe('covers on the home page', () => {
+  const cover = {
+    src: 'https://store.example/a.jpg',
+    width: 1600,
+    height: 1000,
+    alt: 'A kayak at dusk',
+    blurDataUrl: 'data:image/jpeg;base64,/9j/4AAQ',
+  };
+  const picks = [collection(1, [1, 2])];
+  const input: Partial<HomeInput> = {
+    modules: [
+      module(1, 'picks', { collectionId: picks[0]?.id ?? null }),
+      module(2, 'this_week'),
+      module(3, 'reassurance'),
+    ],
+    picks,
+    experiences: [experience(1), experience(2)],
+    thisWeek: {
+      experienceIds: [id(2), id(3)],
+      experiences: [experience(2), experience(3)],
+    },
+  };
+  const page = buildHomePage({ ...baseInput, ...input });
+
+  it('lists each card experience once, across the Picks and this-week modules', () => {
+    expect(homeCardIds(page)).toEqual([id(1), id(2), id(3)]);
+  });
+
+  it('lists none for an empty page', () => {
+    expect(homeCardIds({ kind: 'empty' })).toEqual([]);
+  });
+
+  it('sets the cover of each card that has one and leaves the others without', () => {
+    const covered = withHomeCovers(page, new Map([[id(2), cover]]));
+
+    const cards =
+      covered.kind === 'modules'
+        ? covered.modules.flatMap((view) =>
+            view.kind === 'picks' || view.kind === 'this_week'
+              ? view.cards
+              : [],
+          )
+        : [];
+    expect(cards.map((card) => [card.id, card.image?.alt ?? null])).toEqual([
+      [id(1), null],
+      [id(2), 'A kayak at dusk'],
+      [id(2), 'A kayak at dusk'],
+      [id(3), null],
+    ]);
+  });
+
+  it('returns an empty page as it is', () => {
+    expect(withHomeCovers({ kind: 'empty' }, new Map())).toEqual({
+      kind: 'empty',
+    });
+  });
+
+  it('keeps the modules that have no cards', () => {
+    const covered = withHomeCovers(page, new Map());
+    expect(covered.kind === 'modules' && covered.modules.at(-1)?.kind).toBe(
+      'reassurance',
+    );
   });
 });
 

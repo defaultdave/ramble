@@ -1,7 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { homeCopy } from '@/lib/home';
+import { samplePhoto } from '@/components/Photo/Photo.fixtures';
+import { homeCopy, type HomeModuleView } from '@/lib/home';
 import { HomeModules } from './HomeModules';
 import {
   categoryRail,
@@ -22,6 +23,7 @@ import {
 // - a guide-only card links out and says it is not bookable
 // - the gift guide links to /gifts and carries the sponsor line; without copy it shows none
 // - "On this week" lists its cards; the reassurance rows list their facts, each with the icon it carries
+// - a card with a cover shows it, named by its alt text, in both layouts; a card with none keeps the empty frame
 // - every module is a labelled region, and the modules appear in the order they are given
 // - no module renders nothing
 
@@ -101,6 +103,32 @@ describe('category rail', () => {
     expect(
       within(region).getByRole('link', { name: 'Cooking' }),
     ).toHaveAttribute('href', '/new-york/browse?category=cooking');
+  });
+});
+
+describe('cover photos on cards', () => {
+  const withCover = (module: HomeModuleView): HomeModuleView =>
+    module.kind === 'picks' || module.kind === 'this_week'
+      ? {
+          ...module,
+          cards: module.cards.map((card, index) =>
+            index === 0 ? { ...card, image: samplePhoto(0) } : card,
+          ),
+        }
+      : module;
+
+  it.each([
+    ['a Picks card', withCover(picks)],
+    ['an "On this week" card', withCover(thisWeek)],
+  ])('shows the cover of %s, named by its alt text', (_name, module) => {
+    render_([module]);
+    expect(screen.getAllByRole('img')).toHaveLength(1);
+    expect(screen.getByRole('img', { name: 'Photo 1' })).toBeInTheDocument();
+  });
+
+  it('shows no image for a card with no cover', () => {
+    render_([picks]);
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 });
 

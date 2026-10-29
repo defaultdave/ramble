@@ -7,6 +7,7 @@ import {
   toQueryEntries,
   type BrowseQuery,
 } from './filters';
+import { withCovers, type PhotoView } from './photoViews';
 import { cardPriceLabel } from './pricing';
 import { IsoDateSchema, TimeZoneSchema, isKnownTimeZone } from './sessions';
 
@@ -217,6 +218,8 @@ export type BrowseCard = {
   title: string;
   meta: string;
   href: string;
+  /** The experience's cover photo; null shows the card's missing-image state. */
+  image: PhotoView | null;
 } & (
   { kind: 'bookable'; price: string } | { kind: 'guide-only'; hostHref: string }
 );
@@ -241,6 +244,7 @@ export function toBrowseCard(experience: BrowseExperience): BrowseCard | null {
     title: experience.name,
     meta,
     href: experienceAddress(experience),
+    image: null,
   };
   if (experience.status === 'guide_only') {
     if (experience.linkOutUrl === null) return null;
@@ -312,6 +316,21 @@ export function browseView(query: BrowseQuery, page: BrowsePage): BrowseView {
         : targetFor({ filters, after: page.nextCursor }),
     startHref: after === null ? null : hrefForFilters(filters),
   };
+}
+
+/** The experiences on a page of results, for one read of their cover photos. */
+export function browseCardIds(page: BrowsePage): string[] {
+  return page.ok ? page.items.map((item) => item.id) : [];
+}
+
+/** The view with each card's cover photo set; a view with no cards is returned as it is. */
+export function withBrowseCovers(
+  view: BrowseView,
+  covers: ReadonlyMap<string, PhotoView>,
+): BrowseView {
+  return view.state === 'results'
+    ? { ...view, cards: withCovers(view.cards, covers) }
+    : view;
 }
 
 /** The same address again: a retry reloads exactly what failed. */

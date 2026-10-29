@@ -3,6 +3,7 @@ import { expect, test } from './fixtures';
 import {
   notFoundHeading,
   perRequestFallbackPaths,
+  experiencePaths,
   perRequestGroups,
   routes,
   unknownPaths,
@@ -40,6 +41,8 @@ const paths: readonly PathRow[] = [
     heading: notFoundHeading,
   })),
   { path: unprerenderedParamPath, dynamic: false, status: 200 },
+  { path: experiencePaths.notFound, dynamic: false, status: 404 },
+  { path: experiencePaths.readFails, dynamic: false, status: 200 },
 ];
 
 const staticHeaders: readonly HeaderRow[] = [

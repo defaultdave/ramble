@@ -2,6 +2,7 @@ import Form from 'next/form';
 import { Alert } from '@/components/Alert';
 import { Button, ButtonLink } from '@/components/Button';
 import { Card } from '@/components/Card';
+import { Photo } from '@/components/Photo';
 import type { BrowseCard, BrowseView, FormTarget } from '@/lib/browse';
 import { browsePath } from '@/lib/filters';
 import styles from './BrowseResults.module.css';
@@ -32,7 +33,13 @@ function TargetButton({ target, label, variant }: TargetButtonProps) {
 
 export type BrowseResultsProps = BrowseView;
 
+// A result card spans its grid column: at most 384px from the tablet width, the whole page on a phone.
+const photoSizes = '(min-width: 768px) 384px, 100vw';
+
 function ResultCard({ card }: { card: BrowseCard }) {
+  const image = card.image ? (
+    <Photo photo={card.image} sizes={photoSizes} />
+  ) : null;
   return card.kind === 'guide-only' ? (
     <Card
       kind="guide-only"
@@ -41,8 +48,7 @@ function ResultCard({ card }: { card: BrowseCard }) {
       meta={card.meta}
       href={card.href}
       hostHref={card.hostHref}
-      // TODO(U-039): the experience's cover photo.
-      image={null}
+      image={image}
     />
   ) : (
     <Card
@@ -51,8 +57,7 @@ function ResultCard({ card }: { card: BrowseCard }) {
       meta={card.meta}
       href={card.href}
       price={card.price}
-      // TODO(U-039): the experience's cover photo.
-      image={null}
+      image={image}
     />
   );
 }

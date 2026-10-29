@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BrowseDayRowsSchema,
   browseAsOf,
+  browseCardIds,
   browseDays,
   browseDateHorizonDays,
   browsePageSize,
@@ -19,6 +20,7 @@ import {
   withPriceOptions,
   toBrowseCard,
   venueToday,
+  withBrowseCovers,
   type BrowseExperience,
   type BrowsePage,
   type BrowseRead,
@@ -39,6 +41,8 @@ import { noFilters } from './filters';
 // - an experience address names the area by status
 // - a card carries neighborhood and duration, links a guide entry out, and refuses a guide entry with no link
 // - the summary line counts the cards
+// - the experiences of a page are its items, and none for an outdated page
+// - a cover is set on the cards of a results view, and any other view is returned as it is
 // - each results state is chosen from the page: outdated cursor, empty (filtered or not), results with or without more, later page, error
 
 const id = (n: number) =>
@@ -246,6 +250,7 @@ describe('toBrowseCard', () => {
       title: 'Thing 1',
       meta: 'DUMBO · 2 hr',
       href: `/experiences/thing-1-${id(1)}`,
+      image: null,
       kind: 'bookable',
       price: '$85',
     });
@@ -457,6 +462,47 @@ describe('browseView', () => {
       nextCursor: rows[rows.length - 1]?.id ?? null,
     });
     expect(view.state === 'results' && view.cards).toHaveLength(browsePageSize);
+  });
+});
+
+describe('covers on browse results', () => {
+  const cover = {
+    src: 'https://store.example/a.jpg',
+    width: 1600,
+    height: 1000,
+    alt: 'A kayak at dusk',
+    blurDataUrl: 'data:image/jpeg;base64,/9j/4AAQ',
+  };
+  const page: BrowsePage = {
+    ok: true,
+    items: [experience(1), experience(2)],
+    nextCursor: null,
+  };
+
+  it('lists the experiences of a page, and none for an outdated one', () => {
+    expect(browseCardIds(page)).toEqual([id(1), id(2)]);
+    expect(browseCardIds({ ok: false, reason: 'cursor_not_found' })).toEqual(
+      [],
+    );
+  });
+
+  it('sets the cover of each card that has one', () => {
+    const view = withBrowseCovers(
+      browseView({ filters: noFilters, after: null }, page),
+      new Map([[id(2), cover]]),
+    );
+
+    expect(view.state === 'results' && view.cards.map((c) => c.image)).toEqual([
+      null,
+      cover,
+    ]);
+  });
+
+  it.each([
+    [{ state: 'empty', filtered: false } as const],
+    [{ state: 'outdated', startHref: '/new-york/browse' } as const],
+  ])('returns %j as it is', (view) => {
+    expect(withBrowseCovers(view, new Map([[id(1), cover]]))).toBe(view);
   });
 });
 

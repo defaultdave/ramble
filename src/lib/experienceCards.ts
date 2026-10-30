@@ -5,12 +5,6 @@ import type { PhotoView } from './photoViews';
 import { cardPriceLabel, type CardPriceOption } from './pricing';
 import { experienceCardPath } from './routes';
 
-/**
- * The experiences one card read looks up by ID, and so the cover photos one batch read takes. It is
- * the most the home page can list: 20 modules at most, each with 12 Picks candidates.
- */
-export const cardLookupLimit = 240;
-
 /** The part of a price option a card reads: its amount, and whether a guest holding it takes a space. */
 export const CardPriceOptionSchema = z.object({
   priceMinor: z.int().nonnegative(),

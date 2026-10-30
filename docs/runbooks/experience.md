@@ -1,6 +1,6 @@
 # Experience page
 
-How `/experiences/[slug]-[id]` is built, what it shows and when a section hides, how it is cached, and what the guest sees when something is missing or a read fails. The decisions are in ADR 0001 (Cache Components) and the cache rules in [cache-conventions.md](cache-conventions.md). The page covers PRD-09 to PRD-12 and PRD-68. The upcoming dates, spaces left, and the booking bar, sheet, and panel are other units' (they leave `TODO(U-040)` and `TODO(U-041)` in `ExperiencePage`).
+How `/experiences/[slug]-[id]` is built, what it shows and when a section hides, how it is cached, and what the guest sees when something is missing or a read fails. The decisions are in ADR 0001 (Cache Components) and the cache rules in [cache-conventions.md](cache-conventions.md). The page covers PRD-09 to PRD-12 and PRD-68. The booking bar, sheet, and panel are another unit's (they leave `TODO(U-041)` in `ExperiencePage`).
 
 ## The address
 
@@ -36,6 +36,18 @@ The cancellation terms are stated by window (`cancellationTerms`). The deadline 
 Both are inside the prerendered shell (their `expire` is over five minutes). A hidden or missing experience, and an ID that is no guid, return `null` under the `uncached` profile (`expire: 0`), so a production build keeps nothing and made-up IDs fill no cache. Each such request reads the database again, up to twice (the metadata and the page both ask). `next dev` keeps the entry, so check this against a production build. Publishing, editing, or taking an experience down reaches the entry through `tagsForChange`.
 
 The lead photo goes through `next/image` preloaded (`next/image`'s `preload`) with its blur placeholder; every photo sits in a frame with a fixed aspect ratio, so nothing shifts when it loads (PRD-68). There is no client island: the phone gallery is a scroll-snap strip, and "See all" is a native `<details>`.
+
+## Upcoming dates
+
+The "Upcoming dates" section streams in behind a Suspense boundary (`UpcomingSessionsContent`), so the shell stays prerendered. The skeleton draws the same number of rows as the read's bound, at the loaded row's height, so nothing below moves; a schedule with fewer dates is shorter than its skeleton.
+
+| Part | Rule |
+|---|---|
+| The read | `readUpcomingSessions` in `src/server/upcomingSessions.ts`: the next 6 scheduled sessions inside 90 days (`upcomingSessionLimits`), cached on the `browse` profile under `experience:<id>`, keyed by the minute |
+| Spaces left | `getSpacesLeft(sessionId)` per row (runtime cache, up to 60 seconds stale). Display only: the reserve decides |
+| A row | "Sat, Oct 24 · 5:30 PM EDT" on the session's own clock, the spaces label ("8 spaces", "3 left" from three down, "Sold out"), and the card price. Open and few-left rows link to the booking; a sold-out row stays listed with no link |
+| `?date=YYYY-MM-DD` | Marks the rows on that date (on the session's calendar) as the current date. A date outside the six listed rows marks nothing |
+| A read fails | The section alone shows "We couldn't load the dates" and a "Check availability" button (a GET form to the page's own address); the rest of the page is unaffected |
 
 ## When a read fails
 

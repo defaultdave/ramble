@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { Suspense } from 'react';
 import { ExperienceError, ExperiencePage } from '@/components/ExperiencePage';
+import { UpcomingSessionsSkeleton } from '@/components/UpcomingSessions';
 import {
   buildExperiencePage,
   experienceHead,
@@ -10,6 +12,7 @@ import { experiencePath, parseExperienceAddress } from '@/lib/routes';
 import { getExperiencePage } from '@/server/experiencePage';
 import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
 import { getCachedGuestSettings } from '@/server/siteSettings';
+import { UpcomingSessionsContent } from './UpcomingSessionsContent';
 
 export function generateStaticParams() {
   return [{ slugAndId: 'sample' }];
@@ -34,6 +37,7 @@ export async function generateMetadata({
 
 export default async function ExperienceRoute({
   params,
+  searchParams,
 }: PageProps<'/experiences/[slugAndId]'>) {
   const address = parseExperienceAddress((await params).slugAndId);
   if (!address) notFound();
@@ -53,5 +57,19 @@ export default async function ExperienceRoute({
   }
 
   if (!view) notFound();
-  return <ExperiencePage view={view} />;
+  return (
+    <ExperiencePage
+      view={view}
+      dates={
+        <Suspense fallback={<UpcomingSessionsSkeleton />}>
+          <UpcomingSessionsContent
+            upcoming={view.upcoming}
+            bookHref={view.bookHref}
+            searchParams={searchParams}
+            retryHref={experiencePath(address)}
+          />
+        </Suspense>
+      }
+    />
+  );
 }

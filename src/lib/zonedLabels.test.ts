@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   zonedDayLabel,
   zonedDeadlineLabel,
+  zonedShortDayLabel,
   zonedTimeLabel,
 } from './zonedLabels';
 
@@ -24,6 +25,15 @@ describe('zoned labels', () => {
     expect(zonedDeadlineLabel(winter, 'America/New_York')).toBe(
       'Sat, Nov 7, 2:00 PM EST',
     );
+  });
+
+  it("writes the short day on the zone's calendar", () => {
+    const lateNight = new Date('2026-11-08T03:30:00Z');
+    expect(zonedShortDayLabel(winter, 'America/New_York')).toBe('Sat, Nov 7');
+    expect(zonedShortDayLabel(lateNight, 'America/New_York')).toBe(
+      'Sat, Nov 7',
+    );
+    expect(zonedShortDayLabel(lateNight, 'Asia/Tokyo')).toBe('Sun, Nov 8');
   });
 
   it('follows daylight saving', () => {

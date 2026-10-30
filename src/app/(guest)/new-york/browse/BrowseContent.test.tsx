@@ -18,8 +18,10 @@ const server = vi.hoisted(() => ({
   logError: vi.fn(),
 }));
 vi.mock('next/server', () => ({ connection: () => Promise.resolve() }));
-vi.mock('@/server/browse', () => ({
+vi.mock('@/server/filterOptions', () => ({
   getFilterOptions: server.options,
+}));
+vi.mock('@/server/browse', () => ({
   getBrowseDates: server.dates,
   getBrowseResults: server.results,
 }));

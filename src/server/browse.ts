@@ -7,11 +7,10 @@ import {
   type BrowsePage,
 } from '@/lib/pages/browse';
 import { tags } from '@/lib/cacheTags';
-import type { Category, Neighborhood } from '@/lib/catalog';
 import type { BrowseFilters, BrowseQuery } from '@/lib/filters';
 import { readOrRefuse } from '@/server/cache/readOrRefuse';
 import { listBrowseDayRows, listBrowseExperiences } from '@/server/db/browse';
-import { listCategories, listNeighborhoods } from '@/server/db/catalog';
+import { getFilterOptions } from '@/server/filterOptions';
 import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
 
 // A schedule change reaches an entry here only through the experiences it lists. A session added to
@@ -49,20 +48,6 @@ export async function getBrowseDates(
   return readOrRefuse('Browse dates', async () =>
     browseDays(await listBrowseDayRows(filters, asOf)),
   );
-}
-
-/** Every category and neighborhood, for the chips. They change when staff publish, and `tags.catalog` says so. */
-export async function getFilterOptions(): Promise<{
-  categories: Category[];
-  neighborhoods: Neighborhood[];
-}> {
-  'use cache';
-  cacheLife('catalog');
-  cacheTag(tags.catalog);
-  const [categories, neighborhoods] = await readOrRefuse('Filter options', () =>
-    Promise.all([listCategories(), listNeighborhoods()]),
-  );
-  return { categories, neighborhoods };
 }
 
 /**

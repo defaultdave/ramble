@@ -14,11 +14,8 @@ import {
 } from '@/lib/filters';
 import { minuteAsOf } from '@/lib/time';
 import { venueToday } from '@/lib/venue';
-import {
-  getBrowseDates,
-  getBrowseResults,
-  getFilterOptions,
-} from '@/server/browse';
+import { getBrowseDates, getBrowseResults } from '@/server/browse';
+import { getFilterOptions } from '@/server/filterOptions';
 import { chooseBrowseDate } from '@/server/actions/browse';
 import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
 

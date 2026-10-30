@@ -16,7 +16,11 @@ import { ExperienceGallery } from '@/components/ExperienceGallery';
 import type { ExperiencePageView, KeyFactIcon } from '@/lib/pages/experience';
 import styles from './ExperiencePage.module.css';
 
-export type ExperiencePageProps = { view: ExperiencePageView };
+export type ExperiencePageProps = {
+  view: ExperiencePageView;
+  /** The upcoming dates, which the route streams in behind a skeleton of their own height. */
+  dates: ReactNode;
+};
 
 const factIcon = {
   place: MapPin,
@@ -46,9 +50,10 @@ function Section({
 
 /**
  * The content of an experience page: its photos, what it is, what it costs, and the terms a guest
- * agrees to before choosing a date. The dates and the booking controls are other units'.
+ * agrees to before choosing a date, with the upcoming dates in a slot the route fills. The
+ * booking controls are another unit's.
  */
-export function ExperiencePage({ view }: ExperiencePageProps) {
+export function ExperiencePage({ view, dates }: ExperiencePageProps) {
   return (
     <article className={styles.page}>
       <header className={styles.header}>
@@ -110,7 +115,8 @@ export function ExperiencePage({ view }: ExperiencePageProps) {
           </ul>
         </div>
 
-        {/* TODO(U-040): the upcoming dates and spaces left go here, streamed into reserved space. */}
+        <Section heading="Upcoming dates">{dates}</Section>
+
         {/* TODO(U-041): the booking bar and sheet on a phone, and the panel beside this column from the tablet width. */}
         <div className={styles.action}>
           <ButtonLink href={view.bookHref} variant="primary" size="lg">

@@ -32,6 +32,7 @@ import type { GuestPhoto } from '../photos';
 // - the included list is one row per line, blank lines dropped, at most the limit
 // - a guide entry is not this page; a bookable one shows its facts in order and leaves out what it does not have
 // - the badges: outdoor, 21+, kids; each only when it applies
+// - the streamed dates are handed the experience and only the price fields they read
 // - gifts switched off leave the gift entry out; the private-session entry stays
 // - the gallery is in the order staff set; a blank text section is left out
 // - the gallery layout follows the photo count (none, one, two, three, many); only the first photo leads; each photo of a set says its place and a lone one says nothing; "See all" and the photos behind it appear only past the grid
@@ -406,6 +407,13 @@ describe('buildExperiencePage', () => {
 
   it('books through the demo checkout with the experience id', () => {
     expect(build()?.bookHref).toBe(demoCheckoutPath(id(1)));
+  });
+
+  it('hands the streamed dates the experience and only the price fields they read', () => {
+    expect(build()?.upcoming).toEqual({
+      experienceId: id(1),
+      priceOptions: [{ priceMinor: 6500, usesSpace: true }],
+    });
   });
 
   it('goes to the gift checkout when gifts are on, and has no gift entry when they are off', () => {

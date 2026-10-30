@@ -19,7 +19,6 @@ async function cachedSpacesLeft(sessionId: string): Promise<number | null> {
   return readOrRefuse('Spaces left', () => readSessionSpacesLeft(sessionId));
 }
 
-// TODO(U-040): first caller, the spaces-left stream on the experience page.
 /**
  * Spaces left in a session for display, or null when no session guests can see has this ID. Zero
  * or less reads as sold out. Only a well-formed ID reaches a cache key, and a failure of the

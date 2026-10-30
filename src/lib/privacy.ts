@@ -615,6 +615,13 @@ export const nonPiiColumns: readonly {
     'received_at',
     'processed_at',
   ]),
+  ...notPersonal('fake_gateway_state', aFixedList, ['key']),
+  ...notPersonal(
+    'fake_gateway_state',
+    "The fake payment gateway's own objects and events: Ramble ids, amounts, and fake client secrets, with no name, email, or card detail",
+    ['state'],
+  ),
+  ...notPersonal('fake_gateway_state', aTime, ['updated_at']),
   ...notPersonal('refunds', aRandomId, ['id']),
   ...notPersonal('refunds', structure, [
     'order_id',

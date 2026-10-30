@@ -667,12 +667,10 @@ describe('through the webhook route and the job drain', () => {
       .update(schema.paymentAttempts)
       .set({ providerPaymentId: payment.id })
       .where(eq(schema.paymentAttempts.id, world.attemptId));
-    await fake.confirm(payment.id, { outcome: 'succeeded' });
-    const succeeded = fake
-      .emittedEvents()
-      .find((e) => e.type === 'payment.succeeded' && e.objectId === payment.id);
-    if (!succeeded) throw new Error('no succeeded event');
-    const delivery = fake.signWebhook(succeeded);
+    const { event } = await fake.confirm(payment.id, {
+      outcome: 'succeeded',
+    });
+    const delivery = fake.signWebhook(event);
 
     const response = await route.POST(
       new Request('http://localhost/api/webhooks/payments', {

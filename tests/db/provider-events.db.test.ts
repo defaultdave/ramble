@@ -21,7 +21,6 @@ import {
 import { backoffSeconds } from '@/lib/jobs';
 import type { ConfirmOrder } from '@/server/db/confirmOrder';
 import { createFakePaymentsAdapter } from '@/server/ports/payments/fake';
-import { getFakePayments } from '@/server/ports/payments/gateway';
 import {
   deliverEmittedEvents,
   type SimulatedDelivery,
@@ -62,6 +61,7 @@ let jobModule: typeof import('@/server/jobs/providerEvents');
 let schema: typeof import('@/server/db/schema');
 let drain: typeof import('@/server/jobs/drain');
 let clockModule: typeof import('@/server/ports/clock');
+let gateway: typeof import('@/server/ports/payments/gateway');
 let side: Pool;
 const parents = {
   hostId: '',
@@ -83,6 +83,7 @@ beforeAll(async () => {
   schema = await import('@/server/db/schema');
   drain = await import('@/server/jobs/drain');
   clockModule = await import('@/server/ports/clock');
+  gateway = await import('@/server/ports/payments/gateway');
   Object.assign(parents, await createOrderParents(client.db, 'events'));
   side = new Pool({ connectionString: fresh.url, max: 4 });
 });
@@ -693,7 +694,7 @@ describe('events that match nothing', () => {
   });
 
   it('looks up the ids at the provider before the transaction, only for an event that needs it', async () => {
-    const fake = getFakePayments();
+    const fake = gateway.getFakePayments();
     const recordId = randomUUID();
     const orderId = randomUUID();
     const payment = await fake.createPayment({

@@ -40,6 +40,15 @@ To show a job "tomorrow" in the demo: set `DEMO_CLOCK=on`, then POST `{ "asOf": 
 
 An `asOf` run treats the clock as `asOf` for everything, including the lock test. A row another drain is running right now has a lock that lapses after the real time, so at a later `asOf` it looks lapsed: the demo run takes it, and when the real drain finishes its re-check finds the claim gone and the outcome is `lost`. The job was not run twice by the real drain, but it cost an attempt. Use `asOf` when nothing is mid-run. A crashed `asOf` run leaves its rows locked until `asOf` plus 5 minutes, so a later real pulse will not touch them until the real clock passes that time; for an `asOf` in the future that can be a long wait. To free them sooner, set `status = 'pending'`, `locked_until = NULL`, `run_after = now()` on those rows (attempts already spent stay spent).
 
+## After Pay on the fake gateway
+
+When a guest taps Pay in the fake card form, the order does not wait for the pulse. `confirmFakePayment` (`src/server/actions/fakePayment.ts`) records the outcome at the fake, signs the event it emitted, and hands it to the webhook intake in the same process (`src/server/fakePaymentDelivery.ts`), so it runs the real path: signature, budget, `recordProviderEvent`, and the `process-provider-event` job. Once the intake has taken it, `after()` runs one `drainJobs` after the response, so the order reaches `confirmed` (and the two booking emails are sent) within a second or two. A concurrent pulse is safe: claims use `SKIP LOCKED`. The drain may also run other due jobs, within the usual 200-job and 60-second caps.
+
+- The fake keeps its payments and events in the one-row table `fake_gateway_state`, so a server instance that did not start the payment still knows it. The webhook secret stays random per process and needs no setting: the event is signed and checked in one process, and the webhook route still refuses anything from outside.
+- If the intake refuses the delivery, the action throws (the log has the kind and status only) and the guest sees the "we're checking your payment" notice. The fake holds the payment and its event, Ramble does not, and nothing retries. If the drain fails, it is logged and the job stays due for the next pulse or payment.
+- The fake holds at most 2,000 payments, refunds, transfers, and reversals and 10,000 events (about 6.5 MB at both limits). Past either, every write answers `provider_unavailable` and payments are refused. To clear it on a demo database, delete the row: `DELETE FROM fake_gateway_state;`. The next payment makes a fresh one. Payments already made keep their orders, but the fake forgets them, so a guest still on a payment form from before the delete is refused.
+- The row is one lock: every fake write takes turns. A load test on the fake measures that row, not checkout.
+
 ## Dead jobs
 
 Query `jobs` where `status = 'dead'`: `last_error` holds the error kind and a redacted message, never the payload. To retry one, set `status = 'pending'`, `attempts = 0`, `finished_at = NULL`, `run_after = now()` in one UPDATE (the table's CHECKs refuse a half-edited row).

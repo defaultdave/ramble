@@ -36,6 +36,18 @@ function resolveImport(specifier: string, from: string): string | null {
   return hit && /\.tsx?$/.test(hit) ? hit : null;
 }
 
+/**
+ * A `'use server'` module is the seam between the browser and the server: a client component that imports
+ * it is given a reference to call, and the module's own imports run on the server only. Its imports are
+ * not followed, so server work an action does (the fake payment's job drain reaches the server Sentry SDK)
+ * is not mistaken for a script the browser loads.
+ */
+function isServerActionModule(file: string): boolean {
+  return /^\s*(?:\/\/[^\n]*\n\s*)*['"]use server['"]/.test(
+    readFileSync(file, 'utf8'),
+  );
+}
+
 function importsOf(file: string): string[] {
   const text = readFileSync(file, 'utf8');
   return [...text.matchAll(/(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g)].map(
@@ -56,6 +68,7 @@ function checkoutClosure() {
     const file = queue.pop();
     if (!file || seen.has(file)) continue;
     seen.add(file);
+    if (isServerActionModule(file)) continue;
     for (const specifier of importsOf(file)) {
       specifiers.add(specifier);
       const next = resolveImport(specifier, file);

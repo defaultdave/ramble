@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { recordProviderEvent } from '@/server/db/providerEvents';
 import { logger } from '@/server/monitoring/logger';
 import { maxWebhookBodyLength, PaymentsError } from '@/server/ports/payments';
+import { createFakePaymentsAdapter } from '@/server/ports/payments/fake';
 import { getFakePayments } from '@/server/ports/payments/gateway';
 import { consumeRateLimit } from '@/server/ports/rate-limit';
 import { POST } from './route';
@@ -26,7 +27,13 @@ vi.mock('@/server/monitoring/logger', () => ({
 const orderId = '00000000-0000-4000-8000-0000000000a1';
 const recordId = '00000000-0000-4000-8000-0000000000b2';
 const url = 'http://localhost/api/webhooks/payments';
+// The gateway signs and checks deliveries without a database; the events come from an adapter on its own
+// in-memory state, which signs with another secret, so the gateway signs them again.
 const fake = getFakePayments();
+const provider = createFakePaymentsAdapter({
+  webhookSecret: 'w'.repeat(32),
+  now: () => new Date(),
+});
 
 function post(
   body: string,
@@ -46,15 +53,16 @@ function post(
 let counter = 0;
 async function emitSucceeded() {
   counter += 1;
-  const payment = await fake.createPayment({
+  const payment = await provider.createPayment({
     idempotencyKey: `pay:route-test:${String(counter)}`,
     amountMinor: 13_000,
     currency: 'USD',
     metadata: { orderId, recordId },
   });
-  await fake.confirm(payment.id, { outcome: 'succeeded', method: 'apple_pay' });
-  const event = fake.emittedEvents().at(-1);
-  if (!event) throw new Error('no event emitted');
+  const { event } = await provider.confirm(payment.id, {
+    outcome: 'succeeded',
+    method: 'apple_pay',
+  });
   return event;
 }
 

@@ -1,5 +1,10 @@
 import 'server-only';
 import { randomBytes } from 'node:crypto';
+import { fakeGatewayLimits } from '@/lib/payments';
+import {
+  readFakeGatewayState,
+  withFakeGatewayState,
+} from '@/server/db/fakeGateway';
 import { systemClock } from '@/server/ports/clock';
 import type { PaymentsPort } from '.';
 import {
@@ -9,37 +14,65 @@ import {
   type FakePaymentsState,
 } from './fake';
 
-type Shared = { state: FakePaymentsState; webhookSecret: string };
+/**
+ * The fake provider as the rest of the app sees it: the payments port, plus the simulation calls the
+ * fake card form drives. Its objects live in the database, so any server instance finds a payment
+ * another one created. There is no call that lists its events: `confirm` hands back the one it emitted.
+ */
+export type FakeGateway = Omit<FakePaymentsAdapter, 'emittedEvents'>;
 
-// Next can load this module once per route bundle in development. The fake's objects and its
-// signing secret live on the global object so every copy reads and signs the same ones.
-const sharedKey = Symbol.for('ramble.fakePayments');
+function createGateway(webhookSecret: string): FakeGateway {
+  const adapterOn = (state: FakePaymentsState) =>
+    createFakePaymentsAdapter({
+      webhookSecret,
+      now: () => systemClock.now(),
+      state,
+      maxObjects: fakeGatewayLimits.maxObjects,
+      maxEvents: fakeGatewayLimits.maxEvents,
+    });
 
-function shared(): Shared {
-  const found = Reflect.get(globalThis, sharedKey) as Shared | undefined;
-  if (found) return found;
-  const created: Shared = {
-    state: createFakePaymentsState(),
-    webhookSecret: randomBytes(32).toString('hex'),
+  // Signing and checking a delivery use the secret only, so they touch no database: a forged
+  // delivery costs no query.
+  const signer = adapterOn(createFakePaymentsState());
+  const write = <T>(run: (adapter: FakePaymentsAdapter) => Promise<T>) =>
+    withFakeGatewayState((state) => run(adapterOn(state)));
+  const read = async <T>(run: (adapter: FakePaymentsAdapter) => Promise<T>) =>
+    run(adapterOn(await readFakeGatewayState()));
+
+  return {
+    provider: signer.provider,
+    createPayment: (input) => write((adapter) => adapter.createPayment(input)),
+    cancelPayment: (input) => write((adapter) => adapter.cancelPayment(input)),
+    refund: (input) => write((adapter) => adapter.refund(input)),
+    transfer: (input) => write((adapter) => adapter.transfer(input)),
+    reverseTransfer: (input) =>
+      write((adapter) => adapter.reverseTransfer(input)),
+    confirm: (paymentId, input) =>
+      write((adapter) => adapter.confirm(paymentId, input)),
+    retrieve: (query) => read((adapter) => adapter.retrieve(query)),
+    getBalance: () => read((adapter) => adapter.getBalance()),
+    verifyWebhook: (delivery) => signer.verifyWebhook(delivery),
+    signWebhook: (event, signedAt) => signer.signWebhook(event, signedAt),
+    signBody: (rawBody, signedAt) => signer.signBody(rawBody, signedAt),
   };
-  Reflect.set(globalThis, sharedKey, created);
-  return created;
 }
 
-let adapter: FakePaymentsAdapter | undefined;
+// Next can load this module once per route bundle in development. The gateway, and so the signing
+// secret it closes over, lives on the global object so every copy signs and checks with the same one.
+const sharedKey = Symbol.for('ramble.fakeGateway');
 
 /**
- * The one fake gateway of this server process. Its objects live in memory and its webhook
- * signing secret is random per process, so a delivery nobody here signed is refused.
+ * The one fake gateway of this server process. Its objects are in the database; its webhook signing
+ * secret is random per process, so a delivery nobody in this process signed is refused. The fake signs
+ * and checks its own deliveries in one process (`deliverFakeConfirmation`), so no instance needs
+ * another's secret. A payment's client secret is stored with it and keeps working across instances.
  */
-export function getFakePayments(): FakePaymentsAdapter {
-  const { state, webhookSecret } = shared();
-  adapter ??= createFakePaymentsAdapter({
-    webhookSecret,
-    now: () => systemClock.now(),
-    state,
-  });
-  return adapter;
+export function getFakePayments(): FakeGateway {
+  const found = Reflect.get(globalThis, sharedKey) as FakeGateway | undefined;
+  if (found) return found;
+  const created = createGateway(randomBytes(32).toString('hex'));
+  Reflect.set(globalThis, sharedKey, created);
+  return created;
 }
 
 /**

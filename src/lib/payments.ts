@@ -89,6 +89,17 @@ export const paymentLimits = {
   maxAttemptNo: 50,
 } as const;
 
+/**
+ * What the fake gateway may hold in its one `fake_gateway_state` row. The row is read on every call, so
+ * it is capped: past `maxObjects` payments, refunds, transfers, and reversals, or `maxEvents` events, the
+ * fake answers `provider_unavailable`. `stateStoredBytes` is the backstop on the stored jsonb text.
+ */
+export const fakeGatewayLimits = {
+  maxObjects: 2_000,
+  maxEvents: 10_000,
+  stateStoredBytes: 8_388_608,
+} as const;
+
 /** `pay:{order_id}:{attempt_no}` (FORM-8): the provider's idempotency key for this attempt. */
 export function attemptProviderKey(orderId: string, attemptNo: number): string {
   return `pay:${orderId.toLowerCase()}:${String(attemptNo)}`;

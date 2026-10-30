@@ -69,7 +69,7 @@ const reversalInput = (transferId: string, n: number, amountMinor = 100) => ({
 
 async function paid(fake: FakePaymentsAdapter, n = 1) {
   const payment = await fake.createPayment(paymentInput(n));
-  return fake.confirm(payment.id, { outcome: 'succeeded' });
+  return (await fake.confirm(payment.id, { outcome: 'succeeded' })).payment;
 }
 
 describePaymentsPortContract('fake adapter', () => {
@@ -362,7 +362,7 @@ describe('fake adapter', () => {
 
       expect(fake.emittedEvents()).toHaveLength(maxChallenges);
       expect(
-        await fake.confirm(payment.id, { outcome: 'succeeded' }),
+        (await fake.confirm(payment.id, { outcome: 'succeeded' })).payment,
       ).toMatchObject({ status: 'succeeded' });
     });
   });
@@ -420,6 +420,25 @@ describe('fake adapter', () => {
       await fake.retrieve({ kind: 'payment', metadata: first.metadata }),
     ).toEqual(first);
   });
+
+  it.each([
+    ['succeeded', 'payment.succeeded'],
+    ['declined', 'payment.failed'],
+    ['requires_action', 'payment.requires_action'],
+  ] as const)(
+    'hands back the event a %s confirmation emitted, as a copy',
+    async (outcome, type) => {
+      const fake = makeFake();
+      const payment = await fake.createPayment(paymentInput(1));
+
+      const confirmed = await fake.confirm(payment.id, { outcome });
+
+      expect(confirmed.event).toEqual(firstEvent(fake));
+      expect(confirmed.event).toMatchObject({ type, objectId: payment.id });
+      confirmed.event.type = 'payment.canceled';
+      expect(firstEvent(fake).type).toBe(type);
+    },
+  );
 
   it('hands out copies, so a caller cannot change the provider state', async () => {
     const fake = makeFake();

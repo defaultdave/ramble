@@ -18,6 +18,7 @@ import { orderCurrency, orderLimits } from '@/lib/orders';
 import {
   attemptStatuses,
   failureCodePattern,
+  fakeGatewayLimits,
   maxFailedTries,
   paymentLimits,
   paymentMethods,
@@ -212,6 +213,36 @@ export const providerEvents = pgTable(
     check(
       'provider_events_processed_at_in_range',
       sql`${table.processedAt} IS NULL OR (${isReadableDate(table.processedAt)} AND ${table.processedAt} >= ${table.receivedAt})`,
+    ),
+  ],
+);
+
+/**
+ * The fake payment gateway's objects and events, kept whole as one jsonb document so every server
+ * instance sees the same payments (the fake stands in for an outside provider and may not forget a
+ * payment because a process was recycled). One row: the key is the constant `fake`. The document is
+ * capped in size here, and in object and event counts by the gateway. It holds Ramble ids, amounts, and
+ * fake client secrets, no personal data.
+ */
+export const fakeGatewayState = pgTable(
+  'fake_gateway_state',
+  {
+    key: text().primaryKey().default('fake'),
+    state: jsonb().notNull(),
+    updatedAt: timestampTz()
+      .notNull()
+      .default(sql`clock_timestamp()`),
+  },
+  (table) => [
+    check('fake_gateway_state_single_row', sql`${table.key} = 'fake'`),
+    check(
+      'fake_gateway_state_document',
+      sql`jsonb_typeof(${table.state}) = 'object'
+        AND octet_length(${table.state}::text) <= ${sql.raw(String(fakeGatewayLimits.stateStoredBytes))}`,
+    ),
+    check(
+      'fake_gateway_state_updated_at_in_range',
+      isReadableDate(table.updatedAt),
     ),
   ],
 );

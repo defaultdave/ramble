@@ -8,7 +8,9 @@ import {
   it,
   vi,
 } from 'vitest';
+import { fakeDrainLeadMs } from '@/lib/fakePayment';
 import type { Payment } from '@/server/ports/payments';
+import type { Clock } from '@/server/ports/clock';
 import { setEnv } from '../email/testEnv';
 import { dueClock } from '../support/dueClock';
 import { createFreshDatabase, type FreshDatabase } from './harness';
@@ -16,7 +18,7 @@ import { seedBooking } from './confirmOrderFixtures';
 import { createOrderParents } from './orderParents';
 
 const testEnv = vi.hoisted((): Record<string, unknown> => ({}));
-const scheduled = vi.hoisted((): (() => Promise<void>)[] => []);
+const scheduled = vi.hoisted((): Promise<unknown>[] => []);
 const logged = vi.hoisted(() => ({
   warn: vi.fn(),
   info: vi.fn(),
@@ -32,15 +34,10 @@ vi.mock('@/server/db/refundPath', () => ({
   takeRefundPath: vi.fn().mockResolvedValue({ status: 'unavailable' }),
 }));
 vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
-// A request would run the task after its response; the test runs it when it says so.
+// A request would hold what `after` is given past its response; the test keeps it to look at.
 vi.mock('next/server', async (original) => ({
   ...(await original<typeof import('next/server')>()),
-  after: (task: () => Promise<void>) => scheduled.push(task),
-}));
-// A clock a few seconds ahead, so a job enqueued on the database's clock is due when the drain looks.
-vi.mock('@/server/ports/clock', async (original) => ({
-  ...(await original<typeof import('@/server/ports/clock')>()),
-  systemClock: (await import('../support/dueClock')).dueClock,
+  after: (task: Promise<unknown>) => scheduled.push(task),
 }));
 vi.mock('@/server/ports/rate-limit', async (original) => {
   const actual = await original<typeof import('@/server/ports/rate-limit')>();
@@ -54,16 +51,20 @@ vi.mock('@/server/jobs/drain', async (original) => {
 });
 
 // What happens after a guest taps Pay on the fake gateway, through `confirmFakePayment` and the real intake, jobs, and
-// order confirmation. The task `after` would run is run by the test. Behaviours under test, one per decision or risk:
-// - a payment that succeeds: the action returns with the order still pending and one task scheduled; running the task
-//   confirms the order with its seat, hold, ledger rows, transfer, and the guest and host emails, from one stored event
-// - a second Pay on the same payment is refused and adds no event, no stored event, and no task
+// order confirmation. `after` keeps the drain it is given for the test to look at. Behaviours under test, one per
+// decision or risk:
+// - a payment that succeeds: the action waits for the drain, so the order is confirmed when it returns, with its seat,
+//   hold, ledger rows, transfer, and the guest and host emails, from one stored event; the drain ran as a clock a few
+//   seconds ahead of now, and was handed to `after`
+// - the method the guest chose (card or a wallet) reaches the stored event, the fake's event, and the attempt
+// - a second Pay on the same payment is refused and adds no event, no stored event, and no drain
 // - a decline delivers payment.failed (the attempt records the failed try and the order is not confirmed) and the
-//   guest's next try then confirms the order
+//   guest's next try then confirms the order; the fifth decline ends the payment and a sixth Pay is refused
 // - 3-D Secure delivers payment.requires_action, then the success confirms the order
-// - a delivery the intake refuses throws without naming the payment or the body in the log, schedules no drain, and
+// - a delivery the intake refuses throws without naming the payment or the body in the log, starts no drain, and
 //   leaves the fake holding the payment with its event
-// - a drain that fails does not fail the action and is logged by kind alone; the job stays due for the next drain
+// - a drain that fails does not fail the action and the failure is left to `after` to report; the job stays due for
+//   the next drain
 
 let fresh: FreshDatabase;
 let client: typeof import('@/server/db/client');
@@ -136,11 +137,6 @@ const pay = (payment: Payment, plan: unknown) =>
   });
 const card = { outcome: 'succeeded', method: 'card' };
 
-/** Runs what the response left for after it, as the server does, one task at a time. */
-async function runAfterTasks() {
-  for (const task of scheduled.splice(0)) await task();
-}
-
 async function orderOf(world: World) {
   const [order] = await client.db
     .select()
@@ -167,19 +163,18 @@ const storedEvents = () =>
     .from(schema.providerEvents);
 
 describe('after Pay', () => {
-  it('confirms the paid order from one stored event once the scheduled drain has run', async () => {
+  it('confirms the paid order from one stored event before the action returns', async () => {
     const { world, payment } = await atThePaymentForm();
+    const before = Date.now();
 
     await expect(pay(payment, card)).resolves.toEqual({ status: 'succeeded' });
 
-    expect((await orderOf(world)).order.status).toBe('pending_payment');
-    expect(await storedEvents()).toMatchObject([
-      { type: 'payment.succeeded', processedAt: null },
-    ]);
     expect(scheduled).toHaveLength(1);
-
-    await runAfterTasks();
-
+    await expect(scheduled[0]).resolves.toBeDefined();
+    const [clock] = drainer.drainJobs.mock.calls[0] as [Clock];
+    expect(clock.now().getTime()).toBeGreaterThanOrEqual(
+      before + fakeDrainLeadMs,
+    );
     const { order, attempt, session } = await orderOf(world);
     expect(order.status).toBe('confirmed');
     expect(attempt.status).toBe('succeeded');
@@ -221,7 +216,7 @@ describe('after Pay', () => {
   it('refuses a second Pay on a paid payment and adds no event', async () => {
     const { world, payment } = await atThePaymentForm();
     await pay(payment, card);
-    await runAfterTasks();
+    scheduled.length = 0;
 
     await expect(pay(payment, card)).resolves.toEqual({ status: 'refused' });
 
@@ -237,7 +232,6 @@ describe('after Pay', () => {
     await expect(
       pay(payment, { outcome: 'declined', failureCode: 'expired_card' }),
     ).resolves.toEqual({ status: 'declined', failureCode: 'expired_card' });
-    await runAfterTasks();
 
     const declined = await orderOf(world);
     expect(declined.attempt).toMatchObject({
@@ -249,7 +243,6 @@ describe('after Pay', () => {
     expect(await storedEvents()).toMatchObject([{ type: 'payment.failed' }]);
 
     await expect(pay(payment, card)).resolves.toEqual({ status: 'succeeded' });
-    await runAfterTasks();
 
     expect((await orderOf(world)).order.status).toBe('confirmed');
     expect(
@@ -263,14 +256,12 @@ describe('after Pay', () => {
     await expect(pay(payment, { outcome: 'requires_action' })).resolves.toEqual(
       { status: 'requires_action' },
     );
-    await runAfterTasks();
 
     const challenged = await orderOf(world);
     expect(challenged.attempt.status).toBe('requires_action');
     expect(challenged.order.status).not.toBe('confirmed');
 
     await expect(pay(payment, card)).resolves.toEqual({ status: 'succeeded' });
-    await runAfterTasks();
 
     expect((await orderOf(world)).order.status).toBe('confirmed');
     expect(
@@ -307,20 +298,14 @@ describe('after Pay', () => {
     expect(held.events).toHaveLength(1);
   });
 
-  it('does not fail the action when the drain fails, and leaves the job due', async () => {
+  it('does not fail the action when the drain fails, and leaves the failure to after and the job due', async () => {
     const { world, payment } = await atThePaymentForm();
     drainer.drainJobs.mockRejectedValueOnce(new TypeError('connection lost'));
 
     await expect(pay(payment, card)).resolves.toEqual({ status: 'succeeded' });
-    await expect(runAfterTasks()).resolves.toBeUndefined();
 
-    expect(logged.error).toHaveBeenCalledExactlyOnceWith(
-      'fake payment drain failed',
-      { errorKind: 'TypeError' },
-    );
-    expect(JSON.stringify(logged.error.mock.calls)).not.toContain(
-      'connection lost',
-    );
+    await expect(scheduled[0]).rejects.toThrow('connection lost');
+    expect(logged.error).not.toHaveBeenCalled();
     expect((await orderOf(world)).order.status).toBe('pending_payment');
     const due = await client.db.execute<{ status: string }>(
       sql`SELECT status FROM jobs WHERE kind = 'process-provider-event'`,
@@ -329,5 +314,45 @@ describe('after Pay', () => {
 
     await drainer.drainJobs(dueClock);
     expect((await orderOf(world)).order.status).toBe('confirmed');
+  });
+
+  it.each(['card', 'apple_pay', 'google_pay'] as const)(
+    'carries a %s payment through the stored event, the fake, and the attempt',
+    async (method) => {
+      const { world, payment } = await atThePaymentForm();
+
+      await pay(payment, { outcome: 'succeeded', method });
+
+      const [stored] = await client.db
+        .execute<{ method: string }>(
+          sql`SELECT payload->>'method' AS method FROM provider_events`,
+        )
+        .then((result) => result.rows);
+      expect(stored?.method).toBe(method);
+      expect((await data.readFakeGatewayState()).events[0]?.method).toBe(
+        method,
+      );
+      expect((await orderOf(world)).attempt.method).toBe(method);
+    },
+  );
+
+  it('ends the payment at the fifth decline and refuses a sixth Pay', async () => {
+    const { world, payment } = await atThePaymentForm();
+    const decline = { outcome: 'declined', failureCode: 'card_declined' };
+
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      await expect(pay(payment, decline)).resolves.toEqual({
+        status: 'declined',
+        failureCode: 'card_declined',
+      });
+    }
+    scheduled.length = 0;
+
+    await expect(pay(payment, decline)).resolves.toEqual({ status: 'refused' });
+    await expect(pay(payment, card)).resolves.toEqual({ status: 'refused' });
+
+    expect(scheduled).toHaveLength(0);
+    expect(await storedEvents()).toHaveLength(5);
+    expect((await orderOf(world)).order.status).not.toBe('confirmed');
   });
 });

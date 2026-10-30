@@ -3,6 +3,8 @@ import {
   connectionLostNotice,
   declineCodes,
   declineNotice,
+  fakeDrainLeadMs,
+  fakeDrainTime,
   isRefusalCode,
   planChallenge,
   planWallet,
@@ -91,5 +93,21 @@ describe('other notices', () => {
   it('tells a guest whose payment is closed to reload', () => {
     expect(refusedNotice.tone).toBe('danger');
     expect(refusedNotice.body).toContain('Reload the page');
+  });
+});
+
+describe('fakeDrainTime', () => {
+  it('is the lead after now, so a job the database clock dates slightly ahead is already due', () => {
+    const now = new Date('2026-10-30T12:00:00.000Z');
+
+    expect(fakeDrainTime(now)).toEqual(new Date('2026-10-30T12:00:05.000Z'));
+    expect(fakeDrainTime(now).getTime() - now.getTime()).toBe(fakeDrainLeadMs);
+  });
+
+  it('leaves the time it was given alone', () => {
+    const now = new Date('2026-10-30T12:00:00.000Z');
+    fakeDrainTime(now);
+
+    expect(now.toISOString()).toBe('2026-10-30T12:00:00.000Z');
   });
 });

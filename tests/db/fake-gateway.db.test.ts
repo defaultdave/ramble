@@ -34,26 +34,26 @@ vi.mock('@/server/env', () => ({ env: testEnv }));
 // - the database refuses a second row, a document that is not an object, one past the byte limit, and a time out of range
 // - a damaged row stops every call that reads it, and nothing is written over it
 
-const processSecretKey = Symbol.for('ramble.fakeGateway');
+const processSecretKey = Symbol.for('ramble.fakeGatewaySecret');
 const { maxObjects, maxEvents, stateStoredBytes } = fakeGatewayLimits;
 
 let fresh: FreshDatabase;
 let client: typeof import('@/server/db/client');
-let gatewayModule: typeof import('@/server/ports/payments/gateway');
 let dataModule: typeof import('@/server/db/fakeGateway');
 let side: Pool;
+const pools: (() => Promise<void>)[] = [];
 
 beforeAll(async () => {
   fresh = await createFreshDatabase(process.env.DATABASE_URL_UNPOOLED ?? '');
   setEnv(testEnv, { DATABASE_URL: fresh.url });
   client = await import('@/server/db/client');
-  gatewayModule = await import('@/server/ports/payments/gateway');
   dataModule = await import('@/server/db/fakeGateway');
   side = new Pool({ connectionString: fresh.url, max: 4 });
 });
 
 afterAll(async () => {
   await side.end();
+  await Promise.all(pools.map((end) => end()));
   await client.db.$client.end();
   await fresh.dispose();
 });
@@ -62,10 +62,14 @@ beforeEach(async () => {
   await side.query('DELETE FROM fake_gateway_state');
 });
 
-/** A gateway of its own: a new process secret and nothing in memory. */
-function anotherProcess() {
+/** A gateway of its own: a module copy loaded afresh, a new process secret, and nothing in memory. */
+async function anotherProcess() {
+  vi.resetModules();
   Reflect.deleteProperty(globalThis, processSecretKey);
-  return gatewayModule.getFakePayments();
+  const copy = await import('@/server/ports/payments/gateway');
+  const copyClient = await import('@/server/db/client');
+  pools.push(() => copyClient.db.$client.end());
+  return copy.getFakePayments();
 }
 
 const paymentInput = (key = randomUUID()) => ({
@@ -123,10 +127,10 @@ async function payments(
 
 describe('across two server processes', () => {
   it('retrieves and confirms on one gateway a payment another made, and keeps the balance', async () => {
-    const first = anotherProcess();
+    const first = await anotherProcess();
     const created = await first.createPayment(paymentInput());
 
-    const second = anotherProcess();
+    const second = await anotherProcess();
     expect(second).not.toBe(first);
     await expect(
       second.retrieve({ kind: 'payment', id: created.id }),
@@ -140,7 +144,7 @@ describe('across two server processes', () => {
       type: 'payment.succeeded',
       objectId: created.id,
     });
-    const third = anotherProcess();
+    const third = await anotherProcess();
     await expect(third.getBalance()).resolves.toEqual({
       availableMinor: 13_000 - 407,
       currency: 'USD',
@@ -149,7 +153,7 @@ describe('across two server processes', () => {
   });
 
   it('checks a delivery only against the secret of the process that signed it', async () => {
-    const signer = anotherProcess();
+    const signer = await anotherProcess();
     const created = await signer.createPayment(paymentInput());
     const { event } = await signer.confirm(created.id, {
       outcome: 'succeeded',
@@ -160,36 +164,36 @@ describe('across two server processes', () => {
       status: 'event',
     });
     await expect(
-      anotherProcess().verifyWebhook(delivery),
+      (await anotherProcess()).verifyWebhook(delivery),
     ).rejects.toMatchObject({ code: 'invalid_signature' });
   });
 
   it('replays the first payment for a repeated key instead of making a second', async () => {
     const input = paymentInput();
-    const created = await anotherProcess().createPayment(input);
+    const created = await (await anotherProcess()).createPayment(input);
 
-    await expect(anotherProcess().createPayment(input)).resolves.toEqual(
-      created,
-    );
+    await expect(
+      (await anotherProcess()).createPayment(input),
+    ).resolves.toEqual(created);
     expect((await storedState()).payments.size).toBe(1);
   });
 
   it('finds nothing, and writes nothing, before the first payment', async () => {
     await expect(
-      anotherProcess().retrieve({ kind: 'payment', id: 'pay_none' }),
+      (await anotherProcess()).retrieve({ kind: 'payment', id: 'pay_none' }),
     ).resolves.toBeNull();
     expect(await rowOf()).toEqual([]);
   });
 
   it('makes its row on the first write', async () => {
-    await anotherProcess().createPayment(paymentInput());
+    await (await anotherProcess()).createPayment(paymentInput());
     expect(await rowOf()).toHaveLength(1);
   });
 });
 
 describe('writes take turns', () => {
   it('lets one of two simultaneous confirms of a payment win, with one event', async () => {
-    const fake = anotherProcess();
+    const fake = await anotherProcess();
     const created = await fake.createPayment(paymentInput());
 
     const results = await Promise.allSettled([
@@ -207,7 +211,7 @@ describe('writes take turns', () => {
   });
 
   it('judges a write that waited for the lock by what the holder left', async () => {
-    const fake = anotherProcess();
+    const fake = await anotherProcess();
     const created = await fake.createPayment(paymentInput());
     const holder = await side.connect();
     try {
@@ -247,7 +251,7 @@ describe('writes take turns', () => {
 
 describe('a refused call', () => {
   it('leaves the row byte for byte as it was', async () => {
-    const fake = anotherProcess();
+    const fake = await anotherProcess();
     const created = await fake.createPayment(paymentInput());
     await fake.confirm(created.id, { outcome: 'succeeded' });
     const before = await rowOf();
@@ -277,7 +281,7 @@ describe('the caps', () => {
     await payments(adapter, maxObjects, 0);
     await putRow(state);
     const before = await rowOf();
-    const fake = anotherProcess();
+    const fake = await anotherProcess();
 
     await expect(fake.createPayment(paymentInput())).rejects.toMatchObject({
       code: 'provider_unavailable',
@@ -297,7 +301,7 @@ describe('the caps', () => {
     expect(state.events).toHaveLength(maxEvents);
     await putRow(state);
     const before = await rowOf();
-    const fake = anotherProcess();
+    const fake = await anotherProcess();
     const open = [...state.payments.keys()].at(-1);
 
     await expect(fake.createPayment(paymentInput())).rejects.toMatchObject({
@@ -326,12 +330,11 @@ describe('the caps', () => {
     const bytes = Number(rows[0]?.bytes);
     expect(bytes).toBeLessThan(stateStoredBytes * 0.9);
     await expect(
-      anotherProcess().retrieve({
+      (await anotherProcess()).retrieve({
         kind: 'payment',
         id: [...state.payments.keys()][0] ?? '',
       }),
     ).resolves.not.toBeNull();
-    console.info(`fake_gateway_state at both caps: ${String(bytes)} bytes`);
   });
 });
 
@@ -384,7 +387,7 @@ describe('a damaged row', () => {
       `INSERT INTO fake_gateway_state (key, state) VALUES ('fake', '{"payments": "not a list"}')`,
     );
     const before = await rowOf();
-    const fake = anotherProcess();
+    const fake = await anotherProcess();
 
     await expect(
       fake.retrieve({ kind: 'payment', id: 'pay_x' }),

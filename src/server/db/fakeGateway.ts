@@ -1,10 +1,8 @@
 import 'server-only';
 import { eq, sql } from 'drizzle-orm';
+import type { FakePaymentsState } from '@/server/ports/payments/fake';
 import {
-  createFakePaymentsState,
-  type FakePaymentsState,
-} from '@/server/ports/payments/fake';
-import {
+  emptyFakeStateDocument,
   parseFakeState,
   serializeFakeState,
 } from '@/server/ports/payments/fakeState';
@@ -23,7 +21,7 @@ export async function readFakeGatewayState(): Promise<FakePaymentsState> {
     .select({ state: fakeGatewayState.state })
     .from(fakeGatewayState)
     .where(eq(fakeGatewayState.key, rowKey));
-  return row ? parseFakeState(row.state) : createFakePaymentsState();
+  return parseFakeState(row?.state ?? emptyFakeStateDocument);
 }
 
 /**
@@ -38,10 +36,7 @@ export async function withFakeGatewayState<T>(
   return db.transaction(async (tx) => {
     await tx
       .insert(fakeGatewayState)
-      .values({
-        key: rowKey,
-        state: serializeFakeState(createFakePaymentsState()),
-      })
+      .values({ key: rowKey, state: emptyFakeStateDocument })
       .onConflictDoNothing();
     const [row] = await tx
       .select({ state: fakeGatewayState.state })

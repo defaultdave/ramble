@@ -57,22 +57,31 @@ function createGateway(webhookSecret: string): FakeGateway {
   };
 }
 
-// Next can load this module once per route bundle in development. The gateway, and so the signing
-// secret it closes over, lives on the global object so every copy signs and checks with the same one.
-const sharedKey = Symbol.for('ramble.fakeGateway');
+// Next can load this module once per route bundle, and each copy has its own `PaymentsError` class, so
+// an object made in one bundle fails `instanceof` in another. Only the secret is shared, on the global
+// object; every copy builds its own gateway from it, so every copy signs and checks with the same one
+// and the errors it throws belong to the code that catches them.
+const secretKey = Symbol.for('ramble.fakeGatewaySecret');
+
+function processSecret(): string {
+  const found = Reflect.get(globalThis, secretKey) as string | undefined;
+  if (found) return found;
+  const created = randomBytes(32).toString('hex');
+  Reflect.set(globalThis, secretKey, created);
+  return created;
+}
+
+let gateway: FakeGateway | undefined;
 
 /**
- * The one fake gateway of this server process. Its objects are in the database; its webhook signing
- * secret is random per process, so a delivery nobody in this process signed is refused. The fake signs
- * and checks its own deliveries in one process (`deliverFakeConfirmation`), so no instance needs
- * another's secret. A payment's client secret is stored with it and keeps working across instances.
+ * The fake gateway of this module copy. Its objects are in the database; its webhook signing secret is
+ * random per process, so a delivery nobody in this process signed is refused. The fake signs and checks
+ * its own deliveries in one process (`deliverFakeConfirmation`), so no instance needs another's secret.
+ * A payment's client secret is stored with it and keeps working across instances.
  */
 export function getFakePayments(): FakeGateway {
-  const found = Reflect.get(globalThis, sharedKey) as FakeGateway | undefined;
-  if (found) return found;
-  const created = createGateway(randomBytes(32).toString('hex'));
-  Reflect.set(globalThis, sharedKey, created);
-  return created;
+  gateway ??= createGateway(processSecret());
+  return gateway;
 }
 
 /**

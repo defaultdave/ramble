@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { fakeCardFeeMinor } from '@/lib/fakeCardFee';
 import { orderCurrency as currency } from '@/lib/orders';
 import {
+  fakeGatewayLimits,
   paymentMethods,
   providerEventTypes,
   type ProviderEventType,
@@ -36,8 +37,7 @@ const provider = 'fake';
 
 /** Design doc 4.2.3 and ADR 0002: the fifth failed try cancels the attempt. */
 const defaultMaxFailedTries = 5;
-/** Authentication challenges one payment may raise before the fake refuses another. */
-const maxActionRounds = 3;
+const { maxActionRounds } = fakeGatewayLimits;
 /** A delivery signed further than this from now is refused as a replay. */
 const signatureToleranceSeconds = 300;
 const defaultMaxObjects = 10_000;

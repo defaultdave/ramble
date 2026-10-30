@@ -14,6 +14,8 @@ vi.mock('@/server/db/fakeGateway', () => ({
 // - the port the webhook route and the job use is the fake gateway, one object for the whole process
 // - signing and checking a delivery touch no database, so a forged delivery costs no query
 // - a delivery signed with another secret is refused
+// - a module copy loaded later (another bundle) builds its own gateway on the shared secret, so what it throws is an
+//   instance of its own PaymentsError, and a delivery signed by one copy is accepted by the other
 // - a write goes through the locked state and a read through the unlocked one
 
 const eventBody = JSON.stringify({
@@ -114,5 +116,57 @@ describe('getFakePayments', () => {
     await expect(
       getFakePayments().confirm('pay_none', { outcome: 'succeeded' }),
     ).rejects.toMatchObject({ code: 'not_found' });
+  });
+});
+
+describe('another copy of the module', () => {
+  async function freshCopy() {
+    vi.resetModules();
+    const copy = {
+      gateway: await import('./gateway'),
+      payments: await import('./index'),
+      fake: await import('./fake'),
+      data: await import('@/server/db/fakeGateway'),
+    };
+    vi.mocked(copy.data.withFakeGatewayState).mockImplementation((work) =>
+      work(copy.fake.createFakePaymentsState()),
+    );
+    return copy;
+  }
+
+  it('throws errors that are instances of its own PaymentsError, not the first copy', async () => {
+    const first = await freshCopy();
+    const second = await freshCopy();
+    expect(second.payments.PaymentsError).not.toBe(
+      first.payments.PaymentsError,
+    );
+
+    const refusal = await second.gateway
+      .getFakePayments()
+      .confirm('pay_none', { outcome: 'succeeded' })
+      .catch((error: unknown) => error);
+    const forged = await second.gateway
+      .getFakePayments()
+      .verifyWebhook({ rawBody: '{}', signature: 'nope' })
+      .catch((error: unknown) => error);
+
+    expect(refusal).toBeInstanceOf(second.payments.PaymentsError);
+    expect(refusal).not.toBeInstanceOf(first.payments.PaymentsError);
+    expect(forged).toBeInstanceOf(second.payments.PaymentsError);
+    expect(forged).toMatchObject({ code: 'invalid_signature' });
+  });
+
+  it('is a gateway of its own that signs and checks with the same process secret', async () => {
+    const first = await freshCopy();
+    const second = await freshCopy();
+    expect(second.gateway.getFakePayments()).not.toBe(
+      first.gateway.getFakePayments(),
+    );
+
+    const delivery = first.gateway.getFakePayments().signBody(eventBody);
+
+    await expect(
+      second.gateway.getFakePayments().verifyWebhook(delivery),
+    ).resolves.toMatchObject({ status: 'ignored' });
   });
 });

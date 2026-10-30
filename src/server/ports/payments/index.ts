@@ -9,7 +9,7 @@ import {
   type PaymentProvider,
 } from '@/lib/payments';
 
-const CurrencySchema = z.literal(orderCurrency);
+export const CurrencySchema = z.literal(orderCurrency);
 type Currency = typeof orderCurrency;
 
 /** The smallest charge the provider accepts, in cents (Stripe's USD minimum). */

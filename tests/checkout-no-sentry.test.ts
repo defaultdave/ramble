@@ -42,10 +42,8 @@ function resolveImport(specifier: string, from: string): string | null {
  * not followed, so server work an action does (the fake payment's job drain reaches the server Sentry SDK)
  * is not mistaken for a script the browser loads.
  */
-function isServerActionModule(file: string): boolean {
-  return /^\s*(?:\/\/[^\n]*\n\s*)*['"]use server['"]/.test(
-    readFileSync(file, 'utf8'),
-  );
+function hasServerActionDirective(text: string): boolean {
+  return /^\s*(?:\/\/[^\n]*\n\s*)*['"]use server['"]/.test(text);
 }
 
 function importsOf(file: string): string[] {
@@ -68,7 +66,7 @@ function checkoutClosure() {
     const file = queue.pop();
     if (!file || seen.has(file)) continue;
     seen.add(file);
-    if (isServerActionModule(file)) continue;
+    if (hasServerActionDirective(readFileSync(file, 'utf8'))) continue;
     for (const specifier of importsOf(file)) {
       specifiers.add(specifier);
       const next = resolveImport(specifier, file);
@@ -134,5 +132,20 @@ describe('the checkout route group', () => {
     expect(entry).toMatch(/startBotChallenge\(window\.location\.pathname\)/);
     expect(wrapper).toMatch(/if \(!shouldLoadBotId\(pathname\)\) return;/);
     expect(specifiers.filter((s) => /botid/i.test(s))).toEqual([]);
+  });
+});
+
+describe("the 'use server' seam the closure stops at", () => {
+  it.each([
+    ["'use server';\nimport x from './x';", true],
+    ['"use server"\nimport x from "./x";', true],
+    ["// A comment first.\n\n'use server';\nimport x from './x';", true],
+    ["'use client';\nimport x from './x';", false],
+    ["import x from './x';\n'use server';", false],
+    ["const note = 'use server';\nimport x from './x';", false],
+    ["export const a = 1;\n// 'use server'\n", false],
+    ['', false],
+  ])('reads %j as an action module: %s', (text, expected) => {
+    expect(hasServerActionDirective(text)).toBe(expected);
   });
 });

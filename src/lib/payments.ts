@@ -98,6 +98,14 @@ export const fakeGatewayLimits = {
   maxObjects: 2_000,
   maxEvents: 10_000,
   stateStoredBytes: 8_388_608,
+  /** One key per object, and a payment can also be canceled under a key of its own, which holds a response but no object. */
+  maxIdempotencyKeys: 4_000,
+  /** The JSON of one idempotency fingerprint: an operation name and its input. */
+  maxFingerprintLength: 4_096,
+  /** A client secret is the payment id, a marker, and a short digest. */
+  maxClientSecretLength: 512,
+  /** Authentication challenges one payment may raise before the fake refuses another. */
+  maxActionRounds: 3,
 } as const;
 
 /** `pay:{order_id}:{attempt_no}` (FORM-8): the provider's idempotency key for this attempt. */

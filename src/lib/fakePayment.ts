@@ -1,6 +1,16 @@
 // The vocabulary shared by the fake card form, its flow, and the server entry that confirms a
 // payment. Pure, so the browser and the server read the same rules.
 
+/** How far ahead of now the drain after Pay looks for due jobs: a job's `run_after` is the database's clock, which may lead this process's. */
+export const fakeDrainLeadMs = 5_000;
+/** The longest the guest's reply waits for the drain after Pay; past it the drain carries on in `after`. */
+export const fakeDrainWaitMs = 5_000;
+
+/** The time the drain after Pay runs as, so a job the intake has just queued is due even if the database clock leads. */
+export function fakeDrainTime(now: Date): Date {
+  return new Date(now.getTime() + fakeDrainLeadMs);
+}
+
 /** Why a try failed, as the fake gateway reports it (the adapter accepts any `[a-z0-9_]{1,64}`). */
 export const declineCodes = [
   'card_declined',

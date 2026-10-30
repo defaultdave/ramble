@@ -1,14 +1,16 @@
 import 'server-only';
 import { z } from 'zod';
-import { orderCurrency } from '@/lib/orders';
 import {
   attemptStatuses,
   fakeGatewayLimits,
+  maxFailedTries,
+  paymentLimits,
   paymentMethods,
   paymentProviders,
 } from '@/lib/payments';
 import type { FakePaymentsState } from './fake';
 import {
+  CurrencySchema,
   maxAmountMinor,
   ProviderEventSchema,
   ProviderIdSchema,
@@ -24,15 +26,24 @@ import {
 // becomes a list of entries and `occurredAt` becomes its ISO text. Reading is strict: a row that does
 // not parse throws and nothing is repaired, so a damaged row stops payments instead of changing them.
 
-const { maxObjects, maxEvents } = fakeGatewayLimits;
-/** A payment can also be canceled under its own key, which holds a response but no object. */
-const maxIdempotencyKeys = 2 * maxObjects;
-const maxFingerprintLength = 4_096;
+const {
+  maxObjects,
+  maxEvents,
+  maxIdempotencyKeys,
+  maxFingerprintLength,
+  maxClientSecretLength,
+  maxActionRounds,
+} = fakeGatewayLimits;
 
 const AmountSchema = z.int().min(0).max(maxAmountMinor);
-const CurrencySchema = z.literal(orderCurrency);
+// The port's schemas drop a key they do not know; a stored row must not be quietly changed by a read.
+const StrictMetadataSchema = RambleMetadataSchema.strict();
+const StrictEventSchema = ProviderEventSchema.extend({
+  metadata: StrictMetadataSchema.nullable(),
+}).strict();
+const FailureCodeSchema = z.string().max(paymentLimits.failureCode).nullable();
 
-const PaymentSchema = z.object({
+const PaymentSchema = z.strictObject({
   id: ProviderIdSchema,
   provider: z.enum(paymentProviders),
   status: z.enum(attemptStatuses),
@@ -41,44 +52,44 @@ const PaymentSchema = z.object({
   feeMinor: AmountSchema.nullable(),
   refundedMinor: AmountSchema,
   method: z.enum(paymentMethods).nullable(),
-  failureCode: z.string().max(64).nullable(),
-  failedTries: z.int().min(0).max(100),
-  clientSecret: z.string().min(1).max(512),
-  metadata: RambleMetadataSchema,
+  failureCode: FailureCodeSchema,
+  failedTries: z.int().min(0).max(maxFailedTries),
+  clientSecret: z.string().min(1).max(maxClientSecretLength),
+  metadata: StrictMetadataSchema,
 }) satisfies z.ZodType<Payment>;
 
-const RefundSchema = z.object({
+const RefundSchema = z.strictObject({
   id: ProviderIdSchema,
   paymentId: ProviderIdSchema,
   status: z.enum(['pending', 'succeeded', 'failed']),
   amountMinor: AmountSchema,
   currency: CurrencySchema,
-  failureCode: z.string().max(64).nullable(),
-  metadata: RambleMetadataSchema,
+  failureCode: FailureCodeSchema,
+  metadata: StrictMetadataSchema,
 }) satisfies z.ZodType<Refund>;
 
-const TransferSchema = z.object({
+const TransferSchema = z.strictObject({
   id: ProviderIdSchema,
   destinationAccountId: ProviderIdSchema,
   status: z.enum(['paid', 'failed', 'reversed']),
   amountMinor: AmountSchema,
   reversedMinor: AmountSchema,
   currency: CurrencySchema,
-  metadata: RambleMetadataSchema,
+  metadata: StrictMetadataSchema,
 }) satisfies z.ZodType<Transfer>;
 
-const ReversalSchema = z.object({
+const ReversalSchema = z.strictObject({
   id: ProviderIdSchema,
   transferId: ProviderIdSchema,
   amountMinor: AmountSchema,
   currency: CurrencySchema,
-  metadata: RambleMetadataSchema,
+  metadata: StrictMetadataSchema,
 }) satisfies z.ZodType<TransferReversal>;
 
 const entries = <T extends z.ZodType>(value: T, max: number) =>
   z.array(z.tuple([ProviderIdSchema, value])).max(max);
 
-const StoredStateSchema = z.object({
+const StoredStateSchema = z.strictObject({
   payments: entries(PaymentSchema, maxObjects),
   refunds: entries(RefundSchema, maxObjects),
   transfers: entries(TransferSchema, maxObjects),
@@ -87,7 +98,7 @@ const StoredStateSchema = z.object({
     .array(
       z.tuple([
         ProviderIdSchema,
-        z.object({
+        z.strictObject({
           fingerprint: z.string().max(maxFingerprintLength),
           response: z.union([
             PaymentSchema,
@@ -100,13 +111,26 @@ const StoredStateSchema = z.object({
     )
     .max(maxIdempotencyKeys),
   byMetadata: entries(ProviderIdSchema, maxObjects),
-  actionRounds: entries(z.int().min(0).max(100), maxObjects),
-  events: z.array(ProviderEventSchema).max(maxEvents),
+  actionRounds: entries(z.int().min(0).max(maxActionRounds), maxObjects),
+  events: z.array(StrictEventSchema).max(maxEvents),
   balanceMinor: z.int(),
 });
 
 type StoredState = z.input<typeof StoredStateSchema>;
 type StoredResponse = Payment | Refund | Transfer | TransferReversal;
+
+/** The document of a gateway that holds nothing: what a missing row reads as and what a new row starts with. */
+export const emptyFakeStateDocument = {
+  payments: [],
+  refunds: [],
+  transfers: [],
+  reversals: [],
+  idempotency: [],
+  byMetadata: [],
+  actionRounds: [],
+  events: [],
+  balanceMinor: 0,
+} satisfies StoredState;
 
 /** The state as plain JSON, for the jsonb column. */
 export function serializeFakeState(state: FakePaymentsState): StoredState {

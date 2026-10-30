@@ -1,0 +1,150 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* One height for a loaded row and its skeleton, so the page does not move when the dates arrive: 12px, 24px of date, 16px of spaces, 12px, and the rule. */
+.row {
+  box-sizing: border-box;
+  display: flex;
+  min-block-size: calc(var(--space-16) + 1px);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-block: var(--space-3);
+  border-block-end: 1px solid var(--color-border-default);
+  color: var(--color-text-primary);
+  text-decoration: none;
+}
+
+.link:hover {
+  background: var(--color-bg-sunken);
+}
+
+.link:focus-visible {
+  outline: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  box-shadow:
+    0 0 0 2px var(--color-bg-canvas),
+    0 0 0 4px var(--color-focus-ring);
+}
+
+/* The date the address asked for. The padding is given back by the margin, so the text stays on the column's edge. */
+.selected {
+  margin-inline: calc(-1 * var(--space-3));
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-sunken);
+}
+
+.text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.when {
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  font-weight: var(--font-weight-semibold);
+}
+
+.spaces {
+  font-size: var(--font-size-caption);
+  line-height: var(--font-line-height-caption);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+}
+
+.fewLeft .spaces {
+  color: var(--color-status-warning-text);
+}
+
+.soldOut .when {
+  color: var(--color-text-secondary);
+}
+
+.end {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.price {
+  font-size: var(--font-size-body-s);
+  line-height: var(--font-line-height-body-s);
+  color: var(--color-text-secondary);
+}
+
+.chevron {
+  flex: none;
+  width: var(--space-5);
+  height: var(--space-5);
+}
+
+.empty {
+  margin: 0;
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  color: var(--color-text-secondary);
+}
+
+.bar {
+  display: block;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-disabled);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.barWhen {
+  inline-size: 60%;
+  block-size: var(--space-6);
+}
+
+.barSpaces {
+  inline-size: 30%;
+  block-size: var(--space-4);
+}
+
+.errorBox {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.visuallyHidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    animation: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .selected {
+    outline: 2px solid Highlight;
+  }
+
+  .bar {
+    outline: 1px solid GrayText;
+    outline-offset: -1px;
+  }
+}

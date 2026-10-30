@@ -10,7 +10,7 @@ import { demoCheckoutPath } from '../demoCheckout';
 import { presentText, textLines } from '../displayText';
 import type { GuestPhoto } from '../photos';
 import { photoView, type PhotoView } from '../photoViews';
-import { perPersonAmount } from '../pricing';
+import { perPersonAmount, type CardPriceOption } from '../pricing';
 import {
   categoryPath,
   giftCheckoutPath,
@@ -337,6 +337,8 @@ export type ExperiencePageView = {
   /** Where, how long, and who for, in one line under the title on a wide screen. */
   summary: string;
   prices: PriceLine[];
+  /** What the streamed upcoming dates are read and priced from. */
+  upcoming: { experienceId: string; priceOptions: CardPriceOption[] };
   keyFacts: KeyFact[];
   gallery: GalleryView;
   about: string[];
@@ -420,6 +422,15 @@ export function buildExperiencePage(
       .map(({ text }) => text)
       .join(' · '),
     prices: priceLines(experience.priceOptions),
+    upcoming: {
+      experienceId: experience.id,
+      priceOptions: experience.priceOptions.map(
+        ({ priceMinor, usesSpace }) => ({
+          priceMinor,
+          usesSpace,
+        }),
+      ),
+    },
     keyFacts,
     gallery: galleryView(
       photos

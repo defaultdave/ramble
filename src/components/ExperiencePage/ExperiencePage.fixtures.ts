@@ -11,6 +11,10 @@ export const sunsetKayak: ExperiencePageView = {
   badges: [{ tone: 'green', label: 'Outdoor', icon: 'outdoor' }],
   summary: 'Tribeca · 2\u00a0hr · Ages 14 and up',
   prices: [{ amount: '$65', unit: 'per person' }],
+  upcoming: {
+    experienceId: '00000000-0000-4000-8000-000000000001',
+    priceOptions: [{ priceMinor: 6500, usesSpace: true }],
+  },
   keyFacts: [
     { icon: 'place', text: 'Tribeca' },
     { icon: 'duration', text: '2\u00a0hr' },
@@ -64,6 +68,13 @@ export const kidsClass: ExperiencePageView = {
     { amount: 'Free', unit: 'per adult' },
     { amount: '$45', unit: 'per child' },
   ],
+  upcoming: {
+    experienceId: '00000000-0000-4000-8000-000000000002',
+    priceOptions: [
+      { priceMinor: 0, usesSpace: false },
+      { priceMinor: 4500, usesSpace: true },
+    ],
+  },
   keyFacts: [
     { icon: 'place', text: 'Williamsburg' },
     { icon: 'duration', text: '1.5\u00a0hr' },
@@ -101,6 +112,10 @@ export const bareExperience: ExperiencePageView = {
   badges: [],
   summary: 'Red Hook · All ages',
   prices: [{ amount: '$30', unit: 'per person' }],
+  upcoming: {
+    experienceId: '00000000-0000-4000-8000-000000000003',
+    priceOptions: [{ priceMinor: 3000, usesSpace: true }],
+  },
   keyFacts: [
     { icon: 'place', text: 'Red Hook' },
     { icon: 'age', text: 'All ages' },

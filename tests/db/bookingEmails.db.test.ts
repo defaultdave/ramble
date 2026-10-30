@@ -22,6 +22,7 @@ import {
 } from '@/server/db/schema';
 import { server } from '../msw/server';
 import { setEnv } from '../email/testEnv';
+import { dueClock } from '../support/dueClock';
 import { createFreshDatabase, type FreshDatabase } from './harness';
 import { insertHold } from './holdFixtures';
 import { createOrderParents } from './orderParents';
@@ -62,7 +63,6 @@ let handlers: typeof import('@/server/jobs/bookingEmails');
 let tokens: typeof import('@/server/tokens');
 let enqueueModule: typeof import('@/server/jobs/enqueue');
 let drainModule: typeof import('@/server/jobs/drain');
-let clockModule: typeof import('@/server/ports/clock');
 let parents: Awaited<ReturnType<typeof createOrderParents>>;
 let sessionId: string;
 let childOptionId: string;
@@ -93,7 +93,6 @@ beforeAll(async () => {
   tokens = await import('@/server/tokens');
   enqueueModule = await import('@/server/jobs/enqueue');
   drainModule = await import('@/server/jobs/drain');
-  clockModule = await import('@/server/ports/clock');
   parents = await createOrderParents(client.db, 'booking-emails');
   const [session] = await client.db
     .insert(sessions)
@@ -383,7 +382,7 @@ describe('where the raw token is stored', () => {
         dedupeKey: `guest-confirmation:${order.id}`,
       }),
     );
-    await drainModule.drainJobs(clockModule.systemClock);
+    await drainModule.drainJobs(dueClock);
 
     const jobRows = await client.db.select().from(jobs);
     expect(jobRows).toHaveLength(1);
@@ -578,7 +577,7 @@ describe('the jobs', () => {
       }
     });
 
-    const report = await drainModule.drainJobs(clockModule.systemClock);
+    const report = await drainModule.drainJobs(dueClock);
 
     expect(report).toMatchObject({ claimed: 2, succeeded: 2 });
     expect(

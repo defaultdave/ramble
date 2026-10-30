@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -350,6 +350,99 @@ describe('the answers of the reserve', () => {
     );
 
     expect(mocks.push).toHaveBeenCalledWith('/checkout/hold-1');
+  });
+});
+
+describe('where a refusal shows', () => {
+  const soldOut: ReserveResult = { status: 'sold_out', alternatives: [] };
+
+  it("keeps the sheet closed when the panel's Continue is refused, and says so in the panel", async () => {
+    mocks.reserve.mockResolvedValue(soldOut);
+    render(
+      <>
+        <Page offer={kayakOffer} />
+        <BookingPanelIsland offer={kayakOffer} />
+      </>,
+    );
+    await userEvent.click(day('Saturday, October 24, 2026'));
+    await userEvent.click(screen.getByRole('button', { name: /5:30 PM EDT/ }));
+    const panel = screen.getByRole('region', { name: 'Book this experience' });
+
+    await userEvent.click(
+      within(panel).getByRole('button', { name: 'Continue · $130.00' }),
+    );
+
+    expect(within(panel).getByRole('alert')).toHaveTextContent(
+      'Those spaces just sold out',
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it("shows the notice in the sheet when the sheet's Continue is refused", async () => {
+    mocks.reserve.mockResolvedValue(soldOut);
+    render(<Page offer={kayakOffer} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Choose date' }));
+    await chooseSaturdayEvening();
+    await userEvent.click(
+      within(sheet()).getByRole('button', { name: 'Continue · $130.00' }),
+    );
+    expect(within(sheet()).getByRole('alert')).toHaveTextContent(
+      'Those spaces just sold out',
+    );
+  });
+
+  it('opens the sheet when a refusal comes to the bar with the sheet closed', async () => {
+    mocks.reserve.mockResolvedValue(soldOut);
+    render(<Page offer={kayakOffer} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Choose date' }));
+    await chooseSaturdayEvening();
+    await userEvent.click(
+      within(sheet()).getByRole('button', { name: 'Close' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(within(sheet()).getByRole('alert')).toBeVisible();
+  });
+});
+
+describe('leaving the page and failing to leave it', () => {
+  it('does not carry a pending hold to the next visit when the page is gone before the answer', async () => {
+    let finish: (result: ReserveResult) => void = () => undefined;
+    mocks.reserve.mockReturnValue(
+      new Promise<ReserveResult>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const offer = { ...kayakOffer, preselectedDate: '2026-10-22' };
+    const first = render(<BookingBarIsland offer={offer} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    first.unmount();
+    await act(async () => {
+      finish({ status: 'sold_out', alternatives: [] });
+      await Promise.resolve();
+    });
+
+    render(<BookingBarIsland offer={offer} />);
+    expect(
+      screen.getByRole('button', { name: 'Continue' }),
+    ).not.toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('says something went wrong, and stops waiting, when the move to checkout fails', async () => {
+    mocks.push.mockImplementation(() => {
+      throw new Error('navigation failed');
+    });
+    render(<Page offer={kayakOffer} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Choose date' }));
+    await chooseSaturdayEvening();
+    await userEvent.click(
+      within(sheet()).getByRole('button', { name: 'Continue · $130.00' }),
+    );
+    expect(within(sheet()).getByRole('alert')).toHaveTextContent(
+      'nothing was held',
+    );
+    expect(
+      within(sheet()).getByRole('button', { name: 'Continue · $130.00' }),
+    ).not.toHaveAttribute('aria-busy', 'true');
   });
 });
 

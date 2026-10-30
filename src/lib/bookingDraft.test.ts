@@ -400,7 +400,7 @@ describe('choicesView', () => {
 
   it('clears the last answer when the mode changes', () => {
     const state = run(kayakOffer, [
-      { type: 'submitDone', effect: effectNotice() },
+      { type: 'submitDone', origin: 'phone', effect: effectNotice() },
       { type: 'setMode', mode: 'gift' },
     ]);
     expect(state.notice).toBeNull();
@@ -563,7 +563,11 @@ describe('the reserve and its answers', () => {
       kayakOffer,
       [
         { type: 'submitStarted' },
-        { type: 'submitDone', effect: { kind: 'held', href: '/checkout/1' } },
+        {
+          type: 'submitDone',
+          origin: 'phone',
+          effect: { kind: 'held', href: '/checkout/1' },
+        },
       ],
       chosen(),
     );
@@ -576,7 +580,7 @@ describe('the reserve and its answers', () => {
       kayakOffer,
       [
         { type: 'submitStarted' },
-        { type: 'submitDone', effect: { kind: 'paused' } },
+        { type: 'submitDone', origin: 'phone', effect: { kind: 'paused' } },
       ],
       chosen(),
     );
@@ -587,12 +591,31 @@ describe('the reserve and its answers', () => {
   it('opens the sheet on the notice, and keeps the time when it can still be booked', () => {
     const state = run(
       kayakOffer,
-      [{ type: 'submitDone', effect: effectNotice() }],
+      [{ type: 'submitDone', origin: 'phone', effect: effectNotice() }],
       chosen(),
     );
     expect(state.sheetOpen).toBe(true);
     expect(state.notice?.title).toBe('Those spaces just sold out');
     expect(state.sessionId).toBe(sessionAt(3));
+  });
+
+  it('keeps the sheet closed, and shows the notice, when the panel was refused', () => {
+    const state = run(
+      kayakOffer,
+      [{ type: 'submitDone', origin: 'panel', effect: effectNotice() }],
+      chosen(),
+    );
+    expect(state.sheetOpen).toBe(false);
+    expect(state.notice?.title).toBe('Those spaces just sold out');
+  });
+
+  it('leaves a sheet that is already open open when the panel is refused', () => {
+    const state = run(
+      kayakOffer,
+      [{ type: 'submitDone', origin: 'panel', effect: effectNotice() }],
+      { ...chosen(), sheetOpen: true },
+    );
+    expect(state.sheetOpen).toBe(true);
   });
 
   it("strikes the session that cannot be booked, and its date when it was the date's last", () => {
@@ -602,6 +625,7 @@ describe('the reserve and its answers', () => {
       [
         {
           type: 'submitDone',
+          origin: 'phone',
           effect: { ...effectNotice(), closeSession: true },
         },
       ],
@@ -621,6 +645,7 @@ describe('the reserve and its answers', () => {
       [
         {
           type: 'submitDone',
+          origin: 'phone',
           effect: { ...effectNotice(), closeSession: true },
         },
       ],
@@ -642,6 +667,7 @@ describe('the reserve and its answers', () => {
       [
         {
           type: 'submitDone',
+          origin: 'phone',
           effect: { ...effectNotice(), closeSession: true },
         },
       ],
@@ -657,6 +683,7 @@ describe('the reserve and its answers', () => {
       [
         {
           type: 'submitDone',
+          origin: 'phone',
           effect: {
             ...effectNotice(),
             closeSession: true,
@@ -701,8 +728,12 @@ describe('the reserve and its answers', () => {
 });
 
 describe('effectOf', () => {
-  it('names the checkout and the seat limit of the offer', () => {
-    const offer = { ...kayakOffer, checkoutBase: '/pay/', maxSeats: 4 };
+  it('names the checkout and the device seat limit of the offer', () => {
+    const offer = {
+      ...kayakOffer,
+      checkoutBase: '/pay/',
+      deviceSeatLimit: 4,
+    };
     expect(
       effectOf(offer, {
         status: 'held',

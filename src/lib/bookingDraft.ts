@@ -48,8 +48,10 @@ export type BookingOffer = {
   ageNote: string;
   /** A 21+ experience says so beside the party, and that ID is checked at the door (PRD-23). */
   twentyOnePlus: boolean;
-  /** The most spaces one booking takes; one device holds the same number (PRD-17). */
+  /** The most spaces one booking takes. */
   maxSeats: number;
+  /** The most spaces one device holds at once (PRD-17). */
+  deviceSeatLimit: number;
   giftsEnabled: boolean;
   /** Ops paused bookings (PRD-16). */
   paused: boolean;
@@ -296,6 +298,9 @@ function withDate(
   };
 }
 
+/** Where Continue was pressed: the bar or the sheet on a phone, or the panel beside the page. */
+export type SubmitOrigin = 'phone' | 'panel';
+
 export type BookingAction =
   | { type: 'chooseDate'; date: string }
   | { type: 'chooseSession'; sessionId: string }
@@ -306,7 +311,7 @@ export type BookingAction =
   | { type: 'openSheet' }
   | { type: 'closeSheet' }
   | { type: 'submitStarted' }
-  | { type: 'submitDone'; effect: ReserveEffect };
+  | { type: 'submitDone'; effect: ReserveEffect; origin: SubmitOrigin };
 
 /** A session's date and the labels the choices show, on its own calendar and clock. */
 export function sessionLabels(startsAt: Date, timeZone: string) {
@@ -330,6 +335,7 @@ function afterReserve(
   offer: BookingOffer,
   state: BookingState,
   effect: ReserveEffect,
+  origin: SubmitOrigin,
 ): BookingState {
   switch (effect.kind) {
     case 'held':
@@ -361,7 +367,8 @@ function afterReserve(
           next.date !== null && !availableDates(offer, next).includes(next.date)
             ? null
             : next.date,
-        sheetOpen: true,
+        // The panel shows its own notice; a sheet opened over it would cover the page on a wide screen.
+        sheetOpen: origin === 'phone' ? true : next.sheetOpen,
       };
     }
   }
@@ -427,7 +434,7 @@ export function bookingReducer(
     case 'submitStarted':
       return { ...state, pending: true, notice: null, alternatives: [] };
     case 'submitDone':
-      return afterReserve(offer, state, action.effect);
+      return afterReserve(offer, state, action.effect, action.origin);
   }
 }
 
@@ -578,6 +585,7 @@ export function effectOf(
   return describeReserve(result, {
     checkoutBase: offer.checkoutBase,
     maxSeats: offer.maxSeats,
+    deviceSeatLimit: offer.deviceSeatLimit,
   });
 }
 

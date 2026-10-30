@@ -21,7 +21,7 @@ export function BookingBarIsland({ offer }: { offer: BookingOffer }) {
           guests={bar.guests}
           totalMinor={bar.totalMinor}
           loading={state.pending}
-          onContinue={() => void submit()}
+          onContinue={() => void submit('phone')}
         />
       );
     case 'default':

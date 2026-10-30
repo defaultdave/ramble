@@ -30,7 +30,7 @@ export function BookingSheetIsland({ offer }: { offer: BookingOffer }) {
             summary={view.summary}
             canContinue={canContinue(offer, state)}
             pending={state.pending}
-            onContinue={() => void submit()}
+            onContinue={() => void submit('phone')}
           />
         )
       }

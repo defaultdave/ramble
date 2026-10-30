@@ -9,6 +9,7 @@ import {
   type BookingMode,
   type BookingOffer,
   type BookingState,
+  type SubmitOrigin,
 } from '@/lib/bookingDraft';
 import { somethingWentWrong } from '@/lib/bookingOutcome';
 import type { SessionSummary } from '@/lib/holds';
@@ -56,6 +57,8 @@ export function useBookingDraft(offer: BookingOffer) {
 
   const dispatch = useCallback(
     (action: BookingAction) => {
+      // A reserve that answers after the page is gone must not leave a pending draft for the next visit.
+      if (!listeners.get(key)?.size) return;
       states.set(
         key,
         bookingReducer(offer, states.get(key) ?? initial, action),
@@ -67,19 +70,22 @@ export function useBookingDraft(offer: BookingOffer) {
     [offer, key, initial],
   );
 
-  const submit = useCallback(async () => {
-    const current = states.get(key) ?? initial;
-    const input = reserveInput(offer, current);
-    if (!input || current.pending) return;
-    dispatch({ type: 'submitStarted' });
-    try {
-      const effect = effectOf(offer, await reserveSpaces(input));
-      dispatch({ type: 'submitDone', effect });
-      if (effect.kind === 'held') router.push(effect.href);
-    } catch {
-      dispatch({ type: 'submitDone', effect: somethingWentWrong });
-    }
-  }, [offer, key, initial, dispatch, router]);
+  const submit = useCallback(
+    async (origin: SubmitOrigin) => {
+      const current = states.get(key) ?? initial;
+      const input = reserveInput(offer, current);
+      if (!input || current.pending) return;
+      dispatch({ type: 'submitStarted' });
+      try {
+        const effect = effectOf(offer, await reserveSpaces(input));
+        dispatch({ type: 'submitDone', effect, origin });
+        if (effect.kind === 'held') router.push(effect.href);
+      } catch {
+        dispatch({ type: 'submitDone', effect: somethingWentWrong, origin });
+      }
+    },
+    [offer, key, initial, dispatch, router],
+  );
 
   const handlers = useMemo(
     () => ({

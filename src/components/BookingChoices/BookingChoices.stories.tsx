@@ -73,6 +73,7 @@ const reserved = (offer: BookingOffer, result: ReserveResult) =>
   describeReserve(result, {
     checkoutBase: offer.checkoutBase,
     maxSeats: offer.maxSeats,
+    deviceSeatLimit: offer.deviceSeatLimit,
   });
 
 const handlers = {
@@ -157,6 +158,7 @@ function Sheet({
 
 const soldOut = (offer: BookingOffer = kayakOffer): BookingAction => ({
   type: 'submitDone',
+  origin: 'phone',
   effect: reserved(offer, {
     status: 'sold_out',
     alternatives: [
@@ -178,6 +180,7 @@ const soldOut = (offer: BookingOffer = kayakOffer): BookingAction => ({
 
 const answer = (result: ReserveResult): BookingAction => ({
   type: 'submitDone',
+  origin: 'phone',
   effect: reserved(kayakOffer, result),
 });
 

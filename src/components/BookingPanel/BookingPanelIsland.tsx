@@ -53,7 +53,7 @@ export function BookingPanelIsland({ offer }: { offer: BookingOffer }) {
         : {})}
       holdNote={holdNote}
       loading={state.pending}
-      onContinue={() => void submit()}
+      onContinue={() => void submit('panel')}
     >
       <BookingChoices
         view={view}

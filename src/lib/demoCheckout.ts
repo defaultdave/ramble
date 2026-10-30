@@ -6,7 +6,7 @@ import {
 } from './orderSummary';
 import { checkoutPath, orderPath } from './routes';
 
-// TODO(U-047b): replaced by the checkout page; the hold id, the order reference, and this module go with it.
+// TODO(U-041): remove the demo click-through: the hold id, the order reference, and this module.
 const demoHoldId = '00000000-0000-4000-8000-0000000000d1';
 const demoOrderReference = 'RMB-DEMO01';
 
@@ -54,3 +54,8 @@ export const demoSummary: DemoSummary = {
   ],
   totalMinor: pricePerPersonMinor * guests,
 };
+
+/** Whether a checkout address is the demo's, which shows the stub before any hold is read. */
+export function isDemoHold(holdId: string): boolean {
+  return holdId.toLowerCase() === demoHoldId;
+}

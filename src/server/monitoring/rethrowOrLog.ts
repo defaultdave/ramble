@@ -1,6 +1,7 @@
 import 'server-only';
 import { unstable_rethrow } from 'next/navigation';
 import { errorDigest } from '@/lib/errorDigest';
+import { isPrerenderEnd } from '@/lib/prerender';
 import { logger } from '@/server/monitoring/logger';
 
 /**
@@ -12,6 +13,8 @@ import { logger } from '@/server/monitoring/logger';
  */
 export function rethrowOrLog(message: string, error: unknown): void {
   unstable_rethrow(error);
+  // A driver wraps the framework's "prerender is complete" error, so it is looked for by message.
+  if (isPrerenderEnd(error)) throw error;
   logger.error(message, {
     digest: errorDigest(error),
     kind: error instanceof Error ? error.name : 'unknown',

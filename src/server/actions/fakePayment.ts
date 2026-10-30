@@ -11,7 +11,6 @@ import { secureEqual } from '@/server/secureEqual';
 
 const refused: FakeConfirmResult = { status: 'refused' };
 
-// TODO(U-047b): first caller, the checkout page's payment island.
 /**
  * The confirm step of the fake gateway: records what the guest did in the fake card form
  * (paid, was declined, or was sent to 3-D Secure) as the provider would, and emits its event.

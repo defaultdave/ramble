@@ -117,3 +117,39 @@ export const TogglesOnPress: BookingStory = {
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   },
 };
+
+const mobile = { viewport: { value: 'mobile1', isRotated: false } };
+const desktop = { viewport: { value: 'desktop', isRotated: false } };
+
+/** From 768px an opt-in summary is open by itself: no toggle in the tree, the panel and a heading visible. */
+export const OpenFromTabletOnDesktop: BookingStory = {
+  args: { ...taxable, openFrom: 'tablet', expanded: false },
+  globals: desktop,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.queryAllByRole('button')).toHaveLength(0);
+    const [heading] = canvas.getAllByRole('heading', { level: 2 });
+    await expect(heading).toBeVisible();
+    // `hidden` stays on the panel; the stylesheet is what shows it, so read what is painted.
+    const panel = canvasElement.querySelector(
+      '[data-open-from] [id$="-details"]',
+    );
+    if (!panel) throw new Error('No panel rendered');
+    await expect(getComputedStyle(panel).display).toBe('flex');
+  },
+};
+
+/** Below 768px the same summary keeps its toggle, collapsed until it is pressed. */
+export const OpenFromTabletOnPhone: BookingStory = {
+  args: { ...taxable, openFrom: 'tablet' },
+  globals: mobile,
+  render: (args) => <Toggleable {...args} />,
+  play: async ({ canvasElement }) => {
+    const [toggle] = within(canvasElement).getAllByRole('button');
+    if (!toggle) throw new Error('No toggle rendered');
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(toggle);
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  },
+};

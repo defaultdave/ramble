@@ -240,6 +240,27 @@ export function isOpenHold(hold: HoldTimes, at: Date): boolean {
   }
 }
 
+/** The deadline that decides whether a hold still holds: `paying_until` once payment began. */
+export function holdDeadline(hold: HoldTimes): Date {
+  return hold.status === 'paying' && hold.payingUntil !== null
+    ? hold.payingUntil
+    : hold.expiresAt;
+}
+
+/** A hold is shown at checkout while it is `active` or `paying`; one that was released or converted is gone. */
+export function isCheckoutHold(hold: Pick<HoldTimes, 'status'>): boolean {
+  return hold.status === 'active' || hold.status === 'paying';
+}
+
+/**
+ * A hold that ran out before the guest paid, by the database clock: `active` with its expiry at or
+ * before `at`. Only such a hold may be held again, and once. A `paying` hold is never lapsed here,
+ * because a payment may still be on its way (design doc 4.2.3).
+ */
+export function isLapsedHold(hold: HoldTimes, at: Date): boolean {
+  return hold.status === 'active' && hold.expiresAt.getTime() <= at.getTime();
+}
+
 /** The seats the open holds among `holds` take. A lapsed or finished hold takes none. */
 export function openHeldSeats(
   holds: readonly (HoldTimes & { seats: number })[],

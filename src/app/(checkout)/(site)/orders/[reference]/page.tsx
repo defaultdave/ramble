@@ -3,8 +3,8 @@ import { Alert } from '@/components/Alert';
 import { ButtonLink } from '@/components/Button';
 import { demoSummary } from '@/lib/demoCheckout';
 import { browsePath } from '@/lib/routes';
-import { DemoOrderSummary } from '../../_demo/DemoOrderSummary';
-import { DemoPage } from '../../_demo/DemoPage';
+import { DemoOrderSummary } from '../../../_demo/DemoOrderSummary';
+import { DemoPage } from '../../../_demo/DemoPage';
 
 export const metadata: Metadata = { title: 'Order confirmation' };
 

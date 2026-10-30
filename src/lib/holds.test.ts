@@ -30,6 +30,9 @@ import {
   holdExpiresAt,
   holdLimits,
   invalidFromIssues,
+  holdDeadline,
+  isCheckoutHold,
+  isLapsedHold,
   isOpenHold,
   openHeldSeats,
   partyFits,
@@ -1091,6 +1094,68 @@ describe('field errors from issues', () => {
         (path) => path.map(String).join('.'),
       ),
     ).toEqual({ 'a.b': 'required', c: 'invalid' });
+  });
+});
+
+describe('the hold that is shown', () => {
+  const times = {
+    expiresAt: new Date('2026-10-23T14:10:00Z'),
+    payingUntil: new Date('2026-10-23T14:15:00Z'),
+  };
+
+  it('counts an active hold to its expiry and a paying one to its paying deadline', () => {
+    expect(holdDeadline({ status: 'active', ...times })).toEqual(
+      times.expiresAt,
+    );
+    expect(holdDeadline({ status: 'paying', ...times })).toEqual(
+      times.payingUntil,
+    );
+    expect(
+      holdDeadline({ status: 'paying', ...times, payingUntil: null }),
+    ).toEqual(times.expiresAt);
+  });
+
+  it.each([
+    ['active', true],
+    ['paying', true],
+    ['converted', false],
+    ['released', false],
+  ] as const)('shows a %s hold: %s', (status, shown) => {
+    expect(isCheckoutHold({ status })).toBe(shown);
+  });
+});
+
+describe('isLapsedHold', () => {
+  const times = {
+    expiresAt: new Date('2026-10-23T14:10:00Z'),
+    payingUntil: new Date('2026-10-23T14:20:00Z'),
+  };
+
+  it.each([
+    [
+      'an active hold before its expiry',
+      'active',
+      '2026-10-23T14:09:59.999Z',
+      false,
+    ],
+    ['an active hold at its expiry', 'active', '2026-10-23T14:10:00Z', true],
+    ['an active hold after its expiry', 'active', '2026-10-23T15:00:00Z', true],
+    [
+      'a paying hold before its paying deadline',
+      'paying',
+      '2026-10-23T14:15:00Z',
+      false,
+    ],
+    [
+      'a paying hold after its paying deadline',
+      'paying',
+      '2026-10-23T14:30:00Z',
+      false,
+    ],
+    ['a converted hold', 'converted', '2026-10-23T15:00:00Z', false],
+    ['a released hold', 'released', '2026-10-23T15:00:00Z', false],
+  ] as const)('reads %s', (_name, status, at, lapsed) => {
+    expect(isLapsedHold({ status, ...times }, new Date(at))).toBe(lapsed);
   });
 });
 

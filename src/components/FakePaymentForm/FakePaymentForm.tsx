@@ -62,8 +62,6 @@ export type FakePaymentFormProps = {
 
 const emptyFields: CardFields = { number: '', expiry: '', cvc: '', zip: '' };
 
-// The first caller is the checkout page, which wires `confirm` to the `confirmFakePayment` action.
-// TODO(U-047b): first caller, the checkout page's payment island.
 export function FakePaymentForm({
   payment,
   amountMinor,

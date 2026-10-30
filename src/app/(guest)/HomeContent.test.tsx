@@ -161,7 +161,8 @@ describe('HomeContent', () => {
             slug: 'rainy-day',
             title: 'Rainy day',
             summary: null,
-            items: [{ experienceId: id(2) }, { experienceId: id(1) }],
+            itemCount: 2,
+            experienceIds: [id(2), id(1)],
           },
         ],
         experiences: [id(1), id(2)].map((experienceId) => ({

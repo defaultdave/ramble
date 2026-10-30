@@ -10,7 +10,10 @@ const meta = {
     a11y: {
       config: {
         // Every story renders the state twice, once per color scheme.
-        rules: [{ id: 'landmark-unique', enabled: false }],
+        rules: [
+          { id: 'landmark-unique', enabled: false },
+          { id: 'landmark-no-duplicate-banner', enabled: false },
+        ],
       },
     },
   },

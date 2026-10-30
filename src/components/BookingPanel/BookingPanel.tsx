@@ -3,7 +3,7 @@ import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import { Alert } from '@/components/Alert';
 import { Button } from '@/components/Button';
 import { SimilarLink } from '@/components/BookingBar/SimilarLink';
-import { continueLabel } from '@/lib/booking';
+import { continueLabel, pausedNotice } from '@/lib/booking';
 import { formatMoney } from '@/lib/money';
 import { perPersonAmount } from '@/lib/pricing';
 import styles from './BookingPanel.module.css';
@@ -18,8 +18,8 @@ type BookingPanelBaseProps = Omit<
 
 export type DefaultBookingPanelProps = BookingPanelBaseProps & {
   state?: 'default';
-  /** The book or gift switch. */
-  mode: ReactNode;
+  /** The book or gift switch, left out while gifts are off. */
+  mode?: ReactNode;
   /** The date, time, and party choices. */
   children: ReactNode;
   /** Left out until a date and party are chosen; Continue stays disabled without it. */
@@ -41,16 +41,31 @@ export type DefaultBookingPanelProps = BookingPanelBaseProps & {
 export type SoldOutBookingPanelProps = BookingPanelBaseProps & {
   state: 'sold-out';
   similarHref: string;
-  // TODO(U-041): first caller; the private-session request page the link opens comes from its own unit.
   /** Where "Ask about a private session" goes. */
   privateSessionHref: string;
 };
 
-export type BookingPanelProps =
-  DefaultBookingPanelProps | SoldOutBookingPanelProps;
+/** Ops paused bookings: the panel says so in place of the choices. */
+export type PausedBookingPanelProps = BookingPanelBaseProps & {
+  state: 'paused';
+};
 
-// TODO(U-041): first caller, the experience page, which shows it from 768px and the bar below that.
+export type BookingPanelProps =
+  DefaultBookingPanelProps | SoldOutBookingPanelProps | PausedBookingPanelProps;
+
 export function BookingPanel(props: BookingPanelProps) {
+  if (props.state === 'paused') {
+    const { state, priceMinor, ...rest } = props;
+    return (
+      <Shell {...rest} state={state} priceMinor={priceMinor}>
+        <Alert
+          tone="info"
+          title={pausedNotice.title}
+          body={pausedNotice.body}
+        />
+      </Shell>
+    );
+  }
   if (props.state === 'sold-out') {
     const { state, priceMinor, similarHref, privateSessionHref, ...rest } =
       props;
@@ -87,7 +102,7 @@ export function BookingPanel(props: BookingPanelProps) {
   } = props;
   return (
     <Shell {...rest} state={state} priceMinor={priceMinor}>
-      <div className={styles.mode}>{mode}</div>
+      {mode ? <div className={styles.mode}>{mode}</div> : null}
       {children}
       {total ? (
         <>
@@ -124,7 +139,7 @@ function Shell({
   children,
   ...rest
 }: BookingPanelBaseProps & {
-  state: 'default' | 'sold-out';
+  state: 'default' | 'sold-out' | 'paused';
   children: ReactNode;
 }) {
   return (

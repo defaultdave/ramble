@@ -37,6 +37,33 @@ describe('DatePicker', () => {
     expect(screen.getByText('October 2026')).toBeVisible();
   });
 
+  it('opens on the month of the first offered date when nothing is chosen', () => {
+    render(
+      <DatePicker
+        label="Choose a date"
+        value={null}
+        today={today}
+        availableDates={['2026-11-03', '2026-11-10']}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('November 2026')).toBeVisible();
+  });
+
+  it('moves to the month of the chosen date when it changes from outside', () => {
+    const props = {
+      label: 'Choose a date',
+      today,
+      availableDates,
+      onChange: vi.fn(),
+    };
+    const { rerender } = render(<DatePicker {...props} value="2026-10-24" />);
+    expect(screen.getByText('October 2026')).toBeVisible();
+    rerender(<DatePicker {...props} value="2026-11-03" />);
+    expect(screen.getAllByText('November 2026').length).toBeGreaterThan(0);
+    expect(screen.queryAllByText('October 2026')).toHaveLength(0);
+  });
+
   it('marks the chosen date as selected', () => {
     setup();
     expect(day(/Saturday, October 24, 2026/).closest('td')).toHaveAttribute(

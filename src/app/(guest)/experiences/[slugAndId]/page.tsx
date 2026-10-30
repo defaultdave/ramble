@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { ExperiencePage } from '@/components/ExperiencePage';
+import { Suspense } from 'react';
+import { BookingPanelSkeleton } from '@/components/BookingPanel';
+import { BookingSlots, ExperiencePage } from '@/components/ExperiencePage';
 import { PageError } from '@/components/PageError';
+import { UpcomingSessionsSkeleton } from '@/components/UpcomingSessions';
 import {
   buildExperiencePage,
   experienceHead,
@@ -11,6 +14,8 @@ import { experiencePath, parseExperienceAddress } from '@/lib/routes';
 import { getExperiencePage } from '@/server/experiencePage';
 import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
 import { getCachedGuestSettings } from '@/server/siteSettings';
+import { BookingContent } from './BookingContent';
+import { UpcomingSessionsContent } from './UpcomingSessionsContent';
 
 export function generateStaticParams() {
   return [{ slugAndId: 'sample' }];
@@ -35,6 +40,7 @@ export async function generateMetadata({
 
 export default async function ExperienceRoute({
   params,
+  searchParams,
 }: PageProps<'/experiences/[slugAndId]'>) {
   const address = parseExperienceAddress((await params).slugAndId);
   if (!address) notFound();
@@ -46,7 +52,11 @@ export default async function ExperienceRoute({
       getCachedGuestSettings(),
     ]);
     view = data
-      ? buildExperiencePage({ ...data, giftsEnabled: settings.giftsEnabled })
+      ? buildExperiencePage({
+          ...data,
+          giftsEnabled: settings.giftsEnabled,
+          bookingsPaused: settings.bookingsPaused,
+        })
       : null;
   } catch (error) {
     rethrowOrLog('The experience page could not be read', error);
@@ -61,5 +71,31 @@ export default async function ExperienceRoute({
   }
 
   if (!view) notFound();
-  return <ExperiencePage view={view} />;
+  return (
+    <ExperiencePage
+      view={view}
+      dates={
+        <Suspense fallback={<UpcomingSessionsSkeleton />}>
+          <UpcomingSessionsContent
+            upcoming={view.upcoming}
+            searchParams={searchParams}
+            retryHref={experiencePath(address)}
+          />
+        </Suspense>
+      }
+      booking={
+        <Suspense
+          fallback={
+            <BookingSlots bar={null} panel={<BookingPanelSkeleton />} />
+          }
+        >
+          <BookingContent
+            basics={view.booking}
+            searchParams={searchParams}
+            retryHref={experiencePath(address)}
+          />
+        </Suspense>
+      }
+    />
+  );
 }

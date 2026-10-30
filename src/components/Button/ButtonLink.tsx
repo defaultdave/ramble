@@ -12,6 +12,8 @@ export type ButtonLinkProps = {
   iconStart?: ReactNode;
   /** The address is another site's: it opens in a new tab, and says so to a screen reader. */
   external?: boolean;
+  /** The address is a file to save under this name, not a page: it renders a plain anchor. */
+  download?: string;
 };
 
 const variantClass = {
@@ -33,6 +35,7 @@ export function ButtonLink({
   size = 'md',
   iconStart,
   external = false,
+  download,
 }: ButtonLinkProps) {
   const className = classNames(
     styles.button,
@@ -52,6 +55,13 @@ export function ButtonLink({
       ) : null}
     </span>
   );
+  if (download !== undefined) {
+    return (
+      <a href={href} download={download} className={className}>
+        {content}
+      </a>
+    );
+  }
   return external ? (
     <a
       href={href}

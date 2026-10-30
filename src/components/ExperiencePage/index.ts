@@ -1,2 +1,2 @@
-export { ExperiencePage } from './ExperiencePage';
-export type { ExperiencePageProps } from './ExperiencePage';
+export { BookingSlots, ExperiencePage } from './ExperiencePage';
+export type { BookingSlotsProps, ExperiencePageProps } from './ExperiencePage';

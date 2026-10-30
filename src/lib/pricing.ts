@@ -1,4 +1,4 @@
-import { taxTreatments, type PriceOption } from './catalog';
+import type { PriceOption, taxTreatments } from './catalog';
 import { formatPrice } from './money';
 
 // Integer minor units (cents) and parts per million only: no float touches an amount.
@@ -62,12 +62,30 @@ function roundHalfUpPpm(amountMinor: number, ratePpm: number): number {
   return remainder * 2 >= PPM ? quotient + 1 : quotient;
 }
 
+/** The tax on a ticket subtotal: `round_half_up(subtotal * rate / 1_000_000)` (PRD-19). */
+export function taxMinor(ticketSubtotalMinor: number, ratePpm: number): number {
+  return roundHalfUpPpm(ticketSubtotalMinor, ratePpm);
+}
+
+/**
+ * The commission Ramble takes on the ticket before tax, in basis points (Q-03, 15 percent). The
+ * `settings` row holds no commission rate, so an order snapshots this constant when it is made.
+ */
+export const defaultCommissionRateBps = 1500;
+
+/** `round_half_up(subtotal * bps / 10_000)`, on the ticket before tax (Q-03). A basis point is 100 ppm. */
+export function commissionMinor(
+  ticketSubtotalMinor: number,
+  commissionRateBps: number,
+): number {
+  return roundHalfUpPpm(ticketSubtotalMinor, commissionRateBps * 100);
+}
+
 /**
  * The rate to charge for an experience (PRD-78): the configured rate when it is taxable, and 0
  * when it is not taxable or unknown (unknown is charged as not taxable until Q-12 is answered).
  * The configured rate is checked in every case so a broken setting fails loudly instead of
  * waiting for the first taxable experience.
- * TODO(U-014a): first caller, the held total in `reserveSpaces`.
  */
 export function taxRatePpm(
   taxTreatment: TaxTreatment,
@@ -95,7 +113,6 @@ export function taxRatePpm(
  *
  * Bad input is refused, never repaired: a quantity or price that is negative, fractional, or out
  * of range, an unknown or repeated price option, or too many lines throws a RangeError.
- * TODO(U-014a): first caller, the held total in `reserveSpaces`.
  */
 export function lines(
   items: readonly PricingItem[],
@@ -150,13 +167,13 @@ export function lines(
     });
   }
 
-  const taxMinor = roundHalfUpPpm(ticketSubtotalMinor, ratePpm);
+  const tax = taxMinor(ticketSubtotalMinor, ratePpm);
   return {
     lines: priced,
     ticketSubtotalMinor,
     taxRatePpm: ratePpm,
-    taxMinor,
-    totalMinor: ticketSubtotalMinor + taxMinor,
+    taxMinor: tax,
+    totalMinor: ticketSubtotalMinor + tax,
   };
 }
 

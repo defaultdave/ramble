@@ -70,3 +70,6 @@ export const db = lazy(createPooledDb);
  * (capacity, balance) oversold 615 spaces in 8 rounds of the concurrency spike, so never run one here.
  */
 export const dbRead: ReadDb = lazy(createReadDb);
+
+/** What `db.transaction` hands its callback. The plain `db` handle is not assignable to it. */
+export type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];

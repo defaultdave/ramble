@@ -1,11 +1,11 @@
 import type { ComponentPropsWithoutRef } from 'react';
 import { Button } from '@/components/Button';
-import { chosenPartyLabel, perPersonLabel } from '@/lib/booking';
+import { chosenPartyLabel, pausedNotice, perPersonLabel } from '@/lib/booking';
 import { fromPriceLabel } from '@/lib/pricing';
 import { SimilarLink } from './SimilarLink';
 import styles from './BookingBar.module.css';
 
-export type BookingBarState = 'default' | 'date-chosen' | 'sold-out';
+export type BookingBarState = 'default' | 'date-chosen' | 'sold-out' | 'paused';
 
 type BookingBarBaseProps = Omit<
   ComponentPropsWithoutRef<'div'>,
@@ -40,11 +40,29 @@ export type SoldOutBookingBarProps = BookingBarBaseProps & {
   similarHref: string;
 };
 
-export type BookingBarProps =
-  DefaultBookingBarProps | DateChosenBookingBarProps | SoldOutBookingBarProps;
+/** Ops paused bookings: the bar says so and offers nothing to press. */
+export type PausedBookingBarProps = BookingBarBaseProps & {
+  state: 'paused';
+};
 
-// TODO(U-041): first caller, the experience page, which shows it on phones and the panel from 768px.
+export type BookingBarProps =
+  | DefaultBookingBarProps
+  | DateChosenBookingBarProps
+  | SoldOutBookingBarProps
+  | PausedBookingBarProps;
+
 export function BookingBar(props: BookingBarProps) {
+  if (props.state === 'paused') {
+    const { state, ...rest } = props;
+    return (
+      <div {...rest} className={styles.bar} data-state={state}>
+        <BarText
+          primary={pausedNotice.title}
+          secondary="Please check back soon"
+        />
+      </div>
+    );
+  }
   if (props.state === 'date-chosen') {
     const {
       state,

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   cardPriceLabel,
+  commissionMinor,
+  defaultCommissionRateBps,
   fromPriceLabel,
   lines,
   MAX_LINES,
@@ -8,6 +10,7 @@ import {
   MAX_UNIT_PRICE_MINOR,
   perPersonAmount,
   PPM,
+  taxMinor,
   taxRatePpm,
   type PricedOption,
   type TaxTreatment,
@@ -56,6 +59,32 @@ describe('taxRatePpm', () => {
     expect(() =>
       taxRatePpm('exempt' as unknown as TaxTreatment, NYC_RATE_PPM),
     ).toThrow(RangeError);
+  });
+});
+
+describe('taxMinor', () => {
+  it.each([
+    [17000, 88750, 1509],
+    [1, 500_000, 1],
+    [1, 499_999, 0],
+    [100, 0, 0],
+    [0, 88750, 0],
+    [1_000_000_000, 1_000_000, 1_000_000_000],
+  ])('taxes %i at %i ppm to %i', (subtotal, rate, expected) => {
+    expect(taxMinor(subtotal, rate)).toBe(expected);
+  });
+});
+
+describe('commissionMinor', () => {
+  it.each([
+    [17000, 1500, 2550],
+    [1, 5000, 1],
+    [1, 4999, 0],
+    [3, 1500, 0],
+    [10, 1500, 2],
+    [17000, 0, 0],
+  ])('commission on %i at %i bps is %i', (subtotal, bps, expected) => {
+    expect(commissionMinor(subtotal, bps)).toBe(expected);
   });
 });
 
@@ -419,5 +448,12 @@ describe('fromPriceLabel', () => {
     [0, 'Free'],
   ])('labels a lowest price of %i', (minor, label) => {
     expect(fromPriceLabel(minor)).toBe(label);
+  });
+});
+
+describe('the default commission rate', () => {
+  it('is 15 percent of the ticket before tax', () => {
+    expect(defaultCommissionRateBps).toBe(1500);
+    expect(commissionMinor(17_000, defaultCommissionRateBps)).toBe(2_550);
   });
 });

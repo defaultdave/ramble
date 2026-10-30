@@ -3,6 +3,12 @@
 export * from './catalog';
 export * from './policies';
 export * from './editorial';
+export * from './holds';
+export * from './people';
 export * from './messages';
 export * from './operations';
 export { publishStatusEnum } from './shared';
+export * from './jobs';
+export * from './orders';
+export * from './payments';
+export * from './ledger';

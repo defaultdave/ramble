@@ -2,6 +2,7 @@ import type { Preview } from '@storybook/nextjs-vite';
 import '@fontsource-variable/fraunces';
 import '@fontsource-variable/inter';
 import '../src/styles/tokens.css';
+import '../src/styles/forced-colors.css';
 import { withColorSchemes } from './color-schemes';
 
 // next/font is not available here, so point the font variables at the Fontsource families.

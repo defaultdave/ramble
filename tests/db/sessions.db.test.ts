@@ -24,6 +24,8 @@ import {
   type FreshDatabase,
 } from './harness';
 
+vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
+
 // Behaviours under test, one per decision, branch or risk:
 // - every CHECK, foreign key and unique index on the two tables refuses its bad row; the
 //   seats_sold CHECK refuses an insert and a later capacity drop alike
@@ -1259,8 +1261,9 @@ describe('updateSessionAllocation', () => {
 
     expect(result).toEqual({
       ok: false,
-      reason: 'below_seats_sold',
+      reason: 'below_sold_and_held',
       seatsSold: 5,
+      heldSeats: 0,
     });
     expect(await stored(session.id)).toMatchObject({
       allocation: 8,
@@ -1334,8 +1337,9 @@ describe('updateSessionAllocation', () => {
 
       await expect(pending).resolves.toEqual({
         ok: false,
-        reason: 'below_seats_sold',
+        reason: 'below_sold_and_held',
         seatsSold: 3,
+        heldSeats: 0,
       });
     } finally {
       booking.release();

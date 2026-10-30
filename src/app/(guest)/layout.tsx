@@ -5,6 +5,7 @@ import { VercelMeasurement } from '@/server/analytics/VercelMeasurement';
 import { SentryBrowserScript } from '@/server/monitoring/SentryBrowserScript';
 import '@/styles/base.css';
 import '@/styles/tokens.css';
+import '@/styles/forced-colors.css';
 import { fontVariables } from '../fonts';
 import { GuestBanner } from './GuestBanner';
 

@@ -1,23 +1,24 @@
 import 'server-only';
 import { z } from 'zod';
+import { orderCurrency } from '@/lib/orders';
+import {
+  attemptStatuses,
+  paymentMethods,
+  paymentProviders,
+  providerEventTypes,
+  type PaymentProvider,
+} from '@/lib/payments';
 
-const paymentProviders = ['fake', 'stripe'] as const;
-type PaymentProvider = (typeof paymentProviders)[number];
-
-export const currency = 'USD';
-const CurrencySchema = z.literal(currency);
-type Currency = typeof currency;
+const CurrencySchema = z.literal(orderCurrency);
+type Currency = typeof orderCurrency;
 
 /** The smallest charge the provider accepts, in cents (Stripe's USD minimum). */
-// TODO(U-047a): first caller
 export const minAmountMinor = 50;
 /** The largest single amount the provider accepts, in cents. */
-// TODO(U-047a): first caller
 export const maxAmountMinor = 99_999_999;
 /** Stripe caps an Idempotency-Key at 255 characters; the fake keeps the same bound. */
 const maxKeyLength = 255;
 /** A webhook body larger than this is refused before its signature is checked. */
-// TODO(U-048): first caller
 export const maxWebhookBodyLength = 65_536;
 
 const IdempotencyKeySchema = z.string().min(1).max(maxKeyLength);
@@ -32,16 +33,9 @@ const RambleMetadataSchema = z.object({
 });
 export type RambleMetadata = z.infer<typeof RambleMetadataSchema>;
 
-export const paymentMethods = ['card', 'apple_pay', 'google_pay'] as const;
 type PaymentMethod = (typeof paymentMethods)[number];
 
-type PaymentStatus =
-  | 'created'
-  | 'requires_action'
-  | 'processing'
-  | 'failed_try'
-  | 'succeeded'
-  | 'canceled';
+type PaymentStatus = (typeof attemptStatuses)[number];
 
 export type Payment = {
   id: string;
@@ -165,23 +159,6 @@ export const WebhookDeliverySchema = z.object({
 });
 export type WebhookDelivery = z.infer<typeof WebhookDeliverySchema>;
 
-/** The normalized event types of design doc 4.2.3. */
-export const providerEventTypes = [
-  'payment.succeeded',
-  'payment.failed',
-  'payment.requires_action',
-  'payment.canceled',
-  'refund.succeeded',
-  'refund.failed',
-  'transfer.paid',
-  'transfer.failed',
-  'transfer.reversed',
-  'dispute.opened',
-  'dispute.won',
-  'dispute.lost',
-] as const;
-export type ProviderEventType = (typeof providerEventTypes)[number];
-
 export const ProviderEventSchema = z.object({
   /** Unique with `provider`; a repeat delivery carries the same id. */
   id: ProviderIdSchema,
@@ -245,7 +222,6 @@ export class PaymentsError extends Error {
  * in metadata. Expected refusals reject with a `PaymentsError`; nothing is repaired.
  * Money is integer cents in USD.
  */
-// TODO(U-047a): first caller
 export type PaymentsPort = {
   readonly provider: PaymentProvider;
   /**

@@ -27,6 +27,10 @@ import {
   weatherPolicies,
 } from '@/lib/catalog';
 import {
+  emailAddressPattern,
+  maxEmailAddressLength,
+} from '@/lib/email/address';
+import {
   blurDataUrlPattern,
   photoLimits,
   photoRightsBases,
@@ -43,6 +47,7 @@ import {
   sessionStatuses,
 } from '@/lib/sessions';
 import { cancellationTiers, legalDocuments } from './policies';
+import { notBlank } from './shared';
 
 export const experienceStatusEnum = pgEnum(
   'experience_status',
@@ -66,10 +71,6 @@ export const sessionCancelReasonEnum = pgEnum(
 
 const timestampTz = () => timestamp({ withTimezone: true });
 
-// A row the Zod schema in src/lib/catalog.ts refuses makes a whole list read throw, so a CHECK here
-// must refuse whatever that schema refuses.
-const notBlank = (column: AnyPgColumn) => sql`${column} ~ '[^[:space:]]'`;
-
 // The read schemas test stored links with this same pattern, so the two cannot disagree.
 const isHttpUrlOrNull = (column: AnyPgColumn) =>
   sql`${column} IS NULL OR ${column} ~ ${sql.raw(`'${httpUrlPattern}'`)}`;
@@ -88,11 +89,17 @@ export const hosts = pgTable(
     name: text().notNull(),
     description: text(),
     timeZone: text().notNull(),
+    /** Where booking and cancellation notices go (PRD-44). Not shown on listings. */
+    notificationEmail: text(),
     createdAt: timestampTz().notNull().defaultNow(),
   },
   (table) => [
     check('hosts_slug_kebab', sql`${table.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
     check('hosts_name_not_blank', notBlank(table.name)),
+    check(
+      'hosts_notification_email_shape',
+      sql`${table.notificationEmail} IS NULL OR (${table.notificationEmail} ~ ${sql.raw(`'${emailAddressPattern}'`)} AND char_length(${table.notificationEmail}) <= ${sql.raw(String(maxEmailAddressLength))})`,
+    ),
     check('hosts_created_at_in_range', isReadableDate(table.createdAt)),
     check('hosts_time_zone_not_blank', notBlank(table.timeZone)),
   ],

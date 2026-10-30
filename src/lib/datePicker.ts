@@ -19,6 +19,17 @@ export function isDateAvailable(
   return date >= today && availableDates.includes(date);
 }
 
+/** The date whose month the calendar shows: the chosen date, else the first date on offer, else today. */
+export function visibleDate({
+  today,
+  value,
+  availableDates,
+}: DayContext): string {
+  if (value !== null) return value;
+  const offered = availableDates.filter((date) => date >= today).sort();
+  return offered[0] ?? today;
+}
+
 export function dayFlags(
   date: string,
   { today, value, availableDates }: DayContext,

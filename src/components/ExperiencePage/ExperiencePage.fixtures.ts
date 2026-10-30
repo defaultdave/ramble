@@ -1,4 +1,5 @@
 import { samplePhotos } from '@/components/Photo/Photo.fixtures';
+import { basicsOf, kayakOffer, kidsOffer } from '@/lib/bookingDraft.fixtures';
 import { galleryView, type ExperiencePageView } from '@/lib/pages/experience';
 
 /** The experience of Figma frame 03: outdoor, with a weather call, a host, a meeting point, and fifteen photos. */
@@ -11,6 +12,10 @@ export const sunsetKayak: ExperiencePageView = {
   badges: [{ tone: 'green', label: 'Outdoor', icon: 'outdoor' }],
   summary: 'Tribeca · 2\u00a0hr · Ages 14 and up',
   prices: [{ amount: '$65', unit: 'per person' }],
+  upcoming: {
+    experienceId: '00000000-0000-4000-8000-000000000001',
+    priceOptions: [{ priceMinor: 6500, usesSpace: true }],
+  },
   keyFacts: [
     { icon: 'place', text: 'Tribeca' },
     { icon: 'duration', text: '2\u00a0hr' },
@@ -45,9 +50,8 @@ export const sunsetKayak: ExperiencePageView = {
     "Go or no-go is decided 3 hours before start. If it's off, you're refunded in full and emailed right away.",
   cancellation:
     'Free cancellation up to 24 hours before start. After that, no refund. If the host or the weather cancels, you get everything back.',
+  booking: basicsOf(kayakOffer),
   giftHref: '/gifts/checkout/00000000-0000-4000-8000-000000000001',
-  bookHref:
-    '/checkout/00000000-0000-4000-8000-0000000000d1?experience=00000000-0000-4000-8000-000000000001',
   privateSessionHref: '/contact',
 };
 
@@ -64,6 +68,13 @@ export const kidsClass: ExperiencePageView = {
     { amount: 'Free', unit: 'per adult' },
     { amount: '$45', unit: 'per child' },
   ],
+  upcoming: {
+    experienceId: '00000000-0000-4000-8000-000000000002',
+    priceOptions: [
+      { priceMinor: 0, usesSpace: false },
+      { priceMinor: 4500, usesSpace: true },
+    ],
+  },
   keyFacts: [
     { icon: 'place', text: 'Williamsburg' },
     { icon: 'duration', text: '1.5\u00a0hr' },
@@ -85,9 +96,8 @@ export const kidsClass: ExperiencePageView = {
   weather: null,
   cancellation:
     'Free cancellation up to 2 days before start. After that, no refund. If the host or the weather cancels, you get everything back.',
+  booking: basicsOf(kidsOffer, 48),
   giftHref: null,
-  bookHref:
-    '/checkout/00000000-0000-4000-8000-0000000000d1?experience=00000000-0000-4000-8000-000000000001',
   privateSessionHref: '/contact',
 };
 
@@ -101,6 +111,10 @@ export const bareExperience: ExperiencePageView = {
   badges: [],
   summary: 'Red Hook · All ages',
   prices: [{ amount: '$30', unit: 'per person' }],
+  upcoming: {
+    experienceId: '00000000-0000-4000-8000-000000000003',
+    priceOptions: [{ priceMinor: 3000, usesSpace: true }],
+  },
   keyFacts: [
     { icon: 'place', text: 'Red Hook' },
     { icon: 'age', text: 'All ages' },
@@ -115,8 +129,21 @@ export const bareExperience: ExperiencePageView = {
   weather: null,
   cancellation:
     'Free cancellation up to 24 hours before start. After that, no refund. If the host or the weather cancels, you get everything back.',
+  booking: basicsOf({
+    ...kayakOffer,
+    experienceId: '00000000-0000-4000-8000-000000000003',
+    title: 'Evening walk',
+    ageNote: 'All ages',
+    giftsEnabled: false,
+    options: [
+      {
+        id: '00000000-0000-4000-8000-000000000031',
+        kind: 'adult',
+        priceMinor: 3000,
+        usesSpace: true,
+      },
+    ],
+  }),
   giftHref: null,
-  bookHref:
-    '/checkout/00000000-0000-4000-8000-0000000000d1?experience=00000000-0000-4000-8000-000000000001',
   privateSessionHref: '/contact',
 };

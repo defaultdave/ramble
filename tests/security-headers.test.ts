@@ -27,7 +27,13 @@ function isGroup(dir: string): boolean {
   return path.basename(dir).startsWith('(');
 }
 
+/** A route group inside a route group, such as `(site)` under `(checkout)`, is no part of the address. */
+function isGroupSegment(segment: string): boolean {
+  return segment.startsWith('(') && segment.endsWith(')');
+}
+
 function segmentToUrl(segment: string): string {
+  if (isGroupSegment(segment)) return '';
   if (segment.startsWith('[...')) return 'sample/unknown';
   if (segment.startsWith('[')) return 'sample';
   return segment;
@@ -55,7 +61,7 @@ function pageRoutes(): PageRoute[] {
       const dynamic = groupRendersPerRequest(group);
       return pagesUnder(path.join(appDir, group), []).map((segments) => ({
         group,
-        urlPath: `/${segments.map(segmentToUrl).join('/')}`,
+        urlPath: `/${segments.map(segmentToUrl).filter(Boolean).join('/')}`,
         dynamic,
       }));
     });
@@ -111,10 +117,19 @@ function isGroupName(segment: string): boolean {
 
 describe('next.config headers', () => {
   it('applies the security header set to every path', async () => {
-    const rules = await nextConfig.headers?.();
-    expect(rules).toEqual([
-      { source: '/:path*', headers: [...securityHeaders] },
-    ]);
+    const rules = (await nextConfig.headers?.()) ?? [];
+    expect(rules[0]).toEqual({
+      source: '/:path*',
+      headers: [...securityHeaders],
+    });
+  });
+
+  it('adds nothing else but the BotID challenge proxy rule', async () => {
+    const rules = (await nextConfig.headers?.()) ?? [];
+    const others = rules.slice(1).map((rule) => rule.source);
+
+    expect(others).toHaveLength(1);
+    expect(others[0]).toMatch(/^\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/:path\*$/);
   });
 });
 

@@ -5,7 +5,6 @@ import { captureAlert } from './sentry';
 
 type AlertContext = Record<string, unknown>;
 
-// TODO(U-048): first caller, the payment webhook intake.
 export const alerts = {
   /**
    * Raises an operational alert: one structured log line (which also reaches Axiom) and one

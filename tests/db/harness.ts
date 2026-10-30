@@ -19,6 +19,7 @@ import { neonConfig } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
+import { expect } from 'vitest';
 
 export type FreshDatabase = {
   /** Connection string whose sessions resolve unqualified names in the file's own schema. */
@@ -190,4 +191,46 @@ export async function serveNeonHttp(url: string) {
   const { endpoint, stop } = await startNeonHttpShim(url);
   neonConfig.fetchEndpoint = endpoint;
   return stop;
+}
+
+export const aFewMoments = () =>
+  new Promise((resolve) => setTimeout(resolve, 300));
+
+/**
+ * Runs `holder` in a transaction that stays open, starts `challenger` on another connection,
+ * checks the challenger is still waiting, then commits the holder and returns what the challenger
+ * answered. A challenger that does not wait was not serialized by the lock. `openTransaction` is
+ * the client's `db.transaction`, so the helper does not import the lazy client.
+ */
+export async function raceAgainstOpenTransaction<Tx, T>(
+  openTransaction: (body: (tx: Tx) => Promise<void>) => Promise<unknown>,
+  holder: (tx: Tx) => Promise<void>,
+  challenger: () => Promise<T>,
+): Promise<T> {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let held!: () => void;
+  const holding = new Promise<void>((resolve) => {
+    held = resolve;
+  });
+  const holderDone = openTransaction(async (tx) => {
+    await holder(tx);
+    held();
+    await gate;
+  });
+  await holding;
+
+  let settled = false;
+  const answer = challenger().finally(() => {
+    settled = true;
+  });
+  answer.catch(() => undefined);
+  await aFewMoments();
+  const waited = !settled;
+  release();
+  await holderDone;
+  expect(waited, 'the challenger waited for the holder').toBe(true);
+  return answer;
 }

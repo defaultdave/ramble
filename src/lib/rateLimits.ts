@@ -8,7 +8,11 @@ export const rateLimitSurfaces = [
   'forms',
   'email_webhook',
   'email_webhook_failed',
+  'payment_webhook',
+  'payment_webhook_failed',
   'mailbox_unlock_failed',
+  'pulse',
+  'pulse_failed',
 ] as const;
 
 export type RateLimitSurface = (typeof rateLimitSurfaces)[number];
@@ -53,9 +57,26 @@ export const rateLimitPolicies = {
     windowSeconds: 10 * 60,
     normalizeSubject: trimmed,
   },
+  // The same two counters for the payment provider's webhooks, kept apart from the email ones.
+  payment_webhook: { limit: 600, windowSeconds: 60, normalizeSubject: trimmed },
+  payment_webhook_failed: {
+    limit: 20,
+    windowSeconds: 10 * 60,
+    normalizeSubject: trimmed,
+  },
   // Wrong dev-mailbox secrets, per source address. A correct secret is never counted or refused.
   mailbox_unlock_failed: {
     limit: 10,
+    windowSeconds: 10 * 60,
+    normalizeSubject: trimmed,
+  },
+  // Authenticated pulse calls on one shared counter. The schedule fires every 30 minutes and a demo
+  // adds a few manual ones, so this only stops a leaked secret from being used to hammer the drain.
+  pulse: { limit: 30, windowSeconds: 10 * 60, normalizeSubject: trimmed },
+  // Pulse calls with a wrong or missing secret, per source address; kept apart so bad traffic
+  // cannot refuse the real schedule.
+  pulse_failed: {
+    limit: 20,
     windowSeconds: 10 * 60,
     normalizeSubject: trimmed,
   },
@@ -65,12 +86,15 @@ export const maxSubjectLength = 512;
 export const maxLimit = 10_000;
 export const maxWindowSeconds = 24 * 60 * 60;
 
+/** A sha-256 digest in lowercase hex, the shape every hashed key in the database takes. */
+export const sha256HexDigits = String.raw`[0-9a-f]{64}`;
+
 /**
  * `<surface>:<sha-256 of the subject, hex>`. Hashing bounds the length whatever the subject was and
  * keeps email addresses out of the table. The database CHECK on `rate_limits.key` spells the same
  * pattern, case-sensitively, so the two cannot disagree.
  */
-export const rateLimitKeyPattern = String.raw`^[a-z][a-z_]{0,31}:[0-9a-f]{64}$`;
+export const rateLimitKeyPattern = `^[a-z][a-z_]{0,31}:${sha256HexDigits}$`;
 
 export const RateLimitKeySchema = z
   .string()

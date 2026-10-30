@@ -57,7 +57,7 @@ describe('BookingBar date chosen', () => {
     const onContinue = vi.fn();
     render(<BookingBar {...chosen} loading onContinue={onContinue} />);
     const button = screen.getByRole('button', { name: 'Continue' });
-    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-disabled', 'true');
     expect(button).toHaveAttribute('aria-busy', 'true');
     await userEvent.click(button);
     expect(onContinue).not.toHaveBeenCalled();
@@ -78,6 +78,16 @@ describe('BookingBar sold out', () => {
   it('offers no booking action', () => {
     render(<BookingBar state="sold-out" similarHref="/browse" />);
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+});
+
+describe('BookingBar paused', () => {
+  it('says bookings are paused and offers nothing to press', () => {
+    render(<BookingBar state="paused" />);
+    expect(screen.getByText('Bookings are paused')).toBeVisible();
+    expect(screen.getByText('Please check back soon')).toBeVisible();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 });
 

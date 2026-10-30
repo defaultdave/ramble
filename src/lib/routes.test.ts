@@ -14,9 +14,12 @@ import {
   helpPath,
   homePicksHref,
   legalPath,
+  managePath,
   maxAddressLength,
   neighborhoodPath,
+  orderConfirmationPath,
   orderPath,
+  orderTokenParam,
   parseExperienceAddress,
   picksAnchor,
   picksPath,
@@ -105,12 +108,24 @@ describe('literal addresses', () => {
     ['a gift checkout', giftCheckoutPath(id(1)), `/gifts/checkout/${id(1)}`],
     ['a checkout', checkoutPath(id(1)), `/checkout/${id(1)}`],
     ['an order', orderPath('RMB-ABC123'), '/orders/RMB-ABC123'],
+    [
+      'an order with its token',
+      orderConfirmationPath('RMB-ABC123', 'a-b_c'),
+      '/orders/RMB-ABC123?t=a-b_c',
+    ],
+    [
+      'an order without a token',
+      orderConfirmationPath('RMB-ABC123'),
+      '/orders/RMB-ABC123',
+    ],
+    ['the order token key', orderTokenParam, 't'],
     ['contact', contactPath, '/contact'],
     ['help', helpPath, '/help'],
     ['accessibility', accessibilityPath, '/accessibility'],
     ['the terms', legalPath('terms'), '/legal/terms'],
     ['the privacy policy', legalPath('privacy'), '/legal/privacy'],
     ['a private session', privateSessionPath, '/contact'],
+    ['a manage page', managePath('abc'), '/manage/abc'],
   ])('writes %s', (_name, actual, expected) => {
     expect(actual).toBe(expected);
   });

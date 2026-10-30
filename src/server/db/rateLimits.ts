@@ -45,9 +45,8 @@ export async function consumeRateLimitRow(input: {
   return decideRateLimit({ ...row, limit });
 }
 
-const PURGE_BATCH = 1000;
+export const PURGE_BATCH = 1000;
 
-// TODO(U-005): first caller, on each pulse.
 /**
  * Deletes rows whose window has ended, at most one batch per call, and returns how many. A row is
  * dead the moment `expires_at` passes (the next try replaces it), so purging only keeps the table

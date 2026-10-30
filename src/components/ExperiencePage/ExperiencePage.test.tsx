@@ -1,14 +1,17 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { ExperiencePage } from './ExperiencePage';
+import { BookingSlots, ExperiencePage } from './ExperiencePage';
 import {
   bareExperience,
   kidsClass,
   sunsetKayak,
 } from './ExperiencePage.fixtures';
 
+const dates = <p>The dates</p>;
+
 // Behaviours under test, one per decision, branch or risk:
+// - the dates slot sits under its own heading, ahead of the About text
 // - the title is the page's one h1, with the breadcrumb ending at it and the badges and prices under it
 // - the key facts, the about text, the included rows, the host, and each terms section are there under their own headings
 // - the meeting point is text with an "Open in Maps" link that opens in a new tab and says so
@@ -16,11 +19,34 @@ import {
 // - the gift entry goes to the gift checkout, and is absent when gifts are off; the private-session entry is always there and goes to contact
 // - a section with nothing to say is left out whole, and the cancellation terms always stay
 // - two prices name who each is for
-// - the error state keeps a heading, says what went wrong, and retries with a GET form to the page's own address
+// - the booking slot is the page's last child, with the bar and the panel in their own slots, the panel an aside
+
+describe('the booking slot', () => {
+  it('sits after the content, inside the article, so the bar can stick against the whole page', () => {
+    render(
+      <ExperiencePage
+        dates={dates}
+        view={sunsetKayak}
+        booking={<BookingSlots bar={<p>The bar</p>} panel={<p>The panel</p>} />}
+      />,
+    );
+    const article = screen.getByRole('article');
+    expect(article.lastElementChild).toBe(screen.getByRole('complementary'));
+    expect(within(article).getByText('The bar')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('complementary')).getByText('The panel'),
+    ).toBeInTheDocument();
+  });
+
+  it('draws nothing extra without one', () => {
+    render(<ExperiencePage dates={dates} view={sunsetKayak} />);
+    expect(screen.queryByRole('complementary')).toBeNull();
+  });
+});
 
 describe('ExperiencePage', () => {
   it('has the title as its only h1, and a breadcrumb that ends at it', () => {
-    render(<ExperiencePage view={sunsetKayak} />);
+    render(<ExperiencePage dates={dates} view={sunsetKayak} />);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       'Sunset kayak on the Hudson',
     );
@@ -39,7 +65,7 @@ describe('ExperiencePage', () => {
   });
 
   it('shows the badges, the price, and the key facts', () => {
-    render(<ExperiencePage view={sunsetKayak} />);
+    render(<ExperiencePage dates={dates} view={sunsetKayak} />);
     expect(screen.getByText('Outdoor')).toBeInTheDocument();
     expect(screen.getByText('$65').parentElement).toHaveTextContent(
       '$65 per person',
@@ -63,10 +89,11 @@ describe('ExperiencePage', () => {
   });
 
   it('has a heading for each section it shows', () => {
-    render(<ExperiencePage view={sunsetKayak} />);
+    render(<ExperiencePage dates={dates} view={sunsetKayak} />);
     expect(
       screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent),
     ).toEqual([
+      'Upcoming dates',
       'About',
       "What's included",
       'Your host',
@@ -77,8 +104,19 @@ describe('ExperiencePage', () => {
     ]);
   });
 
+  it('puts the streamed dates under their own heading, before the About text', () => {
+    render(<ExperiencePage dates={dates} view={sunsetKayak} />);
+    const section = screen.getByRole('region', { name: 'Upcoming dates' });
+    expect(section).toHaveTextContent('The dates');
+    expect(
+      section.compareDocumentPosition(
+        screen.getByRole('region', { name: 'About' }),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it('lists what is included, one row each', () => {
-    render(<ExperiencePage view={sunsetKayak} />);
+    render(<ExperiencePage dates={dates} view={sunsetKayak} />);
     const section = screen
       .getByRole('heading', { name: "What's included" })
       .closest('section') as HTMLElement;
@@ -86,13 +124,13 @@ describe('ExperiencePage', () => {
   });
 
   it('names the host and what they say', () => {
-    render(<ExperiencePage view={sunsetKayak} />);
+    render(<ExperiencePage dates={dates} view={sunsetKayak} />);
     expect(screen.getByText('Hudson Paddle Club')).toBeInTheDocument();
     expect(screen.getByText(/Six guides, all trained/)).toBeInTheDocument();
   });
 
   it('gives the meeting point as text with a Maps link that opens in a new tab', () => {
-    render(<ExperiencePage view={sunsetKayak} />);
+    render(<ExperiencePage dates={dates} view={sunsetKayak} />);
     expect(
       screen.getByText(/Pier 26 boathouse, Tribeca\./),
     ).toBeInTheDocument();
@@ -104,7 +142,7 @@ describe('ExperiencePage', () => {
   });
 
   it('keeps the meeting point as text when no Maps search can be made', () => {
-    render(<ExperiencePage view={kidsClass} />);
+    render(<ExperiencePage dates={dates} view={kidsClass} />);
     expect(
       screen.getByText(/Wheelhouse Kids Studio, ground floor/),
     ).toBeInTheDocument();
@@ -113,16 +151,8 @@ describe('ExperiencePage', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('has a Book link to the checkout with the experience', () => {
-    render(<ExperiencePage view={sunsetKayak} />);
-    expect(screen.getByRole('link', { name: 'Book' })).toHaveAttribute(
-      'href',
-      sunsetKayak.bookHref,
-    );
-  });
-
   it('goes to the gift checkout and to contact for a private session', () => {
-    render(<ExperiencePage view={sunsetKayak} />);
+    render(<ExperiencePage dates={dates} view={sunsetKayak} />);
     expect(
       screen.getByRole('link', { name: 'Give this as a gift' }),
     ).toHaveAttribute(
@@ -137,7 +167,7 @@ describe('ExperiencePage', () => {
   });
 
   it('has no gift entry while gifts are off, and keeps the private-session one', () => {
-    render(<ExperiencePage view={kidsClass} />);
+    render(<ExperiencePage dates={dates} view={kidsClass} />);
     expect(
       screen.queryByRole('link', { name: 'Give this as a gift' }),
     ).not.toBeInTheDocument();
@@ -147,24 +177,24 @@ describe('ExperiencePage', () => {
   });
 
   it('names who each of two prices is for', () => {
-    render(<ExperiencePage view={kidsClass} />);
+    render(<ExperiencePage dates={dates} view={kidsClass} />);
     expect(screen.getByText('per adult')).toBeInTheDocument();
     expect(screen.getByText('per child')).toBeInTheDocument();
     expect(screen.getByText('Free')).toBeInTheDocument();
   });
 
   it('leaves out each section with nothing to say, and keeps the cancellation terms', () => {
-    render(<ExperiencePage view={bareExperience} />);
+    render(<ExperiencePage dates={dates} view={bareExperience} />);
     expect(
       screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent),
-    ).toEqual(['Your host', 'Cancellation']);
+    ).toEqual(['Upcoming dates', 'Your host', 'Cancellation']);
     expect(
       screen.getByText(/Free cancellation up to 24 hours before start/),
     ).toBeInTheDocument();
   });
 
   it('shows the gallery placeholder when there is no photo', () => {
-    render(<ExperiencePage view={bareExperience} />);
+    render(<ExperiencePage dates={dates} view={bareExperience} />);
     expect(screen.getByText('Photos are on their way')).toBeInTheDocument();
   });
 });

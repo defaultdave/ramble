@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import type { Category, Neighborhood } from '../catalog';
-import { demoCheckoutPath } from '../demoCheckout';
 import {
   ageLabel,
   buildExperiencePage,
@@ -9,9 +8,7 @@ import {
   galleryGridPhotos,
   galleryView,
   includedItems,
-  mapsHref,
   maxIncludedItems,
-  maxMapsQueryLength,
   maxMetaDescriptionLength,
   metaDescription,
   placeOf,
@@ -32,6 +29,7 @@ import type { GuestPhoto } from '../photos';
 // - the included list is one row per line, blank lines dropped, at most the limit
 // - a guide entry is not this page; a bookable one shows its facts in order and leaves out what it does not have
 // - the badges: outdoor, 21+, kids; each only when it applies
+// - the streamed dates are handed the experience and only the price fields they read
 // - gifts switched off leave the gift entry out; the private-session entry stays
 // - the gallery is in the order staff set; a blank text section is left out
 // - the gallery layout follows the photo count (none, one, two, three, many); only the first photo leads; each photo of a set says its place and a lone one says nothing; "See all" and the photos behind it appear only past the grid
@@ -55,6 +53,7 @@ const build = (overrides: Partial<ExperiencePageInput> = {}) =>
     photos: [],
     place,
     giftsEnabled: true,
+    bookingsPaused: false,
     ...overrides,
   });
 
@@ -211,88 +210,6 @@ describe('placeOf', () => {
   });
 });
 
-describe('mapsHref', () => {
-  it('searches the first sentence of the meeting point, in New York', () => {
-    expect(
-      mapsHref(
-        'Pier 26 boathouse, Tribeca. The exact door is in your confirmation.',
-      ),
-    ).toBe(
-      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('Pier 26 boathouse, Tribeca, New York')}`,
-    );
-  });
-
-  it('drops the full stop of a single sentence', () => {
-    expect(mapsHref('Wheelhouse Kids Studio, Williamsburg.')).toContain(
-      encodeURIComponent('Wheelhouse Kids Studio, Williamsburg, New York'),
-    );
-  });
-
-  it('encodes what would otherwise end the query', () => {
-    expect(mapsHref('A&B #1')).toContain(
-      encodeURIComponent('A&B #1, New York'),
-    );
-  });
-
-  const searchFor = (place: string) =>
-    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${place}, New York`)}`;
-
-  it.each([
-    ['W. 23rd St. The door is on the left.', 'W. 23rd St'],
-    ['St. Marks Pl', 'St. Marks Pl'],
-    ['St. Marks Pl. Ring the bell.', 'St. Marks Pl'],
-    ['Meet at St. Marks Pl', 'Meet at St. Marks Pl'],
-    ['Meet at St. Marks Pl. Ring the bell.', 'Meet at St. Marks Pl'],
-    ['Near St. Marks Pl', 'Near St. Marks Pl'],
-    ['Pier 57, St. Johns Pl', 'Pier 57, St. Johns Pl'],
-    ['Hudson St. The door is on the left.', 'Hudson St'],
-    ['Park Ave. Meet at the gate.', 'Park Ave'],
-    ['Union Sq. Meet at the fountain.', 'Union Sq'],
-    ['Meet at Gate B. The desk is open.', 'Meet at Gate B'],
-    ['Bleecker St. and Mott St. Ring bell.', 'Bleecker St. and Mott St'],
-    ['Ave. B and E 4th St.', 'Ave. B and E 4th St'],
-    // Pinned limit: a single letter after a street reads as "Ave. B", so the note stays in.
-    ['Hudson St. A door', 'Hudson St. A door'],
-    ['Ave. B', 'Ave. B'],
-    ['Pier 26. A guide will wait there.', 'Pier 26'],
-    ['The Cloisters. A staff member opens at 9.', 'The Cloisters'],
-    ["Central Park Zoo. I'm in a red hat.", 'Central Park Zoo'],
-    ['Pier 26. 5 minutes early please', 'Pier 26'],
-    ['Pier 26. 4 people wait.', 'Pier 26'],
-    ['Park Ave. 5 is closed', 'Park Ave'],
-    ['Ave. 5 is closed', 'Ave. 5 is closed'],
-    // Pinned limit: a lowercase next word reads as the same sentence, so this note stays in.
-    ['Hudson St. use the side door', 'Hudson St. use the side door'],
-    ['Meet at 10 Ave. B', 'Meet at 10 Ave. B'],
-    ['Pier 57, 25 11th Ave. Meet at the gate.', 'Pier 57, 25 11th Ave'],
-    ['Gate 5. Meet at the sign.', 'Gate 5'],
-    ['Pier 26! Look for the flag.', 'Pier 26'],
-    ['Where is it? Pier 26.', 'Where is it'],
-    [
-      'Pier 26, Tribeca\nThe exact door is in your confirmation.',
-      'Pier 26, Tribeca',
-    ],
-    ['Pier 26, \t Tribeca. Ring the bell.', 'Pier 26, Tribeca'],
-    ['Pier   26 \t Tribeca', 'Pier 26 Tribeca'],
-    ['123 Main St.', '123 Main St'],
-  ])('searches the first real sentence of %j', (text, place) => {
-    expect(mapsHref(text)).toBe(searchFor(place));
-  });
-
-  it('refuses a first sentence that is long before whitespace collapses, without walking on', () => {
-    expect(mapsHref(`${'a '.repeat(maxMapsQueryLength * 2)}end.`)).toBeNull();
-  });
-
-  it.each([null, '', '   ', '. Only a note'])('makes none for %j', (text) => {
-    expect(mapsHref(text)).toBeNull();
-  });
-
-  it('takes a first sentence at the limit and refuses one past it', () => {
-    expect(mapsHref('a'.repeat(maxMapsQueryLength))).not.toBeNull();
-    expect(mapsHref('a'.repeat(maxMapsQueryLength + 1))).toBeNull();
-  });
-});
-
 describe('includedItems', () => {
   it('has none for no text', () => {
     expect(includedItems('')).toEqual([]);
@@ -404,8 +321,93 @@ describe('buildExperiencePage', () => {
     expect(build({ experience: experience(indoor) })?.badges).toEqual([]);
   });
 
-  it('books through the demo checkout with the experience id', () => {
-    expect(build()?.bookHref).toBe(demoCheckoutPath(id(1)));
+  it('hands the streamed dates the experience and only the price fields they read', () => {
+    expect(build()?.upcoming).toEqual({
+      experienceId: id(1),
+      priceOptions: [{ priceMinor: 6500, usesSpace: true }],
+    });
+  });
+
+  it('hands the booking choices what they need before the dates arrive', () => {
+    expect(build()?.booking).toEqual({
+      experienceId: id(1),
+      title: 'Sunset kayak on the Hudson',
+      options: [
+        { id: id(6), kind: 'adult', priceMinor: 6500, usesSpace: true },
+      ],
+      childAges: null,
+      ageNote: 'Ages 14 and up',
+      twentyOnePlus: false,
+      maxSeats: 6,
+      deviceSeatLimit: 6,
+      giftsEnabled: true,
+      paused: false,
+      checkoutBase: '/checkout/',
+      similarHref: '/new-york/things-to-do/outdoors',
+      privateSessionHref: '/contact',
+      fullRefundHoursBefore: 24,
+    });
+  });
+
+  it.each([
+    ['gifts off', { giftsEnabled: false }, { giftsEnabled: false }],
+    ['bookings paused', { bookingsPaused: true }, { paused: true }],
+  ] as const)(
+    'carries the switch for %s into the booking choices',
+    (_name, input, expected) => {
+      expect(build(input)?.booking).toMatchObject(expected);
+    },
+  );
+
+  it.each([
+    ['an age range', { ageRule: 'age_range', minAge: 5, maxAge: 10 }, 5, 10],
+    [
+      'a minimum age',
+      { ageRule: 'minimum_age', minAge: 12, maxAge: null },
+      12,
+      17,
+    ],
+  ] as const)(
+    'gives the ages a child may be for %s when a child price exists',
+    (_name, rule, min, max) => {
+      const child = {
+        id: id(7),
+        experienceId: id(1),
+        kind: 'child',
+        priceMinor: 4500,
+        usesSpace: true,
+      } as const;
+      const adult = { ...child, id: id(6), kind: 'adult' } as const;
+      expect(
+        build({
+          experience: experience({ ...rule, priceOptions: [adult, child] }),
+        })?.booking.childAges,
+      ).toEqual({ min, max });
+    },
+  );
+
+  it('offers no child ages without a child price, whatever the age rule', () => {
+    expect(
+      build({
+        experience: experience({
+          ageRule: 'all_ages',
+          minAge: null,
+          maxAge: null,
+        }),
+      })?.booking.childAges,
+    ).toBeNull();
+  });
+
+  it('marks a 21+ experience', () => {
+    expect(
+      build({
+        experience: experience({
+          ageRule: 'twenty_one_plus',
+          minAge: null,
+          maxAge: null,
+        }),
+      })?.booking,
+    ).toMatchObject({ twentyOnePlus: true, ageNote: '21 and over' });
   });
 
   it('goes to the gift checkout when gifts are on, and has no gift entry when they are off', () => {

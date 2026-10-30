@@ -4,9 +4,11 @@ import { tags } from '@/lib/cacheTags';
 import type { Category, Neighborhood } from '@/lib/catalog';
 import type { Collection, HomeModule } from '@/lib/editorial';
 import {
+  homePickIds,
   homeExperienceIds,
   homeLimits,
   thisWeekExperienceIds,
+  type HomePick,
 } from '@/lib/pages/home';
 import type { CardExperience } from '@/lib/experienceCards';
 import { upcomingWindow } from '@/lib/sessionWindow';
@@ -15,13 +17,13 @@ import { listCategories, listNeighborhoods } from '@/server/db/catalog';
 import {
   getPublishedGiftGuide,
   listHomeModules,
-  listPublishedPicks,
+  listHomePicks,
 } from '@/server/db/editorial';
 import { listHomeExperiences, listThisWeekSessions } from '@/server/db/home';
 
 export type HomeContent = {
   modules: HomeModule[];
-  picks: Collection[];
+  picks: HomePick[];
   giftGuide: Collection | null;
   categories: Category[];
   neighborhoods: Neighborhood[];
@@ -38,10 +40,13 @@ export async function getHomeContent(): Promise<HomeContent> {
   cacheLife('editorial');
   cacheTag(tags.home, tags.catalog);
   const content = await readOrRefuse('Home', async () => {
-    const [modules, picks, giftGuide, categories, neighborhoods] =
+    // The Picks wait for the modules, which say which ones to read; the rest read beside them.
+    const [{ modules, picks }, giftGuide, categories, neighborhoods] =
       await Promise.all([
-        listHomeModules(),
-        listPublishedPicks(),
+        listHomeModules().then(async (listed) => ({
+          modules: listed,
+          picks: await listHomePicks(homePickIds(listed)),
+        })),
         getPublishedGiftGuide(),
         listCategories(),
         listNeighborhoods(),

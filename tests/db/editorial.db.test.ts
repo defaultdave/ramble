@@ -11,6 +11,7 @@ import {
   vi,
 } from 'vitest';
 import { editorialLimits } from '@/lib/editorial';
+import { homeLimits } from '@/lib/pages/home';
 import { ForbiddenError, Role, anonymousCaller } from '@/server/auth/caller';
 import { testCaller } from '@/server/auth/test-caller';
 import {
@@ -44,6 +45,7 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 // - a published legal version cannot be edited, deleted, re-keyed, or published under a newer one;
 //   an acceptance names a published version only, is unique per subject and version, and never changes
 // - an experience can name a legal document as its waiver, and an unknown one is refused
+// - the home Picks read finds the Picks it is asked for however many others are published, reads their first entries and a count of the rest, and never the intro
 // - guest reads return published content only; collection entries a guest cannot see are left out;
 //   a home module whose collection is a draft is left out; a malformed key is null
 // - a stored document that needs repair is repaired on read
@@ -1051,51 +1053,86 @@ describe('guest reads', () => {
   describe('collections', () => {
     const published = unique('read-pick');
     const draft = unique('read-draft');
+    let publishedId: string;
+    let draftId: string;
+    let emptyId: string;
 
     beforeAll(async () => {
-      await saved(
-        editorial.saveCollection(
-          ops,
-          collectionInput({
-            slug: published,
-            title: 'Published',
-            status: 'published',
-            intro: doc('Intro'),
-            items: [
-              { experienceId: guideId, note: 'Second on the list' },
-              { experienceId: draftExperienceId, note: null },
-              { experienceId: liveId, note: null },
-              { experienceId: pausedExperienceId, note: null },
-            ],
-          }),
-        ),
-      );
-      await saved(
-        editorial.saveCollection(ops, collectionInput({ slug: draft })),
-      );
+      publishedId = (
+        await saved(
+          editorial.saveCollection(
+            ops,
+            collectionInput({
+              slug: published,
+              title: 'Published',
+              status: 'published',
+              intro: doc('Intro'),
+              items: [
+                { experienceId: guideId, note: 'Second on the list' },
+                { experienceId: draftExperienceId, note: null },
+                { experienceId: liveId, note: null },
+                { experienceId: pausedExperienceId, note: null },
+              ],
+            }),
+          ),
+        )
+      ).value.id;
+      draftId = (
+        await saved(
+          editorial.saveCollection(ops, collectionInput({ slug: draft })),
+        )
+      ).value.id;
+      emptyId = (
+        await saved(
+          editorial.saveCollection(
+            ops,
+            collectionInput({
+              status: 'published',
+              items: [{ experienceId: draftExperienceId, note: null }],
+            }),
+          ),
+        )
+      ).value.id;
     });
 
-    it('lists a published pick with only the entries a guest can see, in order', async () => {
-      const picks = await editorial.listPublishedPicks();
+    it('reads a published pick by ID with only the entries a guest can see, in order, and their count', async () => {
+      const [pick] = await editorial.listHomePicks([publishedId]);
 
-      const pick = picks.find((entry) => entry.slug === published);
-      expect(pick).toMatchObject({
-        kind: 'pick',
-        status: 'published',
-        intro: doc('Intro'),
-        items: [
-          { experienceId: guideId, note: 'Second on the list' },
-          { experienceId: liveId, note: null },
-        ],
+      expect(pick).toEqual({
+        id: publishedId,
+        slug: published,
+        title: 'Published',
+        summary: null,
+        itemCount: 2,
+        experienceIds: [guideId, liveId],
       });
-      expect(pick?.publishedAt).toBeInstanceOf(Date);
+      expect(pick).not.toHaveProperty('intro');
     });
 
-    it('leaves out a draft pick and the gift guide', async () => {
-      const picks = await editorial.listPublishedPicks();
+    it('leaves out a draft pick and an ID nothing has', async () => {
+      const picks = await editorial.listHomePicks([draftId, uuid(404)]);
 
-      expect(picks.map((pick) => pick.slug)).not.toContain(draft);
-      expect(picks.every((pick) => pick.kind === 'pick')).toBe(true);
+      expect(picks).toEqual([]);
+    });
+
+    it('reads nothing for no IDs', async () => {
+      expect(await editorial.listHomePicks([])).toEqual([]);
+    });
+
+    it('refuses more IDs than the home page has modules, and an ID that is not one', async () => {
+      const tooMany = Array.from(
+        { length: editorialLimits.homeModules + 1 },
+        (_, n) => uuid(n + 1),
+      );
+
+      await expect(editorial.listHomePicks(tooMany)).rejects.toThrow(ZodError);
+      await expect(editorial.listHomePicks(['nope'])).rejects.toThrow(ZodError);
+    });
+
+    it('reads a pick with no visible entry as an empty one', async () => {
+      const [pick] = await editorial.listHomePicks([emptyId]);
+
+      expect(pick).toMatchObject({ itemCount: 0, experienceIds: [] });
     });
 
     it.each([
@@ -2518,5 +2555,63 @@ describe('the publish lookup in publishLegalDocument', () => {
         await legal.publishLegalDocument(ops, await idOf(key, version)),
       ).toEqual({ status: 'superseded' });
     }
+  });
+});
+
+describe('the home Picks read when many Picks are published', () => {
+  const crowd = unique('crowd');
+
+  afterAll(async () => {
+    await client.db
+      .delete(collections)
+      .where(sql`${collections.slug} like ${`${crowd}-%`}`);
+  });
+
+  it('finds a named pick past the list limit, with the first entries and the full count, and no intro', async () => {
+    const experienceIds = [];
+    for (let n = 0; n < homeLimits.picksCandidates + 3; n += 1) {
+      experienceIds.push((await insertExperience('live')).id);
+    }
+    const named = await saved(
+      editorial.saveCollection(
+        ops,
+        collectionInput({
+          slug: `${crowd}-named`,
+          // Sorts last by title, so a read capped at the list limit would cut it off.
+          title: 'zzzz named',
+          status: 'published',
+          intro: doc('A long intro'),
+          items: experienceIds.map((experienceId) => ({
+            experienceId,
+            note: null,
+          })),
+        }),
+      ),
+    );
+    await client.db.insert(collections).values(
+      Array.from({ length: editorialLimits.listed + 1 }, (_, n) => ({
+        kind: 'pick' as const,
+        slug: `${crowd}-${String(n)}`,
+        title: `Crowd ${String(n).padStart(3, '0')}`,
+        status: 'published' as const,
+        publishedAt: new Date(),
+      })),
+    );
+
+    const [pick, ...others] = await editorial.listHomePicks([named.value.id]);
+
+    expect(others).toEqual([]);
+    expect(pick?.id).toBe(named.value.id);
+    expect(pick?.itemCount).toBe(experienceIds.length);
+    expect(pick?.experienceIds).toEqual(
+      experienceIds.slice(0, homeLimits.picksCandidates),
+    );
+    expect(pick).not.toHaveProperty('intro');
+    expect(pick).not.toHaveProperty('items');
+
+    // The same shared read in its full shape keeps the intro and every entry.
+    const full = await editorial.getPublishedPick(`${crowd}-named`);
+    expect(full?.items).toHaveLength(experienceIds.length);
+    expect(full?.intro).toEqual(doc('A long intro'));
   });
 });

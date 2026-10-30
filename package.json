@@ -16,6 +16,7 @@
     "postinstall": "next typegen || echo 'next typegen failed; lint and typecheck run it again'",
     "dev": "next dev",
     "build": "next build",
+    "build:profile": "next build --profile",
     "start": "next start",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

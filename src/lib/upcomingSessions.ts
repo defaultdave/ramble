@@ -90,7 +90,8 @@ export type UpcomingSessionsInput = {
   sessions: readonly SessionWithSpaces[];
   priceOptions: readonly CardPriceOption[];
   selectedDate: string | null;
-  bookHref: string;
+  /** The experience page's own address; an open row links to it with its date, which the booking choices preselect. */
+  pageHref: string;
 };
 
 /** The date the address asks for (`?date=YYYY-MM-DD`, as the checkout's links send it), or null when absent, repeated, or not a real date. */
@@ -107,7 +108,7 @@ export function buildUpcomingSessions({
   sessions,
   priceOptions,
   selectedDate,
-  bookHref,
+  pageHref,
 }: UpcomingSessionsInput): UpcomingSessionsView {
   const priceLabel = cardPriceLabel(priceOptions);
   const rows = sessions
@@ -117,6 +118,9 @@ export function buildUpcomingSessions({
     .slice(0, upcomingSessionLimits.maxRows)
     .map(({ session, spacesLeft }): SessionRowView => {
       const status = spacesStatus(spacesLeft);
+      const date = calendarDateFormat(session.timeZone).format(
+        session.startsAt,
+      );
       return {
         id: session.id,
         dayLabel: zonedShortDayLabel(session.startsAt, session.timeZone),
@@ -124,11 +128,11 @@ export function buildUpcomingSessions({
         spacesLabel: spacesLabel(spacesLeft),
         status,
         priceLabel,
-        selected:
-          selectedDate !== null &&
-          calendarDateFormat(session.timeZone).format(session.startsAt) ===
-            selectedDate,
-        href: status === 'sold-out' ? null : bookHref,
+        selected: selectedDate !== null && date === selectedDate,
+        href:
+          status === 'sold-out'
+            ? null
+            : `${pageHref}?${browseParamNames.date}=${date}`,
       };
     });
   return rows.length === 0 ? { kind: 'none' } : { kind: 'rows', rows };

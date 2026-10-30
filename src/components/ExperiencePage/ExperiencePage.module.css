@@ -223,11 +223,6 @@
   overflow-wrap: anywhere;
 }
 
-.action {
-  display: flex;
-  align-self: flex-start;
-}
-
 .entries {
   display: flex;
   flex-direction: column;

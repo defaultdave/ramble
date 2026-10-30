@@ -74,7 +74,6 @@ export default async function ExperienceRoute({
         <Suspense fallback={<UpcomingSessionsSkeleton />}>
           <UpcomingSessionsContent
             upcoming={view.upcoming}
-            bookHref={view.bookHref}
             searchParams={searchParams}
             retryHref={experiencePath(address)}
           />

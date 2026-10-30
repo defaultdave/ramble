@@ -15,7 +15,6 @@ import { readUpcomingSessions } from '@/server/upcomingSessions';
 
 type UpcomingSessionsContentProps = {
   upcoming: ExperiencePageView['upcoming'];
-  bookHref: string;
   /** Not awaited by the page, so only this streamed part waits for the address's query. */
   searchParams: Promise<RawSearchParams>;
   retryHref: string;
@@ -24,7 +23,6 @@ type UpcomingSessionsContentProps = {
 /** The streamed upcoming dates: the next sessions of the experience with the spaces left in each. */
 export async function UpcomingSessionsContent({
   upcoming,
-  bookHref,
   searchParams,
   retryHref,
 }: UpcomingSessionsContentProps) {
@@ -48,7 +46,7 @@ export async function UpcomingSessionsContent({
         sessions,
         priceOptions: upcoming.priceOptions,
         selectedDate,
-        bookHref,
+        pageHref: retryHref,
       })}
     />
   );

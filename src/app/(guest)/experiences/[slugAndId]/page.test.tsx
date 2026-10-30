@@ -145,7 +145,6 @@ describe('the experience route', () => {
         experienceId: id(1),
         priceOptions: [{ priceMinor: 6500, usesSpace: true }],
       },
-      bookHref: expect.stringContaining('/checkout/') as string,
       searchParams,
       retryHref: `/experiences/${address}`,
     });

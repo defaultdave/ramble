@@ -25,7 +25,7 @@ import {
 // - the row whose date (on the session's calendar, not UTC) is the one in the address is selected, and no other
 // - the address's date is read only when it is one real calendar date
 
-const bookHref = '/checkout/demo';
+const pageHref = '/experiences/sunset-kayak-1';
 const at = (iso: string): SessionWithSpaces['session'] => ({
   id: id(10),
   startsAt: new Date(iso),
@@ -45,7 +45,7 @@ const input = (
   sessions: [entry(8)],
   priceOptions: [{ priceMinor: 6500, usesSpace: true }],
   selectedDate: null,
-  bookHref,
+  pageHref,
   ...overrides,
 });
 function rowsOf(view: ReturnType<typeof buildUpcomingSessions>) {
@@ -103,7 +103,11 @@ describe('buildUpcomingSessions', () => {
         }),
       ),
     );
-    expect(rows.map((row) => row.href)).toEqual([null, bookHref, bookHref]);
+    expect(rows.map((row) => row.href)).toEqual([
+      null,
+      `${pageHref}?date=2026-10-24`,
+      `${pageHref}?date=2026-10-24`,
+    ]);
     expect(rows.map((row) => row.status)).toEqual([
       'sold-out',
       'few-left',

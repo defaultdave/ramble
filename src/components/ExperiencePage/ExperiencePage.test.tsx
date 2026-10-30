@@ -153,14 +153,6 @@ describe('ExperiencePage', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('has a Book link to the checkout with the experience', () => {
-    render(<ExperiencePage dates={dates} view={sunsetKayak} />);
-    expect(screen.getByRole('link', { name: 'Book' })).toHaveAttribute(
-      'href',
-      sunsetKayak.bookHref,
-    );
-  });
-
   it('goes to the gift checkout and to contact for a private session', () => {
     render(<ExperiencePage dates={dates} view={sunsetKayak} />);
     expect(

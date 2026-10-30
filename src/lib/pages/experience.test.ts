@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import type { Category, Neighborhood } from '../catalog';
-import { demoCheckoutPath } from '../demoCheckout';
 import {
   ageLabel,
   buildExperiencePage,
@@ -378,10 +377,6 @@ describe('buildExperiencePage', () => {
       })?.badges,
     ).toEqual([{ tone: 'yellow', label: 'Kids' }]);
     expect(build({ experience: experience(indoor) })?.badges).toEqual([]);
-  });
-
-  it('books through the demo checkout with the experience id', () => {
-    expect(build()?.bookHref).toBe(demoCheckoutPath(id(1)));
   });
 
   it('hands the streamed dates the experience and only the price fields they read', () => {

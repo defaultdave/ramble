@@ -7,7 +7,6 @@ import {
 } from '../catalog';
 import { MAX_FULL_REFUND_HOURS } from '../cancellation';
 import { childAgeAllowed } from '../checkout';
-import { demoCheckoutPath } from '../demoCheckout';
 import { presentText, textLines } from '../displayText';
 import { holdLimits } from '../holds';
 import { mapsHref } from '../maps';
@@ -293,8 +292,6 @@ export type ExperiencePageView = {
   /** Goes to the gift checkout, or null while gifts are switched off. */
   giftHref: string | null;
   booking: BookingBasics;
-  /** Goes to the checkout. TODO(U-041): remove the demo click-through when the checkout page lands. */
-  bookHref: string;
   privateSessionHref: string;
 };
 
@@ -418,7 +415,6 @@ export function buildExperiencePage(
       privateSessionHref: privateSessionPath,
       fullRefundHoursBefore: experience.cancellationTier.fullRefundHoursBefore,
     },
-    bookHref: demoCheckoutPath(experience.id),
     privateSessionHref: privateSessionPath,
   };
 }

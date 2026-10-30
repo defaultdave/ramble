@@ -119,12 +119,6 @@ export function ExperiencePage({ view, dates, booking }: ExperiencePageProps) {
 
         <Section heading="Upcoming dates">{dates}</Section>
 
-        <div className={styles.action}>
-          <ButtonLink href={view.bookHref} variant="primary" size="lg">
-            Book
-          </ButtonLink>
-        </div>
-
         {view.about.length > 0 ? (
           <Section heading="About">
             <div className={styles.prose}>

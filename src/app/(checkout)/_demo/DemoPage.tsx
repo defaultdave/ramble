@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { PageHeading } from '@/components/PageHeading';
 import styles from './DemoPage.module.css';
 
-// TODO(U-047b): replaced by the checkout page's own layout.
 export function DemoPage({
   title,
   children,

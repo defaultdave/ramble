@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   StartPaymentInputSchema,
   acceptedDocumentIds,
+  ageRequirements,
   alreadyConfirmedResult,
   amountDueNow,
   attendeeIssues,
@@ -1243,5 +1244,55 @@ describe('the newsletter consent', () => {
       source: 'checkout',
     });
     expect(newsletterConsent('g1', false)).toBeNull();
+  });
+});
+
+describe('ageRequirements', () => {
+  const rule = (
+    ageRule: 'all_ages' | 'minimum_age' | 'age_range' | 'twenty_one_plus',
+    minAge: number | null,
+    maxAge: number | null,
+  ) => ({
+    ageRule,
+    minAge,
+    maxAge,
+  });
+
+  it.each([
+    [rule('all_ages', null, null), null],
+    [
+      rule('twenty_one_plus', null, null),
+      'Everyone in my party is 21 or older',
+    ],
+    [
+      rule('minimum_age', 14, null),
+      'Everyone is 14 or older, and anyone under 18 comes with an adult',
+    ],
+    [rule('minimum_age', 18, null), 'Everyone in my party is 18 or older'],
+    [
+      rule('age_range', 6, 12),
+      'Everyone in my party is between 6 and 12 years old',
+    ],
+  ])('words the confirmation for %j', (subject, label) => {
+    expect(ageRequirements(subject, 0).confirmation).toBe(label);
+  });
+
+  it('asks nothing of a party with no children', () => {
+    expect(ageRequirements(rule('all_ages', null, null), 0)).toEqual({
+      confirmation: null,
+      childAges: null,
+      guardian: false,
+    });
+  });
+
+  it.each([
+    [rule('all_ages', null, null), { count: 2, min: 0, max: 17 }],
+    [rule('minimum_age', 8, null), { count: 2, min: 8, max: 17 }],
+    [rule('age_range', 6, 12), { count: 2, min: 6, max: 12 }],
+    [rule('age_range', 6, 40), { count: 2, min: 6, max: 17 }],
+  ])('takes an age for each child, within the rule: %j', (subject, ages) => {
+    const needs = ageRequirements(subject, 2);
+    expect(needs.childAges).toEqual(ages);
+    expect(needs.guardian).toBe(true);
   });
 });

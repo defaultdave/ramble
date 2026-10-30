@@ -3,7 +3,7 @@ import { expect, test } from './fixtures';
 // The e2e server has no database behind it, so home and the experience page show their error states
 // and the Book link cannot be reached here; it is covered by the ExperiencePage component test. This
 // spec starts at the address that link builds and clicks through the rest.
-// TODO(U-047b): replaced when the real checkout and confirmation pages land.
+// TODO(U-041): remove with the demo click-through.
 
 const demoCheckout =
   '/checkout/00000000-0000-4000-8000-0000000000d1?experience=00000000-0000-4000-8000-000000000001';

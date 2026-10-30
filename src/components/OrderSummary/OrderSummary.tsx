@@ -33,6 +33,12 @@ type OrderSummaryBaseProps = Omit<
   totalMinor: number;
   /** The cancellation or validity line under the total. */
   terms: string;
+  /**
+   * Opt in to a summary that is open by itself from the tablet width (768px), by CSS alone. From
+   * there the toggle is out of the page's accessibility tree and tab order and the title shows as
+   * a plain heading; below it the toggle works as usual.
+   */
+  openFrom?: 'tablet';
 };
 
 export type BookingOrderSummaryProps = OrderSummaryBaseProps & {
@@ -51,7 +57,6 @@ export type GiftOrderSummaryProps = OrderSummaryBaseProps & {
 export type OrderSummaryProps =
   BookingOrderSummaryProps | GiftOrderSummaryProps;
 
-// TODO(U-047b): first caller, the checkout page; the confirmation page follows in U-048.
 export function OrderSummary(props: OrderSummaryProps) {
   if (props.kind === 'gift') {
     const { kind, recipientName, deliveryLabel, ...shell } = props;
@@ -91,6 +96,7 @@ function Shell({
   taxMinor,
   totalMinor,
   terms,
+  openFrom,
   ...rest
 }: ShellProps) {
   const baseId = useId();
@@ -107,7 +113,12 @@ function Shell({
   });
 
   return (
-    <div {...rest} className={styles.summary} data-kind={kind}>
+    <div
+      {...rest}
+      className={styles.summary}
+      data-kind={kind}
+      data-open-from={openFrom}
+    >
       <button
         type="button"
         className={styles.toggle}
@@ -140,6 +151,15 @@ function Shell({
           <ChevronDown className={styles.chevron} aria-hidden="true" />
         )}
       </button>
+      {openFrom ? (
+        <div className={styles.fixedHead}>
+          <span className={styles.text}>
+            <h2 className={styles.fixedTitle}>{title}</h2>
+            <span className={styles.meta}>{meta}</span>
+          </span>
+          <span className={styles.total}>{amounts.total}</span>
+        </div>
+      ) : null}
       <div id={detailsId} className={styles.details} hidden={!expanded}>
         <div className={styles.item}>
           <div className={styles.thumbnail}>{thumbnail}</div>

@@ -184,3 +184,34 @@
   font-size: var(--font-size-caption);
   line-height: var(--font-line-height-caption);
 }
+
+/* The head that stands in for the toggle when the summary opens by itself (`openFrom`). */
+.fixedHead {
+  display: none;
+  align-items: center;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+
+.fixedTitle {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  font-weight: var(--font-weight-semibold);
+}
+
+@media (min-width: 768px) {
+  /* `display: none` takes the toggle out of the accessibility tree and the tab order. */
+  .summary[data-open-from='tablet'] .toggle {
+    display: none;
+  }
+
+  .summary[data-open-from='tablet'] .fixedHead {
+    display: flex;
+  }
+
+  .summary[data-open-from='tablet'] .details[hidden] {
+    display: flex;
+  }
+}

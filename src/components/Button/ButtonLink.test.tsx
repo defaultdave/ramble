@@ -4,6 +4,17 @@ import { describe, expect, it } from 'vitest';
 import { ButtonLink } from './ButtonLink';
 
 describe('ButtonLink', () => {
+  it('is a plain download anchor, not a routed link, when it names a file', () => {
+    render(
+      <ButtonLink href="data:text/calendar,x" download="booking.ics">
+        Download
+      </ButtonLink>,
+    );
+    const link = screen.getByRole('link', { name: 'Download' });
+    expect(link).toHaveAttribute('download', 'booking.ics');
+    expect(link).toHaveAttribute('href', 'data:text/calendar,x');
+  });
+
   it('is a link to its address, named by its label', () => {
     render(<ButtonLink href="/new-york/browse">Clear all filters</ButtonLink>);
     expect(

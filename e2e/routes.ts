@@ -50,19 +50,13 @@ export const routes: readonly RouteRow[] = [
   },
   { path: '/contact', group: 'guest', heading: 'Contact', noindex: false },
   {
-    path: '/checkout/sample',
-    group: 'checkout',
-    heading: 'Checkout',
-    noindex: true,
-  },
-  {
     path: '/gifts/checkout/sample',
     group: 'checkout',
     heading: 'Gift checkout',
     noindex: true,
   },
   {
-    path: '/orders/sample',
+    path: '/orders/RMB-DEMO01',
     group: 'checkout',
     heading: 'Order confirmation',
     noindex: true,
@@ -142,3 +136,12 @@ export const experiencePaths = {
 export function expectedTitle(heading: string): string {
   return heading === 'Ramble' ? heading : `${heading} | Ramble`;
 }
+
+/** The checkout page reads a hold from the database, so its addresses are covered in `checkout.spec.ts`. */
+export const checkoutPaths = {
+  malformed: '/checkout/sample',
+  wellFormed: '/checkout/0b8f6c4e-2d1a-4f33-9a77-5d1e3c9b7a10',
+} as const;
+
+/** A device cookie of the shape the app mints: 43 characters of base64url. */
+export const deviceCookieValue = 'e2e-device-cookie-0123456789-abcdefghijkl_A';

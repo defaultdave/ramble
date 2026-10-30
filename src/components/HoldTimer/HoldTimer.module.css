@@ -8,7 +8,10 @@
   font-size: var(--font-size-label);
   line-height: var(--font-line-height-label);
   font-weight: var(--font-weight-semibold);
-  white-space: nowrap;
+  /* Shrinks and wraps beside the logo on a narrow phone, so a long time such as 59:59 never scrolls the page sideways. */
+  flex: 0 1 auto;
+  min-inline-size: 0;
+  text-align: start;
 }
 
 .running {

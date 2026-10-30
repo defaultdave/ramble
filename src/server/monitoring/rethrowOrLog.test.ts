@@ -37,6 +37,19 @@ describe('rethrowOrLog', () => {
     expect(logger.error).not.toHaveBeenCalled();
   });
 
+  it('rethrows the framework ending a prerender, even inside a driver error, and logs nothing', () => {
+    const wrapped = new Error('Failed query: select 1', {
+      cause: new Error(
+        'During prerendering, fetch() rejects when the prerender is complete.',
+      ),
+    });
+
+    expect(() => {
+      rethrowOrLog('Page failed', wrapped);
+    }).toThrow(wrapped);
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
   it('logs the message, the digest and the kind of an error with a digest', () => {
     const error = Object.assign(new TypeError('boom'), { digest: '1234567' });
 

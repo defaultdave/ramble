@@ -1,0 +1,48 @@
+.poller {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-status-info-bg);
+  color: var(--color-status-info-text);
+  font-family: var(--font-family-body);
+}
+
+.poller:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--font-size-heading-s);
+  line-height: var(--font-line-height-heading-s);
+  font-weight: var(--font-weight-semibold);
+}
+
+.body {
+  margin: 0;
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+}
+
+.spinner {
+  flex: none;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}

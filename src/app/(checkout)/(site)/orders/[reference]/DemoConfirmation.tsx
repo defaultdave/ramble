@@ -1,15 +1,12 @@
-import type { Metadata } from 'next';
 import { Alert } from '@/components/Alert';
 import { ButtonLink } from '@/components/Button';
 import { demoSummary } from '@/lib/demoCheckout';
 import { browsePath } from '@/lib/routes';
-import { DemoOrderSummary } from '../../_demo/DemoOrderSummary';
-import { DemoPage } from '../../_demo/DemoPage';
+import { DemoOrderSummary } from '../../../_demo/DemoOrderSummary';
+import { DemoPage } from '../../../_demo/DemoPage';
 
-export const metadata: Metadata = { title: 'Order confirmation' };
-
-// TODO(U-050): replaced by the confirmation page.
-export default function OrderConfirmationPage() {
+// TODO(U-041): goes with the demo checkout, which this is the end of.
+export function DemoConfirmation() {
   return (
     <DemoPage title="Order confirmation">
       <Alert

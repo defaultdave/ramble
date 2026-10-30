@@ -164,6 +164,60 @@ export function childAgeAllowed(subject: AgeSubject, age: number): boolean {
   }
 }
 
+export type AgeRequirements = {
+  /** The label of the confirmation checkbox, or null when the experience has no age limit. */
+  confirmation: string | null;
+  /** The ages the form takes for each child, or null when the party has no children. */
+  childAges: { count: number; min: number; max: number } | null;
+  /** Whether a guardian's name and contact are asked for. */
+  guardian: boolean;
+};
+
+function confirmationLabel(subject: AgeSubject): string | null {
+  switch (subject.ageRule) {
+    case 'all_ages':
+      return null;
+    case 'twenty_one_plus':
+      return 'Everyone in my party is 21 or older';
+    case 'minimum_age': {
+      const min = subject.minAge ?? 0;
+      return min >= 18
+        ? `Everyone in my party is ${String(min)} or older`
+        : `Everyone is ${String(min)} or older, and anyone under 18 comes with an adult`;
+    }
+    case 'age_range':
+      return `Everyone in my party is between ${String(subject.minAge ?? 0)} and ${String(subject.maxAge ?? 0)} years old`;
+  }
+}
+
+/**
+ * Which attendee fields and checkboxes checkout shows (design doc 4.3, `ageRule.requirements`).
+ * The range a child's age may take is read off `childAgeAllowed`, the rule `attendeeIssues`
+ * enforces, so what the form offers and what the server accepts cannot drift apart.
+ */
+export function ageRequirements(
+  subject: AgeSubject,
+  children: number,
+): AgeRequirements {
+  const confirmation = confirmationLabel(subject);
+  if (children === 0) {
+    return { confirmation, childAges: null, guardian: false };
+  }
+  const allowed = Array.from(
+    { length: orderLimits.maxChildAge + 1 },
+    (_, age) => age,
+  ).filter((age) => childAgeAllowed(subject, age));
+  return {
+    confirmation,
+    childAges: {
+      count: children,
+      min: allowed[0] ?? 0,
+      max: allowed.at(-1) ?? orderLimits.maxChildAge,
+    },
+    guardian: true,
+  };
+}
+
 /**
  * Age rules at checkout (PRD-23). An experience with any age limit needs the booker to confirm
  * every attendee meets it (`age_confirmed` true, 21+ included). The party's children each give an

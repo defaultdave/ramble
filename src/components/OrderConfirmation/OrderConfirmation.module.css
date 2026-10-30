@@ -1,0 +1,140 @@
+.page {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 40rem);
+  justify-content: center;
+  justify-items: stretch;
+  gap: var(--space-4);
+  padding: var(--space-8) var(--size-gutter);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  color: var(--color-text-primary);
+}
+
+.badge {
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  inline-size: var(--space-16);
+  block-size: var(--space-16);
+  border-radius: var(--radius-pill);
+  background: var(--color-status-success-bg);
+  color: var(--color-status-success-text);
+}
+
+.heading {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-heading-l);
+  line-height: var(--font-line-height-heading-l);
+  font-weight: var(--font-weight-semibold);
+}
+
+.sub {
+  margin: 0;
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.card,
+.next {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+}
+
+.next {
+  border-color: transparent;
+  background: var(--color-bg-sunken);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-heading-s);
+  line-height: var(--font-line-height-heading-s);
+  font-weight: var(--font-weight-semibold);
+}
+
+.meta,
+.where {
+  margin: 0;
+}
+
+.where {
+  color: var(--color-text-secondary);
+}
+
+.actions {
+  display: grid;
+  gap: var(--space-2);
+  margin-block-start: var(--space-2);
+}
+
+.lines {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.line,
+.totalLine {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.line dt,
+.totalLine dt {
+  margin: 0;
+}
+
+.line dd,
+.totalLine dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.totalLine {
+  padding-block-start: var(--space-2);
+  border-block-start: 1px solid var(--color-border-default);
+  font-weight: var(--font-weight-semibold);
+}
+
+.fine {
+  margin: 0;
+  font-size: var(--font-size-body-s);
+  line-height: var(--font-line-height-body-s);
+  color: var(--color-text-secondary);
+}
+
+.list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding-inline-start: var(--space-5);
+}
+
+/* A lone action fills the phone width and keeps its own width from tablet up. */
+.page > a {
+  justify-self: stretch;
+}
+
+@media (min-width: 768px) {
+  .heading {
+    font-size: var(--font-size-display-m);
+    line-height: var(--font-line-height-display-m);
+  }
+
+  .actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .page > a {
+    justify-self: center;
+  }
+}

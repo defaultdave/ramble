@@ -9,7 +9,6 @@ import {
 import { startCheckoutPayment } from '@/server/checkout';
 import { getDevice } from '@/server/device';
 
-// TODO(U-047b): first caller, the checkout page.
 /**
  * Turns the caller's open hold into an order and a live payment attempt, and hands back the
  * client secret to pay it with. Safe to call again: a second tab, a refresh, or a retry after a

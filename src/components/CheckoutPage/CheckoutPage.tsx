@@ -8,34 +8,23 @@ import {
   useReducer,
   useRef,
   useState,
-  type ChangeEvent,
   type ReactNode,
   type RefObject,
-  type SyntheticEvent,
 } from 'react';
 import { Alert } from '@/components/Alert';
 import { Button, ButtonLink } from '@/components/Button';
-import { Checkbox } from '@/components/Checkbox';
 import { FakePaymentForm } from '@/components/FakePaymentForm';
 import { Header } from '@/components/Header';
-import { Input } from '@/components/Input';
 import { OrderSummary } from '@/components/OrderSummary';
 import {
-  ageRequirements,
   type StartPaymentInput,
   type StartPaymentResult,
 } from '@/lib/checkout';
 import {
-  childAgeKeys,
-  errorMessage,
   firstErrorField,
   focusId,
   formIssues,
-  guardianKeys,
-  initialValues,
-  inputId,
   issueCount,
-  issueSummary,
   startPaymentInput,
   type FormValues,
 } from '@/lib/pages/checkoutForm';
@@ -54,12 +43,12 @@ import {
   type ReholdInput,
   type ReholdResult,
 } from '@/lib/pages/checkoutFlow';
-import { ageRangeHint, type CheckoutView } from '@/lib/pages/checkoutPage';
+import type { CheckoutView } from '@/lib/pages/checkoutPage';
 import type { FakeConfirmResult } from '@/lib/fakePayment';
 import type { FakeConfirmInput } from '@/lib/fakePaymentInput';
-import { formatMoney } from '@/lib/money';
 import { experiencePath, orderConfirmationPath } from '@/lib/routes';
 import styles from './CheckoutPage.module.css';
+import { CheckoutForm } from './CheckoutForm';
 import { CheckoutHoldTimer } from './CheckoutHoldTimer';
 
 export type CheckoutActions = {
@@ -77,11 +66,6 @@ export type CheckoutPageProps = {
   focusTitle?: boolean;
 };
 
-/** An error prop only when there is an error: the inputs take no explicit `undefined`. */
-function optionalError(text: string | undefined) {
-  return text === undefined ? {} : { errorText: text };
-}
-
 /**
  * The checkout page's one client island: the form state, the hold timer, and the payment form.
  * `startPayment` is called only from the guest's tap on Continue, never on load or refresh, so
@@ -95,7 +79,6 @@ export function CheckoutPage({
 }: CheckoutPageProps) {
   const router = useRouter();
   const [step, dispatch] = useReducer(checkoutReducer, initialStep);
-  const [values, setValues] = useState(() => initialValues(view));
   // Collapsed on a phone; from 768px the summary opens by itself (`openFrom`).
   const [summaryOpen, setSummaryOpen] = useState(false);
   // The panel that replaces the form (payment, ended, sold out): focus moves to it when it shows.
@@ -111,9 +94,6 @@ export function CheckoutPage({
     if (focusTitle) titleRef.current?.focus();
   }, [focusTitle]);
 
-  const needs = ageRequirements(view.ageSubject, view.children);
-  const childAges = needs.childAges;
-
   /** After the errors render, so the field that was wrong has its error text to announce. */
   function focusFirstInvalid(errors: Record<string, string>) {
     const first = firstErrorField(errors);
@@ -124,8 +104,7 @@ export function CheckoutPage({
     }
   }
 
-  async function submit(event: SyntheticEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function submit(values: FormValues) {
     if (!canSend(step)) return;
     const found = formIssues(values, view);
     if (issueCount(found) > 0) {
@@ -167,30 +146,7 @@ export function CheckoutPage({
     dispatch({ type: 'rehold_answered', result });
   }
 
-  function set<K extends keyof FormValues>(key: K, value: FormValues[K]) {
-    setValues((current) => ({ ...current, [key]: value }));
-  }
-
-  const text =
-    (
-      key:
-        | 'email'
-        | 'phone'
-        | 'leadGuestName'
-        | 'guardianName'
-        | 'guardianContact',
-    ) =>
-    (event: ChangeEvent<HTMLInputElement>) => {
-      set(key, event.target.value);
-    };
-  const ticked =
-    (key: 'newsletter' | 'ageConfirmed' | 'waiverAccepted' | 'termsAccepted') =>
-    (event: ChangeEvent<HTMLInputElement>) => {
-      set(key, event.target.checked);
-    };
-
   const errors = step.step === 'details' ? step.errors : {};
-  const message = (...keys: string[]) => errorMessage(errors, ...keys);
   const sending = step.step === 'details' && step.sending;
 
   return (
@@ -252,194 +208,13 @@ export function CheckoutPage({
                   dispatch({ type: 'connection_lost' });
                 }}
               >
-                <form
-                  className={styles.form}
-                  noValidate
-                  onSubmit={(event) => void submit(event)}
-                >
-                  <p role="status" className={styles.visuallyHidden}>
-                    {sending ? 'Getting your payment ready' : ''}
-                  </p>
-                  {step.step === 'details' && step.notice ? (
-                    <Alert tone="danger" title="Not sent" body={step.notice} />
-                  ) : null}
-
-                  <fieldset className={styles.group}>
-                    <legend className={styles.legend}>Contact</legend>
-                    <Input
-                      id={inputId('contact.email')}
-                      label="Email"
-                      type="email"
-                      inputMode="email"
-                      autoComplete="email"
-                      maxLength={254}
-                      hint="Your confirmation and any updates go here."
-                      value={values.email}
-                      {...optionalError(message('contact.email'))}
-                      onChange={text('email')}
-                    />
-                    <Input
-                      id={inputId('contact.phone')}
-                      label="Phone"
-                      optional
-                      type="tel"
-                      inputMode="tel"
-                      autoComplete="tel"
-                      maxLength={40}
-                      hint="Only for day-of changes from the host."
-                      value={values.phone}
-                      {...optionalError(message('contact.phone'))}
-                      onChange={text('phone')}
-                    />
-                    <Checkbox
-                      label="Send me the Ramble newsletter"
-                      description="One email on Sundays. Leave any time."
-                      checked={values.newsletter}
-                      onChange={ticked('newsletter')}
-                    />
-                  </fieldset>
-
-                  <fieldset className={styles.group}>
-                    <legend className={styles.legend}>Who&apos;s coming</legend>
-                    <Input
-                      id={inputId('leadGuestName')}
-                      label="Lead guest name"
-                      autoComplete="name"
-                      maxLength={120}
-                      value={values.leadGuestName}
-                      {...optionalError(message('leadGuestName'))}
-                      onChange={text('leadGuestName')}
-                    />
-                    {needs.confirmation === null ? null : (
-                      <Acceptance
-                        id={inputId('attendees.ageConfirmed')}
-                        label={needs.confirmation}
-                        checked={values.ageConfirmed}
-                        error={message('attendees.ageConfirmed')}
-                        onChange={ticked('ageConfirmed')}
-                      />
-                    )}
-                    {childAges === null ? null : (
-                      <>
-                        <div className={styles.ages}>
-                          {values.childAges.map((age, index) => (
-                            <Input
-                              // The ages are positional, one box per child, so the index is their identity.
-                              key={index}
-                              id={inputId(
-                                `attendees.childrenAges.${String(index)}`,
-                              )}
-                              label={`Child ${String(index + 1)} age`}
-                              inputMode="numeric"
-                              autoComplete="off"
-                              maxLength={2}
-                              {...(index === 0
-                                ? { hint: ageRangeHint(childAges) }
-                                : {})}
-                              value={age}
-                              {...optionalError(
-                                message(...childAgeKeys(index)),
-                              )}
-                              onChange={(event) => {
-                                set(
-                                  'childAges',
-                                  values.childAges.map((existing, at) =>
-                                    at === index
-                                      ? event.target.value
-                                      : existing,
-                                  ),
-                                );
-                              }}
-                            />
-                          ))}
-                        </div>
-                        <Input
-                          id={inputId('attendees.guardian.name')}
-                          label="Guardian name"
-                          autoComplete="off"
-                          maxLength={120}
-                          value={values.guardianName}
-                          {...optionalError(message(...guardianKeys.name))}
-                          onChange={text('guardianName')}
-                        />
-                        <Input
-                          id={inputId('attendees.guardian.contact')}
-                          label="Guardian phone or email"
-                          autoComplete="off"
-                          maxLength={254}
-                          hint="The adult who comes with the children."
-                          value={values.guardianContact}
-                          {...optionalError(message(...guardianKeys.contact))}
-                          onChange={text('guardianContact')}
-                        />
-                      </>
-                    )}
-                  </fieldset>
-
-                  {view.waiverDocument === null ? null : (
-                    <fieldset className={styles.group}>
-                      <legend className={styles.legend}>Host waiver</legend>
-                      <p className={styles.body}>
-                        {view.experience.hostName} asks every guest to accept
-                        its waiver.
-                      </p>
-                      <DocumentLink href={view.waiverDocument.href}>
-                        Read the waiver
-                      </DocumentLink>
-                      <Acceptance
-                        id={inputId('waiverDocumentId')}
-                        label="I accept the waiver for everyone in my party"
-                        checked={values.waiverAccepted}
-                        error={message('waiverDocumentId')}
-                        onChange={ticked('waiverAccepted')}
-                      />
-                    </fieldset>
-                  )}
-
-                  <fieldset className={styles.group}>
-                    <legend className={styles.legend}>Terms</legend>
-                    <DocumentLink href={view.termsDocument.href}>
-                      Read the terms
-                    </DocumentLink>
-                    <Acceptance
-                      id={inputId('termsDocumentId')}
-                      label="I accept Ramble's terms and the cancellation terms below"
-                      checked={values.termsAccepted}
-                      error={message('termsDocumentId')}
-                      onChange={ticked('termsAccepted')}
-                    />
-                  </fieldset>
-
-                  <div className={styles.total}>
-                    <div className={styles.totalRow}>
-                      <span>Total charged</span>
-                      <span className={styles.totalAmount}>
-                        {formatMoney(view.totalMinor)}
-                      </span>
-                    </div>
-                    <p className={styles.caption}>{view.cancellationLine}</p>
-                  </div>
-
-                  {issueCount(errors) > 0 ? (
-                    <Alert
-                      tone="danger"
-                      title="Check your details"
-                      body={issueSummary(issueCount(errors))}
-                    />
-                  ) : null}
-
-                  <div className={styles.actions}>
-                    <Button type="submit" size="lg" loading={sending}>
-                      {sending
-                        ? 'Getting payment ready'
-                        : 'Continue to payment'}
-                    </Button>
-                    <p className={styles.caption}>
-                      You choose a card or wallet on the next step. Nothing is
-                      charged until then.
-                    </p>
-                  </div>
-                </form>
+                <CheckoutForm
+                  view={view}
+                  errors={errors}
+                  sending={sending}
+                  notice={step.step === 'details' ? step.notice : null}
+                  onSubmit={(values) => void submit(values)}
+                />
               </Step>
             )}
           </div>
@@ -584,58 +359,4 @@ function Step({
         </div>
       );
   }
-}
-
-function Acceptance({
-  id,
-  label,
-  checked,
-  error,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  checked: boolean;
-  error: string | undefined;
-  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
-}) {
-  const errorId = `${id}-error`;
-  return (
-    <div>
-      <Checkbox
-        id={id}
-        label={label}
-        checked={checked}
-        onChange={onChange}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : undefined}
-      />
-      {error ? (
-        <p id={errorId} className={styles.error}>
-          {error}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function DocumentLink({
-  href,
-  children,
-}: {
-  href: string;
-  children: ReactNode;
-}) {
-  // A new tab, so the guest keeps what they typed.
-  return (
-    <a
-      className={styles.documentLink}
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      {children}
-      <span className={styles.visuallyHidden}> (opens in a new tab)</span>
-    </a>
-  );
 }

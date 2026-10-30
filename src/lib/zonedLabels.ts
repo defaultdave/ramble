@@ -1,7 +1,8 @@
 // An instant written as the host's wall clock. The zone is the session's own, so a guest in another
 // city reads the time the host will stand there. A zone that is not an IANA name throws a RangeError.
 
-type LabelKind = 'day' | 'time' | 'deadline';
+type LabelKind =
+  'day' | 'time' | 'deadline' | 'shortDay' | 'clock' | 'deadlineNoZone';
 
 const options: Record<LabelKind, Intl.DateTimeFormatOptions> = {
   day: { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' },
@@ -13,6 +14,15 @@ const options: Record<LabelKind, Intl.DateTimeFormatOptions> = {
     hour: 'numeric',
     minute: '2-digit',
     timeZoneName: 'short',
+  },
+  shortDay: { weekday: 'short', month: 'short', day: 'numeric' },
+  clock: { hour: 'numeric', minute: '2-digit' },
+  deadlineNoZone: {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
   },
 };
 
@@ -48,4 +58,22 @@ export function zonedTimeLabel(instant: Date, timeZone: string): string {
 /** "Sat, Nov 7, 2:00 PM EST", for a deadline in running text. */
 export function zonedDeadlineLabel(instant: Date, timeZone: string): string {
   return plain(formatter('deadline', timeZone).format(instant));
+}
+
+/** "Sat, Nov 7": the day in the zone, for a summary line that is not about a deadline. */
+export function zonedShortDayLabel(instant: Date, timeZone: string): string {
+  return plain(formatter('shortDay', timeZone).format(instant));
+}
+
+/** "2:00 PM": the clock time in the zone, without its name, where the page already says where it is. */
+export function zonedClockLabel(instant: Date, timeZone: string): string {
+  return plain(formatter('clock', timeZone).format(instant));
+}
+
+/** "Fri, Nov 6, 2:00 PM": a deadline in the zone, without the zone's name. */
+export function zonedDeadlineNoZoneLabel(
+  instant: Date,
+  timeZone: string,
+): string {
+  return plain(formatter('deadlineNoZone', timeZone).format(instant));
 }

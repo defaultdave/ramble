@@ -1,0 +1,4 @@
+/* A phone-width column, to see the header at 320px whatever the browser window is. */
+.narrow {
+  inline-size: 320px;
+}

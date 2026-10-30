@@ -80,10 +80,14 @@ describe('the checkout route group', () => {
   });
 
   it('names no Sentry host or loader in any module it loads', () => {
+    // The validated env module names the variable so the guest layout can read it, and loads no
+    // script. Only that name is allowed there; a Sentry host or loader is not.
+    const envModule = path.join(src, 'server', 'env.ts');
     const offenders = files.filter((file) =>
-      /sentry-cdn|ingest\.sentry|SENTRY_BROWSER_DSN/i.test(
-        readFileSync(file, 'utf8'),
-      ),
+      (file === envModule
+        ? /sentry-cdn|ingest\.sentry/i
+        : /sentry-cdn|ingest\.sentry|SENTRY_BROWSER_DSN/i
+      ).test(readFileSync(file, 'utf8')),
     );
 
     expect(offenders).toEqual([]);

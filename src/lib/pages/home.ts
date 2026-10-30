@@ -1,7 +1,12 @@
 import { z } from 'zod';
-import { EntityIdSchema, guestVisibleStatuses } from '../catalog';
+import { EntityIdSchema, guestVisibleStatuses, SlugSchema } from '../catalog';
 import type { Category, Neighborhood } from '../catalog';
-import type { Collection, HomeModule } from '../editorial';
+import {
+  collectionIdsOf,
+  editorialLimits,
+  type Collection,
+  type HomeModule,
+} from '../editorial';
 import {
   cardsInOrder,
   type CardExperience,
@@ -48,6 +53,30 @@ export const ThisWeekSessionSchema = z.object({
   seatsSold: z.int().nonnegative(),
 });
 export type ThisWeekSession = z.infer<typeof ThisWeekSessionSchema>;
+
+/**
+ * What a home Picks module reads of a Pick: its copy, how many entries a guest can see, and the
+ * first `picksCandidates` of them. Not the intro and not the other entries, which the home page
+ * never shows.
+ */
+export const HomePickSchema = z.object({
+  id: EntityIdSchema,
+  slug: SlugSchema,
+  title: z.string(),
+  summary: z.string().nullable(),
+  /** Every entry a guest can see, not only the ones read, for "See all N". */
+  itemCount: z.int().nonnegative(),
+  experienceIds: z.array(EntityIdSchema),
+});
+export type HomePick = z.infer<typeof HomePickSchema>;
+
+/** The Pick IDs one home read looks up: at most one per module. */
+export const HomePickIdsSchema = idListSchema(editorialLimits.homeModules);
+
+/** The Picks the modules name, each once: the only collections the home read looks up. */
+export function homePickIds(modules: readonly HomeModule[]): string[] {
+  return collectionIdsOf(modules.filter((module) => module.kind === 'picks'));
+}
 
 // ---- On this week ----
 
@@ -158,7 +187,7 @@ export type HomeModuleView =
 export type HomeInput = {
   /** The enabled modules in order, as the data layer reads them. */
   modules: readonly HomeModule[];
-  picks: readonly Collection[];
+  picks: readonly HomePick[];
   /** The published gift guide, which the gift guide module takes its copy from. */
   giftGuide: Collection | null;
   categories: readonly Category[];
@@ -188,23 +217,19 @@ export function collectionModuleCopy(
 
 function pickModuleIds(
   module: HomeModule,
-  picks: readonly Collection[],
+  picks: readonly HomePick[],
 ): string[] {
   if (module.kind !== 'picks' || module.collectionId === null) return [];
   const pick = picks.find(
     (collection) => collection.id === module.collectionId,
   );
-  return (
-    pick?.items
-      .slice(0, homeLimits.picksCandidates)
-      .map((item) => item.experienceId) ?? []
-  );
+  return pick?.experienceIds.slice(0, homeLimits.picksCandidates) ?? [];
 }
 
 /** The experiences the Picks modules might show, each once and at most `maxCardIds`, for one read by ID. */
 export function homeExperienceIds(
   modules: readonly HomeModule[],
-  picks: readonly Collection[],
+  picks: readonly HomePick[],
 ): string[] {
   return [
     ...new Set(modules.flatMap((module) => pickModuleIds(module, picks))),
@@ -268,7 +293,7 @@ function viewOf(
         cards,
         seeAll: {
           href: picksPath(pick.slug),
-          label: `See all ${String(pick.items.length)} picks`,
+          label: `See all ${String(pick.itemCount)} picks`,
         },
       };
     }

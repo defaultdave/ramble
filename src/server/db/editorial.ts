@@ -49,6 +49,12 @@ import {
 } from '@/lib/editorial';
 import type { Caller } from '@/server/auth/caller';
 import { updateTagsForChanges } from '@/server/cache/invalidate';
+import {
+  HomePickIdsSchema,
+  HomePickSchema,
+  homeLimits,
+  type HomePick,
+} from '@/lib/pages/home';
 import { guestVisible } from './catalog';
 import { db, dbRead } from './client';
 import {
@@ -108,12 +114,61 @@ async function readCollections(
 
 const publishedCollection = eq(collections.status, 'published');
 
-/** The published Ramble Picks, with the entries a guest can see. */
-export function listPublishedPicks(): Promise<Collection[]> {
-  return readCollections(
-    and(publishedCollection, eq(collections.kind, 'pick')),
-    true,
-  );
+/**
+ * The published Picks with these IDs, for the home modules that name them: the copy, the number
+ * of entries a guest can see, and the first `picksCandidates` of them. A Pick that is missing or
+ * still a draft is not in the answer. It never reads the intro or the entries past the cap, and
+ * how many other Picks are published does not change what it finds.
+ */
+export async function listHomePicks(
+  collectionIds: readonly string[],
+): Promise<HomePick[]> {
+  const ids = HomePickIdsSchema.parse(collectionIds);
+  if (ids.length === 0) return [];
+  // The window count is taken before the limit, so it counts every visible entry.
+  const firstEntries = dbRead
+    .select({
+      experienceId: collectionItems.experienceId,
+      position: collectionItems.position,
+      total: sql<number>`(count(*) over ())::int`.as('total'),
+    })
+    .from(collectionItems)
+    .innerJoin(experiences, eq(collectionItems.experienceId, experiences.id))
+    .where(and(eq(collectionItems.collectionId, collections.id), guestVisible))
+    .orderBy(asc(collectionItems.position), asc(collectionItems.experienceId))
+    .limit(homeLimits.picksCandidates)
+    .as('first_entries');
+  const entries = dbRead
+    .select({
+      experienceIds: sql<
+        string[]
+      >`coalesce(json_agg(${firstEntries.experienceId} order by ${firstEntries.position}, ${firstEntries.experienceId}), '[]'::json)`.as(
+        'experience_ids',
+      ),
+      total: sql<number>`coalesce(max(${firstEntries.total}), 0)`.as('total'),
+    })
+    .from(firstEntries)
+    .as('entries');
+  const rows = await dbRead
+    .select({
+      id: collections.id,
+      slug: collections.slug,
+      title: collections.title,
+      summary: collections.summary,
+      itemCount: entries.total,
+      experienceIds: entries.experienceIds,
+    })
+    .from(collections)
+    .leftJoinLateral(entries, sql`true`)
+    .where(
+      and(
+        inArray(collections.id, ids),
+        publishedCollection,
+        eq(collections.kind, 'pick'),
+      ),
+    )
+    .orderBy(asc(collections.title), asc(collections.id));
+  return HomePickSchema.array().parse(rows);
 }
 
 // TODO(U-036): first caller

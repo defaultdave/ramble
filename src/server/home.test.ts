@@ -5,6 +5,7 @@ import { getHomeContent, getThisWeek } from './home';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the home read uses the editorial profile and tags the home, the catalog, and each experience on a card
+// - the home read asks for the Picks its modules name, once each, and for no other
 // - the home read asks for the experiences its modules might show, and only those
 // - the this-week read uses the browse profile, reads the window of its key, and tags the catalog and each listed experience
 // - the this-week read looks up only the experiences with an open session, soonest first, and asks for their covers; the Picks experiences are read without covers
@@ -28,7 +29,7 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@/server/db/editorial', () => ({
   listHomeModules: db.modules,
-  listPublishedPicks: db.picks,
+  listHomePicks: db.picks,
   getPublishedGiftGuide: db.giftGuide,
 }));
 vi.mock('@/server/db/catalog', () => ({
@@ -55,7 +56,7 @@ beforeEach(() => {
     { id: id(901), kind: 'reassurance', collectionId: null },
   ]);
   db.picks.mockResolvedValue([
-    { id: id(800), items: [{ experienceId: id(1) }, { experienceId: id(2) }] },
+    { id: id(800), itemCount: 2, experienceIds: [id(1), id(2)] },
   ]);
   db.giftGuide.mockResolvedValue({ id: id(802), items: [] });
   db.categories.mockResolvedValue([]);
@@ -82,6 +83,20 @@ describe('getHomeContent', () => {
     const content = await getHomeContent();
 
     expect(content.giftGuide).toEqual({ id: id(802), items: [] });
+  });
+
+  it('reads the Picks its Picks modules name, once each, and not the gift guide collection', async () => {
+    db.modules.mockResolvedValue([
+      { id: id(900), kind: 'picks', collectionId: id(800) },
+      { id: id(901), kind: 'picks', collectionId: id(803) },
+      { id: id(902), kind: 'picks', collectionId: id(800) },
+      { id: id(903), kind: 'gift_guide', collectionId: id(802) },
+      { id: id(904), kind: 'picks', collectionId: null },
+    ]);
+
+    await getHomeContent();
+
+    expect(db.picks).toHaveBeenCalledExactlyOnceWith([id(800), id(803)]);
   });
 
   it('looks up the experiences the Picks modules might show, and no others', async () => {

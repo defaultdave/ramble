@@ -398,13 +398,18 @@ describe('the curated seed', () => {
   });
 
   it('shows the published Picks without the paused entry, and the gift guide', async () => {
-    const picks = await editorialReads.listPublishedPicks();
+    const picks = await client.db
+      .select({ slug: collections.slug })
+      .from(collections)
+      .where(
+        and(eq(collections.kind, 'pick'), eq(collections.status, 'published')),
+      );
     expect(picks.map((p) => p.slug).sort()).toEqual([
       'golden-hour',
       'rainy-day-sorted',
       'slow-saturday-mornings',
     ]);
-    const golden = picks.find((p) => p.slug === 'golden-hour');
+    const golden = await editorialReads.getPublishedPick('golden-hour');
     expect(golden?.items).toHaveLength(3);
     expect(golden?.items.map((i) => i.experienceId)).not.toContain(
       experienceId('winter-paddle-series'),

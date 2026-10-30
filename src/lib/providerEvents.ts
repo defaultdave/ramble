@@ -153,6 +153,11 @@ export function intakeResponse(outcome: IntakeOutcome): IntakeResponse {
   }
 }
 
+/** A delivery the intake took (2xx), as opposed to one it refused or asked to be repeated later. */
+export function isDeliveryTaken(status: number): boolean {
+  return status >= 200 && status < 300;
+}
+
 // -- Intake -----------------------------------------------------------------------------------
 
 /** What the payments port hands over for a verified delivery. */

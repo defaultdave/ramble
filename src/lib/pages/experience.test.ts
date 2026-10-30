@@ -4,7 +4,6 @@ import {
   ageLabel,
   buildExperiencePage,
   cancellationTerms,
-  childAgeRange,
   experienceHead,
   galleryGridPhotos,
   galleryView,
@@ -158,63 +157,6 @@ describe('cancellationTerms', () => {
     expect(
       cancellationTerms({ fullRefundHoursBefore: 24 * 365 }).fact,
     ).toContain('365 days');
-  });
-});
-
-describe('childAgeRange', () => {
-  const child = {
-    id: id(7),
-    experienceId: id(1),
-    kind: 'child',
-    priceMinor: 4500,
-    usesSpace: true,
-  } as const;
-  const adult = { ...child, id: id(6), kind: 'adult' } as const;
-
-  it.each([
-    [
-      'all ages',
-      { ageRule: 'all_ages', minAge: null, maxAge: null },
-      { min: 0, max: 17 },
-    ],
-    [
-      'a minimum age',
-      { ageRule: 'minimum_age', minAge: 12, maxAge: null },
-      { min: 12, max: 17 },
-    ],
-    [
-      'an age range',
-      { ageRule: 'age_range', minAge: 5, maxAge: 10 },
-      { min: 5, max: 10 },
-    ],
-    [
-      'a minimum age of an adult',
-      { ageRule: 'minimum_age', minAge: 18, maxAge: null },
-      null,
-    ],
-    [
-      '21 and over',
-      { ageRule: 'twenty_one_plus', minAge: null, maxAge: null },
-      null,
-    ],
-  ] as const)(
-    'gives the ages for %s, where a child price exists',
-    (_name, rule, range) => {
-      expect(childAgeRange({ ...rule, priceOptions: [adult, child] })).toEqual(
-        range,
-      );
-    },
-  );
-
-  it('is null without a child price', () => {
-    expect(
-      childAgeRange({
-        ageRule: 'all_ages',
-        minAge: null,
-        maxAge: null,
-        priceOptions: [adult],
-      }),
-    ).toBeNull();
   });
 });
 
@@ -397,6 +339,7 @@ describe('buildExperiencePage', () => {
       ageNote: 'Ages 14 and up',
       twentyOnePlus: false,
       maxSeats: 6,
+      deviceSeatLimit: 6,
       giftsEnabled: true,
       paused: false,
       checkoutBase: '/checkout/',
@@ -415,6 +358,45 @@ describe('buildExperiencePage', () => {
       expect(build(input)?.booking).toMatchObject(expected);
     },
   );
+
+  it.each([
+    ['an age range', { ageRule: 'age_range', minAge: 5, maxAge: 10 }, 5, 10],
+    [
+      'a minimum age',
+      { ageRule: 'minimum_age', minAge: 12, maxAge: null },
+      12,
+      17,
+    ],
+  ] as const)(
+    'gives the ages a child may be for %s when a child price exists',
+    (_name, rule, min, max) => {
+      const child = {
+        id: id(7),
+        experienceId: id(1),
+        kind: 'child',
+        priceMinor: 4500,
+        usesSpace: true,
+      } as const;
+      const adult = { ...child, id: id(6), kind: 'adult' } as const;
+      expect(
+        build({
+          experience: experience({ ...rule, priceOptions: [adult, child] }),
+        })?.booking.childAges,
+      ).toEqual({ min, max });
+    },
+  );
+
+  it('offers no child ages without a child price, whatever the age rule', () => {
+    expect(
+      build({
+        experience: experience({
+          ageRule: 'all_ages',
+          minAge: null,
+          maxAge: null,
+        }),
+      })?.booking.childAges,
+    ).toBeNull();
+  });
 
   it('marks a 21+ experience', () => {
     expect(

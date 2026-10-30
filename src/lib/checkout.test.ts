@@ -3,6 +3,7 @@ import {
   StartPaymentInputSchema,
   acceptedDocumentIds,
   ageRequirements,
+  allowedChildAges,
   alreadyConfirmedResult,
   amountDueNow,
   attendeeIssues,
@@ -1244,6 +1245,43 @@ describe('the newsletter consent', () => {
       source: 'checkout',
     });
     expect(newsletterConsent('g1', false)).toBeNull();
+  });
+});
+
+describe('allowedChildAges', () => {
+  it.each([
+    [
+      'all ages',
+      { ageRule: 'all_ages', minAge: null, maxAge: null },
+      { min: 0, max: 17 },
+    ],
+    [
+      'a minimum age',
+      { ageRule: 'minimum_age', minAge: 12, maxAge: null },
+      { min: 12, max: 17 },
+    ],
+    [
+      'an age range',
+      { ageRule: 'age_range', minAge: 5, maxAge: 10 },
+      { min: 5, max: 10 },
+    ],
+    [
+      'a range past 17',
+      { ageRule: 'age_range', minAge: 6, maxAge: 40 },
+      { min: 6, max: 17 },
+    ],
+    [
+      'a minimum age of an adult',
+      { ageRule: 'minimum_age', minAge: 18, maxAge: null },
+      null,
+    ],
+    [
+      '21 and over',
+      { ageRule: 'twenty_one_plus', minAge: null, maxAge: null },
+      null,
+    ],
+  ] as const)('gives the ages for %s', (_name, rule, range) => {
+    expect(allowedChildAges(rule)).toEqual(range);
   });
 });
 

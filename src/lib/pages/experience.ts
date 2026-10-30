@@ -6,11 +6,10 @@ import {
   type Neighborhood,
 } from '../catalog';
 import { MAX_FULL_REFUND_HOURS } from '../cancellation';
-import { childAgeAllowed } from '../checkout';
+import { allowedChildAges } from '../checkout';
 import { presentText, textLines } from '../displayText';
 import { holdLimits } from '../holds';
 import { mapsHref } from '../maps';
-import { orderLimits } from '../orders';
 import type { GuestPhoto } from '../photos';
 import { photoView, type PhotoView } from '../photoViews';
 import { perPersonAmount, type CardPriceOption } from '../pricing';
@@ -124,22 +123,6 @@ export function cancellationTerms(
     fact: `Free cancellation up to ${window} before`,
     detail: `Free cancellation up to ${window} before start. After that, no refund. ${refunded}`,
   };
-}
-
-/** The ages a child may be, or null when the experience takes no children: no child price, or an age rule that leaves no age under 18. */
-export function childAgeRange(
-  experience: AgeFields & Pick<GuestExperience, 'priceOptions'>,
-): { min: number; max: number } | null {
-  if (!experience.priceOptions.some((option) => option.kind === 'child')) {
-    return null;
-  }
-  const ages = Array.from(
-    { length: orderLimits.maxChildAge + 1 },
-    (_, age) => age,
-  ).filter((age) => childAgeAllowed(experience, age));
-  const min = ages[0];
-  const max = ages.at(-1);
-  return min === undefined || max === undefined ? null : { min, max };
 }
 
 // ---- Prices ----
@@ -404,10 +387,13 @@ export function buildExperiencePage(
           usesSpace,
         }),
       ),
-      childAges: childAgeRange(experience),
+      childAges: experience.priceOptions.some(({ kind }) => kind === 'child')
+        ? allowedChildAges(experience)
+        : null,
       ageNote: ageLabel(experience),
       twentyOnePlus: experience.ageRule === 'twenty_one_plus',
       maxSeats: holdLimits.maxSeats,
+      deviceSeatLimit: holdLimits.deviceSeatLimit,
       giftsEnabled,
       paused: bookingsPaused,
       checkoutBase: checkoutPath(''),

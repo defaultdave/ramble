@@ -145,8 +145,8 @@ export function childCount(
   );
 }
 
-/** Whether a child of `age` meets the experience's age rule: the one rule `attendeeIssues` enforces and the booking choices read. */
-export function childAgeAllowed(subject: AgeSubject, age: number): boolean {
+/** Whether a child of `age` meets the experience's age rule: the one rule `attendeeIssues` enforces, and `allowedChildAges` reads. */
+function childAgeAllowed(subject: AgeSubject, age: number): boolean {
   switch (subject.ageRule) {
     case 'all_ages':
       return true;
@@ -190,9 +190,22 @@ function confirmationLabel(subject: AgeSubject): string | null {
   }
 }
 
+/** The ages a child may be, lowest to highest, under the age rule; null when no age under 18 is allowed. */
+export function allowedChildAges(
+  subject: AgeSubject,
+): { min: number; max: number } | null {
+  const allowed = Array.from(
+    { length: orderLimits.maxChildAge + 1 },
+    (_, age) => age,
+  ).filter((age) => childAgeAllowed(subject, age));
+  const min = allowed[0];
+  const max = allowed.at(-1);
+  return min === undefined || max === undefined ? null : { min, max };
+}
+
 /**
  * Which attendee fields and checkboxes checkout shows (design doc 4.3, `ageRule.requirements`).
- * The range a child's age may take is read off `childAgeAllowed`, the rule `attendeeIssues`
+ * The range a child's age may take is read off `allowedChildAges`, the rule `attendeeIssues`
  * enforces, so what the form offers and what the server accepts cannot drift apart.
  */
 export function ageRequirements(
@@ -203,16 +216,13 @@ export function ageRequirements(
   if (children === 0) {
     return { confirmation, childAges: null, guardian: false };
   }
-  const allowed = Array.from(
-    { length: orderLimits.maxChildAge + 1 },
-    (_, age) => age,
-  ).filter((age) => childAgeAllowed(subject, age));
+  const allowed = allowedChildAges(subject);
   return {
     confirmation,
     childAges: {
       count: children,
-      min: allowed[0] ?? 0,
-      max: allowed.at(-1) ?? orderLimits.maxChildAge,
+      min: allowed?.min ?? 0,
+      max: allowed?.max ?? orderLimits.maxChildAge,
     },
     guardian: true,
   };

@@ -35,7 +35,7 @@ describe('tagsForChange', () => {
 
   it.each<[string, CacheChange, string[]]>([
     [
-      'a listing reaches its pages, its category and neighborhood listings, the catalog, and home',
+      'a listing reaches its pages, its category and neighborhood listings, and the catalog, but not home',
       listing,
       [
         'catalog',
@@ -43,9 +43,13 @@ describe('tagsForChange', () => {
         'category:outdoors',
         'experience:e1',
         'guide-entry:e1',
-        'home',
         'neighborhood:red-hook',
       ],
+    ],
+    [
+      'a rename of a category or neighborhood reaches the names and the catalog',
+      { kind: 'taxonomy' },
+      ['catalog', 'taxonomy'],
     ],
     [
       'a schedule change reaches the experience page only',

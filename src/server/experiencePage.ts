@@ -5,11 +5,8 @@ import { EntityIdSchema, type GuestExperience } from '@/lib/catalog';
 import { placeOf, type Place } from '@/lib/pages/experience';
 import type { GuestPhoto } from '@/lib/photos';
 import { readOrRefuse } from '@/server/cache/readOrRefuse';
-import {
-  getGuestExperience,
-  listCategories,
-  listNeighborhoods,
-} from '@/server/db/catalog';
+import { getGuestExperience } from '@/server/db/catalog';
+import { getFilterOptions } from '@/server/filterOptions';
 import { listGuestPhotos } from '@/server/db/photos';
 
 export type ExperiencePageData = {
@@ -21,7 +18,7 @@ export type ExperiencePageData = {
 /**
  * What the experience page reads, or null when no experience with this ID is visible to guests.
  * Publishing, editing, or taking the experience down reaches it through `tags.experience(id)`, and a
- * renamed category or neighborhood through `tags.catalog`. A miss is not kept (the `uncached` profile),
+ * renamed category or neighborhood through `tags.taxonomy`, which `getFilterOptions` hands to this entry. A miss is not kept (the `uncached` profile),
  * so made-up IDs fill nothing; a hidden experience costs one read per request.
  */
 export async function getExperiencePage(
@@ -34,14 +31,13 @@ export async function getExperiencePage(
     cacheLife('uncached');
     return null;
   }
-  cacheTag(tags.experience(id.toLowerCase()), tags.catalog);
+  cacheTag(tags.experience(id.toLowerCase()));
   const page = await readOrRefuse('Experience', async () => {
     const experience = await getGuestExperience(id);
     if (!experience) return null;
-    const [photos, categories, neighborhoods] = await Promise.all([
+    const [photos, { categories, neighborhoods }] = await Promise.all([
       listGuestPhotos(id),
-      listCategories(),
-      listNeighborhoods(),
+      getFilterOptions(),
     ]);
     return {
       experience,

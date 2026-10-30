@@ -735,6 +735,7 @@ describe('eventRetry', () => {
 describe('afterConfirm', () => {
   it.each([
     ['confirmed', 'finish'],
+    ['already_confirmed', 'finish'],
     ['unavailable', 'retry'],
   ] as const)('%s means %s', (status, outcome) => {
     expect(afterConfirm(status)).toBe(outcome);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bookingEmailKey,
   bookingCalendarEvent,
   bookingCancellationData,
   bookingRefundData,
@@ -419,4 +420,16 @@ describe('paidAfterLapseData', () => {
       browseUrl: 'https://ramble.example/new-york/browse',
     });
   });
+});
+
+describe('bookingEmailKey', () => {
+  it.each(['guest-confirmation', 'host-booking-notice'] as const)(
+    'builds one key per order for %s',
+    (kind) => {
+      expect(bookingEmailKey(kind, 'abc')).toBe(`${kind}:abc`);
+      expect(bookingEmailKey(kind, 'abc')).not.toBe(
+        bookingEmailKey(kind, 'abd'),
+      );
+    },
+  );
 });

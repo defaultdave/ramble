@@ -22,6 +22,7 @@ import {
   orderLedgerSummaries,
   parseLedgerEvent,
   postOutcome,
+  providerFeeEntries,
   rambleSelfPayout,
   refundFailed,
   refundRequested,
@@ -1314,5 +1315,36 @@ describe('LedgerWindowSchema', () => {
     ['has an invalid start', { from: new Date('x'), to }],
   ])('refuses a window that %s', (_name, window) => {
     expect(LedgerWindowSchema.safeParse(window).success).toBe(false);
+  });
+});
+
+describe('providerFeeEntries', () => {
+  const payment = {
+    providerPaymentId: 'pay_1',
+    orderId: '00000000-0000-4000-8000-000000000001',
+    hostId: '00000000-0000-4000-8000-000000000002',
+    paymentAttemptId: '00000000-0000-4000-8000-000000000003',
+    simulated: true,
+    at: new Date('2026-11-01T12:00:00Z'),
+  };
+
+  it('posts the reported fee as a card fee under the payment id', () => {
+    const [row, ...rest] = providerFeeEntries({ ...payment, feeMinor: 407 });
+    expect(rest).toEqual([]);
+    expect(row).toMatchObject({
+      entryType: 'processing_fee',
+      amountMinor: 407,
+      providerObjectId: 'pay_1',
+      occurredAt: payment.at,
+      simulated: true,
+      paymentAttemptId: payment.paymentAttemptId,
+    });
+  });
+
+  it.each([
+    ['a fee the provider has not reported', null],
+    ['a fee of nothing', 0],
+  ])('posts nothing for %s', (_name, feeMinor) => {
+    expect(providerFeeEntries({ ...payment, feeMinor })).toEqual([]);
   });
 });

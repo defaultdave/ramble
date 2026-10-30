@@ -41,6 +41,8 @@ import {
   spacesLeft,
   unbookableSession,
   type HoldTimes,
+  holdTransitions,
+  requireHoldTransition,
 } from './holds';
 import { jobLimits } from './jobs';
 import { maxAllocation } from './sessions';
@@ -1089,5 +1091,38 @@ describe('field errors from issues', () => {
         (path) => path.map(String).join('.'),
       ),
     ).toEqual({ 'a.b': 'required', c: 'invalid' });
+  });
+});
+
+describe('hold transitions', () => {
+  it.each([
+    ['active', 'paying'],
+    ['paying', 'paying'],
+    ['paying', 'active'],
+    ['active', 'converted'],
+    ['paying', 'converted'],
+    ['active', 'released'],
+    ['paying', 'released'],
+    ['released', 'converted'],
+  ] as const)('%s to %s is allowed', (from, to) => {
+    expect(() => {
+      requireHoldTransition(from, to);
+    }).not.toThrow();
+  });
+
+  it.each([
+    ['converted', 'released'],
+    ['converted', 'active'],
+    ['released', 'active'],
+    ['released', 'paying'],
+    ['active', 'active'],
+  ] as const)('%s to %s is refused', (from, to) => {
+    expect(() => {
+      requireHoldTransition(from, to);
+    }).toThrow(`A hold does not move from ${from} to ${to}`);
+  });
+
+  it('keeps a converted hold terminal', () => {
+    expect(holdTransitions.converted).toEqual([]);
   });
 });

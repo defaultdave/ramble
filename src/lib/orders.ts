@@ -18,7 +18,7 @@ import { canTransition, type TransitionTable } from './transitions';
 // tuples and constants, so the database refuses what these schemas refuse (design doc 4.2.3, Orders).
 
 export const orderKinds = ['booking', 'gift_purchase'] as const;
-type OrderKind = (typeof orderKinds)[number];
+export type OrderKind = (typeof orderKinds)[number];
 
 export const orderStatuses = [
   'pending_payment',

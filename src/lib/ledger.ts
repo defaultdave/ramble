@@ -420,7 +420,6 @@ function amountOf(input: Amount, what: string): number {
   return input.amountMinor;
 }
 
-// TODO(U-049): first caller, confirmOrder.
 /** Booking paid: the host share, the commission, and the tax (taxable only) land in cash, all under the payment's id. */
 export function bookingPaid(
   input: Common &
@@ -454,7 +453,6 @@ export function bookingPaid(
   );
 }
 
-// TODO(U-049): first caller, confirmOrder.
 /** The card fee the provider kept from a payment, under that payment's id. */
 export function cardFee(
   input: Common &
@@ -474,6 +472,32 @@ export function cardFee(
     ],
     input.providerObjectId,
   );
+}
+
+/**
+ * The card fee row a payment calls for, or none. The provider may not know its fee yet (Stripe
+ * reports it on the balance transaction, sometimes later), and a fee of nothing has no row, because
+ * a row's amount is above zero. Neither is an error.
+ */
+export function providerFeeEntries(input: {
+  providerPaymentId: string;
+  feeMinor: number | null;
+  orderId: string;
+  hostId: string;
+  paymentAttemptId: string;
+  simulated: boolean;
+  at: Date;
+}): LedgerEntryInput[] {
+  if (input.feeMinor === null || input.feeMinor === 0) return [];
+  return cardFee({
+    occurredAt: input.at,
+    simulated: input.simulated,
+    orderId: input.orderId,
+    hostId: input.hostId,
+    paymentAttemptId: input.paymentAttemptId,
+    providerObjectId: input.providerPaymentId,
+    amountMinor: input.feeMinor,
+  });
 }
 
 // TODO(U-079a): first caller, the weekly transfer release.

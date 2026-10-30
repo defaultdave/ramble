@@ -58,6 +58,17 @@ export type BookingEmailSource = {
   confirmedAt: Date | null;
 };
 
+/**
+ * One key per email and order: the confirm step uses it to queue each job once, and the job uses it
+ * so the provider delivers each message once however often the job runs.
+ */
+export function bookingEmailKey(
+  kind: 'guest-confirmation' | 'host-booking-notice',
+  orderId: string,
+): string {
+  return `${kind}:${orderId}`;
+}
+
 export type ConfirmationDecision = 'send' | 'skip' | 'refuse';
 
 /**
@@ -334,7 +345,7 @@ export function lapseReasonLine(reason: LapseReason): string {
   return lapseReasons[reason];
 }
 
-// TODO(U-049): first caller, the refund path of confirmOrder.
+// TODO(U-109): first caller, the refund path.
 export function paidAfterLapseData(input: {
   recipientName: string | null;
   reference: string;

@@ -1,6 +1,7 @@
 import 'server-only';
 import { z } from 'zod';
 import {
+  bookingEmailKey,
   confirmationDecision,
   guestConfirmationData,
   hostBookingNoticeData,
@@ -85,7 +86,7 @@ export async function sendGuestConfirmation({
       appUrl: env.APP_URL,
       manageToken: liveManageToken(order),
     }),
-    idempotencyKey: `guest-confirmation:${payload.orderId}`,
+    idempotencyKey: bookingEmailKey('guest-confirmation', payload.orderId),
   });
 }
 
@@ -106,6 +107,6 @@ export async function sendHostBookingNotice({
     template: 'host-booking-notice',
     to: order.hostNotificationEmail,
     data: hostBookingNoticeData(order.source),
-    idempotencyKey: `host-booking-notice:${payload.orderId}`,
+    idempotencyKey: bookingEmailKey('host-booking-notice', payload.orderId),
   });
 }

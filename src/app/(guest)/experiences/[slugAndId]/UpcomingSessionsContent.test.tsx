@@ -32,7 +32,6 @@ const session = (n: number, iso: string) => ({
 });
 const props = (query: Record<string, string> = {}) => ({
   upcoming,
-  bookHref: '/checkout/demo',
   searchParams: Promise.resolve(query),
   retryHref: '/experiences/sunset-kayak-1',
 });
@@ -67,7 +66,10 @@ describe('UpcomingSessionsContent', () => {
     expect(open).toHaveTextContent('Sat, Oct 24 · 5:30 PM EDT');
     expect(open).toHaveTextContent('8 spaces');
     expect(open).toHaveTextContent('$65');
-    expect(open).toHaveAttribute('href', '/checkout/demo');
+    expect(open).toHaveAttribute(
+      'href',
+      '/experiences/sunset-kayak-1?date=2026-10-24',
+    );
     expect(rows[1]).toHaveTextContent('Sun, Oct 25 · 5:30 PM EDT');
     expect(rows[1]).toHaveTextContent('Sold out');
     expect(within(rows[1] as HTMLElement).queryByRole('link')).toBeNull();

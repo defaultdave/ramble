@@ -53,16 +53,3 @@ test('a link with no token shows the one not-found page (a streamed 200, like th
     page.locator('meta[property^="og:"], meta[name^="twitter:"]'),
   ).toHaveCount(0);
 });
-
-test('the demo confirmation still answers its own reference, and is noindex', async ({
-  page,
-}) => {
-  const response = await page.goto('/orders/RMB-DEMO01');
-  expect(response?.status()).toBe(200);
-  await expect(
-    page.getByRole('heading', { level: 1, name: 'Order confirmation' }),
-  ).toBeVisible();
-  await expect(
-    page.locator('meta[property^="og:"], meta[name^="twitter:"]'),
-  ).toHaveCount(0);
-});

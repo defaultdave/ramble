@@ -4,6 +4,7 @@ import {
   BookingBar,
   type DateChosenBookingBarProps,
   type DefaultBookingBarProps,
+  type PausedBookingBarProps,
   type SoldOutBookingBarProps,
 } from '@/components/BookingBar';
 import styles from './BookingBar.stories.module.css';
@@ -26,6 +27,7 @@ export default meta;
 type DefaultStory = StoryObj<DefaultBookingBarProps>;
 type DateChosenStory = StoryObj<DateChosenBookingBarProps>;
 type SoldOutStory = StoryObj<SoldOutBookingBarProps>;
+type PausedStory = StoryObj<PausedBookingBarProps>;
 
 const defaults = {
   priceMinor: 8500,
@@ -58,3 +60,6 @@ export const DateChosenPlacingHold: DateChosenStory = {
 export const SoldOut: SoldOutStory = {
   args: { state: 'sold-out', similarHref: '/browse?like=hand-rolled-pasta' },
 };
+
+// Ops paused bookings (PRD-16): the bar says so and offers nothing to press.
+export const Paused: PausedStory = { args: { state: 'paused' } };

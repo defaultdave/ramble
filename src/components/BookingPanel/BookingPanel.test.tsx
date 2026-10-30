@@ -31,6 +31,27 @@ function setup(
   return onContinue;
 }
 
+describe('BookingPanel paused', () => {
+  it('keeps the price and says bookings are paused in place of the choices', () => {
+    render(<BookingPanel state="paused" priceMinor={6500} />);
+    expect(screen.getByText('$65')).toBeVisible();
+    expect(screen.getByRole('status')).toHaveTextContent('Bookings are paused');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+});
+
+describe('BookingPanel without a mode switch', () => {
+  it('leaves out the switch row while gifts are off', () => {
+    const { container } = render(
+      <BookingPanel priceMinor={6500} onContinue={vi.fn()}>
+        <p>Choices</p>
+      </BookingPanel>,
+    );
+    expect(container.querySelector('[class*="mode"]')).toBeNull();
+    expect(screen.getByText('Choices')).toBeVisible();
+  });
+});
+
 describe('BookingPanel', () => {
   it('is a labelled region showing the per-person price', () => {
     setup();

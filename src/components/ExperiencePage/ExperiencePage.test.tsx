@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ExperienceError } from './ExperienceError';
-import { ExperiencePage } from './ExperiencePage';
+import { BookingSlots, ExperiencePage } from './ExperiencePage';
 import {
   bareExperience,
   kidsClass,
@@ -20,7 +20,31 @@ const dates = <p>The dates</p>;
 // - the gift entry goes to the gift checkout, and is absent when gifts are off; the private-session entry is always there and goes to contact
 // - a section with nothing to say is left out whole, and the cancellation terms always stay
 // - two prices name who each is for
+// - the booking slot is the page's last child, with the bar and the panel in their own slots, the panel an aside
 // - the error state keeps a heading, says what went wrong, and retries with a GET form to the page's own address
+
+describe('the booking slot', () => {
+  it('sits after the content, inside the article, so the bar can stick against the whole page', () => {
+    render(
+      <ExperiencePage
+        dates={dates}
+        view={sunsetKayak}
+        booking={<BookingSlots bar={<p>The bar</p>} panel={<p>The panel</p>} />}
+      />,
+    );
+    const article = screen.getByRole('article');
+    expect(article.lastElementChild).toBe(screen.getByRole('complementary'));
+    expect(within(article).getByText('The bar')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('complementary')).getByText('The panel'),
+    ).toBeInTheDocument();
+  });
+
+  it('draws nothing extra without one', () => {
+    render(<ExperiencePage dates={dates} view={sunsetKayak} />);
+    expect(screen.queryByRole('complementary')).toBeNull();
+  });
+});
 
 describe('ExperiencePage', () => {
   it('has the title as its only h1, and a breadcrumb that ends at it', () => {
@@ -127,14 +151,6 @@ describe('ExperiencePage', () => {
     expect(
       screen.queryByRole('link', { name: /Open in Maps/ }),
     ).not.toBeInTheDocument();
-  });
-
-  it('has a Book link to the checkout with the experience', () => {
-    render(<ExperiencePage dates={dates} view={sunsetKayak} />);
-    expect(screen.getByRole('link', { name: 'Book' })).toHaveAttribute(
-      'href',
-      sunsetKayak.bookHref,
-    );
   });
 
   it('goes to the gift checkout and to contact for a private session', () => {

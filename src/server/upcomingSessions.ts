@@ -4,7 +4,9 @@ import { tags } from '@/lib/cacheTags';
 import { EntityIdSchema } from '@/lib/catalog';
 import { upcomingWindow } from '@/lib/sessionWindow';
 import {
-  upcomingSessionLimits,
+  listRead,
+  requireBoundedRead,
+  type SessionRead,
   type SessionWithSpaces,
   type UpcomingSession,
 } from '@/lib/upcomingSessions';
@@ -21,6 +23,8 @@ import { getSpacesLeft } from '@/server/spacesLeft';
 async function getUpcomingSessions(
   experienceId: string,
   asOf: string,
+  limit: number,
+  windowDays: number,
 ): Promise<UpcomingSession[]> {
   'use cache';
   cacheLife('browse');
@@ -32,23 +36,28 @@ async function getUpcomingSessions(
   const id = experienceId.toLowerCase();
   cacheTag(tags.experience(id));
   return readOrRefuse('Upcoming sessions', () =>
-    listUpcomingSessions(
-      id,
-      upcomingWindow(asOf, upcomingSessionLimits.windowDays),
-    ),
+    listUpcomingSessions(id, upcomingWindow(asOf, windowDays), limit),
   );
 }
 
 /**
  * The next sessions of an experience, each with the spaces left in it for display (up to a minute
- * stale; the reserve decides). A failure of either read propagates, so the page shows its error
+ * stale; the reserve decides). `reading` is the list's six within 90 days unless the booking choices
+ * ask for their wider, bounded window; a read outside the bounds throws. A failure of either read propagates, so the page shows its error
  * state instead of a list that could be missing a sold-out date.
  */
 export async function readUpcomingSessions(
   experienceId: string,
   asOf: string,
+  reading: SessionRead = listRead,
 ): Promise<SessionWithSpaces[]> {
-  const found = await getUpcomingSessions(experienceId, asOf);
+  requireBoundedRead(reading);
+  const found = await getUpcomingSessions(
+    experienceId,
+    asOf,
+    reading.limit,
+    reading.windowDays,
+  );
   return Promise.all(
     found.map(async (session) => ({
       session,

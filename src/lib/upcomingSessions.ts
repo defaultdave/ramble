@@ -15,6 +15,43 @@ import { zonedShortDayLabel, zonedTimeLabel } from './zonedLabels';
  */
 export const upcomingSessionLimits = { maxRows: 6, windowDays: 90 } as const;
 
+/**
+ * How much of the schedule the booking choices read: the sessions of the next 60 days, at most 60.
+ * The calendar needs every bookable date, so this is wider than the list; the cap keeps a cold
+ * cache to at most 60 spaces-left reads, one per session shown, and a session beyond it is not offered.
+ */
+export const bookingSessionLimits = {
+  maxSessions: 60,
+  windowDays: 60,
+} as const;
+
+/** What a read takes: how many sessions at most, within how many days. The list's own is the default. */
+export type SessionRead = { limit: number; windowDays: number };
+
+export const listRead: SessionRead = {
+  limit: upcomingSessionLimits.maxRows,
+  windowDays: upcomingSessionLimits.windowDays,
+};
+
+export const bookingRead: SessionRead = {
+  limit: bookingSessionLimits.maxSessions,
+  windowDays: bookingSessionLimits.windowDays,
+};
+
+/** A read is refused, never trimmed, when it asks for more than the widest read there is. */
+export function requireBoundedRead({ limit, windowDays }: SessionRead): void {
+  if (
+    !Number.isInteger(limit) ||
+    limit < 1 ||
+    limit > bookingSessionLimits.maxSessions ||
+    !Number.isInteger(windowDays) ||
+    windowDays < 1 ||
+    windowDays > upcomingSessionLimits.windowDays
+  ) {
+    throw new RangeError('The session read is outside its bounds');
+  }
+}
+
 /** What the data layer hands over for one session: when and where it starts. */
 export const UpcomingSessionSchema = z.object({
   id: EntityIdSchema,
@@ -53,7 +90,8 @@ export type UpcomingSessionsInput = {
   sessions: readonly SessionWithSpaces[];
   priceOptions: readonly CardPriceOption[];
   selectedDate: string | null;
-  bookHref: string;
+  /** The experience page's own address; an open row links to it with its date, which the booking choices preselect. */
+  pageHref: string;
 };
 
 /** The date the address asks for (`?date=YYYY-MM-DD`, as the checkout's links send it), or null when absent, repeated, or not a real date. */
@@ -70,7 +108,7 @@ export function buildUpcomingSessions({
   sessions,
   priceOptions,
   selectedDate,
-  bookHref,
+  pageHref,
 }: UpcomingSessionsInput): UpcomingSessionsView {
   const priceLabel = cardPriceLabel(priceOptions);
   const rows = sessions
@@ -80,6 +118,9 @@ export function buildUpcomingSessions({
     .slice(0, upcomingSessionLimits.maxRows)
     .map(({ session, spacesLeft }): SessionRowView => {
       const status = spacesStatus(spacesLeft);
+      const date = calendarDateFormat(session.timeZone).format(
+        session.startsAt,
+      );
       return {
         id: session.id,
         dayLabel: zonedShortDayLabel(session.startsAt, session.timeZone),
@@ -87,11 +128,11 @@ export function buildUpcomingSessions({
         spacesLabel: spacesLabel(spacesLeft),
         status,
         priceLabel,
-        selected:
-          selectedDate !== null &&
-          calendarDateFormat(session.timeZone).format(session.startsAt) ===
-            selectedDate,
-        href: status === 'sold-out' ? null : bookHref,
+        selected: selectedDate !== null && date === selectedDate,
+        href:
+          status === 'sold-out'
+            ? null
+            : `${pageHref}?${browseParamNames.date}=${date}`,
       };
     });
   return rows.length === 0 ? { kind: 'none' } : { kind: 'rows', rows };

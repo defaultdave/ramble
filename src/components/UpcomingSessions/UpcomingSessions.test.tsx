@@ -43,7 +43,7 @@ describe('UpcomingSessions', () => {
     const rows = screen.getAllByRole('listitem');
     expect(within(rows[0] as HTMLElement).getByRole('link')).toHaveAttribute(
       'href',
-      '/checkout/demo',
+      '/experiences/sunset-kayak-1?date=2026-10-24',
     );
     expect(within(rows[1] as HTMLElement).getByRole('link')).toHaveTextContent(
       '2 left',

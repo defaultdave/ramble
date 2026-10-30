@@ -6,14 +6,17 @@ import {
   type Neighborhood,
 } from '../catalog';
 import { MAX_FULL_REFUND_HOURS } from '../cancellation';
-import { demoCheckoutPath } from '../demoCheckout';
+import { allowedChildAges } from '../checkout';
 import { presentText, textLines } from '../displayText';
+import { holdLimits } from '../holds';
 import { mapsHref } from '../maps';
 import type { GuestPhoto } from '../photos';
 import { photoView, type PhotoView } from '../photoViews';
 import { perPersonAmount, type CardPriceOption } from '../pricing';
+import type { BookingOffer } from '../bookingDraft';
 import {
   categoryPath,
+  checkoutPath,
   giftCheckoutPath,
   neighborhoodPath,
   privateSessionPath,
@@ -242,6 +245,15 @@ type ExperienceBadge = {
   icon?: 'outdoor';
 };
 
+/** What the booking choices know before the dates arrive; the route adds the sessions. */
+export type BookingBasics = Omit<
+  BookingOffer,
+  'today' | 'sessions' | 'preselectedDate'
+> & {
+  /** How long before the start a booking can still be cancelled for a full refund. */
+  fullRefundHoursBefore: number;
+};
+
 export type ExperiencePageView = {
   title: string;
   breadcrumb: { label: string; href: string }[];
@@ -262,8 +274,7 @@ export type ExperiencePageView = {
   cancellation: string;
   /** Goes to the gift checkout, or null while gifts are switched off. */
   giftHref: string | null;
-  /** Goes to the checkout. TODO(U-041): replaced by the booking bar and panel, which hold a session first. */
-  bookHref: string;
+  booking: BookingBasics;
   privateSessionHref: string;
 };
 
@@ -272,6 +283,7 @@ export type ExperiencePageInput = {
   photos: readonly GuestPhoto[];
   place: Place;
   giftsEnabled: boolean;
+  bookingsPaused: boolean;
 };
 
 function badgesFor(experience: GuestExperience): ExperienceBadge[] {
@@ -296,7 +308,7 @@ function badgesFor(experience: GuestExperience): ExperienceBadge[] {
 export function buildExperiencePage(
   input: ExperiencePageInput,
 ): ExperiencePageView | null {
-  const { experience, photos, place, giftsEnabled } = input;
+  const { experience, photos, place, giftsEnabled, bookingsPaused } = input;
   if (experience.status === 'guide_only') return null;
 
   const cancellation = cancellationTerms(experience.cancellationTier);
@@ -364,7 +376,31 @@ export function buildExperiencePage(
     weather: weather?.detail ?? null,
     cancellation: cancellation.detail,
     giftHref: giftsEnabled ? giftCheckoutPath(experience.id) : null,
-    bookHref: demoCheckoutPath(experience.id),
+    booking: {
+      experienceId: experience.id,
+      title: experience.name,
+      options: experience.priceOptions.map(
+        ({ id, kind, priceMinor, usesSpace }) => ({
+          id,
+          kind,
+          priceMinor,
+          usesSpace,
+        }),
+      ),
+      childAges: experience.priceOptions.some(({ kind }) => kind === 'child')
+        ? allowedChildAges(experience)
+        : null,
+      ageNote: ageLabel(experience),
+      twentyOnePlus: experience.ageRule === 'twenty_one_plus',
+      maxSeats: holdLimits.maxSeats,
+      deviceSeatLimit: holdLimits.deviceSeatLimit,
+      giftsEnabled,
+      paused: bookingsPaused,
+      checkoutBase: checkoutPath(''),
+      similarHref: categoryPath(place.category.slug),
+      privateSessionHref: privateSessionPath,
+      fullRefundHoursBefore: experience.cancellationTier.fullRefundHoursBefore,
+    },
     privateSessionHref: privateSessionPath,
   };
 }

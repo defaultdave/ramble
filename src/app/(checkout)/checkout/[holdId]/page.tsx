@@ -3,12 +3,9 @@ import { notFound } from 'next/navigation';
 import { Alert } from '@/components/Alert';
 import { ButtonLink } from '@/components/Button';
 import { CheckoutPage } from '@/components/CheckoutPage';
-import { SiteShell } from '@/components/SiteShell';
 import { CheckoutFrame } from '@/components/CheckoutPage/CheckoutFrame';
 import { EntityIdSchema } from '@/lib/catalog';
-import { isDemoHold } from '@/lib/demoCheckout';
 import { checkoutPath } from '@/lib/routes';
-import { DemoCheckout } from '../../_demo/DemoCheckout';
 import { notFoundPerRequest } from '@/app/renderPerRequest';
 import { readCheckoutView } from '@/server/db/checkoutView';
 import { readDevice } from '@/server/device';
@@ -28,16 +25,6 @@ export default async function CheckoutRoute({
   // A malformed id is no hold, and no query is made for it.
   if (!parsed.success) return notFoundPerRequest();
   const holdId = parsed.data.toLowerCase();
-
-  // The demo click-through shows its stub before any hold is read, so the experience page's Book
-  // link keeps working until the booking bar makes real holds.
-  if (isDemoHold(holdId)) {
-    return (
-      <SiteShell>
-        <DemoCheckout />
-      </SiteShell>
-    );
-  }
 
   // Reading the cookie never sets one: a guest with no device has no hold.
   const device = await readDevice();

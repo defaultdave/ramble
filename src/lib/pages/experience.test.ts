@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import type { Category, Neighborhood } from '../catalog';
-import { demoCheckoutPath } from '../demoCheckout';
 import {
   ageLabel,
   buildExperiencePage,
@@ -54,6 +53,7 @@ const build = (overrides: Partial<ExperiencePageInput> = {}) =>
     photos: [],
     place,
     giftsEnabled: true,
+    bookingsPaused: false,
     ...overrides,
   });
 
@@ -321,15 +321,93 @@ describe('buildExperiencePage', () => {
     expect(build({ experience: experience(indoor) })?.badges).toEqual([]);
   });
 
-  it('books through the demo checkout with the experience id', () => {
-    expect(build()?.bookHref).toBe(demoCheckoutPath(id(1)));
-  });
-
   it('hands the streamed dates the experience and only the price fields they read', () => {
     expect(build()?.upcoming).toEqual({
       experienceId: id(1),
       priceOptions: [{ priceMinor: 6500, usesSpace: true }],
     });
+  });
+
+  it('hands the booking choices what they need before the dates arrive', () => {
+    expect(build()?.booking).toEqual({
+      experienceId: id(1),
+      title: 'Sunset kayak on the Hudson',
+      options: [
+        { id: id(6), kind: 'adult', priceMinor: 6500, usesSpace: true },
+      ],
+      childAges: null,
+      ageNote: 'Ages 14 and up',
+      twentyOnePlus: false,
+      maxSeats: 6,
+      deviceSeatLimit: 6,
+      giftsEnabled: true,
+      paused: false,
+      checkoutBase: '/checkout/',
+      similarHref: '/new-york/things-to-do/outdoors',
+      privateSessionHref: '/contact',
+      fullRefundHoursBefore: 24,
+    });
+  });
+
+  it.each([
+    ['gifts off', { giftsEnabled: false }, { giftsEnabled: false }],
+    ['bookings paused', { bookingsPaused: true }, { paused: true }],
+  ] as const)(
+    'carries the switch for %s into the booking choices',
+    (_name, input, expected) => {
+      expect(build(input)?.booking).toMatchObject(expected);
+    },
+  );
+
+  it.each([
+    ['an age range', { ageRule: 'age_range', minAge: 5, maxAge: 10 }, 5, 10],
+    [
+      'a minimum age',
+      { ageRule: 'minimum_age', minAge: 12, maxAge: null },
+      12,
+      17,
+    ],
+  ] as const)(
+    'gives the ages a child may be for %s when a child price exists',
+    (_name, rule, min, max) => {
+      const child = {
+        id: id(7),
+        experienceId: id(1),
+        kind: 'child',
+        priceMinor: 4500,
+        usesSpace: true,
+      } as const;
+      const adult = { ...child, id: id(6), kind: 'adult' } as const;
+      expect(
+        build({
+          experience: experience({ ...rule, priceOptions: [adult, child] }),
+        })?.booking.childAges,
+      ).toEqual({ min, max });
+    },
+  );
+
+  it('offers no child ages without a child price, whatever the age rule', () => {
+    expect(
+      build({
+        experience: experience({
+          ageRule: 'all_ages',
+          minAge: null,
+          maxAge: null,
+        }),
+      })?.booking.childAges,
+    ).toBeNull();
+  });
+
+  it('marks a 21+ experience', () => {
+    expect(
+      build({
+        experience: experience({
+          ageRule: 'twenty_one_plus',
+          minAge: null,
+          maxAge: null,
+        }),
+      })?.booking,
+    ).toMatchObject({ twentyOnePlus: true, ageNote: '21 and over' });
   });
 
   it('goes to the gift checkout when gifts are on, and has no gift entry when they are off', () => {

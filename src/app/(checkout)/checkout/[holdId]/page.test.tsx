@@ -6,7 +6,6 @@ import CheckoutRoute from './page';
 // - the framework ending a prerender inside a driver error is rethrown and not logged
 // - a real read failure logs only the kind and renders the retry view
 // - a malformed id and a browser with no device are not-found before anything is read
-// - the demo address renders its stub before any hold is read
 // - arriving from a re-hold asks the page to focus its heading
 
 const server = vi.hoisted(() => ({
@@ -96,16 +95,6 @@ describe('the checkout route', () => {
     server.device.mockResolvedValue(null);
 
     await expect(CheckoutRoute(props(holdId))).rejects.toThrow();
-    expect(server.view).not.toHaveBeenCalled();
-  });
-
-  it('renders the demo stub for the demo address before reading anything', async () => {
-    const element = await CheckoutRoute(
-      props('00000000-0000-4000-8000-0000000000d1'),
-    );
-
-    expect(element).toBeTruthy();
-    expect(server.device).not.toHaveBeenCalled();
     expect(server.view).not.toHaveBeenCalled();
   });
 });

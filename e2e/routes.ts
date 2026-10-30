@@ -56,12 +56,6 @@ export const routes: readonly RouteRow[] = [
     noindex: true,
   },
   {
-    path: '/orders/RMB-DEMO01',
-    group: 'checkout',
-    heading: 'Order confirmation',
-    noindex: true,
-  },
-  {
     path: '/manage/sample',
     group: 'checkout',
     heading: 'Manage booking',

@@ -18,6 +18,7 @@ import ExperienceRoute, {
 // - an experience that is not visible to guests, and a guide entry, are a not-found
 // - a visible experience renders its page, with the gift entry only while gifts are on
 // - the upcoming dates sit under their heading and are handed the experience, its prices, the book link, the address's query unread, and the page's own address
+// - the booking controls are handed the experience's booking basics (paused as settings say), the address's query unread, and the page's own address
 // - a failed read logs only the digest and kind and renders the error state, which retries at the page's own address
 // - a framework control-flow error is rethrown and not logged
 // - the head names the experience and describes it; a failed read falls back to the plain title and logs only its digest and kind, as the page does
@@ -40,6 +41,14 @@ vi.mock('./UpcomingSessionsContent', () => ({
   UpcomingSessionsContent: (props: unknown) => {
     dates.content(props);
     return <p>Dates stub</p>;
+  },
+}));
+
+const booking = vi.hoisted(() => ({ content: vi.fn() }));
+vi.mock('./BookingContent', () => ({
+  BookingContent: (props: unknown) => {
+    booking.content(props);
+    return <p>Booking stub</p>;
   },
 }));
 
@@ -136,11 +145,36 @@ describe('the experience route', () => {
         experienceId: id(1),
         priceOptions: [{ priceMinor: 6500, usesSpace: true }],
       },
-      bookHref: expect.stringContaining('/checkout/') as string,
       searchParams,
       retryHref: `/experiences/${address}`,
     });
   });
+
+  it.each([false, true])(
+    'hands the booking controls the basics, with bookings paused %s as settings say',
+    async (bookingsPaused) => {
+      server.settings.mockResolvedValue({
+        giftsEnabled: true,
+        bookingsPaused,
+        bannerText: null,
+      });
+      const searchParams = Promise.resolve({ date: '2026-10-24' });
+
+      render(await ExperienceRoute({ ...props(address), searchParams }));
+
+      expect(screen.getByText('Booking stub')).toBeVisible();
+      expect(booking.content).toHaveBeenCalledExactlyOnceWith({
+        basics: expect.objectContaining({
+          experienceId: id(1),
+          title: 'Sunset kayak on the Hudson',
+          paused: bookingsPaused,
+          giftsEnabled: true,
+        }) as unknown,
+        searchParams,
+        retryHref: `/experiences/${address}`,
+      });
+    },
+  );
 
   it('has no gift entry while gifts are off', async () => {
     server.settings.mockResolvedValue({

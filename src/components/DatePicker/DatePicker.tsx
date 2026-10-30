@@ -2,6 +2,7 @@
 
 import { parseDate } from '@internationalized/date';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState } from 'react';
 import {
   Button as AriaButton,
   Calendar,
@@ -14,7 +15,7 @@ import {
   I18nProvider,
 } from 'react-aria-components';
 import { classNames } from '@/lib/classNames';
-import { dayFlags, dayLabel } from '@/lib/datePicker';
+import { dayFlags, dayLabel, visibleDate } from '@/lib/datePicker';
 import styles from './DatePicker.module.css';
 
 export type DatePickerProps = {
@@ -47,6 +48,14 @@ export function DatePicker({
   onChange,
 }: DatePickerProps) {
   const context = { today, value, availableDates };
+  // The visible month follows the chosen date (or the first offered one) whenever that changes, and the guest's own paging in between.
+  const anchor = visibleDate(context);
+  const [anchored, setAnchored] = useState(anchor);
+  const [focused, setFocused] = useState(anchor);
+  if (anchored !== anchor) {
+    setAnchored(anchor);
+    setFocused(anchor);
+  }
 
   return (
     // Ramble publishes in US English only, so the grid starts on Sunday as in Figma.
@@ -55,7 +64,10 @@ export function DatePicker({
         aria-label={label}
         className={classNames(styles.calendar)}
         value={value ? parseDate(value) : null}
-        defaultFocusedValue={parseDate(value ?? today)}
+        focusedValue={parseDate(focused)}
+        onFocusChange={(date) => {
+          setFocused(date.toString());
+        }}
         minValue={parseDate(today)}
         isDisabled={disabled}
         isDateUnavailable={(date) =>

@@ -8,6 +8,7 @@ import { TimeSlot } from '@/components/TimeSlot';
 import {
   BookingPanel,
   type DefaultBookingPanelProps,
+  type PausedBookingPanelProps,
   type SoldOutBookingPanelProps,
 } from '@/components/BookingPanel';
 import styles from './BookingPanel.stories.module.css';
@@ -37,6 +38,7 @@ export default meta;
 // BookingPanel is a union on state, which Storybook cannot infer args from, so each story names its props.
 type DefaultStory = StoryObj<DefaultBookingPanelProps>;
 type SoldOutStory = StoryObj<SoldOutBookingPanelProps>;
+type PausedStory = StoryObj<PausedBookingPanelProps>;
 
 const mode = (
   <>
@@ -134,4 +136,9 @@ export const SoldOut: SoldOutStory = {
     similarHref: '/browse?like=hand-rolled-pasta',
     privateSessionHref: '/private-sessions/hand-rolled-pasta',
   },
+};
+
+// Ops paused bookings (PRD-16): the price stays, and the choices give way to the notice.
+export const Paused: PausedStory = {
+  args: { state: 'paused', priceMinor: 6500 },
 };

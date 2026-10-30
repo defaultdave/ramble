@@ -28,7 +28,7 @@ function view(
     sessions,
     priceOptions: price,
     selectedDate,
-    bookHref: '/checkout/demo',
+    pageHref: '/experiences/sunset-kayak-1',
   });
 }
 

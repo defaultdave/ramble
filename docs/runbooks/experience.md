@@ -1,6 +1,6 @@
 # Experience page
 
-How `/experiences/[slug]-[id]` is built, what it shows and when a section hides, how it is cached, and what the guest sees when something is missing or a read fails. The decisions are in ADR 0001 (Cache Components) and the cache rules in [cache-conventions.md](cache-conventions.md). The page covers PRD-09 to PRD-12 and PRD-68. The booking bar, sheet, and panel are another unit's (they leave `TODO(U-041)` in `ExperiencePage`).
+How `/experiences/[slug]-[id]` is built, what it shows and when a section hides, how it is cached, and what the guest sees when something is missing or a read fails. The decisions are in ADR 0001 (Cache Components) and the cache rules in [cache-conventions.md](cache-conventions.md). The page covers PRD-09 to PRD-12 and PRD-68. The booking bar, sheet, and panel are another unit's (`BookingSlots` in `ExperiencePage`).
 
 ## The address
 

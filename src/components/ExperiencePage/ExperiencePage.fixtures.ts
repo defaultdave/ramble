@@ -1,4 +1,5 @@
 import { samplePhotos } from '@/components/Photo/Photo.fixtures';
+import { basicsOf, kayakOffer, kidsOffer } from '@/lib/bookingDraft.fixtures';
 import { galleryView, type ExperiencePageView } from '@/lib/pages/experience';
 
 /** The experience of Figma frame 03: outdoor, with a weather call, a host, a meeting point, and fifteen photos. */
@@ -49,9 +50,8 @@ export const sunsetKayak: ExperiencePageView = {
     "Go or no-go is decided 3 hours before start. If it's off, you're refunded in full and emailed right away.",
   cancellation:
     'Free cancellation up to 24 hours before start. After that, no refund. If the host or the weather cancels, you get everything back.',
+  booking: basicsOf(kayakOffer),
   giftHref: '/gifts/checkout/00000000-0000-4000-8000-000000000001',
-  bookHref:
-    '/checkout/00000000-0000-4000-8000-0000000000d1?experience=00000000-0000-4000-8000-000000000001',
   privateSessionHref: '/contact',
 };
 
@@ -96,9 +96,8 @@ export const kidsClass: ExperiencePageView = {
   weather: null,
   cancellation:
     'Free cancellation up to 2 days before start. After that, no refund. If the host or the weather cancels, you get everything back.',
+  booking: basicsOf(kidsOffer, 48),
   giftHref: null,
-  bookHref:
-    '/checkout/00000000-0000-4000-8000-0000000000d1?experience=00000000-0000-4000-8000-000000000001',
   privateSessionHref: '/contact',
 };
 
@@ -130,8 +129,21 @@ export const bareExperience: ExperiencePageView = {
   weather: null,
   cancellation:
     'Free cancellation up to 24 hours before start. After that, no refund. If the host or the weather cancels, you get everything back.',
+  booking: basicsOf({
+    ...kayakOffer,
+    experienceId: '00000000-0000-4000-8000-000000000003',
+    title: 'Evening walk',
+    ageNote: 'All ages',
+    giftsEnabled: false,
+    options: [
+      {
+        id: '00000000-0000-4000-8000-000000000031',
+        kind: 'adult',
+        priceMinor: 3000,
+        usesSpace: true,
+      },
+    ],
+  }),
   giftHref: null,
-  bookHref:
-    '/checkout/00000000-0000-4000-8000-0000000000d1?experience=00000000-0000-4000-8000-000000000001',
   privateSessionHref: '/contact',
 };

@@ -2,7 +2,10 @@ import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ZodError } from 'zod';
 import { upcomingWindow } from '@/lib/sessionWindow';
-import { upcomingSessionLimits } from '@/lib/upcomingSessions';
+import {
+  bookingSessionLimits,
+  upcomingSessionLimits,
+} from '@/lib/upcomingSessions';
 import {
   cancellationTiers,
   categories,
@@ -234,6 +237,37 @@ describe('listUpcomingSessions', () => {
         .slice(0, upcomingSessionLimits.maxRows)
         .map((start) => start.getTime()),
     );
+  });
+
+  it('returns up to the limit the caller asks for, soonest first, and refuses one past the booking bound', async () => {
+    const experience = await insertExperience();
+    const starts = Array.from(
+      { length: 12 },
+      (_, n) => new Date(opens.getTime() + (n + 1) * hour),
+    );
+    await client.db.insert(sessions).values(
+      starts.map((startsAt) => ({
+        experienceId: experience.id,
+        startsAt,
+        endsAt: new Date(startsAt.getTime() + hour),
+        timeZone: 'America/New_York',
+        allocation: 8,
+        source: 'ramble' as const,
+      })),
+    );
+
+    const found = await reads.listUpcomingSessions(experience.id, window, 10);
+
+    expect(found.map((row) => row.startsAt.getTime())).toEqual(
+      starts.slice(0, 10).map((start) => start.getTime()),
+    );
+    await expect(
+      reads.listUpcomingSessions(
+        experience.id,
+        window,
+        bookingSessionLimits.maxSessions + 1,
+      ),
+    ).rejects.toBeInstanceOf(RangeError);
   });
 
   it('refuses an ID that is not a uuid', async () => {

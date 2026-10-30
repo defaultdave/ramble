@@ -1,9 +1,30 @@
 import { describe, expect, it } from 'vitest';
-import { dayFlags, dayLabel, isDateAvailable } from './datePicker';
+import { dayFlags, dayLabel, isDateAvailable, visibleDate } from './datePicker';
 
 const today = '2026-10-18';
 const available = ['2026-10-18', '2026-10-22', '2026-10-25', '2026-10-10'];
 const context = { today, value: '2026-10-22', availableDates: available };
+
+describe('visibleDate', () => {
+  it.each([
+    ['the chosen date', '2026-11-07', ['2026-10-22'], '2026-11-07'],
+    [
+      'the first date on offer when nothing is chosen',
+      null,
+      ['2026-11-09', '2026-11-03'],
+      '2026-11-03',
+    ],
+    [
+      'a date on offer, skipping any before today',
+      null,
+      ['2026-10-10', '2026-11-03'],
+      '2026-11-03',
+    ],
+    ['today when nothing is on offer', null, [], today],
+  ])('shows the month of %s', (_name, value, dates, expected) => {
+    expect(visibleDate({ today, value, availableDates: dates })).toBe(expected);
+  });
+});
 
 describe('isDateAvailable', () => {
   it.each([

@@ -3,11 +3,7 @@ import { fn } from 'storybook/test';
 import { BookingBar } from '@/components/BookingBar';
 import { BookingChoices } from '@/components/BookingChoices';
 import { BookingPanel, BookingPanelSkeleton } from '@/components/BookingPanel';
-import {
-  BookingSlots,
-  ExperienceError,
-  ExperiencePage,
-} from '@/components/ExperiencePage';
+import { BookingSlots, ExperiencePage } from '@/components/ExperiencePage';
 import { bookingReducer, choicesView, initialState } from '@/lib/bookingDraft';
 import { kayakOffer } from '@/lib/bookingDraft.fixtures';
 import {
@@ -21,8 +17,7 @@ import {
   sunsetKayak,
 } from './ExperiencePage.fixtures';
 
-// One story per state of the experience page, on a phone (Figma 03) and from the tablet width (D03),
-// plus the error state (S3) beside the listing pages' own.
+// One story per state of the experience page, on a phone (Figma 03) and from the tablet width (D03).
 const meta = {
   title: 'Experience/ExperiencePage',
   component: ExperiencePage,
@@ -134,22 +129,4 @@ export const LoadingBookingDesktop: Story = {
   },
   globals: desktop,
   parameters: fullWidth,
-};
-
-type ErrorStory = StoryObj<typeof ExperienceError>;
-
-export const ErrorMobile: ErrorStory = {
-  render: () => <ExperienceError retryHref="/experiences/sunset-kayak-1" />,
-  globals: mobile,
-  parameters: {
-    a11y: { config: { rules: [{ id: 'landmark-unique', enabled: false }] } },
-  },
-};
-export const ErrorDesktop: ErrorStory = {
-  render: () => <ExperienceError retryHref="/experiences/sunset-kayak-1" />,
-  globals: desktop,
-  parameters: {
-    colorScheme: 'light',
-    a11y: { config: { rules: [{ id: 'landmark-unique', enabled: false }] } },
-  },
 };

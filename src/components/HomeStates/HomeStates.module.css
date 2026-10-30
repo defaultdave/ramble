@@ -53,14 +53,6 @@
     0 0 0 4px var(--color-focus-ring);
 }
 
-.retry {
-  display: flex;
-}
-
-.retry > button {
-  flex: 1;
-}
-
 /* The loading state repeats the hero, the category row and the first row of Picks at the sizes, gaps and gutters of the loaded page (HomeHero and HomeModules), so little moves when they arrive. */
 .band {
   box-sizing: border-box;

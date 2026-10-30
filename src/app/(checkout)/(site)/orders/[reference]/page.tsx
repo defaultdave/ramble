@@ -1,26 +1,44 @@
 import type { Metadata } from 'next';
-import { Alert } from '@/components/Alert';
-import { ButtonLink } from '@/components/Button';
-import { demoSummary } from '@/lib/demoCheckout';
-import { browsePath } from '@/lib/routes';
-import { DemoOrderSummary } from '../../../_demo/DemoOrderSummary';
-import { DemoPage } from '../../../_demo/DemoPage';
+import { cookies } from 'next/headers';
+import { notFound } from 'next/navigation';
+import { OrderConfirmation } from '@/components/OrderConfirmation';
+import { isDemoOrder } from '@/lib/demoCheckout';
+import { orderAccessCookieName, pickOrderToken } from '@/lib/orderAccess';
+import { orderTokenParam } from '@/lib/routes';
+import { getOrderStatus } from '@/server/actions/orders';
+import { readOrderPage } from '@/server/orderConfirmation';
+import { DemoConfirmation } from './DemoConfirmation';
 
-export const metadata: Metadata = { title: 'Order confirmation' };
+// The address is a capability, so nothing here may describe the order: a generic title, no
+// description, and no Open Graph or Twitter card, so a pasted link unfurls to nothing.
+export const metadata: Metadata = {
+  title: 'Order confirmation',
+  description: null,
+  robots: { index: false, follow: false, nocache: true },
+  referrer: 'no-referrer',
+  openGraph: null,
+  twitter: null,
+};
 
-// TODO(U-050): replaced by the confirmation page.
-export default function OrderConfirmationPage() {
+export default async function OrderConfirmationPage({
+  params,
+  searchParams,
+}: PageProps<'/orders/[reference]'>) {
+  const [{ reference }, query, jar] = await Promise.all([
+    params,
+    searchParams,
+    cookies(),
+  ]);
+  // TODO(U-041): the demo checkout ends here until the real one does.
+  if (isDemoOrder(reference)) return <DemoConfirmation />;
+
+  const token = pickOrderToken({
+    cookie: jar.get(orderAccessCookieName)?.value,
+    query: query[orderTokenParam],
+  });
+  const view = token === null ? null : await readOrderPage(reference, token);
+  if (token === null || view === null) notFound();
   return (
-    <DemoPage title="Order confirmation">
-      <Alert
-        tone="success"
-        title="Your demo order is confirmed"
-        body="This was a demo: nothing was charged and nothing was booked."
-      />
-      <DemoOrderSummary summary={demoSummary} />
-      <ButtonLink href={browsePath} variant="secondary">
-        Browse more experiences
-      </ButtonLink>
-    </DemoPage>
+    <OrderConfirmation view={view} token={token} checkStatus={getOrderStatus} />
   );
 }

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { demoCheckoutPath, demoOrderPath, demoSummary } from './demoCheckout';
+import {
+  demoCheckoutPath,
+  demoOrderPath,
+  demoSummary,
+  isDemoOrder,
+} from './demoCheckout';
 import { orderSummaryAmounts } from './orderSummary';
 
 // Behaviours under test, one per decision, branch or risk:
@@ -13,6 +18,16 @@ describe('demo paths', () => {
       `/checkout/00000000-0000-4000-8000-0000000000d1?experience=${id}`,
     );
     expect(demoOrderPath).toBe('/orders/RMB-DEMO01');
+  });
+});
+
+describe('isDemoOrder', () => {
+  it.each([
+    ['RMB-DEMO01', true],
+    ['RMB-A3K7MN', false],
+    ['', false],
+  ])('is %j: %s', (reference, expected) => {
+    expect(isDemoOrder(reference)).toBe(expected);
   });
 });
 

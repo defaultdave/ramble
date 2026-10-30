@@ -80,6 +80,39 @@ describe('proxy', () => {
     },
   );
 
+  describe('a confirmation link', () => {
+    const token = 'A'.repeat(43);
+
+    it('moves the token into a cookie for that order and redirects to the page without it', () => {
+      const { response } = run(`/orders/RMB-A3K7MN?t=${token}&utm=x`);
+      expect(response.status).toBe(303);
+      expect(response.headers.get('location')).toBe(
+        'http://localhost/orders/RMB-A3K7MN',
+      );
+      const cookie = response.headers.get('set-cookie') ?? '';
+      expect(cookie).toContain(`ramble_order_access=${token}`);
+      expect(cookie).toContain('Path=/orders/RMB-A3K7MN');
+      expect(cookie).toMatch(/HttpOnly/i);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+    });
+
+    it.each([
+      `/orders/RMB-A3K7MN?t=short`,
+      `/orders/sample?t=${token}`,
+      `/orders/RMB-A3K7MN`,
+    ])('leaves %s to the page, with no cookie', (path) => {
+      const { response } = run(path);
+      expect(response.status).toBe(200);
+      expect(response.headers.get('set-cookie')).toBeNull();
+    });
+
+    it('keeps the page itself out of indexes and caches', () => {
+      const { response } = run('/orders/RMB-A3K7MN');
+      expect(response.headers.get('x-robots-tag')).toMatch(/noindex/);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+    });
+  });
+
   it('issues a different nonce per request', () => {
     const nonces = new Set(
       [1, 2, 3].map((n) =>

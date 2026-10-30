@@ -79,6 +79,23 @@ export const reheldCheckoutPath = (holdId: string) =>
   `${checkoutPath(holdId)}?rehold=1`;
 export const orderPath = (reference: string) => `/orders/${reference}`;
 
+/** The query key that carries the order token on the confirmation URL. */
+export const orderTokenParam = 't';
+
+/**
+ * The confirmation page of an order. The order token, which only the paying device is given,
+ * travels in the query as `t`; the proxy moves it into a cookie and drops it from the address.
+ */
+export function orderConfirmationPath(
+  reference: string,
+  orderToken?: string,
+): string {
+  const base = orderPath(reference);
+  return orderToken === undefined
+    ? base
+    : `${base}?${orderTokenParam}=${encodeURIComponent(orderToken)}`;
+}
+
 // ---- Help and legal ----
 
 export const contactPath = '/contact';
@@ -89,20 +106,6 @@ export const legalPath = (doc: 'terms' | 'privacy') => `/legal/${doc}`;
 
 /** Any published document by its key, such as a host's waiver. */
 export const legalDocPath = (doc: string) => `/legal/${doc}`;
-
-/**
- * The confirmation page of an order. The order token, which only the paying device is given,
- * travels in the query as `t`.
- */
-export function orderConfirmationPath(
-  reference: string,
-  orderToken?: string,
-): string {
-  const base = orderPath(reference);
-  return orderToken === undefined
-    ? base
-    : `${base}?t=${encodeURIComponent(orderToken)}`;
-}
 
 // ---- Post-booking ----
 

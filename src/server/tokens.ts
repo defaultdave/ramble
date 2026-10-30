@@ -65,7 +65,6 @@ export async function resolveToken(
   kind: 'manage',
   token: string,
 ): Promise<ResolvedToken | null>;
-// TODO(U-050): first caller, the confirmation page.
 export async function resolveToken(
   kind: 'order',
   token: string,

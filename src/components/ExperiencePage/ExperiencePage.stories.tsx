@@ -1,6 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { ExperienceError, ExperiencePage } from '@/components/ExperiencePage';
 import {
+  UpcomingSessions,
+  UpcomingSessionsSkeleton,
+} from '@/components/UpcomingSessions';
+import { mixed } from '@/components/UpcomingSessions/UpcomingSessions.fixtures';
+import {
   bareExperience,
   kidsClass,
   sunsetKayak,
@@ -11,7 +16,7 @@ import {
 const meta = {
   title: 'Experience/ExperiencePage',
   component: ExperiencePage,
-  args: { view: sunsetKayak },
+  args: { view: sunsetKayak, dates: <UpcomingSessions view={mixed} /> },
   parameters: {
     a11y: {
       config: {
@@ -36,6 +41,16 @@ const fullWidth = { ...meta.parameters, colorScheme: 'light' } as const;
 
 export const OutdoorMobile: Story = { globals: mobile };
 export const OutdoorDesktop: Story = {
+  globals: desktop,
+  parameters: fullWidth,
+};
+// The dates still streaming in: the skeleton holds the rows' height.
+export const LoadingDatesMobile: Story = {
+  args: { dates: <UpcomingSessionsSkeleton /> },
+  globals: mobile,
+};
+export const LoadingDatesDesktop: Story = {
+  args: { dates: <UpcomingSessionsSkeleton /> },
   globals: desktop,
   parameters: fullWidth,
 };

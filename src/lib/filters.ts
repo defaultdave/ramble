@@ -66,7 +66,8 @@ function parseSlugList(raw: string | readonly string[] | undefined) {
   return [...slugs].sort();
 }
 
-function parseSingle<T>(
+/** The one value of a single-value parameter that passes `schema`; absent, repeated, or malformed is null. */
+export function parseSingle<T>(
   raw: string | readonly string[] | undefined,
   schema: z.ZodType<T, string>,
 ): T | null {

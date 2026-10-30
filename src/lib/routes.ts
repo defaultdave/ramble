@@ -76,6 +76,23 @@ export const giftCheckoutPath = (experienceId: string) =>
 export const checkoutPath = (holdId: string) => `/checkout/${holdId}`;
 export const orderPath = (reference: string) => `/orders/${reference}`;
 
+/** The query key that carries the order token on the confirmation URL. */
+export const orderTokenParam = 't';
+
+/**
+ * The confirmation page of an order. The order token, which only the paying device is given,
+ * travels in the query as `t`; the proxy moves it into a cookie and drops it from the address.
+ */
+export function orderConfirmationPath(
+  reference: string,
+  orderToken?: string,
+): string {
+  const base = orderPath(reference);
+  return orderToken === undefined
+    ? base
+    : `${base}?${orderTokenParam}=${encodeURIComponent(orderToken)}`;
+}
+
 // ---- Help and legal ----
 
 export const contactPath = '/contact';

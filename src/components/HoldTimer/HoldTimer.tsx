@@ -23,7 +23,6 @@ const stateClass = {
   expired: styles.expired,
 } satisfies Record<HoldTimerState, string | undefined>;
 
-// TODO(U-047b): first caller, the checkout page, which passes it to the checkout Header.
 export function HoldTimer({ now, expiresAt, ...rest }: HoldTimerProps) {
   const state = holdTimerState(now, expiresAt);
 

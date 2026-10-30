@@ -26,6 +26,7 @@ import {
   deliverEmittedEvents,
   type SimulatedDelivery,
 } from '../support/paymentEvents';
+import { dueClock } from '../support/dueClock';
 import { createFreshDatabase, type FreshDatabase } from './harness';
 import { insertHold, insertSession, minute } from './holdFixtures';
 import { createOrderParents } from './orderParents';
@@ -424,10 +425,7 @@ describe('payment.succeeded', () => {
           ),
       },
     });
-    const report = await drain.drainJobs(
-      clockModule.systemClock,
-      registryWith(unavailable),
-    );
+    const report = await drain.drainJobs(dueClock, registryWith(unavailable));
 
     expect(report).toMatchObject({ succeeded: 1, retried: 0, dead: 0 });
     expect(await attemptOf(world)).toMatchObject({ status: 'succeeded' });
@@ -447,9 +445,9 @@ describe('payment.succeeded', () => {
     expect(raise).not.toHaveBeenCalled();
 
     await client.db.execute(
-      sql`UPDATE jobs SET run_after = now() WHERE id = ${retry?.id}`,
+      sql`UPDATE jobs SET run_after = now() - interval '1 minute' WHERE id = ${retry?.id}`,
     );
-    await drain.drainJobs(clockModule.systemClock, registryWith(confirmsOrder));
+    await drain.drainJobs(dueClock, registryWith(confirmsOrder));
 
     expect((await orderOf(world)).status).toBe('confirmed');
     expect(await attemptOf(world)).toMatchObject({ status: 'succeeded' });
@@ -650,7 +648,7 @@ describe('events that belong to later units', () => {
         attempt: { status: 'succeeded' },
       });
       const id = await store(incoming(world, type));
-      const report = await drain.drainJobs(clockModule.systemClock);
+      const report = await drain.drainJobs(dueClock);
 
       expect(report).toMatchObject({ succeeded: 1, retried: 0, dead: 0 });
       expect(await eventOf(id)).toMatchObject({

@@ -28,7 +28,6 @@ export type CheckoutHeaderProps = HeaderBaseProps & {
 
 export type HeaderProps = DefaultHeaderProps | CheckoutHeaderProps;
 
-// TODO(U-047b): first caller of the checkout variant.
 export function Header(props: HeaderProps) {
   return props.variant === 'checkout' ? (
     <CheckoutHeader {...props} />

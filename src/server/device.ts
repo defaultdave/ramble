@@ -44,6 +44,17 @@ function deviceFrom(cookieValue: string, forwardedFor: string | null): Device {
 }
 
 /**
+ * The calling device if it already has a cookie, else null. It writes nothing, so a page render
+ * may call it (a render cannot set a cookie, and guest routes send none, B14). A guest with no
+ * cookie has no holds to read.
+ */
+export async function readDevice(): Promise<Device | null> {
+  const stored = (await cookies()).get(deviceCookieName)?.value;
+  if (!isDeviceCookie(stored)) return null;
+  return deviceFrom(stored, (await headers()).get('x-forwarded-for'));
+}
+
+/**
  * The calling device, from its cookie. A request with no cookie, or one that is not a value this
  * app minted, gets a new cookie in the action's response, so a guest page render never sets one
  * (guest routes send no cookies, B14). Call it from a Server Action only.

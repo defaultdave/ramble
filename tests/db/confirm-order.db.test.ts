@@ -21,6 +21,7 @@ import {
 import { fakeCardFeeMinor } from '@/lib/fakeCardFee';
 import { setEnv } from '../email/testEnv';
 import { testDevice } from '../deviceFixture';
+import { dueClock } from '../support/dueClock';
 import { createFreshDatabase, type FreshDatabase } from './harness';
 import {
   insertOtherOpenHold,
@@ -649,7 +650,7 @@ describe('concurrency', () => {
 describe('through the webhook route and the job drain', () => {
   async function drainAll() {
     for (let pass = 0; pass < 3; pass += 1) {
-      await drain.drainJobs(clockModule.systemClock);
+      await drain.drainJobs(dueClock);
     }
   }
 
@@ -724,7 +725,7 @@ describe('through the webhook route and the job drain', () => {
         kind: processProviderEventKind,
         payload: { eventId: id },
         dedupeKey: processEventDedupeKey(id, 1),
-        runAfter: new Date(Date.now() - 1000),
+        runAfter: new Date(Date.now() - 60_000),
       }),
     );
     await drainAll();

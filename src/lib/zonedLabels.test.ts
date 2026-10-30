@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   zonedDayLabel,
+  zonedClockLabel,
   zonedDeadlineLabel,
+  zonedDeadlineNoZoneLabel,
+  zonedShortDayLabel,
   zonedTimeLabel,
 } from './zonedLabels';
 
@@ -46,5 +49,30 @@ describe('zoned labels', () => {
 
   it('refuses a zone that is not an IANA name', () => {
     expect(() => zonedDayLabel(winter, 'Not/AZone')).toThrow(RangeError);
+  });
+});
+
+describe('zoned labels without the zone name', () => {
+  const start = new Date('2026-10-24T21:30:00Z');
+
+  it.each([
+    ['America/New_York', 'Sat, Oct 24', '5:30 PM', 'Sat, Oct 24, 5:30 PM'],
+    ['Asia/Tokyo', 'Sun, Oct 25', '6:30 AM', 'Sun, Oct 25, 6:30 AM'],
+    ['UTC', 'Sat, Oct 24', '9:30 PM', 'Sat, Oct 24, 9:30 PM'],
+  ])(
+    'writes the day, the clock, and the deadline in %s',
+    (zone, day, clock, deadline) => {
+      expect(zonedShortDayLabel(start, zone)).toBe(day);
+      expect(zonedClockLabel(start, zone)).toBe(clock);
+      expect(zonedDeadlineNoZoneLabel(start, zone)).toBe(deadline);
+    },
+  );
+
+  it('uses a plain space before PM', () => {
+    expect(zonedClockLabel(start, 'America/New_York')).not.toContain('\u202f');
+  });
+
+  it('refuses a zone it does not know', () => {
+    expect(() => zonedShortDayLabel(start, 'Not/AZone')).toThrow(RangeError);
   });
 });

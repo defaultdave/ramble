@@ -114,12 +114,16 @@ export function cancellationTermsLabel(
   freeCancelUntil: Date | null,
   confirmedAt: Date,
   timeZone: string,
+  deadlineLabel: (
+    instant: Date,
+    timeZone: string,
+  ) => string = zonedDeadlineLabel,
 ): string {
   if (freeCancelUntil === null) {
     return 'The cancellation terms are on your booking page.';
   }
   return confirmedAt.getTime() <= freeCancelUntil.getTime()
-    ? `Free cancellation until ${zonedDeadlineLabel(freeCancelUntil, timeZone)}.`
+    ? `Free cancellation until ${deadlineLabel(freeCancelUntil, timeZone)}.`
     : 'The free cancellation window has closed, so a cancellation now is not refunded.';
 }
 

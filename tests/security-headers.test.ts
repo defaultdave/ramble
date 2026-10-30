@@ -27,7 +27,13 @@ function isGroup(dir: string): boolean {
   return path.basename(dir).startsWith('(');
 }
 
+/** A route group inside a route group, such as `(site)` under `(checkout)`, is no part of the address. */
+function isGroupSegment(segment: string): boolean {
+  return segment.startsWith('(') && segment.endsWith(')');
+}
+
 function segmentToUrl(segment: string): string {
+  if (isGroupSegment(segment)) return '';
   if (segment.startsWith('[...')) return 'sample/unknown';
   if (segment.startsWith('[')) return 'sample';
   return segment;
@@ -55,7 +61,7 @@ function pageRoutes(): PageRoute[] {
       const dynamic = groupRendersPerRequest(group);
       return pagesUnder(path.join(appDir, group), []).map((segments) => ({
         group,
-        urlPath: `/${segments.map(segmentToUrl).join('/')}`,
+        urlPath: `/${segments.map(segmentToUrl).filter(Boolean).join('/')}`,
         dynamic,
       }));
     });

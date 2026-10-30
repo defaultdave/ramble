@@ -21,8 +21,8 @@ type BookingContentProps = {
 
 /**
  * The streamed booking controls: the bar and sheet on a phone, the panel beside the page from the
- * tablet width. They read the same upcoming sessions as the dates list (one cached read), and
- * `?date=` preselects its date.
+ * tablet width. They read the upcoming sessions with `bookingRead` (up to 60 sessions), apart from
+ * the dates list's own read of 6 rows, and `?date=` preselects its date.
  */
 export async function BookingContent({
   basics,

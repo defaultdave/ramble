@@ -15,7 +15,7 @@ import type { ReserveResult, SessionSummary } from './holds';
 // - invalid: a bad session is struck, a bad party names the limits, prices that moved ask for a reload, anything else is generic
 // - an alternative reads as day, time, and spaces on its own clock
 
-const context = { checkoutBase: '/checkout/', maxSeats: 6 };
+const context = { checkoutBase: '/checkout/', maxSeats: 6, deviceSeatLimit: 6 };
 const describeIt = (result: ReserveResult) => describeReserve(result, context);
 
 const other: SessionSummary = {
@@ -71,6 +71,16 @@ describe('describeReserve', () => {
     expect(effect.alternatives).toEqual([]);
     expect(effect.notice.similar).toBe(true);
     expect(effect.notice.body).toContain('Try fewer guests');
+  });
+
+  it("names the device's own limit, not the size of one booking", () => {
+    const effect = describeReserve(
+      { status: 'blocked', reason: 'device_limit' },
+      { ...context, maxSeats: 6, deviceSeatLimit: 4 },
+    );
+    expect(effect.kind === 'notice' && effect.notice.body).toContain(
+      'up to 4 spaces at once',
+    );
   });
 
   it('names the limit when the device holds as much as it may', () => {

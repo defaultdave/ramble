@@ -1,4 +1,5 @@
 import { Gift } from 'lucide-react';
+import { useId } from 'react';
 import { Alert } from '@/components/Alert';
 import { SimilarLink } from '@/components/BookingBar/SimilarLink';
 import { Button } from '@/components/Button';
@@ -71,6 +72,7 @@ export function BookingChoices({
   onAlternative,
 }: BookingChoicesProps) {
   const { notice, party, times } = view;
+  const timesHeadingId = useId();
   return (
     <div className={styles.choices}>
       {notice ? (
@@ -123,8 +125,14 @@ export function BookingChoices({
           </section>
           {times && view.timesHeading ? (
             <section className={styles.section}>
-              <h3 className={styles.heading}>{view.timesHeading}</h3>
-              <div className={styles.times}>
+              <h3 className={styles.heading} id={timesHeadingId}>
+                {view.timesHeading}
+              </h3>
+              <div
+                className={styles.times}
+                role="group"
+                aria-labelledby={timesHeadingId}
+              >
                 {times.map((slot) => (
                   <TimeSlot
                     key={slot.id}

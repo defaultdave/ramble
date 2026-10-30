@@ -35,6 +35,8 @@ type OutcomeContext = {
   /** `/checkout/`, passed in because the route builder imports Zod. */
   checkoutBase: string;
   maxSeats: number;
+  /** The seats one device may hold at once (PRD-17); it matches `maxSeats` today but is its own rule. */
+  deviceSeatLimit: number;
 };
 
 type NoticeOptions = {
@@ -80,13 +82,13 @@ function soldOutEffect(alternatives: SessionSummary[]): ReserveEffect {
 function blockedEffect(
   reason: 'device_limit' | 'too_many_holds',
   until: string | undefined,
-  maxSeats: number,
+  deviceSeatLimit: number,
 ): ReserveEffect {
   if (reason === 'device_limit') {
     return notice(
       'warning',
       "You're holding as many spaces as one device can",
-      `One device can hold up to ${String(maxSeats)} spaces at once. Finish booking the spaces you hold, wait for that hold to run out, or choose a smaller party.`,
+      `One device can hold up to ${String(deviceSeatLimit)} spaces at once. Finish booking the spaces you hold, wait for that hold to run out, or choose a smaller party.`,
     );
   }
   if (until === undefined) {
@@ -169,7 +171,11 @@ export function describeReserve(
     case 'sold_out':
       return soldOutEffect(result.alternatives);
     case 'blocked':
-      return blockedEffect(result.reason, result.until, context.maxSeats);
+      return blockedEffect(
+        result.reason,
+        result.until,
+        context.deviceSeatLimit,
+      );
     case 'unavailable':
       return unavailableEffect(result.reason);
     case 'invalid':

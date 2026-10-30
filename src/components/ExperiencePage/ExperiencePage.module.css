@@ -265,7 +265,19 @@
   display: none;
 }
 
+/* The page scrolls in the root element, so it carries the bar's height as scroll padding: a focused control scrolls clear of the sticky bar. The sum is the bar's own padding, its touch-target-high button, and its border. */
+:global(html):has(.page) {
+  scroll-padding-block-end: calc(
+    var(--space-3) + var(--size-touch-target) + var(--space-6) + 1px +
+      env(safe-area-inset-bottom, 0px)
+  );
+}
+
 @media (min-width: 768px) {
+  :global(html):has(.page) {
+    scroll-padding-block-end: 0;
+  }
+
   .page {
     display: grid;
     grid-template-columns: minmax(0, 1fr) calc(

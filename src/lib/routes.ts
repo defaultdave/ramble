@@ -107,20 +107,6 @@ export const legalPath = (doc: 'terms' | 'privacy') => `/legal/${doc}`;
 /** Any published document by its key, such as a host's waiver. */
 export const legalDocPath = (doc: string) => `/legal/${doc}`;
 
-/**
- * The confirmation page of an order. The order token, which only the paying device is given,
- * travels in the query as `t`.
- */
-export function orderConfirmationPath(
-  reference: string,
-  orderToken?: string,
-): string {
-  const base = orderPath(reference);
-  return orderToken === undefined
-    ? base
-    : `${base}?t=${encodeURIComponent(orderToken)}`;
-}
-
 // ---- Post-booking ----
 
 /** The manage page a booking email links to. The token is a capability: it is never logged or stored. */

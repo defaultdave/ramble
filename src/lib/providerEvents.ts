@@ -526,9 +526,9 @@ export function eventRetry(
 
 /** Whether the event is finished once the confirm step has answered, or comes back for another try. */
 export function afterConfirm(
-  status: 'confirmed' | 'unavailable',
+  status: 'confirmed' | 'already_confirmed' | 'unavailable',
 ): 'finish' | 'retry' {
-  return status === 'confirmed' ? 'finish' : 'retry';
+  return status === 'unavailable' ? 'retry' : 'finish';
 }
 
 export type ProviderEventResult =

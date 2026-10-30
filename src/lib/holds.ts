@@ -6,6 +6,7 @@ import { maxAllocation, sessionStatuses } from './sessions';
 import { jobLimits } from './jobs';
 import { sha256HexDigits, type RateLimitDecision } from './rateLimits';
 import { settingsBounds } from './settings';
+import { canTransition, type TransitionTable } from './transitions';
 
 export const holdPurposes = ['booking', 'gift_redemption'] as const;
 
@@ -194,6 +195,24 @@ export function invalidFromIssues(issues: readonly Issue[]): ReserveResult {
     status: 'invalid',
     fieldErrors: fieldErrorsFromIssues(issues, firstField),
   };
+}
+
+/**
+ * Every hold moves along this table and no other (design doc 4.2.3, Hold transitions). A released
+ * hold can still become `converted`: the upkeep releases a lapsed hold, and a payment that lands
+ * after that and finds room is confirmed all the same (`confirmOrder`, step 3).
+ */
+export const holdTransitions = {
+  active: ['paying', 'converted', 'released'],
+  paying: ['paying', 'active', 'converted', 'released'],
+  released: ['converted'],
+  converted: [],
+} as const satisfies TransitionTable<HoldStatus>;
+
+export function requireHoldTransition(from: HoldStatus, to: HoldStatus): void {
+  if (!canTransition(holdTransitions, from, to)) {
+    throw new Error(`A hold does not move from ${from} to ${to}`);
+  }
 }
 
 export type HoldTimes = {

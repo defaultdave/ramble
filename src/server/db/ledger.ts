@@ -14,6 +14,7 @@ import {
   orderLedgerSummaries,
   parseLedgerEvent,
   postOutcome,
+  providerFeeEntries,
   type AccountBalances,
   type HostStatement,
   type LedgerEntryInput,
@@ -29,7 +30,6 @@ import { requireStaff } from './staff';
 export type PostResult =
   { status: 'posted'; count: number } | { status: 'already_posted' };
 
-// TODO(U-049): first caller, confirmOrder.
 /**
  * Writes the rows of one event, all or none. It takes no locks: the caller has locked in the one
  * lock order (design doc 4.2.3 rule 1) and passes its transaction, so the rows commit with the
@@ -57,6 +57,20 @@ export async function postEntries(
       ? ({ status: 'posted', count: inserted.length } as const)
       : ({ status: 'already_posted' } as const);
   });
+}
+
+/**
+ * Posts the card fee the provider kept from a payment, under that payment's id, so a replay posts it
+ * once. A fee the provider has not reported (or a fee of nothing) posts nothing and is no error.
+ * Same rules as `postEntries`: the caller's transaction, no locks of its own. The confirm steps
+ * for a booking, a gift purchase, and a redemption with a top-up share it.
+ */
+export async function postProviderFee(
+  tx: Transaction,
+  fee: Parameters<typeof providerFeeEntries>[0],
+): Promise<PostResult | { status: 'no_fee' }> {
+  const entries = providerFeeEntries(fee);
+  return entries.length === 0 ? { status: 'no_fee' } : postEntries(tx, entries);
 }
 
 // Sums are Postgres bigints, which the driver returns as text.

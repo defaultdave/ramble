@@ -19,7 +19,7 @@ import {
   type IncomingProviderEvent,
 } from '@/lib/providerEvents';
 import { backoffSeconds } from '@/lib/jobs';
-import { confirmOrder, type ConfirmOrder } from '@/server/db/confirmOrder';
+import type { ConfirmOrder } from '@/server/db/confirmOrder';
 import { createFakePaymentsAdapter } from '@/server/ports/payments/fake';
 import { getFakePayments } from '@/server/ports/payments/gateway';
 import {
@@ -248,8 +248,12 @@ const confirmsOrder: ConfirmOrder = async (tx, input) => {
     .update(schema.orders)
     .set({ status: 'confirmed', confirmedAt: sql`clock_timestamp()` })
     .where(eq(schema.orders.id, input.orderId));
-  return { status: 'confirmed' };
+  return { status: 'confirmed', reference: 'RMB-TEST01' };
 };
+
+/** A confirm step that cannot confirm, as the seam was before the confirm step existed: the event keeps its mark and retries. */
+const unavailable: ConfirmOrder = () =>
+  Promise.resolve({ status: 'unavailable' });
 
 async function run(
   eventId: string,
@@ -397,11 +401,33 @@ describe('payment.succeeded', () => {
     expect(raise).not.toHaveBeenCalled();
   });
 
-  it('with the confirm seam of this unit, keeps the succeeded mark, schedules a retry, and alerts nobody; a working seam then confirms the order', async () => {
+  it('with a confirm seam that is unavailable, keeps the succeeded mark, schedules a retry, and alerts nobody; a working seam then confirms the order', async () => {
     await clearJobs();
     const world = await seedWorld();
     const id = await store(incoming(world, 'payment.succeeded'));
-    const report = await drain.drainJobs(clockModule.systemClock);
+    const { jobRegistry } = await import('@/server/jobs/registry');
+    const registryWith = (seam: ConfirmOrder) => ({
+      ...jobRegistry,
+      [processProviderEventKind]: {
+        ...jobRegistry[processProviderEventKind],
+        handleIdempotent: (
+          context: Parameters<
+            (typeof jobRegistry)[typeof processProviderEventKind]['handleIdempotent']
+          >[0],
+        ) =>
+          jobModule.handleProviderEvent(
+            {
+              ...context,
+              payload: ProcessProviderEventPayloadSchema.parse(context.payload),
+            },
+            { confirmOrder: seam },
+          ),
+      },
+    });
+    const report = await drain.drainJobs(
+      clockModule.systemClock,
+      registryWith(unavailable),
+    );
 
     expect(report).toMatchObject({ succeeded: 1, retried: 0, dead: 0 });
     expect(await attemptOf(world)).toMatchObject({ status: 'succeeded' });
@@ -423,23 +449,7 @@ describe('payment.succeeded', () => {
     await client.db.execute(
       sql`UPDATE jobs SET run_after = now() WHERE id = ${retry?.id}`,
     );
-    const { jobRegistry } = await import('@/server/jobs/registry');
-    await drain.drainJobs(clockModule.systemClock, {
-      ...jobRegistry,
-      [processProviderEventKind]: {
-        ...jobRegistry[processProviderEventKind],
-        handleIdempotent: (context) =>
-          jobModule.handleProviderEvent(
-            {
-              ...context,
-              payload: ProcessProviderEventPayloadSchema.parse(context.payload),
-            },
-            {
-              confirmOrder: confirmsOrder,
-            },
-          ),
-      },
-    });
+    await drain.drainJobs(clockModule.systemClock, registryWith(confirmsOrder));
 
     expect((await orderOf(world)).status).toBe('confirmed');
     expect(await attemptOf(world)).toMatchObject({ status: 'succeeded' });
@@ -454,7 +464,7 @@ describe('payment.succeeded', () => {
       .update(schema.providerEvents)
       .set({ attempts: paymentLimits.maxEventAttempts - 1 })
       .where(eq(schema.providerEvents.id, id));
-    await run(id, { confirmOrder });
+    await run(id, { confirmOrder: unavailable });
 
     expect((await eventOf(id)).attempts).toBe(paymentLimits.maxEventAttempts);
     expect(raise).toHaveBeenCalledTimes(1);

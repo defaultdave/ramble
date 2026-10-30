@@ -57,6 +57,17 @@ export function transferProviderKey(orderId: string): string {
   return `transfer:${orderId.toLowerCase()}`;
 }
 
+const millisecondsPerHour = 3_600_000;
+/** How long after a session ends its transfer waits for the weekly release (design doc 4.2.3, Transfers). */
+const releaseDelayHours = 24;
+
+/** The session's end plus 24 hours: the earliest the weekly job may release the host's share. */
+export function transferReleaseAfter(sessionEndsAt: Date): Date {
+  return new Date(
+    sessionEndsAt.getTime() + releaseDelayHours * millisecondsPerHour,
+  );
+}
+
 type TransferRuleFields = {
   orderId: string;
   amountMinor: number | null;

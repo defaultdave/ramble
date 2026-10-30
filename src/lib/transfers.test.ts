@@ -4,6 +4,7 @@ import {
   TransferSchema,
   canTransferTransition,
   transferProviderKey,
+  transferReleaseAfter,
   transferStatuses,
   transferTransitions,
   type TransferStatus,
@@ -114,5 +115,14 @@ describe('TransferSchema', () => {
     expect(TransferSchema.safeParse({ ...transfer, ...change }).success).toBe(
       false,
     );
+  });
+});
+
+describe('transferReleaseAfter', () => {
+  it.each([
+    ['2026-11-07T23:00:00Z', '2026-11-08T23:00:00Z'],
+    ['2026-12-31T23:30:00Z', '2027-01-01T23:30:00Z'],
+  ])('a session ending %s releases after %s', (ends, release) => {
+    expect(transferReleaseAfter(new Date(ends))).toEqual(new Date(release));
   });
 });

@@ -20,6 +20,10 @@ export const demoCheckoutPath = (experienceId: string) =>
 
 export const demoOrderPath = orderPath(demoOrderReference);
 
+/** Whether the reference is the fixed one the demo checkout ends at. */
+export const isDemoOrder = (reference: string) =>
+  orderPath(reference) === demoOrderPath;
+
 export type DemoSummary = {
   title: string;
   dateLabel: string;

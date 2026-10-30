@@ -2,7 +2,7 @@
 
 import {
   OrderStatusInputSchema,
-  unknownOrderStatus,
+  orderStatusResult,
   type OrderStatusInput,
   type OrderStatusResult,
 } from '@/lib/orderStatus';
@@ -17,7 +17,6 @@ export async function getOrderStatus(
   input: OrderStatusInput,
 ): Promise<OrderStatusResult> {
   const parsed = OrderStatusInputSchema.safeParse(input);
-  if (!parsed.success) return unknownOrderStatus;
-  const state = await readOrderState(parsed.data.reference, parsed.data.token);
-  return state === null ? unknownOrderStatus : { state };
+  if (!parsed.success) return orderStatusResult(null);
+  return readOrderState(parsed.data.reference, parsed.data.token);
 }

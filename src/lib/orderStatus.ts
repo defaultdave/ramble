@@ -13,7 +13,7 @@ export type OrderStatusInput = z.input<typeof OrderStatusInputSchema>;
 export type OrderStatusResult =
   { state: OrderStatusState } | { state: 'unknown' };
 
-export const unknownOrderStatus: OrderStatusResult = { state: 'unknown' };
+const unknownOrderStatus: OrderStatusResult = { state: 'unknown' };
 
 // What a guest waiting on a payment is told, and how often the page asks. The status itself is the
 // order's; this folds it into the answers design doc 4.2 gives the S9 poller.
@@ -41,6 +41,15 @@ export function orderStatusState(status: OrderStatus): OrderStatusState {
   }
 }
 
+/** The answer for an order's status, or for no order the token opens (null): the same `unknown` as every other refusal. */
+export function orderStatusResult(
+  status: OrderStatus | null,
+): OrderStatusResult {
+  return status === null
+    ? unknownOrderStatus
+    : { state: orderStatusState(status) };
+}
+
 /**
  * What the poller does with an answer. A pending order, or an answer that never arrived (a dropped
  * connection is why the guest is here), is asked about again; anything else is for the page to
@@ -54,7 +63,7 @@ export function pollStep(
 
 const delaysMs = [2_000, 3_000, 5_000, 8_000, 13_000, 20_000] as const;
 
-/** About two minutes of asking in all, then the guest is handed a button instead of a loop. */
+/** About three minutes of asking in all (171 s of waiting), then the guest is handed a button instead of a loop. */
 export const maxPollAttempts = 12;
 
 /** The wait before poll number `attempt` (0 is the first), growing to a ceiling; null once the cap is reached. */

@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { OrderConfirmation } from '@/components/OrderConfirmation';
-import { demoOrderPath } from '@/lib/demoCheckout';
+import { isDemoOrder } from '@/lib/demoCheckout';
 import { orderAccessCookieName, pickOrderToken } from '@/lib/orderAccess';
-import { orderPath, orderTokenParam } from '@/lib/routes';
+import { orderTokenParam } from '@/lib/routes';
 import { getOrderStatus } from '@/server/actions/orders';
 import { readOrderPage } from '@/server/orderConfirmation';
 import { DemoConfirmation } from './DemoConfirmation';
@@ -29,8 +29,8 @@ export default async function OrderConfirmationPage({
     searchParams,
     cookies(),
   ]);
-  // TODO(U-047b): the demo checkout ends here until the real one does.
-  if (orderPath(reference) === demoOrderPath) return <DemoConfirmation />;
+  // TODO(U-041): the demo checkout ends here until the real one does.
+  if (isDemoOrder(reference)) return <DemoConfirmation />;
 
   const token = pickOrderToken({
     cookie: jar.get(orderAccessCookieName)?.value,

@@ -3,6 +3,7 @@ import { orderStatuses, type OrderStatus } from './orders';
 import {
   OrderStatusInputSchema,
   maxPollAttempts,
+  orderStatusResult,
   orderStatusState,
   pollDelayMs,
   pollStep,
@@ -32,6 +33,17 @@ describe('orderStatusState', () => {
 
   it('refuses a status it does not know', () => {
     expect(() => orderStatusState('lost' as OrderStatus)).toThrow(RangeError);
+  });
+});
+
+describe('orderStatusResult', () => {
+  it('wraps the state of a known status', () => {
+    expect(orderStatusResult('confirmed')).toEqual({ state: 'confirmed' });
+    expect(orderStatusResult('pending_payment')).toEqual({ state: 'pending' });
+  });
+
+  it('is unknown when no order opened', () => {
+    expect(orderStatusResult(null)).toEqual({ state: 'unknown' });
   });
 });
 

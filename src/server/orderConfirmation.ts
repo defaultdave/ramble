@@ -1,6 +1,6 @@
 import 'server-only';
 import { orderPageView, type OrderPageView } from '@/lib/orderReceipt';
-import { orderStatusState, type OrderStatusState } from '@/lib/orderStatus';
+import { orderStatusResult, type OrderStatusResult } from '@/lib/orderStatus';
 import { db } from '@/server/db/client';
 import { readBookingEmailOrder } from '@/server/db/bookingEmails';
 import { readOrderStatus } from '@/server/db/orderStatus';
@@ -28,13 +28,12 @@ export async function readOrderPage(
   });
 }
 
-/** Where the order stands for the S9 poller, or null when the token does not open it. */
+/** Where the order stands for the S9 poller; `unknown` when the token does not open it. */
 export async function readOrderState(
   reference: string,
   token: string,
-): Promise<OrderStatusState | null> {
+): Promise<OrderStatusResult> {
   const opened = await resolveToken('order', token, reference);
-  if (opened === null) return null;
-  const status = await readOrderStatus(opened.id);
-  return status === null ? null : orderStatusState(status);
+  if (opened === null) return orderStatusResult(null);
+  return orderStatusResult(await readOrderStatus(opened.id));
 }

@@ -222,16 +222,16 @@ describe('the status', () => {
     const waiting = await insertOrder('pending_payment');
     expect(
       await confirmation.readOrderState(paid.reference, orderToken(paid.id)),
-    ).toBe('confirmed');
+    ).toEqual({ state: 'confirmed' });
     expect(
       await confirmation.readOrderState(
         waiting.reference,
         orderToken(waiting.id),
       ),
-    ).toBe('pending');
+    ).toEqual({ state: 'pending' });
     expect(
       await confirmation.readOrderState(waiting.reference, orderToken(paid.id)),
-    ).toBeNull();
+    ).toEqual({ state: 'unknown' });
   });
 
   it('is `unknown` from the action for a bad input, another order, and no order alike', async () => {

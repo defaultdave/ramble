@@ -49,7 +49,7 @@ Two ways reach a card. The browse cards and the home "On this week" cards get th
 
 The home Picks cards are built with no image and the page then reads their covers (`homeCardIds`, `withHomeCovers` in `src/lib/pages/home.ts`) with `getCoverPhotos(ids)` in `src/server/coverPhotos.ts`: `'use cache'`, profile `catalog`, tagged `experience:<id>` for every ID it was asked about, so a photo added to an experience reaches every card that lists it. `getHomeContent` reads its experiences with `{ covers: false }` because its entry lives under the longer `editorial` profile, which would show a new cover later than `catalog` does. Pass the IDs through `coverLookupIds` so two pages that list the same experiences in another order share one entry. A photo is decoration, so a failed read of the Picks covers costs the photos and not the page: `readGuestCovers` logs it and the cards render with no image.
 
-`listGuestCoverPhotos` takes at most `photoLimits.maxCoverLookups` IDs (240, `cardLookupLimit` in `src/lib/experienceCards.ts`, the most the home page can list) and returns one row per experience, guest-visible experiences only. A longer or malformed list is refused, never cut.
+`listGuestCoverPhotos` takes at most `photoLimits.maxCoverLookups` IDs (240, `cardLookupLimit` in `src/lib/idLookup.ts`, 20 home modules times 12 Picks candidates, the most the home page can list) and returns one row per experience, guest-visible experiences only. A longer or malformed list is refused, never cut.
 
 `Photo` (`src/components/Photo`) draws the image with `next/image`, filling its frame, with the blur placeholder. A decorative photo has an empty alt. The cards ask for `384px` from the tablet width and `100vw` below it; the horizontal card asks for `168px`.
 

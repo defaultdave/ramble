@@ -3,12 +3,12 @@ import { EntityIdSchema, guestVisibleStatuses } from '../catalog';
 import type { Category, Neighborhood } from '../catalog';
 import type { Collection, HomeModule } from '../editorial';
 import {
-  cardLookupLimit,
   cardsInOrder,
   type CardExperience,
   type ExperienceCard,
 } from '../experienceCards';
 import { hrefForFilters, noFilters } from '../filters';
+import { cardLookupLimit, idListSchema, picksCandidates } from '../idLookup';
 import { withCovers, type PhotoView } from '../photoViews';
 import type { RichTextDoc } from '../richText/format';
 import { hasContent, paragraphs } from '../richText/paragraphs';
@@ -21,7 +21,7 @@ export const homeLimits = {
   /** Cards in one Ramble Picks module; the rest are behind its "See all" link. */
   picksShown: 3,
   /** Entries of one collection looked at to find that many cards, in case some cannot be shown. */
-  picksCandidates: 12,
+  picksCandidates,
   /** Cards in the "On this week" module. */
   thisWeekShown: 4,
   /** Experiences "On this week" looks up, twice what it shows, so one that cannot be a card does not leave the module short. */
@@ -35,9 +35,7 @@ export const homeLimits = {
 } as const;
 
 /** The experience IDs one home read looks up, by the bound the page is built for. */
-export const HomeExperienceIdsSchema = z
-  .array(EntityIdSchema)
-  .max(homeLimits.maxCardIds);
+export const HomeExperienceIdsSchema = idListSchema(homeLimits.maxCardIds);
 
 // ---- What the data layer hands over ----
 

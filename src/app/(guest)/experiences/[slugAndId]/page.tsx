@@ -1,7 +1,12 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
-import { ExperienceError, ExperiencePage } from '@/components/ExperiencePage';
+import { BookingPanelSkeleton } from '@/components/BookingPanel';
+import {
+  BookingSlots,
+  ExperienceError,
+  ExperiencePage,
+} from '@/components/ExperiencePage';
 import { UpcomingSessionsSkeleton } from '@/components/UpcomingSessions';
 import {
   buildExperiencePage,
@@ -12,6 +17,7 @@ import { experiencePath, parseExperienceAddress } from '@/lib/routes';
 import { getExperiencePage } from '@/server/experiencePage';
 import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
 import { getCachedGuestSettings } from '@/server/siteSettings';
+import { BookingContent } from './BookingContent';
 import { UpcomingSessionsContent } from './UpcomingSessionsContent';
 
 export function generateStaticParams() {
@@ -49,7 +55,11 @@ export default async function ExperienceRoute({
       getCachedGuestSettings(),
     ]);
     view = data
-      ? buildExperiencePage({ ...data, giftsEnabled: settings.giftsEnabled })
+      ? buildExperiencePage({
+          ...data,
+          giftsEnabled: settings.giftsEnabled,
+          bookingsPaused: settings.bookingsPaused,
+        })
       : null;
   } catch (error) {
     rethrowOrLog('The experience page could not be read', error);
@@ -65,6 +75,19 @@ export default async function ExperienceRoute({
           <UpcomingSessionsContent
             upcoming={view.upcoming}
             bookHref={view.bookHref}
+            searchParams={searchParams}
+            retryHref={experiencePath(address)}
+          />
+        </Suspense>
+      }
+      booking={
+        <Suspense
+          fallback={
+            <BookingSlots bar={null} panel={<BookingPanelSkeleton />} />
+          }
+        >
+          <BookingContent
+            basics={view.booking}
             searchParams={searchParams}
             retryHref={experiencePath(address)}
           />

@@ -1,0 +1,62 @@
+/* The frame of the panel, at the height of a panel with only the calendar showing. */
+.skeleton {
+  box-sizing: border-box;
+  inline-size: 100%;
+  max-inline-size: calc(var(--space-16) * 6 + var(--space-4));
+  min-block-size: calc(var(--space-16) * 9);
+  padding: var(--space-6);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.price,
+.calendar,
+.action {
+  display: block;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-sunken);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.price {
+  inline-size: 50%;
+  block-size: var(--space-8);
+}
+
+.calendar {
+  block-size: calc(var(--space-16) * 5);
+}
+
+.action {
+  block-size: var(--space-12);
+}
+
+.hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .price,
+  .calendar,
+  .action {
+    animation: none;
+  }
+}

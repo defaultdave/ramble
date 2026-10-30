@@ -1,9 +1,11 @@
-/* The gutter sits on .page and the cap on the one grid column, so past the content width the column lines up with the header. */
+/* A column on a phone, so the booking bar can stick to the bottom of the whole page; a two-column grid from the tablet width. The gutter sits here and the cap on the content, so past the content width the column lines up with the header. */
 .page {
   box-sizing: border-box;
-  display: grid;
-  grid-template-columns: minmax(0, var(--size-content-max));
-  justify-content: center;
+  display: flex;
+  flex-direction: column;
+  inline-size: 100%;
+  max-inline-size: calc(var(--size-content-max) + 2 * var(--size-gutter));
+  margin-inline: auto;
   padding-inline: var(--size-gutter);
   font-family: var(--font-family-body);
   color: var(--color-text-primary);
@@ -255,8 +257,54 @@
     0 0 0 4px var(--color-focus-ring);
 }
 
+/* Full width past the gutter, and sticky here so it sticks against the whole page. It keeps its place in the page flow, so it never covers the last content (PRD-11). */
+.bar {
+  position: sticky;
+  inset-block-end: 0;
+  z-index: 10;
+  order: 1;
+  margin-inline: calc(-1 * var(--size-gutter));
+}
+
+.aside {
+  display: none;
+}
+
 @media (min-width: 768px) {
+  .page {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) calc(
+        var(--space-16) * 6 + var(--space-4)
+      );
+    column-gap: var(--space-10);
+    align-items: start;
+  }
+
+  .header,
   .gallery {
+    grid-column: 1 / -1;
+  }
+
+  .header {
+    grid-row: 1;
+  }
+
+  .bar {
+    display: none;
+  }
+
+  /* The panel's row is the body's, so it sticks while the body scrolls past. */
+  .aside {
+    display: block;
+    grid-column: 2;
+    grid-row: 3;
+    position: sticky;
+    inset-block-start: var(--space-6);
+    margin-block-start: var(--space-4);
+  }
+
+  .gallery {
+    grid-row: 2;
     order: 0;
     margin-inline: 0;
   }
@@ -271,8 +319,9 @@
     display: block;
   }
 
-  /* TODO(U-041): the booking panel sits in a column beside this one. */
   .body {
+    grid-column: 1;
+    grid-row: 3;
     max-inline-size: 48rem;
     gap: var(--space-10);
     padding-block: var(--space-4) var(--space-16);

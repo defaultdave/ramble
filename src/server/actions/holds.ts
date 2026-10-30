@@ -17,7 +17,6 @@ import { getDevice } from '@/server/device';
 import { consumeRateLimit } from '@/server/ports/rate-limit';
 import { checkBot } from '@/server/ports/rate-limit/bot-check';
 
-// TODO(U-041): first caller, the booking sheet.
 /**
  * Places a hold for the calling device. The bot check and the device's try count come first, so a
  * flood is refused before it reaches a lock; a bot or a device over its limit is answered as

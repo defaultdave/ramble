@@ -127,7 +127,7 @@ export function invalidStartPayment(
 
 // ---- The rules on the form ----
 
-type AgeSubject = {
+export type AgeSubject = {
   ageRule: (typeof ageRules)[number];
   minAge: number | null;
   maxAge: number | null;
@@ -145,7 +145,8 @@ export function childCount(
   );
 }
 
-function childAgeAllowed(subject: AgeSubject, age: number): boolean {
+/** Whether a child of `age` meets the experience's age rule: the one rule `attendeeIssues` enforces and the booking choices read. */
+export function childAgeAllowed(subject: AgeSubject, age: number): boolean {
   switch (subject.ageRule) {
     case 'all_ages':
       return true;

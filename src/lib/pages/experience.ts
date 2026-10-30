@@ -6,13 +6,18 @@ import {
   type Neighborhood,
 } from '../catalog';
 import { MAX_FULL_REFUND_HOURS } from '../cancellation';
+import { childAgeAllowed } from '../checkout';
 import { demoCheckoutPath } from '../demoCheckout';
 import { presentText, textLines } from '../displayText';
+import { holdLimits } from '../holds';
+import { orderLimits } from '../orders';
 import type { GuestPhoto } from '../photos';
 import { photoView, type PhotoView } from '../photoViews';
 import { perPersonAmount, type CardPriceOption } from '../pricing';
+import type { BookingOffer } from '../bookingDraft';
 import {
   categoryPath,
+  checkoutPath,
   giftCheckoutPath,
   neighborhoodPath,
   privateSessionPath,
@@ -120,6 +125,22 @@ export function cancellationTerms(
     fact: `Free cancellation up to ${window} before`,
     detail: `Free cancellation up to ${window} before start. After that, no refund. ${refunded}`,
   };
+}
+
+/** The ages a child may be, or null when the experience takes no children: no child price, or an age rule that leaves no age under 18. */
+export function childAgeRange(
+  experience: AgeFields & Pick<GuestExperience, 'priceOptions'>,
+): { min: number; max: number } | null {
+  if (!experience.priceOptions.some((option) => option.kind === 'child')) {
+    return null;
+  }
+  const ages = Array.from(
+    { length: orderLimits.maxChildAge + 1 },
+    (_, age) => age,
+  ).filter((age) => childAgeAllowed(experience, age));
+  const min = ages[0];
+  const max = ages.at(-1);
+  return min === undefined || max === undefined ? null : { min, max };
 }
 
 // ---- Prices ----
@@ -330,6 +351,15 @@ type ExperienceBadge = {
   icon?: 'outdoor';
 };
 
+/** What the booking choices know before the dates arrive; the route adds the sessions. */
+export type BookingBasics = Omit<
+  BookingOffer,
+  'today' | 'sessions' | 'preselectedDate'
+> & {
+  /** How long before the start a booking can still be cancelled for a full refund. */
+  fullRefundHoursBefore: number;
+};
+
 export type ExperiencePageView = {
   title: string;
   breadcrumb: { label: string; href: string }[];
@@ -350,7 +380,8 @@ export type ExperiencePageView = {
   cancellation: string;
   /** Goes to the gift checkout, or null while gifts are switched off. */
   giftHref: string | null;
-  /** Goes to the checkout. TODO(U-041): replaced by the booking bar and panel, which hold a session first. */
+  booking: BookingBasics;
+  /** Goes to the checkout. TODO(U-041): remove the demo click-through when the checkout page lands. */
   bookHref: string;
   privateSessionHref: string;
 };
@@ -360,6 +391,7 @@ export type ExperiencePageInput = {
   photos: readonly GuestPhoto[];
   place: Place;
   giftsEnabled: boolean;
+  bookingsPaused: boolean;
 };
 
 function badgesFor(experience: GuestExperience): ExperienceBadge[] {
@@ -384,7 +416,7 @@ function badgesFor(experience: GuestExperience): ExperienceBadge[] {
 export function buildExperiencePage(
   input: ExperiencePageInput,
 ): ExperiencePageView | null {
-  const { experience, photos, place, giftsEnabled } = input;
+  const { experience, photos, place, giftsEnabled, bookingsPaused } = input;
   if (experience.status === 'guide_only') return null;
 
   const cancellation = cancellationTerms(experience.cancellationTier);
@@ -452,6 +484,28 @@ export function buildExperiencePage(
     weather: weather?.detail ?? null,
     cancellation: cancellation.detail,
     giftHref: giftsEnabled ? giftCheckoutPath(experience.id) : null,
+    booking: {
+      experienceId: experience.id,
+      title: experience.name,
+      options: experience.priceOptions.map(
+        ({ id, kind, priceMinor, usesSpace }) => ({
+          id,
+          kind,
+          priceMinor,
+          usesSpace,
+        }),
+      ),
+      childAges: childAgeRange(experience),
+      ageNote: ageLabel(experience),
+      twentyOnePlus: experience.ageRule === 'twenty_one_plus',
+      maxSeats: holdLimits.maxSeats,
+      giftsEnabled,
+      paused: bookingsPaused,
+      checkoutBase: checkoutPath(''),
+      similarHref: categoryPath(place.category.slug),
+      privateSessionHref: privateSessionPath,
+      fullRefundHoursBefore: experience.cancellationTier.fullRefundHoursBefore,
+    },
     bookHref: demoCheckoutPath(experience.id),
     privateSessionHref: privateSessionPath,
   };

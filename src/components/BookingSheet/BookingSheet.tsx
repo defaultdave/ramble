@@ -14,7 +14,6 @@ export type BookingSheetProps = {
   footer?: ReactNode;
 };
 
-// TODO(U-041): first caller
 export function BookingSheet({
   open,
   onClose,

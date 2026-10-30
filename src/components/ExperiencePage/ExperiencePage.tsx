@@ -20,6 +20,8 @@ export type ExperiencePageProps = {
   view: ExperiencePageView;
   /** The upcoming dates, which the route streams in behind a skeleton of their own height. */
   dates: ReactNode;
+  /** The booking bar and panel (`BookingSlots`), which the route streams in. Left out where the page has no bookable dates to offer. */
+  booking?: ReactNode;
 };
 
 const factIcon = {
@@ -50,10 +52,10 @@ function Section({
 
 /**
  * The content of an experience page: its photos, what it is, what it costs, and the terms a guest
- * agrees to before choosing a date, with the upcoming dates in a slot the route fills. The
- * booking controls are another unit's.
+ * agrees to before choosing a date, with the upcoming dates and the booking controls in slots the
+ * route fills.
  */
-export function ExperiencePage({ view, dates }: ExperiencePageProps) {
+export function ExperiencePage({ view, dates, booking }: ExperiencePageProps) {
   return (
     <article className={styles.page}>
       <header className={styles.header}>
@@ -117,7 +119,6 @@ export function ExperiencePage({ view, dates }: ExperiencePageProps) {
 
         <Section heading="Upcoming dates">{dates}</Section>
 
-        {/* TODO(U-041): the booking bar and sheet on a phone, and the panel beside this column from the tablet width. */}
         <div className={styles.action}>
           <ButtonLink href={view.bookHref} variant="primary" size="lg">
             Book
@@ -211,6 +212,28 @@ export function ExperiencePage({ view, dates }: ExperiencePageProps) {
           </Link>
         </div>
       </div>
+      {booking}
     </article>
+  );
+}
+
+export type BookingSlotsProps = {
+  /** The booking bar and its sheet, shown below the tablet width. */
+  bar: ReactNode;
+  /** The booking panel, shown beside the page from the tablet width. */
+  panel: ReactNode;
+};
+
+/**
+ * Where the booking controls sit on the page: the bar sticks to the bottom of the viewport on a
+ * phone (PRD-11), and the panel takes the second column from the tablet width and follows the
+ * scroll. Each is hidden where the other shows.
+ */
+export function BookingSlots({ bar, panel }: BookingSlotsProps) {
+  return (
+    <>
+      <div className={styles.bar}>{bar}</div>
+      <aside className={styles.aside}>{panel}</aside>
+    </>
   );
 }

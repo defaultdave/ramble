@@ -1,5 +1,15 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { ExperienceError, ExperiencePage } from '@/components/ExperiencePage';
+import { fn } from 'storybook/test';
+import { BookingBar } from '@/components/BookingBar';
+import { BookingChoices } from '@/components/BookingChoices';
+import { BookingPanel, BookingPanelSkeleton } from '@/components/BookingPanel';
+import {
+  BookingSlots,
+  ExperienceError,
+  ExperiencePage,
+} from '@/components/ExperiencePage';
+import { bookingReducer, choicesView, initialState } from '@/lib/bookingDraft';
+import { kayakOffer } from '@/lib/bookingDraft.fixtures';
 import {
   UpcomingSessions,
   UpcomingSessionsSkeleton,
@@ -33,6 +43,40 @@ const meta = {
 
 export default meta;
 type Story = StoryObj<typeof meta>;
+
+// The booking controls as the route fills them, drawn from the same reducer without the Server Action
+// the islands call: the bar on a phone, the panel from the tablet width.
+const view = choicesView(
+  kayakOffer,
+  bookingReducer(kayakOffer, initialState(kayakOffer), {
+    type: 'chooseDate',
+    date: '2026-10-24',
+  }),
+);
+const booking = (
+  <BookingSlots
+    bar={
+      <BookingBar
+        priceMinor={6500}
+        nextDate="Thu, Oct 22"
+        onChooseDate={fn()}
+      />
+    }
+    panel={
+      <BookingPanel priceMinor={6500} onContinue={fn()}>
+        <BookingChoices
+          view={view}
+          similarHref={kayakOffer.similarHref}
+          onDate={fn()}
+          onSession={fn()}
+          onAdults={fn()}
+          onChildren={fn()}
+          onAlternative={fn()}
+        />
+      </BookingPanel>
+    }
+  />
+);
 
 const mobile = { viewport: { value: 'mobile1', isRotated: false } };
 const desktop = { viewport: { value: 'desktop', isRotated: false } };
@@ -69,6 +113,25 @@ export const BareMobile: Story = {
 };
 export const BareDesktop: Story = {
   args: { view: bareExperience },
+  globals: desktop,
+  parameters: fullWidth,
+};
+
+// The booking controls in place (Figma 03 with its bar, D03 with its panel).
+export const WithBookingMobile: Story = {
+  args: { booking },
+  globals: mobile,
+};
+export const WithBookingDesktop: Story = {
+  args: { booking },
+  globals: desktop,
+  parameters: fullWidth,
+};
+// The booking controls still streaming in: the panel's column holds its height.
+export const LoadingBookingDesktop: Story = {
+  args: {
+    booking: <BookingSlots bar={null} panel={<BookingPanelSkeleton />} />,
+  },
   globals: desktop,
   parameters: fullWidth,
 };

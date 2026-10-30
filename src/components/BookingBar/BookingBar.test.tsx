@@ -81,6 +81,16 @@ describe('BookingBar sold out', () => {
   });
 });
 
+describe('BookingBar paused', () => {
+  it('says bookings are paused and offers nothing to press', () => {
+    render(<BookingBar state="paused" />);
+    expect(screen.getByText('Bookings are paused')).toBeVisible();
+    expect(screen.getByText('Please check back soon')).toBeVisible();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+});
+
 describe('BookingBar props', () => {
   it('rejects className and style', () => {
     expectTypeOf<ComponentProps<typeof BookingBar>>().not.toHaveProperty(

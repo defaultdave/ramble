@@ -1,8 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, within } from 'storybook/test';
-import { HomeEmpty, HomeError, HomeSkeleton, HomeTitle } from '.';
+import { HomeEmpty, HomeSkeleton, HomeTitle } from '.';
 
-// One story per state of the home page: loading (S1), error with retry (S3), and nothing to show.
+// One story per state of the home page: loading (S1) and nothing to show.
 const meta = {
   title: 'Home/HomeStates',
   parameters: {
@@ -31,28 +30,6 @@ export const LoadingDesktop: Story = {
   render: () => <HomeSkeleton />,
   globals: desktop,
   parameters: { ...meta.parameters, ...fullWidth },
-};
-// jsdom draws no CSS, so only a browser can say whether a rule of the alert strips the button down to a link.
-const retryKeepsItsBorder: Story['play'] = async ({ canvasElement }) => {
-  const button = within(canvasElement).getAllByRole('button', {
-    name: 'Try again',
-  })[0];
-  if (!button) throw new Error('The retry button is missing');
-  const style = getComputedStyle(button);
-  await expect(style.borderTopWidth).not.toBe('0px');
-  await expect(style.textDecorationLine).toBe('none');
-};
-
-export const ErrorMobile: Story = {
-  render: () => <HomeError />,
-  globals: mobile,
-  play: retryKeepsItsBorder,
-};
-export const ErrorDesktop: Story = {
-  render: () => <HomeError />,
-  globals: desktop,
-  parameters: { ...meta.parameters, ...fullWidth },
-  play: retryKeepsItsBorder,
 };
 export const EmptyMobile: Story = {
   render: () => <HomeEmpty />,

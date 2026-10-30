@@ -1,3 +1,4 @@
+import { mapsHref } from './maps';
 import { describe, expect, it } from 'vitest';
 import type { BookingEmailSource } from './bookingEmails';
 import {
@@ -8,7 +9,6 @@ import {
 } from './bookingEmails.fixtures';
 import {
   confirmationHeading,
-  mapsSearchUrl,
   orderPageView,
   sellerOfRecordLine,
 } from './orderReceipt';
@@ -74,8 +74,17 @@ describe('orderPageView, confirmed', () => {
 
   it('opens the meeting point in a maps search', () => {
     expect(receipt.mapsUrl).toBe(
-      'https://www.google.com/maps/search/?api=1&query=Pier+40%2C+West+Side+Highway+at+Houston+Street',
+      mapsHref('Pier 40, West Side Highway at Houston Street'),
     );
+    expect(receipt.mapsUrl).toContain('New%20York');
+  });
+
+  it('searches only the first sentence of the meeting point, as the experience page does', () => {
+    const note = 'Pier 26 boathouse. The exact door is in your confirmation.';
+    const page = view({ ...orderA, meetingPoint: note });
+    if (page.kind !== 'confirmed') throw new Error('expected a receipt');
+    expect(page.receipt.mapsUrl).toBe(mapsHref(note));
+    expect(page.receipt.mapsUrl).not.toContain('exact');
   });
 
   it('says the host is the seller and Ramble its agent', () => {
@@ -143,17 +152,6 @@ describe('confirmationHeading', () => {
     ['', "You're booked"],
   ])('greets %j as %j', (name, expected) => {
     expect(confirmationHeading(name)).toBe(expected);
-  });
-});
-
-describe('mapsSearchUrl', () => {
-  it.each([null, '', '   '])('is null for %j', (point) => {
-    expect(mapsSearchUrl(point)).toBeNull();
-  });
-
-  it('clips a meeting point that runs long', () => {
-    const url = new URL(mapsSearchUrl('x'.repeat(1000)) ?? '');
-    expect(url.searchParams.get('query')?.length).toBeLessThanOrEqual(300);
   });
 });
 

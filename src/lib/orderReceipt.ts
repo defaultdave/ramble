@@ -6,6 +6,7 @@ import {
 } from './bookingEmails';
 import { calendarFilename } from './email/bookingTemplates';
 import { buildIcs } from './ics';
+import { mapsHref } from './maps';
 import { orderStatusState, type OrderStatusState } from './orderStatus';
 import { browsePath, managePath } from './routes';
 import { oneLineClipped } from './text';
@@ -67,16 +68,6 @@ export function confirmationHeading(leadGuestName: string | null): string {
   return name === 'there'
     ? "You're booked"
     : `You're booked, ${name.split(' ')[0] ?? name}`;
-}
-
-/** A map search for the meeting point, which opens the guest's maps app on a phone. */
-export function mapsSearchUrl(meetingPoint: string | null): string | null {
-  const text = oneLineClipped(meetingPoint ?? '', 300);
-  if (text === '') return null;
-  const url = new URL('https://www.google.com/maps/search/');
-  url.searchParams.set('api', '1');
-  url.searchParams.set('query', text);
-  return url.toString();
 }
 
 function icsDataHref(ics: string): string {
@@ -159,7 +150,7 @@ export function orderPageView(
         buildIcs(bookingCalendarEvent(source, input.appUrl)),
       ),
       icsFileName: calendarFilename,
-      mapsUrl: mapsSearchUrl(source.meetingPoint),
+      mapsUrl: mapsHref(source.meetingPoint),
       manageHref: managePath(input.manageToken),
     },
   };

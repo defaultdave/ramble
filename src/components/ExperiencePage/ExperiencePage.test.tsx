@@ -1,7 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { ExperienceError } from './ExperienceError';
 import { BookingSlots, ExperiencePage } from './ExperiencePage';
 import {
   bareExperience,
@@ -21,7 +20,6 @@ const dates = <p>The dates</p>;
 // - a section with nothing to say is left out whole, and the cancellation terms always stay
 // - two prices name who each is for
 // - the booking slot is the page's last child, with the bar and the panel in their own slots, the panel an aside
-// - the error state keeps a heading, says what went wrong, and retries with a GET form to the page's own address
 
 describe('the booking slot', () => {
   it('sits after the content, inside the article, so the bar can stick against the whole page', () => {
@@ -198,26 +196,5 @@ describe('ExperiencePage', () => {
   it('shows the gallery placeholder when there is no photo', () => {
     render(<ExperiencePage dates={dates} view={bareExperience} />);
     expect(screen.getByText('Photos are on their way')).toBeInTheDocument();
-  });
-});
-
-describe('ExperienceError', () => {
-  it('keeps a heading and says what went wrong', () => {
-    render(<ExperienceError retryHref="/experiences/kayak-1" />);
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      'Experience',
-    );
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      "We couldn't load this experience",
-    );
-  });
-
-  it('retries with a GET form to the same address', () => {
-    render(<ExperienceError retryHref="/experiences/kayak-1" />);
-    const button = screen.getByRole('button', { name: 'Try again' });
-    const form = button.closest('form');
-    expect(form).toHaveAttribute('action', '/experiences/kayak-1');
-    expect(form).toHaveAttribute('method', 'get');
-    expect(button).toHaveAttribute('type', 'submit');
   });
 });

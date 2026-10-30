@@ -97,4 +97,9 @@
   .form {
     inline-size: 15rem;
   }
+
+  /* The retry takes its label's width, as PageError's does. */
+  .error .form {
+    inline-size: auto;
+  }
 }

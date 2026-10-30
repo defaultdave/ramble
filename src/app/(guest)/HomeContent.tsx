@@ -1,7 +1,8 @@
 import { connection } from 'next/server';
 import { HomeModules } from '@/components/HomeModules';
 import { RichText } from '@/components/RichText';
-import { HomeEmpty, HomeError, HomeTitle } from '@/components/HomeStates';
+import { HomeEmpty, HomeTitle } from '@/components/HomeStates';
+import { PageError } from '@/components/PageError';
 import { buildHomePage, homeCardIds, withHomeCovers } from '@/lib/pages/home';
 import { minuteAsOf } from '@/lib/time';
 import { venueToday } from '@/lib/venue';
@@ -31,7 +32,14 @@ export async function HomeContent() {
     page = withHomeCovers(built, covers);
   } catch (error) {
     rethrowOrLog('The home page could not be read', error);
-    return <HomeError />;
+    return (
+      <PageError
+        title="Ramble"
+        alertTitle="We couldn't load the home page"
+        alertBody="Something went wrong on our side. Try again in a moment."
+        retryHref="/"
+      />
+    );
   }
 
   if (page.kind === 'empty') return <HomeEmpty />;

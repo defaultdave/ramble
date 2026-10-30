@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { BookingPanel } from '@/components/BookingPanel';
 import { BookingChoices, BookingModeSwitch } from '@/components/BookingChoices';
 import { useBookingDraft } from '@/components/BookingChoices/useBookingDraft';
@@ -15,6 +16,17 @@ import {
 /** The booking panel beside the page on a wide screen: the same choices as the sheet, in place, with Continue under them. */
 export function BookingPanelIsland({ offer }: { offer: BookingOffer }) {
   const { state, handlers, submit } = useBookingDraft(offer);
+  const { notice } = state;
+  // A refusal can leave Continue disabled (the time is struck), so focus would fall to the page; the notice takes it and is read out.
+  useEffect(() => {
+    if (notice) {
+      document
+        .querySelector<HTMLElement>(
+          'section[aria-label="Book this experience"] [data-booking-notice]',
+        )
+        ?.focus();
+    }
+  }, [notice]);
   const priceMinor = lowestPriceMinor(offer);
   const bar = barView(offer, state);
   if (bar.state === 'paused') {

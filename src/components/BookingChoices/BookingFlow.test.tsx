@@ -378,6 +378,20 @@ describe('where a refusal shows', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('moves focus to the notice when the panel is refused, so it is read out and focus is not lost', async () => {
+    mocks.reserve.mockResolvedValue({
+      status: 'unavailable',
+      reason: 'session_cancelled',
+    });
+    render(<BookingPanelIsland offer={kayakOffer} />);
+    await userEvent.click(day('Saturday, October 24, 2026'));
+    await userEvent.click(screen.getByRole('button', { name: /5:30 PM EDT/ }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Continue · $130.00' }),
+    );
+    expect(screen.getByRole('alert')).toHaveFocus();
+  });
+
   it("shows the notice in the sheet when the sheet's Continue is refused", async () => {
     mocks.reserve.mockResolvedValue(soldOut);
     render(<Page offer={kayakOffer} />);

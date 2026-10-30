@@ -77,6 +77,8 @@ export function BookingChoices({
     <div className={styles.choices}>
       {notice ? (
         <Alert
+          data-booking-notice=""
+          tabIndex={-1}
           tone={notice.tone}
           title={notice.title}
           body={notice.body}

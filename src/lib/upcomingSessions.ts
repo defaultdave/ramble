@@ -15,6 +15,43 @@ import { zonedShortDayLabel, zonedTimeLabel } from './zonedLabels';
  */
 export const upcomingSessionLimits = { maxRows: 6, windowDays: 90 } as const;
 
+/**
+ * How much of the schedule the booking choices read: the sessions of the next 60 days, at most 60.
+ * The calendar needs every bookable date, so this is wider than the list; the cap keeps a cold
+ * cache to at most 60 spaces-left reads, one per session shown, and a session beyond it is not offered.
+ */
+export const bookingSessionLimits = {
+  maxSessions: 60,
+  windowDays: 60,
+} as const;
+
+/** What a read takes: how many sessions at most, within how many days. The list's own is the default. */
+export type SessionRead = { limit: number; windowDays: number };
+
+export const listRead: SessionRead = {
+  limit: upcomingSessionLimits.maxRows,
+  windowDays: upcomingSessionLimits.windowDays,
+};
+
+export const bookingRead: SessionRead = {
+  limit: bookingSessionLimits.maxSessions,
+  windowDays: bookingSessionLimits.windowDays,
+};
+
+/** A read is refused, never trimmed, when it asks for more than the widest read there is. */
+export function requireBoundedRead({ limit, windowDays }: SessionRead): void {
+  if (
+    !Number.isInteger(limit) ||
+    limit < 1 ||
+    limit > bookingSessionLimits.maxSessions ||
+    !Number.isInteger(windowDays) ||
+    windowDays < 1 ||
+    windowDays > upcomingSessionLimits.windowDays
+  ) {
+    throw new RangeError('The session read is outside its bounds');
+  }
+}
+
 /** What the data layer hands over for one session: when and where it starts. */
 export const UpcomingSessionSchema = z.object({
   id: EntityIdSchema,

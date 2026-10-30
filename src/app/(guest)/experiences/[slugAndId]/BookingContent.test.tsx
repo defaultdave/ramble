@@ -7,7 +7,7 @@ import { id } from '@/lib/pages/experience.fixtures';
 import { BookingContent } from './BookingContent';
 
 // Behaviours under test, one per decision, branch or risk:
-// - the sessions are read for the experience as of the current minute, once the query is known
+// - the sessions are read for the experience as of the current minute, once the query is known, in the booking window (60 sessions, 60 days)
 // - the bar, its sheet, and the panel are all handed the offer built from them, with the venue's date and ?date= kept when listed
 // - a failed read logs only the digest and kind, and shows the dates' error state in the panel's column with the way back
 // - a framework control-flow error is rethrown and not logged
@@ -73,6 +73,7 @@ describe('BookingContent', () => {
     expect(server.read).toHaveBeenCalledExactlyOnceWith(
       id(1),
       '2026-10-20T14:03:00.000Z',
+      { limit: 60, windowDays: 60 },
     );
   });
 

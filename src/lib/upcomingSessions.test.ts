@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { id } from './pages/experience.fixtures';
 import {
   UpcomingSessionSchema,
+  bookingRead,
+  bookingSessionLimits,
   buildUpcomingSessions,
+  listRead,
+  requireBoundedRead,
   selectedDateFrom,
   upcomingSessionLimits,
   type SessionWithSpaces,
@@ -15,6 +19,7 @@ import {
 // - a sold-out session stays listed, marked sold out, with no link; every other row links to booking
 // - a session with no spaces figure (not visible to guests) is left out, and a list of only those is "none"
 // - no sessions at all is "none"
+// - the list reads 6 within 90 days and the booking choices 60 within 60; a read past those bounds, or not a whole number, is refused
 // - the view never holds more than the row bound, in the order given
 // - the price on each row is the card price: one price plain, two prices "From" the lowest, none when no option takes a space
 // - the row whose date (on the session's calendar, not UTC) is the one in the address is selected, and no other
@@ -203,5 +208,34 @@ describe('UpcomingSessionSchema', () => {
     expect(
       UpcomingSessionSchema.safeParse({ ...valid, ...override }).success,
     ).toBe(false);
+  });
+});
+
+describe('session reads', () => {
+  it('reads six within ninety days for the list, and sixty within sixty days for booking', () => {
+    expect(listRead).toEqual({ limit: 6, windowDays: 90 });
+    expect(bookingRead).toEqual({ limit: 60, windowDays: 60 });
+    expect(() => {
+      requireBoundedRead(listRead);
+      requireBoundedRead(bookingRead);
+    }).not.toThrow();
+  });
+
+  it.each([
+    [0, 60],
+    [61, 60],
+    [1.5, 60],
+    [Number.NaN, 60],
+    [60, 0],
+    [60, 91],
+    [60, 2.5],
+  ])('refuses a read of %s sessions in %s days', (limit, windowDays) => {
+    expect(() => {
+      requireBoundedRead({ limit, windowDays });
+    }).toThrow(RangeError);
+  });
+
+  it('keeps the booking bound as wide as the widest read', () => {
+    expect(bookingSessionLimits.maxSessions).toBe(60);
   });
 });

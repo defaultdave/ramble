@@ -8,7 +8,7 @@ import type { RawSearchParams } from '@/lib/filters';
 import type { BookingBasics } from '@/lib/pages/experience';
 import { buildBookingOffer } from '@/lib/pages/experienceBooking';
 import { minuteAsOf } from '@/lib/time';
-import { selectedDateFrom } from '@/lib/upcomingSessions';
+import { bookingRead, selectedDateFrom } from '@/lib/upcomingSessions';
 import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
 import { readUpcomingSessions } from '@/server/upcomingSessions';
 
@@ -37,7 +37,11 @@ export async function BookingContent({
 
   let sessions;
   try {
-    sessions = await readUpcomingSessions(basics.experienceId, asOf);
+    sessions = await readUpcomingSessions(
+      basics.experienceId,
+      asOf,
+      bookingRead,
+    );
   } catch (error) {
     rethrowOrLog('The booking dates could not be read', error);
     return (

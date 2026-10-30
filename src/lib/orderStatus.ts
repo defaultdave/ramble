@@ -61,6 +61,25 @@ export function pollStep(
   return result !== 'error' && result.state !== 'pending' ? 'show' : 'again';
 }
 
+/**
+ * What the status region says once an answer settles the order, until the page re-renders and
+ * replaces the region, so a screen reader hears the outcome rather than the region vanishing.
+ * Null while the order is still pending or the answer was lost.
+ */
+export function settledMessage(
+  result: OrderStatusResult | 'error',
+): string | null {
+  if (pollStep(result) === 'again' || result === 'error') return null;
+  switch (result.state) {
+    case 'confirmed':
+      return 'Payment confirmed. Loading your receipt.';
+    case 'failed':
+      return 'The payment did not go through. Loading the details.';
+    default:
+      return 'Your order has been updated. Loading the details.';
+  }
+}
+
 const delaysMs = [2_000, 3_000, 5_000, 8_000, 13_000, 20_000] as const;
 
 /** About three minutes of asking in all (171 s of waiting), then the guest is handed a button instead of a loop. */

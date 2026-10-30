@@ -1,6 +1,7 @@
 'use client';
 
 import { LoaderCircle } from 'lucide-react';
+import { useRef } from 'react';
 import { Button } from '@/components/Button';
 import type { OrderStatusInput } from '@/lib/orderStatus';
 import styles from './OrderStatusPoller.module.css';
@@ -16,10 +17,20 @@ export function OrderStatusPoller({
   token,
   check,
 }: OrderStatusPollerProps) {
-  const { gaveUp, checkAgain } = useOrderStatus({ reference, token }, check);
+  const { gaveUp, settledMessage, checkAgain } = useOrderStatus(
+    { reference, token },
+    check,
+  );
+  const region = useRef<HTMLDivElement>(null);
+
+  // "Check again" unmounts itself, which would drop keyboard focus to the top of the document.
+  const handleCheckAgain = () => {
+    checkAgain();
+    region.current?.focus();
+  };
 
   return (
-    <div role="status" className={styles.poller}>
+    <div role="status" tabIndex={-1} ref={region} className={styles.poller}>
       {gaveUp ? (
         <>
           <p className={styles.title}>This is taking longer than usual</p>
@@ -27,7 +38,7 @@ export function OrderStatusPoller({
             Your payment has not shown up yet. Please do not pay again: check
             again in a moment, or look for the confirmation email.
           </p>
-          <Button variant="secondary" onClick={checkAgain}>
+          <Button variant="secondary" onClick={handleCheckAgain}>
             Check again
           </Button>
         </>
@@ -35,7 +46,7 @@ export function OrderStatusPoller({
         <>
           <p className={styles.title}>
             <LoaderCircle className={styles.spinner} aria-hidden="true" />
-            Checking your payment
+            {settledMessage ?? 'Checking your payment'}
           </p>
           <p className={styles.body}>
             We are confirming it with the bank. This page updates on its own, so

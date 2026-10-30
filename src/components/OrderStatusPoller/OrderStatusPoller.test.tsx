@@ -11,6 +11,8 @@ import { OrderStatusPoller } from './OrderStatusPoller';
 // - any settled answer has the page render again, and the asking stops
 // - a lost answer does not stop the asking
 // - after the cap it says so, stops asking, and offers to check again, which asks from the start
+// - "Check again" removes itself, so focus moves to the status region
+// - a settled answer is announced in the status region while the page renders again
 // - it asks with the reference and the token it was given, and stops when it goes away
 
 const refresh = vi.hoisted(() => vi.fn());
@@ -113,6 +115,27 @@ describe('OrderStatusPoller', () => {
     );
     await advance(delay(0));
     expect(check).toHaveBeenCalledTimes(maxPollAttempts + 1);
+  });
+
+  it('moves focus to the status region when "Check again" removes itself', async () => {
+    const check = vi.fn(() => Promise.resolve({ state: 'pending' as const }));
+    renderPoller(check);
+    for (let attempt = 0; attempt < maxPollAttempts; attempt += 1) {
+      await advance(delay(attempt));
+    }
+    const button = screen.getByRole('button', { name: 'Check again' });
+    button.focus();
+    fireEvent.click(button);
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.getByRole('status')).toHaveFocus();
+  });
+
+  it('tells the guest the outcome while the page renders again', async () => {
+    const check = vi.fn(() => Promise.resolve({ state: 'confirmed' as const }));
+    renderPoller(check);
+    await advance(delay(0));
+    expect(screen.getByRole('status')).toHaveTextContent('Payment confirmed');
+    expect(refresh).toHaveBeenCalledTimes(1);
   });
 
   it('stops asking when it is removed', async () => {

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   pollDelayMs,
   pollStep,
+  settledMessage,
   type OrderStatusInput,
   type OrderStatusResult,
 } from '@/lib/orderStatus';
@@ -15,6 +16,8 @@ export type CheckOrderStatus = (
 export type OrderStatusPolling = {
   /** True once the polls ran out without the order settling. */
   gaveUp: boolean;
+  /** What the status region says once the order has settled and the page is about to render again; null before. */
+  settledMessage: string | null;
   /** Starts the polls again from the short delays. */
   checkAgain: () => void;
 };
@@ -31,22 +34,23 @@ export function useOrderStatus(
   const router = useRouter();
   const { reference, token } = input;
   const [attempt, setAttempt] = useState(0);
+  const [settled, setSettled] = useState<string | null>(null);
   const delay = pollDelayMs(attempt);
 
   useEffect(() => {
     if (delay === null) return;
     let cancelled = false;
     const timer = setTimeout(() => {
-      check({ reference, token }).then(
-        (result) => {
-          if (cancelled) return;
-          if (pollStep(result) === 'show') router.refresh();
-          else setAttempt((current) => current + 1);
-        },
-        () => {
-          if (!cancelled) setAttempt((current) => current + 1);
-        },
-      );
+      const settle = (result: OrderStatusResult | 'error') => {
+        if (cancelled) return;
+        if (pollStep(result) === 'show') {
+          setSettled(settledMessage(result));
+          router.refresh();
+        } else setAttempt((current) => current + 1);
+      };
+      check({ reference, token }).then(settle, () => {
+        settle('error');
+      });
     }, delay);
     return () => {
       cancelled = true;
@@ -58,5 +62,5 @@ export function useOrderStatus(
     setAttempt(0);
   }, []);
 
-  return { gaveUp: delay === null, checkAgain };
+  return { gaveUp: delay === null, settledMessage: settled, checkAgain };
 }

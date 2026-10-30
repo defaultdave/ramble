@@ -7,6 +7,7 @@ import {
   orderStatusState,
   pollDelayMs,
   pollStep,
+  settledMessage,
   type OrderStatusState,
 } from './orderStatus';
 
@@ -44,6 +45,23 @@ describe('orderStatusResult', () => {
 
   it('is unknown when no order opened', () => {
     expect(orderStatusResult(null)).toEqual({ state: 'unknown' });
+  });
+});
+
+describe('settledMessage', () => {
+  it.each([
+    ['confirmed', /^Payment confirmed/],
+    ['failed', /did not go through/],
+    ['refunded_after_lapse', /has been updated/],
+    ['closed', /has been updated/],
+    ['unknown', /has been updated/],
+  ] as const)('says the outcome for %s', (state, message) => {
+    expect(settledMessage({ state })).toMatch(message);
+  });
+
+  it('says nothing while pending or when the answer was lost', () => {
+    expect(settledMessage({ state: 'pending' })).toBeNull();
+    expect(settledMessage('error')).toBeNull();
   });
 });
 

@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StartPaymentResult } from '@/lib/checkout';
@@ -18,6 +18,19 @@ import { CheckoutPage, type CheckoutActions } from './CheckoutPage';
 
 const push = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
+
+const renders = vi.hoisted(() => ({ summary: 0 }));
+vi.mock('@/components/OrderSummary', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/components/OrderSummary')>();
+  return {
+    ...actual,
+    OrderSummary: (props: React.ComponentProps<typeof actual.OrderSummary>) => {
+      renders.summary += 1;
+      return <actual.OrderSummary {...props} />;
+    },
+  };
+});
 
 const uuid = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -459,6 +472,47 @@ describe('CheckoutPage', () => {
     expect(
       screen.getByRole('button', { name: 'Hold my spaces again' }),
     ).toBeVisible();
+  });
+
+  it('ticks the timer without re-rendering the rest of the page', () => {
+    vi.useFakeTimers();
+    try {
+      render(<CheckoutPage view={view} actions={actions()} />);
+      const before = renders.summary;
+      const text = screen.getByRole('timer').textContent;
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      expect(screen.getByRole('timer').textContent).not.toBe(text);
+      expect(renders.summary).toBe(before);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ends the hold from the timer when it runs out', () => {
+    vi.useFakeTimers();
+    try {
+      const soon = new Date(Date.now() + 2000).toISOString();
+      render(
+        <CheckoutPage
+          view={{
+            ...view,
+            expiresAt: soon,
+            serverNow: new Date().toISOString(),
+          }}
+          actions={actions()}
+        />,
+      );
+      expect(screen.queryByText('Your hold ended')).not.toBeInTheDocument();
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      expect(screen.getByText('Your hold ended')).toBeVisible();
+      expect(screen.getByRole('timer')).toHaveTextContent('Hold expired');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('holds again from the ended state and goes to the new checkout', async () => {

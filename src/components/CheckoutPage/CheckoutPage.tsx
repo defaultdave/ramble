@@ -18,7 +18,6 @@ import { Button, ButtonLink } from '@/components/Button';
 import { Checkbox } from '@/components/Checkbox';
 import { FakePaymentForm } from '@/components/FakePaymentForm';
 import { Header } from '@/components/Header';
-import { HoldTimer } from '@/components/HoldTimer';
 import { Input } from '@/components/Input';
 import { OrderSummary } from '@/components/OrderSummary';
 import {
@@ -61,7 +60,7 @@ import type { FakeConfirmInput } from '@/lib/fakePaymentInput';
 import { formatMoney } from '@/lib/money';
 import { experiencePath, orderConfirmationPath } from '@/lib/routes';
 import styles from './CheckoutPage.module.css';
-import { useHoldCountdown } from './useHoldCountdown';
+import { CheckoutHoldTimer } from './CheckoutHoldTimer';
 
 export type CheckoutActions = {
   startPayment: (input: StartPaymentInput) => Promise<StartPaymentResult>;
@@ -102,13 +101,6 @@ export function CheckoutPage({
   // The panel that replaces the form (payment, ended, sold out): focus moves to it when it shows.
   const stepRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const { now, expires } = useHoldCountdown(
-    view.expiresAt,
-    view.serverNow,
-    () => {
-      dispatch({ type: 'timer_ended' });
-    },
-  );
 
   useEffect(() => {
     if (step.step !== 'details') stepRef.current?.focus();
@@ -205,7 +197,15 @@ export function CheckoutPage({
     <>
       <Header
         variant="checkout"
-        holdTimer={<HoldTimer now={now} expiresAt={expires} />}
+        holdTimer={
+          <CheckoutHoldTimer
+            expiresAt={view.expiresAt}
+            serverNow={view.serverNow}
+            onEnd={() => {
+              dispatch({ type: 'timer_ended' });
+            }}
+          />
+        }
       />
       <main id="main" className={styles.main}>
         <div className={styles.page}>

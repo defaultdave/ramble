@@ -5,7 +5,7 @@ import { browsePath } from '@/lib/routes';
 import { DemoOrderSummary } from '../../../_demo/DemoOrderSummary';
 import { DemoPage } from '../../../_demo/DemoPage';
 
-// TODO(U-047b): goes with the demo checkout, which this is the end of.
+// TODO(U-041): goes with the demo checkout, which this is the end of.
 export function DemoConfirmation() {
   return (
     <DemoPage title="Order confirmation">

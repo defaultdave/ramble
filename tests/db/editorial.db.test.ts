@@ -2608,5 +2608,10 @@ describe('the home Picks read when many Picks are published', () => {
     );
     expect(pick).not.toHaveProperty('intro');
     expect(pick).not.toHaveProperty('items');
+
+    // The same shared read in its full shape keeps the intro and every entry.
+    const full = await editorial.getPublishedPick(`${crowd}-named`);
+    expect(full?.items).toHaveLength(experienceIds.length);
+    expect(full?.intro).toEqual(doc('A long intro'));
   });
 });

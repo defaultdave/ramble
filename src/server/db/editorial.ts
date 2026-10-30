@@ -3,6 +3,7 @@ import {
   and,
   asc,
   eq,
+  getTableColumns,
   inArray,
   isNull,
   ne,
@@ -74,19 +75,41 @@ type PageCopyKind = PageCopy['kind'];
 
 // ---- Guest reads: published content only ----
 
-async function readCollections(
+type CollectionRead = {
+  /** Entries read per collection, in order; all of them without it. The count still covers every visible entry. */
+  entryCap?: number;
+  /** False leaves the intro rich text unread. */
+  intro: boolean;
+};
+
+const columnsWithoutIntro = {
+  id: collections.id,
+  kind: collections.kind,
+  slug: collections.slug,
+  title: collections.title,
+  summary: collections.summary,
+  status: collections.status,
+  publishedAt: collections.publishedAt,
+  updatedAt: collections.updatedAt,
+};
+
+/**
+ * The one read of collections with their entries. One query: the entries of each collection come
+ * back as an ordered JSON list beside it, with the number of entries a guest can see, so a
+ * collection and its entries are read at one moment and in one round trip.
+ */
+async function readCollectionRows(
   where: SQL | undefined,
   forGuest: boolean,
-): Promise<Collection[]> {
-  // One query: the items of each collection come back as an ordered JSON list beside it, so a
-  // collection and its items are read at one moment and in one round trip.
-  const items = dbRead
+  { entryCap, intro }: CollectionRead,
+) {
+  // The window count is taken before the limit, so it counts every entry that qualifies.
+  const firstEntries = dbRead
     .select({
-      list: sql<
-        CollectionItem[]
-      >`coalesce(json_agg(json_build_object('experienceId', ${collectionItems.experienceId}, 'note', ${collectionItems.note}) order by ${collectionItems.position}), '[]'::json)`.as(
-        'list',
-      ),
+      experienceId: collectionItems.experienceId,
+      note: collectionItems.note,
+      position: collectionItems.position,
+      total: sql<number>`(count(*) over ())::int`.as('total'),
     })
     .from(collectionItems)
     .innerJoin(experiences, eq(collectionItems.experienceId, experiences.id))
@@ -96,19 +119,40 @@ async function readCollections(
         forGuest ? guestVisible : undefined,
       ),
     )
-    .as('items');
-  const rows = await dbRead
-    .select({ collection: collections, items: items.list })
+    .orderBy(asc(collectionItems.position), asc(collectionItems.experienceId))
+    .limit(entryCap ?? editorialLimits.collectionItems)
+    .as('first_entries');
+  const entries = dbRead
+    .select({
+      list: sql<
+        CollectionItem[]
+      >`coalesce(json_agg(json_build_object('experienceId', ${firstEntries.experienceId}, 'note', ${firstEntries.note}) order by ${firstEntries.position}, ${firstEntries.experienceId}), '[]'::json)`.as(
+        'list',
+      ),
+      total: sql<number>`coalesce(max(${firstEntries.total}), 0)`.as('total'),
+    })
+    .from(firstEntries)
+    .as('entries');
+  return dbRead
+    .select({
+      collection: intro ? getTableColumns(collections) : columnsWithoutIntro,
+      items: entries.list,
+      itemCount: entries.total,
+    })
     .from(collections)
-    .leftJoinLateral(items, sql`true`)
+    .leftJoinLateral(entries, sql`true`)
     .where(where)
     .orderBy(asc(collections.title), asc(collections.id))
     .limit(editorialLimits.listed);
+}
+
+async function readCollections(
+  where: SQL | undefined,
+  forGuest: boolean,
+): Promise<Collection[]> {
+  const rows = await readCollectionRows(where, forGuest, { intro: true });
   return CollectionSchema.array().parse(
-    rows.map(({ collection, items: list }) => ({
-      ...collection,
-      items: list,
-    })),
+    rows.map(({ collection, items }) => ({ ...collection, items })),
   );
 }
 
@@ -125,50 +169,25 @@ export async function listHomePicks(
 ): Promise<HomePick[]> {
   const ids = HomePickIdsSchema.parse(collectionIds);
   if (ids.length === 0) return [];
-  // The window count is taken before the limit, so it counts every visible entry.
-  const firstEntries = dbRead
-    .select({
-      experienceId: collectionItems.experienceId,
-      position: collectionItems.position,
-      total: sql<number>`(count(*) over ())::int`.as('total'),
-    })
-    .from(collectionItems)
-    .innerJoin(experiences, eq(collectionItems.experienceId, experiences.id))
-    .where(and(eq(collectionItems.collectionId, collections.id), guestVisible))
-    .orderBy(asc(collectionItems.position), asc(collectionItems.experienceId))
-    .limit(homeLimits.picksCandidates)
-    .as('first_entries');
-  const entries = dbRead
-    .select({
-      experienceIds: sql<
-        string[]
-      >`coalesce(json_agg(${firstEntries.experienceId} order by ${firstEntries.position}, ${firstEntries.experienceId}), '[]'::json)`.as(
-        'experience_ids',
-      ),
-      total: sql<number>`coalesce(max(${firstEntries.total}), 0)`.as('total'),
-    })
-    .from(firstEntries)
-    .as('entries');
-  const rows = await dbRead
-    .select({
-      id: collections.id,
-      slug: collections.slug,
-      title: collections.title,
-      summary: collections.summary,
-      itemCount: entries.total,
-      experienceIds: entries.experienceIds,
-    })
-    .from(collections)
-    .leftJoinLateral(entries, sql`true`)
-    .where(
-      and(
-        inArray(collections.id, ids),
-        publishedCollection,
-        eq(collections.kind, 'pick'),
-      ),
-    )
-    .orderBy(asc(collections.title), asc(collections.id));
-  return HomePickSchema.array().parse(rows);
+  const rows = await readCollectionRows(
+    and(
+      inArray(collections.id, ids),
+      publishedCollection,
+      eq(collections.kind, 'pick'),
+    ),
+    true,
+    { entryCap: homeLimits.picksCandidates, intro: false },
+  );
+  return HomePickSchema.array().parse(
+    rows.map(({ collection, items, itemCount }) => ({
+      id: collection.id,
+      slug: collection.slug,
+      title: collection.title,
+      summary: collection.summary,
+      itemCount,
+      experienceIds: items.map((item) => item.experienceId),
+    })),
+  );
 }
 
 // TODO(U-036): first caller

@@ -69,6 +69,7 @@ export const WithFilters: Story = {
       categories: ['cooking'],
       neighborhoods: ['carroll-gardens'],
       date: '2026-10-31',
+      guests: null,
     },
   },
 };

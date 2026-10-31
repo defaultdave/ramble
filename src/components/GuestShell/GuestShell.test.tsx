@@ -121,7 +121,7 @@ describe('GuestShell', () => {
     ).toEqual(['/new-york/browse', '/#picks', '/gifts']);
     expect(screen.getByRole('link', { name: /Search/ })).toHaveAttribute(
       'href',
-      '/new-york/browse',
+      '/new-york/browse?guests=2',
     );
   });
 

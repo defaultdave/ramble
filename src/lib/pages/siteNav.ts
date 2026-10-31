@@ -1,3 +1,5 @@
+import { browseHref, defaultGuests, noFilters } from '../filters';
+import { guestsLabel } from '../orderSummary';
 import {
   accessibilityPath,
   browsePath,
@@ -45,9 +47,15 @@ export const footerGroups: SiteLinkGroup[] = [
   },
 ];
 
+/** Where the header's search pill goes. It names no day, since the static shell cannot know today. */
+export const searchHref = browseHref({
+  filters: { ...noFilters, guests: defaultGuests },
+  after: null,
+});
+
 export const siteChrome = {
-  /** What the header's search pill says. It links to browse, so it names no filter it does not apply. */
-  searchLabel: 'Anywhere · Any day',
+  /** What the header's search pill says. It links to `searchHref`, so it names no filter that link does not apply. */
+  searchLabel: `Anywhere · Any day · ${guestsLabel(defaultGuests)}`,
   tagline: 'The friend who always knows what to do in New York.',
   copyright: '© 2026 Ramble. Made in Brooklyn.',
 } as const;

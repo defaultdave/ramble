@@ -32,7 +32,7 @@ describe('the checkout group site layout', () => {
     ).toHaveAttribute('href', '/new-york/browse');
     expect(
       within(header).getByRole('link', { name: /^Search:/ }),
-    ).toHaveAttribute('href', '/new-york/browse');
+    ).toHaveAttribute('href', '/new-york/browse?guests=2');
   });
 
   it('puts the footer navigation in the footer', () => {

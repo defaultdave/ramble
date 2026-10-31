@@ -107,12 +107,21 @@ function scheduledInWindow(window: SessionWindow): SQL | undefined {
 }
 
 // With `scheduledInWindow`, this mirrors `isOpenSession` in `src/lib/sessionWindow.ts` (spaces left above
-// zero), for the day queries only: a day is offered, and an experience matches it, through a session that is
-// open. The database test keeps the two together.
-const hasSpace = sql`${sessions.seatsSold} < ${sessions.allocation}`;
+// zero, and at least the party when one is given), for the session queries only: a day is offered, and an
+// experience matches a day or a party, through a session that is open. The database test keeps the two together.
+// Browse counts sold seats only, not open holds, so a session whose last spaces are held still matches.
+function hasSpaceFor(guests: number | null): SQL {
+  return guests === null
+    ? sql`${sessions.seatsSold} < ${sessions.allocation}`
+    : sql`${sessions.allocation} - ${sessions.seatsSold} >= ${guests}`;
+}
 
-function hasSessionOn(date: string | null, window: SessionWindow) {
-  if (date === null) return undefined;
+// With neither a day nor a party there is nothing to ask of a session, and an experience with none still lists.
+function hasOpenSession(
+  { date, guests }: Pick<BrowseFilters, 'date' | 'guests'>,
+  window: SessionWindow,
+) {
+  if (date === null && guests === null) return undefined;
   return exists(
     dbRead
       .select({ one: sql`1` })
@@ -121,8 +130,8 @@ function hasSessionOn(date: string | null, window: SessionWindow) {
         and(
           eq(sessions.experienceId, experiences.id),
           scheduledInWindow(window),
-          hasSpace,
-          sql`${sessionLocalDate} = ${date}::date`,
+          hasSpaceFor(guests),
+          date === null ? undefined : sql`${sessionLocalDate} = ${date}::date`,
         ),
       ),
   );
@@ -179,7 +188,9 @@ function pastCursor(cursor: BrowseCursorRow | null): SQL | undefined {
 /**
  * One page of the experiences a guest can see that match the filters, by name and then id, with the
  * row `after` names. A category or neighborhood list matches any of its values, and the date matches
- * an experience with a scheduled session that starts on that day in the window. `after` is the id
+ * an experience with a scheduled session that starts on that day in the window. Guests match an
+ * experience with a scheduled session in the window that has spaces for the whole party, on that day
+ * when a date is chosen too. `after` is the id
  * of the last experience on the previous page: the next page is every row past it in the same order,
  * so a row that appears or goes between pages moves nothing that was already shown. When no visible
  * experience has the `after` id, the page is empty and `cursor` is null, and only the cursor is read;
@@ -218,7 +229,7 @@ export async function listBrowseExperiences(
         shownInBrowse(),
         inChosenCategories(filters.categories),
         inChosenNeighborhoods(filters.neighborhoods),
-        hasSessionOn(filters.date, window),
+        hasOpenSession(filters, window),
         pastCursor(cursor),
       ),
     )
@@ -235,27 +246,32 @@ export async function listBrowseExperiences(
 
 /**
  * The stored values the calendar is worked out from, for scheduled sessions in the window of the
- * experiences the category and neighborhood filters leave. The date filter itself is not applied:
+ * experiences the category and neighborhood filters leave, with spaces for the party when guests are
+ * chosen. The date filter itself is not applied:
  * the calendar must show every day a guest could switch to. No day is decided here: a generated
  * session brings its stored date and a session entered by hand its start and zone, and `browseDays`
  * turns them into days. Each list has a hard cap.
  */
 export async function listBrowseDayRows(
-  filters: Pick<BrowseFilters, 'categories' | 'neighborhoods'>,
+  filters: Pick<BrowseFilters, 'categories' | 'neighborhoods' | 'guests'>,
   asOf: string,
 ): Promise<BrowseDayRows> {
-  const { categories: chosenCategories, neighborhoods: chosenNeighborhoods } =
-    BrowseFiltersSchema.pick({
-      categories: true,
-      neighborhoods: true,
-    }).parse(filters);
+  const {
+    categories: chosenCategories,
+    neighborhoods: chosenNeighborhoods,
+    guests,
+  } = BrowseFiltersSchema.pick({
+    categories: true,
+    neighborhoods: true,
+    guests: true,
+  }).parse(filters);
   const window = upcomingWindow(asOf, browseWindowDays);
   const shown = and(
     shownInBrowse(),
     inChosenCategories(chosenCategories),
     inChosenNeighborhoods(chosenNeighborhoods),
     scheduledInWindow(window),
-    hasSpace,
+    hasSpaceFor(guests),
   );
   const [storedDates, handEntered] = await Promise.all([
     dbRead

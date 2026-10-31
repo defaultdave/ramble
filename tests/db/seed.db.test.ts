@@ -258,6 +258,7 @@ describe('the curated seed', () => {
               categories: ['kids'],
               neighborhoods: ['williamsburg'],
               date,
+              guests: null,
             },
             after: null,
           },

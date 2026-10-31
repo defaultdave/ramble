@@ -29,6 +29,7 @@ import {
   heldResult,
   holdExpiresAt,
   holdLimits,
+  PartySizeSchema,
   invalidFromIssues,
   holdDeadline,
   isCheckoutHold,
@@ -94,6 +95,18 @@ const booking = {
   items: [{ priceOptionId: otherUuid, quantity: 2 }],
   purpose: 'booking' as const,
 };
+
+describe('PartySizeSchema', () => {
+  it.each([
+    [holdLimits.minSeats - 1, false],
+    [holdLimits.minSeats, true],
+    [holdLimits.maxSeats, true],
+    [holdLimits.maxSeats + 1, false],
+    [2.5, false],
+  ])('takes %s: %s', (size, ok) => {
+    expect(PartySizeSchema.safeParse(size).success).toBe(ok);
+  });
+});
 
 describe('ReserveInputSchema', () => {
   it('accepts a booking and lower-cases its ids', () => {

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { EntityIdSchema, SlugSchema } from './catalog';
+import { holdLimits, PartySizeSchema } from './holds';
+import { guestsLabel } from './orderSummary';
 import { browsePath } from './routes';
 import { IsoDateSchema } from './sessions';
 
@@ -8,15 +10,32 @@ export const maxFilterValues = 8;
 const maxSlugLength = 64;
 const maxCursorLength = 36;
 
-/** The one place the browse URL grammar lives: `category`, `neighborhood`, `date`, and `after`. */
+/** The one place the browse URL grammar lives: `category`, `neighborhood`, `date`, `guests`, and `after`. */
 export const browseParamNames = {
   categories: 'category',
   neighborhoods: 'neighborhood',
   date: 'date',
+  guests: 'guests',
   after: 'after',
 } as const;
 
 export type FilterListKey = 'categories' | 'neighborhoods';
+
+// Digits only, so "2.0", "+2", "0x2", and " 2" are dropped instead of read as 2.
+const GuestsParamSchema = z
+  .string()
+  .regex(/^[1-9]\d?$/)
+  .transform(Number)
+  .pipe(PartySizeSchema);
+
+/** The party a search starts with, in the hero and in the header's link to browse. */
+export const defaultGuests = 2;
+
+/** The party sizes a guest can search for, in order. */
+export const guestCounts: readonly number[] = Array.from(
+  { length: holdLimits.maxSeats - holdLimits.minSeats + 1 },
+  (_, index) => holdLimits.minSeats + index,
+);
 
 const FilterSlugSchema = z.string().max(maxSlugLength).pipe(SlugSchema);
 // Postgres returns uuids in lower case, and the cursor is compared against stored ids.
@@ -31,6 +50,7 @@ export const BrowseFiltersSchema = z.object({
   categories: z.array(FilterSlugSchema).max(maxFilterValues),
   neighborhoods: z.array(FilterSlugSchema).max(maxFilterValues),
   date: IsoDateSchema.nullable(),
+  guests: PartySizeSchema.nullable(),
 });
 export type BrowseFilters = z.infer<typeof BrowseFiltersSchema>;
 
@@ -48,6 +68,7 @@ export const noFilters: BrowseFilters = {
   categories: [],
   neighborhoods: [],
   date: null,
+  guests: null,
 };
 
 function valuesOf(raw: string | readonly string[] | undefined) {
@@ -91,6 +112,10 @@ export function parseFilters(searchParams: RawSearchParams): BrowseQuery {
         searchParams[browseParamNames.neighborhoods],
       ),
       date: parseSingle(searchParams[browseParamNames.date], IsoDateSchema),
+      guests: parseSingle(
+        searchParams[browseParamNames.guests],
+        GuestsParamSchema,
+      ),
     },
     after: parseSingle(searchParams[browseParamNames.after], CursorSchema),
   };
@@ -142,6 +167,9 @@ export function toQueryEntries({
     entries.push([browseParamNames.neighborhoods, slug]);
   }
   if (filters.date) entries.push([browseParamNames.date, filters.date]);
+  if (filters.guests !== null) {
+    entries.push([browseParamNames.guests, String(filters.guests)]);
+  }
   if (after) entries.push([browseParamNames.after, after]);
   return entries;
 }
@@ -165,7 +193,8 @@ export function activeFilterCount(filters: BrowseFilters): number {
   return (
     filters.categories.length +
     filters.neighborhoods.length +
-    (filters.date ? 1 : 0)
+    (filters.date ? 1 : 0) +
+    (filters.guests === null ? 0 : 1)
   );
 }
 
@@ -188,6 +217,64 @@ export function chipState(
   return { selected, disabled: !selected && !canAddFilterValue(filters, key) };
 }
 
+/** One chip of a group, with the address choosing it leads to. A disabled chip has no address to go to. */
+export type ChipView = {
+  key: string;
+  label: string;
+  selected: boolean;
+  disabled: boolean;
+  href: string;
+};
+
+/** The chips of a list filter, one per option, each linking to the address with it turned on or off. */
+export function listChips(
+  filters: BrowseFilters,
+  key: FilterListKey,
+  options: readonly { slug: string; name: string }[],
+): ChipView[] {
+  return options.map(({ slug, name }) => ({
+    key: slug,
+    label: name,
+    ...chipState(filters, key, slug),
+    href: hrefForFilters(toggleFilterValue(filters, key, slug)),
+  }));
+}
+
+/** The chips for each party size; the chosen one links to the address without a party, so choosing it again clears it. */
+export function guestChips(filters: BrowseFilters): ChipView[] {
+  return guestCounts.map((count) => {
+    const selected = filters.guests === count;
+    return {
+      key: String(count),
+      label: guestsLabel(count),
+      selected,
+      disabled: false,
+      href: hrefForFilters(withGuests(filters, selected ? null : count)),
+    };
+  });
+}
+
+/** What a search select offers: the value it submits and the words it shows. */
+export type SelectOption = { value: string; label: string };
+
+/** "Anywhere" first, which submits nothing, then each neighborhood by its slug. */
+export function neighborhoodOptions(
+  neighborhoods: readonly { slug: string; name: string }[],
+): SelectOption[] {
+  return [
+    { value: '', label: 'Anywhere' },
+    ...neighborhoods.map(({ slug, name }) => ({ value: slug, label: name })),
+  ];
+}
+
+/** Each party size a search offers, by its number. */
+export function guestOptions(): SelectOption[] {
+  return guestCounts.map((count) => ({
+    value: String(count),
+    label: String(count),
+  }));
+}
+
 /** Adds the slug, or removes it when it is already chosen. A full list refuses a new value. */
 export function toggleFilterValue(
   filters: BrowseFilters,
@@ -207,6 +294,13 @@ export function withDate(
   date: string | null,
 ): BrowseFilters {
   return { ...filters, date };
+}
+
+export function withGuests(
+  filters: BrowseFilters,
+  guests: number | null,
+): BrowseFilters {
+  return { ...filters, guests };
 }
 
 /**

@@ -36,6 +36,24 @@
   background: var(--color-bg-inverse);
 }
 
+.chip[aria-busy='true'] {
+  background: var(--color-bg-sunken);
+  cursor: progress;
+}
+
+/* Waiting for something to arrive: a slow pulse, and none for a guest who asked for less motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .chip[aria-busy='true'] {
+    animation: chip-busy 1s ease-in-out infinite;
+  }
+}
+
+@keyframes chip-busy {
+  50% {
+    opacity: 0.6;
+  }
+}
+
 .chip:disabled,
 .chip[aria-disabled='true'] {
   border-color: var(--color-bg-disabled);

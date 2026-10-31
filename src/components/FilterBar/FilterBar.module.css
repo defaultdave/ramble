@@ -34,14 +34,16 @@
   display: none;
 }
 
-/* Heard, not seen: says the drawer could not load. */
+/* Under the row, for everyone: says the drawer could not load. It takes no room while it is empty. */
 .status {
-  position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+  margin: 0;
+  font-size: var(--font-size-body-s);
+  line-height: var(--font-line-height-body-s);
+  color: var(--color-status-danger-text);
+}
+
+.status:not(:empty) {
+  margin-block-start: var(--space-2);
 }
 
 /* Forced colors drop the edge shadows, so the phone row shows its scrollbar to say it scrolls. */

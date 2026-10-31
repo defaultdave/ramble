@@ -31,6 +31,8 @@ type FilterRowProps = {
   /** The filter groups the drawer shows. */
   drawer: ReactNode;
   applyLabel: string;
+  /** What the row says, visibly and to a screen reader, when the drawer's code could not be fetched. */
+  loadFailedMessage: string;
   /** Where Clear all goes. It comes from the server so this file does not pull the route and catalog code into the browser. */
   clearHref: string;
   /** Changes whenever the filters do. */
@@ -52,6 +54,7 @@ type FilterRowProps = {
 export function FilterRow({
   drawer,
   applyLabel,
+  loadFailedMessage,
   clearHref,
   filtersKey,
   children,
@@ -62,9 +65,9 @@ export function FilterRow({
   const [failed, setFailed] = useState(false);
   const router = useRouter();
   const row = useRef<HTMLDivElement>(null);
+  const memory = useFocusMemory(row);
   const opener = useRef<HTMLButtonElement | null>(null);
   const waiting = useRef(false);
-  const memory = useFocusMemory();
 
   function filtersButton() {
     return row.current?.querySelector<HTMLElement>('[data-kind="filters"]');
@@ -146,7 +149,7 @@ export function FilterRow({
         {children}
       </div>
       <p role="status" className={styles.status}>
-        {failed ? 'Filters could not load. Try again.' : ''}
+        {failed ? loadFailedMessage : ''}
       </p>
       {open && Loaded ? (
         <Loaded

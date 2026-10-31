@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { drawerLoadFailedMessage } from '@/lib/filterBar';
 import { maxFilterValues, noFilters, type BrowseFilters } from '@/lib/filters';
 import { loadDrawer } from './drawerLoader';
 import { FilterBar, type FilterBarProps } from './FilterBar';
@@ -15,12 +16,14 @@ import { FilterBar, type FilterBarProps } from './FilterBar';
 // - the drawer is not mounted until opened; it opens from the three buttons with every group, by keyboard too
 // - the drawer opens only once its code has arrived: the button is busy meanwhile and a second press does nothing
 // - a failed fetch leaves it closed, says so, and a later press tries again
-// - a guest who pressed or focused elsewhere while it was arriving is not pulled into the dialog
+// - a guest who pressed or focused elsewhere while it was arriving is not pulled into the dialog, and the watch for that is removed
 // - Clear all goes to the bare address; Show results and Escape close it
 // - after a close focus goes to the button that opened it, or to Filters when that button is gone
 // - a chip that takes focus is scrolled into view in the row
 // - a chosen chip that clears itself hands focus to Filters; history moves that remove nothing focused leave focus alone
 // - the date chip shows the chosen day or "Pick a date"; the calendar opens, picks, clears, and closes on Escape or a press outside
+// - a calendar card fixed over the chip scrolls the page by the overlap; one that clears it or sits against the chip does not
+// - a press on blank space forgets the focus a history change would then wrongly claim
 // - a changed day closes the calendar, and moves focus only when it was in the control; Back and Forward and the rest of the page leave it; the same day changes nothing
 
 // jsdom has no layout, so it has nothing to scroll.
@@ -296,7 +299,7 @@ describe('a drawer that has to be fetched', () => {
     drawer.fail(new Error('chunk failed'));
 
     expect(await screen.findByRole('status')).toHaveTextContent(
-      'Filters could not load. Try again.',
+      drawerLoadFailedMessage(),
     );
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(filtersButton()).not.toHaveAttribute('aria-busy');
@@ -435,6 +438,64 @@ describe('the date chip', () => {
     await userEvent.click(document.body);
     expect(details.open).toBe(false);
   });
+
+  it('leaves focus on the page when the day changes by history after a press on blank space', async () => {
+    const { rerender } = render(bar(noFilters));
+    await userEvent.click(screen.getByText('Pick a date'));
+    await userEvent.click(document.body);
+    rerender(bar({ ...noFilters, date: '2026-11-07' }));
+    expect(document.body).toHaveFocus();
+  });
+
+  it.each([
+    [
+      'moves the page so a card over the chip does not hide it',
+      'fixed',
+      300,
+      290,
+      18,
+    ],
+    [
+      'leaves the page alone when the card clears the chip',
+      'fixed',
+      300,
+      400,
+      null,
+    ],
+    [
+      'leaves the page alone when the card is placed against the chip',
+      'absolute',
+      300,
+      290,
+      null,
+    ],
+  ] as const)(
+    '%s',
+    async (_name, position, chipBottom, cardTop, scrolledBy) => {
+      const scrollBy = vi.fn();
+      vi.stubGlobal('scrollBy', scrollBy);
+      const { details } = setup();
+      const chip = details.querySelector('summary');
+      const card = details.lastElementChild;
+      if (!chip || !card) throw new Error('No chip or card');
+      (card as HTMLElement).style.position = position;
+      chip.getBoundingClientRect = () => ({ bottom: chipBottom }) as DOMRect;
+      card.getBoundingClientRect = () => ({ top: cardTop }) as DOMRect;
+      await userEvent.click(chip);
+      await waitFor(() => {
+        expect(details.open).toBe(true);
+      });
+      if (scrolledBy === null) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(scrollBy).not.toHaveBeenCalled();
+      } else {
+        await waitFor(() => {
+          expect(scrollBy).toHaveBeenCalledWith({ top: scrolledBy });
+        });
+      }
+      vi.unstubAllGlobals();
+    },
+  );
 
   it('closes the calendar and focuses the chip when the chosen day changes and focus was in the calendar', async () => {
     const { rerender, container } = render(bar(noFilters));

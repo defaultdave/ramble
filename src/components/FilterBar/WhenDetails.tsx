@@ -33,7 +33,7 @@ export function WhenDetails({
   const details = useRef<HTMLDetailsElement>(null);
   const chip = useRef<HTMLElement>(null);
   const previous = useRef(date);
-  const memory = useFocusMemory();
+  const memory = useFocusMemory(details);
   useEffect(() => {
     if (previous.current === date) return;
     previous.current = date;

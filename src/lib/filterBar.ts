@@ -11,6 +11,11 @@ type Option = { slug: string; name: string };
 export type SelectedChip = ChipView & { hint: string };
 
 /** Read after the visible label, so the name still starts with what is on screen: "Cooking, remove filter". */
+/** What the filter bar says when the filter drawer's code could not be fetched. */
+export function drawerLoadFailedMessage(): string {
+  return 'Filters could not load. Try again.';
+}
+
 const removeFilterHint = ', remove filter';
 
 /**

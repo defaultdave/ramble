@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { selectedChips } from './filterBar';
+import { drawerLoadFailedMessage, selectedChips } from './filterBar';
 import { noFilters } from './filters';
 
 const options = {
@@ -52,5 +52,13 @@ describe('selectedChips', () => {
     expect(
       selectedChips({ ...noFilters, categories: ['gone'] }, options),
     ).toEqual([]);
+  });
+});
+
+describe('drawerLoadFailedMessage', () => {
+  it('says the filters could not load and that trying again is possible', () => {
+    expect(drawerLoadFailedMessage()).toBe(
+      'Filters could not load. Try again.',
+    );
   });
 });

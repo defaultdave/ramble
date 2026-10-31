@@ -3,7 +3,7 @@ import { ButtonLink } from '@/components/Button';
 import { ChipLink } from '@/components/Chip';
 import { DatePicker } from '@/components/DatePicker';
 import { dateChipLabel } from '@/lib/pages/browse';
-import { selectedChips } from '@/lib/filterBar';
+import { drawerLoadFailedMessage, selectedChips } from '@/lib/filterBar';
 import {
   activeFilterCount,
   guestChips,
@@ -122,6 +122,7 @@ export function FilterBar({
         filtersKey={toQuery({ filters, after: null })}
         // The number of results is not read for the bar, so the button cannot say how many.
         applyLabel="Show results"
+        loadFailedMessage={drawerLoadFailedMessage()}
         clearHref={browsePath}
         drawer={
           <>

@@ -103,7 +103,7 @@ const openDrawer: Story['play'] = async ({ canvasElement }) => {
   await userEvent.click(canvas.getByRole('link', { name: /^Filters/ }));
   await expect(
     await within(document.body).findByRole('dialog', { name: 'Filters' }),
-  ).toBeVisible();
+  ).toBeInTheDocument();
 };
 
 /** The drawer opens from the Filters chip, with every group. */

@@ -292,10 +292,6 @@
     gap: var(--space-5);
   }
 
-  .headingLines > .bar:nth-child(4) {
-    display: block;
-  }
-
   .art {
     order: 0;
     flex: 0 1 40%;
@@ -327,13 +323,6 @@
   }
 }
 
-/* With room beside the art the copy wraps onto fewer lines. */
-@media (min-width: 1024px) {
-  .headingLines > .bar:nth-child(4) {
-    display: none;
-  }
-}
-
 /* The row waits for the copy column, as the hero's does. */
 @container (min-width: 736px) {
   .search {
@@ -347,12 +336,6 @@
   }
 }
 
-@media (min-width: 1200px) {
-  .headingLines > .bar:nth-child(3) {
-    display: none;
-  }
-}
-
 /* The default hero copy wraps onto 3 lines below 430px, 2 below 1232px and 1 from there, at 18px in Inter. */
 @media (min-width: 430px) {
   .bodyLines > .bar:nth-child(3) {
@@ -362,6 +345,38 @@
 
 @media (min-width: 1232px) {
   .bodyLines > .bar:nth-child(2) {
+    display: none;
+  }
+}
+
+/* The default hero headline wraps onto 3 lines up to 400px, 2 to 718px, 1 to 767px, then 4 beside the
+   art, 3 from 794px and 2 from 1069px. Each rule sets how many bars show from its width up. */
+@media (min-width: 401px) {
+  .headingLines > .bar:nth-child(3) {
+    display: none;
+  }
+}
+
+@media (min-width: 719px) {
+  .headingLines > .bar:nth-child(2) {
+    display: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .headingLines > .bar:nth-child(-n + 4) {
+    display: block;
+  }
+}
+
+@media (min-width: 794px) {
+  .headingLines > .bar:nth-child(4) {
+    display: none;
+  }
+}
+
+@media (min-width: 1069px) {
+  .headingLines > .bar:nth-child(3) {
     display: none;
   }
 }

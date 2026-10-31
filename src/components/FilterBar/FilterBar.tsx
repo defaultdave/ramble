@@ -3,17 +3,14 @@ import { ButtonLink } from '@/components/Button';
 import { ChipLink } from '@/components/Chip';
 import { DatePicker } from '@/components/DatePicker';
 import { dateChipLabel } from '@/lib/pages/browse';
-import { guestsLabel } from '@/lib/orderSummary';
 import {
   activeFilterCount,
-  chipState,
-  guestCounts,
+  guestChips,
   hrefForFilters,
-  toggleFilterValue,
+  listChips,
   withDate,
-  withGuests,
   type BrowseFilters,
-  type FilterListKey,
+  type ChipView,
 } from '@/lib/filters';
 import { browsePath } from '@/lib/routes';
 import styles from './FilterBar.module.css';
@@ -36,28 +33,23 @@ export type FilterBarProps = {
 
 type ChipGroupProps = {
   legend: string;
-  listKey: FilterListKey;
-  options: readonly FilterOption[];
-  filters: BrowseFilters;
+  chips: readonly ChipView[];
 };
 
-function ChipGroup({ legend, listKey, options, filters }: ChipGroupProps) {
+function ChipGroup({ legend, chips }: ChipGroupProps) {
   return (
     <fieldset className={styles.group}>
       <legend className={styles.legend}>{legend}</legend>
       <div className={styles.chips}>
-        {options.map(({ slug, name }) => {
-          const { selected, disabled } = chipState(filters, listKey, slug);
-          return (
-            <ChipLink
-              key={slug}
-              label={name}
-              selected={selected}
-              disabled={disabled}
-              href={hrefForFilters(toggleFilterValue(filters, listKey, slug))}
-            />
-          );
-        })}
+        {chips.map(({ key, label, selected, disabled, href }) => (
+          <ChipLink
+            key={key}
+            label={label}
+            selected={selected}
+            disabled={disabled}
+            href={href}
+          />
+        ))}
       </div>
     </fieldset>
   );
@@ -104,35 +96,14 @@ export function FilterBar({
           </div>
         </WhenDetails>
       </fieldset>
-      <fieldset className={styles.group}>
-        <legend className={styles.legend}>Guests</legend>
-        <div className={styles.chips}>
-          {guestCounts.map((count) => {
-            const selected = filters.guests === count;
-            return (
-              <ChipLink
-                key={count}
-                label={guestsLabel(count)}
-                selected={selected}
-                href={hrefForFilters(
-                  withGuests(filters, selected ? null : count),
-                )}
-              />
-            );
-          })}
-        </div>
-      </fieldset>
+      <ChipGroup legend="Guests" chips={guestChips(filters)} />
       <ChipGroup
         legend="Neighborhood"
-        listKey="neighborhoods"
-        options={neighborhoods}
-        filters={filters}
+        chips={listChips(filters, 'neighborhoods', neighborhoods)}
       />
       <ChipGroup
         legend="Category"
-        listKey="categories"
-        options={categories}
-        filters={filters}
+        chips={listChips(filters, 'categories', categories)}
       />
       {activeFilterCount(filters) > 0 ? (
         <div className={styles.clear}>

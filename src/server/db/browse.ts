@@ -109,6 +109,7 @@ function scheduledInWindow(window: SessionWindow): SQL | undefined {
 // With `scheduledInWindow`, this mirrors `isOpenSession` in `src/lib/sessionWindow.ts` (spaces left above
 // zero, and at least the party when one is given), for the session queries only: a day is offered, and an
 // experience matches a day or a party, through a session that is open. The database test keeps the two together.
+// Browse counts sold seats only, not open holds, so a session whose last spaces are held still matches.
 function hasSpaceFor(guests: number | null): SQL {
   return guests === null
     ? sql`${sessions.seatsSold} < ${sessions.allocation}`

@@ -19,7 +19,8 @@ import { SeedStepError } from '@/lib/seed/decide';
 import { ForbiddenError, Role, type Caller } from '@/server/auth/caller';
 import { curated } from '@/lib/seed/fixtures';
 import { planSessions } from '@/lib/seed/plan';
-import { experienceId } from '@/lib/seed/rows';
+import { maxScaleExperiences } from '@/lib/seed/args';
+import { experienceId, hostNotificationEmail, hostRow } from '@/lib/seed/rows';
 import { generateScaleFixtures } from '@/lib/seed/scale';
 import { snapshotFromFixtures } from '@/lib/seed/snapshot';
 import {
@@ -63,6 +64,8 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 // - a rerun is idempotent: no row is added, no id changes, no legal version is added, and a
 //   created-at stays; a booking that sold more than the plan is not lowered
 // - a document left as a draft by a stopped run is published by the next run, not duplicated
+// - every seeded host has the address bookings@<slug>.example, a rerun fills a host whose address
+//   is null, and the database CHECK accepts the address of the longest slug the seed can write
 // - the settings row, and so the tax rate the settings migration seeds, is not touched
 // - the scale fixture writes the requested number of experiences and hosts, passes the scale probe,
 //   repeats exactly on a second run, and keeps the zero-results state true
@@ -491,7 +494,56 @@ describe('the curated seed', () => {
     expect(invalidated).not.toContain('pick:date-night-downtown');
   });
 
+  it('gives every seeded host a booking notice address on the reserved .example domain', async () => {
+    const stored = await client.db
+      .select({ slug: hosts.slug, email: hosts.notificationEmail })
+      .from(hosts);
+    expect(stored).toHaveLength(curated.hosts.length);
+    expect(stored.map((h) => [h.slug, h.email]).sort()).toEqual(
+      curated.hosts.map((h) => [h.slug, `bookings@${h.slug}.example`]).sort(),
+    );
+  });
+
+  it('accepts, under the table CHECK, the address of the longest host slug the seed can write', async () => {
+    const longest = [
+      ...curated.hosts,
+      ...generateScaleFixtures({ experiences: maxScaleExperiences, seed: 1 })
+        .hosts,
+    ].reduce((a, b) => (b.slug.length > a.slug.length ? b : a));
+    const rolledBack = new Error('roll back the probe');
+    let accepted = false;
+    await expect(
+      client.db.transaction(async (tx) => {
+        await tx.insert(hosts).values({
+          ...hostRow({ slug: 'probe-host', name: 'Probe', description: 'D' }),
+          notificationEmail: hostNotificationEmail(longest.slug),
+        });
+        accepted = true;
+        throw rolledBack;
+      }),
+    ).rejects.toBe(rolledBack);
+    expect(accepted).toBe(true);
+  });
+
   describe('run again', () => {
+    it('fills the address of a host that has none and leaves the others alone', async () => {
+      const slug = 'hudson-paddle-club';
+      await client.db
+        .update(hosts)
+        .set({ notificationEmail: null })
+        .where(eq(hosts.slug, slug));
+      const beforeCounts = await tableCounts();
+      await runner.runSeed({ caller: seedCaller, now });
+      const stored = await client.db
+        .select({ slug: hosts.slug, email: hosts.notificationEmail })
+        .from(hosts);
+      expect(stored.find((h) => h.slug === slug)?.email).toBe(
+        `bookings@${slug}.example`,
+      );
+      expect(stored.filter((h) => h.email === null)).toEqual([]);
+      expect(await tableCounts()).toEqual(beforeCounts);
+    });
+
     it('adds nothing and changes no id, version, publication time, or created-at', async () => {
       const beforeCounts = await tableCounts();
       const beforePrint = await fingerprint();

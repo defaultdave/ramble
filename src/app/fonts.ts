@@ -5,7 +5,8 @@ const fraunces = localFont({
   variable: '--font-face-fraunces',
   weight: '100 900',
   display: 'swap',
-  fallback: ['Georgia', 'serif'],
+  adjustFontFallback: false,
+  fallback: ['Fraunces Fallback', 'Georgia', 'serif'],
 });
 
 const inter = localFont({

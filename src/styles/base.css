@@ -11,6 +11,20 @@
   }
 }
 
+/* The face shown until Fraunces arrives. It is Times New Roman scaled to Fraunces's real widths: next/font
+   would scale it by 126.68%, taken from the font's default instance, so the wordmark was 2px wider and
+   longer words wider still. 124.6% makes the wordmark the same width in both faces, and no sampled
+   string is wider than the real face by more than about 7%. The vertical overrides are Fraunces's ascent (97.8%)
+   and descent (25.5%) divided by the scale, so the baseline does not move on the swap. */
+@font-face {
+  font-family: 'Fraunces Fallback';
+  src: local('Times New Roman');
+  size-adjust: 124.6%;
+  ascent-override: 78.49%;
+  descent-override: 20.47%;
+  line-gap-override: 0%;
+}
+
 /* A full-height column so the footer meets the bottom of the window on short pages. */
 body {
   display: flex;

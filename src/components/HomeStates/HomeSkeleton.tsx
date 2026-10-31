@@ -42,6 +42,10 @@ export function HomeSkeleton() {
                   <span className={classNames(bar, styles.labelBar)} />
                   <span className={classNames(bar, styles.controlBar)} />
                 </div>
+                <div className={styles.searchField}>
+                  <span className={classNames(bar, styles.labelBar)} />
+                  <span className={classNames(bar, styles.controlBar)} />
+                </div>
                 <span className={classNames(bar, styles.submitBar)} />
               </div>
             </div>

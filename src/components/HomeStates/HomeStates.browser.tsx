@@ -18,7 +18,7 @@ vi.hoisted(() => {
 // the loaded hero takes, so the page does not move when the data arrives:
 // - the search box is as tall as the loaded one, and so is each field and the button in it
 // - a line of the headline and a line of the copy are as tall as the loaded ones
-// - the loaded copy is set in body-l, the Figma size, whatever order the stylesheets load in
+// - the loaded copy is set in body-l and text-secondary, as in Figma, whatever order the stylesheets load in
 // - the eyebrow is as tall as the loaded one
 // This runs on the fixture hero, in a real browser and with no database, and compares sizes that
 // do not depend on the words or the font. How many lines the words take is not compared here: it
@@ -44,6 +44,14 @@ const expectSame = (actual: number, expected: number | null) => {
 // A CSS module's class can read as undefined to the type checker; an empty name makes the selector throw.
 const dot = (name: string | undefined) => `.${name ?? ''}`;
 const pixels = (value: string) => Number.parseFloat(value);
+const resolvedColor = (token: string) => {
+  const probe = document.createElement('span');
+  probe.style.color = `var(${token})`;
+  document.body.append(probe);
+  const { color } = getComputedStyle(probe);
+  probe.remove();
+  return color;
+};
 
 function heroSizes() {
   const form = container.querySelector(
@@ -72,6 +80,7 @@ function heroSizes() {
       : lineOf(body),
     eyebrow: heightOf(eyebrow),
     bodySize: paragraph ? pixels(getComputedStyle(paragraph).fontSize) : null,
+    bodyColor: paragraph ? getComputedStyle(paragraph).color : null,
   };
 }
 
@@ -121,5 +130,6 @@ describe('HomeSkeleton against the loaded hero', () => {
         ),
       ),
     );
+    expect(loaded.bodyColor).toBe(resolvedColor('--color-text-secondary'));
   });
 });

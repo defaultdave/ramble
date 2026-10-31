@@ -296,10 +296,6 @@
     display: block;
   }
 
-  .bodyLines > .bar:nth-child(3) {
-    display: none;
-  }
-
   .art {
     order: 0;
     flex: 0 1 40%;
@@ -352,7 +348,19 @@
 }
 
 @media (min-width: 1200px) {
-  .headingLines > .bar:nth-child(3),
+  .headingLines > .bar:nth-child(3) {
+    display: none;
+  }
+}
+
+/* The default hero copy wraps onto 3 lines below 430px, 2 below 1232px and 1 from there, at 18px in Inter. */
+@media (min-width: 430px) {
+  .bodyLines > .bar:nth-child(3) {
+    display: none;
+  }
+}
+
+@media (min-width: 1232px) {
   .bodyLines > .bar:nth-child(2) {
     display: none;
   }

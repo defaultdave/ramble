@@ -112,6 +112,7 @@ export function FilterRow({
   function close() {
     setOpen(false);
     // Safari and Firefox do not focus a button on click, so the dialog has nothing to give focus back to.
+    // Two frames: the dialog unmounts after this handler and FocusScope then restores focus in its own frame, and this has to run after that.
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const back = opener.current;

@@ -74,15 +74,49 @@ export const WithFilters: Story = {
   },
 };
 
-/** Forty neighborhoods: a phone scrolls each row sideways inside its own box. */
-export const ManyChips: Story = {
-  args: { neighborhoods: manyNeighborhoods },
+const manyChosen = {
+  categories: categories.slice(0, 5).map(({ slug }) => slug),
+  neighborhoods: neighborhoods.map(({ slug }) => slug),
+  date: '2026-10-31',
+  guests: 4,
+};
+
+/** Every group chosen: the row grows past the screen and scrolls sideways inside its own box. */
+export const ManyChosen: Story = {
+  args: { filters: manyChosen },
 };
 
 /** The same, alone on the page, so a phone width shows whether the page itself scrolls sideways. */
-export const ManyChipsLight: Story = {
+export const ManyChosenLight: Story = {
+  args: { filters: manyChosen },
+  parameters: { colorScheme: 'light' },
+};
+
+/** Forty neighborhoods: they live in the drawer, so the row stays one row. */
+export const ManyNeighborhoods: Story = {
   args: { neighborhoods: manyNeighborhoods },
   parameters: { colorScheme: 'light' },
+};
+
+const openDrawer: Story['play'] = async ({ canvasElement }) => {
+  const canvas = within(canvasElement);
+  await userEvent.click(canvas.getByRole('button', { name: /^Filters/ }));
+  await expect(
+    await within(document.body).findByRole('dialog', { name: 'Filters' }),
+  ).toBeInTheDocument();
+};
+
+/** The drawer opens from the Filters chip, with every group. */
+export const DrawerOpen: Story = {
+  args: { filters: { ...manyChosen, categories: ['cooking'] } },
+  parameters: { colorScheme: 'light' },
+  play: openDrawer,
+};
+
+export const DrawerOpenDark: Story = {
+  args: { filters: { ...manyChosen, categories: ['cooking'] } },
+  parameters: { colorScheme: 'dark' },
+  play: openDrawer,
 };
 
 export const AtTheLimit: Story = {
@@ -150,25 +184,19 @@ export const CalendarOpenAtPhoneWidth: Story = {
   },
 };
 
-/** A stand-in for the page: a control outside the bar changes the chosen date, as the next-day link does. */
+/** A stand-in for the route: the day the calendar picks becomes the chosen date, as the Server Action's redirect does. */
 function DayChangesInPlace(args: React.ComponentProps<typeof FilterBar>) {
   const [date, setDate] = useState<string | null>(null);
   return (
-    <>
-      <FilterBar {...args} filters={{ ...args.filters, date }} />
-      <button
-        type="button"
-        onClick={() => {
-          setDate('2026-11-07');
-        }}
-      >
-        Go to Nov 7
-      </button>
-    </>
+    <FilterBar
+      {...args}
+      filters={{ ...args.filters, date }}
+      onPickDate={setDate}
+    />
   );
 }
 
-/** With the calendar open, a new day must leave focus on the chip, not on the page. */
+/** Picking a day closes the calendar and leaves focus on the chip, not on the page. */
 export const FocusStaysOnTheChipWhenTheDayChanges: Story = {
   parameters: { colorScheme: 'light' },
   render: (args) => <DayChangesInPlace {...args} />,
@@ -180,11 +208,13 @@ export const FocusStaysOnTheChipWhenTheDayChanges: Story = {
     await userEvent.click(chip);
     await waitFor(() => expect(disclosure).toHaveProperty('open', true));
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Go to Nov 7' }));
+    await userEvent.click(
+      canvas.getByRole('button', { name: /Saturday, October 31, 2026/ }),
+    );
 
     await waitFor(() => expect(disclosure).toHaveProperty('open', false));
     await waitFor(() =>
-      expect(canvas.getByText('Sat, Nov 7').closest('details')).toBe(
+      expect(canvas.getByText('Sat, Oct 31').closest('details')).toBe(
         disclosure,
       ),
     );

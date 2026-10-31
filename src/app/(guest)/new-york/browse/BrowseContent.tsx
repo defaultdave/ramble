@@ -65,21 +65,23 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
       <p role="status" className={styles.announcement}>
         {browseHeading(view)}
       </p>
-      <FilterBar
-        categories={options.categories.map(({ slug, name }) => ({
-          slug,
-          name,
-        }))}
-        neighborhoods={options.neighborhoods.map(({ slug, name }) => ({
-          slug,
-          name,
-        }))}
-        filters={filters}
-        today={venueToday(now)}
-        availableDates={dates}
-        onPickDate={chooseBrowseDate.bind(null, filters)}
-      />
-      <BrowseResults {...view} />
+      <div className={styles.band}>
+        <FilterBar
+          categories={options.categories.map(({ slug, name }) => ({
+            slug,
+            name,
+          }))}
+          neighborhoods={options.neighborhoods.map(({ slug, name }) => ({
+            slug,
+            name,
+          }))}
+          filters={filters}
+          today={venueToday(now)}
+          availableDates={dates}
+          onPickDate={chooseBrowseDate.bind(null, filters)}
+        />
+        <BrowseResults {...view} />
+      </div>
     </>
   );
 }

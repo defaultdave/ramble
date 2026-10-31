@@ -34,16 +34,29 @@
   display: none;
 }
 
+/* Heard, not seen: says the drawer could not load. */
+.status {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Forced colors drop the edge shadows, so the phone row shows its scrollbar to say it scrolls. */
+@media (forced-colors: active) and (max-width: 767px) {
+  .row {
+    scrollbar-width: auto;
+  }
+
+  .row::-webkit-scrollbar {
+    display: block;
+  }
+}
+
 .row > * {
   flex: none;
-}
-
-.opener {
-  composes: chip from '../Chip/Chip.module.css';
-}
-
-.count {
-  composes: count from '../Chip/Chip.module.css';
 }
 
 .dateChip {

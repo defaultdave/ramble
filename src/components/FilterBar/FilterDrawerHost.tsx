@@ -3,24 +3,29 @@
 import { useRouter } from 'next/navigation';
 import {
   createContext,
-  lazy,
-  Suspense,
   useContext,
   useEffect,
   useRef,
   useState,
+  type MouseEvent,
   type ReactNode,
 } from 'react';
+import { DisclosureChip } from '@/components/Chip';
+import type { FilterDrawer } from '@/components/FilterDrawer';
+import { loadDrawer } from './drawerLoader';
+import { useFocusMemory } from './focusMemory';
 import styles from './FilterBar.module.css';
 
-// The drawer brings the dialog machinery with it, which a guest who never opens it should not download.
-const loadDrawer = () =>
-  import('@/components/FilterDrawer').then(({ FilterDrawer }) => ({
-    default: FilterDrawer,
-  }));
-const Drawer = lazy(loadDrawer);
+/** Which button opens the drawer. Filters is also where focus goes when the button that opened it is gone. */
+type OpenerKind = 'filters' | 'neighborhood' | 'guests';
 
-const OpenDrawer = createContext<(() => void) | null>(null);
+type Openers = {
+  open: (kind: OpenerKind, button: HTMLButtonElement) => void;
+  /** The button waiting for the drawer to arrive. */
+  busy: OpenerKind | null;
+};
+
+const OpenersContext = createContext<Openers | null>(null);
 
 type FilterRowProps = {
   /** The filter groups the drawer shows. */
@@ -35,10 +40,14 @@ type FilterRowProps = {
 };
 
 /**
- * The row of chips and the drawer that the Filters, Neighborhood and Guests buttons open. The
- * drawer is fetched and mounted when it is first opened, and unmounted when it closes. The row stays
- * mounted as the filters change, so a chosen chip that clears itself (and so leaves the page with
- * focus on it) hands focus to the Filters button rather than to the page.
+ * The row of chips and the drawer that the Filters, Neighborhood and Guests buttons open.
+ *
+ * The drawer is fetched when first wanted and opens only once it has arrived: until then the
+ * button says it is busy and a second press does nothing. A fetch that fails leaves the drawer closed,
+ * says so, and the next press tries again. A guest who pressed or focused something else while it
+ * was arriving is not pulled into a dialog. The row stays mounted as the filters change, so a
+ * chosen chip that clears itself (and so leaves the page with focus on it) hands focus to the Filters
+ * button rather than to the page.
  */
 export function FilterRow({
   drawer,
@@ -48,36 +57,73 @@ export function FilterRow({
   children,
 }: FilterRowProps) {
   const [open, setOpen] = useState(false);
+  const [Loaded, setLoaded] = useState<typeof FilterDrawer | null>(null);
+  const [busy, setBusy] = useState<OpenerKind | null>(null);
+  const [failed, setFailed] = useState(false);
   const router = useRouter();
   const row = useRef<HTMLDivElement>(null);
-  const lastFocused = useRef<EventTarget | null>(null);
+  const opener = useRef<HTMLButtonElement | null>(null);
+  const waiting = useRef(false);
+  const memory = useFocusMemory();
 
-  function focusFiltersButton() {
-    row.current?.querySelector<HTMLElement>('[data-filters-button]')?.focus();
+  function filtersButton() {
+    return row.current?.querySelector<HTMLElement>('[data-kind="filters"]');
   }
 
   useEffect(() => {
-    const focused = lastFocused.current;
-    if (!(focused instanceof Node) || focused.isConnected) return;
-    lastFocused.current = null;
-    const { activeElement } = document;
-    if (!activeElement || activeElement === document.body) {
-      focusFiltersButton();
-    }
+    if (memory.focusWasLost()) filtersButton()?.focus();
+    // The memory is a stable ref holder; only a change of address should ask.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtersKey]);
+
+  async function openFrom(kind: OpenerKind, button: HTMLButtonElement) {
+    if (waiting.current) return;
+    waiting.current = true;
+    setBusy(kind);
+    setFailed(false);
+    const away = { moved: false };
+    function noteAway(event: Event) {
+      if (!(event.target instanceof Node) || !button.contains(event.target)) {
+        away.moved = true;
+      }
+    }
+    document.addEventListener('pointerdown', noteAway, true);
+    document.addEventListener('focusin', noteAway, true);
+    try {
+      const component = await loadDrawer();
+      setLoaded(() => component);
+      if (!away.moved) {
+        opener.current = button;
+        setOpen(true);
+      }
+    } catch {
+      setFailed(true);
+    } finally {
+      document.removeEventListener('pointerdown', noteAway, true);
+      document.removeEventListener('focusin', noteAway, true);
+      waiting.current = false;
+      setBusy(null);
+    }
+  }
 
   function close() {
     setOpen(false);
     // Safari and Firefox do not focus a button on click, so the dialog has nothing to give focus back to.
     requestAnimationFrame(() => {
-      requestAnimationFrame(focusFiltersButton);
+      requestAnimationFrame(() => {
+        const back = opener.current;
+        (back?.isConnected ? back : filtersButton())?.focus();
+      });
     });
   }
 
   return (
-    <OpenDrawer.Provider
-      value={() => {
-        setOpen(true);
+    <OpenersContext.Provider
+      value={{
+        open: (kind, button) => {
+          void openFrom(kind, button);
+        },
+        busy,
       }}
     >
       <div
@@ -86,7 +132,7 @@ export function FilterRow({
         aria-label="Quick filters"
         className={styles.row}
         onFocus={(event) => {
-          lastFocused.current = event.target;
+          memory.onFocus(event);
           // Focus alone leaves a chip that is half past the edge of the scrolling row half hidden.
           if (event.target instanceof HTMLElement) {
             event.target.scrollIntoView({
@@ -95,61 +141,63 @@ export function FilterRow({
             });
           }
         }}
-        onBlur={(event) => {
-          const next = event.relatedTarget;
-          if (next instanceof Node && !event.currentTarget.contains(next)) {
-            lastFocused.current = null;
-          }
-        }}
+        onBlur={memory.onBlur}
       >
         {children}
       </div>
-      {open ? (
-        <Suspense fallback={null}>
-          <Drawer
-            open
-            applyLabel={applyLabel}
-            onClose={close}
-            onApply={close}
-            onClear={() => {
-              close();
-              router.push(clearHref);
-            }}
-          >
-            {drawer}
-          </Drawer>
-        </Suspense>
+      <p role="status" className={styles.status}>
+        {failed ? 'Filters could not load. Try again.' : ''}
+      </p>
+      {open && Loaded ? (
+        <Loaded
+          open
+          applyLabel={applyLabel}
+          onClose={close}
+          onApply={close}
+          onClear={() => {
+            close();
+            router.push(clearHref);
+          }}
+        >
+          {drawer}
+        </Loaded>
       ) : null}
-    </OpenDrawer.Provider>
+    </OpenersContext.Provider>
   );
 }
 
 type DrawerButtonProps = {
-  /** The Filters button: where focus returns when the drawer closes. */
-  filters?: boolean;
-  children: ReactNode;
+  kind: OpenerKind;
+  label: string;
+  /** The number of chosen filters, shown on the Filters button. */
+  count?: number;
+  iconStart?: ReactNode;
 };
 
-export function DrawerButton({ filters = false, children }: DrawerButtonProps) {
-  const open = useContext(OpenDrawer);
+export function DrawerButton({
+  kind,
+  label,
+  count,
+  iconStart,
+}: DrawerButtonProps) {
+  const openers = useContext(OpenersContext);
+  function prefetch() {
+    // The chunk is needed a moment from now; a failure here is reported when the guest actually asks.
+    loadDrawer().catch(() => undefined);
+  }
   return (
-    <button
-      type="button"
-      className={styles.opener}
-      aria-haspopup="dialog"
-      data-filters-button={filters ? '' : undefined}
-      // The chunk is needed a moment from now; start fetching it.
-      onPointerEnter={() => {
-        void loadDrawer();
+    <DisclosureChip
+      popup="dialog"
+      label={label}
+      {...(count === undefined ? {} : { count })}
+      {...(iconStart === undefined ? {} : { iconStart })}
+      data-kind={kind}
+      aria-busy={openers?.busy === kind ? true : undefined}
+      onPointerEnter={prefetch}
+      onFocus={prefetch}
+      onOpen={(event: MouseEvent<HTMLButtonElement>) => {
+        openers?.open(kind, event.currentTarget);
       }}
-      onFocus={() => {
-        void loadDrawer();
-      }}
-      onClick={() => {
-        open?.();
-      }}
-    >
-      {children}
-    </button>
+    />
   );
 }

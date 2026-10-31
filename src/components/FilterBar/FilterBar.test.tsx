@@ -1,8 +1,9 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { maxFilterValues, noFilters, type BrowseFilters } from '@/lib/filters';
+import { loadDrawer } from './drawerLoader';
 import { FilterBar, type FilterBarProps } from './FilterBar';
 
 // Behaviours under test, one per decision, branch or risk:
@@ -12,11 +13,15 @@ import { FilterBar, type FilterBarProps } from './FilterBar';
 // - Neighborhood and Guests are offered only while that filter is empty
 // - the bar offers no Clear all filters, which the empty state owns
 // - the drawer is not mounted until opened; it opens from the three buttons with every group, by keyboard too
-// - Clear all goes to the bare address; Show results and Escape close it; focus goes to the Filters button after any close
+// - the drawer opens only once its code has arrived: the button is busy meanwhile and a second press does nothing
+// - a failed fetch leaves it closed, says so, and a later press tries again
+// - a guest who pressed or focused elsewhere while it was arriving is not pulled into the dialog
+// - Clear all goes to the bare address; Show results and Escape close it
+// - after a close focus goes to the button that opened it, or to Filters when that button is gone
 // - a chip that takes focus is scrolled into view in the row
 // - a chosen chip that clears itself hands focus to Filters; history moves that remove nothing focused leave focus alone
 // - the date chip shows the chosen day or "Pick a date"; the calendar opens, picks, clears, and closes on Escape or a press outside
-// - a changed day closes the calendar, and moves focus only when it was in the calendar or on the page; the same day changes nothing
+// - a changed day closes the calendar, and moves focus only when it was in the control; Back and Forward and the rest of the page leave it; the same day changes nothing
 
 // jsdom has no layout, so it has nothing to scroll.
 const scrollIntoView = vi.fn();
@@ -24,6 +29,34 @@ Element.prototype.scrollIntoView = scrollIntoView;
 
 const push = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
+
+// The real fetch by default; a test swaps in one that waits or fails.
+vi.mock('./drawerLoader', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./drawerLoader')>();
+  return { loadDrawer: vi.fn(actual.loadDrawer) };
+});
+let realLoadDrawer: typeof loadDrawer;
+beforeEach(async () => {
+  const actual =
+    await vi.importActual<typeof import('./drawerLoader')>('./drawerLoader');
+  realLoadDrawer = actual.loadDrawer;
+  vi.mocked(loadDrawer).mockReset();
+  vi.mocked(loadDrawer).mockImplementation(realLoadDrawer);
+});
+
+function deferredDrawer() {
+  let finish: () => void = () => undefined;
+  let fail: (error: Error) => void = () => undefined;
+  const arrives = new Promise<void>((resolve, reject) => {
+    finish = resolve;
+    fail = reject;
+  });
+  vi.mocked(loadDrawer).mockImplementation(async () => {
+    await arrives;
+    return realLoadDrawer();
+  });
+  return { finish, fail };
+}
 
 const categories = [
   { slug: 'cooking', name: 'Cooking' },
@@ -178,9 +211,10 @@ describe('the drawer', () => {
     },
   );
 
-  it('opens by keyboard and closes on Escape, with focus on Filters', async () => {
+  it('opens by keyboard and closes on Escape, with focus on the button that opened it', async () => {
     setup();
-    row().getByRole('button', { name: 'Neighborhood' }).focus();
+    const neighborhood = row().getByRole('button', { name: 'Neighborhood' });
+    neighborhood.focus();
     await userEvent.keyboard('{Enter}');
     await screen.findByRole('dialog', { name: 'Filters' });
     await waitFor(() => {
@@ -192,6 +226,30 @@ describe('the drawer', () => {
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
+    await waitFor(() => {
+      expect(neighborhood).toHaveFocus();
+    });
+  });
+
+  it.each(['Filters', 'Guests'])(
+    'gives focus back to %s after Show results',
+    async (name) => {
+      setup();
+      await openDrawer(name);
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Show results' }),
+      );
+      await waitFor(() => {
+        expect(row().getByRole('button', { name })).toHaveFocus();
+      });
+    },
+  );
+
+  it('gives focus to Filters when the button that opened the drawer is gone', async () => {
+    const { rerender } = render(bar(noFilters));
+    await openDrawer('Guests');
+    rerender(bar({ ...noFilters, guests: 2 }));
+    await userEvent.click(screen.getByRole('button', { name: 'Show results' }));
     await waitFor(() => {
       expect(filtersButton()).toHaveFocus();
     });
@@ -212,6 +270,79 @@ describe('the drawer', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
   });
+});
+
+describe('a drawer that has to be fetched', () => {
+  it('stays closed and shows the button as busy until its code arrives, then opens once', async () => {
+    const drawer = deferredDrawer();
+    setup();
+    await userEvent.click(filtersButton());
+    expect(filtersButton()).toHaveAttribute('aria-busy', 'true');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    await userEvent.click(filtersButton());
+    drawer.finish();
+
+    expect(await screen.findAllByRole('dialog')).toHaveLength(1);
+    expect(
+      screen.getByRole('button', { name: /^Filters/, hidden: true }),
+    ).not.toHaveAttribute('aria-busy');
+  });
+
+  it('stays closed, says so, and tries again on the next press when the fetch fails', async () => {
+    const drawer = deferredDrawer();
+    setup();
+    await userEvent.click(filtersButton());
+    drawer.fail(new Error('chunk failed'));
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Filters could not load. Try again.',
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(filtersButton()).not.toHaveAttribute('aria-busy');
+
+    vi.mocked(loadDrawer).mockImplementation(realLoadDrawer);
+    await userEvent.click(filtersButton());
+    expect(
+      await screen.findByRole('dialog', { name: 'Filters' }),
+    ).toBeVisible();
+    // The dialog hides the page behind it from the accessibility tree.
+    expect(screen.getByRole('status', { hidden: true })).toBeEmptyDOMElement();
+  });
+
+  it.each([
+    [
+      'presses',
+      () => userEvent.click(screen.getByRole('button', { name: 'Elsewhere' })),
+    ],
+    [
+      'focuses',
+      () => {
+        screen.getByRole('button', { name: 'Elsewhere' }).focus();
+        return Promise.resolve();
+      },
+    ],
+  ])(
+    'does not take focus from a guest who %s elsewhere while it arrives',
+    async (_how, moveAway) => {
+      const drawer = deferredDrawer();
+      render(
+        <>
+          <button type="button">Elsewhere</button>
+          {bar(noFilters)}
+        </>,
+      );
+      await userEvent.click(filtersButton());
+      await moveAway();
+      drawer.finish();
+
+      await waitFor(() => {
+        expect(filtersButton()).not.toHaveAttribute('aria-busy');
+      });
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Elsewhere' })).toHaveFocus();
+    },
+  );
 });
 
 describe('focus when a chosen chip clears itself', () => {
@@ -317,6 +448,12 @@ describe('the date chip', () => {
     expect(container.querySelector('details')).toBe(details);
     expect(details.open).toBe(false);
     expect(screen.getByText('Sat, Nov 7')).toHaveFocus();
+  });
+
+  it('leaves focus on the page when the day changes by Back or Forward', () => {
+    const { rerender } = render(bar(noFilters));
+    rerender(bar({ ...noFilters, date: '2026-11-07' }));
+    expect(document.body).toHaveFocus();
   });
 
   it('closes the calendar but leaves focus where it is when the day changes from elsewhere on the page', () => {

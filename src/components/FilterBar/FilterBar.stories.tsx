@@ -184,27 +184,19 @@ export const CalendarOpenAtPhoneWidth: Story = {
   },
 };
 
-/** A stand-in for the page: a control outside the bar changes the chosen date, as the next-day link does. */
+/** A stand-in for the route: the day the calendar picks becomes the chosen date, as the Server Action's redirect does. */
 function DayChangesInPlace(args: React.ComponentProps<typeof FilterBar>) {
   const [date, setDate] = useState<string | null>(null);
   return (
-    <>
-      <FilterBar {...args} filters={{ ...args.filters, date }} />
-      {date === null ? (
-        <button
-          type="button"
-          onClick={() => {
-            setDate('2026-11-07');
-          }}
-        >
-          Go to Nov 7
-        </button>
-      ) : null}
-    </>
+    <FilterBar
+      {...args}
+      filters={{ ...args.filters, date }}
+      onPickDate={setDate}
+    />
   );
 }
 
-/** With the calendar open, a new day must leave focus on the chip, not on the page. */
+/** Picking a day closes the calendar and leaves focus on the chip, not on the page. */
 export const FocusStaysOnTheChipWhenTheDayChanges: Story = {
   parameters: { colorScheme: 'light' },
   render: (args) => <DayChangesInPlace {...args} />,
@@ -216,11 +208,13 @@ export const FocusStaysOnTheChipWhenTheDayChanges: Story = {
     await userEvent.click(chip);
     await waitFor(() => expect(disclosure).toHaveProperty('open', true));
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Go to Nov 7' }));
+    await userEvent.click(
+      canvas.getByRole('button', { name: /Saturday, October 31, 2026/ }),
+    );
 
     await waitFor(() => expect(disclosure).toHaveProperty('open', false));
     await waitFor(() =>
-      expect(canvas.getByText('Sat, Nov 7').closest('details')).toBe(
+      expect(canvas.getByText('Sat, Oct 31').closest('details')).toBe(
         disclosure,
       ),
     );

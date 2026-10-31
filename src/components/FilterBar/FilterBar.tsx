@@ -141,13 +141,12 @@ export function FilterBar({
           </>
         }
       >
-        <DrawerButton filters>
-          <span className={styles.icon} aria-hidden="true">
-            <SlidersHorizontal />
-          </span>
-          Filters
-          {count > 0 ? <span className={styles.count}>{count}</span> : null}
-        </DrawerButton>
+        <DrawerButton
+          kind="filters"
+          label="Filters"
+          iconStart={<SlidersHorizontal />}
+          {...(count > 0 ? { count } : {})}
+        />
         <WhenControl {...when} placement="row" />
         {selectedChips(filters, { categories, neighborhoods }).map(
           ({ key, label, href, hint }) => (
@@ -161,9 +160,11 @@ export function FilterBar({
           ),
         )}
         {filters.neighborhoods.length === 0 ? (
-          <DrawerButton>Neighborhood</DrawerButton>
+          <DrawerButton kind="neighborhood" label="Neighborhood" />
         ) : null}
-        {filters.guests === null ? <DrawerButton>Guests</DrawerButton> : null}
+        {filters.guests === null ? (
+          <DrawerButton kind="guests" label="Guests" />
+        ) : null}
       </FilterRow>
     </div>
   );

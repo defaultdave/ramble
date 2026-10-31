@@ -100,7 +100,7 @@ export const ManyNeighborhoods: Story = {
 
 const openDrawer: Story['play'] = async ({ canvasElement }) => {
   const canvas = within(canvasElement);
-  await userEvent.click(canvas.getByRole('link', { name: /^Filters/ }));
+  await userEvent.click(canvas.getByRole('button', { name: /^Filters/ }));
   await expect(
     await within(document.body).findByRole('dialog', { name: 'Filters' }),
   ).toBeInTheDocument();
@@ -190,14 +190,16 @@ function DayChangesInPlace(args: React.ComponentProps<typeof FilterBar>) {
   return (
     <>
       <FilterBar {...args} filters={{ ...args.filters, date }} />
-      <button
-        type="button"
-        onClick={() => {
-          setDate('2026-11-07');
-        }}
-      >
-        Go to Nov 7
-      </button>
+      {date === null ? (
+        <button
+          type="button"
+          onClick={() => {
+            setDate('2026-11-07');
+          }}
+        >
+          Go to Nov 7
+        </button>
+      ) : null}
     </>
   );
 }

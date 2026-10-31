@@ -25,6 +25,11 @@ describe('selectedChips', () => {
       },
       options,
     );
+    expect(chips.map(({ hint }) => hint)).toEqual([
+      ', remove filter',
+      ', remove filter',
+      ', remove filter',
+    ]);
     expect(chips.map(({ label, href }) => [label, href])).toEqual([
       ['Cooking', '/new-york/browse?neighborhood=dumbo&guests=4'],
       ['DUMBO', '/new-york/browse?category=cooking&guests=4'],

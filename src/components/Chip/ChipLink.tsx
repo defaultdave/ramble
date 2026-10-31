@@ -8,6 +8,8 @@ export type ChipLinkProps = {
   selected: boolean;
   /** A disabled chip names an address it cannot go to, so it renders without one. */
   disabled?: boolean;
+  /** Words only a screen reader hears after the label, for example that choosing the chip removes it. */
+  hint?: string;
 };
 
 export function ChipLink({
@@ -15,6 +17,7 @@ export function ChipLink({
   href,
   selected,
   disabled = false,
+  hint,
 }: ChipLinkProps) {
   if (disabled) {
     return (
@@ -33,6 +36,7 @@ export function ChipLink({
       aria-current={selected ? 'true' : undefined}
     >
       {label}
+      {hint ? <span className={styles.hint}>{hint}</span> : null}
     </Link>
   );
 }

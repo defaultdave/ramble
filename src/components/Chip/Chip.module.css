@@ -1,6 +1,8 @@
 .chip {
   /* A link and a summary default to content-box, a button to border-box; the 44 px height must hold on all three. */
   box-sizing: border-box;
+  /* Holds the screen-reader hint, so it cannot widen a scroll box around the chip. */
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -47,6 +49,16 @@
   box-shadow:
     0 0 0 2px var(--color-bg-canvas),
     0 0 0 4px var(--color-focus-ring);
+}
+
+/* Heard, not seen. */
+.hint {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .icon {

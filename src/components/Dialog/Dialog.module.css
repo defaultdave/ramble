@@ -117,6 +117,11 @@
   background: var(--color-bg-surface);
 }
 
+/* The filter sheet in Figma (45:413) tops out 84 px below the screen's top edge. */
+.drawer {
+  max-block-size: calc(100% - var(--space-16) - var(--space-5));
+}
+
 .sheet .header {
   padding-inline-start: var(--space-6);
 }

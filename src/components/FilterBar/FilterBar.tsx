@@ -1,24 +1,22 @@
-import { Calendar, SlidersHorizontal, X } from 'lucide-react';
-import { Button, ButtonLink } from '@/components/Button';
+import { Calendar, SlidersHorizontal } from 'lucide-react';
+import { ButtonLink } from '@/components/Button';
 import { ChipLink } from '@/components/Chip';
 import { DatePicker } from '@/components/DatePicker';
 import { dateChipLabel } from '@/lib/pages/browse';
 import { selectedChips } from '@/lib/filterBar';
 import {
   activeFilterCount,
-  browseParamNames,
   guestChips,
   hrefForFilters,
   listChips,
   toQuery,
-  toQueryEntries,
   withDate,
   type BrowseFilters,
   type ChipView,
 } from '@/lib/filters';
 import { browsePath } from '@/lib/routes';
 import styles from './FilterBar.module.css';
-import { DrawerLink, FilterRow } from './FilterDrawerHost';
+import { DrawerButton, FilterRow } from './FilterDrawerHost';
 import { WhenDetails } from './WhenDetails';
 
 export type FilterOption = { slug: string; name: string };
@@ -36,31 +34,25 @@ export type FilterBarProps = {
   onPickDate: (date: string) => unknown;
 };
 
-function ChipLinks({ chips }: { chips: readonly ChipView[] }) {
-  return chips.map(({ key, label, selected, disabled, href }) => (
-    <ChipLink
-      key={key}
-      label={label}
-      selected={selected}
-      disabled={disabled}
-      href={href}
-    />
-  ));
-}
-
 type ChipGroupProps = {
   legend: string;
   chips: readonly ChipView[];
-  /** The target of the chip in the row that goes to this group when there is no script. */
-  id?: string;
 };
 
-function ChipGroup({ legend, chips, id }: ChipGroupProps) {
+function ChipGroup({ legend, chips }: ChipGroupProps) {
   return (
-    <fieldset id={id} className={styles.group}>
+    <fieldset className={styles.group}>
       <legend className={styles.legend}>{legend}</legend>
       <div className={styles.chips}>
-        <ChipLinks chips={chips} />
+        {chips.map(({ key, label, selected, disabled, href }) => (
+          <ChipLink
+            key={key}
+            label={label}
+            selected={selected}
+            disabled={disabled}
+            href={href}
+          />
+        ))}
       </div>
     </fieldset>
   );
@@ -114,78 +106,6 @@ function WhenControl({
   );
 }
 
-/** The panel a guest with no script reaches from the row's chips: every group, and a plain form for the day. */
-function FilterPanel({
-  filters,
-  today,
-  categories,
-  neighborhoods,
-}: Pick<FilterBarProps, 'filters' | 'today' | 'categories' | 'neighborhoods'>) {
-  const others = toQueryEntries({
-    filters: withDate(filters, null),
-    after: null,
-  });
-  return (
-    <section id="filters" className={styles.panel} aria-label="All filters">
-      <div className={styles.panelHeader}>
-        <h2 className={styles.panelTitle}>Filters</h2>
-        <a href="#" className={styles.panelClose} aria-label="Close filters">
-          <X aria-hidden="true" />
-        </a>
-      </div>
-      <form method="get" action={browsePath} className={styles.dateForm}>
-        {others.map(([name, value]) => (
-          <input
-            key={`${name}=${value}`}
-            type="hidden"
-            name={name}
-            value={value}
-          />
-        ))}
-        <label className={styles.legend} htmlFor="filters-date">
-          When
-        </label>
-        <input
-          id="filters-date"
-          type="date"
-          name={browseParamNames.date}
-          min={today}
-          defaultValue={filters.date ?? ''}
-          className={styles.dateInput}
-        />
-        <Button type="submit" variant="secondary">
-          Show this day
-        </Button>
-        {filters.date ? (
-          <ButtonLink href={hrefForFilters(withDate(filters, null))}>
-            Clear date
-          </ButtonLink>
-        ) : null}
-      </form>
-      <ChipGroup
-        id="filters-guests"
-        legend="Guests"
-        chips={guestChips(filters)}
-      />
-      <ChipGroup
-        id="filters-neighborhoods"
-        legend="Neighborhood"
-        chips={listChips(filters, 'neighborhoods', neighborhoods)}
-      />
-      <ChipGroup
-        legend="Category"
-        chips={listChips(filters, 'categories', categories)}
-      />
-      <div className={styles.panelActions}>
-        <ButtonLink href={browsePath}>Clear all</ButtonLink>
-        <ButtonLink href={hrefForFilters(filters)} variant="primary">
-          Show results
-        </ButtonLink>
-      </div>
-    </section>
-  );
-}
-
 export function FilterBar({
   categories,
   neighborhoods,
@@ -200,8 +120,9 @@ export function FilterBar({
     <div className={styles.bar}>
       <FilterRow
         filtersKey={toQuery({ filters, after: null })}
-        // The count of results is not read for the bar, so the button cannot say how many.
+        // The number of results is not read for the bar, so the button cannot say how many.
         applyLabel="Show results"
+        clearHref={browsePath}
         drawer={
           <>
             <fieldset className={styles.group}>
@@ -220,26 +141,30 @@ export function FilterBar({
           </>
         }
       >
-        <DrawerLink href="#filters" pill>
+        <DrawerButton filters>
           <span className={styles.icon} aria-hidden="true">
             <SlidersHorizontal />
           </span>
           Filters
           {count > 0 ? <span className={styles.count}>{count}</span> : null}
-        </DrawerLink>
+        </DrawerButton>
         <WhenControl {...when} placement="row" />
-        <ChipLinks
-          chips={selectedChips(filters, { categories, neighborhoods })}
-        />
-        <DrawerLink href="#filters-neighborhoods">Neighborhood</DrawerLink>
-        <DrawerLink href="#filters-guests">Guests</DrawerLink>
+        {selectedChips(filters, { categories, neighborhoods }).map(
+          ({ key, label, href, hint }) => (
+            <ChipLink
+              key={key}
+              label={label}
+              href={href}
+              hint={hint}
+              selected
+            />
+          ),
+        )}
+        {filters.neighborhoods.length === 0 ? (
+          <DrawerButton>Neighborhood</DrawerButton>
+        ) : null}
+        {filters.guests === null ? <DrawerButton>Guests</DrawerButton> : null}
       </FilterRow>
-      <FilterPanel
-        filters={filters}
-        today={today}
-        categories={categories}
-        neighborhoods={neighborhoods}
-      />
     </div>
   );
 }

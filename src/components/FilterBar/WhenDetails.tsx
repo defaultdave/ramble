@@ -31,8 +31,14 @@ export function WhenDetails({
   useEffect(() => {
     if (previous.current === date) return;
     previous.current = date;
+    const { activeElement } = document;
+    // A day that changes through Back or a link elsewhere on the page leaves focus where the guest put it.
+    const focusHere =
+      !activeElement ||
+      activeElement === document.body ||
+      details.current?.contains(activeElement) === true;
     if (details.current) details.current.open = false;
-    chip.current?.focus();
+    if (focusHere) chip.current?.focus();
   }, [date]);
   useEffect(() => {
     function closeOnOutsidePress(event: PointerEvent) {

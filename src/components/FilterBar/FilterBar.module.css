@@ -1,16 +1,37 @@
 .bar {
+  /* The band's top padding in Figma (64:222). */
+  padding-block-start: var(--space-2);
   font-family: var(--font-family-body);
 }
 
-/* One row at every width. A row with more chips than fit scrolls sideways inside its own box; the page itself never does. */
+/*
+ * On a phone the row is one line that scrolls sideways inside its own box, as in Figma, and the
+ * page itself never does. The scrollbar is hidden; a soft edge on the side where more chips wait
+ * is the cue. From 768 up the row wraps, as Figma's desktop does.
+ */
 .row {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   overflow-x: auto;
+  scrollbar-width: none;
   /* Room for the focus ring, which the scroll box would otherwise cut off. */
   padding: var(--space-1);
   margin: calc(var(--space-1) * -1);
+  /* The canvas fades sit on the scrolled content and the shadows on the box, so a shadow shows only where the content has not reached the edge yet. */
+  background:
+    linear-gradient(to right, var(--color-bg-canvas) 30%, transparent) left
+      center / var(--space-6) 100% no-repeat local,
+    linear-gradient(to left, var(--color-bg-canvas) 30%, transparent) right
+      center / var(--space-6) 100% no-repeat local,
+    linear-gradient(to right, var(--color-shadow), transparent) left center /
+      var(--space-3) 100% no-repeat scroll,
+    linear-gradient(to left, var(--color-shadow), transparent) right center /
+      var(--space-3) 100% no-repeat scroll;
+}
+
+.row::-webkit-scrollbar {
+  display: none;
 }
 
 .row > * {
@@ -63,14 +84,19 @@
   background: var(--color-bg-surface);
 }
 
-/* In the row the calendar floats over the page, because the row is a scroll box that would clip anything inside it. A phone gets it as a card at the foot of the screen. */
+/*
+ * In the row the calendar floats over the page, because a scroll box would clip anything inside it.
+ * It is a card at the foot of the screen, which is also what a browser that cannot place a box
+ * against the chip gets.
+ */
 .popover {
   composes: calendar;
   position: fixed;
   z-index: 50;
-  inset-inline: var(--space-4);
+  inset-inline: 0;
   inset-block-end: var(--space-4);
-  max-inline-size: none;
+  inline-size: min(22rem, 100% - var(--space-8));
+  margin-inline: auto;
   max-block-size: 80vh;
   overflow-y: auto;
   box-shadow: var(--elevation-3);
@@ -101,103 +127,19 @@
   gap: var(--space-2);
 }
 
-/* The panel a guest with no script gets: hidden until a chip in the row links to it. */
-.panel {
-  display: none;
-  position: fixed;
-  z-index: 100;
-  inset: 0;
-  flex-direction: column;
-  padding: var(--space-4) var(--space-4) var(--space-8);
-  overflow-y: auto;
-  background: var(--color-bg-surface);
-  color: var(--color-text-primary);
-}
-
-.panel:target,
-.panel:has(:target) {
-  display: flex;
-}
-
-.panelHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-block-end: var(--space-4);
-}
-
-.panelTitle {
-  margin: 0;
-  font-family: var(--font-family-display);
-  font-size: var(--font-size-heading-m);
-  line-height: var(--font-line-height-heading-m);
-  font-weight: var(--font-weight-semibold);
-}
-
-.panelClose {
-  display: grid;
-  place-items: center;
-  inline-size: var(--size-touch-target);
-  block-size: var(--size-touch-target);
-  border-radius: var(--radius-pill);
-  color: var(--color-text-primary);
-}
-
-.panelClose svg {
-  inline-size: var(--space-6);
-  block-size: var(--space-6);
-}
-
-.panelClose:focus-visible {
-  outline: 2px solid transparent;
-  box-shadow:
-    0 0 0 2px var(--color-bg-surface),
-    0 0 0 4px var(--color-focus-ring);
-}
-
-.dateForm {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  margin-block-end: var(--space-6);
-}
-
-.dateForm .legend {
-  inline-size: 100%;
-}
-
-.dateInput {
-  box-sizing: border-box;
-  min-block-size: var(--size-touch-target);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-surface);
-  font: inherit;
-  color: var(--color-text-primary);
-}
-
-.panelActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-}
-
 @media (min-width: 768px) {
-  .panel {
-    inset-inline-start: auto;
-    inline-size: calc(var(--space-16) * 6 + var(--space-4));
-    box-shadow: var(--elevation-3);
+  .row {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    padding: 0;
+    margin: 0;
+    background: none;
   }
+}
 
-  .popover {
-    inset-inline: auto;
-    inline-size: 22rem;
-  }
-
-  /* Where the browser can place a box against the chip, the calendar opens under it. */
-  @supports (top: anchor(bottom)) {
+/* Where the browser can place a box against the chip, the calendar opens under it. */
+@supports (anchor-name: --filter-bar-when) {
+  @media (min-width: 768px) {
     .whenInRow {
       anchor-name: --filter-bar-when;
     }
@@ -206,6 +148,8 @@
       position-anchor: --filter-bar-when;
       inset-block: calc(anchor(bottom) + var(--space-2)) auto;
       inset-inline: anchor(start) auto;
+      inline-size: 22rem;
+      margin-inline: 0;
       position-try-fallbacks: flip-inline;
     }
   }

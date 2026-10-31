@@ -4,8 +4,10 @@ import {
   BrowseQuerySchema,
   browseHref,
   browseParamNames,
+  defaultGuests,
   canAddFilterValue,
   chipState,
+  guestCounts,
   hrefForFilters,
   isIndexable,
   knownFilters,
@@ -16,6 +18,7 @@ import {
   toQueryEntries,
   toggleFilterValue,
   withDate,
+  withGuests,
   type BrowseQuery,
 } from './filters';
 
@@ -40,6 +43,7 @@ describe('browseParamNames', () => {
       categories: 'category',
       neighborhoods: 'neighborhood',
       date: 'date',
+      guests: 'guests',
       after: 'after',
     });
   });
@@ -56,6 +60,7 @@ describe('parseFilters', () => {
         category: 'cooking',
         neighborhood: ['dumbo', 'bushwick'],
         date: '2026-11-07',
+        guests: '4',
         after: cursor,
       }),
     ).toEqual({
@@ -63,6 +68,7 @@ describe('parseFilters', () => {
         categories: ['cooking'],
         neighborhoods: ['bushwick', 'dumbo'],
         date: '2026-11-07',
+        guests: 4,
       },
       after: cursor,
     });
@@ -186,19 +192,72 @@ describe('parseFilters', () => {
   });
 });
 
+describe('guests', () => {
+  it.each([
+    ['1', 1],
+    ['2', 2],
+    ['6', 6],
+  ])('reads %s as a party the booking rules take', (raw, guests) => {
+    expect(parseFilters({ guests: raw }).filters.guests).toBe(guests);
+  });
+
+  it.each([
+    ['zero', '0'],
+    ['over one hold', '7'],
+    ['negative', '-2'],
+    ['a decimal', '2.0'],
+    ['signed', '+2'],
+    ['padded', ' 2'],
+    ['a leading zero', '02'],
+    ['hex', '0x2'],
+    ['words', 'two'],
+    ['empty', ''],
+    ['huge', '9'.repeat(400)],
+  ])('drops a value that is %s, and keeps its siblings', (_name, raw) => {
+    expect(parseFilters({ guests: raw, category: 'cooking' }).filters).toEqual({
+      ...noFilters,
+      categories: ['cooking'],
+    });
+  });
+
+  it('drops a party given twice instead of picking one', () => {
+    expect(parseFilters({ guests: ['2', '4'] }).filters.guests).toBeNull();
+  });
+
+  it('offers exactly the parties one hold takes, and starts on two of them', () => {
+    expect(guestCounts).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(guestCounts).toContain(defaultGuests);
+    expect(defaultGuests).toBe(2);
+  });
+
+  it('writes the party into the address, and sets and clears it', () => {
+    expect(hrefForFilters(withGuests(noFilters, 4))).toBe(
+      '/new-york/browse?guests=4',
+    );
+    expect(withGuests(withGuests(noFilters, 4), null)).toEqual(noFilters);
+  });
+
+  it('keeps the party when another filter changes', () => {
+    const party = withGuests(noFilters, 3);
+    expect(toggleFilterValue(party, 'categories', 'cooking').guests).toBe(3);
+    expect(withDate(party, '2026-11-07').guests).toBe(3);
+  });
+});
+
 describe('toQuery', () => {
   const full: BrowseQuery = {
     filters: {
       categories: ['cooking', 'walking-tours'],
       neighborhoods: ['dumbo'],
       date: '2026-11-07',
+      guests: 4,
     },
     after: cursor,
   };
 
   it('writes one fixed order', () => {
     expect(toQuery(full)).toBe(
-      `category=cooking&category=walking-tours&neighborhood=dumbo&date=2026-11-07&after=${cursor}`,
+      `category=cooking&category=walking-tours&neighborhood=dumbo&date=2026-11-07&guests=4&after=${cursor}`,
     );
   });
 
@@ -292,6 +351,7 @@ describe('changing filters', () => {
       categories: ['cooking'],
       neighborhoods: ['dumbo'],
       date: '2026-11-07',
+      guests: null,
     });
   });
 
@@ -348,14 +408,16 @@ describe('changing filters', () => {
   it.each([
     ['nothing', noFilters, 0],
     ['a date', { ...noFilters, date: '2026-11-07' }, 1],
+    ['a party', { ...noFilters, guests: 2 }, 1],
     [
       'two values and a date',
       {
         categories: ['cooking'],
         neighborhoods: ['dumbo'],
         date: '2026-11-07',
+        guests: 2,
       },
-      3,
+      4,
     ],
   ])('counts %s', (_name, filters, count) => {
     expect(activeFilterCount(filters)).toBe(count);
@@ -373,6 +435,7 @@ describe('isIndexable', () => {
       false,
     ],
     ['a date', { ...noFilters, date: '2026-11-07' }, null, false],
+    ['a party', { ...noFilters, guests: 2 }, null, false],
     ['a later page of the unfiltered list', noFilters, cursor, false],
   ])('%s', (_name, filters, after, indexable) => {
     expect(isIndexable({ filters, after })).toBe(indexable);

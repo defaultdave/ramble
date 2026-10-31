@@ -3,12 +3,15 @@ import { ButtonLink } from '@/components/Button';
 import { ChipLink } from '@/components/Chip';
 import { DatePicker } from '@/components/DatePicker';
 import { dateChipLabel } from '@/lib/pages/browse';
+import { guestsLabel } from '@/lib/orderSummary';
 import {
   activeFilterCount,
   chipState,
+  guestCounts,
   hrefForFilters,
   toggleFilterValue,
   withDate,
+  withGuests,
   type BrowseFilters,
   type FilterListKey,
 } from '@/lib/filters';
@@ -100,6 +103,24 @@ export function FilterBar({
             ) : null}
           </div>
         </WhenDetails>
+      </fieldset>
+      <fieldset className={styles.group}>
+        <legend className={styles.legend}>Guests</legend>
+        <div className={styles.chips}>
+          {guestCounts.map((count) => {
+            const selected = filters.guests === count;
+            return (
+              <ChipLink
+                key={count}
+                label={guestsLabel(count)}
+                selected={selected}
+                href={hrefForFilters(
+                  withGuests(filters, selected ? null : count),
+                )}
+              />
+            );
+          })}
+        </div>
       </fieldset>
       <ChipGroup
         legend="Neighborhood"

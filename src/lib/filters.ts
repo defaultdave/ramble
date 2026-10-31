@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { EntityIdSchema, SlugSchema } from './catalog';
+import { holdLimits } from './holds';
 import { browsePath } from './routes';
 import { IsoDateSchema } from './sessions';
 
@@ -8,15 +9,38 @@ export const maxFilterValues = 8;
 const maxSlugLength = 64;
 const maxCursorLength = 36;
 
-/** The one place the browse URL grammar lives: `category`, `neighborhood`, `date`, and `after`. */
+/** The one place the browse URL grammar lives: `category`, `neighborhood`, `date`, `guests`, and `after`. */
 export const browseParamNames = {
   categories: 'category',
   neighborhoods: 'neighborhood',
   date: 'date',
+  guests: 'guests',
   after: 'after',
 } as const;
 
 export type FilterListKey = 'categories' | 'neighborhoods';
+
+/** A party the booking rules take: the same bounds as one hold, so a search never asks for more than a guest can book. */
+const PartySchema = z
+  .number()
+  .int()
+  .min(holdLimits.minSeats)
+  .max(holdLimits.maxSeats);
+// Digits only, so "2.0", "+2", "0x2", and " 2" are dropped instead of read as 2.
+const GuestsParamSchema = z
+  .string()
+  .regex(/^[1-9]\d?$/)
+  .transform(Number)
+  .pipe(PartySchema);
+
+/** The party a search starts with, in the hero and in the header's link to browse. */
+export const defaultGuests = 2;
+
+/** The party sizes a guest can search for, in order. */
+export const guestCounts: readonly number[] = Array.from(
+  { length: holdLimits.maxSeats - holdLimits.minSeats + 1 },
+  (_, index) => holdLimits.minSeats + index,
+);
 
 const FilterSlugSchema = z.string().max(maxSlugLength).pipe(SlugSchema);
 // Postgres returns uuids in lower case, and the cursor is compared against stored ids.
@@ -31,6 +55,7 @@ export const BrowseFiltersSchema = z.object({
   categories: z.array(FilterSlugSchema).max(maxFilterValues),
   neighborhoods: z.array(FilterSlugSchema).max(maxFilterValues),
   date: IsoDateSchema.nullable(),
+  guests: PartySchema.nullable(),
 });
 export type BrowseFilters = z.infer<typeof BrowseFiltersSchema>;
 
@@ -48,6 +73,7 @@ export const noFilters: BrowseFilters = {
   categories: [],
   neighborhoods: [],
   date: null,
+  guests: null,
 };
 
 function valuesOf(raw: string | readonly string[] | undefined) {
@@ -91,6 +117,10 @@ export function parseFilters(searchParams: RawSearchParams): BrowseQuery {
         searchParams[browseParamNames.neighborhoods],
       ),
       date: parseSingle(searchParams[browseParamNames.date], IsoDateSchema),
+      guests: parseSingle(
+        searchParams[browseParamNames.guests],
+        GuestsParamSchema,
+      ),
     },
     after: parseSingle(searchParams[browseParamNames.after], CursorSchema),
   };
@@ -142,6 +172,9 @@ export function toQueryEntries({
     entries.push([browseParamNames.neighborhoods, slug]);
   }
   if (filters.date) entries.push([browseParamNames.date, filters.date]);
+  if (filters.guests !== null) {
+    entries.push([browseParamNames.guests, String(filters.guests)]);
+  }
   if (after) entries.push([browseParamNames.after, after]);
   return entries;
 }
@@ -165,7 +198,8 @@ export function activeFilterCount(filters: BrowseFilters): number {
   return (
     filters.categories.length +
     filters.neighborhoods.length +
-    (filters.date ? 1 : 0)
+    (filters.date ? 1 : 0) +
+    (filters.guests === null ? 0 : 1)
   );
 }
 
@@ -207,6 +241,13 @@ export function withDate(
   date: string | null,
 ): BrowseFilters {
   return { ...filters, date };
+}
+
+export function withGuests(
+  filters: BrowseFilters,
+  guests: number | null,
+): BrowseFilters {
+  return { ...filters, guests };
 }
 
 /**

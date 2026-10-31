@@ -165,12 +165,22 @@ describe('BrowseContent', () => {
       render(await withSlugs({ category: ['junk', 'cooking'] }));
 
       expect(server.dates).toHaveBeenCalledExactlyOnceWith(
-        { categories: ['cooking'], neighborhoods: [], date: null },
+        {
+          categories: ['cooking'],
+          neighborhoods: [],
+          date: null,
+          guests: null,
+        },
         expect.any(String),
       );
       expect(server.results).toHaveBeenCalledExactlyOnceWith(
         {
-          filters: { categories: ['cooking'], neighborhoods: [], date: null },
+          filters: {
+            categories: ['cooking'],
+            neighborhoods: [],
+            date: null,
+            guests: null,
+          },
           after: null,
         },
         expect.any(String),

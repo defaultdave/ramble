@@ -38,9 +38,9 @@ export async function getBrowseResults(
   return page;
 }
 
-/** The days a guest can pick for the category and neighborhood filters, as YYYY-MM-DD. */
+/** The days a guest can pick for the category, neighborhood, and guests filters, as YYYY-MM-DD. */
 export async function getBrowseDates(
-  filters: Pick<BrowseFilters, 'categories' | 'neighborhoods'>,
+  filters: Pick<BrowseFilters, 'categories' | 'neighborhoods' | 'guests'>,
   asOf: string,
 ): Promise<string[]> {
   'use cache';

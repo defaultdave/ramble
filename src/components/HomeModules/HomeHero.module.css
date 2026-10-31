@@ -132,9 +132,9 @@
 }
 
 /* The row waits for the copy column, not the viewport: beside the picture the column is too narrow
-   for two fields and a button until the viewport is wide. 736px is two selects at 230px (the
-   172px "Anywhere in New York" plus 16px, 40px and 2px of padding and border), the 218px button,
-   two 12px gaps and the 34px of box padding and border; a narrower row clips the label. */
+   for three fields and a button until the viewport is wide. 736px is the Figma card: three equal
+   fields of 149px, the 218px button, three 12px gaps and the 34px of box padding and border; a narrower
+   row clips the date. */
 @container (min-width: 736px) {
   .search {
     flex-direction: row;

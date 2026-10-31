@@ -1,7 +1,13 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { drawerLoadFailedMessage } from '@/lib/filterBar';
 import { maxFilterValues, noFilters, type BrowseFilters } from '@/lib/filters';
 import { loadDrawer } from './drawerLoader';
@@ -16,6 +22,8 @@ import { FilterBar, type FilterBarProps } from './FilterBar';
 // - the drawer is not mounted until opened; it opens from the three buttons with every group, by keyboard too
 // - the drawer opens only once its code has arrived: the button is busy meanwhile and a second press does nothing
 // - a failed fetch leaves it closed, says so, and a later press tries again
+// - the drawer's code is fetched once when the browser is idle (after a timer where there is no idle callback), not at all when the guest saves data, and the fetch stops if the bar goes
+// - a failed idle fetch says nothing, and the next press still opens the drawer
 // - a guest who pressed or focused elsewhere while it was arriving is not pulled into the dialog, and the watch for that is removed
 // - Clear all goes to the bare address; Show results and Escape close it
 // - after a close focus goes to the button that opened it, or to Filters when that button is gone
@@ -346,6 +354,92 @@ describe('a drawer that has to be fetched', () => {
       expect(screen.getByRole('button', { name: 'Elsewhere' })).toHaveFocus();
     },
   );
+});
+
+describe('the drawer fetched ahead of a press', () => {
+  afterEach(() => {
+    // Unmounting calls cancelIdleCallback, which the stubs must still be there to answer.
+    cleanup();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+    Reflect.deleteProperty(navigator, 'connection');
+  });
+
+  function idleQueue() {
+    const queued: (() => void)[] = [];
+    const cancel = vi.fn();
+    vi.stubGlobal('requestIdleCallback', (callback: () => void) => {
+      queued.push(callback);
+      return queued.length;
+    });
+    vi.stubGlobal('cancelIdleCallback', cancel);
+    return { queued, cancel };
+  }
+
+  it('fetches once when the browser is idle, and not before', () => {
+    const { queued } = idleQueue();
+    setup();
+    expect(loadDrawer).not.toHaveBeenCalled();
+    queued.forEach((run) => {
+      run();
+    });
+    expect(loadDrawer).toHaveBeenCalledOnce();
+  });
+
+  it('fetches after a timer where the browser has no idle callback', () => {
+    vi.stubGlobal('requestIdleCallback', undefined);
+    vi.useFakeTimers();
+    setup();
+    vi.advanceTimersByTime(1000);
+    expect(loadDrawer).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1000);
+    expect(loadDrawer).toHaveBeenCalledOnce();
+  });
+
+  it('does not fetch for a guest who saves data', () => {
+    Object.defineProperty(navigator, 'connection', {
+      value: { saveData: true },
+      configurable: true,
+    });
+    const { queued } = idleQueue();
+    setup();
+    expect(queued).toHaveLength(0);
+    expect(loadDrawer).not.toHaveBeenCalled();
+  });
+
+  it('stops waiting when the bar goes', () => {
+    const { cancel } = idleQueue();
+    const { unmount } = render(bar(noFilters));
+    unmount();
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it('says nothing when the fetch fails, and the press still opens the drawer', async () => {
+    const { queued } = idleQueue();
+    vi.mocked(loadDrawer).mockRejectedValueOnce(new Error('chunk failed'));
+    setup();
+    queued.forEach((run) => {
+      run();
+    });
+    await Promise.resolve();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+
+    // The press brings the drawer up although the idle fetch failed.
+    await openDrawer();
+  });
+
+  it('still shows the button as busy while a press waits on the fetch already under way', async () => {
+    const { queued } = idleQueue();
+    const drawer = deferredDrawer();
+    setup();
+    queued.forEach((run) => {
+      run();
+    });
+    await userEvent.click(filtersButton());
+    expect(filtersButton()).toHaveAttribute('aria-busy', 'true');
+    drawer.finish();
+    expect(await screen.findAllByRole('dialog')).toHaveLength(1);
+  });
 });
 
 describe('focus when a chosen chip clears itself', () => {

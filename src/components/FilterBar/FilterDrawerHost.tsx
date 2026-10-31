@@ -16,6 +16,13 @@ import { loadDrawer } from './drawerLoader';
 import { useFocusMemory } from './focusMemory';
 import styles from './FilterBar.module.css';
 
+/** Where a browser without requestIdleCallback (Safari) waits before it fetches the drawer: after the first paints and hydration. */
+const warmFallbackDelayMs = 1500;
+/** The longest a busy page may keep the idle fetch waiting. */
+const warmIdleDeadlineMs = 5000;
+
+type SaveDataConnection = { connection?: { saveData?: boolean } };
+
 /** Which button opens the drawer. Filters is also where focus goes when the button that opened it is gone. */
 type OpenerKind = 'filters' | 'neighborhood' | 'guests';
 
@@ -44,7 +51,8 @@ type FilterRowProps = {
 /**
  * The row of chips and the drawer that the Filters, Neighborhood and Guests buttons open.
  *
- * The drawer is fetched when first wanted and opens only once it has arrived: until then the
+ * The drawer is fetched when first wanted, or once the browser is idle after hydration (a phone never
+ * hovers, so its first press would otherwise start the fetch), unless the guest asked to save data. It opens only once it has arrived: until then the
  * button says it is busy and a second press does nothing. A fetch that fails leaves the drawer closed,
  * says so, and the next press tries again. A guest who pressed or focused something else while it
  * was arriving is not pulled into a dialog. The row stays mounted as the filters change, so a
@@ -78,6 +86,26 @@ export function FilterRow({
     // The memory is a stable ref holder; only a change of address should ask.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtersKey]);
+
+  useEffect(() => {
+    if ((navigator as SaveDataConnection).connection?.saveData) return;
+    // A failure here is reported when the guest actually presses.
+    const warm = () => {
+      loadDrawer().catch(() => undefined);
+    };
+    if (typeof window.requestIdleCallback === 'function') {
+      const handle = window.requestIdleCallback(warm, {
+        timeout: warmIdleDeadlineMs,
+      });
+      return () => {
+        window.cancelIdleCallback(handle);
+      };
+    }
+    const timer = window.setTimeout(warm, warmFallbackDelayMs);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, []);
 
   async function openFrom(kind: OpenerKind, button: HTMLButtonElement) {
     if (waiting.current) return;

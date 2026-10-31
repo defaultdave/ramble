@@ -6,7 +6,12 @@ const fraunces = localFont({
   weight: '100 900',
   display: 'swap',
   adjustFontFallback: false,
-  fallback: ['Fraunces Fallback', 'Georgia', 'serif'],
+  fallback: [
+    'Fraunces Fallback',
+    'Fraunces Fallback Android',
+    'Georgia',
+    'serif',
+  ],
 });
 
 const inter = localFont({

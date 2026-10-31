@@ -15,14 +15,42 @@
    would scale it by 126.68%, taken from the font's default instance, so the wordmark was 2px wider and
    longer words wider still. 124.6% makes the wordmark the same width in both faces, and no sampled
    string is wider than the real face by more than about 7%. The vertical overrides are Fraunces's ascent (97.8%)
-   and descent (25.5%) divided by the scale, so the baseline does not move on the swap. */
+   and descent (25.5%) divided by the scale, so the baseline does not move on the swap.
+
+   A local() face is skipped when its font is not installed, so each system serif has a face. Linux has no
+   Times New Roman but Liberation Serif has its metrics, so it shares the first face. Android has Noto Serif:
+   at 101.3% its "ramble" matches Fraunces's (measured, Chrome on Debian with Noto Serif; the glyph widths
+   alone give 100.7%, 3.438em against 96.92px at 28px). Its overrides are 97.8% / 101.3% = 96.54% and
+   25.5% / 101.3% = 25.17%. */
 @font-face {
   font-family: 'Fraunces Fallback';
-  src: local('Times New Roman');
+  src: local('Times New Roman'), local('Liberation Serif');
   size-adjust: 124.6%;
   ascent-override: 78.49%;
   descent-override: 20.47%;
   line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Fraunces Fallback Android';
+  src:
+    local('Noto Serif'), local('Noto Serif Regular'), local('NotoSerif-Regular');
+  size-adjust: 101.3%;
+  ascent-override: 96.54%;
+  descent-override: 25.17%;
+  line-gap-override: 0%;
+}
+
+/* Chrome without subpixel positioning (Linux at 1x) rounds every glyph advance to a whole pixel, which moves the
+   width of a word by several pixels in steps no scale can follow. This keeps the display type, whose fallback
+   is matched to the real face, on exact advances. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  text-rendering: geometricPrecision;
 }
 
 /* A full-height column so the footer meets the bottom of the window on short pages. */

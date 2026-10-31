@@ -48,6 +48,26 @@ async function expectFallbackShown(
   const faces = await loadedFaces(page, family);
   expect(faces.total).toBeGreaterThan(0);
   expect(faces.loaded).toBe(0);
+  await expectTunedFallbackResolved(page);
+}
+
+// The tuned fallbacks are local() faces, so which one applies depends on the fonts on the machine.
+// If none resolves, the page is showing an untuned system serif and the width check below would
+// measure that, so this fails and names every face with its status.
+async function expectTunedFallbackResolved(page: Page) {
+  const statuses = () =>
+    page.evaluate(() =>
+      [...document.fonts]
+        .filter((face) =>
+          face.family.replace(/["']/g, '').startsWith('Fraunces Fallback'),
+        )
+        .map((face) => `${face.family.replace(/["']/g, '')}: ${face.status}`),
+    );
+  await expect
+    .poll(async () => (await statuses()).join(', '), {
+      message: 'no tuned fallback face matched an installed font',
+    })
+    .toMatch(/: loaded/);
 }
 
 async function expectFontLoaded(page: Page, family: string) {

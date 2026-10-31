@@ -7,5 +7,6 @@
   font-weight: var(--font-weight-semibold);
   letter-spacing: -0.02em;
   white-space: nowrap;
+  text-rendering: geometricPrecision;
   color: var(--logo-color, var(--color-text-link));
 }

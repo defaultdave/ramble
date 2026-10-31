@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Dialog } from './Dialog';
 import type { DialogVariant } from './Dialog';
 
@@ -38,6 +38,16 @@ function Harness({ variant }: { variant: DialogVariant }) {
 
 const variants: DialogVariant[] = ['sheet', 'drawer'];
 
+function scrim() {
+  const found = screen.getByRole('dialog').parentElement?.parentElement;
+  if (!found) throw new Error('No scrim');
+  return found;
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe('Dialog', () => {
   it('renders nothing while closed', () => {
     render(
@@ -67,17 +77,43 @@ describe('Dialog', () => {
     expect(screen.getByRole('button', { name: 'Continue' })).toBeVisible();
   });
 
-  it('asks to close when the scrim is clicked', async () => {
+  it('asks to close when the scrim is pressed after the double-tap window', async () => {
+    const clock = vi.spyOn(performance, 'now').mockReturnValue(1000);
     const onClose = vi.fn();
     render(
       <Dialog variant="sheet" open title="Filters" onClose={onClose}>
         <button type="button">First</button>
       </Dialog>,
     );
-    const scrim = screen.getByRole('dialog').parentElement?.parentElement;
-    if (!scrim) throw new Error('No scrim');
-    await userEvent.click(scrim);
+    clock.mockReturnValue(1000 + 401);
+    await userEvent.click(scrim());
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('ignores a scrim press that lands as the dialog opens, which is a second tap on the opener', async () => {
+    const clock = vi.spyOn(performance, 'now').mockReturnValue(1000);
+    const onClose = vi.fn();
+    render(
+      <Dialog variant="drawer" open title="Filters" onClose={onClose}>
+        <button type="button">First</button>
+      </Dialog>,
+    );
+    clock.mockReturnValue(1000 + 200);
+    await userEvent.click(scrim());
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('still closes on the close button and on Escape inside the double-tap window', async () => {
+    vi.spyOn(performance, 'now').mockReturnValue(1000);
+    const onClose = vi.fn();
+    render(
+      <Dialog variant="drawer" open title="Filters" onClose={onClose}>
+        <button type="button">First</button>
+      </Dialog>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await userEvent.keyboard('{Escape}');
+    expect(onClose).toHaveBeenCalledTimes(2);
   });
 
   it('asks to close on Escape and stays open until the caller closes it', async () => {

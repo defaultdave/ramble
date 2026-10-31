@@ -1,7 +1,7 @@
 'use client';
 
 import { X } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import {
   Dialog as AriaDialog,
   Heading,
@@ -39,6 +39,12 @@ const modalClass = {
   drawer: classNames(styles.modal, styles.drawer),
 } satisfies Record<DialogVariant, string | undefined>;
 
+/**
+ * A second tap on the button that opened the dialog lands on the scrim a moment after the dialog
+ * appears. A press this soon is that tap, not a guest dismissing it.
+ */
+const doubleTapWindowMs = 400;
+
 export function Dialog({
   open,
   onClose,
@@ -48,10 +54,18 @@ export function Dialog({
   variant,
   children,
 }: DialogProps) {
+  const openedAt = useRef(0);
+  useEffect(() => {
+    if (open) openedAt.current = performance.now();
+  }, [open]);
+
   return (
     <ModalOverlay
       isOpen={open}
       isDismissable
+      shouldCloseOnInteractOutside={() =>
+        performance.now() - openedAt.current > doubleTapWindowMs
+      }
       className={overlayClass[variant]}
       onOpenChange={(isOpen) => {
         if (!isOpen) onClose();

@@ -6,7 +6,10 @@ export type PhotoProps = {
   photo: PhotoView;
   /** What the browser needs to pick a size before layout: the width this photo takes at each breakpoint. */
   sizes: string;
-  /** For the one photo that is the page's largest paint: it is fetched first, not lazily. */
+  /**
+   * For the one photo that is the page's largest paint: it is drawn eagerly and fetched at high
+   * priority, and the preload hint carries the same priority so the fetch can start before layout.
+   */
   preload?: boolean;
 };
 
@@ -23,6 +26,7 @@ export function Photo({ photo, sizes, preload = false }: PhotoProps) {
       fill
       sizes={sizes}
       preload={preload}
+      fetchPriority={preload ? 'high' : undefined}
       placeholder="blur"
       blurDataURL={photo.blurDataUrl}
     />

@@ -12,15 +12,22 @@ export type ExperienceCardItemProps = {
   layout: CardLayout;
   /** The surface decides the level: its own heading sits one level above. */
   headingLevel: CardHeadingLevel;
+  /** For the card whose photo is the page's largest paint. */
+  preloadPhoto?: boolean;
 };
 
 export function ExperienceCardItem({
   card,
   layout,
   headingLevel,
+  preloadPhoto = false,
 }: ExperienceCardItemProps) {
   const image = card.image ? (
-    <Photo photo={card.image} sizes={cardPhotoSizes[layout]} />
+    <Photo
+      photo={card.image}
+      sizes={cardPhotoSizes[layout]}
+      preload={preloadPhoto}
+    />
   ) : null;
   return card.kind === 'guide-only' ? (
     <Card

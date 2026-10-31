@@ -3,8 +3,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import { page } from 'vitest/browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomeHero } from '@/components/HomeModules/HomeHero';
-import richTextStyles from '@/components/RichText/RichText.module.css';
+import { RichText } from '@/components/RichText';
 import { homeCopy } from '@/lib/pages/home';
+import { paragraphs } from '@/lib/richText/paragraphs';
 import { HomeSkeleton } from './HomeSkeleton';
 import styles from './HomeStates.module.css';
 
@@ -17,6 +18,7 @@ vi.hoisted(() => {
 // the loaded hero takes, so the page does not move when the data arrives:
 // - the search box is as tall as the loaded one, and so is each field and the button in it
 // - a line of the headline and a line of the copy are as tall as the loaded ones
+// - the loaded copy is set in body-l and text-secondary, as in Figma, whatever order the stylesheets load in
 // - the eyebrow is as tall as the loaded one
 // This runs on the fixture hero, in a real browser and with no database, and compares sizes that
 // do not depend on the words or the font. How many lines the words take is not compared here: it
@@ -42,6 +44,14 @@ const expectSame = (actual: number, expected: number | null) => {
 // A CSS module's class can read as undefined to the type checker; an empty name makes the selector throw.
 const dot = (name: string | undefined) => `.${name ?? ''}`;
 const pixels = (value: string) => Number.parseFloat(value);
+const resolvedColor = (token: string) => {
+  const probe = document.createElement('span');
+  probe.style.color = `var(${token})`;
+  document.body.append(probe);
+  const { color } = getComputedStyle(probe);
+  probe.remove();
+  return color;
+};
 
 function heroSizes() {
   const form = container.querySelector(
@@ -58,6 +68,7 @@ function heroSizes() {
   if (!eyebrow) throw new Error('No eyebrow');
   const lineOf = (loaded: Element | null | undefined) =>
     loaded ? pixels(getComputedStyle(loaded).lineHeight) : null;
+  const paragraph = body?.querySelector('p') ?? null;
   return {
     search: heightOf(form),
     parts: [...form.children].map(heightOf),
@@ -68,6 +79,8 @@ function heroSizes() {
       ? pixels(getComputedStyle(bodyLines).gridAutoRows)
       : lineOf(body),
     eyebrow: heightOf(eyebrow),
+    bodySize: paragraph ? pixels(getComputedStyle(paragraph).fontSize) : null,
+    bodyColor: paragraph ? getComputedStyle(paragraph).color : null,
   };
 }
 
@@ -94,11 +107,7 @@ describe('HomeSkeleton against the loaded hero', () => {
       <HomeHero
         eyebrow={homeCopy.heroEyebrow}
         heading={homeCopy.heroHeading}
-        body={
-          <div className={richTextStyles.richText}>
-            <p>{homeCopy.heroBody}</p>
-          </div>
-        }
+        body={<RichText content={paragraphs(homeCopy.heroBody)} />}
         neighborhoods={[{ slug: 'dumbo', name: 'DUMBO' }]}
         today="2026-11-02"
       />,
@@ -113,5 +122,14 @@ describe('HomeSkeleton against the loaded hero', () => {
     expectSame(loading.headingLine ?? NaN, loaded.headingLine);
     expectSame(loading.bodyLine ?? NaN, loaded.bodyLine);
     expectSame(loading.eyebrow, loaded.eyebrow);
+    expectSame(
+      loaded.bodySize ?? NaN,
+      pixels(
+        getComputedStyle(document.documentElement).getPropertyValue(
+          '--font-size-body-l',
+        ),
+      ),
+    );
+    expect(loaded.bodyColor).toBe(resolvedColor('--color-text-secondary'));
   });
 });

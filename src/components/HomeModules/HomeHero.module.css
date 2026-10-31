@@ -46,7 +46,9 @@
   color: var(--color-text-secondary);
 }
 
-.body > * {
+/* The copy is rich text, whose root sets body-m with one class. Doubling this class outranks that
+   rule whichever stylesheet loads last, so the size and line height do not depend on order. */
+.body.body > * {
   color: inherit;
   font-size: inherit;
   line-height: inherit;

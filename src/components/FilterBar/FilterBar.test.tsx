@@ -1,11 +1,12 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { maxFilterValues, noFilters, type BrowseFilters } from '@/lib/filters';
 import { FilterBar, type FilterBarProps } from './FilterBar';
 
 // Behaviours under test, one per decision, branch or risk:
+// - a party chip links to that party, and the chosen one links to the address without it
 // - the three groups are labelled and each chip says whether it is chosen
 // - a chip links to the address with it added, keeping what else is chosen; a chosen chip links to the address without it
 // - a full list disables the chips that are not chosen, without an address, and keeps the chosen ones linked
@@ -50,7 +51,7 @@ function setup(
 describe('FilterBar', () => {
   it('labels the three groups', () => {
     setup();
-    for (const name of ['When', 'Neighborhood', 'Category']) {
+    for (const name of ['When', 'Guests', 'Neighborhood', 'Category']) {
       expect(screen.getByRole('group', { name })).toBeVisible();
     }
   });
@@ -64,6 +65,36 @@ describe('FilterBar', () => {
     expect(
       screen.getByRole('link', { name: 'Walking tours' }),
     ).not.toHaveAttribute('aria-current');
+  });
+
+  it('offers a chip for each party, marks the chosen one, and links it off', () => {
+    setup({ ...noFilters, guests: 4 });
+    const group = screen.getByRole('group', { name: 'Guests' });
+    const chips = within(group).getAllByRole('link');
+    expect(chips.map((chip) => chip.textContent)).toEqual([
+      '1 guest',
+      '2 guests',
+      '3 guests',
+      '4 guests',
+      '5 guests',
+      '6 guests',
+    ]);
+    expect(
+      within(group).getByRole('link', { name: '4 guests' }),
+    ).toHaveAttribute('aria-current', 'true');
+    expect(
+      within(group).getByRole('link', { name: '4 guests' }),
+    ).toHaveAttribute('href', '/new-york/browse');
+    expect(
+      within(group).getByRole('link', { name: '2 guests' }),
+    ).toHaveAttribute('href', '/new-york/browse?guests=2');
+  });
+
+  it('shows Clear all filters when only a party is chosen, and links it to the bare address', () => {
+    setup({ ...noFilters, guests: 2 });
+    expect(
+      screen.getByRole('link', { name: 'Clear all filters' }),
+    ).toHaveAttribute('href', '/new-york/browse');
   });
 
   it('links a chip to the address with it added, keeping the rest', () => {
@@ -215,6 +246,7 @@ describe('FilterBar', () => {
       categories: ['cooking'],
       neighborhoods: ['dumbo'],
       date: '2026-11-07',
+      guests: null,
     });
     expect(
       screen.getByRole('link', { name: 'Clear all filters' }),

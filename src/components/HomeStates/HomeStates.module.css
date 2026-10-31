@@ -113,9 +113,10 @@
   width: 60%;
 }
 
+/* The hero's copy is rich text, which sets its own body-m size and line height. */
 .bodyLines {
   grid-auto-rows: calc(
-    var(--font-size-body-l) * var(--font-line-height-body-l)
+    var(--font-size-body-m) * var(--font-line-height-body-m)
   );
 }
 
@@ -296,10 +297,6 @@
     display: block;
   }
 
-  .bodyLines > .bar:nth-child(3) {
-    display: none;
-  }
-
   .art {
     order: 0;
     flex: 0 1 40%;
@@ -327,6 +324,13 @@
   }
 
   .linkBar {
+    display: none;
+  }
+}
+
+/* A line of the hero's copy fewer once the phone is wider than the narrowest ones. */
+@media (min-width: 375px) {
+  .bodyLines > .bar:nth-child(3) {
     display: none;
   }
 }

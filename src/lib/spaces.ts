@@ -13,6 +13,14 @@ export function hasSpaceLeft(session: SessionSpace): boolean {
   return spacesStatus(spacesLeft(session)) !== 'sold-out';
 }
 
+/** A session with room for the whole party: it has a space left and at least `party` of them. */
+export function hasSpaceForParty(
+  session: SessionSpace,
+  party: number,
+): boolean {
+  return hasSpaceLeft(session) && spacesLeft(session) >= party;
+}
+
 export function spacesStatus(spacesLeft: number): SpacesStatus {
   if (spacesLeft <= 0) return 'sold-out';
   return spacesLeft <= FEW_LEFT_AT_MOST ? 'few-left' : 'open';

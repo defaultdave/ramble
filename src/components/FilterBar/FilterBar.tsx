@@ -3,20 +3,18 @@ import { Button, ButtonLink } from '@/components/Button';
 import { ChipLink } from '@/components/Chip';
 import { DatePicker } from '@/components/DatePicker';
 import { dateChipLabel } from '@/lib/pages/browse';
-import {
-  guestChips,
-  listChips,
-  selectedChips,
-  type FilterChip,
-} from '@/lib/filterBar';
+import { selectedChips } from '@/lib/filterBar';
 import {
   activeFilterCount,
+  browseParamNames,
+  guestChips,
   hrefForFilters,
+  listChips,
   toQuery,
   toQueryEntries,
   withDate,
-  browseParamNames,
   type BrowseFilters,
+  type ChipView,
 } from '@/lib/filters';
 import { browsePath } from '@/lib/routes';
 import styles from './FilterBar.module.css';
@@ -38,7 +36,7 @@ export type FilterBarProps = {
   onPickDate: (date: string) => unknown;
 };
 
-function ChipLinks({ chips }: { chips: readonly FilterChip[] }) {
+function ChipLinks({ chips }: { chips: readonly ChipView[] }) {
   return chips.map(({ key, label, selected, disabled, href }) => (
     <ChipLink
       key={key}
@@ -52,7 +50,7 @@ function ChipLinks({ chips }: { chips: readonly FilterChip[] }) {
 
 type ChipGroupProps = {
   legend: string;
-  chips: readonly FilterChip[];
+  chips: readonly ChipView[];
   /** The target of the chip in the row that goes to this group when there is no script. */
   id?: string;
 };
@@ -230,7 +228,9 @@ export function FilterBar({
           {count > 0 ? <span className={styles.count}>{count}</span> : null}
         </DrawerLink>
         <WhenControl {...when} placement="row" />
-        <ChipLinks chips={selectedChips(filters, { categories, neighborhoods })} />
+        <ChipLinks
+          chips={selectedChips(filters, { categories, neighborhoods })}
+        />
         <DrawerLink href="#filters-neighborhoods">Neighborhood</DrawerLink>
         <DrawerLink href="#filters-guests">Guests</DrawerLink>
       </FilterRow>

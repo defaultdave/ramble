@@ -3,7 +3,13 @@ import { useId, type ReactNode } from 'react';
 import { Button } from '@/components/Button';
 import { Illustration } from '@/components/Illustration';
 import { Input } from '@/components/Input';
-import { browseParamNames, defaultGuests, guestCounts } from '@/lib/filters';
+import {
+  browseParamNames,
+  defaultGuests,
+  guestOptions,
+  neighborhoodOptions,
+  type SelectOption,
+} from '@/lib/filters';
 import { browsePath } from '@/lib/routes';
 import { Eyebrow } from './Eyebrow';
 import styles from './HomeHero.module.css';
@@ -22,7 +28,7 @@ type SelectFieldProps = {
   label: string;
   name: string;
   defaultValue: string;
-  options: readonly { value: string; label: string }[];
+  options: readonly SelectOption[];
 };
 
 function SelectField({ label, name, defaultValue, options }: SelectFieldProps) {
@@ -84,13 +90,7 @@ export function HomeHero({
               label="Neighborhood"
               name={browseParamNames.neighborhoods}
               defaultValue=""
-              options={[
-                { value: '', label: 'Anywhere' },
-                ...neighborhoods.map(({ slug, name }) => ({
-                  value: slug,
-                  label: name,
-                })),
-              ]}
+              options={neighborhoodOptions(neighborhoods)}
             />
             <div className={styles.field}>
               <Input
@@ -105,10 +105,7 @@ export function HomeHero({
               label="Guests"
               name={browseParamNames.guests}
               defaultValue={String(defaultGuests)}
-              options={guestCounts.map((count) => ({
-                value: String(count),
-                label: String(count),
-              }))}
+              options={guestOptions()}
             />
             <div className={styles.submit}>
               <Button type="submit" size="lg" iconStart={<Search />}>

@@ -74,15 +74,49 @@ export const WithFilters: Story = {
   },
 };
 
-/** Forty neighborhoods: a phone scrolls each row sideways inside its own box. */
-export const ManyChips: Story = {
-  args: { neighborhoods: manyNeighborhoods },
+const manyChosen = {
+  categories: categories.slice(0, 5).map(({ slug }) => slug),
+  neighborhoods: neighborhoods.map(({ slug }) => slug),
+  date: '2026-10-31',
+  guests: 4,
+};
+
+/** Every group chosen: the row grows past the screen and scrolls sideways inside its own box. */
+export const ManyChosen: Story = {
+  args: { filters: manyChosen },
 };
 
 /** The same, alone on the page, so a phone width shows whether the page itself scrolls sideways. */
-export const ManyChipsLight: Story = {
+export const ManyChosenLight: Story = {
+  args: { filters: manyChosen },
+  parameters: { colorScheme: 'light' },
+};
+
+/** Forty neighborhoods: they live in the drawer, so the row stays one row. */
+export const ManyNeighborhoods: Story = {
   args: { neighborhoods: manyNeighborhoods },
   parameters: { colorScheme: 'light' },
+};
+
+const openDrawer: Story['play'] = async ({ canvasElement }) => {
+  const canvas = within(canvasElement);
+  await userEvent.click(canvas.getByRole('link', { name: /^Filters/ }));
+  await expect(
+    await within(document.body).findByRole('dialog', { name: 'Filters' }),
+  ).toBeVisible();
+};
+
+/** The drawer opens from the Filters chip, with every group. */
+export const DrawerOpen: Story = {
+  args: { filters: { ...manyChosen, categories: ['cooking'] } },
+  parameters: { colorScheme: 'light' },
+  play: openDrawer,
+};
+
+export const DrawerOpenDark: Story = {
+  args: { filters: { ...manyChosen, categories: ['cooking'] } },
+  parameters: { colorScheme: 'dark' },
+  play: openDrawer,
 };
 
 export const AtTheLimit: Story = {

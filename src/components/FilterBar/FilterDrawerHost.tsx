@@ -52,9 +52,9 @@ type FilterRowProps = {
  * The row of chips and the drawer that the Filters, Neighborhood and Guests buttons open.
  *
  * The drawer is fetched when first wanted, or once the browser is idle after hydration (a phone never
- * hovers, so its first press would otherwise start the fetch), unless the guest asked to save data. It opens only once it has arrived: until then the
- * button says it is busy and a second press does nothing. A fetch that fails leaves the drawer closed,
- * says so, and the next press tries again. A guest who pressed or focused something else while it
+ * hovers, so its first press would otherwise start the fetch), unless the guest asked to save data.
+ * It opens only once it has arrived: until then the button says it is busy and a second press does
+ * nothing. A fetch that fails leaves the drawer closed, says so, and the next press tries again. A guest who pressed or focused something else while it
  * was arriving is not pulled into a dialog. The row stays mounted as the filters change, so a
  * chosen chip that clears itself (and so leaves the page with focus on it) hands focus to the Filters
  * button rather than to the page.

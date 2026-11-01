@@ -50,6 +50,41 @@ describe('SiteMenu', () => {
     expect(details).not.toHaveAttribute('open');
   });
 
+  it('closes on Escape and returns focus to its button', async () => {
+    const { container } = render(<SiteMenu links={links} />);
+    const details = container.querySelector('details');
+    await userEvent.click(
+      screen.getByText('Menu', { selector: 'summary span' }),
+    );
+    screen.getByRole('link', { name: 'Gift guide', hidden: true }).focus();
+
+    await userEvent.keyboard('{Escape}');
+
+    expect(details).not.toHaveAttribute('open');
+    expect(container.querySelector('summary')).toHaveFocus();
+  });
+
+  it('closes on a press outside, and stays open on a press inside', async () => {
+    const { container } = render(
+      <>
+        <button type="button">Elsewhere</button>
+        <SiteMenu links={links} />
+      </>,
+    );
+    const details = container.querySelector('details');
+    await userEvent.click(
+      screen.getByText('Menu', { selector: 'summary span' }),
+    );
+
+    await userEvent.click(
+      screen.getByRole('navigation', { name: 'Main menu', hidden: true }),
+    );
+    expect(details).toHaveAttribute('open');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Elsewhere' }));
+    expect(details).not.toHaveAttribute('open');
+  });
+
   it('lists its links', () => {
     render(<SiteMenu links={links} />);
     const nav = screen.getByRole('navigation', {

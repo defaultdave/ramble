@@ -10,6 +10,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { useDismissableDetails } from '@/components/Disclosure/useDismissableDetails';
 import { loadDatePicker } from './datePickerLoader';
 import { useFocusMemory } from './focusMemory';
 
@@ -62,8 +63,12 @@ export function WhenDetails({
   date,
   children,
 }: WhenDetailsProps) {
-  const details = useRef<HTMLDetailsElement>(null);
-  const chip = useRef<HTMLElement>(null);
+  const {
+    details,
+    summary: chip,
+    onKeyDown,
+    close,
+  } = useDismissableDetails({ stopEscapePropagation: true });
   const previous = useRef(date);
   const memory = useFocusMemory(details);
   const [opens, setOpens] = useState(0);
@@ -79,7 +84,7 @@ export function WhenDetails({
       cardGapPx -
       card.getBoundingClientRect().top;
     if (overlap > 0) window.scrollBy({ top: overlap });
-  }, []);
+  }, [details, chip]);
   const disclosure = useMemo(
     () => ({ opens, contentChanged: keepChipClear }),
     [opens, keepChipClear],
@@ -87,28 +92,16 @@ export function WhenDetails({
   useEffect(() => {
     // A card opened before this hydrated sent no toggle this could hear.
     if (details.current?.open) setOpens((count) => Math.max(count, 1));
-  }, []);
+  }, [details]);
   useEffect(() => {
     if (previous.current === date) return;
     previous.current = date;
     const hadFocus = memory.hadFocus();
-    if (details.current) details.current.open = false;
+    close();
     if (hadFocus) chip.current?.focus();
     // The memory only reads a ref; the day changing is what asks.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
-  useEffect(() => {
-    function closeOnOutsidePress(event: PointerEvent) {
-      const open = details.current;
-      if (open?.open && event.target instanceof Node) {
-        if (!open.contains(event.target)) open.open = false;
-      }
-    }
-    document.addEventListener('pointerdown', closeOnOutsidePress);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutsidePress);
-    };
-  }, []);
   return (
     <details
       ref={details}
@@ -120,13 +113,7 @@ export function WhenDetails({
         setOpens((count) => count + 1);
         keepChipClear();
       }}
-      onKeyDown={(event) => {
-        if (event.key !== 'Escape' || !details.current?.open) return;
-        // The drawer around the calendar would close on this key too.
-        event.stopPropagation();
-        details.current.open = false;
-        chip.current?.focus();
-      }}
+      onKeyDown={onKeyDown}
     >
       <summary
         ref={chip}

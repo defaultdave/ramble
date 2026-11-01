@@ -8,8 +8,10 @@
 
 export const tags = {
   home: 'home',
-  /** The two catalog indexes (by category, by neighborhood) that listings and browse filter. */
+  /** The reads that depend on which experiences are listed: browse results and dates, and `On this week`. The home entry names its cards instead. */
   catalog: 'catalog',
+  /** The names of the categories and neighborhoods, which the filter chips, the home rails, and an experience's place line show. */
+  taxonomy: 'taxonomy',
   settings: 'settings',
   giftGuide: 'gift-guide',
   helpArticles: 'help-articles',
@@ -35,6 +37,8 @@ export type CacheChange =
   | { kind: 'schedule'; experienceId: string }
   /** A hold, booking, or release changed the spaces left in one session. */
   | { kind: 'spaces'; sessionId: string }
+  /** A category or neighborhood is renamed, added, or removed. Nothing publishes this yet. */
+  | { kind: 'taxonomy' }
   | { kind: 'homeModules' }
   | { kind: 'pick'; slug: string }
   | { kind: 'giftGuide' }
@@ -51,7 +55,6 @@ function tagsFor(change: CacheChange): string[] {
         tags.experience(change.id),
         tags.guideEntry(change.id),
         tags.catalog,
-        tags.home,
         tags.neighborhood(change.neighborhoodSlug),
         ...change.categorySlugs.map(tags.category),
       ];
@@ -59,6 +62,8 @@ function tagsFor(change: CacheChange): string[] {
       return [tags.experience(change.experienceId)];
     case 'spaces':
       return [tags.session(change.sessionId)];
+    case 'taxonomy':
+      return [tags.taxonomy, tags.catalog];
     case 'homeModules':
       return [tags.home];
     case 'pick':

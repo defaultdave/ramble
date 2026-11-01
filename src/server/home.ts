@@ -13,13 +13,13 @@ import {
 import type { CardExperience } from '@/lib/experienceCards';
 import { upcomingWindow } from '@/lib/sessionWindow';
 import { readOrRefuse } from '@/server/cache/readOrRefuse';
-import { listCategories, listNeighborhoods } from '@/server/db/catalog';
 import {
   getPublishedGiftGuide,
   listHomeModules,
   listHomePicks,
 } from '@/server/db/editorial';
 import { listHomeExperiences, listThisWeekSessions } from '@/server/db/home';
+import { getFilterOptions } from '@/server/filterOptions';
 
 export type HomeContent = {
   modules: HomeModule[];
@@ -31,30 +31,33 @@ export type HomeContent = {
 };
 
 /**
- * Everything the home modules show except "On this week" and the gift switch. Publishing a home
- * module, a Pick, or a category reaches it through `tags.home` and `tags.catalog`, and an
- * experience on a Pick card reaches it through that experience's tag.
+ * Everything the home modules show except "On this week" and the gift switch. A home module, a
+ * Pick, or the gift guide reaches it through `tags.home`; a rename of a category or neighborhood
+ * through `tags.taxonomy`, which `getFilterOptions` hands to this entry. A listing change reaches
+ * it only through the tag of each experience a Pick names. That includes one a guest cannot see
+ * yet, so publishing it adds its card, and it is why the tag follows the IDs asked for and not
+ * the cards that came back.
  */
 export async function getHomeContent(): Promise<HomeContent> {
   'use cache';
   cacheLife('editorial');
-  cacheTag(tags.home, tags.catalog);
-  const content = await readOrRefuse('Home', async () => {
+  cacheTag(tags.home);
+  return readOrRefuse('Home', async () => {
     // The Picks wait for the modules, which say which ones to read; the rest read beside them.
-    const [{ modules, picks }, giftGuide, categories, neighborhoods] =
+    const [{ modules, picks }, giftGuide, { categories, neighborhoods }] =
       await Promise.all([
         listHomeModules().then(async (listed) => ({
           modules: listed,
           picks: await listHomePicks(homePickIds(listed)),
         })),
         getPublishedGiftGuide(),
-        listCategories(),
-        listNeighborhoods(),
+        getFilterOptions(),
       ]);
-    const experiences = await listHomeExperiences(
-      homeExperienceIds(modules, picks),
-      { covers: false },
-    );
+    const experienceIds = homeExperienceIds(modules, picks);
+    for (const id of experienceIds) cacheTag(tags.experience(id));
+    const experiences = await listHomeExperiences(experienceIds, {
+      covers: false,
+    });
     return {
       modules,
       picks,
@@ -64,10 +67,6 @@ export async function getHomeContent(): Promise<HomeContent> {
       experiences,
     };
   });
-  for (const experience of content.experiences) {
-    cacheTag(tags.experience(experience.id));
-  }
-  return content;
 }
 
 export type ThisWeekContent = {
@@ -78,9 +77,10 @@ export type ThisWeekContent = {
 
 /**
  * The experiences with an open session in the next week. `asOf` is the minute (`minuteAsOf`), so
- * guests inside one minute share an entry. A schedule or booking change reaches it through the
- * tag of each experience it lists; a session added to an experience that is not listed waits for
- * the `browse` profile to run out, about a minute.
+ * guests inside one minute share an entry. A schedule change reaches it through the tag of each
+ * experience it lists. A booking change publishes `session:<id>`, which no read carries, and a
+ * session added to an experience that is not listed reaches nothing, so both wait for the entry to
+ * roll over with the minute, about 60 seconds.
  */
 export async function getThisWeek(asOf: string): Promise<ThisWeekContent> {
   'use cache';

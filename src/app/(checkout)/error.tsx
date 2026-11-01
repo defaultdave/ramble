@@ -1,13 +1,13 @@
 'use client';
 
 import { ErrorNotice } from '@/components/ErrorNotice';
-import { SiteShell } from '@/components/SiteShell';
+import { GuestShell } from '@/components/GuestShell';
 
 /** At the group's root, above the `(site)` frame, so it brings its own. */
 export default function GroupError({ retry }: { retry: () => void }) {
   return (
-    <SiteShell>
+    <GuestShell>
       <ErrorNotice onRetry={retry} />
-    </SiteShell>
+    </GuestShell>
   );
 }

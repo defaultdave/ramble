@@ -81,7 +81,7 @@ describe('the checkout route group', () => {
 
   it('reaches a meaningful set of modules', () => {
     expect(files.length).toBeGreaterThan(8);
-    expect(files.some((f) => f.endsWith('SiteShell.tsx'))).toBe(true);
+    expect(files.some((f) => f.endsWith('GuestShell.tsx'))).toBe(true);
     expect(files.some((f) => f.endsWith('global-error.tsx'))).toBe(true);
   });
 

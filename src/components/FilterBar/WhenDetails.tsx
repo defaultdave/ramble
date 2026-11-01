@@ -85,6 +85,10 @@ export function WhenDetails({
     [opens, keepChipClear],
   );
   useEffect(() => {
+    // A card opened before this hydrated sent no toggle this could hear.
+    if (details.current?.open) setOpens((count) => Math.max(count, 1));
+  }, []);
+  useEffect(() => {
     if (previous.current === date) return;
     previous.current = date;
     const hadFocus = memory.hadFocus();

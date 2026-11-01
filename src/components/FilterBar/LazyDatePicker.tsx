@@ -1,11 +1,6 @@
 'use client';
 
-import {
-  useEffect,
-  useLayoutEffect,
-  useState,
-  type CSSProperties,
-} from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import type { DatePicker, DatePickerProps } from '@/components/DatePicker';
 import { visibleDate, weeksInMonthOf } from '@/lib/datePicker';
 import { loadDatePicker, loadedDatePicker } from './datePickerLoader';
@@ -37,6 +32,13 @@ export function LazyDatePicker({
     loadedDatePicker,
   );
   const [failedAt, setFailedAt] = useState(0);
+  // A warm-up can land after this mounted, so each open looks again before it shows a stand-in.
+  const [seenOpens, setSeenOpens] = useState(opens);
+  if (seenOpens !== opens) {
+    setSeenOpens(opens);
+    const held = loadedDatePicker();
+    if (held && !Picker) setPicker(() => held);
+  }
 
   useEffect(() => {
     if (opens === 0 || Picker) return;
@@ -61,15 +63,14 @@ export function LazyDatePicker({
   if (Picker) return <Picker {...props} />;
   const asked = opens > 0;
   const failed = asked && failedAt === opens;
-  const weeks = weeksInMonthOf(visibleDate(props));
-  // Closed, the box is empty and says nothing: only a guest who opened the card is waiting.
+  // The live region is there from the first render and empty until a guest opens the card, so its text is announced as it changes.
   return (
     <div
-      role={asked ? 'status' : undefined}
+      role="status"
       aria-busy={asked && !failed ? true : undefined}
       data-failed={failed || undefined}
+      data-weeks={weeksInMonthOf(visibleDate(props))}
       className={styles.calendarPlaceholder}
-      style={{ '--weeks': weeks } as CSSProperties}
     >
       {asked ? (failed ? loadFailedMessage : loadingMessage) : null}
     </div>

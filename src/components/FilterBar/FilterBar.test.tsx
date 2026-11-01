@@ -8,7 +8,16 @@ import {
   within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Root } from 'react-dom/client';
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import {
   calendarLoadFailedMessage,
   calendarLoadingMessage,
@@ -43,6 +52,14 @@ import { FilterBar, type FilterBarProps } from './FilterBar';
 // - the calendar arriving moves no focus, and puts the card clear of the chip again; a pick closes the disclosure, returns focus, and does not remount the calendar
 // - hovering or focusing the date chip fetches the calendar; the idle warm-up fetches it with the drawer, and not for a guest who saves data
 // - a changed day closes the calendar, and moves focus only when it was in the control; Back and Forward and the rest of the page leave it; the same day changes nothing
+
+// The chunks the bar fetches are cold on a loaded machine, and a test that waits a second for one should not be the one to pay.
+beforeAll(async () => {
+  await Promise.all([
+    import('@/components/FilterDrawer'),
+    import('@/components/DatePicker'),
+  ]);
+}, 30_000);
 
 // jsdom has no layout, so it has nothing to scroll.
 const scrollIntoView = vi.fn();
@@ -349,9 +366,11 @@ describe('a drawer that has to be fetched', () => {
     await userEvent.click(filtersButton());
     drawer.fail(new Error('chunk failed'));
 
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      drawerLoadFailedMessage(),
-    );
+    expect(
+      await screen.findByText(drawerLoadFailedMessage(), {
+        selector: '[role="status"]',
+      }),
+    ).toBeVisible();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(filtersButton()).not.toHaveAttribute('aria-busy');
 
@@ -361,7 +380,11 @@ describe('a drawer that has to be fetched', () => {
       await screen.findByRole('dialog', { name: 'Filters' }),
     ).toBeVisible();
     // The dialog hides the page behind it from the accessibility tree.
-    expect(screen.getByRole('status', { hidden: true })).toBeEmptyDOMElement();
+    expect(
+      screen
+        .getAllByRole('status', { hidden: true })
+        .find((region) => region.tagName === 'P'),
+    ).toBeEmptyDOMElement();
   });
 
   it.each([
@@ -467,7 +490,10 @@ describe('the drawer fetched ahead of a press', () => {
       run();
     });
     await Promise.resolve();
-    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    const drawerStatus = screen
+      .getAllByRole('status')
+      .find((region) => region.tagName === 'P');
+    expect(drawerStatus).toBeEmptyDOMElement();
 
     // The press brings the drawer up although the idle fetch failed.
     await openDrawer();
@@ -759,7 +785,96 @@ describe('the calendar fetched when the date disclosure opens', () => {
     const chip = details.querySelector('summary');
     if (!chip) throw new Error('No chip');
     await userEvent.click(chip);
-    expect(placeholder().style.getPropertyValue('--weeks')).toBe(weeks);
+    expect(placeholder()).toHaveAttribute('data-weeks', weeks);
+    expect(placeholder()).not.toHaveAttribute('style');
+  });
+
+  it('keeps its live region from the first render, empty until the card is opened', async () => {
+    const calendar = deferredCalendar();
+    const { details } = setup();
+    const region = details.querySelector('[role="status"]');
+    expect(region).toBeEmptyDOMElement();
+    await userEvent.click(row().getByText('Pick a date'));
+    expect(details.querySelector('[role="status"]')).toBe(region);
+    expect(region).toHaveTextContent(calendarLoadingMessage());
+    calendar.finish();
+    await screen.findByRole('grid');
+  });
+
+  it('loads a card that was opened before the page hydrated', async () => {
+    const { renderToString } = await import('react-dom/server');
+    const { hydrateRoot } = await import('react-dom/client');
+    const html = renderToString(bar(noFilters));
+    const host = document.createElement('div');
+    host.innerHTML = html;
+    document.body.append(host);
+    const details = host.querySelector('details');
+    if (!details) throw new Error('No calendar disclosure');
+    // The page is plain HTML here: a tap on the chip opens the card with no script to hear it.
+    details.open = true;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(loadDatePicker).not.toHaveBeenCalled();
+
+    let root: Root | undefined;
+    try {
+      await act(async () => {
+        root = hydrateRoot(host, bar(noFilters));
+        await Promise.resolve();
+      });
+      expect(await within(host).findByRole('grid')).toBeVisible();
+      expect(details.open).toBe(true);
+    } finally {
+      act(() => {
+        root?.unmount();
+      });
+      host.remove();
+    }
+  });
+
+  it('shows a calendar a warm-up brought after the bar mounted at once, with no stand-in', async () => {
+    const { details } = setup();
+    vi.mocked(loadedDatePicker).mockReturnValue(await realLoadDatePicker());
+    const chip = details.querySelector('summary');
+    if (!chip) throw new Error('No chip');
+    await userEvent.click(chip);
+    expect(screen.getByRole('grid')).toBeVisible();
+    expect(
+      screen.queryByRole('status', { busy: true }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('holds one fetch for a card closed and opened again while the code is on its way', async () => {
+    const calendar = deferredCalendar();
+    const { details } = setup();
+    await userEvent.click(row().getByText('Pick a date'));
+    await userEvent.keyboard('{Escape}');
+    expect(details.open).toBe(false);
+    await userEvent.click(row().getByText('Pick a date'));
+    expect(placeholder()).toHaveTextContent(calendarLoadingMessage());
+
+    calendar.finish();
+    expect(await screen.findAllByRole('grid')).toHaveLength(1);
+    expect(
+      screen.queryByText(calendarLoadFailedMessage()),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the new month once the code arrives when the day changed while it was on its way', async () => {
+    const calendar = deferredCalendar();
+    const { rerender, container } = render(bar(noFilters));
+    await userEvent.click(screen.getByText('Pick a date'));
+    expect(placeholder()).toHaveAttribute('data-weeks', '5');
+
+    rerender(bar({ ...noFilters, date: '2027-01-15' }));
+    expect(container.querySelector('details')?.open).toBe(false);
+    expect(placeholder()).toHaveAttribute('data-weeks', '6');
+
+    calendar.finish();
+    expect(
+      await screen.findByLabelText(/Friday, January 15, 2027 selected/, {
+        selector: '*',
+      }),
+    ).toBeInTheDocument();
   });
 
   it('shows the calendar at once when an earlier fetch has brought it', async () => {
@@ -898,5 +1013,27 @@ describe('the calendar fetched when the date disclosure opens', () => {
     expect(container.querySelector('details')?.open).toBe(false);
     expect(screen.getByText('Sat, Nov 7')).toHaveFocus();
     expect(screen.getByRole('grid', { hidden: true })).toBe(grid);
+  });
+
+  it('keeps the calendar a guest paged through when the day changes, so it is never keyed by the day', async () => {
+    const { rerender } = render(bar({ ...noFilters, date: '2026-10-26' }));
+    await userEvent.click(screen.getByText('Mon, Oct 26'));
+    const grid = await screen.findByRole('grid');
+    const [next] = await screen.findAllByRole('button', { name: 'Next' });
+    if (!next) throw new Error('No Next button');
+    await userEvent.click(next);
+    const marked = screen.getByRole('button', {
+      name: /Saturday, November 7, 2026/,
+    });
+
+    rerender(bar({ ...noFilters, date: '2026-11-08' }));
+
+    expect(screen.getByRole('grid', { hidden: true })).toBe(grid);
+    expect(
+      screen.getByRole('button', {
+        name: /Saturday, November 7, 2026/,
+        hidden: true,
+      }),
+    ).toBe(marked);
   });
 });

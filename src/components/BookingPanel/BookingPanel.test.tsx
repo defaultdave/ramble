@@ -40,6 +40,69 @@ describe('BookingPanel paused', () => {
   });
 });
 
+describe('BookingPanel layout', () => {
+  const choicesOf = () => screen.getByText('Date, time, and party choices');
+
+  it('puts the mode switch after the choices, in the scrolling area', () => {
+    setup({ total });
+    const modeSwitch = screen.getByRole('button', { name: 'Book for me' });
+    expect(
+      choicesOf().compareDocumentPosition(modeSwitch) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(choicesOf().parentElement).toContainElement(modeSwitch);
+  });
+
+  it('keeps the total, terms, Continue, and hold note out of the scrolling area', () => {
+    setup({ total });
+    const scrolling = choicesOf().parentElement;
+    for (const pinned of [
+      screen.getByText('$65 × 2 guests'),
+      screen.getByText('Free cancellation until Fri, Oct 23, 5:30 PM.'),
+      screen.getByRole('button', { name: 'Continue · $130.00' }),
+      screen.getByText('We hold your spaces for 10 minutes while you pay.'),
+    ]) {
+      expect(scrolling).not.toContainElement(pinned);
+    }
+  });
+
+  it('keeps Continue and the hold note pinned before a total exists', () => {
+    setup();
+    const scrolling = choicesOf().parentElement;
+    expect(scrolling).not.toContainElement(
+      screen.getByRole('button', { name: 'Continue' }),
+    );
+    expect(scrolling).not.toContainElement(
+      screen.getByText('We hold your spaces for 10 minutes while you pay.'),
+    );
+  });
+});
+
+describe('BookingPanel per-person line', () => {
+  it('shows before a total exists', () => {
+    setup();
+    expect(screen.getByText('per person')).toBeVisible();
+  });
+
+  it('is left out once the total says the amount', () => {
+    setup({ total });
+    expect(screen.queryByText('per person')).not.toBeInTheDocument();
+    expect(screen.getByText('$130.00')).toBeVisible();
+  });
+
+  it('shows in the sold-out panel, which has no total', () => {
+    render(
+      <BookingPanel
+        state="sold-out"
+        priceMinor={6500}
+        similarHref="/browse"
+        privateSessionHref="/private"
+      />,
+    );
+    expect(screen.getByText('per person')).toBeVisible();
+  });
+});
+
 describe('BookingPanel without a mode switch', () => {
   it('leaves out the switch row while gifts are off', () => {
     const { container } = render(
@@ -67,6 +130,13 @@ describe('BookingPanel', () => {
     expect(screen.getByText('Free')).toBeVisible();
     expect(screen.getByText('per person')).toBeVisible();
     expect(screen.queryByText('$0')).not.toBeInTheDocument();
+  });
+
+  it('adds no tab stop of its own while there are controls to scroll to', () => {
+    setup();
+    expect(
+      screen.getByRole('region', { name: 'Book this experience' }),
+    ).not.toHaveAttribute('tabindex');
   });
 
   it('shows the mode switch and the choices', () => {

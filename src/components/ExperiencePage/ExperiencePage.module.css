@@ -302,12 +302,15 @@
 
   /* The panel's row is the body's, so it sticks while the body scrolls past. */
   .aside {
+    --panel-offset: var(--space-6);
     display: block;
     grid-column: 2;
     grid-row: 3;
     position: sticky;
-    inset-block-start: var(--space-6);
+    inset-block-start: var(--panel-offset);
     margin-block-start: var(--space-4);
+    /* The offset above and the same room below: a stuck panel never outgrows the window. */
+    --panel-max-block-size: calc(100dvh - 2 * var(--panel-offset));
   }
 
   .gallery {

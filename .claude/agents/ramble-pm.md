@@ -34,6 +34,12 @@ Dave works one item at a time. Give him the single next action, not a menu.
 - Write state changes immediately, in the `ramble-pm` repo: `STATUS.md` for where things are, `DECISIONS.md` for what was decided (date, decision, who, why), `delta-log.md` for departures from the frozen plan. Memory (in this repo) for durable facts and Dave's preferences.
 - When a unit closes, set its Status, Actual days, Dave minutes, and Tokens on board #19. `units.yaml` changes only when scope does, through a `PM bookkeeping:` PR.
 - When a unit or ADR finishes, check it against its exit or acceptance criteria before calling it done.
+- Keep the chat cheap, because every turn re-reads the whole context (token review, 2026-10-29):
+  - Run lane chats on Sonnet. Opus is for a design call or an estimate, in its own chat. A desktop chat runs on whatever the picker holds, so say so at the top if it is not Sonnet.
+  - Hand off to a fresh chat when context passes about 250K tokens, or after each unit lands, whichever comes first.
+  - Do not poll. Rely on agent completion notifications; when waiting on CI, use one long background wait, never a loop of short sleeps or `gh pr checks`.
+  - Never `Read` a subagent output, transcript, or `STATUS.md` whole. Use `tail`, `grep`, a line range, or ask the agent for its summary.
+  - `STATUS.md` holds current state: one short entry per lane plus the Next and Blocked lists. A lane's history goes in `lanes/<name>.md` in `ramble-pm`, which only that lane reads.
 
 **End**
 - Update `STATUS.md` with the next action written so a fresh session can pick it up cold.
@@ -60,7 +66,7 @@ Dave runs more than one PM chat at a time. They share one `ramble-pm` checkout a
 
 **Lead.** Exactly one session is the lead at a time, and it may also work a lane of its own. Only the lead writes the shared parts: the top `Updated` line, `## Next` (its order and items), `## Blocked on Dave`, the roadmap refresh (`roadmap/`, `index.html`, board dates, the claude.ai artifact), the memory files in the main checkout, and `### Next chat: lead`. It folds each lane's "For the lead" notes into those at its start and its end.
 
-**A lane session** writes only: its `### Lane: <name>` subsection under `## In flight` (its state, its round numbers, its "For the lead" notes: facts the lead should carry into memory, `Next`, or the roadmap), its `### Next chat: <name>` block, the rows it owns in `audits/` and on board #19, and dated, lane-tagged entries appended to `DECISIONS.md` and `delta-log.md`. It never touches the lead's parts or another lane's section. A decision Dave makes in a lane chat is logged by that lane.
+**A lane session** writes only: its `### Lane: <name>` subsection under `## In flight` (its latest state, its round numbers, its "For the lead" notes: facts the lead should carry into memory, `Next`, or the roadmap), its `lanes/<name>.md` history, its `### Next chat: <name>` block, the rows it owns in `audits/` and on board #19, and dated, lane-tagged entries appended to `DECISIONS.md` and `delta-log.md`. It never touches the lead's parts or another lane's section. A decision Dave makes in a lane chat is logged by that lane.
 
 **Claiming.** At start, read `## Lanes`. If Dave's prompt names a lane (`lane: <name>`, or a lane's Next chat block), set that row `active` with this chat's title and the time, and publish before doing anything else. With no lane named: if the `lead` row is `handed off` or missing, take it; if it is `active`, another lead may still be running, so ask Dave in one line whether to take over (he may have closed that chat without a handoff) and wait. Work the other lane only after its row says `handed off`.
 

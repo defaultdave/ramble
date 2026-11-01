@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { GuestShell, SiteBanner } from '@/components/GuestShell';
 
 const meta = {
@@ -51,4 +52,47 @@ export const WithBannerDesktop: Story = {
   },
   globals: desktop,
   parameters: { ...meta.parameters, ...fullWidth },
+};
+
+// A story with a play function shows one scheme, because the same click would otherwise match twice.
+const menuButton = (canvasElement: HTMLElement) =>
+  within(canvasElement).getByText('Menu', { selector: 'summary span' });
+const menuDetails = (canvasElement: HTMLElement) =>
+  canvasElement.querySelector('details');
+
+/** The phone menu, open. */
+export const MenuOpenMobile: Story = {
+  globals: mobile,
+  parameters: { ...meta.parameters, ...fullWidth },
+  play: async ({ canvasElement }) => {
+    await userEvent.click(menuButton(canvasElement));
+    await expect(menuDetails(canvasElement)).toHaveAttribute('open');
+  },
+};
+
+/** Escape closes the phone menu and puts focus back on the Menu button. */
+export const MenuEscapeMobile: Story = {
+  globals: mobile,
+  parameters: { ...meta.parameters, ...fullWidth },
+  play: async ({ canvasElement }) => {
+    await userEvent.click(menuButton(canvasElement));
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(menuDetails(canvasElement)).not.toHaveAttribute('open'),
+    );
+    await expect(canvasElement.querySelector('summary')).toHaveFocus();
+  },
+};
+
+/** A press outside closes the phone menu. */
+export const MenuOutsidePressMobile: Story = {
+  globals: mobile,
+  parameters: { ...meta.parameters, ...fullWidth },
+  play: async ({ canvasElement }) => {
+    await userEvent.click(menuButton(canvasElement));
+    await userEvent.click(within(canvasElement).getByRole('main'));
+    await waitFor(() =>
+      expect(menuDetails(canvasElement)).not.toHaveAttribute('open'),
+    );
+  },
 };

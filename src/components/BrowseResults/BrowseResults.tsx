@@ -39,12 +39,13 @@ export function BrowseResults(props: BrowseResultsProps) {
         <div className={styles.results}>
           <p className={styles.summary}>{props.summary}</p>
           <ul className={styles.grid}>
-            {props.cards.map((card) => (
+            {props.cards.map((card, index) => (
               <li key={card.id} className={styles.item}>
                 <ExperienceCardItem
                   card={card}
                   layout="vertical"
                   headingLevel={2}
+                  preloadPhoto={index === 0}
                 />
               </li>
             ))}

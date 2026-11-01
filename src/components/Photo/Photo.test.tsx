@@ -8,7 +8,7 @@ import { samplePhoto } from './Photo.fixtures';
 // Behaviours under test, one per decision, branch or risk:
 // - a photo is an image named by its alt text, and a decorative photo (empty alt) is not announced
 // - it fills its frame, shows its blur placeholder while it loads, and asks for the sizes it was given
-// - it is fetched ahead of the rest only when it is the preload photo
+// - it is fetched ahead of the rest, at high priority, only when it is the preload photo
 
 // next/image makes a data address eager and preloads nothing, so the props it is given are what is checked.
 vi.mock('next/image', () => ({
@@ -20,6 +20,7 @@ vi.mock('next/image', () => ({
       data-fill={String(props.fill)}
       data-sizes={props.sizes}
       data-preload={String(props.preload)}
+      data-fetch-priority={String(props.fetchPriority)}
       data-placeholder={props.placeholder}
       data-blur={String(props.blurDataURL)}
     />
@@ -54,8 +55,16 @@ describe('Photo', () => {
   it('is not the preload photo unless it is told to be', () => {
     const { rerender } = render(<Photo photo={samplePhoto(0)} sizes="100vw" />);
     expect(screen.getByRole('img')).toHaveAttribute('data-preload', 'false');
+    expect(screen.getByRole('img')).toHaveAttribute(
+      'data-fetch-priority',
+      'undefined',
+    );
 
     rerender(<Photo photo={samplePhoto(0)} sizes="100vw" preload />);
     expect(screen.getByRole('img')).toHaveAttribute('data-preload', 'true');
+    expect(screen.getByRole('img')).toHaveAttribute(
+      'data-fetch-priority',
+      'high',
+    );
   });
 });

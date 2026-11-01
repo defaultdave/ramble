@@ -115,7 +115,7 @@ describe('getBrowseDates', () => {
     });
 
     await expect(
-      getBrowseDates({ categories: [], neighborhoods: [] }, asOf),
+      getBrowseDates({ categories: [], neighborhoods: [], guests: null }, asOf),
     ).resolves.toEqual(['2026-11-08']);
 
     expect(cache.life).toHaveBeenCalledExactlyOnceWith('browse');
@@ -126,7 +126,7 @@ describe('getBrowseDates', () => {
     db.dates.mockRejectedValue(driverError);
 
     await expect(
-      getBrowseDates({ categories: [], neighborhoods: [] }, asOf),
+      getBrowseDates({ categories: [], neighborhoods: [], guests: null }, asOf),
     ).rejects.toThrow('Browse dates read failed: Error');
   });
 });
@@ -141,7 +141,7 @@ describe('getBrowseDates with a session the calendar cannot place', () => {
     });
 
     const failure = await getBrowseDates(
-      { categories: [], neighborhoods: [] },
+      { categories: [], neighborhoods: [], guests: null },
       asOf,
     ).catch((error: unknown) => error);
 

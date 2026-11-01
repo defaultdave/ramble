@@ -1,8 +1,13 @@
 import type { ReactNode } from 'react';
 import { Footer } from '@/components/Footer';
 import { Header } from '@/components/Header';
-import { browsePath, giftGuidePath } from '@/lib/routes';
-import { footerGroups, mainLinks, siteChrome } from '@/lib/pages/siteNav';
+import { giftGuidePath } from '@/lib/routes';
+import {
+  footerGroups,
+  mainLinks,
+  searchHref,
+  siteChrome,
+} from '@/lib/pages/siteNav';
 import styles from './GuestShell.module.css';
 import { SiteMenu } from './SiteMenu';
 
@@ -24,7 +29,7 @@ export function GuestShell({ banner, children }: GuestShellProps) {
         links={mainLinks}
         giftsHref={giftGuidePath}
         searchLabel={siteChrome.searchLabel}
-        searchHref={browsePath}
+        searchHref={searchHref}
         menu={<SiteMenu links={mainLinks} />}
       />
       <main id="main">{children}</main>

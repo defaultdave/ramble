@@ -1,5 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { hasSpaceLeft, spacesLabel, spacesLeft, spacesStatus } from './spaces';
+import {
+  hasSpaceForParty,
+  hasSpaceLeft,
+  spacesLabel,
+  spacesLeft,
+  spacesStatus,
+} from './spaces';
+
+describe('hasSpaceForParty', () => {
+  it.each([
+    { allocation: 8, seatsSold: 2, party: 6, expected: true },
+    { allocation: 8, seatsSold: 3, party: 6, expected: false },
+    { allocation: 8, seatsSold: 7, party: 1, expected: true },
+    { allocation: 8, seatsSold: 7, party: 2, expected: false },
+    { allocation: 8, seatsSold: 8, party: 1, expected: false },
+    { allocation: 0, seatsSold: 0, party: 1, expected: false },
+    { allocation: 4, seatsSold: 9, party: 1, expected: false },
+  ])(
+    '$seatsSold sold of $allocation holds a party of $party: $expected',
+    ({ allocation, seatsSold, party, expected }) => {
+      expect(hasSpaceForParty({ allocation, seatsSold }, party)).toBe(expected);
+    },
+  );
+});
 
 describe('spacesStatus', () => {
   it.each([

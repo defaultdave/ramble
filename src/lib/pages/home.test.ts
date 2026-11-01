@@ -10,9 +10,12 @@ import {
   homeExperienceIds,
   HomeExperienceIdsSchema,
   homeLimits,
+  homePickIds,
+  HomePickIdsSchema,
   thisWeekExperienceIds,
   withHomeCovers,
   type HomeInput,
+  type HomePick,
   type HomeModuleView,
   type ThisWeekSession,
 } from './home';
@@ -23,6 +26,8 @@ import { upcomingWindow } from '../sessionWindow';
 // - the browse address writes only the parameters that are set, escaped, in the grammar order
 // - "On this week" lists bookable experiences with an open session in the window, soonest first, once each
 //   (a started, late, full, or guide-only session does not count; a start exactly at the window's opening counts and one exactly at its end does not)
+// - the home read looks up the Picks its modules name, once each, and no others
+// - "See all N" counts every entry a guest can see, not only the ones read
 // - the experiences a Picks module may show are looked up once, bounded per collection and in all
 // - each module shows its own copy or the default, and is left out whole when it has nothing to show
 // - the first Picks module alone carries the anchor
@@ -167,6 +172,22 @@ function module(
   };
 }
 
+function pick(
+  n: number,
+  experienceNumbers: number[],
+  overrides: Partial<HomePick> = {},
+): HomePick {
+  return {
+    id: id(800 + n),
+    slug: `pick-${String(n)}`,
+    title: `Pick ${String(n)}`,
+    summary: `About pick ${String(n)}`,
+    itemCount: experienceNumbers.length,
+    experienceIds: experienceNumbers.map((e) => id(e)),
+    ...overrides,
+  };
+}
+
 function collection(
   n: number,
   experienceNumbers: number[],
@@ -209,9 +230,39 @@ function modulesOf(input: Partial<HomeInput>): HomeModuleView[] {
   return page.kind === 'modules' ? page.modules : [];
 }
 
+describe('homePickIds', () => {
+  it('names the collection of each Picks module once, in module order', () => {
+    const modules = [
+      module(1, 'picks', { collectionId: id(802) }),
+      module(2, 'picks', { collectionId: id(801) }),
+      module(3, 'picks', { collectionId: id(802) }),
+    ];
+    expect(homePickIds(modules)).toEqual([id(802), id(801)]);
+  });
+
+  it('ignores a Picks module with no collection and a module of another kind, the gift guide included', () => {
+    const modules = [
+      module(1, 'picks'),
+      module(2, 'gift_guide', { collectionId: id(805) }),
+      module(3, 'this_week'),
+    ];
+    expect(homePickIds(modules)).toEqual([]);
+  });
+
+  it('never names more than the home page has modules', () => {
+    const modules = Array.from({ length: 20 }, (_, i) =>
+      module(i + 1, 'picks', { collectionId: id(800 + i) }),
+    );
+    expect(() => HomePickIdsSchema.parse(homePickIds(modules))).not.toThrow();
+    expect(() =>
+      HomePickIdsSchema.parse(Array.from({ length: 21 }, (_, i) => id(i + 1))),
+    ).toThrow(ZodError);
+  });
+});
+
 describe('homeExperienceIds', () => {
   it('collects the entries of each Picks module once', () => {
-    const picks = [collection(1, [1, 2]), collection(2, [2, 3])];
+    const picks = [pick(1, [1, 2]), pick(2, [2, 3])];
     const modules = [
       module(1, 'picks', { collectionId: picks[0]?.id ?? null }),
       module(2, 'picks', { collectionId: picks[1]?.id ?? null }),
@@ -221,7 +272,7 @@ describe('homeExperienceIds', () => {
 
   it('looks only at the first entries of a long collection', () => {
     const many = Array.from({ length: 30 }, (_, i) => i + 1);
-    const picks = [collection(1, many)];
+    const picks = [pick(1, many)];
     const modules = [module(1, 'picks', { collectionId: id(801) })];
     expect(homeExperienceIds(modules, picks)).toHaveLength(
       homeLimits.picksCandidates,
@@ -230,13 +281,13 @@ describe('homeExperienceIds', () => {
 
   it('is bounded in all, whatever the modules and collections hold', () => {
     const picks = Array.from({ length: 20 }, (_, c) =>
-      collection(
+      pick(
         c + 1,
         Array.from({ length: 12 }, (_, e) => c * 12 + e + 1),
       ),
     );
-    const modules = picks.map((pick, i) =>
-      module(i + 1, 'picks', { collectionId: pick.id }),
+    const modules = picks.map((entry, i) =>
+      module(i + 1, 'picks', { collectionId: entry.id }),
     );
     expect(homeExperienceIds(modules, picks).length).toBeLessThanOrEqual(
       homeLimits.maxCardIds,
@@ -251,7 +302,7 @@ describe('homeExperienceIds', () => {
       module(1, 'picks', { collectionId: id(899) }),
     ],
   ])('ignores %s', (_name, ignored) => {
-    expect(homeExperienceIds([ignored], [collection(1, [1])])).toEqual([]);
+    expect(homeExperienceIds([ignored], [pick(1, [1])])).toEqual([]);
   });
 });
 
@@ -314,10 +365,21 @@ describe('buildHomePage category rail', () => {
 });
 
 describe('buildHomePage picks', () => {
+  it('counts every entry a guest can see in "See all", not only the ones read', () => {
+    const [view] = modulesOf({
+      modules: [module(1, 'picks', { collectionId: id(801) })],
+      picks: [pick(1, [1, 2], { itemCount: 40 })],
+      experiences: [experience(1), experience(2)],
+    });
+    expect(view?.kind === 'picks' && view.seeAll.label).toBe(
+      'See all 40 picks',
+    );
+  });
+
   const experiences = [1, 2, 3, 4, 5].map((n) => experience(n));
 
   it('shows the Pick under its own title, summary, and see-all link', () => {
-    const picks = [collection(1, [1, 2, 3, 4, 5])];
+    const picks = [pick(1, [1, 2, 3, 4, 5])];
     const [view] = modulesOf({
       modules: [module(1, 'picks', { collectionId: id(801) })],
       picks,
@@ -337,7 +399,7 @@ describe('buildHomePage picks', () => {
       modules: [
         module(1, 'picks', { collectionId: id(801), heading: 'Rainy day' }),
       ],
-      picks: [collection(1, [1])],
+      picks: [pick(1, [1])],
       experiences,
     });
     expect(view).toMatchObject({ heading: 'Rainy day' });
@@ -346,7 +408,7 @@ describe('buildHomePage picks', () => {
   it('shows at most three cards, in the Pick order', () => {
     const [view] = modulesOf({
       modules: [module(1, 'picks', { collectionId: id(801) })],
-      picks: [collection(1, [5, 4, 3, 2, 1])],
+      picks: [pick(1, [5, 4, 3, 2, 1])],
       experiences,
     });
     expect(view?.kind === 'picks' && view.cards.map((c) => c.id)).toEqual([
@@ -359,7 +421,7 @@ describe('buildHomePage picks', () => {
   it('takes the next entry when one cannot be a card', () => {
     const [view] = modulesOf({
       modules: [module(1, 'picks', { collectionId: id(801) })],
-      picks: [collection(1, [6, 1, 2, 3])],
+      picks: [pick(1, [6, 1, 2, 3])],
       experiences: [...experiences, experience(6, { priceOptions: [] })],
     });
     expect(view?.kind === 'picks' && view.cards.map((c) => c.id)).toEqual([
@@ -370,7 +432,7 @@ describe('buildHomePage picks', () => {
   });
 
   it.each([
-    ['a module with no collection', module(1, 'picks'), [collection(1, [1])]],
+    ['a module with no collection', module(1, 'picks'), [pick(1, [1])]],
     [
       'a collection that is not published',
       module(1, 'picks', { collectionId: id(801) }),
@@ -379,7 +441,7 @@ describe('buildHomePage picks', () => {
     [
       'a collection none of whose entries can be a card',
       module(1, 'picks', { collectionId: id(801) }),
-      [collection(1, [9])],
+      [pick(1, [9])],
     ],
   ])('is left out for %s', (_name, picksModule, picks) => {
     expect(modulesOf({ modules: [picksModule], picks, experiences })).toEqual(
@@ -393,7 +455,7 @@ describe('buildHomePage picks', () => {
         module(1, 'picks', { collectionId: id(801) }),
         module(2, 'picks', { collectionId: id(802) }),
       ],
-      picks: [collection(1, [1]), collection(2, [2])],
+      picks: [pick(1, [1]), pick(2, [2])],
       experiences,
     });
     expect(views.map((v) => v.kind === 'picks' && v.anchor)).toEqual([
@@ -408,7 +470,7 @@ describe('buildHomePage picks', () => {
         module(1, 'picks', { collectionId: id(801) }),
         module(2, 'picks', { collectionId: id(802) }),
       ],
-      picks: [collection(2, [2])],
+      picks: [pick(2, [2])],
       experiences,
     });
     expect(views).toHaveLength(1);
@@ -421,20 +483,19 @@ describe('collectionModuleCopy', () => {
     ['the module heading wins', 'Mine', 'Mine'],
     ['the collection title otherwise', null, 'Pick 1'],
   ])('uses %s', (_name, heading, expected) => {
-    expect(collectionModuleCopy({ heading }, collection(1, [1])).heading).toBe(
+    expect(collectionModuleCopy({ heading }, pick(1, [1])).heading).toBe(
       expected,
     );
   });
 
   it('takes the collection summary, which may be empty', () => {
-    expect(collectionModuleCopy({ heading: null }, collection(1, [1]))).toEqual(
-      { heading: 'Pick 1', summary: 'About pick 1' },
-    );
+    expect(collectionModuleCopy({ heading: null }, pick(1, [1]))).toEqual({
+      heading: 'Pick 1',
+      summary: 'About pick 1',
+    });
     expect(
-      collectionModuleCopy(
-        { heading: null },
-        collection(1, [1], { summary: null }),
-      ).summary,
+      collectionModuleCopy({ heading: null }, pick(1, [1], { summary: null }))
+        .summary,
     ).toBeNull();
   });
 });
@@ -502,7 +563,7 @@ describe('buildHomePage gift guide', () => {
   it('does not change the count the Picks link shows', () => {
     const [view] = modulesOf({
       modules: [module(1, 'picks', { collectionId: id(801) })],
-      picks: [collection(1, [1, 2, 3, 4, 5])],
+      picks: [pick(1, [1, 2, 3, 4, 5])],
       experiences: [1, 2, 3].map((n) => experience(n)),
     });
     expect(view).toMatchObject({
@@ -599,7 +660,7 @@ describe('covers on the home page', () => {
     alt: 'A kayak at dusk',
     blurDataUrl: 'data:image/jpeg;base64,/9j/4AAQ',
   };
-  const picks = [collection(1, [1, 2])];
+  const picks = [pick(1, [1, 2])];
   const input: Partial<HomeInput> = {
     modules: [
       module(1, 'picks', { collectionId: picks[0]?.id ?? null }),

@@ -87,6 +87,18 @@ export const HeroWhenCleared: Story = {
     await expect(when).toHaveValue('');
   },
 };
+/** The Guests field starts on two and takes any party the booking rules do. */
+export const HeroGuestsDefaultToTwo: Story = {
+  args: { modules: [hero] },
+  globals: mobile,
+  parameters: { ...meta.parameters, colorScheme: 'light' },
+  play: async ({ canvasElement }) => {
+    const guests = within(canvasElement).getByLabelText('Guests');
+    await expect(guests).toHaveValue('2');
+    await userEvent.selectOptions(guests, '6');
+    await expect(guests).toHaveValue('6');
+  },
+};
 export const CategoryRailMobile: Story = {
   args: { modules: [categoryRail] },
   globals: mobile,

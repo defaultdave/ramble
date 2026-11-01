@@ -12,6 +12,7 @@ import {
   type BrowseFilters,
   type BrowseQuery,
 } from '../filters';
+import { guestsLabel } from '../orderSummary';
 import { browsePath } from '../routes';
 import { IsoDateSchema, TimeZoneSchema, isKnownTimeZone } from '../sessions';
 import { calendarDateFormat } from '../time';
@@ -169,7 +170,7 @@ const titleList = new Intl.ListFormat('en-US', {
 
 /**
  * The page title for the filters, so the route announcer reads something new after each change:
- * "Browse Cooking experiences in DUMBO on Sat, Nov 7". Names are the chosen categories and
+ * "Browse Cooking experiences in DUMBO on Sat, Nov 7 for 4 guests". Names are the chosen categories and
  * neighborhoods, in the order of the filters, looked up in the options; a slug with no option is
  * left out.
  */
@@ -192,6 +193,7 @@ export function browseTitle(
     'experiences',
     neighborhoods.length > 0 ? `in ${titleList.format(neighborhoods)}` : null,
     filters.date ? `on ${dateChipLabel(filters.date)}` : null,
+    filters.guests === null ? null : `for ${guestsLabel(filters.guests)}`,
   ]
     .filter((part) => part !== null)
     .join(' ');

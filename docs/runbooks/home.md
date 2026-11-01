@@ -4,7 +4,7 @@ How `/` is built from the modules staff arrange, what each module shows and when
 
 ## The modules
 
-`listHomeModules()` returns the enabled modules in position order, leaving out one whose collection is still a draft. `buildHomePage` in `src/lib/pages/home.ts` turns them into what the page shows, and leaves out a module that has nothing to show. A module with nothing to show is hidden whole, never drawn empty.
+`listHomeModules()` returns the enabled modules in position order, leaving out one whose collection is still a draft. `buildHomePage` in `src/lib/pages/home.ts` turns them into what the page shows, and leaves out a module that has nothing to show. A module with nothing to show is hidden whole, never drawn empty. `getHomeContent` then reads only the Picks those modules name (`listHomePicks(homePickIds(modules))`): each Pick's copy, the number of entries a guest can see (the "See all N" count), and its first 12 entries, never the intro or the rest, so the number of published Picks cannot push a pinned one out.
 
 | Module | Shows | Copy comes from | Hidden when |
 |---|---|---|---|

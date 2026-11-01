@@ -1,19 +1,22 @@
-import { Calendar } from 'lucide-react';
+import { Calendar, SlidersHorizontal } from 'lucide-react';
 import { ButtonLink } from '@/components/Button';
 import { ChipLink } from '@/components/Chip';
 import { DatePicker } from '@/components/DatePicker';
 import { dateChipLabel } from '@/lib/pages/browse';
+import { drawerLoadFailedMessage, selectedChips } from '@/lib/filterBar';
 import {
   activeFilterCount,
-  chipState,
+  guestChips,
   hrefForFilters,
-  toggleFilterValue,
+  listChips,
+  toQuery,
   withDate,
   type BrowseFilters,
-  type FilterListKey,
+  type ChipView,
 } from '@/lib/filters';
 import { browsePath } from '@/lib/routes';
 import styles from './FilterBar.module.css';
+import { DrawerButton, FilterRow } from './FilterDrawerHost';
 import { WhenDetails } from './WhenDetails';
 
 export type FilterOption = { slug: string; name: string };
@@ -33,30 +36,73 @@ export type FilterBarProps = {
 
 type ChipGroupProps = {
   legend: string;
-  listKey: FilterListKey;
-  options: readonly FilterOption[];
-  filters: BrowseFilters;
+  chips: readonly ChipView[];
 };
 
-function ChipGroup({ legend, listKey, options, filters }: ChipGroupProps) {
+function ChipGroup({ legend, chips }: ChipGroupProps) {
   return (
     <fieldset className={styles.group}>
       <legend className={styles.legend}>{legend}</legend>
       <div className={styles.chips}>
-        {options.map(({ slug, name }) => {
-          const { selected, disabled } = chipState(filters, listKey, slug);
-          return (
-            <ChipLink
-              key={slug}
-              label={name}
-              selected={selected}
-              disabled={disabled}
-              href={hrefForFilters(toggleFilterValue(filters, listKey, slug))}
-            />
-          );
-        })}
+        {chips.map(({ key, label, selected, disabled, href }) => (
+          <ChipLink
+            key={key}
+            label={label}
+            selected={selected}
+            disabled={disabled}
+            href={href}
+          />
+        ))}
       </div>
     </fieldset>
+  );
+}
+
+type WhenControlProps = Pick<
+  FilterBarProps,
+  'filters' | 'today' | 'availableDates' | 'onPickDate'
+> & {
+  /** The row opens the calendar as a popover; the drawer shows it in the flow of its group. */
+  placement: 'row' | 'drawer';
+};
+
+function WhenControl({
+  filters,
+  today,
+  availableDates,
+  onPickDate,
+  placement,
+}: WhenControlProps) {
+  const inRow = placement === 'row';
+  return (
+    <WhenDetails
+      summaryClassName={styles.dateChip}
+      className={inRow ? styles.whenInRow : styles.whenInDrawer}
+      summary={
+        <>
+          <span className={styles.icon} aria-hidden="true">
+            <Calendar />
+          </span>
+          {filters.date ? dateChipLabel(filters.date) : 'Pick a date'}
+        </>
+      }
+      date={filters.date}
+    >
+      <div className={inRow ? styles.popover : styles.calendar}>
+        <DatePicker
+          label="Choose a date"
+          value={filters.date}
+          today={today}
+          availableDates={availableDates}
+          onChange={onPickDate}
+        />
+        {filters.date ? (
+          <ButtonLink href={hrefForFilters(withDate(filters, null))}>
+            Clear date
+          </ButtonLink>
+        ) : null}
+      </div>
+    </WhenDetails>
   );
 }
 
@@ -68,56 +114,59 @@ export function FilterBar({
   availableDates,
   onPickDate,
 }: FilterBarProps) {
+  const count = activeFilterCount(filters);
+  const when = { filters, today, availableDates, onPickDate };
   return (
     <div className={styles.bar}>
-      <fieldset className={styles.group}>
-        <legend className={styles.legend}>When</legend>
-        <WhenDetails
-          summaryClassName={styles.dateChip}
-          className={styles.when}
-          summary={
-            <>
-              <span className={styles.icon} aria-hidden="true">
-                <Calendar />
-              </span>
-              {filters.date ? dateChipLabel(filters.date) : 'Pick a date'}
-            </>
-          }
-          date={filters.date}
-        >
-          <div className={styles.calendar}>
-            <DatePicker
-              label="Choose a date"
-              value={filters.date}
-              today={today}
-              availableDates={availableDates}
-              onChange={onPickDate}
+      <FilterRow
+        filtersKey={toQuery({ filters, after: null })}
+        // The number of results is not read for the bar, so the button cannot say how many.
+        applyLabel="Show results"
+        loadFailedMessage={drawerLoadFailedMessage()}
+        clearHref={browsePath}
+        drawer={
+          <>
+            <fieldset className={styles.group}>
+              <legend className={styles.legend}>When</legend>
+              <WhenControl {...when} placement="drawer" />
+            </fieldset>
+            <ChipGroup legend="Guests" chips={guestChips(filters)} />
+            <ChipGroup
+              legend="Neighborhood"
+              chips={listChips(filters, 'neighborhoods', neighborhoods)}
             />
-            {filters.date ? (
-              <ButtonLink href={hrefForFilters(withDate(filters, null))}>
-                Clear date
-              </ButtonLink>
-            ) : null}
-          </div>
-        </WhenDetails>
-      </fieldset>
-      <ChipGroup
-        legend="Neighborhood"
-        listKey="neighborhoods"
-        options={neighborhoods}
-        filters={filters}
-      />
-      <ChipGroup
-        legend="Category"
-        listKey="categories"
-        options={categories}
-        filters={filters}
-      />
-      {activeFilterCount(filters) > 0 ? (
-        <div className={styles.clear}>
-          <ButtonLink href={browsePath}>Clear all filters</ButtonLink>
-        </div>
-      ) : null}
+            <ChipGroup
+              legend="Category"
+              chips={listChips(filters, 'categories', categories)}
+            />
+          </>
+        }
+      >
+        <DrawerButton
+          kind="filters"
+          label="Filters"
+          iconStart={<SlidersHorizontal />}
+          {...(count > 0 ? { count } : {})}
+        />
+        <WhenControl {...when} placement="row" />
+        {selectedChips(filters, { categories, neighborhoods }).map(
+          ({ key, label, href, hint }) => (
+            <ChipLink
+              key={key}
+              label={label}
+              href={href}
+              hint={hint}
+              selected
+            />
+          ),
+        )}
+        {filters.neighborhoods.length === 0 ? (
+          <DrawerButton kind="neighborhood" label="Neighborhood" />
+        ) : null}
+        {filters.guests === null ? (
+          <DrawerButton kind="guests" label="Guests" />
+        ) : null}
+      </FilterRow>
     </div>
   );
 }

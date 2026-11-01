@@ -6,6 +6,7 @@ import { ChipLink } from './ChipLink';
 // Behaviours under test, one per decision or branch:
 // - a chip is a link to its address
 // - a chosen chip is marked current; one that is not carries no mark
+// - a hint is read after the label and is not drawn
 // - a disabled chip is announced as unavailable and goes nowhere
 
 describe('ChipLink', () => {
@@ -24,6 +25,15 @@ describe('ChipLink', () => {
       'aria-current',
       'true',
     );
+  });
+
+  it('reads a hint after the label', () => {
+    render(
+      <ChipLink label="Cooking" href="/x" selected hint=", remove filter" />,
+    );
+    expect(
+      screen.getByRole('link', { name: 'Cooking, remove filter' }),
+    ).toBeVisible();
   });
 
   it('announces a disabled chip as unavailable and gives it no address', () => {

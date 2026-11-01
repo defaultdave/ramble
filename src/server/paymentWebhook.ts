@@ -19,7 +19,7 @@ import { getPaymentsPort } from '@/server/ports/payments/gateway';
 import { consumeRateLimit } from '@/server/ports/rate-limit';
 
 /** The header the fake gateway signs with; the Stripe adapter reads `stripe-signature` instead. */
-const signatureHeader = 'x-ramble-signature';
+export const signatureHeader = 'x-ramble-signature';
 
 type Verified = Awaited<ReturnType<PaymentsPort['verifyWebhook']>>;
 

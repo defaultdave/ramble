@@ -11,7 +11,8 @@ import {
   toBrowsePage,
   type BrowsePage,
 } from '@/lib/pages/browse';
-import { noFilters, type BrowseFilters } from '@/lib/filters';
+import { guestCounts, noFilters, type BrowseFilters } from '@/lib/filters';
+import { isOpenSession, upcomingWindow } from '@/lib/sessionWindow';
 import { msPerDay } from '@/lib/time';
 import {
   cancellationTiers,
@@ -50,6 +51,10 @@ import {
 // - each calendar list has a hard cap
 // - the day the lib decides for a hand-entered session near midnight is the day the date filter matches, never the one before or after
 // - the calendar lists each such day once, in order, for the same experiences, and honors the two filters
+// - guests match an experience through a session with spaces for the whole party: a full session is out for a
+//   party bigger than its spaces left and in for one that fits, on the chosen day or, with no date, anywhere in the window
+// - guests ride with the other filters, and the calendar offers only days with room for the party
+// - the lib's isOpenSession and the SQL agree on a party at every edge of spaces left
 // - a filter the schema refuses (too many values, a bad slug, a bad time) is refused before any query
 
 let fresh: FreshDatabase;
@@ -210,9 +215,12 @@ const names = (page: Extract<BrowsePage, { ok: true }>) =>
   page.items.map(({ name }) => name);
 
 async function daysFor(
-  filters: Pick<BrowseFilters, 'categories' | 'neighborhoods'>,
+  filters: Pick<BrowseFilters, 'categories' | 'neighborhoods'> &
+    Partial<Pick<BrowseFilters, 'guests'>>,
 ) {
-  return browseDays(await browse.listBrowseDayRows(filters, asOf));
+  return browseDays(
+    await browse.listBrowseDayRows({ guests: null, ...filters }, asOf),
+  );
 }
 
 async function insertTemplate(experienceId: string) {
@@ -721,7 +729,7 @@ describe('the calendar read', () => {
     });
 
     const rows = await browse.listBrowseDayRows(
-      { categories: [where.category.slug], neighborhoods: [] },
+      { categories: [where.category.slug], neighborhoods: [], guests: null },
       asOf,
     );
 
@@ -750,7 +758,7 @@ describe('the calendar read', () => {
 
     expect(
       await browse.listBrowseDayRows(
-        { categories: [where.category.slug], neighborhoods: [] },
+        { categories: [where.category.slug], neighborhoods: [], guests: null },
         asOf,
       ),
     ).toEqual({ storedDates: [], handEntered: [] });
@@ -779,7 +787,7 @@ describe('the calendar read', () => {
     );
 
     const { storedDates } = await browse.listBrowseDayRows(
-      { categories: [where.category.slug], neighborhoods: [] },
+      { categories: [where.category.slug], neighborhoods: [], guests: null },
       asOf,
     );
 
@@ -809,7 +817,7 @@ describe('the calendar read', () => {
     );
 
     const { handEntered } = await browse.listBrowseDayRows(
-      { categories: [where.category.slug], neighborhoods: [] },
+      { categories: [where.category.slug], neighborhoods: [], guests: null },
       asOf,
     );
 
@@ -910,6 +918,151 @@ describe('days with no space left', () => {
   });
 });
 
+describe('the guests filter', () => {
+  const start = '2026-11-07T14:00:00Z';
+  const window = upcomingWindow(asOf, browseWindowDays);
+
+  it.each([
+    [1, true],
+    [2, true],
+    [3, true],
+    [4, false],
+    [6, false],
+  ])('with 3 spaces left, a party of %i is %s', async (guests, shown) => {
+    const where = await scope();
+    const exp = await insertExperience(where, { name: 'Three left' });
+    await insertSession(exp.id, start, { allocation: 8, seatsSold: 5 });
+
+    expect(names(await list(filtersFor(where, { guests })))).toEqual(
+      shown ? ['Three left'] : [],
+    );
+  });
+
+  it('leaves out an experience whose only session is full for the party, and keeps one with a session that fits', async () => {
+    const where = await scope();
+    const full = await insertExperience(where, { name: 'A full' });
+    const room = await insertExperience(where, { name: 'B room' });
+    await insertSession(full.id, start, { allocation: 6, seatsSold: 6 });
+    await insertSession(room.id, start, { allocation: 8, seatsSold: 2 });
+
+    expect(names(await list(filtersFor(where, { guests: 6 })))).toEqual([
+      'B room',
+    ]);
+  });
+
+  it('matches through any one session, so a full early session does not hide a later one that fits', async () => {
+    const where = await scope();
+    const exp = await insertExperience(where, { name: 'Two sessions' });
+    await insertSession(exp.id, start, { allocation: 4, seatsSold: 4 });
+    await insertSession(exp.id, '2026-11-14T14:00:00Z', { allocation: 8 });
+
+    expect(names(await list(filtersFor(where, { guests: 4 })))).toEqual([
+      'Two sessions',
+    ]);
+  });
+
+  it('wants the room on the chosen day, not on another day', async () => {
+    const where = await scope();
+    const exp = await insertExperience(where, { name: 'Room on the 14th' });
+    await insertSession(exp.id, start, { allocation: 8, seatsSold: 6 });
+    await insertSession(exp.id, '2026-11-14T14:00:00Z', { allocation: 8 });
+
+    const on = (date: string) =>
+      list(filtersFor(where, { date, guests: 4 })).then(names);
+    expect(await on('2026-11-07')).toEqual([]);
+    expect(await on('2026-11-14')).toEqual(['Room on the 14th']);
+  });
+
+  it('wants one session with room that is also scheduled and inside the window', async () => {
+    const where = await scope();
+    const cancelled = await insertExperience(where, { name: 'Cancelled' });
+    const late = await insertExperience(where, { name: 'Past the window' });
+    await insertSession(cancelled.id, start, {
+      status: 'cancelled',
+      cancelReason: 'host',
+    });
+    await insertSession(late.id, '2027-06-01T14:00:00Z');
+
+    expect((await list(filtersFor(where, { guests: 1 }))).items).toEqual([]);
+  });
+
+  it('lists an experience once when several sessions fit the party', async () => {
+    const where = await scope();
+    const exp = await insertExperience(where, { name: 'Many fit' });
+    await insertSession(exp.id, start);
+    await insertSession(exp.id, '2026-11-08T14:00:00Z');
+
+    expect(names(await list(filtersFor(where, { guests: 2 })))).toEqual([
+      'Many fit',
+    ]);
+  });
+
+  it('offers only the days with room for the party, and the next page keeps the party', async () => {
+    const where = await scope();
+    const exp = await insertExperience(where, { name: 'Days' });
+    await insertSession(exp.id, '2026-11-07T14:00:00Z', {
+      allocation: 8,
+      seatsSold: 6,
+    });
+    await insertSession(exp.id, '2026-11-08T14:00:00Z', { allocation: 8 });
+    const base = { categories: [where.category.slug], neighborhoods: [] };
+
+    expect(await daysFor({ ...base, guests: 2 })).toEqual([
+      '2026-11-07',
+      '2026-11-08',
+    ]);
+    expect(await daysFor({ ...base, guests: 3 })).toEqual(['2026-11-08']);
+    expect(await daysFor(base)).toEqual(['2026-11-07', '2026-11-08']);
+  });
+
+  it('pages through a party search with no row twice or skipped', async () => {
+    const where = await scope();
+    const total = browsePageSize + 3;
+    for (let index = 0; index < total; index += 1) {
+      const exp = await insertExperience(where, {
+        name: `P${String(index).padStart(2, '0')}`,
+      });
+      await insertSession(exp.id, start, { allocation: 8, seatsSold: 5 });
+    }
+    const filters = filtersFor(where, { guests: 3 });
+    const first = await list(filters);
+    const second = await list(filters, first.nextCursor);
+
+    expect(first.items).toHaveLength(browsePageSize);
+    expect([...names(first), ...names(second)]).toHaveLength(total);
+    expect(new Set([...names(first), ...names(second)]).size).toBe(total);
+  });
+
+  // The SQL and the lib are two spellings of one rule; every edge of spaces left, for every party, must agree.
+  it.each([
+    [8, 0],
+    [8, 2],
+    [8, 5],
+    [8, 7],
+    [8, 8],
+    [0, 0],
+  ])(
+    'agrees with isOpenSession for %i spaces and %i sold, for every party',
+    async (allocation, seatsSold) => {
+      const where = await scope();
+      const exp = await insertExperience(where, { name: 'Edge' });
+      await insertSession(exp.id, start, { allocation, seatsSold });
+
+      for (const guests of guestCounts) {
+        expect(
+          (await list(filtersFor(where, { guests }))).items.length > 0,
+        ).toBe(
+          isOpenSession(
+            { startsAt: new Date(start), allocation, seatsSold },
+            window,
+            guests,
+          ),
+        );
+      }
+    },
+  );
+});
+
 describe('the day the calendar shows and the day the date filter matches', () => {
   // Each zone has the minute before local midnight and the minute after, so one side of every pair is the day before.
   it.each([
@@ -979,7 +1132,10 @@ describe('input the schema refuses', () => {
       browse.listBrowseExperiences({ filters: noFilters, after: null }, 'soon'),
     ).rejects.toThrow(ZodError);
     await expect(
-      browse.listBrowseDayRows({ categories: [], neighborhoods: [] }, 'soon'),
+      browse.listBrowseDayRows(
+        { categories: [], neighborhoods: [], guests: null },
+        'soon',
+      ),
     ).rejects.toThrow(ZodError);
   });
 

@@ -3,7 +3,16 @@ import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
 import { defineConfig } from 'vitest/config';
 
-const resolve = { alias: { '@': path.resolve(import.meta.dirname, '../src') } };
+const resolve = {
+  alias: {
+    '@': path.resolve(import.meta.dirname, '../src'),
+    // The real package throws outside React Server Components, as RichText imports it.
+    'server-only': path.resolve(
+      import.meta.dirname,
+      '../tests/stubs/server-only.ts',
+    ),
+  },
+};
 const browser = () => ({
   enabled: true,
   headless: true,

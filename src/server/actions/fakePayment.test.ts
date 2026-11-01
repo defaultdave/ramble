@@ -1,148 +1,100 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createFakePaymentsAdapter } from '@/server/ports/payments/fake';
-import type { Payment } from '@/server/ports/payments';
+import { deliverFakeConfirmation } from '@/server/fakePaymentDelivery';
+import { PaymentsError } from '@/server/ports/payments';
+import { getFakePayments } from '@/server/ports/payments/gateway';
 
-const fixedNow = new Date('2026-10-29T12:00:00.000Z');
-let fake = makeFake();
-
-function makeFake() {
-  return createFakePaymentsAdapter({
-    webhookSecret: 'whsec_fake_0123456789abcdef',
-    now: () => fixedNow,
-  });
-}
-
+vi.mock('@/server/fakePaymentDelivery', () => ({
+  deliverFakeConfirmation: vi.fn(),
+}));
 vi.mock('@/server/ports/payments/gateway', () => ({
-  getFakePayments: () => fake,
+  getFakePayments: vi.fn(),
 }));
 
 const { confirmFakePayment } = await import('./fakePayment');
 
-const orderId = '00000000-0000-4000-8000-000000000001';
-const recordId = '00000000-0000-4000-8000-000000000002';
+// Behaviours under test (the events and the order are in tests/db/fake-payment-delivery.db.test.ts):
+// - a payment the caller holds the client secret of is handed to the delivery with the guest's plan, and the
+//   answer follows the plan
+// - an unknown payment and a wrong secret get the same answer, and nothing is delivered
+// - a payment that cannot take another try, or has vanished, is answered `refused`
+// - any other failure is thrown, so the form treats the answer as lost
+// - input that does not parse is rejected before the gateway is asked anything
 
-async function createPayment(key = 'pay:one:1'): Promise<Payment> {
-  return fake.createPayment({
-    idempotencyKey: key,
-    amountMinor: 13_000,
-    currency: 'USD',
-    metadata: { orderId, recordId },
-  });
-}
+const payment = { id: 'pay_abc', clientSecret: 'pay_abc_secret_xyz' };
+const retrieve = vi.fn();
 
-const paying = (payment: Payment, plan: unknown) => ({
+const paying = (plan: unknown, clientSecret = payment.clientSecret) => ({
   paymentId: payment.id,
-  clientSecret: payment.clientSecret,
+  clientSecret,
   plan,
 });
 
 beforeEach(() => {
-  fake = makeFake();
+  retrieve.mockReset().mockResolvedValue(payment);
+  vi.mocked(getFakePayments)
+    .mockReset()
+    .mockReturnValue({
+      retrieve,
+    } as unknown as ReturnType<typeof getFakePayments>);
+  vi.mocked(deliverFakeConfirmation).mockReset().mockResolvedValue(undefined);
 });
 
 describe('confirmFakePayment', () => {
-  it('records a card payment and emits payment.succeeded', async () => {
-    const payment = await createPayment();
-    const result = await confirmFakePayment(
-      paying(payment, { outcome: 'succeeded', method: 'card' }),
+  it.each([
+    [{ outcome: 'succeeded', method: 'card' }, { status: 'succeeded' }],
+    [{ outcome: 'succeeded', method: 'apple_pay' }, { status: 'succeeded' }],
+    [
+      { outcome: 'declined', failureCode: 'expired_card' },
+      { status: 'declined', failureCode: 'expired_card' },
+    ],
+    [{ outcome: 'requires_action' }, { status: 'requires_action' }],
+  ])('delivers %j and answers %j', async (plan, answer) => {
+    await expect(confirmFakePayment(paying(plan))).resolves.toEqual(answer);
+
+    expect(retrieve).toHaveBeenCalledWith({ kind: 'payment', id: payment.id });
+    expect(deliverFakeConfirmation).toHaveBeenCalledExactlyOnceWith(
+      payment.id,
+      plan,
     );
-    expect(result).toEqual({ status: 'succeeded' });
-    expect(fake.emittedEvents()).toMatchObject([
-      { type: 'payment.succeeded', objectId: payment.id, method: 'card' },
-    ]);
   });
 
-  it.each(['apple_pay', 'google_pay'] as const)(
-    'records a %s payment with its method',
-    async (method) => {
-      const payment = await createPayment();
-      await confirmFakePayment(
-        paying(payment, { outcome: 'succeeded', method }),
+  it('answers a payment that is not there and a wrong secret the same way, and delivers nothing', async () => {
+    const plan = { outcome: 'succeeded', method: 'card' };
+    retrieve.mockResolvedValueOnce(null);
+    const missing = await confirmFakePayment(paying(plan));
+    const wrongSecret = await confirmFakePayment(
+      paying(plan, `${payment.clientSecret}x`),
+    );
+
+    expect(missing).toEqual({ status: 'refused' });
+    expect(wrongSecret).toEqual(missing);
+    expect(deliverFakeConfirmation).not.toHaveBeenCalled();
+  });
+
+  it.each(['not_found', 'invalid_state'] as const)(
+    'answers refused when the gateway says %s',
+    async (code) => {
+      vi.mocked(deliverFakeConfirmation).mockRejectedValueOnce(
+        new PaymentsError(code),
       );
-      expect(fake.emittedEvents()[0]).toMatchObject({ method });
+      await expect(
+        confirmFakePayment(paying({ outcome: 'requires_action' })),
+      ).resolves.toEqual({ status: 'refused' });
     },
   );
 
-  it('records a decline with its reason and keeps the payment open for a retry', async () => {
-    const payment = await createPayment();
-    const result = await confirmFakePayment(
-      paying(payment, { outcome: 'declined', failureCode: 'expired_card' }),
-    );
-    expect(result).toEqual({ status: 'declined', failureCode: 'expired_card' });
-    expect(fake.emittedEvents()).toMatchObject([
-      { type: 'payment.failed', failureCode: 'expired_card' },
-    ]);
-    await expect(
-      confirmFakePayment(
-        paying(payment, { outcome: 'succeeded', method: 'card' }),
-      ),
-    ).resolves.toEqual({ status: 'succeeded' });
-  });
-
-  it('records a 3-D Secure challenge and then its completion', async () => {
-    const payment = await createPayment();
-    expect(
-      await confirmFakePayment(paying(payment, { outcome: 'requires_action' })),
-    ).toEqual({ status: 'requires_action' });
-    expect(
-      await confirmFakePayment(
-        paying(payment, { outcome: 'succeeded', method: 'card' }),
-      ),
-    ).toEqual({ status: 'succeeded' });
-    expect(fake.emittedEvents().map((event) => event.type)).toEqual([
-      'payment.requires_action',
-      'payment.succeeded',
-    ]);
-  });
-
-  it('answers a payment that is not there and a wrong secret the same way, and records nothing', async () => {
-    const payment = await createPayment();
-    const plan = { outcome: 'succeeded', method: 'card' };
-    const missing = await confirmFakePayment({
-      paymentId: 'pay_000000000000000000000000',
-      clientSecret: payment.clientSecret,
-      plan,
-    });
-    const wrongSecret = await confirmFakePayment({
-      paymentId: payment.id,
-      clientSecret: `${payment.clientSecret}x`,
-      plan,
-    });
-    expect(missing).toEqual({ status: 'refused' });
-    expect(wrongSecret).toEqual(missing);
-    expect(fake.emittedEvents()).toEqual([]);
-  });
-
-  it('refuses a payment that has already succeeded, so a second tap cannot pay twice', async () => {
-    const payment = await createPayment();
-    const plan = { outcome: 'succeeded', method: 'card' };
-    await confirmFakePayment(paying(payment, plan));
-    await expect(confirmFakePayment(paying(payment, plan))).resolves.toEqual({
-      status: 'refused',
-    });
-    expect(fake.emittedEvents()).toHaveLength(1);
-  });
-
-  it('refuses another try once the payment has used them all', async () => {
-    const payment = await createPayment();
-    const decline = { outcome: 'declined', failureCode: 'card_declined' };
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      await confirmFakePayment(paying(payment, decline));
-    }
-    await expect(confirmFakePayment(paying(payment, decline))).resolves.toEqual(
-      { status: 'refused' },
-    );
-  });
-
-  it('rethrows what it cannot explain, so the form treats the answer as lost', async () => {
-    const payment = await createPayment();
-    vi.spyOn(fake, 'confirm').mockRejectedValueOnce(new Error('boom'));
-    await expect(
-      confirmFakePayment(
-        paying(payment, { outcome: 'succeeded', method: 'card' }),
-      ),
-    ).rejects.toThrow('boom');
-  });
+  it.each([
+    ['a provider fault', new PaymentsError('provider_unavailable')],
+    ['an event the intake did not take', new Error('not taken')],
+  ])(
+    'throws on %s, so the form treats the answer as lost',
+    async (_name, error) => {
+      vi.mocked(deliverFakeConfirmation).mockRejectedValueOnce(error);
+      await expect(
+        confirmFakePayment(paying({ outcome: 'requires_action' })),
+      ).rejects.toBe(error);
+    },
+  );
 
   it.each([
     ['nothing', undefined],
@@ -155,8 +107,8 @@ describe('confirmFakePayment', () => {
       { paymentId: 'p', clientSecret: 's', plan: { outcome: 'refunded' } },
     ],
   ])('rejects %s before touching the gateway', async (_name, input) => {
-    const retrieve = vi.spyOn(fake, 'retrieve');
     await expect(confirmFakePayment(input)).rejects.toThrow();
+    expect(getFakePayments).not.toHaveBeenCalled();
     expect(retrieve).not.toHaveBeenCalled();
   });
 });

@@ -51,3 +51,10 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* The filter bar and the results under it, 12 px apart as in Figma (64:222), where the page's own gap would be 24. */
+.band {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}

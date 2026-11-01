@@ -1,0 +1,46 @@
+name: pulse
+# Calls POST /api/pulse on the production deployment: drains the jobs outbox, purges expired rate limits,
+# and pings the heartbeat. Every 30 minutes for the demo (the real job runs it every minute; ADR 0007).
+# A manual run may pass as_of (an ISO date-time with offset) to run the jobs as of that time; the
+# route accepts it only while DEMO_CLOCK=on in the deployment and within 400 days of now.
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      as_of:
+        description: 'Run the jobs as of this time, e.g. 2026-11-05T09:00:00-05:00 (needs DEMO_CLOCK=on)'
+        required: false
+        type: string
+permissions: {}
+concurrency:
+  group: pulse
+  cancel-in-progress: false
+jobs:
+  pulse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call the pulse
+        env:
+          PULSE_URL: ${{ vars.PULSE_URL }}
+          PULSE_SECRET: ${{ secrets.PULSE_SECRET }}
+          AS_OF: ${{ inputs.as_of }}
+        run: |
+          set -euo pipefail
+          if [ -z "$PULSE_URL" ] || [ -z "$PULSE_SECRET" ]; then
+            echo "PULSE_URL (repository variable, the full https://.../api/pulse address) and PULSE_SECRET (secret) must both be set" >&2
+            exit 1
+          fi
+          body=''
+          if [ -n "$AS_OF" ]; then
+            body=$(jq -cn --arg asOf "$AS_OF" '{asOf: $asOf}')
+          fi
+          # The response holds counts only; --fail turns a 4xx or 5xx into a failed run.
+          curl --fail --silent --show-error --max-time 120 \
+            --request POST \
+            --header "Authorization: Bearer $PULSE_SECRET" \
+            --header "Content-Type: application/json" \
+            --data "$body" \
+            "$PULSE_URL"
+          echo

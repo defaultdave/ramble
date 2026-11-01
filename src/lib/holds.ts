@@ -62,9 +62,15 @@ export const deviceHashPattern = `^${sha256HexDigits}$`;
 const millisecondsPerMinute = 60_000;
 const millisecondsPerDay = 86_400_000;
 
+/** A party one hold takes, from `holdLimits.minSeats` to `holdLimits.maxSeats`: a line's quantity and a guest's party search. */
+export const PartySizeSchema = z
+  .int()
+  .min(holdLimits.minSeats)
+  .max(holdLimits.maxSeats);
+
 const ItemInputSchema = z.object({
   priceOptionId: WriteIdSchema,
-  quantity: z.int().min(1).max(holdLimits.maxSeats),
+  quantity: PartySizeSchema,
 });
 
 /**

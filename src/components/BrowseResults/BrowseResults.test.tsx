@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
+import type { ImageProps } from 'next/image';
 import { describe, expect, it, vi } from 'vitest';
 import { samplePhoto } from '@/components/Photo/Photo.fixtures';
 import type { ExperienceCard } from '@/lib/experienceCards';
@@ -8,6 +9,7 @@ import { BrowseResults } from './BrowseResults';
 // Behaviours under test, one per decision, branch or risk:
 // - a bookable card and a guide-only card each render as their own kind, under level 2 headings
 // - a card with a cover shows it, named by its alt text, for both kinds; a card with none keeps the empty frame
+// - only the first card's photo is the preload photo, so the one above the fold is fetched first
 // - the summary line and the cards are in one list
 // - Show more is a form that sends every field of the next address, and is absent on the last page
 // - the way back to the first results is there only on a later page
@@ -15,6 +17,14 @@ import { BrowseResults } from './BrowseResults';
 // - empty on a chosen day names the day and links to the next day with experiences and to any day, or only to any day when none follows; Clear all filters is offered only when another filter is on
 // - an error is announced as an alert with a Try again form that carries the same address
 // - an outdated cursor says so and links to the first results
+
+// next/image makes a data address eager and preloads nothing, so the props it is given are what is checked.
+vi.mock('next/image', () => ({
+  default: (props: ImageProps) => (
+    // eslint-disable-next-line @next/next/no-img-element -- a stand-in that reports the props it received
+    <img alt={props.alt} src="data:," data-preload={String(props.preload)} />
+  ),
+}));
 
 vi.mock('next/form', () => ({
   default: ({
@@ -81,6 +91,24 @@ describe('BrowseResults cover photos', () => {
     );
     expect(screen.getByRole('img', { name: 'Photo 1' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Photo 2' })).toBeInTheDocument();
+  });
+
+  it('preloads the first card photo only', () => {
+    render(
+      <BrowseResults
+        {...view(
+          cards.map((card, index) => ({ ...card, image: samplePhoto(index) })),
+        )}
+      />,
+    );
+    expect(screen.getByRole('img', { name: 'Photo 1' })).toHaveAttribute(
+      'data-preload',
+      'true',
+    );
+    expect(screen.getByRole('img', { name: 'Photo 2' })).toHaveAttribute(
+      'data-preload',
+      'false',
+    );
   });
 
   it('shows no image for a card with no cover', () => {

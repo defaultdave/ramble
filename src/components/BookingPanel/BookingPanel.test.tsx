@@ -40,6 +40,46 @@ describe('BookingPanel paused', () => {
   });
 });
 
+describe('BookingPanel layout', () => {
+  it('puts the mode switch after the choices, and Continue after both', () => {
+    setup({ total });
+    const choices = screen.getByText('Date, time, and party choices');
+    const modeSwitch = screen.getByRole('button', { name: 'Book for me' });
+    const next = screen.getByRole('button', { name: 'Continue · $130.00' });
+    const follows = (from: Element, to: Element) =>
+      Boolean(
+        from.compareDocumentPosition(to) & Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+    expect(follows(choices, modeSwitch)).toBe(true);
+    expect(follows(modeSwitch, next)).toBe(true);
+  });
+});
+
+describe('BookingPanel per-person line', () => {
+  it('shows before a total exists', () => {
+    setup();
+    expect(screen.getByText('per person')).toBeVisible();
+  });
+
+  it('is left out once the total says the amount', () => {
+    setup({ total });
+    expect(screen.queryByText('per person')).not.toBeInTheDocument();
+    expect(screen.getByText('$130.00')).toBeVisible();
+  });
+
+  it('shows in the sold-out panel, which has no total', () => {
+    render(
+      <BookingPanel
+        state="sold-out"
+        priceMinor={6500}
+        similarHref="/browse"
+        privateSessionHref="/private"
+      />,
+    );
+    expect(screen.getByText('per person')).toBeVisible();
+  });
+});
+
 describe('BookingPanel without a mode switch', () => {
   it('leaves out the switch row while gifts are off', () => {
     const { container } = render(

@@ -18,7 +18,7 @@ type BookingPanelBaseProps = Omit<
 
 export type DefaultBookingPanelProps = BookingPanelBaseProps & {
   state?: 'default';
-  /** The book or gift switch, left out while gifts are off. */
+  /** The book or gift switch, left out while gifts are off. It sits under the choices. */
   mode?: ReactNode;
   /** The date, time, and party choices. */
   children: ReactNode;
@@ -101,9 +101,15 @@ export function BookingPanel(props: BookingPanelProps) {
     ...rest
   } = props;
   return (
-    <Shell {...rest} state={state} priceMinor={priceMinor}>
-      {mode ? <div className={styles.mode}>{mode}</div> : null}
+    <Shell
+      {...rest}
+      state={state}
+      priceMinor={priceMinor}
+      // The total line already says what a person costs.
+      showPrice={!total}
+    >
       {children}
+      {mode ? <div className={styles.mode}>{mode}</div> : null}
       {total ? (
         <>
           <hr className={styles.divider} />
@@ -136,10 +142,12 @@ export function BookingPanel(props: BookingPanelProps) {
 function Shell({
   state,
   priceMinor,
+  showPrice = true,
   children,
   ...rest
 }: BookingPanelBaseProps & {
   state: 'default' | 'sold-out' | 'paused';
+  showPrice?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -149,12 +157,14 @@ function Shell({
       className={styles.panel}
       data-state={state}
     >
-      <p className={styles.price}>
-        <span className={styles.priceAmount}>
-          {perPersonAmount(priceMinor)}
-        </span>{' '}
-        <span className={styles.priceUnit}>per person</span>
-      </p>
+      {showPrice ? (
+        <p className={styles.price}>
+          <span className={styles.priceAmount}>
+            {perPersonAmount(priceMinor)}
+          </span>{' '}
+          <span className={styles.priceUnit}>per person</span>
+        </p>
+      ) : null}
       {children}
     </section>
   );

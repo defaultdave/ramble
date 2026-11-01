@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BookingSlots, ExperiencePage } from './ExperiencePage';
 import {
   bareExperience,
@@ -9,6 +9,22 @@ import {
 } from './ExperiencePage.fixtures';
 
 const dates = <p>The dates</p>;
+
+beforeEach(() => {
+  // The aside that follows the scroll asks for a width match, which jsdom has no answer for; a narrow one starts nothing.
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  );
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 // Behaviours under test, one per decision, branch or risk:
 // - the dates slot sits under its own heading, ahead of the About text

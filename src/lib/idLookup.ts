@@ -10,7 +10,7 @@ export const thisWeekShown = 4;
 
 /**
  * Entries of one collection the home page looks at to find `picksShown` cards, in case some cannot
- * be shown. The most the tag budget leaves room for (`cacheTagBudget.ts` fails if it grows): every
+ * be shown. The most the tag budget leaves room for (`cacheTagBudget.test.ts` fails if it grows): every
  * candidate is one cache tag on the home entry.
  */
 export const picksCandidates = 5;

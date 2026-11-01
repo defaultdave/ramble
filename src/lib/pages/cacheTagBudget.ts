@@ -2,6 +2,9 @@ import { browsePageSize } from './browse';
 import { homeLimits } from './home';
 import { photoLimits } from '../photos';
 
+// Test-only by design: the budget is enforced by tests against the real tagging code, so nothing in
+// production imports it.
+
 /**
  * The most tags one cached response may carry. Next.js drops the tags past 128 in one `cacheTag()`
  * call (with a console warning) and sets no cap across calls, so tagging once per ID gets past it;
@@ -26,12 +29,16 @@ export const cacheEntryTagCounts = {
   browse: 1 + browsePageSize,
   /** `taxonomy` and the experience's own tag. */
   experiencePage: 2,
+  /** The settings tag. */
+  settings: 1,
 } as const;
 
 /**
  * The most tags the home page response can carry if it takes in every cached read it uses, none of
- * the experiences shared: the home entry, "On this week", and the settings tag. The covers add
+ * the experiences shared: the home entry, "On this week", and settings. The covers add
  * nothing, as they are asked for only for cards that the other two already tag.
  */
 export const homePageTagCount =
-  cacheEntryTagCounts.home + cacheEntryTagCounts.thisWeek + 1;
+  cacheEntryTagCounts.home +
+  cacheEntryTagCounts.thisWeek +
+  cacheEntryTagCounts.settings;

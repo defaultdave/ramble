@@ -431,6 +431,32 @@ describe('buildHomePage picks', () => {
     ]);
   });
 
+  it('looks only at the first candidates, so a Pick with fewer usable ones among them shows fewer cards', () => {
+    const unusable = [6, 7, 8].map((n) => experience(n, { priceOptions: [] }));
+    const [view] = modulesOf({
+      modules: [module(1, 'picks', { collectionId: id(801) })],
+      picks: [pick(1, [6, 7, 8, 1, 2, 3])],
+      experiences: [...experiences, ...unusable],
+    });
+    expect(view?.kind === 'picks' && view.cards.map((c) => c.id)).toEqual([
+      id(1),
+      id(2),
+    ]);
+  });
+
+  it('drops a Pick none of whose first candidates can be a card, even if a later entry could', () => {
+    const unusable = [6, 7, 8, 9, 10].map((n) =>
+      experience(n, { priceOptions: [] }),
+    );
+    expect(
+      modulesOf({
+        modules: [module(1, 'picks', { collectionId: id(801) })],
+        picks: [pick(1, [6, 7, 8, 9, 10, 1])],
+        experiences: [...experiences, ...unusable],
+      }),
+    ).toEqual([]);
+  });
+
   it.each([
     ['a module with no collection', module(1, 'picks'), [pick(1, [1])]],
     [

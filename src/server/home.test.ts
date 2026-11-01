@@ -240,6 +240,17 @@ describe('getThisWeek', () => {
     expect(content.experienceIds).toEqual([id(2), id(1)]);
   });
 
+  it('carries no more tags than the budget when every candidate is listed', async () => {
+    db.sessions.mockResolvedValue(
+      Array.from({ length: 50 }, (_, n) => session(n + 1, n + 1)),
+    );
+
+    await getThisWeek(asOf);
+
+    expect(cache.tag.mock.calls).toHaveLength(cacheEntryTagCounts.thisWeek);
+    expect(cache.tag.mock.calls.length).toBeLessThanOrEqual(cacheTagBudget);
+  });
+
   it('reads the week that starts at its key', async () => {
     db.sessions.mockResolvedValue([]);
 

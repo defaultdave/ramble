@@ -33,7 +33,7 @@ export const homeLimits = {
   picksCandidates,
   thisWeekShown,
   /** Experiences "On this week" looks up, twice what it shows, so one that cannot be a card does not leave the module short. */
-  thisWeekCandidates: 8,
+  thisWeekCandidates: 2 * thisWeekShown,
   /** Sessions one "On this week" read looks at. */
   thisWeekSessions: 500,
   /** How far ahead "On this week" looks. */

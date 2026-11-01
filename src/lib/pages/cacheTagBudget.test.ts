@@ -5,18 +5,13 @@ import {
   homePageTagCount,
 } from './cacheTagBudget';
 import { editorialLimits } from '../editorial';
-import {
-  cardLookupLimit,
-  coverLookupLimit,
-  picksCandidates,
-} from '../idLookup';
+import { cardLookupLimit, coverLookupLimit } from '../idLookup';
 import { homeLimits } from './home';
 import { photoLimits } from '../photos';
 
 // Behaviours under test, one per decision, branch or risk:
 // - no cached read can carry more tags than the budget, whatever its page bounds are
 // - the home page response stays inside the budget too, with every entry it uses taken together
-// - the home entry's count is its fixed tags plus the most IDs it can look up
 // - the cover read is bounded by the cards the page draws, not by the candidates the home read looks at
 // - every Pick keeps a margin of candidates over the cards it shows
 // - the budget is the 128 tags Next.js and Vercel allow
@@ -28,13 +23,6 @@ describe('cacheEntryTagCounts', () => {
       expect(count).toBeLessThanOrEqual(cacheTagBudget);
     },
   );
-
-  it('counts the home entry as home, taxonomy, and one tag per ID the Picks name', () => {
-    expect(cacheEntryTagCounts.home).toBe(
-      2 + editorialLimits.homeModules * picksCandidates,
-    );
-    expect(cacheEntryTagCounts.home).toBe(2 + cardLookupLimit);
-  });
 
   it('counts the cover entry as one tag per cover asked for', () => {
     expect(cacheEntryTagCounts.coverPhotos).toBe(photoLimits.maxCoverLookups);

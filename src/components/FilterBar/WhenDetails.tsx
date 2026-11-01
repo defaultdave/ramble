@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, type ReactNode } from 'react';
+import { useDismissableDetails } from '@/components/Disclosure/useDismissableDetails';
 import { useFocusMemory } from './focusMemory';
 
 /** Space kept between the date chip and a calendar card that rises from the foot of the screen. */
@@ -30,31 +31,23 @@ export function WhenDetails({
   date,
   children,
 }: WhenDetailsProps) {
-  const details = useRef<HTMLDetailsElement>(null);
-  const chip = useRef<HTMLElement>(null);
+  const {
+    details,
+    summary: chip,
+    onKeyDown,
+    close,
+  } = useDismissableDetails({ stopEscapePropagation: true });
   const previous = useRef(date);
   const memory = useFocusMemory(details);
   useEffect(() => {
     if (previous.current === date) return;
     previous.current = date;
     const hadFocus = memory.hadFocus();
-    if (details.current) details.current.open = false;
+    close();
     if (hadFocus) chip.current?.focus();
     // The memory only reads a ref; the day changing is what asks.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
-  useEffect(() => {
-    function closeOnOutsidePress(event: PointerEvent) {
-      const open = details.current;
-      if (open?.open && event.target instanceof Node) {
-        if (!open.contains(event.target)) open.open = false;
-      }
-    }
-    document.addEventListener('pointerdown', closeOnOutsidePress);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutsidePress);
-    };
-  }, []);
   return (
     <details
       ref={details}
@@ -74,13 +67,7 @@ export function WhenDetails({
           card.getBoundingClientRect().top;
         if (overlap > 0) window.scrollBy({ top: overlap });
       }}
-      onKeyDown={(event) => {
-        if (event.key !== 'Escape' || !details.current?.open) return;
-        // The drawer around the calendar would close on this key too.
-        event.stopPropagation();
-        details.current.open = false;
-        chip.current?.focus();
-      }}
+      onKeyDown={onKeyDown}
     >
       <summary
         ref={chip}

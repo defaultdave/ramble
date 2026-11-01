@@ -2,9 +2,9 @@
 
 import { Menu } from 'lucide-react';
 import Link from 'next/link';
+import { useDismissableDetails } from '@/components/Disclosure/useDismissableDetails';
 import type { SiteLink } from '@/lib/pages/siteNav';
 import styles from './SiteMenu.module.css';
-import { useDismissableDetails } from './useDismissableDetails';
 
 export type SiteMenuProps = { links: readonly SiteLink[] };
 

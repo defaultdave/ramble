@@ -41,40 +41,17 @@ describe('BookingPanel paused', () => {
 });
 
 describe('BookingPanel layout', () => {
-  const choicesOf = () => screen.getByText('Date, time, and party choices');
-
-  it('puts the mode switch after the choices, in the scrolling area', () => {
+  it('puts the mode switch after the choices, and Continue after both', () => {
     setup({ total });
+    const choices = screen.getByText('Date, time, and party choices');
     const modeSwitch = screen.getByRole('button', { name: 'Book for me' });
-    expect(
-      choicesOf().compareDocumentPosition(modeSwitch) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(choicesOf().parentElement).toContainElement(modeSwitch);
-  });
-
-  it('keeps the total, terms, Continue, and hold note out of the scrolling area', () => {
-    setup({ total });
-    const scrolling = choicesOf().parentElement;
-    for (const pinned of [
-      screen.getByText('$65 × 2 guests'),
-      screen.getByText('Free cancellation until Fri, Oct 23, 5:30 PM.'),
-      screen.getByRole('button', { name: 'Continue · $130.00' }),
-      screen.getByText('We hold your spaces for 10 minutes while you pay.'),
-    ]) {
-      expect(scrolling).not.toContainElement(pinned);
-    }
-  });
-
-  it('keeps Continue and the hold note pinned before a total exists', () => {
-    setup();
-    const scrolling = choicesOf().parentElement;
-    expect(scrolling).not.toContainElement(
-      screen.getByRole('button', { name: 'Continue' }),
-    );
-    expect(scrolling).not.toContainElement(
-      screen.getByText('We hold your spaces for 10 minutes while you pay.'),
-    );
+    const next = screen.getByRole('button', { name: 'Continue · $130.00' });
+    const follows = (from: Element, to: Element) =>
+      Boolean(
+        from.compareDocumentPosition(to) & Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+    expect(follows(choices, modeSwitch)).toBe(true);
+    expect(follows(modeSwitch, next)).toBe(true);
   });
 });
 
@@ -130,13 +107,6 @@ describe('BookingPanel', () => {
     expect(screen.getByText('Free')).toBeVisible();
     expect(screen.getByText('per person')).toBeVisible();
     expect(screen.queryByText('$0')).not.toBeInTheDocument();
-  });
-
-  it('adds no tab stop of its own while there are controls to scroll to', () => {
-    setup();
-    expect(
-      screen.getByRole('region', { name: 'Book this experience' }),
-    ).not.toHaveAttribute('tabindex');
   });
 
   it('shows the mode switch and the choices', () => {

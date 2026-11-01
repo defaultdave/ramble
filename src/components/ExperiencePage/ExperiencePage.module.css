@@ -300,7 +300,7 @@
     display: none;
   }
 
-  /* The panel's row is the body's, so it sticks while the body scrolls past. */
+  /* The panel's row is the body's, so it sticks while the body scrolls past. StickyAside moves where it sticks when the panel is taller than the window, by the offset above and the same below. */
   .aside {
     --panel-offset: var(--space-6);
     display: block;
@@ -309,8 +309,6 @@
     position: sticky;
     inset-block-start: var(--panel-offset);
     margin-block-start: var(--space-4);
-    /* The offset above and the same room below: a stuck panel never outgrows the window. */
-    --panel-max-block-size: calc(100dvh - 2 * var(--panel-offset));
   }
 
   .gallery {

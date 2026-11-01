@@ -4,8 +4,6 @@
   inline-size: 100%;
   max-inline-size: calc(var(--space-16) * 6 + var(--space-4));
   min-block-size: calc(var(--space-16) * 9);
-  max-block-size: var(--panel-max-block-size, none);
-  overflow: hidden;
   padding: var(--space-6);
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-lg);

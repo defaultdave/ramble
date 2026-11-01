@@ -103,23 +103,6 @@ const choices = (
   </>
 );
 
-const tallChoices = (
-  <>
-    {choices}
-    <Stepper
-      label="Children"
-      hint="Ages 4 to 13"
-      value={1}
-      min={0}
-      max={4}
-      onChange={fn()}
-    />
-    <p className={styles.note}>
-      Children under 14 must be with an adult for the whole session.
-    </p>
-  </>
-);
-
 const defaults = {
   priceMinor: 6500,
   mode,
@@ -142,17 +125,6 @@ export const NothingChosenYet: DefaultStory = {
 // A price of nothing reads "Free per person", not "$0".
 export const FreeExperience: DefaultStory = {
   args: { ...defaults, priceMinor: 0, children: datePicker(null) },
-};
-// Taller than its room: the choices scroll under the title, and the total, Continue, and hold note stay in view.
-export const TallFooterPinned: DefaultStory = {
-  args: { ...defaults, children: tallChoices, total },
-  decorators: [
-    (Story) => (
-      <div className={styles.bounded}>
-        <Story />
-      </div>
-    ),
-  ],
 };
 export const PlacingHold: DefaultStory = {
   args: { ...defaults, total, loading: true },

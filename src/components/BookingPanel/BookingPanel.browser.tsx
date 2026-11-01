@@ -7,38 +7,48 @@ import { BookingPanel } from '@/components/BookingPanel';
 import { BookingSlots, ExperiencePage } from '@/components/ExperiencePage';
 import { sunsetKayak } from '@/components/ExperiencePage/ExperiencePage.fixtures';
 import { holdNote } from '@/lib/booking';
-import { bookingReducer, choicesView, initialState } from '@/lib/bookingDraft';
-import { kayakOffer, optionId } from '@/lib/bookingDraft.fixtures';
+import {
+  bookingReducer,
+  choicesView,
+  initialState,
+  type BookingAction,
+} from '@/lib/bookingDraft';
+import { kidsOffer, optionId } from '@/lib/bookingDraft.fixtures';
 
 // next/link, reached through the Button barrel, reads process.env when it loads, and a browser has no process.
 vi.hoisted(() => {
   Object.assign(globalThis, { process: { env: {} } });
 });
 
-// Behaviours under test, one per risk, in a real browser on the experience page with a date, a time,
-// and a party chosen, once the page is scrolled so the panel is stuck:
-// - the panel is no taller than the window less its sticky offsets, and Continue is inside the window
-// - the choices scroll in their own area and the footer stays under them
-// - in a window too short for a pinned footer, the whole panel scrolls as one instead
-// - a control focused by keyboard in the choices is scrolled clear of the footer
-// - the panel hugs its content when it fits: no space opens between the choices and the footer
+// Behaviours under test, one per risk, in a real browser on the experience page. The panel is as tall as
+// its content, never scrolls inside, and sticks at both ends:
+// - scrolling down from the top-stuck position reaches Continue within the panel's overflow, then holds
+// - scrolling back up reaches the calendar within the panel's overflow, then holds
+// - the panel growing as choices appear does not move it
+// - a panel that fits the window is plain sticky at the top
+// - nothing in the panel scrolls
+// - a control focused by keyboard, at either end, is brought into the window
 
 let container: HTMLDivElement;
 let root: Root;
 
-const selected = bookingReducer(
-  kayakOffer,
-  bookingReducer(kayakOffer, initialState(kayakOffer), {
-    type: 'chooseDate',
-    date: '2026-10-24',
-  }),
-  { type: 'chooseSession', sessionId: optionId(103) },
-);
-const view = choicesView(kayakOffer, selected);
+const chooseDate: BookingAction = { type: 'chooseDate', date: '2026-10-24' };
+const chooseTime: BookingAction = {
+  type: 'chooseSession',
+  sessionId: optionId(103),
+};
+const viewAfter = (actions: BookingAction[]) =>
+  choicesView(
+    kidsOffer,
+    actions.reduce(
+      (state, action) => bookingReducer(kidsOffer, state, action),
+      initialState(kidsOffer),
+    ),
+  );
 
-function mountPage() {
+function mountPage(actions: BookingAction[]) {
+  const view = viewAfter(actions);
   const { summary } = view;
-  if (!summary) throw new Error('No total for the chosen party');
   flushSync(() => {
     root.render(
       <ExperiencePage
@@ -51,15 +61,19 @@ function mountPage() {
               <BookingPanel
                 priceMinor={6500}
                 holdNote={holdNote}
-                total={{
-                  label: summary.label,
-                  amountMinor: summary.totalMinor,
-                }}
+                {...(summary
+                  ? {
+                      total: {
+                        label: summary.label,
+                        amountMinor: summary.totalMinor,
+                      },
+                    }
+                  : {})}
                 onContinue={vi.fn()}
               >
                 <BookingChoices
                   view={view}
-                  similarHref={kayakOffer.similarHref}
+                  similarHref={kidsOffer.similarHref}
                   onDate={vi.fn()}
                   onSession={vi.fn()}
                   onAdults={vi.fn()}
@@ -75,23 +89,58 @@ function mountPage() {
   });
 }
 
-async function stuckPanel(width: number, height: number) {
-  await page.viewport(width, height);
-  mountPage();
-  window.scrollTo(0, 900);
-  await new Promise((resolve) => setTimeout(resolve, 100));
+// A scroll frame is a rAF, and the panel moves in the one after the scroll.
+const frames = () =>
+  new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        resolve();
+      });
+    });
+  });
+
+async function scrollTo(y: number) {
+  window.scrollTo(0, y);
+  await frames();
+}
+async function scrollBy(dy: number) {
+  window.scrollBy(0, dy);
+  await frames();
+}
+
+function panelParts() {
   const panel = document.querySelector<HTMLElement>(
     'section[aria-label="Book this experience"]',
   );
-  const choices = panel?.querySelector<HTMLElement>('[class*="choices"]');
-  const footer = panel?.querySelector<HTMLElement>('[class*="footer"]');
   const next = [...(panel?.querySelectorAll('button') ?? [])].find((button) =>
     button.textContent.startsWith('Continue'),
   );
-  if (!panel || !choices || !footer || !next) {
+  const calendar = panel?.querySelector<HTMLElement>('[role="grid"]');
+  if (!panel || !next || !calendar) {
     throw new Error('The panel did not render');
   }
-  return { panel, choices, footer, next };
+  return { panel, next, calendar };
+}
+const top = (element: Element) => element.getBoundingClientRect().top;
+const bottom = (element: Element) => element.getBoundingClientRect().bottom;
+
+// The room above the panel, and the same below it.
+const offset = 24;
+const overflowOf = (panel: HTMLElement) =>
+  Math.max(
+    0,
+    panel.getBoundingClientRect().height - (innerHeight - 2 * offset),
+  );
+
+/** Scrolls far down the page, then back up until the panel sits at the top offset. */
+async function stickAtTop() {
+  await scrollTo(
+    Math.min(1500, document.documentElement.scrollHeight - innerHeight),
+  );
+  const { panel } = panelParts();
+  while (top(panel) < offset - 0.5 && window.scrollY > 0) {
+    await scrollBy(-10);
+  }
 }
 
 beforeEach(() => {
@@ -103,69 +152,101 @@ beforeEach(() => {
 afterEach(() => {
   root.unmount();
   container.remove();
+  window.scrollTo(0, 0);
 });
 
-// The sticky offset above the panel, and the same room below it.
-const offset = 24;
+describe.each([
+  [1440, 827],
+  [1280, 720],
+  [1024, 500],
+])('the booking panel in a %ix%i window', (width, height) => {
+  async function setup() {
+    await page.viewport(width, height);
+    mountPage([chooseDate, chooseTime]);
+    await frames();
+    await stickAtTop();
+    return panelParts();
+  }
 
-describe('the stuck booking panel', () => {
-  it.each([
-    [1440, 827],
-    [1280, 720],
-    [1024, 600],
-  ])(
-    'fits the window and keeps Continue in view at %ix%i',
-    async (width, height) => {
-      const { panel, next } = await stuckPanel(width, height);
-      expect(panel.getBoundingClientRect().height).toBeLessThanOrEqual(
-        height - 2 * offset + 0.5,
+  it('reaches Continue within the panel overflow, and holds with its bottom above the window bottom', async () => {
+    const { panel, next } = await setup();
+    const overflow = overflowOf(panel);
+    expect(overflow).toBeGreaterThan(0);
+    const from = window.scrollY;
+    while (bottom(next) > innerHeight && window.scrollY < from + overflow) {
+      await scrollBy(10);
+    }
+    expect(bottom(next)).toBeLessThanOrEqual(innerHeight);
+    expect(window.scrollY - from).toBeLessThanOrEqual(overflow);
+    await scrollBy(overflow);
+    expect(bottom(panel)).toBeCloseTo(innerHeight - offset, 0);
+    expect(bottom(next)).toBeLessThanOrEqual(innerHeight - offset);
+  });
+
+  it('reaches the calendar again within the panel overflow when scrolling back up', async () => {
+    const { panel, calendar } = await setup();
+    const overflow = overflowOf(panel);
+    await scrollBy(overflow + 200);
+    expect(bottom(panel)).toBeCloseTo(innerHeight - offset, 0);
+    const from = window.scrollY;
+    while (top(calendar) < 0 && window.scrollY > from - overflow - 10) {
+      await scrollBy(-10);
+    }
+    expect(top(calendar)).toBeGreaterThanOrEqual(0);
+    expect(from - window.scrollY).toBeLessThanOrEqual(overflow);
+    await scrollBy(-overflow);
+    expect(top(panel)).toBeCloseTo(offset, 0);
+  });
+
+  it('brings a control focused by keyboard into the window, at either end', async () => {
+    const { panel, next } = await setup();
+    next.focus();
+    await frames();
+    expect(bottom(next)).toBeLessThanOrEqual(innerHeight);
+    expect(top(next)).toBeGreaterThanOrEqual(0);
+    // The calendar's previous-month button is disabled in the first month, so the first one to take focus is later.
+    const first = [...panel.querySelectorAll('button')].find(
+      (button) => !button.disabled && button.ariaDisabled !== 'true',
+    );
+    first?.focus();
+    await frames();
+    expect(document.activeElement).toBe(first);
+    expect(top(first as HTMLElement)).toBeGreaterThanOrEqual(0);
+  });
+
+  it('has nothing inside it that scrolls', async () => {
+    const { panel } = await setup();
+    for (const element of [panel, ...panel.querySelectorAll('*')]) {
+      expect(['auto', 'scroll']).not.toContain(
+        getComputedStyle(element).overflowY,
       );
-      expect(next.getBoundingClientRect().bottom).toBeLessThanOrEqual(height);
-    },
-  );
+    }
+  });
+});
 
-  it('scrolls the choices above a footer that stays put', async () => {
-    const { choices, footer, next } = await stuckPanel(1280, 600);
-    const before = footer.getBoundingClientRect().top;
-    expect(choices.scrollHeight).toBeGreaterThan(choices.clientHeight);
-    choices.scrollTop = choices.scrollHeight;
-    expect(footer.getBoundingClientRect().top).toBe(before);
-    expect(footer).toContainElement(next);
-    expect(choices.getBoundingClientRect().bottom).toBeLessThanOrEqual(
-      footer.getBoundingClientRect().top + 0.5,
-    );
+describe('the booking panel as it changes', () => {
+  it('does not move when choices appear and it grows', async () => {
+    await page.viewport(1280, 720);
+    mountPage([chooseDate]);
+    await frames();
+    await scrollTo(1200);
+    await scrollBy(-40);
+    const { panel } = panelParts();
+    const before = top(panel);
+    mountPage([chooseDate, chooseTime]);
+    await frames();
+    expect(top(panelParts().panel)).toBeCloseTo(before, 0);
   });
 
-  it('scrolls the whole panel as one in a window too short for a pinned footer', async () => {
-    const { panel, choices } = await stuckPanel(1024, 500);
-    expect(panel.getBoundingClientRect().height).toBeLessThanOrEqual(
-      500 - 2 * offset + 0.5,
-    );
-    expect(panel.scrollHeight).toBeGreaterThan(panel.clientHeight);
-    expect(choices.scrollHeight).toBeLessThanOrEqual(choices.clientHeight + 1);
-  });
-
-  it('scrolls a control focused by keyboard clear of the footer', async () => {
-    const { choices, footer } = await stuckPanel(1280, 600);
-    const controls = [...choices.querySelectorAll<HTMLElement>('button')];
-    const last = controls.at(-1);
-    last?.focus();
-    expect(document.activeElement).toBe(last);
-    const box = last?.getBoundingClientRect();
-    expect(box?.bottom).toBeLessThanOrEqual(
-      footer.getBoundingClientRect().top + 0.5,
-    );
-  });
-
-  it('hugs its content when everything fits', async () => {
-    const { panel, choices, footer } = await stuckPanel(1440, 1400);
-    const last = choices.lastElementChild;
-    if (!last) throw new Error('No choices');
-    expect(panel.getBoundingClientRect().height).toBeLessThan(
-      1400 - 2 * offset,
-    );
-    expect(
-      footer.getBoundingClientRect().top - last.getBoundingClientRect().bottom,
-    ).toBeLessThanOrEqual(24);
+  it('is plain sticky at the top when it fits the window', async () => {
+    await page.viewport(1440, 1400);
+    mountPage([chooseDate, chooseTime]);
+    await frames();
+    const { panel } = panelParts();
+    expect(overflowOf(panel)).toBe(0);
+    for (const y of [900, 1100, 1000, 800]) {
+      await scrollTo(y);
+      expect(top(panel)).toBeCloseTo(offset, 0);
+    }
   });
 });

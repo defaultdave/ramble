@@ -15,6 +15,7 @@ import { ButtonLink } from '@/components/Button';
 import { ExperienceGallery } from '@/components/ExperienceGallery';
 import type { ExperiencePageView, KeyFactIcon } from '@/lib/pages/experience';
 import styles from './ExperiencePage.module.css';
+import { StickyAside } from './StickyAside';
 
 export type ExperiencePageProps = {
   view: ExperiencePageView;
@@ -227,7 +228,7 @@ export function BookingSlots({ bar, panel }: BookingSlotsProps) {
   return (
     <>
       <div className={styles.bar}>{bar}</div>
-      <aside className={styles.aside}>{panel}</aside>
+      <StickyAside>{panel}</StickyAside>
     </>
   );
 }

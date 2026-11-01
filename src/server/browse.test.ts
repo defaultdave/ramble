@@ -1,6 +1,10 @@
 import { notFound } from 'next/navigation';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { browseTitle } from '@/lib/pages/browse';
+import {
+  cacheEntryTagCounts,
+  cacheTagBudget,
+} from '@/lib/pages/cacheTagBudget';
+import { browsePageSize, browseTitle } from '@/lib/pages/browse';
 import { noFilters } from '@/lib/filters';
 import { getBrowseDates, getBrowseResults, getBrowseTitle } from './browse';
 
@@ -63,6 +67,21 @@ describe('getBrowseResults', () => {
       'experience:a',
       'experience:b',
     ]);
+  });
+
+  it('carries no more tags than the budget on a full page', async () => {
+    db.results.mockResolvedValue({
+      cursor: null,
+      items: Array.from({ length: browsePageSize }, (_, n) => ({
+        id: String(n),
+      })),
+      nextCursor: null,
+    });
+
+    await getBrowseResults(query, asOf);
+
+    expect(cache.tag.mock.calls).toHaveLength(cacheEntryTagCounts.browse);
+    expect(cache.tag.mock.calls.length).toBeLessThanOrEqual(cacheTagBudget);
   });
 
   it('tags only the catalog when the cursor was not found', async () => {

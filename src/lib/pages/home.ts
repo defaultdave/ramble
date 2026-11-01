@@ -13,7 +13,13 @@ import {
   type ExperienceCard,
 } from '../experienceCards';
 import { hrefForFilters, noFilters } from '../filters';
-import { cardLookupLimit, idListSchema, picksCandidates } from '../idLookup';
+import {
+  cardLookupLimit,
+  idListSchema,
+  picksCandidates,
+  picksShown,
+  thisWeekShown,
+} from '../idLookup';
 import { withCovers, type PhotoView } from '../photoViews';
 import type { RichTextDoc } from '../richText/format';
 import { hasContent, paragraphs } from '../richText/paragraphs';
@@ -23,19 +29,16 @@ import { isOpenSession, type SessionWindow } from '../sessionWindow';
 
 /** Every bound the home page reads or shows, so a read cannot grow with the catalog. */
 export const homeLimits = {
-  /** Cards in one Ramble Picks module; the rest are behind its "See all" link. */
-  picksShown: 3,
-  /** Entries of one collection looked at to find that many cards, in case some cannot be shown. */
+  picksShown,
   picksCandidates,
-  /** Cards in the "On this week" module. */
-  thisWeekShown: 4,
+  thisWeekShown,
   /** Experiences "On this week" looks up, twice what it shows, so one that cannot be a card does not leave the module short. */
-  thisWeekCandidates: 8,
+  thisWeekCandidates: 2 * thisWeekShown,
   /** Sessions one "On this week" read looks at. */
   thisWeekSessions: 500,
   /** How far ahead "On this week" looks. */
   thisWeekDays: 7,
-  /** Experiences one home read looks up by ID: 20 modules at most, each with `picksCandidates` entries. */
+  /** Experiences one home read looks up by ID: every module with `picksCandidates` entries. */
   maxCardIds: cardLookupLimit,
 } as const;
 

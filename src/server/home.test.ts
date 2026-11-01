@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  cacheEntryTagCounts,
+  cacheTagBudget,
+} from '@/lib/pages/cacheTagBudget';
 import { tagsForChange, type CacheChange } from '@/lib/cacheTags';
+import { editorialLimits } from '@/lib/editorial';
 import { homeLimits } from '@/lib/pages/home';
 import { upcomingWindow } from '@/lib/sessionWindow';
 import { getHomeContent, getThisWeek } from './home';
@@ -91,6 +96,32 @@ describe('getHomeContent', () => {
       ].toSorted(),
     );
     expect(entryTags).not.toContain('catalog');
+  });
+
+  it('carries no more tags than the budget when every module names more candidates than it can look up', async () => {
+    const moduleCount = editorialLimits.homeModules;
+    const collection = (m: number) => id(800 + m);
+    db.modules.mockResolvedValue(
+      Array.from({ length: moduleCount }, (_, m) => ({
+        id: id(900 + m),
+        kind: 'picks',
+        collectionId: collection(m),
+      })),
+    );
+    db.picks.mockResolvedValue(
+      Array.from({ length: moduleCount }, (_, m) => ({
+        id: collection(m),
+        itemCount: 1000,
+        experienceIds: Array.from({ length: 1000 }, (_, e) =>
+          id(10_000 * (m + 1) + e),
+        ),
+      })),
+    );
+
+    const entryTags = await homeEntryTags();
+
+    expect(entryTags).toHaveLength(cacheEntryTagCounts.home);
+    expect(entryTags.length).toBeLessThanOrEqual(cacheTagBudget);
   });
 
   it('tags a Pick experience that guests cannot see yet, so publishing it reaches the page', async () => {
@@ -207,6 +238,17 @@ describe('getThisWeek', () => {
       `experience:${id(1)}`,
     ]);
     expect(content.experienceIds).toEqual([id(2), id(1)]);
+  });
+
+  it('carries no more tags than the budget when every candidate is listed', async () => {
+    db.sessions.mockResolvedValue(
+      Array.from({ length: 50 }, (_, n) => session(n + 1, n + 1)),
+    );
+
+    await getThisWeek(asOf);
+
+    expect(cache.tag.mock.calls).toHaveLength(cacheEntryTagCounts.thisWeek);
+    expect(cache.tag.mock.calls.length).toBeLessThanOrEqual(cacheTagBudget);
   });
 
   it('reads the week that starts at its key', async () => {

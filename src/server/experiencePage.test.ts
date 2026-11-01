@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  cacheEntryTagCounts,
+  cacheTagBudget,
+} from '@/lib/pages/cacheTagBudget';
 import { idWithLetters } from '@/lib/pages/experience.fixtures';
 import { getExperiencePage } from './experiencePage';
 
@@ -59,6 +63,17 @@ describe('getExperiencePage', () => {
     expect(cache.life).toHaveBeenCalledWith('catalog');
     expect(cache.tag.mock.calls.flat().toSorted()).toEqual(
       [`experience:${id(1)}`, 'taxonomy'].toSorted(),
+    );
+  });
+
+  it('carries as many tags as the budget counts for it', async () => {
+    await getExperiencePage(id(1));
+
+    expect(cache.tag.mock.calls.flat()).toHaveLength(
+      cacheEntryTagCounts.experiencePage,
+    );
+    expect(cacheEntryTagCounts.experiencePage).toBeLessThanOrEqual(
+      cacheTagBudget,
     );
   });
 

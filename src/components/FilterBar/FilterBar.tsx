@@ -1,9 +1,13 @@
 import { Calendar, SlidersHorizontal } from 'lucide-react';
 import { ButtonLink } from '@/components/Button';
 import { ChipLink } from '@/components/Chip';
-import { DatePicker } from '@/components/DatePicker';
 import { dateChipLabel } from '@/lib/pages/browse';
-import { drawerLoadFailedMessage, selectedChips } from '@/lib/filterBar';
+import {
+  calendarLoadFailedMessage,
+  calendarLoadingMessage,
+  drawerLoadFailedMessage,
+  selectedChips,
+} from '@/lib/filterBar';
 import {
   activeFilterCount,
   guestChips,
@@ -17,6 +21,7 @@ import {
 import { browsePath } from '@/lib/routes';
 import styles from './FilterBar.module.css';
 import { DrawerButton, FilterRow } from './FilterDrawerHost';
+import { LazyDatePicker } from './LazyDatePicker';
 import { WhenDetails } from './WhenDetails';
 
 export type FilterOption = { slug: string; name: string };
@@ -89,12 +94,14 @@ function WhenControl({
       date={filters.date}
     >
       <div className={inRow ? styles.popover : styles.calendar}>
-        <DatePicker
+        <LazyDatePicker
           label="Choose a date"
           value={filters.date}
           today={today}
           availableDates={availableDates}
           onChange={onPickDate}
+          loadingMessage={calendarLoadingMessage()}
+          loadFailedMessage={calendarLoadFailedMessage()}
         />
         {filters.date ? (
           <ButtonLink href={hrefForFilters(withDate(filters, null))}>

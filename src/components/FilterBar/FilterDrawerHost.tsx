@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { DisclosureChip } from '@/components/Chip';
 import type { FilterDrawer } from '@/components/FilterDrawer';
+import { loadDatePicker } from './datePickerLoader';
 import { loadDrawer } from './drawerLoader';
 import { useFocusMemory } from './focusMemory';
 import styles from './FilterBar.module.css';
@@ -89,9 +90,10 @@ export function FilterRow({
 
   useEffect(() => {
     if ((navigator as SaveDataConnection).connection?.saveData) return;
-    // A failure here is reported when the guest actually presses.
+    // A failure here is reported when the guest actually presses. The calendar rides along because the drawer's When group opens it.
     const warm = () => {
       loadDrawer().catch(() => undefined);
+      loadDatePicker().catch(() => undefined);
     };
     if (typeof window.requestIdleCallback === 'function') {
       const handle = window.requestIdleCallback(warm, {

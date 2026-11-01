@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { drawerLoadFailedMessage, selectedChips } from './filterBar';
+import {
+  calendarLoadFailedMessage,
+  calendarLoadingMessage,
+  drawerLoadFailedMessage,
+  selectedChips,
+} from './filterBar';
 import { noFilters } from './filters';
 
 const options = {
@@ -59,6 +64,18 @@ describe('drawerLoadFailedMessage', () => {
   it('says the filters could not load and that trying again is possible', () => {
     expect(drawerLoadFailedMessage()).toBe(
       'Filters could not load. Try again.',
+    );
+  });
+});
+
+describe('the calendar messages', () => {
+  it('says the calendar is loading', () => {
+    expect(calendarLoadingMessage()).toBe('Loading calendar');
+  });
+
+  it('says the calendar could not load and that closing and opening it tries again', () => {
+    expect(calendarLoadFailedMessage()).toBe(
+      'The calendar could not load. Close it and try again.',
     );
   });
 });

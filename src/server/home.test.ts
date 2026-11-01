@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { tagsForChange, type CacheChange } from '@/lib/cacheTags';
 import { homeLimits } from '@/lib/pages/home';
 import { upcomingWindow } from '@/lib/sessionWindow';
 import { getHomeContent, getThisWeek } from './home';
 
 // Behaviours under test, one per decision, branch or risk:
-// - the home read uses the editorial profile and tags the home, the catalog, and each experience on a card
+// - the home read uses the editorial profile and tags the home, the names of categories and neighborhoods, and each experience a Pick names, shown or not; it does not tag the catalog
+// - the home read gets the categories and neighborhoods through getFilterOptions, once
+// - every write that changes what the home page shows publishes a tag the home entry carries, and a listing change of an experience the page does not name publishes none
 // - the home read asks for the Picks its modules name, once each, and for no other
 // - the home read asks for the experiences its modules might show, and only those
 // - the this-week read uses the browse profile, reads the window of its key, and tags the catalog and each listed experience
@@ -67,16 +70,81 @@ beforeEach(() => {
 });
 
 describe('getHomeContent', () => {
-  it('uses the editorial profile and tags the home, the catalog, and each card', async () => {
+  // The mocked cacheTag sees the tags of the nested getFilterOptions too, as Next hands an inner
+  // entry's tags to the outer one.
+  const homeEntryTags = async () => {
+    cache.tag.mockClear();
+    await getHomeContent();
+    return (cache.tag.mock.calls as string[][]).flat();
+  };
+
+  it('uses the editorial profile and tags the home, the names, and each experience a Pick names, but not the catalog', async () => {
+    const entryTags = await homeEntryTags();
+
+    expect(cache.life).toHaveBeenCalledWith('editorial');
+    expect(entryTags.toSorted()).toEqual(
+      [
+        'home',
+        'taxonomy',
+        `experience:${id(1)}`,
+        `experience:${id(2)}`,
+      ].toSorted(),
+    );
+    expect(entryTags).not.toContain('catalog');
+  });
+
+  it('tags a Pick experience that guests cannot see yet, so publishing it reaches the page', async () => {
+    db.experiences.mockResolvedValue([{ id: id(1) }]);
+
+    expect(await homeEntryTags()).toContain(`experience:${id(2)}`);
+  });
+
+  it('reads the categories and neighborhoods once, through the shared read', async () => {
     await getHomeContent();
 
-    expect(cache.life).toHaveBeenCalledExactlyOnceWith('editorial');
-    expect(cache.tag.mock.calls.flat()).toEqual([
-      'home',
-      'catalog',
-      `experience:${id(1)}`,
-      `experience:${id(2)}`,
-    ]);
+    expect(db.categories).toHaveBeenCalledOnce();
+    expect(db.neighborhoods).toHaveBeenCalledOnce();
+  });
+
+  describe('a write reaches the home entry', () => {
+    const hidden = id(2);
+    const unrelated = id(77);
+    const listing = (experienceId: string): CacheChange => ({
+      kind: 'listing',
+      id: experienceId,
+      categorySlugs: ['kayaking'],
+      neighborhoodSlug: 'red-hook',
+    });
+
+    it.each<[string, CacheChange]>([
+      [
+        'the name, price, status, or cover of a card experience',
+        listing(id(1)),
+      ],
+      ['the publication of a Pick experience that was hidden', listing(hidden)],
+      ['a home module edit', { kind: 'homeModules' }],
+      ['a Pick edit', { kind: 'pick', slug: 'summer' }],
+      ['a gift guide edit', { kind: 'giftGuide' }],
+      ['a category or neighborhood rename', { kind: 'taxonomy' }],
+    ])('%s', async (_name, change) => {
+      const entryTags = await homeEntryTags();
+
+      expect(tagsForChange(change).some((tag) => entryTags.includes(tag))).toBe(
+        true,
+      );
+    });
+
+    it.each<[string, CacheChange]>([
+      ['a listing change of an experience no module names', listing(unrelated)],
+      ['category page copy', { kind: 'categoryCopy', slug: 'kayaking' }],
+      ['a booking', { kind: 'spaces', sessionId: id(500) }],
+    ])('%s leaves it alone', async (_name, change) => {
+      const entryTags = await homeEntryTags();
+
+      expect(tagsForChange(change).some((tag) => entryTags.includes(tag))).toBe(
+        false,
+      );
+    });
   });
 
   it('hands over the published gift guide', async () => {

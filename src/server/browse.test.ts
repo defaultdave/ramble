@@ -2,12 +2,7 @@ import { notFound } from 'next/navigation';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { browseTitle } from '@/lib/pages/browse';
 import { noFilters } from '@/lib/filters';
-import {
-  getBrowseDates,
-  getBrowseResults,
-  getBrowseTitle,
-  getFilterOptions,
-} from './browse';
+import { getBrowseDates, getBrowseResults, getBrowseTitle } from './browse';
 
 // Behaviours under test, one per decision, branch or risk:
 // - each cached read names its cache profile and tags itself, results with the catalog and every experience they list
@@ -155,41 +150,6 @@ describe('getBrowseDates with a session the calendar cannot place', () => {
       message: 'Browse dates read failed: RangeError',
     });
     expect(JSON.stringify(failure)).not.toContain('Phobos');
-  });
-});
-
-describe('getFilterOptions', () => {
-  it('uses the catalog profile and returns both lists', async () => {
-    db.categories.mockResolvedValue([
-      { id: '1', slug: 'cooking', name: 'Cooking' },
-    ]);
-    db.neighborhoods.mockResolvedValue([]);
-
-    await expect(getFilterOptions()).resolves.toEqual({
-      categories: [{ id: '1', slug: 'cooking', name: 'Cooking' }],
-      neighborhoods: [],
-    });
-
-    expect(cache.life).toHaveBeenCalledExactlyOnceWith('catalog');
-    expect(cache.tag.mock.calls.flat()).toEqual(['catalog']);
-  });
-
-  it('throws only the kind of a failed read', async () => {
-    db.categories.mockRejectedValue(driverError);
-    db.neighborhoods.mockResolvedValue([]);
-
-    await expect(getFilterOptions()).rejects.toThrow(
-      'Filter options read failed: Error',
-    );
-  });
-
-  it('names a thrown value that is not an Error as unknown', async () => {
-    db.categories.mockRejectedValue('plain text');
-    db.neighborhoods.mockResolvedValue([]);
-
-    await expect(getFilterOptions()).rejects.toThrow(
-      'Filter options read failed: unknown',
-    );
   });
 });
 

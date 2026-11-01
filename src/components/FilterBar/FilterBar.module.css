@@ -100,6 +100,43 @@
 }
 
 /*
+ * Stands where the calendar will be while its code arrives. Its height is the calendar's for a month of
+ * 4, 5 or 6 rows (data-weeks): the month heading and arrows, the weekday row, and the rows with the gap around each.
+ */
+.calendarPlaceholder {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  inline-size: 100%;
+  block-size: calc(
+    var(--size-touch-target) * (var(--weeks) + 1) + var(--space-2) *
+      (var(--weeks) + 3) + var(--font-size-caption) *
+      var(--font-line-height-caption)
+  );
+  padding-inline: var(--space-3);
+  text-align: center;
+  font-size: var(--font-size-body-s);
+  line-height: var(--font-line-height-body-s);
+  color: var(--color-text-secondary);
+}
+
+.calendarPlaceholder[data-weeks='4'] {
+  --weeks: 4;
+}
+
+.calendarPlaceholder[data-weeks='5'] {
+  --weeks: 5;
+}
+
+.calendarPlaceholder[data-weeks='6'] {
+  --weeks: 6;
+}
+
+.calendarPlaceholder[data-failed] {
+  color: var(--color-status-danger-text);
+}
+
+/*
  * In the row the calendar floats over the page, because a scroll box would clip anything inside it.
  * It is a card at the foot of the screen, which is also what a browser that cannot place a box
  * against the chip gets.

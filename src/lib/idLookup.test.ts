@@ -12,10 +12,13 @@ describe('cardLookupLimit', () => {
     expect(cardLookupLimit).toBe(editorialLimits.homeModules * picksCandidates);
   });
 
-  it('is the one bound the home read and the cover read share', () => {
+  it('is the bound the home read is built for', () => {
     expect(homeLimits.maxCardIds).toBe(cardLookupLimit);
     expect(homeLimits.picksCandidates).toBe(picksCandidates);
-    expect(photoLimits.maxCoverLookups).toBe(cardLookupLimit);
+  });
+
+  it('is not the bound of the cover read, which asks only for the cards shown', () => {
+    expect(photoLimits.maxCoverLookups).not.toBe(cardLookupLimit);
   });
 });
 

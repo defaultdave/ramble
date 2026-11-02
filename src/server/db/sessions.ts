@@ -102,7 +102,7 @@ export async function createSessionTemplate(
 export type GenerateSessionsResult =
   | {
       ok: true;
-      /** For `tagsForChange({ kind: 'schedule', experienceId })` in the calling action or job. */
+      /** For `tagsForChanges([{ kind: 'schedule', experienceId }])` in the calling action or job. */
       experienceId: string;
       created: Session[];
       alreadyExisted: number;

@@ -27,6 +27,42 @@ export function visibilityOfKey(key: string): StorageVisibility | null {
   return key.startsWith('audit/') ? 'audit' : 'private';
 }
 
+/**
+ * Audit objects are write-once and never removed, so no delete is accepted for one. A key that
+ * names no store is not deletable either.
+ */
+export function canDeleteKey(key: string): boolean {
+  const visibility = visibilityOfKey(key);
+  return visibility !== null && visibility !== 'audit';
+}
+
+/** What an adapter declares about the stores behind it. */
+export type StorageCapabilities = {
+  /** A store whose objects cannot be overwritten or deleted, such as a bucket with object lock. */
+  storesAudit: boolean;
+};
+
+/** Photos and documents go to any adapter; an audit object only to one with a locked store. */
+export function canStoreVisibility(
+  visibility: StorageVisibility,
+  capabilities: StorageCapabilities,
+): boolean {
+  return visibility !== 'audit' || capabilities.storesAudit;
+}
+
+/**
+ * Whether a refused write means the key already holds an object. Keys are written once, so for an
+ * export that re-runs it is an earlier attempt's own object.
+ */
+export function isAlreadyWritten(code: string): boolean {
+  return code === 'already_exists';
+}
+
+/** A refusal that retrying cannot change: the adapter lacks the store, however often it is asked. */
+export function isPermanentStorageCode(code: string): boolean {
+  return code === 'unsupported';
+}
+
 /** Public objects are photos; private ones are host documents such as a signed waiver. */
 export const allowedContentTypes = {
   public: ['image/jpeg', 'image/png', 'image/webp'],

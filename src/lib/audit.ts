@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { WriteIdSchema } from './catalog';
-import { msPerDay, msPerMinute } from './time';
+import { IsoDateSchema } from './sessions';
+import { isoDateOf, msPerDay, msPerMinute } from './time';
 
 export const auditActorKinds = ['user', 'guest', 'system'] as const;
 export type AuditActorKind = (typeof auditActorKinds)[number];
@@ -73,6 +74,8 @@ const DetailsSchema = z
       typeof value === 'object' &&
       value !== null &&
       !Array.isArray(value) &&
+      // Zod's record skips an own `__proto__` key, so it would reach the database as a different row.
+      !Object.hasOwn(value, '__proto__') &&
       Object.keys(value).length <= auditLimits.detailsMaxKeys,
     {
       message: `A flat object of at most ${String(auditLimits.detailsMaxKeys)} keys`,
@@ -128,21 +131,10 @@ export type AuditRow = {
   details: unknown;
 };
 
-export const ExportDaySchema = z
-  .string()
-  .max(10)
-  .regex(/^\d{4}-\d{2}-\d{2}$/)
-  .refine((day) => {
-    // Zod runs this even after the length or pattern check failed, so a long input is cut off first.
-    if (day.length !== 10) return false;
-    const start = Date.parse(`${day}T00:00:00Z`);
-    return (
-      Number.isFinite(start) &&
-      new Date(start).toISOString().startsWith(day) &&
-      start >= Date.UTC(2000, 0, 1) &&
-      start < Date.UTC(9999, 0, 1)
-    );
-  }, 'A real calendar date from the year 2000 to 9998');
+export const ExportDaySchema = IsoDateSchema.refine(
+  (day) => day >= '2000-01-01' && day < '9999-01-01',
+  'A real calendar date from the year 2000 to 9998',
+);
 
 export type ExportDay = z.output<typeof ExportDaySchema>;
 
@@ -171,8 +163,6 @@ export function exportDayReady(day: ExportDay, now: Date): boolean {
   );
 }
 
-const dayOf = (date: Date) => date.toISOString().slice(0, 10);
-
 /**
  * The days the pulse should make sure are queued, oldest first: every ready day from the day of
  * the first audit row, going back at most a week. A log with no rows queues nothing. Each day has
@@ -184,8 +174,8 @@ export function exportDaysDue(
 ): ExportDay[] {
   if (firstRecordedAt === null) return [];
   const earliest = Math.max(
-    Date.parse(`${dayOf(firstRecordedAt)}T00:00:00Z`),
-    Date.parse(`${dayOf(now)}T00:00:00Z`) -
+    Date.parse(`${isoDateOf(firstRecordedAt)}T00:00:00Z`),
+    Date.parse(`${isoDateOf(now)}T00:00:00Z`) -
       auditLimits.exportLookbackDays * msPerDay,
   );
   const days: ExportDay[] = [];
@@ -194,7 +184,7 @@ export function exportDaysDue(
     days.length < auditLimits.exportLookbackDays;
     at += msPerDay
   ) {
-    const day = dayOf(new Date(at));
+    const day = isoDateOf(new Date(at));
     if (!exportDayReady(day, now)) break;
     days.push(day);
   }

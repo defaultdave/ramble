@@ -21,7 +21,6 @@ describeStoragePortContract('fake', () => {
     port: fake,
     opens: (url) => Promise.resolve(fake.opens(url)),
     advanceSeconds,
-    storesAudit: true,
   };
 });
 

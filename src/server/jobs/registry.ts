@@ -87,7 +87,8 @@ export const jobRegistry = {
   }),
   [auditExportKind]: defineJob({
     payload: AuditExportPayloadSchema,
-    maxAttempts: jobLimits.defaultMaxAttempts,
+    // A day's export is the only copy outside the database and a dead day is not re-driven, so it gets the longest retry the table allows.
+    maxAttempts: jobLimits.maxAttemptsCeiling,
     prepare: (payload) => exportAuditDay(payload),
     handleIdempotent: async () => {
       // The export finished in `prepare`, which holds no connection while the store is called; the job row only needs to be marked done.

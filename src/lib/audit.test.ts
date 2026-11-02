@@ -24,7 +24,7 @@ import { maxObjectBytes, visibilityOfKey } from './storage';
 // Behaviours under test, one per decision, branch or risk:
 // - an action is two or more dotted lower-case words within 64 characters
 // - an entry names the user exactly when the actor is a user; the ids are lower-cased; unknown fields are refused
-// - details are a flat object of at most 16 keys; keys, integers, booleans, null and short id-like strings pass; names, addresses, sentences, nesting, fractions and unsafe integers do not
+// - details are a flat object of at most 16 keys; keys, integers, booleans, null and short id-like strings pass; names, addresses, sentences, nesting, fractions, unsafe integers and an own `__proto__` key do not
 // - a refusal never echoes the value it refused
 // - an export day is a real calendar date in range, and is ready one hour after it ends (boundary)
 // - the pulse queues every ready day from the first row, at most 7, oldest first, and nothing for an empty log
@@ -85,6 +85,9 @@ describe('actorMatchesKind', () => {
     expect(actorMatchesKind(kind, actorId)).toBe(expected);
   });
 });
+
+/** JSON.parse makes `__proto__` an own key; an object literal would set the prototype instead. */
+const ownProto = (json: string): unknown => JSON.parse(json);
 
 describe('parseAuditEntry', () => {
   it('accepts a user entry and keeps its details', () => {
@@ -148,6 +151,8 @@ describe('parseAuditEntry', () => {
     ['17 keys', tooMany],
     ['an array instead of an object', [1]],
     ['null instead of an object', null],
+    ['an own __proto__ key', ownProto('{"__proto__":"Ada Lovelace","ok":1}')],
+    ['an own __proto__ object', ownProto('{"__proto__":{"x":1}}')],
   ])('refuses details with %s', (_label, details) => {
     expect(() => parseAuditEntry({ ...entry, details })).toThrow();
   });
@@ -182,6 +187,7 @@ describe('ExportDaySchema', () => {
     ['2026-10-31', true],
     ['2024-02-29', true],
     ['2000-01-01', true],
+    ['9998-12-31', true],
     ['2026-02-30', false],
     ['2025-02-29', false],
     ['2026-13-01', false],
@@ -190,6 +196,7 @@ describe('ExportDaySchema', () => {
     ['9999-01-01', false],
     ['2026-10-31T00:00:00Z', false],
     ['', false],
+    [`2026-10-31${'0'.repeat(10_000)}`, false],
   ])('%j is %s', (value, expected) => {
     expect(ExportDaySchema.safeParse(value).success).toBe(expected);
   });

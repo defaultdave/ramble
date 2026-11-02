@@ -1,5 +1,6 @@
 import 'server-only';
 import { createHmac, randomBytes } from 'node:crypto';
+import type { StorageCapabilities } from '@/lib/storage';
 import { secureEqual } from '@/server/secureEqual';
 import {
   parseDeleteInput,
@@ -52,6 +53,8 @@ export function createFakeStorageAdapter(
   const { now } = options;
   const { objects, secret } = options.state ?? createFakeStorageState();
 
+  const capabilities: StorageCapabilities = { storesAudit: true };
+
   const sign = (key: string, expires: number) =>
     createHmac('sha256', secret)
       .update(`${key}\n${String(expires)}`)
@@ -59,10 +62,14 @@ export function createFakeStorageAdapter(
 
   return {
     provider: 'fake',
+    ...capabilities,
 
     put: (input) =>
       settle(() => {
-        const { key, body, contentType, visibility } = parsePutInput(input);
+        const { key, body, contentType, visibility } = parsePutInput(
+          input,
+          capabilities,
+        );
         if (objects.has(key)) throw new StorageError('already_exists');
         objects.set(key, { body: Uint8Array.from(body), contentType });
         return {

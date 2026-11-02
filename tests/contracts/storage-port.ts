@@ -12,8 +12,6 @@ export type StorageContractHarness = {
   opens(signedUrl: string): Promise<boolean>;
   /** Moves the adapter's clock forward, so the suite can see a link expire. */
   advanceSeconds(seconds: number): void;
-  /** Whether the adapter has a locked store for `audit/` keys. One without refuses them with provider_unavailable. */
-  storesAudit: boolean;
 };
 
 const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
@@ -255,15 +253,18 @@ export function describeStoragePortContract(
       });
 
       it('stores an object once, returns no address, and keeps it when a delete is tried', async () => {
-        if (!harness.storesAudit) {
-          await rejectsWith(
-            port.put({
+        if (!port.storesAudit) {
+          const error = await port
+            .put({
               key: auditKey(),
               body: ndjson,
               contentType: 'application/x-ndjson',
-            }),
-            'provider_unavailable',
-          );
+            })
+            .then(
+              () => null,
+              (reason: unknown) => reason,
+            );
+          expect(error).toMatchObject({ code: 'unsupported', permanent: true });
           return;
         }
         const key = auditKey();

@@ -19,6 +19,7 @@ import { env } from '@/server/env';
 import { scheduleAuditExports } from '@/server/jobs/auditSchedule';
 import { drainJobs } from '@/server/jobs/drain';
 import { sendHeartbeat } from '@/server/monitoring/heartbeat';
+import { logger } from '@/server/monitoring/logger';
 import { fixedClock, systemClock } from '@/server/ports/clock';
 import { consumeRateLimit } from '@/server/ports/rate-limit';
 import { secureEqual } from '@/server/secureEqual';
@@ -87,6 +88,21 @@ async function cleanUpHolds(
 }
 
 /**
+ * Queues the audit exports. A failure is logged by name and not thrown: the log is not on the
+ * money path, and a fault here must not stall the drain, the purge, or the hold cleanup. The next
+ * pulse queues the same days again.
+ */
+async function queueAuditExports(): Promise<void> {
+  try {
+    await scheduleAuditExports();
+  } catch (error) {
+    logger.error('audit exports could not be queued', {
+      errorName: error instanceof Error ? error.name : 'NonError',
+    });
+  }
+}
+
+/**
  * Every entry the pulse runs, in order. The later units' entries join this list:
  * TODO(U-097): synthetic booking and timing checks; TODO(U-098): hourly dump trigger.
  */
@@ -95,7 +111,7 @@ async function runPulse(
   heartbeat: boolean,
 ): Promise<PulseCounts> {
   const startedAt = performance.now();
-  await scheduleAuditExports();
+  await queueAuditExports();
   const report = await drainJobs(asOf ? fixedClock(asOf) : systemClock);
   const purged = await purgeRateLimits(startedAt);
   const { holdsReleased, holdsScrubbed } = await cleanUpHolds(startedAt);

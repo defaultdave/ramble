@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Transaction } from '@/server/db/client';
 import { readFirstAuditTime } from '@/server/db/audit';
+import { logger } from '@/server/monitoring/logger';
+import type { StoragePort } from '@/server/ports/storage';
 import { enqueue } from './enqueue';
 import { scheduleAuditExports } from './auditSchedule';
 
@@ -11,16 +13,24 @@ vi.mock('@/server/db/client', () => ({
 }));
 vi.mock('@/server/db/audit', () => ({ readFirstAuditTime: vi.fn() }));
 vi.mock('./enqueue', () => ({ enqueue: vi.fn() }));
+vi.mock('@/server/monitoring/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+vi.mock('@/server/ports/storage/config', () => ({
+  getStorage: () => ({ provider: 'fake', storesAudit: true }),
+}));
 
 // Behaviours under test:
 // - an empty log queues nothing
 // - each ready day from the first row is queued with its own kind, payload and dedupe key, oldest first, in one transaction
 // - the count is the days that were new: a dedupe key already used adds nothing
+// - on a provider with no locked store nothing is read or queued, and one warning says the export is off
 
 beforeEach(() => {
   vi.useFakeTimers({ now: new Date('2026-11-05T12:00:00Z') });
   vi.mocked(enqueue).mockReset().mockResolvedValue({ id: 'job' });
   vi.mocked(readFirstAuditTime).mockReset();
+  vi.mocked(logger.warn).mockReset();
 });
 
 afterEach(() => {
@@ -70,5 +80,24 @@ describe('scheduleAuditExports', () => {
     vi.mocked(enqueue).mockResolvedValueOnce(null);
 
     await expect(scheduleAuditExports()).resolves.toBe(1);
+  });
+
+  it('queues nothing and warns once on a provider with no locked store', async () => {
+    vi.mocked(readFirstAuditTime).mockResolvedValue(
+      new Date('2026-11-03T08:00:00Z'),
+    );
+    const unlocked = {
+      provider: 'vercel-blob',
+      storesAudit: false,
+    } as StoragePort;
+
+    await expect(scheduleAuditExports(unlocked)).resolves.toBe(0);
+
+    expect(readFirstAuditTime).not.toHaveBeenCalled();
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalledExactlyOnceWith(
+      'audit export is off: no locked store is configured for this provider',
+      { provider: 'vercel-blob' },
+    );
   });
 });

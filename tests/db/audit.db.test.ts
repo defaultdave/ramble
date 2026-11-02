@@ -207,6 +207,7 @@ describe('the table', () => {
     ['a key starting with a digit', { '1a': 1 }, false],
     ['a key of 41 characters', { [`k${'a'.repeat(40)}`]: 1 }, false],
     ['17 keys', tooMany, false],
+    ['an own __proto__ key', JSON.parse('{"__proto__":1}') as unknown, false],
   ])(
     'details with %s: lib and database agree',
     async (_label, details, valid) => {

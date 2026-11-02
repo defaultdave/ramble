@@ -13,6 +13,7 @@ import {
   type AuditExportPayload,
   type ExportTally,
 } from '@/lib/audit';
+import { isAlreadyWritten } from '@/lib/storage';
 import { readAuditPage } from '@/server/db/audit';
 import { logger } from '@/server/monitoring/logger';
 import { systemClock } from '@/server/ports/clock';
@@ -32,7 +33,7 @@ async function putOnce(
   try {
     await storage.put({ key, body, contentType: exportContentType });
   } catch (error) {
-    if (error instanceof StorageError && error.code === 'already_exists') {
+    if (error instanceof StorageError && isAlreadyWritten(error.code)) {
       return;
     }
     throw error;

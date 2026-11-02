@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   allowedContentTypes,
+  canDeleteKey,
+  canStoreVisibility,
+  isAlreadyWritten,
+  isPermanentStorageCode,
   publicStoreIdFromToken,
   defaultSignedUrlSeconds,
   maxSignedUrlSeconds,
@@ -153,4 +157,54 @@ describe('storageSettingIssues', () => {
       ).toEqual([]);
     },
   );
+});
+
+describe('canDeleteKey', () => {
+  it.each([
+    ['public/photos/a.jpg', true],
+    ['private/documents/a.pdf', true],
+    ['audit/2026-10-31/part-0001.ndjson', false],
+    ['audit/2026-10-31/manifest.ndjson', false],
+    ['audit/../private/a.pdf', false],
+    ['photos/a.jpg', false],
+    ['', false],
+  ])('%j is %s', (key, expected) => {
+    expect(canDeleteKey(key)).toBe(expected);
+  });
+});
+
+describe('canStoreVisibility', () => {
+  it.each([
+    ['public', false, true],
+    ['private', false, true],
+    ['audit', false, false],
+    ['audit', true, true],
+  ] as const)(
+    '%s with storesAudit %s is %s',
+    (visibility, storesAudit, expected) => {
+      expect(canStoreVisibility(visibility, { storesAudit })).toBe(expected);
+    },
+  );
+});
+
+describe('store error codes', () => {
+  it.each([
+    ['already_exists', true],
+    ['provider_unavailable', false],
+    ['invalid_input', false],
+    ['not_found', false],
+    ['unsupported', false],
+  ])('%s: already written is %s', (code, expected) => {
+    expect(isAlreadyWritten(code)).toBe(expected);
+  });
+
+  it.each([
+    ['unsupported', true],
+    ['provider_unavailable', false],
+    ['already_exists', false],
+    ['invalid_input', false],
+    ['not_found', false],
+  ])('%s: permanent is %s', (code, expected) => {
+    expect(isPermanentStorageCode(code)).toBe(expected);
+  });
 });

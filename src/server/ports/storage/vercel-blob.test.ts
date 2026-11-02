@@ -132,7 +132,6 @@ describeStoragePortContract('vercel-blob', () => ({
   advanceSeconds: (seconds) => {
     current += seconds * 1000;
   },
-  storesAudit: false,
 }));
 
 describe('vercel-blob storage adapter', () => {
@@ -224,16 +223,22 @@ describe('vercel-blob storage adapter', () => {
     },
   );
 
-  it('sends nothing to the provider for an audit object', async () => {
-    await makeAdapter()
+  it('refuses an audit object as unsupported and makes no SDK call', async () => {
+    const error = await makeAdapter()
       .put({
         key: 'audit/2026-10-31/manifest.ndjson',
         body: new TextEncoder().encode('{}\n'),
         contentType: 'application/x-ndjson',
       })
-      .catch(() => undefined);
+      .catch((reason: unknown) => reason);
 
+    expect(error).toBeInstanceOf(StorageError);
+    expect(error).toMatchObject({ code: 'unsupported', permanent: true });
     expect(sdk.calls).toEqual([]);
+  });
+
+  it('declares that it has no locked store', () => {
+    expect(makeAdapter().storesAudit).toBe(false);
   });
 
   it('treats a delete of a key the store does not hold as done', async () => {

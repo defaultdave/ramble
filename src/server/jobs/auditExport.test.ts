@@ -11,10 +11,16 @@ import {
   type FakeStorageAdapter,
 } from '@/server/ports/storage/fake';
 import { StorageError } from '@/server/ports/storage';
+import { createVercelBlobAdapter } from '@/server/ports/storage/vercel-blob';
 import { exportAuditDay } from './auditExport';
 
 vi.mock('@/server/db/audit', () => ({ readAuditPage: vi.fn() }));
 vi.mock('@/server/db/client', () => ({ db: {} }));
+const blob = vi.hoisted(() => ({ put: vi.fn() }));
+vi.mock('@vercel/blob', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@vercel/blob')>()),
+  put: blob.put,
+}));
 vi.mock('@/server/monitoring/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
@@ -28,6 +34,7 @@ vi.mock('@/server/monitoring/logger', () => ({
 // - a day that is not over, judged on the system clock, reads and writes nothing
 // - a store failure fails the run and leaves no manifest
 // - a day needing more parts than the limit fails and leaves no manifest
+// - a store with no locked storage fails with a permanent refusal before any provider call, never reports success, and writes nothing
 
 const day = '2026-10-31';
 const now = new Date('2026-11-01T02:00:00Z');
@@ -214,5 +221,21 @@ describe('exportAuditDay', () => {
       storage.read(exportPartKey(day, auditLimits.exportMaxParts)),
     ).not.toBeNull();
     expect(storage.read(exportManifestKey(day))).toBeNull();
+  });
+
+  it('fails permanently on a store with no locked storage, calling no provider', async () => {
+    serveRows(3);
+    const unlocked = createVercelBlobAdapter({
+      publicToken: 'public-token',
+      privateToken: 'private-token',
+      now: () => now,
+    });
+
+    await expect(exportAuditDay({ day }, unlocked)).rejects.toMatchObject({
+      code: 'unsupported',
+      permanent: true,
+    });
+
+    expect(blob.put).not.toHaveBeenCalled();
   });
 });

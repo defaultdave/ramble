@@ -29,6 +29,7 @@ import type { SessionSummary } from './holds';
 // - a date with no room, or none listed, cannot be chosen; choosing one clears the last answer
 // - a time can be chosen, unchosen, and never when sold out or struck; the party is brought inside what the time has left
 // - the party: an adult always comes; children only where offered; a free adult beside children needs a child; the cap is the spaces left
+// - a party the spaces left cut down says so in a notice; a party that fits says nothing
 // - the total and its label follow the party's prices; the cancellation line is the chosen session's
 // - Continue is ready only for a bookable time in book mode while bookings run; the request lists only the options with a quantity
 // - the bar: paused, sold out, date chosen, or the lowest price and next date
@@ -235,6 +236,39 @@ describe('the party', () => {
       3,
     );
     expect(state).toEqual({ adults: 2, children: 0 });
+  });
+
+  it('says so when the spaces left took people off the party, and not when it fits', () => {
+    const trimmed = run(kayakOffer, [
+      pickSession(3),
+      { type: 'setAdults', value: 4 },
+      pickSession(5),
+    ]);
+    expect(trimmed.notice).toEqual({
+      tone: 'info',
+      title: 'We changed your party',
+      body: 'That time has 2 spaces left, so your party is now 2 adults.',
+      similar: false,
+    });
+    expect(run(kayakOffer, [pickSession(3)]).notice).toBeNull();
+    expect(
+      run(kayakOffer, [{ type: 'setAdults', value: 5 }, pickSession(3)]).notice,
+    ).toBeNull();
+  });
+
+  it('names the children kept in the notice, and clears it on the next change', () => {
+    const trimmed = run(familyOffer, [
+      pickSession(3),
+      { type: 'setAdults', value: 2 },
+      { type: 'setChildren', value: 3 },
+      pickSession(5),
+    ]);
+    expect(trimmed.notice?.body).toBe(
+      'That time has 2 spaces left, so your party is now 2 adults.',
+    );
+    expect(
+      run(familyOffer, [{ type: 'setAdults', value: 1 }], trimmed).notice,
+    ).toBeNull();
   });
 
   it('needs a child beside a free adult who takes no space', () => {

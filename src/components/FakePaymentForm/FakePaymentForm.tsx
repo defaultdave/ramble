@@ -215,7 +215,7 @@ export function FakePaymentForm({
                   field="number"
                   label="Card number"
                   placeholder="Card number"
-                  autoComplete="off"
+                  autoComplete="cc-number"
                   value={fields.number}
                   error={errors.number}
                   uid={uid}
@@ -228,7 +228,7 @@ export function FakePaymentForm({
                   field="expiry"
                   label="Expiry date, month and year"
                   placeholder="MM / YY"
-                  autoComplete="off"
+                  autoComplete="cc-exp"
                   value={fields.expiry}
                   error={errors.expiry}
                   uid={uid}
@@ -239,7 +239,7 @@ export function FakePaymentForm({
                   field="cvc"
                   label="Security code"
                   placeholder="CVC"
-                  autoComplete="off"
+                  autoComplete="cc-csc"
                   value={fields.cvc}
                   error={errors.cvc}
                   uid={uid}
@@ -250,7 +250,7 @@ export function FakePaymentForm({
                   field="zip"
                   label="ZIP code"
                   placeholder="ZIP"
-                  autoComplete="off"
+                  autoComplete="postal-code"
                   value={fields.zip}
                   error={errors.zip}
                   uid={uid}
@@ -361,7 +361,7 @@ type CardInputProps = {
   field: CardField;
   label: string;
   placeholder: string;
-  autoComplete: 'off';
+  autoComplete: 'cc-number' | 'cc-exp' | 'cc-csc' | 'postal-code';
   value: string;
   error: string | undefined;
   uid: string;

@@ -4,9 +4,12 @@ import { createFakeStorageAdapter, createFakeStorageState } from './fake';
 
 const start = new Date('2026-10-26T12:00:00.000Z');
 
-function makeFake() {
+function makeFake(storesAudit = false) {
   let current = start.getTime();
-  const fake = createFakeStorageAdapter({ now: () => new Date(current) });
+  const fake = createFakeStorageAdapter({
+    now: () => new Date(current),
+    storesAudit,
+  });
   return {
     fake,
     advanceSeconds: (seconds: number) => {
@@ -15,13 +18,25 @@ function makeFake() {
   };
 }
 
-describeStoragePortContract('fake', () => {
-  const { fake, advanceSeconds } = makeFake();
-  return {
-    port: fake,
-    opens: (url) => Promise.resolve(fake.opens(url)),
-    advanceSeconds,
-  };
+describe.each([
+  ['fake', false],
+  ['fake with a locked store', true],
+])('%s', (name, storesAudit) => {
+  describeStoragePortContract(name, () => {
+    const { fake, advanceSeconds } = makeFake(storesAudit);
+    return {
+      port: fake,
+      opens: (url) => Promise.resolve(fake.opens(url)),
+      advanceSeconds,
+    };
+  });
+});
+
+describe('fake storage adapter locked store', () => {
+  it('is not declared unless asked for', () => {
+    expect(makeFake().fake.storesAudit).toBe(false);
+    expect(makeFake(true).fake.storesAudit).toBe(true);
+  });
 });
 
 describe('fake storage adapter', () => {

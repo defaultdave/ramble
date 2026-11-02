@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { jobLimits } from '@/lib/jobs';
 import type { Transaction, db } from '@/server/db/client';
 import { insertJob } from '@/server/db/jobs';
 import { enqueue } from './enqueue';
@@ -13,6 +14,7 @@ vi.mock('@/server/db/jobs', () => ({ insertJob: vi.fn() }));
 // - an unknown kind, a kind named like an inherited property, a bad kind shape, or a bad dedupe key throws and writes nothing
 // - a payload the kind's schema refuses, or one over 16 KB, throws and writes nothing
 // - a dedupe key already used returns null
+// - the audit export kind is registered with the table's attempts ceiling
 
 const tx = {} as Transaction;
 const registry = {
@@ -122,6 +124,12 @@ describe('registry', () => {
     expect(findJob(jobRegistry, 'noop')).toBeDefined();
     expect(findJob(jobRegistry, 'toString')).toBeUndefined();
     expect(findJob(jobRegistry, '__proto__')).toBeUndefined();
+  });
+
+  it('gives the audit export the longest retry the table allows', () => {
+    expect(findJob(jobRegistry, 'audit-export')?.maxAttempts).toBe(
+      jobLimits.maxAttemptsCeiling,
+    );
   });
 });
 

@@ -2,14 +2,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { holdLimits } from '@/lib/holds';
 import { releaseLapsedHolds, scrubReleasedHolds } from '@/server/db/holds';
 import { PURGE_BATCH, purgeExpiredRateLimits } from '@/server/db/rateLimits';
+import { scheduleAuditExports } from '@/server/jobs/auditSchedule';
 import { drainJobs } from '@/server/jobs/drain';
 import { sendHeartbeat } from '@/server/monitoring/heartbeat';
+import { logger } from '@/server/monitoring/logger';
 import { consumeRateLimit } from '@/server/ports/rate-limit';
 import { pulseResponse } from './pulse';
 
 const testEnv = vi.hoisted((): Record<string, unknown> => ({}));
 vi.mock('@/server/env', () => ({ env: testEnv }));
 vi.mock('@/server/jobs/drain', () => ({ drainJobs: vi.fn() }));
+vi.mock('@/server/jobs/auditSchedule', () => ({
+  scheduleAuditExports: vi.fn(),
+}));
 vi.mock('@/server/db/rateLimits', () => ({
   PURGE_BATCH: 1000,
   purgeExpiredRateLimits: vi.fn(),
@@ -19,6 +24,9 @@ vi.mock('@/server/db/holds', () => ({
   scrubReleasedHolds: vi.fn(),
 }));
 vi.mock('@/server/monitoring/heartbeat', () => ({ sendHeartbeat: vi.fn() }));
+vi.mock('@/server/monitoring/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
 vi.mock('@/server/ports/rate-limit', () => ({ consumeRateLimit: vi.fn() }));
 
 // Behaviours under test, one per decision, branch, or risk:
@@ -34,6 +42,8 @@ vi.mock('@/server/ports/rate-limit', () => ({ consumeRateLimit: vi.fn() }));
 //   manual time as well (holds are judged at database time), and a failed cleanup is thrown with no heartbeat
 // - a plain pulse drains on the system clock, purges until a short batch, pings the heartbeat once, and answers counts only
 // - asOf with DEMO_CLOCK on drains on a clock fixed at asOf and sends no heartbeat
+// - the audit exports are queued before the drain, so the same pulse runs them
+// - a failure queueing the exports is logged by name and does not stop the drain, the purge, the hold cleanup, or the heartbeat
 // - a drain or purge failure is thrown and sends no heartbeat
 // - a drain that could not record a failure answers 200 with its counts but sends no heartbeat
 // - a heartbeat that fails does not fail the pulse
@@ -75,11 +85,13 @@ beforeEach(() => {
     BETTERSTACK_HEARTBEAT_URL: 'https://uptime.example/h/abc',
   });
   vi.mocked(consumeRateLimit).mockReset().mockResolvedValue(allowed);
+  vi.mocked(scheduleAuditExports).mockReset().mockResolvedValue(0);
   vi.mocked(drainJobs).mockReset().mockResolvedValue(report);
   vi.mocked(purgeExpiredRateLimits).mockReset().mockResolvedValue(0);
   vi.mocked(releaseLapsedHolds).mockReset().mockResolvedValue(0);
   vi.mocked(scrubReleasedHolds).mockReset().mockResolvedValue(0);
   vi.mocked(sendHeartbeat).mockReset().mockResolvedValue('sent');
+  vi.mocked(logger.error).mockReset();
 });
 
 describe('refusals', () => {
@@ -362,6 +374,40 @@ describe('a good pulse', () => {
     vi.mocked(sendHeartbeat).mockResolvedValue('failed');
 
     expect((await pulseResponse(post())).status).toBe(200);
+  });
+
+  it('queues the audit exports before it drains, so the same pulse runs them', async () => {
+    const order: string[] = [];
+    vi.mocked(scheduleAuditExports).mockImplementation(() => {
+      order.push('schedule');
+      return Promise.resolve(1);
+    });
+    vi.mocked(drainJobs).mockImplementation(() => {
+      order.push('drain');
+      return Promise.resolve(report);
+    });
+
+    await pulseResponse(post());
+
+    expect(order).toEqual(['schedule', 'drain']);
+  });
+
+  it('logs a failure queueing the exports by name and carries on with the rest of the pulse', async () => {
+    vi.mocked(scheduleAuditExports).mockRejectedValue(
+      new TypeError('schedule down at postgres://user:pw@host'),
+    );
+
+    const response = await pulseResponse(post());
+
+    expect(response.status).toBe(200);
+    expect(logger.error).toHaveBeenCalledExactlyOnceWith(
+      'audit exports could not be queued',
+      { errorName: 'TypeError' },
+    );
+    expect(drainJobs).toHaveBeenCalled();
+    expect(purgeExpiredRateLimits).toHaveBeenCalled();
+    expect(releaseLapsedHolds).toHaveBeenCalled();
+    expect(sendHeartbeat).toHaveBeenCalled();
   });
 
   it('throws when the drain fails, without a purge or heartbeat', async () => {

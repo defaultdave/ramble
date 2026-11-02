@@ -3,7 +3,11 @@ import { z } from 'zod';
 export const storageProviderNames = ['fake', 'vercel-blob'] as const;
 export type StorageProviderName = (typeof storageProviderNames)[number];
 
-export type StorageVisibility = 'public' | 'private';
+/**
+ * `audit` holds the nightly audit-log export: no address, no signed link, and no delete, so what the
+ * port accepts there it can never be asked to give back or remove.
+ */
+export type StorageVisibility = 'public' | 'private' | 'audit';
 
 /**
  * The first path segment of a key says who may read the object. A public photo cannot be written
@@ -11,7 +15,7 @@ export type StorageVisibility = 'public' | 'private';
  * argument that a caller could get wrong.
  */
 const keyPattern =
-  /^(public|private)\/[a-z0-9][a-z0-9._-]*(\/[a-z0-9][a-z0-9._-]*)*$/;
+  /^(public|private|audit)\/[a-z0-9][a-z0-9._-]*(\/[a-z0-9][a-z0-9._-]*)*$/;
 
 const maxKeyLength = 200;
 
@@ -19,13 +23,51 @@ export const StorageKeySchema = z.string().max(maxKeyLength).regex(keyPattern);
 
 export function visibilityOfKey(key: string): StorageVisibility | null {
   if (!StorageKeySchema.safeParse(key).success) return null;
-  return key.startsWith('public/') ? 'public' : 'private';
+  if (key.startsWith('public/')) return 'public';
+  return key.startsWith('audit/') ? 'audit' : 'private';
+}
+
+/**
+ * Audit objects are write-once and never removed, so no delete is accepted for one. A key that
+ * names no store is not deletable either.
+ */
+export function canDeleteKey(key: string): boolean {
+  const visibility = visibilityOfKey(key);
+  return visibility !== null && visibility !== 'audit';
+}
+
+/** What an adapter declares about the stores behind it. */
+export type StorageCapabilities = {
+  /** A store whose objects cannot be overwritten or deleted, such as a bucket with object lock. */
+  storesAudit: boolean;
+};
+
+/** Photos and documents go to any adapter; an audit object only to one with a locked store. */
+export function canStoreVisibility(
+  visibility: StorageVisibility,
+  capabilities: StorageCapabilities,
+): boolean {
+  return visibility !== 'audit' || capabilities.storesAudit;
+}
+
+/**
+ * Whether a refused write means the key already holds an object. Keys are written once, so for an
+ * export that re-runs it is an earlier attempt's own object.
+ */
+export function isAlreadyWritten(code: string): boolean {
+  return code === 'already_exists';
+}
+
+/** A refusal that retrying cannot change: the adapter lacks the store, however often it is asked. */
+export function isPermanentStorageCode(code: string): boolean {
+  return code === 'unsupported';
 }
 
 /** Public objects are photos; private ones are host documents such as a signed waiver. */
 export const allowedContentTypes = {
   public: ['image/jpeg', 'image/png', 'image/webp'],
   private: ['application/pdf', 'image/jpeg', 'image/png'],
+  audit: ['application/x-ndjson'],
 } as const satisfies Record<StorageVisibility, readonly string[]>;
 
 export const maxObjectBytes = 10 * 1024 * 1024;

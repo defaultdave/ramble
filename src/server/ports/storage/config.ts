@@ -7,7 +7,6 @@ import { createVercelBlobAdapter } from './vercel-blob';
 /** The fake's objects live here, so adapters built on separate calls share them for the life of the process. */
 const fakeState = createFakeStorageState();
 
-// TODO(U-074b): first caller
 /**
  * The storage adapter the environment selects. `now` is the clock port's, passed in because
  * server code does not read the system clock itself.

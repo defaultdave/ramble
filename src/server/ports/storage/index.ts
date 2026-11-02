@@ -2,11 +2,15 @@ import 'server-only';
 import { z } from 'zod';
 import {
   allowedContentTypes,
+  canDeleteKey,
+  canStoreVisibility,
   defaultSignedUrlSeconds,
+  isPermanentStorageCode,
   maxObjectBytes,
   maxSignedUrlSeconds,
   StorageKeySchema,
   visibilityOfKey,
+  type StorageCapabilities,
   type StorageProviderName,
   type StorageVisibility,
 } from '@/lib/storage';
@@ -18,15 +22,20 @@ export type StorageErrorCode =
   /** Keys are immutable: a stored object is never overwritten. */
   | 'already_exists'
   /** The provider could not take the request; retry later. */
-  | 'provider_unavailable';
+  | 'provider_unavailable'
+  /** The adapter has no store for this kind of object, and asking again will not give it one. */
+  | 'unsupported';
 
 export class StorageError extends Error {
   readonly code: StorageErrorCode;
+  /** True when a retry cannot change the outcome; the job drain dead-letters such a failure at once. */
+  readonly permanent: boolean;
 
   constructor(code: StorageErrorCode, message?: string, cause?: unknown) {
     super(message ?? code, cause === undefined ? undefined : { cause });
     this.name = 'StorageError';
     this.code = code;
+    this.permanent = isPermanentStorageCode(code);
   }
 }
 
@@ -84,10 +93,11 @@ type StoredObject = {
 /**
  * Object storage behind one interface (design doc 4.2.1). Keys start with `public/` for photos or
  * `private/` for host documents, and the prefix decides which store holds the object, so a private
- * document can never be written to, or linked from, the public side. Expected refusals reject with a
+ * document can never be written to, or linked from, the public side. `audit/` holds the audit-log
+ * export: written once, never linked or deleted through the port. Expected refusals reject with a
  * `StorageError`; nothing is repaired.
  */
-export type StoragePort = {
+export type StoragePort = StorageCapabilities & {
   readonly provider: StorageProviderName;
   /** Stores a new object. A key that already holds one is refused, never overwritten. */
   put(input: PutInput): Promise<StoredObject>;
@@ -97,11 +107,38 @@ export type StoragePort = {
   delete(input: DeleteInput): Promise<void>;
 };
 
-export function parsePutInput(input: PutInput) {
+type ParsedPut<Visibility extends StorageVisibility> = z.output<
+  typeof PutInputSchema
+> & { visibility: Visibility };
+
+/**
+ * Every adapter's `put` starts here with its own capabilities, so which objects an adapter refuses
+ * is the port's rule and not the adapter's. An object it has no store for is refused before any
+ * provider is called; for an adapter that declares `storesAudit: false` the result is typed
+ * without `audit`.
+ */
+export function parsePutInput(
+  input: PutInput,
+  capabilities: { storesAudit: false },
+): ParsedPut<'public' | 'private'>;
+export function parsePutInput(
+  input: PutInput,
+  capabilities: StorageCapabilities,
+): ParsedPut<StorageVisibility>;
+export function parsePutInput(
+  input: PutInput,
+  capabilities: StorageCapabilities,
+): ParsedPut<StorageVisibility> {
   const result = PutInputSchema.safeParse(input);
   if (!result.success) throw new StorageError('invalid_input');
   const visibility = visibilityOfKey(result.data.key);
   if (!visibility) throw new StorageError('invalid_input');
+  if (!canStoreVisibility(visibility, capabilities)) {
+    throw new StorageError(
+      'unsupported',
+      `This adapter has no locked store for ${visibility} objects`,
+    );
+  }
   return { ...result.data, visibility };
 }
 
@@ -113,6 +150,8 @@ export function parseSignedUrlInput(input: SignedUrlInput) {
 
 export function parseDeleteInput(input: DeleteInput) {
   const result = DeleteInputSchema.safeParse(input);
-  if (!result.success) throw new StorageError('invalid_input');
+  if (!result.success || !canDeleteKey(result.data.key)) {
+    throw new StorageError('invalid_input');
+  }
   return result.data;
 }

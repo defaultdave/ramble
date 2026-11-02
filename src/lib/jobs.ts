@@ -170,7 +170,17 @@ export type FailureOutcome =
   | { status: 'dead'; lastError: string }
   | { status: 'pending'; runAfter: Date; lastError: string };
 
-/** After a failed run: retry later, or dead-letter once the last attempt has been spent. */
+/** Whether the error says a retry cannot help, by carrying `permanent: true`. */
+function isPermanentFailure(error: unknown): boolean {
+  return (
+    error instanceof Error && 'permanent' in error && error.permanent === true
+  );
+}
+
+/**
+ * After a failed run: retry later, or dead-letter once the last attempt has been spent. A
+ * permanent failure is dead-lettered on the attempt that raised it.
+ */
 export function failureOutcome(input: {
   attempts: number;
   maxAttempts: number;
@@ -179,7 +189,9 @@ export function failureOutcome(input: {
   error: unknown;
 }): FailureOutcome {
   const lastError = describeJobError(input.error);
-  if (input.attempts >= input.maxAttempts) return { status: 'dead', lastError };
+  if (input.attempts >= input.maxAttempts || isPermanentFailure(input.error)) {
+    return { status: 'dead', lastError };
+  }
   const delay = backoffSeconds(input.attempts, input.jobId);
   return {
     status: 'pending',

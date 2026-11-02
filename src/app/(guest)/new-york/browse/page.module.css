@@ -44,12 +44,7 @@
 
 /* The live region is heard, not seen: the visible heading over the results says the same. */
 .announcement {
-  position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+  composes: visuallyHidden from '../../../../styles/visually-hidden.module.css';
 }
 
 /* The filter bar and the results under it, 12 px apart as in Figma (64:222), where the page's own gap would be 24. */

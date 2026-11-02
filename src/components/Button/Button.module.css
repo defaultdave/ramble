@@ -121,7 +121,3 @@
     animation-duration: 3s;
   }
 }
-
-.visuallyHidden {
-  composes: visuallyHidden from '../../styles/visually-hidden.module.css';
-}

@@ -275,6 +275,27 @@ describe('CheckoutPage', () => {
     expect(screen.getByLabelText('Email')).toHaveValue('alex@example.com');
   });
 
+  it('moves focus to the notice when the request fails, and again on the next failure', async () => {
+    const a = actions(() => Promise.reject(new Error('offline')));
+    const user = userEvent.setup();
+    render(<CheckoutPage view={view} actions={a} />);
+    await fill(user);
+    const send = screen.getByRole('button', { name: 'Continue to payment' });
+
+    await user.click(send);
+    await screen.findByText(/couldn't reach Ramble/);
+    const notice = () => document.querySelector('[data-checkout-notice]');
+    await waitFor(() => {
+      expect(notice()).toHaveFocus();
+    });
+
+    await user.click(screen.getByLabelText('Email'));
+    await user.click(send);
+    await waitFor(() => {
+      expect(notice()).toHaveFocus();
+    });
+  });
+
   it.each([
     [
       { status: 'hold_expired', canRehold: true, spacesLeft: 6 },
@@ -316,6 +337,23 @@ describe('CheckoutPage', () => {
       expect(screen.getByText(expected)).toBeVisible();
     },
   );
+
+  it('drops the hold timer beside the sold-out panel, so that panel is the only message', async () => {
+    const a = actions(() =>
+      Promise.resolve({ status: 'sold_out', alternatives: [] }),
+    );
+    const user = userEvent.setup();
+    render(<CheckoutPage view={view} actions={a} />);
+    expect(screen.getByRole('timer')).toBeVisible();
+    await fill(user);
+    await user.click(
+      screen.getByRole('button', { name: 'Continue to payment' }),
+    );
+
+    expect(await screen.findByText('These spaces are gone')).toBeVisible();
+    expect(screen.queryByRole('timer')).toBeNull();
+    expect(screen.queryByText(/hold has expired/)).toBeNull();
+  });
 
   it('moves focus to the payment panel, which has one Payment heading', async () => {
     const user = userEvent.setup();

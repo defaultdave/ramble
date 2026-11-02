@@ -149,24 +149,50 @@ function seatCap(offer: BookingOffer, session: OfferedSession | null): number {
     : offer.maxSeats;
 }
 
-/** A party brought inside the minimums and the cap, children giving way first. */
+/** What the guest is told when the spaces left take people off their party. */
+function trimmedNotice(
+  cap: number,
+  { adults, children }: Seats,
+): BookingNotice {
+  const party = [
+    countLabel(adults, 'adult'),
+    ...(children > 0 ? [countLabel(children, 'child', 'children')] : []),
+  ].join(' and ');
+  return {
+    tone: 'info',
+    title: 'We changed your party',
+    body: `That time has ${countLabel(cap, 'space')} left, so your party is now ${party}.`,
+    similar: false,
+  };
+}
+
+/**
+ * A party brought inside the minimums and the cap, children giving way first. It carries the notice
+ * that says so when the cap took someone off, and none when the party fits as asked.
+ */
 function fitParty(
   offer: BookingOffer,
   session: OfferedSession | null,
   party: Seats,
-): Seats {
+): Seats & { notice: BookingNotice | null } {
   const min = minimums(offer);
   const cap = seatCap(offer, session);
   let adults = Math.min(Math.max(party.adults, min.adults), offer.maxSeats);
   let children = childrenOffered(offer)
     ? Math.min(Math.max(party.children, min.children), offer.maxSeats)
     : 0;
+  let trimmed = false;
   while (seatsOf(offer, { adults, children }) > cap) {
     if (children > min.children) children -= 1;
     else if (adults > min.adults) adults -= 1;
     else break;
+    trimmed = true;
   }
-  return { adults, children };
+  return {
+    adults,
+    children,
+    notice: trimmed ? trimmedNotice(cap, { adults, children }) : null,
+  };
 }
 
 type StepperView = {
@@ -292,7 +318,6 @@ function withDate(
     ...state,
     date,
     sessionId: only?.id ?? null,
-    notice: null,
     alternatives: [],
     ...fitParty(offer, only, state),
   };
@@ -395,7 +420,6 @@ export function bookingReducer(
         ...state,
         date: session.date,
         sessionId: session.id,
-        notice: null,
         alternatives: [],
         ...fitParty(offer, session, state),
       };
@@ -403,7 +427,6 @@ export function bookingReducer(
     case 'setAdults':
       return {
         ...state,
-        notice: null,
         ...fitParty(offer, sessionOf(offer, state), {
           adults: action.value,
           children: state.children,
@@ -412,7 +435,6 @@ export function bookingReducer(
     case 'setChildren':
       return {
         ...state,
-        notice: null,
         ...fitParty(offer, sessionOf(offer, state), {
           adults: state.adults,
           children: action.value,

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { ExternalLink } from '@/components/ExternalLink';
 import { classNames } from '@/lib/classNames';
 import type { ButtonSize, ButtonVariant } from './Button';
 import styles from './Button.module.css';
@@ -50,9 +51,6 @@ export function ButtonLink({
         </span>
       ) : null}
       {children}
-      {external ? (
-        <span className={styles.visuallyHidden}> (opens in a new tab)</span>
-      ) : null}
     </span>
   );
   if (download !== undefined) {
@@ -63,14 +61,9 @@ export function ButtonLink({
     );
   }
   return external ? (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={className}
-    >
+    <ExternalLink href={href} className={className}>
       {content}
-    </a>
+    </ExternalLink>
   ) : (
     <Link
       href={href}

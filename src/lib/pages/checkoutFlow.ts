@@ -361,6 +361,11 @@ export function alternativeRow(
   };
 }
 
+/** Whether the header shows the hold timer: not beside the sold-out panel, which says the spaces are gone and is the only message about them. */
+export function showsHoldTimer(state: CheckoutStep): boolean {
+  return state.step !== 'sold_out';
+}
+
 /** Whether the confirm step of the page's own form may be sent: one request at a time, details only. */
 export function canSend(state: CheckoutStep): boolean {
   return state.step === 'details' && !state.sending;

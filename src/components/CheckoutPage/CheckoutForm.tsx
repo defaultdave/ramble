@@ -1,7 +1,9 @@
 import {
   memo,
   useCallback,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
   type SyntheticEvent,
@@ -9,6 +11,7 @@ import {
 import { Alert } from '@/components/Alert';
 import { Button } from '@/components/Button';
 import { Checkbox } from '@/components/Checkbox';
+import { ExternalLink } from '@/components/ExternalLink';
 import { Input, type InputProps } from '@/components/Input';
 import { ageRequirements } from '@/lib/checkout';
 import {
@@ -46,50 +49,29 @@ function optionalError(text: string | undefined) {
   return text === undefined ? {} : { errorText: text };
 }
 
-type TextFieldProps = Omit<InputProps, 'onChange' | 'errorText' | 'value'> & {
-  field: TextKey;
+/** A text field's name, or a child's position for the age boxes. */
+type FieldKey = TextKey | number;
+
+type FieldProps = Omit<InputProps, 'onChange' | 'errorText' | 'value'> & {
+  field: FieldKey;
   value: string;
   errorText: string | undefined;
-  onValue: (field: TextKey, value: string) => void;
+  onValue: (field: FieldKey, value: string) => void;
 };
 
 /** One text box. It is memoised on plain values and the form's stable handler, so only the box typed in renders. */
-const TextField = memo(function TextField({
+const Field = memo(function Field({
   field,
   errorText,
   onValue,
   ...rest
-}: TextFieldProps) {
+}: FieldProps) {
   return (
     <Input
       {...rest}
       {...optionalError(errorText)}
       onChange={(event) => {
         onValue(field, event.target.value);
-      }}
-    />
-  );
-});
-
-type AgeFieldProps = Omit<InputProps, 'onChange' | 'errorText' | 'value'> & {
-  index: number;
-  value: string;
-  errorText: string | undefined;
-  onAge: (index: number, value: string) => void;
-};
-
-const AgeField = memo(function AgeField({
-  index,
-  errorText,
-  onAge,
-  ...rest
-}: AgeFieldProps) {
-  return (
-    <Input
-      {...rest}
-      {...optionalError(errorText)}
-      onChange={(event) => {
-        onAge(index, event.target.value);
       }}
     />
   );
@@ -164,15 +146,9 @@ function DocumentLink({
 }) {
   // A new tab, so the guest keeps what they typed.
   return (
-    <a
-      className={styles.documentLink}
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-    >
+    <ExternalLink className={styles.documentLink} href={href}>
       {children}
-      <span className={styles.visuallyHidden}> (opens in a new tab)</span>
-    </a>
+    </ExternalLink>
   );
 }
 
@@ -194,25 +170,36 @@ export function CheckoutForm({
   );
   const childAges = needs.childAges;
 
-  const onValue = useCallback((field: TextKey, value: string) => {
-    setValues((current) => ({ ...current, [field]: value }));
+  const onValue = useCallback((field: FieldKey, value: string) => {
+    setValues((current) =>
+      typeof field === 'number'
+        ? {
+            ...current,
+            childAges: current.childAges.map((existing, at) =>
+              at === field ? value : existing,
+            ),
+          }
+        : { ...current, [field]: value },
+    );
   }, []);
   const onTick = useCallback((field: TickKey, checked: boolean) => {
     setValues((current) => ({ ...current, [field]: checked }));
   }, []);
-  const onAge = useCallback((index: number, value: string) => {
-    setValues((current) => ({
-      ...current,
-      childAges: current.childAges.map((existing, at) =>
-        at === index ? value : existing,
-      ),
-    }));
-  }, []);
+  const formRef = useRef<HTMLFormElement>(null);
+  // Focus stays on Continue after a failed send, so the notice takes it and is read out.
+  useEffect(() => {
+    if (notice) {
+      formRef.current
+        ?.querySelector<HTMLElement>('[data-checkout-notice]')
+        ?.focus();
+    }
+  }, [notice]);
 
   const message = (...keys: string[]) => errorMessage(errors, ...keys);
 
   return (
     <form
+      ref={formRef}
       className={styles.form}
       noValidate
       onSubmit={(event: SyntheticEvent<HTMLFormElement>) => {
@@ -223,11 +210,19 @@ export function CheckoutForm({
       <p role="status" className={styles.visuallyHidden}>
         {sending ? 'Getting your payment ready' : ''}
       </p>
-      {notice ? <Alert tone="danger" title="Not sent" body={notice} /> : null}
+      {notice ? (
+        <Alert
+          data-checkout-notice=""
+          tabIndex={-1}
+          tone="danger"
+          title="Not sent"
+          body={notice}
+        />
+      ) : null}
 
       <fieldset className={styles.group}>
         <legend className={styles.legend}>Contact</legend>
-        <TextField
+        <Field
           field="email"
           id={inputId('contact.email')}
           label="Email"
@@ -240,7 +235,7 @@ export function CheckoutForm({
           errorText={message('contact.email')}
           onValue={onValue}
         />
-        <TextField
+        <Field
           field="phone"
           id={inputId('contact.phone')}
           label="Phone"
@@ -259,7 +254,7 @@ export function CheckoutForm({
 
       <fieldset className={styles.group}>
         <legend className={styles.legend}>Who&apos;s coming</legend>
-        <TextField
+        <Field
           field="leadGuestName"
           id={inputId('leadGuestName')}
           label="Lead guest name"
@@ -283,10 +278,10 @@ export function CheckoutForm({
           <>
             <div className={styles.ages}>
               {values.childAges.map((age, index) => (
-                <AgeField
+                <Field
                   // The ages are positional, one box per child, so the index is their identity.
                   key={index}
-                  index={index}
+                  field={index}
                   id={inputId(`attendees.childrenAges.${String(index)}`)}
                   label={`Child ${String(index + 1)} age`}
                   inputMode="numeric"
@@ -295,11 +290,11 @@ export function CheckoutForm({
                   {...(index === 0 ? { hint: ageRangeHint(childAges) } : {})}
                   value={age}
                   errorText={message(...childAgeKeys(index))}
-                  onAge={onAge}
+                  onValue={onValue}
                 />
               ))}
             </div>
-            <TextField
+            <Field
               field="guardianName"
               id={inputId('attendees.guardian.name')}
               label="Guardian name"
@@ -309,7 +304,7 @@ export function CheckoutForm({
               errorText={message(...guardianKeys.name)}
               onValue={onValue}
             />
-            <TextField
+            <Field
               field="guardianContact"
               id={inputId('attendees.guardian.contact')}
               label="Guardian phone or email"

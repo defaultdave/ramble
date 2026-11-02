@@ -11,7 +11,7 @@ import {
   type BookingState,
   type SubmitOrigin,
 } from '@/lib/bookingDraft';
-import { somethingWentWrong } from '@/lib/bookingOutcome';
+import { somethingWentWrong, type ReserveEffect } from '@/lib/bookingOutcome';
 import type { SessionSummary } from '@/lib/holds';
 import { reserveSpaces } from '@/server/actions/holds';
 
@@ -76,13 +76,15 @@ export function useBookingDraft(offer: BookingOffer) {
       const input = reserveInput(offer, current);
       if (!input || current.pending) return;
       dispatch({ type: 'submitStarted' });
+      let effect: ReserveEffect;
       try {
-        const effect = effectOf(offer, await reserveSpaces(input));
-        dispatch({ type: 'submitDone', effect, origin });
-        if (effect.kind === 'held') router.push(effect.href);
+        effect = effectOf(offer, await reserveSpaces(input));
       } catch {
-        dispatch({ type: 'submitDone', effect: somethingWentWrong, origin });
+        effect = somethingWentWrong;
       }
+      // Outside the try: a throw from the dispatch or the navigation is not the reserve failing, and the hold is already placed.
+      dispatch({ type: 'submitDone', effect, origin });
+      if (effect.kind === 'held') router.push(effect.href);
     },
     [offer, key, initial, dispatch, router],
   );

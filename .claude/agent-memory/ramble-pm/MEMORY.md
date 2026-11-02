@@ -135,3 +135,4 @@ Full list with reasons in `DECISIONS.md`.
 - With JavaScript off, React Flight defers elements past 3200 bytes, and late pieces stream as bare `<div hidden id="S:n">` segments CSS cannot place. Test no-script on a large result set.
 - zsh does not word-split `$c`: use a function with explicit args in batch commands.
 - `osv-scanner` on a push to `main` can fail while the PR scan passes; read the branch's run list, not the PR's checks (SC-26).
+- Unexported `pgEnum`s are invisible to drizzle-kit: `pnpm db:generate` then wants to drop the type. Only CI's `db` job runs it, and it stops before `test:db`, so run it locally on any schema change and do not treat a schema export as dead (SC-27).

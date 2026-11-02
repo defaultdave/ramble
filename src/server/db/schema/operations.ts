@@ -93,6 +93,7 @@ export const privacyRequests = pgTable(
   ],
 );
 
+// Adding a value is a migration, and Postgres cannot drop one: removing a kind means rebuilding the type.
 export const auditActorKindEnum = pgEnum('audit_actor_kind', auditActorKinds);
 
 const nameShape = `^[a-z][a-z0-9_]{0,${String(auditLimits.detailsKeyMaxChars - 1)}}$`;

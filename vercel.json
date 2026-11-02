@@ -6,7 +6,9 @@
       "unit/*": false,
       "pm/*": false,
       "sync/*": false,
-      "promote/*": false
+      "promote/*": false,
+      "revert/*": false,
+      "dependabot/**": false
     }
   }
 }

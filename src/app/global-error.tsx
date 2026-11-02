@@ -7,6 +7,9 @@ import '@/styles/tokens.css';
 export default function GlobalError({ retry }: { retry: () => void }) {
   return (
     <html lang="en">
+      <head>
+        <title>Something went wrong</title>
+      </head>
       <body>
         <main>
           <ErrorNotice onRetry={retry} />

@@ -1,9 +1,9 @@
 import 'server-only';
-import { cacheLife, cacheTag } from 'next/cache';
-import { tags } from '@/lib/cacheTags';
+import { cacheLife } from 'next/cache';
 import type { GuestPhoto } from '@/lib/photos';
 import { CoverLookupSchema } from '@/lib/photoViews';
 import { readOrRefuse } from '@/server/cache/readOrRefuse';
+import { tagExperiences } from '@/server/cache/tagExperiences';
 import { listGuestCoverPhotos } from '@/server/db/photos';
 
 /**
@@ -22,7 +22,7 @@ export async function getCoverPhotos(
     // Parsed before anything is tagged, so a list past the limit or an ID that is no uuid is
     // refused (by kind only) before it costs a tag. The tag is the lower-case ID.
     const ids = CoverLookupSchema.parse(experienceIds);
-    for (const id of ids) cacheTag(tags.experience(id.toLowerCase()));
+    tagExperiences(ids.map((id) => id.toLowerCase()));
     return listGuestCoverPhotos(ids);
   });
 }

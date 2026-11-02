@@ -1,5 +1,6 @@
 import Form from 'next/form';
 import { Button } from '@/components/Button';
+import { HiddenFields } from '@/components/HiddenFields';
 import { classNames } from '@/lib/classNames';
 import type { FormTarget } from '@/lib/pages/browse';
 import styles from './TargetButton.module.css';
@@ -23,14 +24,7 @@ export function TargetButton({
       action={target.action}
       className={classNames(styles.form, fit && styles.fit)}
     >
-      {target.fields.map(([name, value]) => (
-        <input
-          key={`${name}=${value}`}
-          type="hidden"
-          name={name}
-          value={value}
-        />
-      ))}
+      <HiddenFields fields={target.fields} />
       <Button type="submit" variant={variant}>
         {label}
       </Button>

@@ -1,5 +1,5 @@
-import { Alert } from '@/components/Alert';
 import { ButtonLink } from '@/components/Button';
+import { RetryAlert } from '@/components/PageError';
 import type { BrowseView } from '@/lib/pages/browse';
 import { browsePath } from '@/lib/routes';
 import styles from './BrowseResults.module.css';
@@ -71,23 +71,22 @@ export function BrowseResults(props: BrowseResultsProps) {
       );
     case 'error':
       return (
-        <div className={styles.error}>
-          <Alert
-            tone="danger"
-            title="We couldn't load experiences"
-            body={
-              props.wording === 'landing'
-                ? 'Something went wrong on our side. Try again in a moment.'
-                : 'Something went wrong on our side. Your filters are saved.'
-            }
-          />
+        <RetryAlert
+          fit
+          alertTitle="We couldn't load experiences"
+          alertBody={
+            props.wording === 'landing'
+              ? 'Something went wrong on our side. Try again in a moment.'
+              : 'Something went wrong on our side. Your filters are saved.'
+          }
+        >
           <TargetButton
             target={props.retry}
             label="Try again"
             variant="secondary"
             fit
           />
-        </div>
+        </RetryAlert>
       );
     case 'outdated':
       return (

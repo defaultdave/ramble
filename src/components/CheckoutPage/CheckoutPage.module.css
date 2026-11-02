@@ -177,14 +177,7 @@
 }
 
 .visuallyHidden {
-  position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+  composes: visuallyHidden from '../../styles/visually-hidden.module.css';
 }
 
 @media (min-width: 768px) {

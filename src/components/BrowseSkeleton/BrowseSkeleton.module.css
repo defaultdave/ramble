@@ -16,12 +16,7 @@
 }
 
 .visuallyHidden {
-  position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+  composes: visuallyHidden from '../../styles/visually-hidden.module.css';
 }
 
 /* With scripting off the skeleton is never replaced, so it must not stand where the results are shown. */

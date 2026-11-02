@@ -40,6 +40,7 @@ Dave works one item at a time. Give him the single next action, not a menu.
   - Do not poll. Rely on agent completion notifications; when waiting on CI, use one long background wait, never a loop of short sleeps or `gh pr checks`.
   - Never `Read` a subagent output, transcript, or `STATUS.md` whole. Use `tail`, `grep`, a line range, or ask the agent for its summary.
   - `STATUS.md` holds current state: one short entry per lane plus the Next and Blocked lists. A lane's history goes in `lanes/<name>.md` in `ramble-pm`, which only that lane reads.
+  - Figma and browser inspection stays out of the chat (agent review, 2026-11-01): `use_figma` reads, `get_screenshot`, `get_metadata` and page screenshots run in a `general-purpose` subagent that returns text only (names, ids, measurements, what differs), and the chat keeps nothing but that answer. When Dave is looking at a page with you in the chat's browser, read it with `get_page_text` or `read_page`, and take screenshots at `scale: 0.5` unless he asks to zoom in.
 
 **End**
 - Update `STATUS.md` with the next action written so a fresh session can pick it up cold.

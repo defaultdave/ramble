@@ -17,6 +17,9 @@ import { browsePath } from '../routes';
 import { IsoDateSchema, TimeZoneSchema, isKnownTimeZone } from '../sessions';
 import { calendarDateFormat } from '../time';
 
+/** The id of the streamed results, which the skip link shown with scripting off points at. */
+export const browseResultsId = 'browse-results';
+
 /** A hard page size: the data layer reads one more row than this to learn whether there is a next page. */
 export const browsePageSize = 12;
 

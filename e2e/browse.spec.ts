@@ -164,6 +164,22 @@ test.describe('with JavaScript off', () => {
     ).toBeLessThanOrEqual(footerBox?.y ?? 0);
   });
 
+  test('Skip to results goes to the streamed part, which holds the page below the intro', async ({
+    page,
+  }) => {
+    await page.goto(browse);
+
+    const skip = page.getByRole('link', { name: 'Skip to results' });
+    await skip.focus();
+    await expect(skip).toBeInViewport();
+    await page.keyboard.press('Enter');
+
+    await expect(page).toHaveURL(/#browse-results$/);
+    await expect(page.locator('#browse-results')).toContainText(
+      "We couldn't load experiences",
+    );
+  });
+
   test('Try again is a form that goes to the same address', async ({
     page,
   }) => {

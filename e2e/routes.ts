@@ -16,18 +16,6 @@ export const routes: readonly RouteRow[] = [
     noindex: false,
   },
   {
-    path: '/new-york/things-to-do/sample',
-    group: 'guest',
-    heading: 'Category',
-    noindex: false,
-  },
-  {
-    path: '/new-york/neighborhoods/sample',
-    group: 'guest',
-    heading: 'Neighborhood',
-    noindex: false,
-  },
-  {
     path: '/guide/sample',
     group: 'guest',
     heading: 'Guide entry',
@@ -126,6 +114,23 @@ export const experiencePaths = {
   notFound: '/experiences/sample',
   readFails: '/experiences/sunset-kayak-00000000-0000-4000-8000-000000000001',
 } as const;
+
+/**
+ * The category and neighborhood pages read their names from the database, which the e2e server does
+ * not have: an address that is not a slug is a not-found, and a well-formed one shows the error state.
+ */
+export const landingPaths = [
+  {
+    name: 'category',
+    notASlug: '/new-york/things-to-do/not_a_slug',
+    wellFormed: '/new-york/things-to-do/cooking',
+  },
+  {
+    name: 'neighborhood',
+    notASlug: '/new-york/neighborhoods/not_a_slug',
+    wellFormed: '/new-york/neighborhoods/dumbo',
+  },
+] as const;
 
 export function expectedTitle(heading: string): string {
   return heading === 'Ramble' ? heading : `${heading} | Ramble`;

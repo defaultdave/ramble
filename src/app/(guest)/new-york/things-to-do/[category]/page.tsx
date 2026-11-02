@@ -1,22 +1,23 @@
 import type { Metadata } from 'next';
-import { use } from 'react';
-import { RoutePlaceholder } from '@/components/RoutePlaceholder';
+import { landingPlaceholderSlug } from '@/lib/pages/landing';
+import { LandingRoute, landingMetadata } from '../../_landing/LandingRoute';
 
-export const metadata: Metadata = { title: 'Category' };
-
+// The build has no database to list categories from, so it prerenders the placeholder; a real
+// category renders on its first request and is kept by the cached reads under it.
 export function generateStaticParams() {
-  return [{ category: 'sample' }];
+  return [{ category: landingPlaceholderSlug }];
 }
 
-export default function CategoryPage({
+export async function generateMetadata({
+  params,
+}: PageProps<'/new-york/things-to-do/[category]'>): Promise<Metadata> {
+  const { category } = await params;
+  return landingMetadata({ kind: 'category', slug: category });
+}
+
+export default async function CategoryPage({
   params,
 }: PageProps<'/new-york/things-to-do/[category]'>) {
-  const { category } = use(params);
-  return (
-    <RoutePlaceholder
-      name="Category"
-      covers="PRD-02, PRD-65"
-      param={category}
-    />
-  );
+  const { category } = await params;
+  return <LandingRoute kind="category" slug={category} />;
 }

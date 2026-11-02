@@ -77,32 +77,6 @@ export async function listNeighborhoods(): Promise<Neighborhood[]> {
   return NeighborhoodSchema.array().parse(rows);
 }
 
-// TODO(U-035): first caller
-export async function getCategoryBySlug(
-  slug: string,
-): Promise<Category | null> {
-  const parsedSlug = SlugSchema.safeParse(slug);
-  if (!parsedSlug.success) return null;
-  const [row] = await dbRead
-    .select()
-    .from(categories)
-    .where(eq(categories.slug, parsedSlug.data));
-  return row ? CategorySchema.parse(row) : null;
-}
-
-// TODO(U-035): first caller
-export async function getNeighborhoodBySlug(
-  slug: string,
-): Promise<Neighborhood | null> {
-  const parsedSlug = SlugSchema.safeParse(slug);
-  if (!parsedSlug.success) return null;
-  const [row] = await dbRead
-    .select()
-    .from(neighborhoods)
-    .where(eq(neighborhoods.slug, parsedSlug.data));
-  return row ? NeighborhoodSchema.parse(row) : null;
-}
-
 // TODO(U-091): first caller
 /**
  * Which entity used to hold this slug. Experience and host slugs repeat across entities, so for

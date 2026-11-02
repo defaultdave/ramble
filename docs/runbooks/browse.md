@@ -28,11 +28,11 @@ A filter change always starts again from the first results: `hrefForFilters` lea
 | `listBrowseExperiences(query, asOf)` | `src/server/db/browse.ts` | none; the data layer |
 | `listBrowseDayRows(filters, asOf)` | same | none; returns the stored `local_date` values plus the start and zone of hand-entered sessions, not days |
 | `getBrowseResults`, `getBrowseDates` | `src/server/browse.ts` | `'use cache'`, profile `browse` (revalidate 60 s, expire 10 min), tagged `catalog` and, for results, each listed experience |
-| `getFilterOptions` | same | profile `catalog` |
+| `getFilterOptions` | same | profile `editorial` (revalidate 1 h). The browse chips, the title, and the slug check in `knownFilters` follow it, so they refresh within an hour; a category or neighborhood added to the database is not a known filter slug on browse until then, and a `?category=<new slug>` address shows the empty state meanwhile |
 
 `getBrowseDates` passes the rows from `listBrowseDayRows` to `browseDays` in `src/lib/pages/browse.ts`, which decides the days: the data layer fetches, the lib decides.
 
-The cache key includes `asOf`, the current time cut to the minute (`minuteAsOf`), so guests inside one minute share an entry. A change that reaches an entry through `tagsForChange` is seen at once; a session added to an experience that is not on a cached page waits out the 60 seconds.
+The cache key includes `asOf`, the current time cut to the minute (`minuteAsOf`), so guests inside one minute share an entry. A change that reaches an entry through `tagsForChanges` is seen at once; a session added to an experience that is not on a cached page waits out the 60 seconds.
 
 Paging is keyset, never `OFFSET`. Results are ordered by name and then id, a page is read as 13 rows and shown as 12 (`browsePageSize`), and `after` is the id of the last row shown. The next page is every row past that name and id. The cursor row is read first and once; its name and id are compared in the page query. If the row behind `after` is hidden or gone, the data layer returns an empty page and no cursor row, after that one query, and `toBrowsePage` in `src/lib/pages/browse.ts` turns that into `cursor_not_found`: the page says so and links back to the first results. That answer is not kept (`cacheLife('uncached')`), so made-up cursors fill no cache.
 

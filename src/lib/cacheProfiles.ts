@@ -18,9 +18,9 @@ export type CacheProfile = {
 // Next.js leaves an entry whose `expire` is under five minutes out of the prerendered shell and
 // streams it instead. That is what the spaces-left read needs, and why it must reserve its space.
 export const cacheProfiles = {
-  /** Home modules, Picks, gift guide, category and neighborhood copy, help articles, legal documents. */
+  /** Home modules, Picks, gift guide, category and neighborhood copy and names, help articles, legal documents. */
   editorial: { stale: 300, revalidate: 3_600, expire: 86_400 },
-  /** The experience and guide shells and the two catalog indexes the listings filter in memory. */
+  /** The experience and guide shells and the cover photos of a page's cards. */
   catalog: { stale: 300, revalidate: 900, expire: 86_400 },
   /** Short-lived schedule reads: browse results for one filter combination, and home's "On this week". */
   browse: { stale: 30, revalidate: 60, expire: 600 },

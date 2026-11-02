@@ -1,7 +1,8 @@
-import { ExternalLink, Star } from 'lucide-react';
+import { ExternalLink as ExternalLinkIcon, Star } from 'lucide-react';
 import Link from 'next/link';
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import { Badge, type BadgeProps } from '@/components/Badge';
+import { ExternalLink } from '@/components/ExternalLink';
 import { classNames } from '@/lib/classNames';
 import { ratingDescription, ratingLabel, type Rating } from '@/lib/rating';
 import styles from './Card.module.css';
@@ -107,18 +108,13 @@ export function Card({
           {kind === 'guide-only' ? (
             <div className={styles.guide}>
               <p className={styles.guideNote}>Not bookable on Ramble yet</p>
-              <a
-                className={styles.hostLink}
-                href={hostHref}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <ExternalLink className={styles.hostIcon} aria-hidden="true" />
-                Visit host site{' '}
-                <span className={styles.visuallyHidden}>
-                  (opens in a new tab)
-                </span>
-              </a>
+              <ExternalLink className={styles.hostLink} href={hostHref}>
+                <ExternalLinkIcon
+                  className={styles.hostIcon}
+                  aria-hidden="true"
+                />
+                Visit host site
+              </ExternalLink>
             </div>
           ) : (
             <>

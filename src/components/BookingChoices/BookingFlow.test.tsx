@@ -22,7 +22,8 @@ import type { ReserveResult } from '@/lib/holds';
 // - ?date= preselects its date, and its lone time
 // - every answer the reserve can give says what happened in the sheet and the panel: sold out with other dates that can be chosen, a block with its time, the limit, a struck session
 // - paused: the bar, the sheet, and the panel say so, from the start and when an answer says so
-// - a reserve that throws says nothing was held, and the guest can try again
+// - a reserve that throws says nothing was held, and the guest can try again; a hold that was placed never says so
+//   and keeps waiting for the page change
 // - gift mode says gifts are not open and cannot continue; with gifts off there is no switch
 // - Continue waits while the hold is placed and cannot be pressed twice
 // - a refusal in the panel or the sheet takes focus to its notice, since Continue may have disabled under it
@@ -437,7 +438,7 @@ describe('where a refusal shows', () => {
   });
 });
 
-describe('leaving the page and failing to leave it', () => {
+describe('leaving the page', () => {
   it('does not carry a pending hold to the next visit when the page is gone before the answer', async () => {
     let finish: (result: ReserveResult) => void = () => undefined;
     mocks.reserve.mockReturnValue(
@@ -460,22 +461,18 @@ describe('leaving the page and failing to leave it', () => {
     ).not.toHaveAttribute('aria-busy', 'true');
   });
 
-  it('says something went wrong, and stops waiting, when the move to checkout fails', async () => {
-    mocks.push.mockImplementation(() => {
-      throw new Error('navigation failed');
-    });
+  it('does not say nothing was held once the hold is placed, and keeps waiting for checkout', async () => {
     render(<Page offer={kayakOffer} />);
     await userEvent.click(screen.getByRole('button', { name: 'Choose date' }));
     await chooseSaturdayEvening();
     await userEvent.click(
       within(sheet()).getByRole('button', { name: 'Continue · $130.00' }),
     );
-    expect(within(sheet()).getByRole('alert')).toHaveTextContent(
-      'nothing was held',
-    );
+    expect(mocks.push).toHaveBeenCalledWith('/checkout/hold-1');
+    expect(within(sheet()).queryByRole('alert')).toBeNull();
     expect(
       within(sheet()).getByRole('button', { name: 'Continue · $130.00' }),
-    ).not.toHaveAttribute('aria-busy', 'true');
+    ).toHaveAttribute('aria-busy', 'true');
   });
 });
 

@@ -31,8 +31,9 @@ export async function getLandingData(
 }
 
 /**
- * Editing the copy reaches this entry through the category or neighborhood tag, and a rename
- * through `tags.taxonomy`, which `getFilterOptions` hands to it. A miss is not kept (the `uncached`
+ * Editing the copy reaches this entry through the category or neighborhood tag. No change kind
+ * reaches `tags.taxonomy`, which `getFilterOptions` hands to it, so a rename shows when the
+ * `editorial` profile runs out. A miss is not kept (the `uncached`
  * profile), so made-up addresses fill nothing, and the names come from the cached lists, so a miss
  * costs no database read.
  */

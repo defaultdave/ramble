@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cacheEntryTagCounts } from '@/lib/pages/cacheTagBudget';
-import { tagsForChange } from '@/lib/cacheTags';
+import { tagsForChanges } from '@/lib/cacheTags';
 import { getLandingData } from './landing';
 
 // Behaviours under test, one per decision, branch or risk:
@@ -57,7 +57,7 @@ describe('getLandingData', () => {
       });
 
       expect(db.copy).toHaveBeenCalledExactlyOnceWith(kind, slug);
-      expect(cache.life.mock.calls.flat()).toEqual(['editorial', 'catalog']);
+      expect(cache.life.mock.calls.flat()).toEqual(['editorial', 'editorial']);
       expect(cache.tag.mock.calls.flat().sort()).toEqual([tag, 'taxonomy']);
       expect(cache.tag.mock.calls.flat()).toHaveLength(
         cacheEntryTagCounts.landing,
@@ -126,7 +126,9 @@ describe('the cache entry', () => {
       );
 
       const carried = cache.tag.mock.calls.flat() as string[];
-      expect(tagsForChange(change).some((t) => carried.includes(t))).toBe(true);
+      expect(tagsForChanges([change]).some((t) => carried.includes(t))).toBe(
+        true,
+      );
       expect(carried).toContain(tag);
     },
   );

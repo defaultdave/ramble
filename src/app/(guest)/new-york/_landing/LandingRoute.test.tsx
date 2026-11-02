@@ -11,6 +11,7 @@ import { LandingRoute, landingMetadata } from './LandingRoute';
 // - a failed read of the page logs only the digest and kind and renders the error state, which retries at the page's own address
 // - the page is handed the editor's heading, the intro above the results and the body below them, and the browse address with the page's own filter; without copy it has the plain heading and neither
 // - the results read browse's first page for the page's filter; a failed read logs only the digest and kind and renders the page's own error wording, which retries at the page's own address
+// - both branches of the results are wrapped in the element that is shown with scripting off
 // - an empty page is worded for a page with no filters
 // - a framework control-flow error is rethrown and not logged, by the page and by its results
 // - the head names the page, with the description only when one is written; an unknown page and a failed read fall back to the plain title, and the failed read logs only its digest and kind
@@ -219,6 +220,25 @@ describe('the landing results', () => {
       screen.getByRole('button', { name: 'Try again' }).closest('form'),
     ).toHaveAttribute('action', '/new-york/neighborhoods/dumbo');
   });
+
+  // With scripting off only a marked wrapper is shown, so a branch without it is a blank page under the intro.
+  it.each([
+    { branch: 'read', fail: false, inside: () => screen.getByRole('heading') },
+    { branch: 'failed', fail: true, inside: () => screen.getByRole('alert') },
+  ])(
+    'marks the $branch branch to be shown with scripting off',
+    async ({ fail, inside }) => {
+      if (fail) server.browse.mockRejectedValue(driverError);
+
+      const { container } = await renderResults(
+        await LandingRoute({ kind: 'category', slug: 'cooking' }),
+      );
+
+      const shown = container.querySelector('[data-reveal-without-script]');
+      expect(shown).toBeInTheDocument();
+      expect(shown).toContainElement(inside());
+    },
+  );
 
   it('words an empty page for a page with no filters', async () => {
     await renderResults(

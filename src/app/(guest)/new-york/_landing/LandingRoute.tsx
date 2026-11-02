@@ -54,9 +54,17 @@ async function LandingResults({ kind, slug }: LandingProps) {
     page = await getBrowseResults(landingQuery(kind, slug), asOf);
   } catch (error) {
     rethrowOrLog('The landing page experiences could not be read', error);
-    return <BrowseResults {...landingErrorView(kind, slug)} />;
+    return (
+      <div data-reveal-without-script>
+        <BrowseResults {...landingErrorView(kind, slug)} />
+      </div>
+    );
   }
-  return <BrowseResults {...landingView(kind, slug, page)} />;
+  return (
+    <div data-reveal-without-script>
+      <BrowseResults {...landingView(kind, slug, page)} />
+    </div>
+  );
 }
 
 export async function LandingRoute({ kind, slug }: LandingProps) {

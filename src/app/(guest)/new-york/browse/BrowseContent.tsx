@@ -48,11 +48,7 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
   } catch (error) {
     rethrowOrLog('Browse could not be read', error);
     return (
-      <div
-        id={browseResultsId}
-        className={styles.streamed}
-        data-reveal-without-script
-      >
+      <div id={browseResultsId} data-reveal-without-script>
         <p role="status" className={styles.announcement} />
         <BrowseResults {...errorView(query)} />
       </div>
@@ -62,11 +58,7 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
   const { options, dates, page } = loaded;
   const view = browseView(query, page, dates);
   return (
-    <div
-      id={browseResultsId}
-      className={styles.streamed}
-      data-reveal-without-script
-    >
+    <div id={browseResultsId} data-reveal-without-script>
       {/* Always rendered, so a screen reader hears the text change when the filters do. */}
       <p role="status" className={styles.announcement}>
         {browseHeading(view)}

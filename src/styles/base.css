@@ -72,8 +72,21 @@ body > main {
  * React sends a streamed section in a hidden element at the end of the body, and a script moves it
  * into place. With scripting off nothing moves it, so a section that marks itself with
  * data-reveal-without-script is shown where it arrived, just above the footer, which moves after it.
+ * It takes no box of its own while it sits in the page, and out in the body it carries the width and
+ * gutters of the page column it would have been in.
  */
+[data-reveal-without-script] {
+  display: contents;
+}
+
 @media (scripting: none) {
+  [data-reveal-without-script] {
+    display: block;
+    inline-size: min(var(--size-content-max), 100% - var(--size-gutter) * 2);
+    margin-inline: auto;
+    padding: 0 var(--size-gutter) var(--space-12);
+  }
+
   body > footer {
     order: 1;
   }

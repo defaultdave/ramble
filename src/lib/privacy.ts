@@ -223,6 +223,15 @@ export const piiColumns: readonly PiiColumn[] = [
     deletionPath:
       'Kept with the row as the audit record of who acted; the ledger is append-only (PRD-74), and a staff member who leaves is handled by the staff-removal step, not a guest deletion',
   },
+  {
+    table: 'audit_log',
+    column: 'actor_id',
+    kind: 'link',
+    data: 'The signed-in user (staff or host) who made a change',
+    location: databaseLocation,
+    deletionPath:
+      'Kept with the row as the audit record of who acted; the log is insert-only (PRD-74) and its nightly export is write-once, so a staff member who leaves is handled by the staff-removal step, not a guest deletion. The table holds no guest id: a guest who acts by token is identified by the subject, and details hold ids, codes, and amounts only',
+  },
 ];
 
 const notPersonal = (
@@ -681,6 +690,19 @@ export const nonPiiColumns: readonly {
     'A staff note about the money. The table cannot be edited, so a note never holds a guest name or contact',
     ['memo'],
   ),
+  ...notPersonal('audit_log', 'A number', ['id']),
+  ...notPersonal('audit_log', aTime, ['recorded_at']),
+  ...notPersonal('audit_log', aFixedList, [
+    'actor_kind',
+    'action',
+    'subject_kind',
+  ]),
+  ...notPersonal('audit_log', structure, ['subject_id']),
+  ...notPersonal(
+    'audit_log',
+    'Ids, codes, and whole numbers only. The write schema and a CHECK refuse a string with a space or an @, so a name, an address, or a sentence cannot enter a row that is never corrected',
+    ['details'],
+  ),
 ];
 
 export type PiiVendor = {
@@ -706,11 +728,12 @@ export const piiVendors: readonly PiiVendor[] = [
   },
   {
     name: 'Cloudflare R2',
-    purpose: 'Hourly database dump for recovery (PRD-75)',
-    data: 'A full copy of the database, including every column in the inventory',
+    purpose:
+      'Hourly database dump for recovery (PRD-75) and the nightly audit-log export (PRD-74)',
+    data: 'A full copy of the database, including every column in the inventory; the audit export holds the acting user id of each audit row',
     location: 'A region other than US East (ADR 0002)',
     deletionPath:
-      'Dumps are deleted when they age out; a deletion request cannot reach into an existing dump, so a restore must re-run every anonymization made since the dump',
+      'Dumps are deleted when they age out; a deletion request cannot reach into an existing dump, so a restore must re-run every anonymization made since the dump. Audit exports sit in a locked bucket and are not deleted before their lock ends',
     stage: 'real_job',
   },
   {
@@ -823,6 +846,12 @@ export const retentionSchedule: readonly RetentionRow[] = [
     startsAt: 'The time the request was resolved',
     period: pendingCounsel,
     note: 'Kept as the record that a request was made and how it ended',
+  },
+  {
+    dataset: 'audit_log',
+    startsAt: "The row's recorded time",
+    period: pendingCounsel,
+    note: 'The table allows no delete, so rows stay in the database; the period is the lock on the nightly export objects, which only the storage lock can end',
   },
   {
     dataset: 'payment_tax_and_dispute_records',

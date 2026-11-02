@@ -53,6 +53,13 @@ export function createVercelBlobAdapter(
 
     async put(input) {
       const { key, body, contentType, visibility } = parsePutInput(input);
+      // Vercel Blob has no object-locked store, so an audit export is refused rather than kept where it could be deleted.
+      if (visibility === 'audit') {
+        throw new StorageError(
+          'provider_unavailable',
+          'This adapter has no locked store for audit objects',
+        );
+      }
       try {
         const result = await put(key, Buffer.from(body), {
           access: visibility,

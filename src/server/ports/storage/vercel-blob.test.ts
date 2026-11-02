@@ -132,6 +132,7 @@ describeStoragePortContract('vercel-blob', () => ({
   advanceSeconds: (seconds) => {
     current += seconds * 1000;
   },
+  storesAudit: false,
 }));
 
 describe('vercel-blob storage adapter', () => {
@@ -222,6 +223,18 @@ describe('vercel-blob storage adapter', () => {
       expect((error as StorageError).message).toBe('provider_unavailable');
     },
   );
+
+  it('sends nothing to the provider for an audit object', async () => {
+    await makeAdapter()
+      .put({
+        key: 'audit/2026-10-31/manifest.ndjson',
+        body: new TextEncoder().encode('{}\n'),
+        contentType: 'application/x-ndjson',
+      })
+      .catch(() => undefined);
+
+    expect(sdk.calls).toEqual([]);
+  });
 
   it('treats a delete of a key the store does not hold as done', async () => {
     const port = makeAdapter();

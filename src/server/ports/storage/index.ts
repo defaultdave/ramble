@@ -84,7 +84,8 @@ type StoredObject = {
 /**
  * Object storage behind one interface (design doc 4.2.1). Keys start with `public/` for photos or
  * `private/` for host documents, and the prefix decides which store holds the object, so a private
- * document can never be written to, or linked from, the public side. Expected refusals reject with a
+ * document can never be written to, or linked from, the public side. `audit/` holds the audit-log
+ * export: written once, never linked or deleted through the port. Expected refusals reject with a
  * `StorageError`; nothing is repaired.
  */
 export type StoragePort = {
@@ -113,6 +114,8 @@ export function parseSignedUrlInput(input: SignedUrlInput) {
 
 export function parseDeleteInput(input: DeleteInput) {
   const result = DeleteInputSchema.safeParse(input);
-  if (!result.success) throw new StorageError('invalid_input');
+  if (!result.success || visibilityOfKey(result.data.key) === 'audit') {
+    throw new StorageError('invalid_input');
+  }
   return result.data;
 }

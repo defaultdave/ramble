@@ -16,6 +16,7 @@ import { readBodyText } from '@/server/boundedBody';
 import { releaseLapsedHolds, scrubReleasedHolds } from '@/server/db/holds';
 import { PURGE_BATCH, purgeExpiredRateLimits } from '@/server/db/rateLimits';
 import { env } from '@/server/env';
+import { scheduleAuditExports } from '@/server/jobs/auditSchedule';
 import { drainJobs } from '@/server/jobs/drain';
 import { sendHeartbeat } from '@/server/monitoring/heartbeat';
 import { fixedClock, systemClock } from '@/server/ports/clock';
@@ -94,6 +95,7 @@ async function runPulse(
   heartbeat: boolean,
 ): Promise<PulseCounts> {
   const startedAt = performance.now();
+  await scheduleAuditExports();
   const report = await drainJobs(asOf ? fixedClock(asOf) : systemClock);
   const purged = await purgeRateLimits(startedAt);
   const { holdsReleased, holdsScrubbed } = await cleanUpHolds(startedAt);

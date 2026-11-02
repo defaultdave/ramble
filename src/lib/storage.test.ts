@@ -16,6 +16,10 @@ describe('visibilityOfKey', () => {
       'public/photos/3f2b8a40-5c1d-4e6f-9a7b-1c2d3e4f5a6b/7d1c9b1e.jpg',
       'public',
     ],
+    ['audit/2026-10-31/part-0001.ndjson', 'audit'],
+    ['audit', null],
+    ['audit/', null],
+    ['audit/../private/a.pdf', null],
     ['photos/a.jpg', null],
     ['publicphotos/a.jpg', null],
     ['public', null],
@@ -36,10 +40,15 @@ describe('content types', () => {
     expect(allowedContentTypes.public).not.toContain('application/pdf');
   });
 
+  it('lets only newline-delimited JSON under audit/', () => {
+    expect(allowedContentTypes.audit).toEqual(['application/x-ndjson']);
+  });
+
   it('never lets a script or markup type anywhere', () => {
     const all: readonly string[] = [
       ...allowedContentTypes.public,
       ...allowedContentTypes.private,
+      ...allowedContentTypes.audit,
     ];
     expect(all.some((type) => /html|javascript|svg|xml/.test(type))).toBe(
       false,

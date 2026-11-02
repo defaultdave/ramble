@@ -729,8 +729,8 @@ export const piiVendors: readonly PiiVendor[] = [
   {
     name: 'Cloudflare R2',
     purpose:
-      'Hourly database dump for recovery (PRD-75) and the nightly audit-log export (PRD-74)',
-    data: 'A full copy of the database, including every column in the inventory; the audit export holds the acting user id of each audit row',
+      'Hourly database dump for recovery (PRD-75). The nightly audit-log export (PRD-74) is meant to live here too, but it is not switched on yet',
+    data: 'A full copy of the database, including every column in the inventory. Once the audit export is switched on, it will hold the acting user id of each audit row',
     location: 'A region other than US East (ADR 0002)',
     deletionPath:
       'Dumps are deleted when they age out; a deletion request cannot reach into an existing dump, so a restore must re-run every anonymization made since the dump. The nightly audit-log export is not switched on yet, so no audit export is stored here today; the audit log itself stays in the database',

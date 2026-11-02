@@ -192,9 +192,15 @@ export function exportDaysDue(
   return days;
 }
 
-/** Whether the audit export may run: only on a store that can hold an audit object, so a day is never reported exported into one that cannot. */
-export function auditExportsOn(capabilities: StorageCapabilities): boolean {
-  return canStoreVisibility('audit', capabilities);
+/**
+ * Whether days are due but the store cannot hold an audit object, so the export is skipped and no
+ * day is reported exported into a store that cannot keep it. No days due is not a skip.
+ */
+export function auditExportSkipped(
+  capabilities: StorageCapabilities,
+  dayCount: number,
+): boolean {
+  return dayCount > 0 && !canStoreVisibility('audit', capabilities);
 }
 
 export function exportDedupeKey(day: ExportDay): string {

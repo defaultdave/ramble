@@ -4,7 +4,7 @@ import {
   ExportDaySchema,
   actorMatchesKind,
   auditLimits,
-  auditExportsOn,
+  auditExportSkipped,
   emptyExportTally,
   exportDayReady,
   exportDaysDue,
@@ -183,13 +183,19 @@ describe('parseAuditEntry', () => {
   });
 });
 
-describe('auditExportsOn', () => {
+describe('auditExportSkipped', () => {
   it.each([
-    [true, true],
-    [false, false],
-  ])('a store with storesAudit %s: %s', (storesAudit, expected) => {
-    expect(auditExportsOn({ storesAudit })).toBe(expected);
-  });
+    [false, 3, true],
+    [false, 1, true],
+    [false, 0, false],
+    [true, 3, false],
+    [true, 0, false],
+  ])(
+    'a store with storesAudit %s and %s days due: skipped is %s',
+    (storesAudit, dayCount, expected) => {
+      expect(auditExportSkipped({ storesAudit }, dayCount)).toBe(expected);
+    },
+  );
 });
 
 describe('ExportDaySchema', () => {

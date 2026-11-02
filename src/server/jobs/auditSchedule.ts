@@ -1,7 +1,7 @@
 import 'server-only';
 import {
   auditExportKind,
-  auditExportsOn,
+  auditExportSkipped,
   exportDaysDue,
   exportDedupeKey,
 } from '@/lib/audit';
@@ -25,7 +25,7 @@ export async function scheduleAuditExports(
   storage: StoragePort = getStorage(() => systemClock.now()),
 ): Promise<number> {
   const days = exportDaysDue(systemClock.now(), await readFirstAuditTime());
-  if (days.length > 0 && !auditExportsOn(storage)) {
+  if (auditExportSkipped(storage, days.length)) {
     logger.warn(
       'audit export is off: no locked store is configured for this provider',
       { provider: storage.provider },

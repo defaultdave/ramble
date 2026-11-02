@@ -10,6 +10,17 @@
   gap: var(--space-3);
 }
 
+/* Seven 44 px days need 308 px, which the sheet's side padding leaves out at 320 px. The calendar borrows that padding until the sheet is wide enough to give it back. */
+.calendar {
+  margin-inline: calc(-1 * var(--space-5));
+}
+
+@media (min-width: 360px) {
+  .calendar {
+    margin-inline: 0;
+  }
+}
+
 .heading {
   margin: 0;
   font-size: var(--font-size-heading-s);

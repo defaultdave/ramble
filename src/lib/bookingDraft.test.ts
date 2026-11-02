@@ -56,6 +56,26 @@ const pickSession = (n: number): BookingAction => ({
 });
 
 describe('initialState', () => {
+  it('says so when the lone time of ?date= has fewer spaces than the default party', () => {
+    const state = start({
+      ...kayakOffer,
+      preselectedDate: '2026-10-25',
+      sessions: kayakOffer.sessions.map((s) =>
+        s.id === sessionAt(5) ? { ...s, spacesLeft: 1 } : s,
+      ),
+    });
+    expect(state).toMatchObject({ sessionId: sessionAt(5), adults: 1 });
+    expect(state.notice?.body).toBe(
+      'That time has 1 space left, so your party is now 1 adult.',
+    );
+  });
+
+  it('says nothing when the default party fits the lone time of ?date=', () => {
+    expect(
+      start({ ...kayakOffer, preselectedDate: '2026-10-25' }).notice,
+    ).toBeNull();
+  });
+
   it('starts with nothing chosen and two adults', () => {
     expect(start()).toMatchObject({
       mode: 'book',

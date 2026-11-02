@@ -13,6 +13,8 @@ import { flag, option, siteDir } from "./units";
 
 const OWNER = "defaultdave";
 const BOARD = 19;
+/** The audit tickets' open-ended sprint. It has no dates, so it is never in the schedule's calendar. */
+const MAINTENANCE = "Maintenance";
 const run = flag("run");
 
 /**
@@ -49,7 +51,7 @@ let fields = listFields();
 const wanted = [
   { name: "Start date", type: "DATE" },
   { name: "Target date", type: "DATE" },
-  { name: "Sprint", type: "SINGLE_SELECT", options: sprints.map(sprintLabel) },
+  { name: "Sprint", type: "SINGLE_SELECT", options: [...sprints.map(sprintLabel), MAINTENANCE] },
 ];
 for (const w of wanted) {
   const have = fields.find((f) => f.name === w.name);
@@ -57,7 +59,10 @@ for (const w of wanted) {
   const stale = have && w.options && (have.options ?? []).map((o) => o.name).join("|") !== w.options.join("|");
   if (have && !stale) continue;
   if (have && stale && !run) console.log(`would rebuild field "${w.name}" with new options`);
-  if (have && stale && run) gh(["project", "field-delete", "--id", have.id]);
+  if (have && stale && run) {
+    gh(["project", "field-delete", "--id", have.id]);
+    console.error(`Sprint rebuilt, which clears ${MAINTENANCE}: rerun bun tools/audit-tickets.ts --run in ramble-pm`);
+  }
   if (!run) {
     console.log(`would create field "${w.name}" (${w.type}${w.options ? `: ${w.options.join(", ")}` : ""})`);
     continue;
@@ -81,7 +86,7 @@ const field = (name: string) => fields.find((f) => f.name === name);
 // Board items carry the unit ID in the "Unit ID" field, which gh's JSON names "unit ID".
 type Item = { id: string; "unit ID"?: string; status?: string };
 const items = (
-  JSON.parse(gh(["project", "item-list", String(BOARD), "--owner", OWNER, "--limit", "500", "--format", "json"])) as {
+  JSON.parse(gh(["project", "item-list", String(BOARD), "--owner", OWNER, "--limit", "2000", "--format", "json"])) as {
     items: Item[];
   }
 ).items;

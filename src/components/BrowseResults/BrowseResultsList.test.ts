@@ -3,13 +3,13 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 // Behaviours under test, one per decision, branch or risk:
-// - the grid is a client component, which is what keeps the cards from being deferred server elements
-//   (its rendering is covered through BrowseResults)
+// - the list is a client component, which is what keeps the cards and Show more from being deferred
+//   server elements (its rendering is covered through BrowseResults)
 
-describe('BrowseCardGrid', () => {
+describe('BrowseResultsList', () => {
   it('opens with the client directive', () => {
     const source = readFileSync(
-      path.join(import.meta.dirname, 'BrowseCardGrid.tsx'),
+      path.join(import.meta.dirname, 'BrowseResultsList.tsx'),
       'utf8',
     );
 

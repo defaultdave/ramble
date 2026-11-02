@@ -1,14 +1,10 @@
 import { occurrencesBetween, splitUpcoming } from '@/lib/sessions';
+import { isoDateOf, msPerDay } from '@/lib/time';
+import { venueTimeZone } from '@/lib/venue';
 import type { ExperienceFixture, HostFixture, SlotFixture } from './types';
-
-export const defaultTimeZone = 'America/New_York';
 
 /** ADR 0008: sessions are generated eight weeks ahead. */
 export const sessionWeeksAhead = 8;
-
-const dayMs = 86_400_000;
-
-const isoDate = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 /**
  * The dates sessions are generated for. It starts a day before `now` so a host's evening on the
@@ -19,10 +15,10 @@ export function seedSessionRange(now: Date): {
   fromDate: string;
   toDate: string;
 } {
-  const from = now.getTime() - dayMs;
+  const from = now.getTime() - msPerDay;
   return {
-    fromDate: isoDate(from),
-    toDate: isoDate(from + sessionWeeksAhead * 7 * dayMs),
+    fromDate: isoDateOf(new Date(from)),
+    toDate: isoDateOf(new Date(from + sessionWeeksAhead * 7 * msPerDay)),
   };
 }
 
@@ -118,11 +114,11 @@ export function planSessions(
   now: Date,
 ): PlannedSession[] {
   const zones = new Map(
-    hosts.map((host) => [host.slug, host.timeZone ?? defaultTimeZone]),
+    hosts.map((host) => [host.slug, host.timeZone ?? venueTimeZone]),
   );
   const range = seedSessionRange(now);
   return experiences.flatMap((experience) => {
-    const zone = zones.get(experience.hostSlug) ?? defaultTimeZone;
+    const zone = zones.get(experience.hostSlug) ?? venueTimeZone;
     return experience.slots.flatMap((slot) =>
       planSlot(experience.slug, slot, zone, range, now),
     );

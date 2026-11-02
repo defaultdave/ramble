@@ -1,0 +1,2 @@
+ALTER TABLE "cancellation_tiers" DROP CONSTRAINT "cancellation_tiers_hours_not_negative";--> statement-breakpoint
+ALTER TABLE "cancellation_tiers" ADD CONSTRAINT "cancellation_tiers_hours_in_range" CHECK ("cancellation_tiers"."full_refund_hours_before" BETWEEN 0 AND 8760);

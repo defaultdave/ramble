@@ -51,6 +51,8 @@ function createGateway(webhookSecret: string): FakeGateway {
       write((adapter) => adapter.confirm(paymentId, input)),
     retrieve: (query) => read((adapter) => adapter.retrieve(query)),
     getBalance: () => read((adapter) => adapter.getBalance()),
+    lastEventFor: (paymentId) =>
+      read((adapter) => adapter.lastEventFor(paymentId)),
     verifyWebhook: (delivery) => signer.verifyWebhook(delivery),
     signWebhook: (event, signedAt) => signer.signWebhook(event, signedAt),
     signBody: (rawBody, signedAt) => signer.signBody(rawBody, signedAt),

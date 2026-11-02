@@ -38,7 +38,7 @@ const db = vi.hoisted(() => ({
 vi.mock('@/server/db/editorial', () => ({
   listHomeModules: db.modules,
   listHomePicks: db.picks,
-  getPublishedGiftGuide: db.giftGuide,
+  getHomeGiftGuide: db.giftGuide,
 }));
 vi.mock('@/server/db/catalog', () => ({
   listCategories: db.categories,

@@ -1,8 +1,8 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, getTableColumns, inArray, sql } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
-import { EntityIdSchema, guestVisibleStatuses } from '@/lib/catalog';
+import { EntityIdSchema } from '@/lib/catalog';
 import { CoverLookupSchema, photoView, type PhotoView } from '@/lib/photoViews';
 import {
   GuestPhotoSchema,
@@ -44,17 +44,16 @@ export class PhotoLimitError extends Error {
   }
 }
 
-const photoColumns = {
-  id: photos.id,
-  experienceId: photos.experienceId,
-  position: photos.position,
-  url: photos.url,
-  width: photos.width,
-  height: photos.height,
-  decorative: photos.decorative,
-  altText: photos.altText,
-  blurDataUrl: photos.blurDataUrl,
-};
+// The guest columns are exactly the keys of the guest schema, so a column added to the table stays
+// out of every guest read until the schema names it.
+const guestPhotoKeys = Object.keys(GuestPhotoSchema.shape) as Array<
+  keyof GuestPhoto
+>;
+
+const tableColumns = getTableColumns(photos);
+const photoColumns = Object.fromEntries(
+  guestPhotoKeys.map((key) => [key, tableColumns[key]]),
+) as Pick<typeof tableColumns, keyof GuestPhoto>;
 
 // The guest cover rule, written once: of an experience's photos, the one with the lowest position.
 const coverOrder = asc(photos.position);
@@ -64,20 +63,12 @@ const coverOrder = asc(photos.position);
  * names its columns so the storage key and the rights record never reach a cached page.
  */
 export const coverWith = {
-  columns: {
-    id: true,
-    experienceId: true,
-    position: true,
-    url: true,
-    width: true,
-    height: true,
-    decorative: true,
-    altText: true,
-    blurDataUrl: true,
-  },
+  columns: Object.fromEntries(
+    guestPhotoKeys.map((key) => [key, true]),
+  ) as Record<keyof GuestPhoto, true>,
   orderBy: coverOrder,
   limit: 1,
-} as const;
+};
 
 /**
  * The cover of the experience whose ID column is given, to join laterally: one row, or none for an
@@ -97,17 +88,9 @@ type CoverJoin = ReturnType<typeof guestCoverOf>;
 
 /** The columns of a joined cover, to select from the read that joins it. */
 export function coverSelection(cover: CoverJoin) {
-  return {
-    id: cover.id,
-    experienceId: cover.experienceId,
-    position: cover.position,
-    url: cover.url,
-    width: cover.width,
-    height: cover.height,
-    decorative: cover.decorative,
-    altText: cover.altText,
-    blurDataUrl: cover.blurDataUrl,
-  };
+  return Object.fromEntries(
+    guestPhotoKeys.map((key) => [key, cover[key]]),
+  ) as Pick<CoverJoin, keyof GuestPhoto>;
 }
 
 /** What a card draws from a left-joined cover: null when the experience has no photo. */
@@ -282,12 +265,7 @@ export async function listGuestPhotos(
     .select(photoColumns)
     .from(photos)
     .innerJoin(experiences, eq(experiences.id, photos.experienceId))
-    .where(
-      and(
-        eq(photos.experienceId, parsedId.data),
-        inArray(experiences.status, [...guestVisibleStatuses]),
-      ),
-    )
+    .where(and(eq(photos.experienceId, parsedId.data), guestVisible))
     .orderBy(asc(photos.position))
     .limit(photoLimits.maxPerExperience);
   return GuestPhotoSchema.array().parse(rows);

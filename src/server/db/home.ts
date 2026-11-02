@@ -10,12 +10,10 @@ import {
   homeLimits,
   type ThisWeekSession,
 } from '@/lib/pages/home';
-import { GuestPhotoSchema } from '@/lib/photos';
-import { photoView } from '@/lib/photoViews';
 import type { SessionWindow } from '@/lib/sessionWindow';
 import { guestVisible } from './catalog';
 import { dbRead } from './client';
-import { coverWith } from './photos';
+import { coverImage, coverWith } from './photos';
 import { experiences, sessions } from './schema';
 
 /**
@@ -56,9 +54,7 @@ export async function listHomeExperiences(
       return {
         ...row,
         neighborhoodName: neighborhood.name,
-        ...(covers
-          ? { image: cover ? photoView(GuestPhotoSchema.parse(cover)) : null }
-          : {}),
+        ...(covers ? { image: coverImage(cover ?? null) } : {}),
       };
     }),
   );

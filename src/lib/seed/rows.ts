@@ -4,9 +4,9 @@ import type {
   HomeModulesInput,
   PageCopyInput,
 } from '@/lib/editorial';
+import { venueTimeZone } from '@/lib/venue';
 import { collectionTarget, lookup, SeedStepError } from './decide';
 import { seedId } from './ids';
-import { defaultTimeZone } from './plan';
 import type {
   CollectionFixture,
   ExperienceFixture,
@@ -56,7 +56,7 @@ export function hostRow(host: HostFixture) {
     slug: host.slug,
     name: host.name,
     description: host.description,
-    timeZone: host.timeZone ?? defaultTimeZone,
+    timeZone: host.timeZone ?? venueTimeZone,
     notificationEmail: hostNotificationEmail(host.slug),
   };
 }

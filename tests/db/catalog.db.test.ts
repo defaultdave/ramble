@@ -27,7 +27,7 @@ import {
 // - the migration inserts three cancellation tiers and exactly one is the default
 // - a guest lookup carries the ids a cache tag needs, children in one result, and no host-only field
 // - a guest lookup hides the three hidden statuses, and a malformed or unknown ID is null
-// - categories and neighborhoods list by name and look up by slug; a malformed slug is null
+// - categories and neighborhoods list by name
 // - a renamed slug resolves to its entity, an unknown or malformed one is null, and a slug
 //   that is live again is no longer retired
 // - an owner lists their own experiences in every status and not another host's

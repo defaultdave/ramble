@@ -1,6 +1,6 @@
 // The one place that names a cache tag. A cached function tags its output with these builders
 // (`cacheTag(tags.experience(id))`), and every publish or booking change finds the tags to
-// invalidate through `tagsForChange()`, so a page can only go stale if this file is wrong.
+// invalidate through `tagsForChanges()`, so a page can only go stale if this file is wrong.
 //
 // A listing that features an experience (a Picks page, the gift guide, a home module) tags itself
 // with that experience's tag for each entry it shows, so an experience change reaches it without
@@ -10,7 +10,11 @@ export const tags = {
   home: 'home',
   /** The reads that depend on which experiences are listed: browse results and dates, and `On this week`. The home entry names its cards instead. */
   catalog: 'catalog',
-  /** The names of the categories and neighborhoods, which the filter chips, the home rails, and an experience's place line show. */
+  /**
+   * The names of the categories and neighborhoods, which the filter chips, the home rails, and an
+   * experience's place line show. No change kind reaches it, because no unit renames a category or
+   * neighborhood, so a new name shows when the entry's cache profile runs out.
+   */
   taxonomy: 'taxonomy',
   settings: 'settings',
   giftGuide: 'gift-guide',
@@ -37,8 +41,6 @@ export type CacheChange =
   | { kind: 'schedule'; experienceId: string }
   /** A hold, booking, or release changed the spaces left in one session. */
   | { kind: 'spaces'; sessionId: string }
-  /** A category or neighborhood is renamed, added, or removed. Nothing publishes this yet. */
-  | { kind: 'taxonomy' }
   | { kind: 'homeModules' }
   | { kind: 'pick'; slug: string }
   | { kind: 'giftGuide' }
@@ -62,8 +64,6 @@ function tagsFor(change: CacheChange): string[] {
       return [tags.experience(change.experienceId)];
     case 'spaces':
       return [tags.session(change.sessionId)];
-    case 'taxonomy':
-      return [tags.taxonomy, tags.catalog];
     case 'homeModules':
       return [tags.home];
     case 'pick':
@@ -81,11 +81,6 @@ function tagsFor(change: CacheChange): string[] {
     case 'settings':
       return [tags.settings];
   }
-}
-
-/** The tags a change invalidates, without repeats and in a stable order. */
-export function tagsForChange(change: CacheChange): string[] {
-  return [...new Set(tagsFor(change))].sort();
 }
 
 /** The tags a set of changes invalidates together, without repeats and in a stable order. */

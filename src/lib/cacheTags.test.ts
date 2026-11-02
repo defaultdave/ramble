@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  type CacheChange,
-  tagsForChange,
-  tagsForChanges,
-  tags,
-} from './cacheTags';
+import { type CacheChange, tagsForChanges, tags } from './cacheTags';
 
 describe('tags', () => {
   it.each([
@@ -25,7 +20,7 @@ describe('tags', () => {
   });
 });
 
-describe('tagsForChange', () => {
+describe('tagsForChanges for one change', () => {
   const listing: CacheChange = {
     kind: 'listing',
     id: 'e1',
@@ -45,11 +40,6 @@ describe('tagsForChange', () => {
         'guide-entry:e1',
         'neighborhood:red-hook',
       ],
-    ],
-    [
-      'a rename of a category or neighborhood reaches the names and the catalog',
-      { kind: 'taxonomy' },
-      ['catalog', 'taxonomy'],
     ],
     [
       'a schedule change reaches the experience page only',
@@ -90,20 +80,22 @@ describe('tagsForChange', () => {
     ],
     ['settings', { kind: 'settings' }, ['settings']],
   ])('%s', (_name, change, expected) => {
-    expect(tagsForChange(change)).toEqual(expected);
+    expect(tagsForChanges([change])).toEqual(expected);
   });
 
   it('lists a tag once when a category slug repeats', () => {
-    const result = tagsForChange({
-      ...listing,
-      categorySlugs: ['kayaking', 'kayaking'],
-    });
+    const result = tagsForChanges([
+      {
+        ...listing,
+        categorySlugs: ['kayaking', 'kayaking'],
+      },
+    ]);
 
     expect(result.filter((tag) => tag === 'category:kayaking')).toHaveLength(1);
   });
 
   it('lists a listing with no categories without a category tag', () => {
-    const result = tagsForChange({ ...listing, categorySlugs: [] });
+    const result = tagsForChanges([{ ...listing, categorySlugs: [] }]);
 
     expect(result.some((tag) => tag.startsWith('category:'))).toBe(false);
   });

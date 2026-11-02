@@ -16,6 +16,7 @@ export type StorageContractHarness = {
 
 const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
 const pdf = new TextEncoder().encode('%PDF-1.7 fake');
+const ndjson = new TextEncoder().encode('{"id":1}\n');
 
 let counter = 0;
 function newId() {
@@ -222,6 +223,67 @@ export function describeStoragePortContract(
         await rejectsWith(
           port.delete({ key: '../etc/passwd' }),
           'invalid_input',
+        );
+      });
+    });
+
+    describe('audit/ keys', () => {
+      const auditKey = () => `audit/2026-10-31/part-${newId()}.ndjson`;
+
+      it.each([
+        ['a pdf', 'application/pdf'],
+        ['plain json', 'application/json'],
+        ['an image', 'image/png'],
+      ])('refuses %s', async (_label, contentType) => {
+        await rejectsWith(
+          port.put({ key: auditKey(), body: ndjson, contentType }),
+          'invalid_input',
+        );
+      });
+
+      it('has no signed link, because it is not under private/', async () => {
+        await rejectsWith(
+          port.getSignedUrl({ key: auditKey() }),
+          'invalid_input',
+        );
+      });
+
+      it('cannot be deleted through the port', async () => {
+        await rejectsWith(port.delete({ key: auditKey() }), 'invalid_input');
+      });
+
+      it('stores an object once, returns no address, and keeps it when a delete is tried', async () => {
+        if (!port.storesAudit) {
+          const error = await port
+            .put({
+              key: auditKey(),
+              body: ndjson,
+              contentType: 'application/x-ndjson',
+            })
+            .then(
+              () => null,
+              (reason: unknown) => reason,
+            );
+          expect(error).toMatchObject({ code: 'unsupported', permanent: true });
+          return;
+        }
+        const key = auditKey();
+
+        const stored = await port.put({
+          key,
+          body: ndjson,
+          contentType: 'application/x-ndjson',
+        });
+        await rejectsWith(port.delete({ key }), 'invalid_input');
+
+        expect(stored).toMatchObject({ key, visibility: 'audit', url: null });
+        await rejectsWith(
+          port.put({
+            key,
+            body: ndjson,
+            contentType: 'application/x-ndjson',
+          }),
+          'already_exists',
         );
       });
     });

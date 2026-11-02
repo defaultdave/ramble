@@ -223,6 +223,24 @@ describe('vercel-blob storage adapter', () => {
     },
   );
 
+  it('refuses an audit object as unsupported and makes no SDK call', async () => {
+    const error = await makeAdapter()
+      .put({
+        key: 'audit/2026-10-31/manifest.ndjson',
+        body: new TextEncoder().encode('{}\n'),
+        contentType: 'application/x-ndjson',
+      })
+      .catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(StorageError);
+    expect(error).toMatchObject({ code: 'unsupported', permanent: true });
+    expect(sdk.calls).toEqual([]);
+  });
+
+  it('declares that it has no locked store', () => {
+    expect(makeAdapter().storesAudit).toBe(false);
+  });
+
   it('treats a delete of a key the store does not hold as done', async () => {
     const port = makeAdapter();
     sdk.failNext = new BlobNotFoundError();

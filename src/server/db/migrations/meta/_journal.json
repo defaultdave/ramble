@@ -141,6 +141,20 @@
       "when": 1793400063468,
       "tag": "0019_fake_gateway_state",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793579730493,
+      "tag": "0020_audit_log",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793579731109,
+      "tag": "0021_audit_log_guards",
+      "breakpoints": true
     }
   ]
 }

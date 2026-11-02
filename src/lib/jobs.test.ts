@@ -261,6 +261,22 @@ describe('failureOutcome', () => {
     expect(failureOutcome({ ...base, attempts: 3 }).status).toBe('dead');
   });
 
+  it.each([
+    [
+      'an error marked permanent',
+      Object.assign(new Error('x'), { permanent: true }),
+      'dead',
+    ],
+    [
+      'an error marked not permanent',
+      Object.assign(new Error('x'), { permanent: false }),
+      'pending',
+    ],
+    ['a value that is not an error', { permanent: true }, 'pending'],
+  ])('on the first attempt, %s is %s', (_name, error, status) => {
+    expect(failureOutcome({ ...base, attempts: 1, error }).status).toBe(status);
+  });
+
   it('describes a thrown non-error without its value', () => {
     expect(describeJobError('secret-looking string')).toBe(
       'NonError: thrown value',

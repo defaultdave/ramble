@@ -45,14 +45,20 @@ function toStorageError(error: unknown): StorageError {
 export function createVercelBlobAdapter(
   options: VercelBlobOptions,
 ): StoragePort {
+  // No object-locked store here, so the shared parse refuses an audit export before any SDK call.
+  const capabilities = { storesAudit: false } as const;
   const tokenFor = (visibility: 'public' | 'private') =>
     visibility === 'public' ? options.publicToken : options.privateToken;
 
   return {
     provider: 'vercel-blob',
+    ...capabilities,
 
     async put(input) {
-      const { key, body, contentType, visibility } = parsePutInput(input);
+      const { key, body, contentType, visibility } = parsePutInput(
+        input,
+        capabilities,
+      );
       try {
         const result = await put(key, Buffer.from(body), {
           access: visibility,

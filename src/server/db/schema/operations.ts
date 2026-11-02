@@ -1,8 +1,10 @@
 import { sql } from 'drizzle-orm';
 import {
+  bigint,
   check,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -10,10 +12,13 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { auditActorKinds, auditLimits, auditPatterns } from '@/lib/audit';
 import { privacyRequestKinds, privacyRequestStatuses } from '@/lib/guests';
 import { rateLimitKeyPattern } from '@/lib/rateLimits';
 import { guests } from './people';
-import { isReadableDate } from './shared';
+import { isReadableDate, maxChars } from './shared';
+
+// No `import 'server-only'` here: drizzle-kit loads the schema outside Next.js, where that import throws.
 
 /**
  * One fixed window per key. A row past `expires_at` is dead: the next try starts a new window, and
@@ -85,5 +90,70 @@ export const privacyRequests = pgTable(
       .on(table.guestId, table.kind)
       .where(sql`${table.status} = 'open'`),
     index('privacy_requests_guest_idx').on(table.guestId),
+  ],
+);
+
+export const auditActorKindEnum = pgEnum('audit_actor_kind', auditActorKinds);
+
+const nameShape = `^[a-z][a-z0-9_]{0,${String(auditLimits.detailsKeyMaxChars - 1)}}$`;
+// jsonpath filters over `details`: each one matches a name, nested value, non-integer, or string that breaks the lib's rule.
+// Strict mode, so an array value is judged as an array and not unwrapped into its elements.
+const detailsBreakingRules = [
+  `strict $.keyvalue() ? (!(@.key like_regex "${nameShape}"))`,
+  `strict $.* ? (@.type() == "array" || @.type() == "object")`,
+  `strict $.* ? (@.type() == "number" && (@ != @.floor() || @ > 9007199254740991 || @ < -9007199254740991))`,
+  `strict $.* ? (@.type() == "string" && !(@ like_regex "${auditPatterns.detailValue}"))`,
+];
+
+/**
+ * Who did what to which record, and when (PRD-74). A row is written in the same transaction as the
+ * change it records and is never changed or removed: the `audit_log_guards` migration adds the
+ * trigger and the restricted role. `details` holds ids, codes, and amounts and no free text. Each
+ * CHECK repeats a rule in src/lib/audit.ts. A `user` actor names the signed-in user; a guest who
+ * acts by capability token is identified by the subject, so no guest id lives in this table.
+ */
+export const auditLog = pgTable(
+  'audit_log',
+  {
+    id: bigint({ mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+    recordedAt: timestamp({ withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+    actorKind: auditActorKindEnum().notNull(),
+    // TODO(U-004a): foreign key to the users table once an auth unit builds it.
+    actorId: uuid(),
+    action: text().notNull(),
+    subjectKind: text().notNull(),
+    subjectId: uuid().notNull(),
+    details: jsonb()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+  },
+  (table) => [
+    check(
+      'audit_log_actor_matches_kind',
+      sql`(${table.actorKind} = 'user') = (${table.actorId} IS NOT NULL)`,
+    ),
+    check(
+      'audit_log_action_shape',
+      sql`${table.action} ~ ${sql.raw(`'${auditPatterns.action}'`)} AND ${maxChars(table.action, auditLimits.actionMaxChars)}`,
+    ),
+    check(
+      'audit_log_subject_kind_shape',
+      sql`${table.subjectKind} ~ ${sql.raw(`'${auditPatterns.word}'`)} AND ${maxChars(table.subjectKind, auditLimits.subjectKindMaxChars)}`,
+    ),
+    check(
+      'audit_log_details_shape',
+      sql`jsonb_typeof(${table.details}) = 'object' AND octet_length(${table.details}::text) <= ${sql.raw(String(auditLimits.detailsStoredMaxBytes))} AND jsonb_array_length(jsonb_path_query_array(${table.details}, 'strict $.*')) <= ${sql.raw(String(auditLimits.detailsMaxKeys))} AND ${sql.join(
+        detailsBreakingRules.map(
+          (rule) =>
+            sql`NOT jsonb_path_exists(${table.details}, ${sql.raw(`'${rule}'`)})`,
+        ),
+        sql` AND `,
+      )}`,
+    ),
+    check('audit_log_recorded_at_in_range', isReadableDate(table.recordedAt)),
+    index('audit_log_recorded_at_idx').on(table.recordedAt),
+    index('audit_log_subject_idx').on(table.subjectKind, table.subjectId),
   ],
 );

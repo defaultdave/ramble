@@ -19,6 +19,12 @@ describe('getStorage', () => {
     expect(getStorage(now).provider).toBe('fake');
   });
 
+  it('declares no locked store on the fake, so an audit export cannot report success into memory', async () => {
+    const { getStorage } = await loadConfig();
+
+    expect(getStorage(now).storesAudit).toBe(false);
+  });
+
   it('gives every fake adapter the same objects', async () => {
     const { getStorage } = await loadConfig();
     const key = 'private/documents/shared.pdf';

@@ -47,7 +47,9 @@ async function verify(
  * and answered 2xx, however often the provider repeats it. The signature is the capability, so
  * the route takes no `Caller`. Only the kind of a refusal is logged, never the body.
  */
-async function takePaymentWebhook(request: Request): Promise<IntakeOutcome> {
+export async function takePaymentWebhook(
+  request: Request,
+): Promise<IntakeOutcome> {
   if (
     declaredLengthExceeds(
       request.headers.get('content-length'),

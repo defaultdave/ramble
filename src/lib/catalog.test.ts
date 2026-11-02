@@ -250,6 +250,18 @@ describe('identifiers', () => {
       CancellationTierSchema.parse({ ...tier, fullRefundHoursBefore: -1 }),
     ).toThrow();
   });
+
+  it.each([
+    [8760, true],
+    [8761, false],
+  ])('notice of %i hours parses: %s', (hours, ok) => {
+    expect(
+      CancellationTierSchema.safeParse({
+        ...tier,
+        fullRefundHoursBefore: hours,
+      }).success,
+    ).toBe(ok);
+  });
 });
 
 describe('isSlug', () => {

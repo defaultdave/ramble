@@ -13,7 +13,11 @@
 }
 
 @media (min-width: 768px) {
-  .root {
+  .root > form {
+    align-self: flex-start;
+  }
+
+  .fit {
     align-items: flex-start;
   }
 }

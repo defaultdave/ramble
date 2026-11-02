@@ -72,6 +72,7 @@ export function BrowseResults(props: BrowseResultsProps) {
     case 'error':
       return (
         <RetryAlert
+          fit
           alertTitle="We couldn't load experiences"
           alertBody={
             props.wording === 'landing'

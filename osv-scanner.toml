@@ -1,19 +1,19 @@
 # Each entry stops being ignored on its ignoreUntil date, so the advisory comes back for a decision.
-# Overrides do not help: deepmerge has no fixed release, and the fixed glob (14) and minimatch (11)
-# are major bumps whose callers (msw's bundled glob, the lint tooling's minimatch 3 and 10) were written for
-# the old APIs.
+# An override is no fix here: deepmerge has no fixed release, and the fixed glob (14.0.2) and
+# minimatch (11.0.1) are major bumps that the parents below do not accept.
+# Chains are from `pnpm why`; rerun it before renewing an entry.
 
 [[IgnoredVulns]]
 id = "GHSA-gcqx-w48m-w2h4"
 ignoreUntil = 2027-02-01
-reason = "deepmerge 4.3.1 has no fixed release. Reached only through msw's bundled copy, which is a dev dependency used by tests."
+reason = "deepmerge 4.3.1 has no fixed release. It is reached only through style-dictionary (dev dependency, via @bundled-es-modules/deepmerge), which merges our own token files at build time. Before the date: check for a deepmerge release or a style-dictionary that drops it."
 
 [[IgnoredVulns]]
 id = "GHSA-3g3m-2fjr-6pw4"
 ignoreUntil = 2027-02-01
-reason = "glob 13.0.6 is msw's bundled copy, a dev dependency that never receives untrusted patterns. The fix is a major bump (14.0.2)."
+reason = "glob 13.0.6 is a production dependency of @sentry/nextjs (via @sentry/bundler-plugins) and of react-email, and a dev dependency of storybook and style-dictionary. The Sentry plugin globs our own build output at build time with patterns we set; whether react-email calls glob at runtime in our deployed code is not confirmed. Before the date: confirm that, and look for a glob 14 range in @sentry/nextjs, react-email or a pnpm override that installs cleanly."
 
 [[IgnoredVulns]]
 id = "GHSA-g3hv-75wg-m249"
 ignoreUntil = 2027-02-01
-reason = "minimatch 3.1.5 and 10.2.6 are dev-time tooling dependencies (eslint and its plugins, test runners), matching our own file globs only. The fix is a major bump (11.0.1) that eslint's pinned range does not accept."
+reason = "minimatch 10.2.6 is under that same glob 13.0.6 (so under @sentry/nextjs and react-email in production) and under eslint and typescript-eslint (dev); minimatch 3.1.5 is lint tooling only. Both match our own patterns against our own files. Same runtime question about react-email as for glob. Before the date: recheck with pnpm why and take the minimatch 11 fix where the parents allow it."

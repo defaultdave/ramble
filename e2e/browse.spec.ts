@@ -139,3 +139,55 @@ test.describe('when the read fails', () => {
     expect(overflow).toBeLessThanOrEqual(0);
   });
 });
+
+test.describe('with JavaScript off', () => {
+  test.use({ javaScriptEnabled: false });
+
+  // The server sends the page in two parts and a script swaps the second into the first. Without
+  // the script the second part stays in a hidden element after the footer.
+  test('the streamed part shows in place of the skeleton, above the footer', async ({
+    page,
+  }) => {
+    await page.goto(browse);
+
+    const alert = errorAlert(page);
+    await expect(alert).toBeVisible();
+    await expect(page.getByText('Loading experiences')).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+
+    const alertBox = await alert.boundingBox();
+    const footerBox = await page.getByRole('contentinfo').boundingBox();
+    expect(alertBox).not.toBeNull();
+    expect(footerBox).not.toBeNull();
+    expect(
+      (alertBox?.y ?? Infinity) + (alertBox?.height ?? 0),
+    ).toBeLessThanOrEqual(footerBox?.y ?? 0);
+  });
+
+  test('Skip to results goes to the streamed part, which holds the page below the intro', async ({
+    page,
+  }) => {
+    await page.goto(browse);
+
+    const skip = page.getByRole('link', { name: 'Skip to results' });
+    await skip.focus();
+    await expect(skip).toBeInViewport();
+    await page.keyboard.press('Enter');
+
+    await expect(page).toHaveURL(/#browse-results$/);
+    await expect(page.locator('#browse-results')).toContainText(
+      "We couldn't load experiences",
+    );
+  });
+
+  test('Try again is a form that goes to the same address', async ({
+    page,
+  }) => {
+    await page.goto(`${browse}?category=cooking&date=2026-11-07`);
+
+    await page.getByRole('button', { name: 'Try again' }).click();
+
+    await expect(page).toHaveURL(`${browse}?category=cooking&date=2026-11-07`);
+    await expect(errorAlert(page)).toBeVisible();
+  });
+});

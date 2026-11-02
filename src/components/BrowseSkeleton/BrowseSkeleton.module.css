@@ -23,3 +23,10 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* With scripting off the skeleton is never replaced, so it must not stand where the results are shown. */
+@media (scripting: none) {
+  .skeleton {
+    display: none;
+  }
+}

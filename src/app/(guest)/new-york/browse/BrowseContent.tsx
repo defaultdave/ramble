@@ -3,6 +3,7 @@ import { BrowseResults } from '@/components/BrowseResults';
 import { FilterBar } from '@/components/FilterBar';
 import {
   browseHeading,
+  browseResultsId,
   browseView,
   emptyBrowsePage,
   errorView,
@@ -47,17 +48,17 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
   } catch (error) {
     rethrowOrLog('Browse could not be read', error);
     return (
-      <>
+      <div id={browseResultsId} data-reveal-without-script>
         <p role="status" className={styles.announcement} />
         <BrowseResults {...errorView(query)} />
-      </>
+      </div>
     );
   }
 
   const { options, dates, page } = loaded;
   const view = browseView(query, page, dates);
   return (
-    <>
+    <div id={browseResultsId} data-reveal-without-script>
       {/* Always rendered, so a screen reader hears the text change when the filters do. */}
       <p role="status" className={styles.announcement}>
         {browseHeading(view)}
@@ -79,6 +80,6 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
         />
         <BrowseResults {...view} />
       </div>
-    </>
+    </div>
   );
 }

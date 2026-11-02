@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { BrowseSkeleton } from '@/components/BrowseSkeleton';
 import { isIndexable, parseFilters } from '@/lib/filters';
+import { browseResultsId } from '@/lib/pages/browse';
 import { getBrowseTitle } from '@/server/browse';
 import { BrowseContent } from './BrowseContent';
 import styles from './page.module.css';
@@ -28,6 +29,12 @@ export default function BrowsePage({
           Narrow them down by day, neighborhood, or kind.
         </p>
       </header>
+      {/* With scripting off the results sit after the footer in the document, so this is the way to them. */}
+      <noscript>
+        <a className={styles.skipToResults} href={`#${browseResultsId}`}>
+          Skip to results
+        </a>
+      </noscript>
       <Suspense fallback={<BrowseSkeleton />}>
         <BrowseContent searchParams={searchParams} />
       </Suspense>

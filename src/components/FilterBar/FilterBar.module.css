@@ -206,3 +206,26 @@
     }
   }
 }
+
+/* With scripting off the row's buttons and the date disclosure cannot open anything; the filters below stand in for them. */
+@media (scripting: none) {
+  .row > button,
+  .row > details {
+    display: none;
+  }
+}
+
+.noScript {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-block-start: var(--space-4);
+}
+
+.dayForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin-block-end: var(--space-6);
+}

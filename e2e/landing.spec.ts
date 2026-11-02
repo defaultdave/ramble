@@ -42,6 +42,26 @@ for (const { name, notASlug, wellFormed } of landingPaths) {
       expect(errors).toEqual([]);
     });
 
+    test.describe('with JavaScript off', () => {
+      test.use({ javaScriptEnabled: false });
+
+      test('keeps its heading and says what happened', async ({ page }) => {
+        await page.goto(wellFormed);
+
+        await expect(
+          page.getByRole('heading', {
+            level: 1,
+            name: 'Things to do in New York',
+          }),
+        ).toBeVisible();
+        await expect(
+          page
+            .getByRole('alert')
+            .filter({ hasText: "We couldn't load this page" }),
+        ).toBeVisible();
+      });
+    });
+
     test('Try again comes back to the same address', async ({ page }) => {
       await page.goto(wellFormed);
 

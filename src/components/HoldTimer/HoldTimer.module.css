@@ -37,12 +37,5 @@
 
 /* Spoken, not shown: the timer itself stays silent so a screen reader is not read every second. */
 .announcement {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+  composes: visuallyHidden from '../../styles/visually-hidden.module.css';
 }

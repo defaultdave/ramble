@@ -1,34 +1,10 @@
-import Form from 'next/form';
 import { Alert } from '@/components/Alert';
-import { Button, ButtonLink } from '@/components/Button';
-import { ExperienceCardItem } from '@/components/ExperienceCard';
-import type { BrowseView, FormTarget } from '@/lib/pages/browse';
+import { ButtonLink } from '@/components/Button';
+import type { BrowseView } from '@/lib/pages/browse';
 import { browsePath } from '@/lib/routes';
 import styles from './BrowseResults.module.css';
-
-type TargetButtonProps = {
-  target: FormTarget;
-  label: string;
-  variant: 'primary' | 'secondary';
-};
-
-function TargetButton({ target, label, variant }: TargetButtonProps) {
-  return (
-    <Form action={target.action} className={styles.form}>
-      {target.fields.map(([name, value]) => (
-        <input
-          key={`${name}=${value}`}
-          type="hidden"
-          name={name}
-          value={value}
-        />
-      ))}
-      <Button type="submit" variant={variant}>
-        {label}
-      </Button>
-    </Form>
-  );
-}
+import { BrowseResultsList } from './BrowseResultsList';
+import { TargetButton } from './TargetButton';
 
 export type BrowseResultsProps = BrowseView;
 
@@ -38,32 +14,11 @@ export function BrowseResults(props: BrowseResultsProps) {
       return (
         <div className={styles.results}>
           <p className={styles.summary}>{props.summary}</p>
-          <ul className={styles.grid}>
-            {props.cards.map((card, index) => (
-              <li key={card.id} className={styles.item}>
-                <ExperienceCardItem
-                  card={card}
-                  layout="vertical"
-                  headingLevel={2}
-                  preloadPhoto={index === 0}
-                />
-              </li>
-            ))}
-          </ul>
-          <div className={styles.more}>
-            {props.showMore ? (
-              <TargetButton
-                target={props.showMore}
-                label="Show more"
-                variant="secondary"
-              />
-            ) : null}
-            {props.startHref ? (
-              <ButtonLink href={props.startHref}>
-                Back to the first results
-              </ButtonLink>
-            ) : null}
-          </div>
+          <BrowseResultsList
+            cards={props.cards}
+            showMore={props.showMore}
+            startHref={props.startHref}
+          />
         </div>
       );
     case 'empty':
@@ -130,6 +85,7 @@ export function BrowseResults(props: BrowseResultsProps) {
             target={props.retry}
             label="Try again"
             variant="secondary"
+            fit
           />
         </div>
       );

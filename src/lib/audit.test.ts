@@ -4,6 +4,7 @@ import {
   ExportDaySchema,
   actorMatchesKind,
   auditLimits,
+  auditExportsOn,
   emptyExportTally,
   exportDayReady,
   exportDaysDue,
@@ -179,6 +180,15 @@ describe('parseAuditEntry', () => {
     })();
 
     expect(text).not.toContain('ada@example.com');
+  });
+});
+
+describe('auditExportsOn', () => {
+  it.each([
+    [true, true],
+    [false, false],
+  ])('a store with storesAudit %s: %s', (storesAudit, expected) => {
+    expect(auditExportsOn({ storesAudit })).toBe(expected);
   });
 });
 

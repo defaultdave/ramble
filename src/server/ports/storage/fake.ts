@@ -33,6 +33,12 @@ export type FakeStorageOptions = {
   /** Time source for link expiry (the Clock port's `now`). */
   now: () => Date;
   state?: FakeStorageState;
+  /**
+   * Whether it declares a locked store for audit objects. Off unless asked: its objects vanish with
+   * the process, so the app's fake must not let an audit export report success. A test of the
+   * export's success path turns it on.
+   */
+  storesAudit?: boolean;
 };
 
 export type FakeStorageAdapter = StoragePort & {
@@ -53,7 +59,9 @@ export function createFakeStorageAdapter(
   const { now } = options;
   const { objects, secret } = options.state ?? createFakeStorageState();
 
-  const capabilities: StorageCapabilities = { storesAudit: true };
+  const capabilities: StorageCapabilities = {
+    storesAudit: options.storesAudit ?? false,
+  };
 
   const sign = (key: string, expires: number) =>
     createHmac('sha256', secret)

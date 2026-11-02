@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { WriteIdSchema } from './catalog';
 import { IsoDateSchema } from './sessions';
+import { canStoreVisibility, type StorageCapabilities } from './storage';
 import { isoDateOf, msPerDay, msPerMinute } from './time';
 
 export const auditActorKinds = ['user', 'guest', 'system'] as const;
@@ -189,6 +190,11 @@ export function exportDaysDue(
     days.push(day);
   }
   return days;
+}
+
+/** Whether the audit export may run: only on a store that can hold an audit object, so a day is never reported exported into one that cannot. */
+export function auditExportsOn(capabilities: StorageCapabilities): boolean {
+  return canStoreVisibility('audit', capabilities);
 }
 
 export function exportDedupeKey(day: ExportDay): string {

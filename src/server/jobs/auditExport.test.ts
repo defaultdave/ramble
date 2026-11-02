@@ -76,7 +76,7 @@ let storage: FakeStorageAdapter;
 beforeEach(() => {
   vi.useFakeTimers({ now });
   vi.mocked(readAuditPage).mockReset();
-  storage = createFakeStorageAdapter({ now: () => now });
+  storage = createFakeStorageAdapter({ now: () => now, storesAudit: true });
 });
 
 afterEach(() => {

@@ -24,7 +24,7 @@ vi.mock('@/server/ports/storage/config', () => ({
 // - an empty log queues nothing
 // - each ready day from the first row is queued with its own kind, payload and dedupe key, oldest first, in one transaction
 // - the count is the days that were new: a dedupe key already used adds nothing
-// - on a provider with no locked store nothing is read or queued, and one warning says the export is off
+// - on a provider with no locked store nothing is queued, and one warning says the export is off, but only when there are days to export
 
 beforeEach(() => {
   vi.useFakeTimers({ now: new Date('2026-11-05T12:00:00Z') });
@@ -36,6 +36,11 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
 });
+
+const unlocked = {
+  provider: 'vercel-blob',
+  storesAudit: false,
+} as StoragePort;
 
 describe('scheduleAuditExports', () => {
   it('queues nothing for an empty log', async () => {
@@ -86,18 +91,21 @@ describe('scheduleAuditExports', () => {
     vi.mocked(readFirstAuditTime).mockResolvedValue(
       new Date('2026-11-03T08:00:00Z'),
     );
-    const unlocked = {
-      provider: 'vercel-blob',
-      storesAudit: false,
-    } as StoragePort;
 
     await expect(scheduleAuditExports(unlocked)).resolves.toBe(0);
 
-    expect(readFirstAuditTime).not.toHaveBeenCalled();
     expect(enqueue).not.toHaveBeenCalled();
     expect(logger.warn).toHaveBeenCalledExactlyOnceWith(
       'audit export is off: no locked store is configured for this provider',
       { provider: 'vercel-blob' },
     );
+  });
+
+  it('does not warn on a provider with no locked store while the log is empty', async () => {
+    vi.mocked(readFirstAuditTime).mockResolvedValue(null);
+
+    await expect(scheduleAuditExports(unlocked)).resolves.toBe(0);
+
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 });

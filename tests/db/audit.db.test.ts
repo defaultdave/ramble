@@ -21,6 +21,26 @@ import {
 } from './harness';
 
 vi.mock('@/server/monitoring/heartbeat', () => ({ sendHeartbeat: vi.fn() }));
+const raiseAlert = vi.hoisted(() => vi.fn());
+vi.mock('@/server/monitoring/alerts', () => ({
+  alerts: { raise: raiseAlert },
+}));
+// The app's fake store declares no locked storage; the export's success path runs on one that does.
+const store = vi.hoisted(() => ({ locked: true }));
+vi.mock('@/server/ports/storage/config', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('@/server/ports/storage/config')>();
+  const { createFakeStorageAdapter } =
+    await import('@/server/ports/storage/fake');
+  const locked = createFakeStorageAdapter({
+    now: () => new Date(),
+    storesAudit: true,
+  });
+  return {
+    getStorage: (now: () => Date) =>
+      store.locked ? locked : original.getStorage(now),
+  };
+});
 vi.mock('@/server/monitoring/logger', () => ({
   logger: { warn: vi.fn(), info: vi.fn(), error: vi.fn() },
 }));
@@ -40,6 +60,7 @@ vi.mock('@/server/monitoring/logger', () => ({
 // - a day holds the rows recorded in [00:00, 24:00) UTC, the boundary instants on the right sides, and no other day
 // - rows are paged by id past one page, each exactly once, even when recorded times are out of id order
 // - the schedule queues each ready day once from the first row, and the drain exports them through the registry
+// - a day whose store has no locked storage dead-letters at its first attempt through the real drain, raising job-dead once
 // - a pulse queues the exports and runs them in the same call, and the next pulse queues nothing new
 
 let fresh: FreshDatabase;
@@ -517,6 +538,7 @@ describe('the export', () => {
     const b = await insertAt('2020-05-01T09:00:00Z', marker);
     const storage = fakeStore.createFakeStorageAdapter({
       now: () => new Date(),
+      storesAudit: true,
     });
 
     const tally = await exporter.exportAuditDay({ day: '2020-05-01' }, storage);
@@ -573,6 +595,42 @@ describe('the export', () => {
       typeof fakeStore.createFakeStorageAdapter
     >;
     expect(store.read('audit/2020-05-31/manifest.ndjson')).not.toBeNull();
+  });
+
+  it('dead-letters a day at the first attempt, with one job-dead alert, when the store has no locked storage', async () => {
+    const { enqueue } = await import('@/server/jobs/enqueue');
+    const { drainJobs } = await import('@/server/jobs/drain');
+    const { systemClock } = await import('@/server/ports/clock');
+    raiseAlert.mockClear();
+    await client.db.transaction((tx) =>
+      enqueue(tx, {
+        kind: 'audit-export',
+        payload: { day: '2020-01-15' },
+        dedupeKey: 'audit-export:2020-01-15',
+      }),
+    );
+
+    store.locked = false;
+    let report: Awaited<ReturnType<typeof drainJobs>>;
+    try {
+      report = await drainJobs(systemClock);
+    } finally {
+      store.locked = true;
+    }
+
+    expect(report).toMatchObject({ claimed: 1, dead: 1, retried: 0 });
+    const { rows } = await client.db.execute<{
+      status: string;
+      attempts: number;
+      max_attempts: number;
+    }>(sql`SELECT status, attempts, max_attempts FROM jobs`);
+    expect(rows).toEqual([{ status: 'dead', attempts: 1, max_attempts: 20 }]);
+    expect(raiseAlert).toHaveBeenCalledExactlyOnceWith(
+      'job-dead',
+      'error',
+      expect.any(String),
+      expect.objectContaining({ kind: 'audit-export' }),
+    );
   });
 });
 

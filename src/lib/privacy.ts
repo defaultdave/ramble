@@ -230,7 +230,7 @@ export const piiColumns: readonly PiiColumn[] = [
     data: 'The signed-in user (staff or host) who made a change',
     location: databaseLocation,
     deletionPath:
-      'Kept with the row as the audit record of who acted; the log is insert-only (PRD-74) and its nightly export is write-once, so a staff member who leaves is handled by the staff-removal step, not a guest deletion. The table holds no guest id: a guest who acts by token is identified by the subject, and details hold ids, codes, and amounts only',
+      'Kept with the row as the audit record of who acted; the log is insert-only (PRD-74) and, once switched on, its nightly export is write-once, so a staff member who leaves is handled by the staff-removal step, not a guest deletion. The table holds no guest id: a guest who acts by token is identified by the subject, and details hold ids, codes, and amounts only',
   },
 ];
 

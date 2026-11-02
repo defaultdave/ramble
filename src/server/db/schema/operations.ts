@@ -93,7 +93,7 @@ export const privacyRequests = pgTable(
   ],
 );
 
-const auditActorKindEnum = pgEnum('audit_actor_kind', auditActorKinds);
+export const auditActorKindEnum = pgEnum('audit_actor_kind', auditActorKinds);
 
 const nameShape = `^[a-z][a-z0-9_]{0,${String(auditLimits.detailsKeyMaxChars - 1)}}$`;
 // jsonpath filters over `details`: each one matches a name, nested value, non-integer, or string that breaks the lib's rule.

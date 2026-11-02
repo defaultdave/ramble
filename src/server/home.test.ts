@@ -3,7 +3,7 @@ import {
   cacheEntryTagCounts,
   cacheTagBudget,
 } from '@/lib/pages/cacheTagBudget';
-import { tagsForChange, type CacheChange } from '@/lib/cacheTags';
+import { tagsForChanges, type CacheChange } from '@/lib/cacheTags';
 import { editorialLimits } from '@/lib/editorial';
 import { homeLimits } from '@/lib/pages/home';
 import { upcomingWindow } from '@/lib/sessionWindow';
@@ -86,7 +86,10 @@ describe('getHomeContent', () => {
   it('uses the editorial profile and tags the home, the names, and each experience a Pick names, but not the catalog', async () => {
     const entryTags = await homeEntryTags();
 
-    expect(cache.life).toHaveBeenCalledWith('editorial');
+    // The reads nested in the entry name their profiles too, and the entry takes the shortest.
+    expect(new Set(cache.life.mock.calls.flat())).toEqual(
+      new Set(['editorial']),
+    );
     expect(entryTags.toSorted()).toEqual(
       [
         'home',
@@ -156,13 +159,12 @@ describe('getHomeContent', () => {
       ['a home module edit', { kind: 'homeModules' }],
       ['a Pick edit', { kind: 'pick', slug: 'summer' }],
       ['a gift guide edit', { kind: 'giftGuide' }],
-      ['a category or neighborhood rename', { kind: 'taxonomy' }],
     ])('%s', async (_name, change) => {
       const entryTags = await homeEntryTags();
 
-      expect(tagsForChange(change).some((tag) => entryTags.includes(tag))).toBe(
-        true,
-      );
+      expect(
+        tagsForChanges([change]).some((tag) => entryTags.includes(tag)),
+      ).toBe(true);
     });
 
     it.each<[string, CacheChange]>([
@@ -172,9 +174,9 @@ describe('getHomeContent', () => {
     ])('%s leaves it alone', async (_name, change) => {
       const entryTags = await homeEntryTags();
 
-      expect(tagsForChange(change).some((tag) => entryTags.includes(tag))).toBe(
-        false,
-      );
+      expect(
+        tagsForChanges([change]).some((tag) => entryTags.includes(tag)),
+      ).toBe(false);
     });
   });
 

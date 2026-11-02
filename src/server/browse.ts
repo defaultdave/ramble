@@ -9,6 +9,7 @@ import {
 import { tags } from '@/lib/cacheTags';
 import type { BrowseFilters, BrowseQuery } from '@/lib/filters';
 import { readOrRefuse } from '@/server/cache/readOrRefuse';
+import { tagExperiences } from '@/server/cache/tagExperiences';
 import { listBrowseDayRows, listBrowseExperiences } from '@/server/db/browse';
 import { getFilterOptions } from '@/server/filterOptions';
 import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
@@ -30,10 +31,7 @@ export async function getBrowseResults(
   const page = toBrowsePage(query.after, read);
   // A cursor nobody can see is not worth an entry per made-up id.
   if (!page.ok) cacheLife('uncached');
-  if (page.ok) {
-    for (const experience of page.items)
-      cacheTag(tags.experience(experience.id));
-  }
+  if (page.ok) tagExperiences(page.items.map((experience) => experience.id));
   return page;
 }
 

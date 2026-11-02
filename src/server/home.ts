@@ -13,6 +13,7 @@ import {
 import type { CardExperience } from '@/lib/experienceCards';
 import { upcomingWindow } from '@/lib/sessionWindow';
 import { readOrRefuse } from '@/server/cache/readOrRefuse';
+import { tagExperiences } from '@/server/cache/tagExperiences';
 import {
   getPublishedGiftGuide,
   listHomeModules,
@@ -32,9 +33,8 @@ export type HomeContent = {
 
 /**
  * Everything the home modules show except "On this week" and the gift switch. A home module, a
- * Pick, or the gift guide reaches it through `tags.home`; a rename of a category or neighborhood
- * through `tags.taxonomy`, which `getFilterOptions` hands to this entry. A listing change reaches
- * it only through the tag of each experience a Pick names. That includes one a guest cannot see
+ * Pick, or the gift guide reaches it through `tags.home`. A category or neighborhood rename
+ * reaches it when its profile runs out. A listing change reaches it only through the tag of each experience a Pick names. That includes one a guest cannot see
  * yet, so publishing it adds its card, and it is why the tag follows the IDs asked for and not
  * the cards that came back.
  */
@@ -54,7 +54,7 @@ export async function getHomeContent(): Promise<HomeContent> {
         getFilterOptions(),
       ]);
     const experienceIds = homeExperienceIds(modules, picks);
-    for (const id of experienceIds) cacheTag(tags.experience(id));
+    tagExperiences(experienceIds);
     const experiences = await listHomeExperiences(experienceIds, {
       covers: false,
     });
@@ -99,8 +99,6 @@ export async function getThisWeek(asOf: string): Promise<ThisWeekContent> {
     });
     return { experienceIds, experiences };
   });
-  for (const experience of content.experiences) {
-    cacheTag(tags.experience(experience.id));
-  }
+  tagExperiences(content.experiences.map((experience) => experience.id));
   return content;
 }

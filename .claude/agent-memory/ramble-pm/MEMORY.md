@@ -21,7 +21,7 @@ The project owner keeps a second, private memory on their own machine for person
 - `bun scripts/plan/breakdown.ts --write` regenerates `02-work-breakdown.md` in full; its fixed prose lives in the script.
 - `bun scripts/plan/critical-path.ts` (artifact 4) and `bun scripts/plan/execution-model.ts` (artifact 5) each take `--write` to refresh the generated block in their document.
 - `bun scripts/plan/forecast.ts --report estimate|resourcing|schedule` simulates the graph with the owner as a capacity-limited reviewer. Scenarios and levers are constants in the script; the owner's review minutes are in `scripts/plan/dave-time.ts`, shared with `execution-model.ts`.
-- Roadmap page: `roadmap/status.json` in `ramble-pm` (a hand digest of STATUS and DECISIONS) plus the schedule report, built by `bun scripts/plan/roadmap.ts` into that repo's `index.html` and README.
+- Roadmap page: `roadmap/status.json` in `ramble-pm` (a hand digest of STATUS and DECISIONS) plus the schedule report, built by `bun scripts/plan/roadmap.ts` into that repo's `index.html` and README. `roadmap/template.html` reads fixed field names: `decisionsNeeded` items take `title`, `impact`, `detail`, `recommendation`, `blocks`; `actionsForDave` items take `title`, `detail`, `where`; `heldUp`, `decisionsMade` and `watch` take `what`. Digests written as `what`/`effect` rendered every decision and to-do as blank cards reading "Recommend: undefined" from 2026-10-28 until the owner spotted it on 2026-10-29. Since 2026-10-29 the page opens with a daily standup the owner asked for (done, in the works today, needs a decision, what held us up): `standups` in status.json, newest first, one entry per day, kept as history; the lead updates today's entry at each session end.
 - `ramble-pm` (since 2026-10-22) is the project's viewable state: status, decisions, delta log, roadmap. `scripts/plan/site.ts` finds its checkout (beside the main checkout, or `RAMBLE_PM_DIR`) and publishes it straight to `main` as the App. Unit status and actuals live on board #19.
 
 ## Settled decisions (do not reopen)
@@ -114,3 +114,25 @@ Full list with reasons in `DECISIONS.md`.
 - `bun scripts/plan/forecast.ts --report schedule` takes any scenario name from its `SCENARIOS` list in `--scenarios "a|b"`; `Lever 4 too (money core to agents), Dave 12.5 h` models the human-led money units on agents. The model prices units at their estimates with review gates and does not carry measured agent actuals (merged units closed at 4 to 42 percent of estimate), so its dates are the slow case.
 - Inside the sandbox `gh` cannot read the keychain login (`Failed to log in to github.com account (keyring)`), so `scripts/plan/board-dates.ts --run` and other `gh` reads fail there; `site.ts publish` and the merge-desk scripts still work because they use the App token. Hand the board sync to the owner or run it outside the sandbox.
 - The Prototype milestone in `07-resourcing.md` includes half a day of stub glue (checkout and confirmation placeholders filled with U-027's components and fixture data) that has no unit and was never built; a milestone's "glue outside units.yaml" needs a tracking row or it is forgotten.
+
+## Working rule since 2026-10-29: proceed on the recommendation
+- When a question has a recommended answer and needs no capability only the owner has, the PM takes it, logs it in `DECISIONS.md` as a PM decision the owner can overrule, and lists it under "Decided for you" on the roadmap. Work does not wait for the owner unless it cannot proceed without the answer. Owner-only remains: promotions, bypass merges of protected files, rulesets, the GitHub App, secrets, repo creation, deploys, spend.
+
+## Lessons from the money chain and first production deploy (2026-10-30)
+- Production migrations go through the `db-migrate-production` workflow. `vercel env run` cannot read the production secrets, and `vercel env run ... -- node <script>` deployed the script as a stray project instead of running it. Refreshing production is `vercel deploy --prod` from a clean copy of `origin/main`, because deployments of `main` are off in `vercel.json`; `vercel redeploy` of an old deployment rebuilds old code.
+- `scripts/vercel-build.sh` runs `db:migrate` on previews only, so a production deploy needs the migrations run first.
+- A promotion PR whose head is `integration` deletes the branch when `delete_branch_on_merge` is on; the `integration` ruleset's admin bypass was `always`. Bypass is now `pull_request`; verify the branch survives the next promotion.
+- Production needs `CAPABILITY_TOKEN_SECRET`, `FORM_GUARD_SECRET`, `PULSE_SECRET` and `APP_URL` before checkout works; the first two throw at checkout.
+- A fake payment gateway that keeps its payments and signing secret in process memory fails on a multi-instance host, and nothing in the app delivered a confirmed fake payment's event to the webhook intake, so orders stayed `pending_payment` (BC-37, BC-38). Check that every seam a test harness fills (event delivery, shared state) has a runtime counterpart before calling a flow end to end.
+- Time-box QA in briefs: a full UI unit's QA took about 6 hours under machine load of 12 to 36, and a 60-minute box held.
+- Inside the sandbox `bun` exits silently, so run `site.ts` and `gh` reads with the sandbox bypassed. `forecast.ts --remaining` needs a comma list with no spaces; build it with bash, not zsh word splitting.
+- Setting `Done` on board #19 closes the issue, so set it only when the unit is truly complete.
+
+## Lessons from the Sprint 1 close (2026-11-01)
+- The GitHub App has no Issues write here: `Closes #n` in an App-merged PR does not close the issue, and labels on an App-opened issue drop with no error. Set Status Done on board #19, which closes the issue, and read labels back after filing.
+- Merging `main` into a branch before pushing caught two real semantic breaks (a removed helper, landing pages going blank). When a merge is skipped, compare the branch's files with what `main` gained and say so; CI on the PR merge ref covers tests, not visual review.
+- Local Chromium in this environment launches with `--single-process --no-zygote` as Playwright args, sandbox on, one browser per width and scheme.
+- With JavaScript off, React Flight defers elements past 3200 bytes, and late pieces stream as bare `<div hidden id="S:n">` segments CSS cannot place. Test no-script on a large result set.
+- zsh does not word-split `$c`: use a function with explicit args in batch commands.
+- `osv-scanner` on a push to `main` can fail while the PR scan passes; read the branch's run list, not the PR's checks (SC-26).
+- Unexported `pgEnum`s are invisible to drizzle-kit: `pnpm db:generate` then wants to drop the type. Only CI's `db` job runs it, and it stops before `test:db`, so run it locally on any schema change and do not treat a schema export as dead (SC-27).

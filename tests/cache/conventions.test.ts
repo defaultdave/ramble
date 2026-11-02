@@ -23,6 +23,15 @@ describe('cacheConventionViolations', () => {
       }`,
     ],
     [
+      'the experience tagging helper in place of cacheTag',
+      `export async function getX(ids: string[]) {
+        'use cache';
+        cacheLife('editorial');
+        tagExperiences(ids);
+        return ids;
+      }`,
+    ],
+    [
       'an arrow function in a component',
       `export const Banner = async () => {
         'use cache';

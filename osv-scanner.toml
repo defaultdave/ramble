@@ -1,0 +1,19 @@
+# Each entry stops being ignored on its ignoreUntil date, so the advisory comes back for a decision.
+# Overrides do not help: deepmerge has no fixed release, and the fixed glob (14) and minimatch (11)
+# are major bumps whose callers (msw's bundled glob, the lint tooling's minimatch 3 and 10) were written for
+# the old APIs.
+
+[[IgnoredVulns]]
+id = "GHSA-gcqx-w48m-w2h4"
+ignoreUntil = 2027-02-01
+reason = "deepmerge 4.3.1 has no fixed release. Reached only through msw's bundled copy, which is a dev dependency used by tests."
+
+[[IgnoredVulns]]
+id = "GHSA-3g3m-2fjr-6pw4"
+ignoreUntil = 2027-02-01
+reason = "glob 13.0.6 is msw's bundled copy, a dev dependency that never receives untrusted patterns. The fix is a major bump (14.0.2)."
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2027-02-01
+reason = "minimatch 3.1.5 and 10.2.6 are dev-time tooling dependencies (eslint and its plugins, test runners), matching our own file globs only. The fix is a major bump (11.0.1) that eslint's pinned range does not accept."

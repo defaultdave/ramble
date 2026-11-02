@@ -247,8 +247,10 @@ export type BrowseView =
       filtered: boolean;
       /** Set when the browse has a date: a way out of a day with nothing on it. */
       dated: DatedEmpty | null;
+      /** A page that has no filters to take off words its empty state for itself. */
+      wording?: 'landing';
     }
-  | { state: 'error'; retry: FormTarget }
+  | { state: 'error'; retry: FormTarget; wording?: 'landing' }
   | { state: 'outdated'; startHref: string };
 
 function targetFor(query: BrowseQuery): FormTarget {

@@ -27,6 +27,8 @@ export const cacheEntryTagCounts = {
   coverPhotos: photoLimits.maxCoverLookups,
   /** `catalog` and an experience tag for each card of the page. */
   browse: 1 + browsePageSize,
+  /** `taxonomy` and the category's or neighborhood's own tag. */
+  landing: 2,
   /** `taxonomy` and the experience's own tag. */
   experiencePage: 2,
   /** The settings tag. */

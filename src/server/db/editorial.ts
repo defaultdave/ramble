@@ -262,7 +262,6 @@ async function readPageCopy(
   );
 }
 
-// TODO(U-035): first caller
 /** Null when the slug is malformed, has no copy, or the copy is still a draft. */
 export async function getPublishedPageCopy(
   kind: PageCopyKind,

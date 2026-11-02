@@ -6,6 +6,7 @@ import { BrowseSkeleton } from './BrowseSkeleton';
 // Behaviours under test:
 // - it announces that experiences are loading, once, as a status
 // - it draws a page of cards and hides the drawings from assistive technology
+// - it holds no space for the filter area on a page that has none
 
 describe('BrowseSkeleton', () => {
   it('announces the loading state', () => {
@@ -17,5 +18,10 @@ describe('BrowseSkeleton', () => {
     const { container } = render(<BrowseSkeleton />);
     const drawings = container.querySelectorAll('[aria-hidden="true"]');
     expect(drawings).toHaveLength(7);
+  });
+
+  it('draws only the cards when the page has no filter bar', () => {
+    const { container } = render(<BrowseSkeleton filters={false} />);
+    expect(container.querySelectorAll('[aria-hidden="true"]')).toHaveLength(6);
   });
 });

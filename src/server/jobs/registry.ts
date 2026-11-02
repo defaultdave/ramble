@@ -1,5 +1,6 @@
 import 'server-only';
 import { z } from 'zod';
+import { AuditExportPayloadSchema, auditExportKind } from '@/lib/audit';
 import { MaxAttemptsSchema, jobLimits } from '@/lib/jobs';
 import {
   ProcessProviderEventPayloadSchema,
@@ -7,6 +8,7 @@ import {
 } from '@/lib/providerEvents';
 import type { Transaction } from '@/server/db/client';
 import type { Clock } from '@/server/ports/clock';
+import { exportAuditDay } from './auditExport';
 import {
   BookingEmailPayloadSchema,
   sendGuestConfirmation,
@@ -82,6 +84,15 @@ export const jobRegistry = {
     maxAttempts: jobLimits.defaultMaxAttempts,
     prepare: (payload) => prepareProviderEvent(payload),
     handleIdempotent: (context) => handleProviderEvent(context),
+  }),
+  [auditExportKind]: defineJob({
+    payload: AuditExportPayloadSchema,
+    // A day's export is the only copy outside the database and a dead day is not re-driven, so it gets the longest retry the table allows.
+    maxAttempts: jobLimits.maxAttemptsCeiling,
+    prepare: (payload) => exportAuditDay(payload),
+    handleIdempotent: async () => {
+      // The export finished in `prepare`, which holds no connection while the store is called; the job row only needs to be marked done.
+    },
   }),
   'guest-confirmation': defineJob({
     payload: BookingEmailPayloadSchema,

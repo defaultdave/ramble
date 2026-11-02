@@ -1,5 +1,6 @@
 import 'server-only';
 import { createHmac, randomBytes } from 'node:crypto';
+import type { StorageCapabilities } from '@/lib/storage';
 import { secureEqual } from '@/server/secureEqual';
 import {
   parseDeleteInput,
@@ -32,6 +33,12 @@ export type FakeStorageOptions = {
   /** Time source for link expiry (the Clock port's `now`). */
   now: () => Date;
   state?: FakeStorageState;
+  /**
+   * Whether it declares a locked store for audit objects. Off unless asked: its objects vanish with
+   * the process, so the app's fake must not let an audit export report success. A test of the
+   * export's success path turns it on.
+   */
+  storesAudit?: boolean;
 };
 
 export type FakeStorageAdapter = StoragePort & {
@@ -52,6 +59,10 @@ export function createFakeStorageAdapter(
   const { now } = options;
   const { objects, secret } = options.state ?? createFakeStorageState();
 
+  const capabilities: StorageCapabilities = {
+    storesAudit: options.storesAudit ?? false,
+  };
+
   const sign = (key: string, expires: number) =>
     createHmac('sha256', secret)
       .update(`${key}\n${String(expires)}`)
@@ -59,10 +70,14 @@ export function createFakeStorageAdapter(
 
   return {
     provider: 'fake',
+    ...capabilities,
 
     put: (input) =>
       settle(() => {
-        const { key, body, contentType, visibility } = parsePutInput(input);
+        const { key, body, contentType, visibility } = parsePutInput(
+          input,
+          capabilities,
+        );
         if (objects.has(key)) throw new StorageError('already_exists');
         objects.set(key, { body: Uint8Array.from(body), contentType });
         return {

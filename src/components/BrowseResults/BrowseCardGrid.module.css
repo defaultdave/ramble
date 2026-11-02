@@ -1,0 +1,18 @@
+/* As many columns as fit at a card's minimum width, so no breakpoint is needed and nothing scrolls sideways. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  min-inline-size: 0;
+}
+
+.item > * {
+  flex: 1;
+}

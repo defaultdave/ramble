@@ -1,15 +1,33 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
 import type { ImageProps } from 'next/image';
+import { isValidElement, type ReactElement, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { samplePhoto } from '@/components/Photo/Photo.fixtures';
 import type { ExperienceCard } from '@/lib/experienceCards';
+import { ExperienceCardItem } from '@/components/ExperienceCard';
+import { BrowseCardGrid } from './BrowseCardGrid';
 import { BrowseResults } from './BrowseResults';
+
+/** Every element of the given component type in an unrendered tree, in document order. */
+function elementsOfType<Props>(
+  node: ReactNode,
+  type: (props: Props) => ReactNode,
+): ReactElement<Props>[] {
+  if (Array.isArray(node)) {
+    return (node as ReactNode[]).flatMap((n) => elementsOfType(n, type));
+  }
+  if (!isValidElement(node)) return [];
+  const { children } = node.props as { children?: ReactNode };
+  const own = node.type === type ? [node as ReactElement<Props>] : [];
+  return [...own, ...elementsOfType(children, type)];
+}
 
 // Behaviours under test, one per decision, branch or risk:
 // - a bookable card and a guide-only card each render as their own kind, under level 2 headings
 // - a card with a cover shows it, named by its alt text, for both kinds; a card with none keeps the empty frame
 // - only the first card's photo is the preload photo, so the one above the fold is fetched first
+// - the cards reach the client grid as one plain-data prop, so no card is a deferred server element
 // - the summary line and the cards are in one list
 // - Show more is a form that sends every field of the next address, and is absent on the last page
 // - the way back to the first results is there only on a later page
@@ -141,6 +159,19 @@ describe('BrowseResults results', () => {
         name: /Visit host site/,
       }),
     ).toHaveAttribute('href', 'https://host.example/sourdough');
+  });
+
+  // One plain-data prop, not one server element per card: React Flight defers elements past about
+  // 3,200 bytes, and with scripting off the deferred cards are never shown.
+  it('hands the cards to the client grid as one plain-data prop', () => {
+    const tree = BrowseResults(results);
+
+    const grids = elementsOfType(tree, BrowseCardGrid);
+    expect(grids).toHaveLength(1);
+    expect(grids[0]?.props.cards).toEqual(
+      JSON.parse(JSON.stringify(results.cards)),
+    );
+    expect(elementsOfType(tree, ExperienceCardItem)).toEqual([]);
   });
 
   it('shows the summary line', () => {

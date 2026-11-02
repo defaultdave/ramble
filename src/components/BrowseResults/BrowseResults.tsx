@@ -1,9 +1,9 @@
 import Form from 'next/form';
 import { Alert } from '@/components/Alert';
 import { Button, ButtonLink } from '@/components/Button';
-import { ExperienceCardItem } from '@/components/ExperienceCard';
 import type { BrowseView, FormTarget } from '@/lib/pages/browse';
 import { browsePath } from '@/lib/routes';
+import { BrowseCardGrid } from './BrowseCardGrid';
 import styles from './BrowseResults.module.css';
 
 type TargetButtonProps = {
@@ -38,18 +38,7 @@ export function BrowseResults(props: BrowseResultsProps) {
       return (
         <div className={styles.results}>
           <p className={styles.summary}>{props.summary}</p>
-          <ul className={styles.grid}>
-            {props.cards.map((card, index) => (
-              <li key={card.id} className={styles.item}>
-                <ExperienceCardItem
-                  card={card}
-                  layout="vertical"
-                  headingLevel={2}
-                  preloadPhoto={index === 0}
-                />
-              </li>
-            ))}
-          </ul>
+          <BrowseCardGrid cards={props.cards} />
           <div className={styles.more}>
             {props.showMore ? (
               <TargetButton

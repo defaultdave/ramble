@@ -1,6 +1,7 @@
 import { Calendar, SlidersHorizontal } from 'lucide-react';
-import { ButtonLink } from '@/components/Button';
+import { Button, ButtonLink } from '@/components/Button';
 import { ChipLink } from '@/components/Chip';
+import { Input } from '@/components/Input';
 import { dateChipLabel } from '@/lib/pages/browse';
 import {
   calendarLoadFailedMessage,
@@ -10,10 +11,12 @@ import {
 } from '@/lib/filterBar';
 import {
   activeFilterCount,
+  browseParamNames,
   guestChips,
   hrefForFilters,
   listChips,
   toQuery,
+  toQueryEntries,
   withDate,
   type BrowseFilters,
   type ChipView,
@@ -113,6 +116,65 @@ function WhenControl({
   );
 }
 
+type NoScriptFiltersProps = Pick<FilterBarProps, 'filters' | 'today'> & {
+  categories: readonly FilterOption[];
+  neighborhoods: readonly FilterOption[];
+};
+
+/**
+ * What the drawer and the calendar hold, for a browser with scripting off, where neither opens:
+ * every chip is a link and the day is a plain GET form that keeps the other filters.
+ */
+function NoScriptFilters({
+  filters,
+  today,
+  categories,
+  neighborhoods,
+}: NoScriptFiltersProps) {
+  const kept = toQueryEntries({
+    filters: withDate(filters, null),
+    after: null,
+  });
+  return (
+    <noscript>
+      <div className={styles.noScript}>
+        <form
+          className={styles.dayForm}
+          action={browsePath}
+          method="get"
+          aria-label="Choose a day"
+        >
+          {kept.map(([name, value]) => (
+            <input
+              key={`${name}:${value}`}
+              type="hidden"
+              name={name}
+              value={value}
+            />
+          ))}
+          <Input
+            type="date"
+            name={browseParamNames.date}
+            label="When"
+            min={today}
+            {...(filters.date ? { defaultValue: filters.date } : {})}
+          />
+          <Button type="submit">Show this day</Button>
+        </form>
+        <ChipGroup legend="Guests" chips={guestChips(filters)} />
+        <ChipGroup
+          legend="Neighborhood"
+          chips={listChips(filters, 'neighborhoods', neighborhoods)}
+        />
+        <ChipGroup
+          legend="Category"
+          chips={listChips(filters, 'categories', categories)}
+        />
+      </div>
+    </noscript>
+  );
+}
+
 export function FilterBar({
   categories,
   neighborhoods,
@@ -174,6 +236,12 @@ export function FilterBar({
           <DrawerButton kind="guests" label="Guests" />
         ) : null}
       </FilterRow>
+      <NoScriptFilters
+        filters={filters}
+        today={today}
+        categories={categories}
+        neighborhoods={neighborhoods}
+      />
     </div>
   );
 }

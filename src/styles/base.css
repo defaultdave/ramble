@@ -67,3 +67,18 @@ body {
 body > main {
   flex: 1;
 }
+
+/*
+ * React sends a streamed section in a hidden element at the end of the body, and a script moves it
+ * into place. With scripting off nothing moves it, so a section that marks itself with
+ * data-reveal-without-script is shown where it arrived, just above the footer, which moves after it.
+ */
+@media (scripting: none) {
+  body > footer {
+    order: 1;
+  }
+
+  body > div[hidden]:has(> [data-reveal-without-script]) {
+    display: block;
+  }
+}

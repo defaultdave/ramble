@@ -58,3 +58,18 @@
   flex-direction: column;
   gap: var(--space-3);
 }
+
+/* Takes no box of its own, so the page's flex column sees the same children as before. */
+.streamed {
+  display: contents;
+}
+
+/* With scripting off the streamed part sits outside the page column, so it carries the column's width and gutters. */
+@media (scripting: none) {
+  .streamed {
+    display: block;
+    inline-size: min(var(--size-content-max), 100% - var(--size-gutter) * 2);
+    margin-inline: auto;
+    padding: 0 var(--size-gutter) var(--space-12);
+  }
+}

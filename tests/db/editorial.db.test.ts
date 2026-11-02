@@ -1195,6 +1195,34 @@ describe('guest reads', () => {
       });
     });
 
+    it('reads for the home page only its copy, with no intro and no entries', async () => {
+      const existing = await editorial.getPublishedGiftGuide();
+      const guide = await saved(
+        editorial.saveCollection(ops, {
+          id: existing?.id,
+          ...collectionInput({
+            kind: 'gift_guide',
+            slug: 'gift-guide',
+            title: 'Give a Saturday',
+            summary: 'They pick the date.',
+            intro: doc('Intro'),
+            status: 'published',
+            items: [{ experienceId: liveId, note: null }],
+          }),
+        }),
+      );
+
+      const home = await editorial.getHomeGiftGuide();
+
+      expect(home).toEqual({
+        id: guide.value.id,
+        title: 'Give a Saturday',
+        summary: 'They pick the date.',
+      });
+      expect(home).not.toHaveProperty('intro');
+      expect(home).not.toHaveProperty('items');
+    });
+
     it('cannot be a second one, in the data layer or the table', async () => {
       await expect(
         editorial.saveCollection(

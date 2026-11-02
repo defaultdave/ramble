@@ -693,6 +693,26 @@ describe('constraints', () => {
           .values({ key: '', name: 'Blank', fullRefundHoursBefore: 1 }),
     ],
     [
+      'a cancellation tier past the longest notice',
+      'cancellation_tiers_hours_in_range',
+      () =>
+        client.db.insert(cancellationTiers).values({
+          key: unique('long'),
+          name: 'Too long',
+          fullRefundHoursBefore: 8761,
+        }),
+    ],
+    [
+      'a cancellation tier with negative notice',
+      'cancellation_tiers_hours_in_range',
+      () =>
+        client.db.insert(cancellationTiers).values({
+          key: unique('negative'),
+          name: 'Negative',
+          fullRefundHoursBefore: -1,
+        }),
+    ],
+    [
       'a link-out with no host',
       'experiences_link_out_url_http',
       (ids: Parents) => insertExperience(ids, { linkOutUrl: 'http://' }),

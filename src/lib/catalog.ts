@@ -89,7 +89,7 @@ export const SlugSchema = z.string().refine(isSlug, {
  */
 export const httpUrlPattern = String.raw`^[Hh][Tt][Tt][Pp][Ss]?://((?![Xx][Nn]--)[A-Za-z0-9-]+\.)*(?![Xx][Nn]--)[A-Za-z][A-Za-z0-9-]*(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[0-9]{1,4}))?([/?#][!-~]*)?$`;
 
-const HttpUrlSchema = z.string().regex(new RegExp(httpUrlPattern));
+export const HttpUrlSchema = z.string().regex(new RegExp(httpUrlPattern));
 
 const MinorUnitsSchema = z.int().nonnegative();
 
@@ -107,11 +107,14 @@ export const NeighborhoodSchema = z.object({
 });
 export type Neighborhood = z.infer<typeof NeighborhoodSchema>;
 
+// The longest tier is 7 days (PRD-46); a year is far past any tier and keeps the arithmetic small.
+export const MAX_FULL_REFUND_HOURS = 24 * 365;
+
 export const CancellationTierSchema = z.object({
   id: EntityIdSchema,
   key: z.string().min(1),
   name: z.string().min(1),
-  fullRefundHoursBefore: z.int().nonnegative(),
+  fullRefundHoursBefore: z.int().nonnegative().max(MAX_FULL_REFUND_HOURS),
   isDefault: z.boolean(),
 });
 export type CancellationTier = z.infer<typeof CancellationTierSchema>;

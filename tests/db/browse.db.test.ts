@@ -13,7 +13,7 @@ import {
 } from '@/lib/pages/browse';
 import { guestCounts, noFilters, type BrowseFilters } from '@/lib/filters';
 import { isOpenSession, upcomingWindow } from '@/lib/sessionWindow';
-import { msPerDay } from '@/lib/time';
+import { isoDateOf, msPerDay } from '@/lib/time';
 import {
   cancellationTiers,
   categories,
@@ -240,9 +240,7 @@ async function insertTemplate(experienceId: string) {
 }
 
 function shiftDay(date: string, days: number): string {
-  const shifted = new Date(`${date}T00:00:00Z`);
-  shifted.setUTCDate(shifted.getUTCDate() + days);
-  return shifted.toISOString().slice(0, 10);
+  return isoDateOf(new Date(Date.parse(`${date}T00:00:00Z`) + days * msPerDay));
 }
 
 describe('what a guest sees', () => {

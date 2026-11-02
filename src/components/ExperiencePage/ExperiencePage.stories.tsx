@@ -4,8 +4,14 @@ import { BookingBar } from '@/components/BookingBar';
 import { BookingChoices } from '@/components/BookingChoices';
 import { BookingPanel, BookingPanelSkeleton } from '@/components/BookingPanel';
 import { BookingSlots, ExperiencePage } from '@/components/ExperiencePage';
-import { bookingReducer, choicesView, initialState } from '@/lib/bookingDraft';
-import { kayakOffer } from '@/lib/bookingDraft.fixtures';
+import { holdNote } from '@/lib/booking';
+import {
+  bookingReducer,
+  choicesView,
+  initialState,
+  type BookingAction,
+} from '@/lib/bookingDraft';
+import { kayakOffer, optionId } from '@/lib/bookingDraft.fixtures';
 import {
   UpcomingSessions,
   UpcomingSessionsSkeleton,
@@ -41,37 +47,57 @@ type Story = StoryObj<typeof meta>;
 
 // The booking controls as the route fills them, drawn from the same reducer without the Server Action
 // the islands call: the bar on a phone, the panel from the tablet width.
-const view = choicesView(
-  kayakOffer,
-  bookingReducer(kayakOffer, initialState(kayakOffer), {
-    type: 'chooseDate',
-    date: '2026-10-24',
-  }),
-);
-const booking = (
-  <BookingSlots
-    bar={
-      <BookingBar
-        priceMinor={6500}
-        nextDate="Thu, Oct 22"
-        onChooseDate={fn()}
-      />
-    }
-    panel={
-      <BookingPanel priceMinor={6500} onContinue={fn()}>
-        <BookingChoices
-          view={view}
-          similarHref={kayakOffer.similarHref}
-          onDate={fn()}
-          onSession={fn()}
-          onAdults={fn()}
-          onChildren={fn()}
-          onAlternative={fn()}
+const chooseDate: BookingAction = { type: 'chooseDate', date: '2026-10-24' };
+const chooseTime: BookingAction = {
+  type: 'chooseSession',
+  sessionId: optionId(103),
+};
+function bookingAfter(actions: BookingAction[]) {
+  const state = actions.reduce(
+    (current, action) => bookingReducer(kayakOffer, current, action),
+    initialState(kayakOffer),
+  );
+  const view = choicesView(kayakOffer, state);
+  const { summary } = view;
+  return (
+    <BookingSlots
+      bar={
+        <BookingBar
+          priceMinor={6500}
+          nextDate="Thu, Oct 22"
+          onChooseDate={fn()}
         />
-      </BookingPanel>
-    }
-  />
-);
+      }
+      panel={
+        <BookingPanel
+          priceMinor={6500}
+          holdNote={holdNote}
+          {...(summary
+            ? {
+                total: {
+                  label: summary.label,
+                  amountMinor: summary.totalMinor,
+                  ...(summary.terms ? { terms: summary.terms } : {}),
+                },
+              }
+            : {})}
+          onContinue={fn()}
+        >
+          <BookingChoices
+            view={view}
+            similarHref={kayakOffer.similarHref}
+            onDate={fn()}
+            onSession={fn()}
+            onAdults={fn()}
+            onChildren={fn()}
+            onAlternative={fn()}
+          />
+        </BookingPanel>
+      }
+    />
+  );
+}
+const booking = bookingAfter([chooseDate]);
 
 const mobile = { viewport: { value: 'mobile1', isRotated: false } };
 const desktop = { viewport: { value: 'desktop', isRotated: false } };
@@ -119,6 +145,12 @@ export const WithBookingMobile: Story = {
 };
 export const WithBookingDesktop: Story = {
   args: { booking },
+  globals: desktop,
+  parameters: fullWidth,
+};
+// A date, a time, and a party: the panel at its tallest, and Continue still in the window.
+export const WithBookingChosenDesktop: Story = {
+  args: { booking: bookingAfter([chooseDate, chooseTime]) },
   globals: desktop,
   parameters: fullWidth,
 };

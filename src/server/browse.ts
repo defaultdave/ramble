@@ -7,11 +7,11 @@ import {
   type BrowsePage,
 } from '@/lib/pages/browse';
 import { tags } from '@/lib/cacheTags';
-import type { Category, Neighborhood } from '@/lib/catalog';
 import type { BrowseFilters, BrowseQuery } from '@/lib/filters';
 import { readOrRefuse } from '@/server/cache/readOrRefuse';
+import { tagExperiences } from '@/server/cache/tagExperiences';
 import { listBrowseDayRows, listBrowseExperiences } from '@/server/db/browse';
-import { listCategories, listNeighborhoods } from '@/server/db/catalog';
+import { getFilterOptions } from '@/server/filterOptions';
 import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
 
 // A schedule change reaches an entry here only through the experiences it lists. A session added to
@@ -31,16 +31,13 @@ export async function getBrowseResults(
   const page = toBrowsePage(query.after, read);
   // A cursor nobody can see is not worth an entry per made-up id.
   if (!page.ok) cacheLife('uncached');
-  if (page.ok) {
-    for (const experience of page.items)
-      cacheTag(tags.experience(experience.id));
-  }
+  if (page.ok) tagExperiences(page.items.map((experience) => experience.id));
   return page;
 }
 
-/** The days a guest can pick for the category and neighborhood filters, as YYYY-MM-DD. */
+/** The days a guest can pick for the category, neighborhood, and guests filters, as YYYY-MM-DD. */
 export async function getBrowseDates(
-  filters: Pick<BrowseFilters, 'categories' | 'neighborhoods'>,
+  filters: Pick<BrowseFilters, 'categories' | 'neighborhoods' | 'guests'>,
   asOf: string,
 ): Promise<string[]> {
   'use cache';
@@ -49,20 +46,6 @@ export async function getBrowseDates(
   return readOrRefuse('Browse dates', async () =>
     browseDays(await listBrowseDayRows(filters, asOf)),
   );
-}
-
-/** Every category and neighborhood, for the chips. They change when staff publish, and `tags.catalog` says so. */
-export async function getFilterOptions(): Promise<{
-  categories: Category[];
-  neighborhoods: Neighborhood[];
-}> {
-  'use cache';
-  cacheLife('catalog');
-  cacheTag(tags.catalog);
-  const [categories, neighborhoods] = await readOrRefuse('Filter options', () =>
-    Promise.all([listCategories(), listNeighborhoods()]),
-  );
-  return { categories, neighborhoods };
 }
 
 /**

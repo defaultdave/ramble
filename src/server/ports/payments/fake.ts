@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { fakeCardFeeMinor } from '@/lib/fakeCardFee';
 import { orderCurrency as currency } from '@/lib/orders';
 import {
+  fakeGatewayLimits,
   paymentMethods,
   providerEventTypes,
   type ProviderEventType,
@@ -36,8 +37,7 @@ const provider = 'fake';
 
 /** Design doc 4.2.3 and ADR 0002: the fifth failed try cancels the attempt. */
 const defaultMaxFailedTries = 5;
-/** Authentication challenges one payment may raise before the fake refuses another. */
-const maxActionRounds = 3;
+const { maxActionRounds } = fakeGatewayLimits;
 /** A delivery signed further than this from now is refused as a replay. */
 const signatureToleranceSeconds = 300;
 const defaultMaxObjects = 10_000;
@@ -112,10 +112,13 @@ export function createFakePaymentsState(): FakePaymentsState {
   };
 }
 
+/** What a confirmation did: the payment as it now stands and the one event it emitted. */
+type ConfirmedPayment = { payment: Payment; event: ProviderEvent };
+
 /** The fake's simulation surface beyond the port: what the fake card form and tests drive. */
 export type FakePaymentsAdapter = PaymentsPort & {
-  /** Plays the guest's confirmation: the provider records the outcome and emits its event. */
-  confirm(paymentId: string, input: ConfirmInput): Promise<Payment>;
+  /** Plays the guest's confirmation: the provider records the outcome and emits its event, which is handed back. */
+  confirm(paymentId: string, input: ConfirmInput): Promise<ConfirmedPayment>;
   /** Every event emitted so far, oldest first. */
   emittedEvents(): ProviderEvent[];
   /** Signs an event as a delivery timestamped `signedAt` (now by default), so a late delivery is signed fresh. */
@@ -264,9 +267,9 @@ export function createFakePaymentsAdapter(
     }
   }
 
-  function emit(fields: EventFields): void {
+  function emit(fields: EventFields): ProviderEvent {
     const sequence = state.events.length;
-    state.events.push({
+    const event: ProviderEvent = {
       id: fakeId(
         'evt',
         `${String(sequence)}:${fields.type}:${fields.objectId}`,
@@ -281,7 +284,9 @@ export function createFakePaymentsAdapter(
       failureCode: fields.failureCode ?? null,
       method: fields.method ?? null,
       occurredAt: now(),
-    });
+    };
+    state.events.push(event);
+    return copy(event);
   }
 
   /**
@@ -309,7 +314,10 @@ export function createFakePaymentsAdapter(
     return copy(response);
   }
 
-  function confirm(paymentId: string, rawInput: ConfirmInput): Payment {
+  function confirm(
+    paymentId: string,
+    rawInput: ConfirmInput,
+  ): ConfirmedPayment {
     const input = parseOrThrow(ConfirmInputSchema, rawInput);
     const payment = mustFind('payment', paymentId);
     if (!settleableStatuses.has(payment.status)) throw invalidState(payment);
@@ -334,7 +342,7 @@ export function createFakePaymentsAdapter(
         payment.feeMinor = feeMinor;
         payment.method = input.method;
         state.balanceMinor += payment.amountMinor - feeMinor;
-        emit({
+        const event = emit({
           type: 'payment.succeeded',
           objectId: payment.id,
           metadata: payment.metadata,
@@ -342,34 +350,33 @@ export function createFakePaymentsAdapter(
           feeMinor,
           method: input.method,
         });
-        break;
+        return { payment: copy(payment), event };
       }
       case 'declined': {
         payment.status = 'failed_try';
         payment.failedTries += 1;
         payment.failureCode = input.failureCode;
-        emit({
+        const event = emit({
           type: 'payment.failed',
           objectId: payment.id,
           metadata: payment.metadata,
           amountMinor: payment.amountMinor,
           failureCode: input.failureCode,
         });
-        break;
+        return { payment: copy(payment), event };
       }
       case 'requires_action': {
         payment.status = 'requires_action';
         state.actionRounds.set(payment.id, rounds + 1);
-        emit({
+        const event = emit({
           type: 'payment.requires_action',
           objectId: payment.id,
           metadata: payment.metadata,
           amountMinor: payment.amountMinor,
         });
-        break;
+        return { payment: copy(payment), event };
       }
     }
-    return copy(payment);
   }
 
   function createPayment(rawInput: unknown): Payment {

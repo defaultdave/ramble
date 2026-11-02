@@ -117,13 +117,15 @@ export function BookingChoices({
         <>
           <section className={styles.section}>
             <h3 className={styles.heading}>Pick a date</h3>
-            <DatePicker
-              label="Choose a date"
-              value={view.date}
-              today={view.today}
-              availableDates={view.availableDates}
-              onChange={onDate}
-            />
+            <div className={styles.calendar}>
+              <DatePicker
+                label="Choose a date"
+                value={view.date}
+                today={view.today}
+                availableDates={view.availableDates}
+                onChange={onDate}
+              />
+            </div>
           </section>
           {times && view.timesHeading ? (
             <section className={styles.section}>

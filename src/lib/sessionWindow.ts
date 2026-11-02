@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { hasSpaceLeft } from './spaces';
+import { hasSpaceForParty, hasSpaceLeft } from './spaces';
 import { msPerDay } from './time';
 
 /** The minute key a cached read takes, as `minuteAsOf` writes it. */
@@ -30,10 +30,14 @@ export function isUpcomingSession(
   return start >= window.from.getTime() && start < window.to.getTime();
 }
 
-/** An upcoming session that still has a space left. */
+/** An upcoming session that still has a space left, or room for the whole `party` when one is given. */
 export function isOpenSession(
   session: WindowedSession,
   window: SessionWindow,
+  party: number | null = null,
 ): boolean {
-  return isUpcomingSession(session, window) && hasSpaceLeft(session);
+  return (
+    isUpcomingSession(session, window) &&
+    (party === null ? hasSpaceLeft(session) : hasSpaceForParty(session, party))
+  );
 }

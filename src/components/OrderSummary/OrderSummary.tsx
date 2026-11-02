@@ -153,10 +153,10 @@ function Shell({
       </button>
       {openFrom ? (
         <div className={styles.fixedHead}>
-          <span className={styles.text}>
+          <div className={styles.text}>
             <h2 className={styles.fixedTitle}>{title}</h2>
             <span className={styles.meta}>{meta}</span>
-          </span>
+          </div>
           <span className={styles.total}>{amounts.total}</span>
         </div>
       ) : null}

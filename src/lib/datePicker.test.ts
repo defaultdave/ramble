@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { dayFlags, dayLabel, isDateAvailable, visibleDate } from './datePicker';
+import {
+  dayFlags,
+  dayLabel,
+  isDateAvailable,
+  visibleDate,
+  weeksInMonthOf,
+} from './datePicker';
 
 const today = '2026-10-18';
 const available = ['2026-10-18', '2026-10-22', '2026-10-25', '2026-10-10'];
@@ -98,5 +104,16 @@ describe('dayLabel', () => {
     ],
   ])('words %s', (_name, flags, expected) => {
     expect(dayLabel('2026-10-22', flags)).toBe(expected);
+  });
+});
+
+describe('weeksInMonthOf', () => {
+  it.each([
+    ['February 2026 starts on a Sunday and has 28 days', '2026-02-14', 4],
+    ['November 2026 starts on a Sunday and has 30 days', '2026-11-30', 5],
+    ['October 2026 starts on a Thursday and has 31 days', '2026-10-01', 5],
+    ['August 2026 starts on a Saturday and has 31 days', '2026-08-15', 6],
+  ])('%s', (_name, date, weeks) => {
+    expect(weeksInMonthOf(date)).toBe(weeks);
   });
 });

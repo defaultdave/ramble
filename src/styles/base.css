@@ -11,6 +11,48 @@
   }
 }
 
+/* The face shown until Fraunces arrives. It is Times New Roman scaled to Fraunces's real widths: next/font
+   would scale it by 126.68%, taken from the font's default instance, so the wordmark was 2px wider and
+   longer words wider still. 124.6% makes the wordmark the same width in both faces, and no sampled
+   string is wider than the real face by more than about 7%. The vertical overrides are Fraunces's ascent (97.8%)
+   and descent (25.5%) divided by the scale, so the baseline does not move on the swap.
+
+   A local() face is skipped when its font is not installed, so each system serif has a face. Linux has no
+   Times New Roman but Liberation Serif has its metrics, so it shares the first face. Android has Noto Serif:
+   at 101.3% its "ramble" matches Fraunces's (measured, Chrome on Debian with Noto Serif; the glyph widths
+   alone give 100.7%, 3.438em against 96.92px at 28px). Its overrides are 97.8% / 101.3% = 96.54% and
+   25.5% / 101.3% = 25.17%. */
+@font-face {
+  font-family: 'Fraunces Fallback';
+  src: local('Times New Roman'), local('Liberation Serif');
+  size-adjust: 124.6%;
+  ascent-override: 78.49%;
+  descent-override: 20.47%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Fraunces Fallback Android';
+  src:
+    local('Noto Serif'), local('Noto Serif Regular'), local('NotoSerif-Regular');
+  size-adjust: 101.3%;
+  ascent-override: 96.54%;
+  descent-override: 25.17%;
+  line-gap-override: 0%;
+}
+
+/* Chrome without subpixel positioning (Linux at 1x) rounds every glyph advance to a whole pixel, which moves the
+   width of a word by several pixels in steps no scale can follow. This keeps the display type, whose fallback
+   is matched to the real face, on exact advances. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  text-rendering: geometricPrecision;
+}
+
 /* A full-height column so the footer meets the bottom of the window on short pages. */
 body {
   display: flex;
@@ -24,4 +66,32 @@ body {
 
 body > main {
   flex: 1;
+}
+
+/*
+ * React sends a streamed section in a hidden element at the end of the body, and a script moves it
+ * into place. With scripting off nothing moves it, so a section that marks itself with
+ * data-reveal-without-script is shown where it arrived, just above the footer, which moves after it.
+ * It takes no box of its own while it sits in the page, and out in the body it carries the width and
+ * gutters of the page column it would have been in.
+ */
+[data-reveal-without-script] {
+  display: contents;
+}
+
+@media (scripting: none) {
+  [data-reveal-without-script] {
+    display: block;
+    inline-size: min(var(--size-content-max), 100% - var(--size-gutter) * 2);
+    margin-inline: auto;
+    padding: 0 var(--size-gutter) var(--space-12);
+  }
+
+  body > footer {
+    order: 1;
+  }
+
+  body > div[hidden]:has(> [data-reveal-without-script]) {
+    display: block;
+  }
 }

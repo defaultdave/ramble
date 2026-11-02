@@ -1,5 +1,4 @@
-import { z } from 'zod';
-import { EntityIdSchema } from './catalog';
+import { idListSchema } from './idLookup';
 import { photoLimits, type GuestPhoto } from './photos';
 
 /** What a page needs to draw one photo with `next/image`: an empty `alt` marks a decorative photo. */
@@ -21,15 +20,8 @@ export function photoView(photo: GuestPhoto): PhotoView {
   };
 }
 
-/**
- * The experiences one batch read of cover photos takes, bounded so the read cannot grow with the
- * page. The length is checked before any ID is, as Zod checks every ID of an array even when
- * the array is already too long.
- */
-export const CoverLookupSchema = z
-  .array(z.unknown())
-  .max(photoLimits.maxCoverLookups)
-  .pipe(z.array(EntityIdSchema));
+/** The experiences one batch read of cover photos takes, bounded so the read cannot grow with the page. */
+export const CoverLookupSchema = idListSchema(photoLimits.maxCoverLookups);
 
 /**
  * The IDs a cover read looks up, each once, lower-case and in one order, so two pages that list the

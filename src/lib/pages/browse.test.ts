@@ -223,6 +223,7 @@ describe('browseView', () => {
               categories: ['cooking'],
               neighborhoods: ['dumbo'],
               date: '2026-11-07',
+              guests: null,
             },
             after: null,
           },
@@ -685,6 +686,13 @@ describe('browseTitle', () => {
       'everything',
       { categories: ['cooking'], neighborhoods: ['dumbo'], date: '2026-11-07' },
       'Browse Cooking experiences in DUMBO on Sat, Nov 7',
+    ],
+    ['a party', { guests: 4 }, 'Browse experiences for 4 guests'],
+    ['a party of one', { guests: 1 }, 'Browse experiences for 1 guest'],
+    [
+      'a day and a party',
+      { date: '2026-11-07', guests: 2 },
+      'Browse experiences on Sat, Nov 7 for 2 guests',
     ],
     [
       'a slug with no name',

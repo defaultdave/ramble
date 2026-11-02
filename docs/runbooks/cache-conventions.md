@@ -14,7 +14,9 @@ How cached code is written in Ramble, and what happens when the cache fails. The
 
 ## Invalidating
 
-Describe what changed as a `CacheChange` and let `tagsForChange()` choose the tags. Adding a kind of change means adding one case there and one row to its test.
+Describe what changed as a `CacheChange` and let `tagsForChanges([change])` choose the tags. Adding a kind of change means adding one case there and one row to its test.
+
+A category or neighborhood rename has no publisher, so there is no kind of change for it: it shows when the reading entry's profile runs out. `tags.taxonomy` stays on `getFilterOptions` as the hook for a later renaming unit, which adds the kind of change and its case.
 
 | Where the change happens | Call | Effect |
 |---|---|---|

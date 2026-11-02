@@ -9,7 +9,7 @@ import {
   type PaymentProvider,
 } from '@/lib/payments';
 
-const CurrencySchema = z.literal(orderCurrency);
+export const CurrencySchema = z.literal(orderCurrency);
 type Currency = typeof orderCurrency;
 
 /** The smallest charge the provider accepts, in cents (Stripe's USD minimum). */
@@ -22,12 +22,12 @@ const maxKeyLength = 255;
 export const maxWebhookBodyLength = 65_536;
 
 const IdempotencyKeySchema = z.string().min(1).max(maxKeyLength);
-const ProviderIdSchema = z.string().min(1).max(maxKeyLength);
+export const ProviderIdSchema = z.string().min(1).max(maxKeyLength);
 const AmountMinorSchema = z.int().positive().max(maxAmountMinor);
 const ChargeAmountSchema = z.int().min(minAmountMinor).max(maxAmountMinor);
 
 /** Ramble's IDs on every provider object (design doc 4.2.3 rule 6). */
-const RambleMetadataSchema = z.object({
+export const RambleMetadataSchema = z.object({
   orderId: z.uuid(),
   recordId: z.uuid(),
 });

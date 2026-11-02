@@ -2,14 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   CardExperienceSchema,
   CardPriceOptionSchema,
-  cardLookupLimit,
   cardsInOrder,
   toExperienceCard,
   withPriceOptions,
   type CardExperience,
 } from './experienceCards';
-import { homeLimits } from './pages/home';
-import { photoLimits } from './photos';
 
 // Behaviours under test, one per decision, branch or risk:
 // - prices are grouped under their experience, lowest first; a price of an unlisted experience is ignored
@@ -222,16 +219,5 @@ describe('the card schemas', () => {
       CardExperienceSchema.safeParse({ ...experience(1), status: 'draft' })
         .success,
     ).toBe(false);
-  });
-});
-
-describe('cardLookupLimit', () => {
-  it('is the one bound the home read and the cover read share', () => {
-    expect(homeLimits.maxCardIds).toBe(cardLookupLimit);
-    expect(photoLimits.maxCoverLookups).toBe(cardLookupLimit);
-  });
-
-  it('covers the 20 home modules at 12 Picks candidates each', () => {
-    expect(cardLookupLimit).toBe(20 * homeLimits.picksCandidates);
   });
 });

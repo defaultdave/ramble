@@ -30,6 +30,15 @@ export function visibleDate({
   return offered[0] ?? today;
 }
 
+/** The weeks the calendar draws for the month of `date`, which starts its weeks on Sunday. */
+export function weeksInMonthOf(date: string): number {
+  const first = new Date(`${date.slice(0, 7)}-01T00:00:00Z`);
+  const daysInMonth = new Date(
+    Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  return Math.ceil((first.getUTCDay() + daysInMonth) / 7);
+}
+
 export function dayFlags(
   date: string,
   { today, value, availableDates }: DayContext,

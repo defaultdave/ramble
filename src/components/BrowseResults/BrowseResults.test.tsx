@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
+import type { ImageProps } from 'next/image';
 import { describe, expect, it, vi } from 'vitest';
 import { samplePhoto } from '@/components/Photo/Photo.fixtures';
 import type { ExperienceCard } from '@/lib/experienceCards';
@@ -8,13 +9,23 @@ import { BrowseResults } from './BrowseResults';
 // Behaviours under test, one per decision, branch or risk:
 // - a bookable card and a guide-only card each render as their own kind, under level 2 headings
 // - a card with a cover shows it, named by its alt text, for both kinds; a card with none keeps the empty frame
+// - only the first card's photo is the preload photo, so the one above the fold is fetched first
 // - the summary line and the cards are in one list
 // - Show more is a form that sends every field of the next address, and is absent on the last page
 // - the way back to the first results is there only on a later page
 // - empty says whether a filter is on and offers Clear all filters only then
 // - empty on a chosen day names the day and links to the next day with experiences and to any day, or only to any day when none follows; Clear all filters is offered only when another filter is on
+// - a page with no filters words its empty state without filters and offers browse, and its error without saying filters are saved
 // - an error is announced as an alert with a Try again form that carries the same address
 // - an outdated cursor says so and links to the first results
+
+// next/image makes a data address eager and preloads nothing, so the props it is given are what is checked.
+vi.mock('next/image', () => ({
+  default: (props: ImageProps) => (
+    // eslint-disable-next-line @next/next/no-img-element -- a stand-in that reports the props it received
+    <img alt={props.alt} src="data:," data-preload={String(props.preload)} />
+  ),
+}));
 
 vi.mock('next/form', () => ({
   default: ({
@@ -81,6 +92,24 @@ describe('BrowseResults cover photos', () => {
     );
     expect(screen.getByRole('img', { name: 'Photo 1' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Photo 2' })).toBeInTheDocument();
+  });
+
+  it('preloads the first card photo only', () => {
+    render(
+      <BrowseResults
+        {...view(
+          cards.map((card, index) => ({ ...card, image: samplePhoto(index) })),
+        )}
+      />,
+    );
+    expect(screen.getByRole('img', { name: 'Photo 1' })).toHaveAttribute(
+      'data-preload',
+      'true',
+    );
+    expect(screen.getByRole('img', { name: 'Photo 2' })).toHaveAttribute(
+      'data-preload',
+      'false',
+    );
   });
 
   it('shows no image for a card with no cover', () => {
@@ -180,6 +209,34 @@ describe('BrowseResults empty', () => {
     expect(
       screen.queryByRole('link', { name: 'Clear all filters' }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('BrowseResults on a page with no filters', () => {
+  it('words empty without filters and offers all of browse', () => {
+    render(
+      <BrowseResults
+        state="empty"
+        filtered={false}
+        dated={null}
+        wording="landing"
+      />,
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Nothing here yet' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: 'Browse all experiences' }),
+    ).toHaveAttribute('href', '/new-york/browse');
+    expect(screen.queryByText(/filter/i)).not.toBeInTheDocument();
+  });
+
+  it('words an error without saying filters are saved', () => {
+    render(<BrowseResults state="error" retry={next} wording="landing" />);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Something went wrong on our side. Try again in a moment.',
+    );
+    expect(screen.queryByText(/filter/i)).not.toBeInTheDocument();
   });
 });
 

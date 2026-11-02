@@ -55,6 +55,15 @@ const props = (query: Record<string, string> = {}) => ({
 });
 
 beforeEach(() => {
+  // The aside that follows the scroll asks for a width match, which jsdom has no answer for; a narrow one starts nothing.
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  );
   vi.clearAllMocks();
   vi.useRealTimers();
   handed.offers.length = 0;

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { EmailAddressSchema } from '@/lib/email/address';
+import { maxScaleExperiences } from './args';
 import { curated } from './fixtures';
 import { seedId } from './ids';
 import {
@@ -7,6 +9,7 @@ import {
   experienceRow,
   homeModulesInput,
   hostId,
+  hostNotificationEmail,
   hostRow,
   pageCopyInput,
   priceRows,
@@ -14,11 +17,15 @@ import {
   templateInput,
   type RefMaps,
 } from './rows';
+import { generateScaleFixtures } from './scale';
 import type { ExperienceFixture } from './types';
 
 // Behaviours under test:
 // - ids come from slugs, so a host, experience, category and neighborhood with one slug differ and repeat across runs
 // - a host defaults to New York
+// - a host's notification address is bookings@<slug>.example, on the reserved .example domain, and
+//   every curated host and every host of the largest scale fixture gets one the address schema accepts
+// - a slug that would make an address the schema refuses stops the seed, naming the host
 // - an experience row resolves its references, requires a waiver exactly when it names one, and a
 //   missing reference stops with a message naming it
 // - price rows carry the experience id; template input carries the slot and defaults to a Ramble source
@@ -56,6 +63,41 @@ describe('hostRow', () => {
     expect(hostRow(host).timeZone).toBe('America/New_York');
     expect(hostRow({ ...host, timeZone: 'America/Chicago' }).timeZone).toBe(
       'America/Chicago',
+    );
+  });
+});
+
+describe('hostNotificationEmail', () => {
+  it('derives the address from the slug on the reserved .example domain', () => {
+    expect(hostNotificationEmail('hudson-paddle-club')).toBe(
+      'bookings@hudson-paddle-club.example',
+    );
+    expect(
+      hostRow({ slug: 'h', name: 'H', description: 'D' }).notificationEmail,
+    ).toBe('bookings@h.example');
+  });
+
+  it('gives every curated host and every host of the largest scale fixture a valid address', () => {
+    const scale = generateScaleFixtures({
+      experiences: maxScaleExperiences,
+      seed: 1,
+    });
+    const hosts = [...curated.hosts, ...scale.hosts];
+    expect(hosts.length).toBeGreaterThan(curated.hosts.length);
+    for (const host of hosts) {
+      const address = hostRow(host).notificationEmail;
+      expect(EmailAddressSchema.safeParse(address).success).toBe(true);
+    }
+  });
+
+  it.each([
+    ['upper case', 'Hudson'],
+    ['a space', 'hudson club'],
+    ['empty', ''],
+    ['an address too long', 'a'.repeat(250)],
+  ])('refuses a slug that is %s', (_why, slug) => {
+    expect(() => hostNotificationEmail(slug)).toThrow(
+      /cannot have a notification address/,
     );
   });
 });

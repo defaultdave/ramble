@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  cacheEntryTagCounts,
+  cacheTagBudget,
+} from '@/lib/pages/cacheTagBudget';
 import { idWithLetters } from '@/lib/pages/experience.fixtures';
 import { getExperiencePage } from './experiencePage';
 
 // Behaviours under test, one per decision, branch or risk:
-// - the page read uses the catalog profile and tags the experience and the catalog
+// - the page read uses the catalog profile and tags the experience only; the category and neighborhood names arrive with their own tag through getFilterOptions
 // - an ID that is no guid gives null before anything is tagged or read; the tag is the lower-case ID
 // - an experience that is not visible to guests gives null, and nothing else is read for it
 // - a visible one comes back with its photos and its place, from the lists of categories and neighborhoods
@@ -53,13 +57,23 @@ beforeEach(() => {
 });
 
 describe('getExperiencePage', () => {
-  it('uses the catalog profile and tags the experience and the catalog', async () => {
+  it('uses the catalog profile, tags the experience and the names, and not the catalog', async () => {
     await getExperiencePage(id(1));
 
-    expect(cache.life).toHaveBeenCalledExactlyOnceWith('catalog');
-    expect(cache.tag).toHaveBeenCalledExactlyOnceWith(
-      `experience:${id(1)}`,
-      'catalog',
+    expect(cache.life).toHaveBeenCalledWith('catalog');
+    expect(cache.tag.mock.calls.flat().toSorted()).toEqual(
+      [`experience:${id(1)}`, 'taxonomy'].toSorted(),
+    );
+  });
+
+  it('carries as many tags as the budget counts for it', async () => {
+    await getExperiencePage(id(1));
+
+    expect(cache.tag.mock.calls.flat()).toHaveLength(
+      cacheEntryTagCounts.experiencePage,
+    );
+    expect(cacheEntryTagCounts.experiencePage).toBeLessThanOrEqual(
+      cacheTagBudget,
     );
   });
 
@@ -75,10 +89,7 @@ describe('getExperiencePage', () => {
   it('tags the lower-case ID', async () => {
     await getExperiencePage(idWithLetters.toUpperCase());
 
-    expect(cache.tag).toHaveBeenCalledExactlyOnceWith(
-      `experience:${idWithLetters}`,
-      'catalog',
-    );
+    expect(cache.tag).toHaveBeenCalledWith(`experience:${idWithLetters}`);
   });
 
   it('comes back with the experience, its photos, and its place', async () => {
@@ -126,13 +137,16 @@ describe('getExperiencePage', () => {
     expect(JSON.stringify(failure)).not.toContain('secret-id');
   });
 
-  it('throws the kind of a failure in the lists too', async () => {
+  it('throws the kind of a failure in the lists too, and not their cause', async () => {
     db.categories.mockRejectedValue(driverError);
 
     const failure = await getExperiencePage(id(1)).catch(
       (error: unknown) => error,
     );
 
-    expect(failure).toMatchObject({ message: 'Experience read failed: Error' });
+    expect(failure).toMatchObject({
+      message: 'Experience read failed: CachedReadError',
+    });
+    expect(JSON.stringify(failure)).not.toContain('secret-id');
   });
 });

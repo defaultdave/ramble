@@ -1,6 +1,6 @@
 // The one place that names a cache tag. A cached function tags its output with these builders
 // (`cacheTag(tags.experience(id))`), and every publish or booking change finds the tags to
-// invalidate through `tagsForChange()`, so a page can only go stale if this file is wrong.
+// invalidate through `tagsForChanges()`, so a page can only go stale if this file is wrong.
 //
 // A listing that features an experience (a Picks page, the gift guide, a home module) tags itself
 // with that experience's tag for each entry it shows, so an experience change reaches it without
@@ -8,8 +8,14 @@
 
 export const tags = {
   home: 'home',
-  /** The two catalog indexes (by category, by neighborhood) that listings and browse filter. */
+  /** The reads that depend on which experiences are listed: browse results and dates, and `On this week`. The home entry names its cards instead. */
   catalog: 'catalog',
+  /**
+   * The names of the categories and neighborhoods, which the filter chips, the home rails, and an
+   * experience's place line show. No change kind reaches it, because no unit renames a category or
+   * neighborhood, so a new name shows when the entry's cache profile runs out.
+   */
+  taxonomy: 'taxonomy',
   settings: 'settings',
   giftGuide: 'gift-guide',
   helpArticles: 'help-articles',
@@ -51,7 +57,6 @@ function tagsFor(change: CacheChange): string[] {
         tags.experience(change.id),
         tags.guideEntry(change.id),
         tags.catalog,
-        tags.home,
         tags.neighborhood(change.neighborhoodSlug),
         ...change.categorySlugs.map(tags.category),
       ];
@@ -76,11 +81,6 @@ function tagsFor(change: CacheChange): string[] {
     case 'settings':
       return [tags.settings];
   }
-}
-
-/** The tags a change invalidates, without repeats and in a stable order. */
-export function tagsForChange(change: CacheChange): string[] {
-  return [...new Set(tagsFor(change))].sort();
 }
 
 /** The tags a set of changes invalidates together, without repeats and in a stable order. */

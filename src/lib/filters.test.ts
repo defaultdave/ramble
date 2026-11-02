@@ -4,18 +4,25 @@ import {
   BrowseQuerySchema,
   browseHref,
   browseParamNames,
+  defaultGuests,
   canAddFilterValue,
   chipState,
+  guestChips,
+  guestOptions,
+  guestCounts,
   hrefForFilters,
   isIndexable,
   knownFilters,
+  listChips,
   maxFilterValues,
+  neighborhoodOptions,
   noFilters,
   parseFilters,
   toQuery,
   toQueryEntries,
   toggleFilterValue,
   withDate,
+  withGuests,
   type BrowseQuery,
 } from './filters';
 
@@ -40,6 +47,7 @@ describe('browseParamNames', () => {
       categories: 'category',
       neighborhoods: 'neighborhood',
       date: 'date',
+      guests: 'guests',
       after: 'after',
     });
   });
@@ -56,6 +64,7 @@ describe('parseFilters', () => {
         category: 'cooking',
         neighborhood: ['dumbo', 'bushwick'],
         date: '2026-11-07',
+        guests: '4',
         after: cursor,
       }),
     ).toEqual({
@@ -63,6 +72,7 @@ describe('parseFilters', () => {
         categories: ['cooking'],
         neighborhoods: ['bushwick', 'dumbo'],
         date: '2026-11-07',
+        guests: 4,
       },
       after: cursor,
     });
@@ -186,19 +196,72 @@ describe('parseFilters', () => {
   });
 });
 
+describe('guests', () => {
+  it.each([
+    ['1', 1],
+    ['2', 2],
+    ['6', 6],
+  ])('reads %s as a party the booking rules take', (raw, guests) => {
+    expect(parseFilters({ guests: raw }).filters.guests).toBe(guests);
+  });
+
+  it.each([
+    ['zero', '0'],
+    ['over one hold', '7'],
+    ['negative', '-2'],
+    ['a decimal', '2.0'],
+    ['signed', '+2'],
+    ['padded', ' 2'],
+    ['a leading zero', '02'],
+    ['hex', '0x2'],
+    ['words', 'two'],
+    ['empty', ''],
+    ['huge', '9'.repeat(400)],
+  ])('drops a value that is %s, and keeps its siblings', (_name, raw) => {
+    expect(parseFilters({ guests: raw, category: 'cooking' }).filters).toEqual({
+      ...noFilters,
+      categories: ['cooking'],
+    });
+  });
+
+  it('drops a party given twice instead of picking one', () => {
+    expect(parseFilters({ guests: ['2', '4'] }).filters.guests).toBeNull();
+  });
+
+  it('offers exactly the parties one hold takes, and starts on two of them', () => {
+    expect(guestCounts).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(guestCounts).toContain(defaultGuests);
+    expect(defaultGuests).toBe(2);
+  });
+
+  it('writes the party into the address, and sets and clears it', () => {
+    expect(hrefForFilters(withGuests(noFilters, 4))).toBe(
+      '/new-york/browse?guests=4',
+    );
+    expect(withGuests(withGuests(noFilters, 4), null)).toEqual(noFilters);
+  });
+
+  it('keeps the party when another filter changes', () => {
+    const party = withGuests(noFilters, 3);
+    expect(toggleFilterValue(party, 'categories', 'cooking').guests).toBe(3);
+    expect(withDate(party, '2026-11-07').guests).toBe(3);
+  });
+});
+
 describe('toQuery', () => {
   const full: BrowseQuery = {
     filters: {
       categories: ['cooking', 'walking-tours'],
       neighborhoods: ['dumbo'],
       date: '2026-11-07',
+      guests: 4,
     },
     after: cursor,
   };
 
   it('writes one fixed order', () => {
     expect(toQuery(full)).toBe(
-      `category=cooking&category=walking-tours&neighborhood=dumbo&date=2026-11-07&after=${cursor}`,
+      `category=cooking&category=walking-tours&neighborhood=dumbo&date=2026-11-07&guests=4&after=${cursor}`,
     );
   });
 
@@ -292,6 +355,7 @@ describe('changing filters', () => {
       categories: ['cooking'],
       neighborhoods: ['dumbo'],
       date: '2026-11-07',
+      guests: null,
     });
   });
 
@@ -348,14 +412,16 @@ describe('changing filters', () => {
   it.each([
     ['nothing', noFilters, 0],
     ['a date', { ...noFilters, date: '2026-11-07' }, 1],
+    ['a party', { ...noFilters, guests: 2 }, 1],
     [
       'two values and a date',
       {
         categories: ['cooking'],
         neighborhoods: ['dumbo'],
         date: '2026-11-07',
+        guests: 2,
       },
-      3,
+      4,
     ],
   ])('counts %s', (_name, filters, count) => {
     expect(activeFilterCount(filters)).toBe(count);
@@ -373,6 +439,7 @@ describe('isIndexable', () => {
       false,
     ],
     ['a date', { ...noFilters, date: '2026-11-07' }, null, false],
+    ['a party', { ...noFilters, guests: 2 }, null, false],
     ['a later page of the unfiltered list', noFilters, cursor, false],
   ])('%s', (_name, filters, after, indexable) => {
     expect(isIndexable({ filters, after })).toBe(indexable);
@@ -434,5 +501,116 @@ describe('knownFilters', () => {
       filters: expected,
       matchesNothing,
     });
+  });
+});
+
+describe('chips for a group', () => {
+  const options = [
+    { slug: 'cooking', name: 'Cooking' },
+    { slug: 'wine', name: 'Wine' },
+  ];
+
+  it('lists a chip per option, each linking to the address with it turned on', () => {
+    expect(listChips(noFilters, 'categories', options)).toEqual([
+      {
+        key: 'cooking',
+        label: 'Cooking',
+        selected: false,
+        disabled: false,
+        href: '/new-york/browse?category=cooking',
+      },
+      {
+        key: 'wine',
+        label: 'Wine',
+        selected: false,
+        disabled: false,
+        href: '/new-york/browse?category=wine',
+      },
+    ]);
+  });
+
+  it('links a chosen chip to the address without it, keeping the rest', () => {
+    const filters = { ...noFilters, categories: ['cooking'], guests: 3 };
+    const [cooking, wine] = listChips(filters, 'categories', options);
+    expect(cooking).toMatchObject({
+      selected: true,
+      href: '/new-york/browse?guests=3',
+    });
+    expect(wine).toMatchObject({
+      selected: false,
+      href: '/new-york/browse?category=cooking&category=wine&guests=3',
+    });
+  });
+
+  it('disables a chip that is not chosen once its list is full, and keeps a chosen one on', () => {
+    const slugs = Array.from(
+      { length: maxFilterValues },
+      (_, i) => `c${String(i)}`,
+    );
+    const full = { ...noFilters, categories: slugs };
+    const chips = listChips(full, 'categories', [
+      { slug: 'c0', name: 'C0' },
+      { slug: 'extra', name: 'Extra' },
+    ]);
+    expect(chips.map(({ selected, disabled }) => [selected, disabled])).toEqual(
+      [
+        [true, false],
+        [false, true],
+      ],
+    );
+  });
+
+  it('lists a chip for each party, marks the chosen one, and links it off', () => {
+    const chips = guestChips({ ...noFilters, guests: 4 });
+    expect(chips.map(({ label }) => label)).toEqual([
+      '1 guest',
+      '2 guests',
+      '3 guests',
+      '4 guests',
+      '5 guests',
+      '6 guests',
+    ]);
+    expect(chips.filter(({ selected }) => selected)).toEqual([
+      {
+        key: '4',
+        label: '4 guests',
+        selected: true,
+        disabled: false,
+        href: '/new-york/browse',
+      },
+    ]);
+    expect(chips[1]?.href).toBe('/new-york/browse?guests=2');
+  });
+
+  it('keeps the other filters when a party is chosen or cleared', () => {
+    const filters = { ...noFilters, categories: ['cooking'], guests: 2 };
+    const chips = guestChips(filters);
+    expect(chips[1]?.href).toBe('/new-york/browse?category=cooking');
+    expect(chips[2]?.href).toBe('/new-york/browse?category=cooking&guests=3');
+  });
+});
+
+describe('search select options', () => {
+  it('offers anywhere first, then each neighborhood by its slug', () => {
+    expect(
+      neighborhoodOptions([
+        { slug: 'dumbo', name: 'DUMBO' },
+        { slug: 'greenpoint', name: 'Greenpoint' },
+      ]),
+    ).toEqual([
+      { value: '', label: 'Anywhere' },
+      { value: 'dumbo', label: 'DUMBO' },
+      { value: 'greenpoint', label: 'Greenpoint' },
+    ]);
+  });
+
+  it('offers anywhere alone when there are no neighborhoods', () => {
+    expect(neighborhoodOptions([])).toEqual([{ value: '', label: 'Anywhere' }]);
+  });
+
+  it('offers each party size by its number', () => {
+    expect(guestOptions()).toEqual(
+      [1, 2, 3, 4, 5, 6].map((n) => ({ value: String(n), label: String(n) })),
+    );
   });
 });

@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cacheTagBudget } from '@/lib/pages/cacheTagBudget';
+import { photoLimits } from '@/lib/photos';
 import { idWithLetters } from '@/lib/pages/experience.fixtures';
 import { getCoverPhotos } from './coverPhotos';
 
@@ -39,6 +41,15 @@ describe('getCoverPhotos', () => {
       `experience:${id(1)}`,
       `experience:${id(2)}`,
     ]);
+  });
+
+  it('carries no more tags than the budget when asked for the most covers it takes', async () => {
+    await getCoverPhotos(
+      Array.from({ length: photoLimits.maxCoverLookups }, (_, n) => id(n)),
+    );
+
+    expect(cache.tag).toHaveBeenCalledTimes(photoLimits.maxCoverLookups);
+    expect(cache.tag.mock.calls.length).toBeLessThanOrEqual(cacheTagBudget);
   });
 
   it('tags the lower-case ID', async () => {

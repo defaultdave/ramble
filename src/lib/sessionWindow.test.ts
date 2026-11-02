@@ -66,3 +66,26 @@ describe('isOpenSession', () => {
     ).toBe(expected);
   });
 });
+
+describe('isOpenSession for a party', () => {
+  it.each([
+    ['4 spaces left for a party of 4', 4, 4, true],
+    ['3 spaces left for a party of 4', 3, 4, false],
+    ['1 space left for a party of 1', 1, 1, true],
+    ['no space left for a party of 1', 0, 1, false],
+    ['1 space left and no party given', 1, null, true],
+    ['no space left and no party given', 0, null, false],
+  ])('a session with %s', (_name, spacesLeft, party, expected) => {
+    const session = {
+      startsAt: at(60_000),
+      allocation: 10,
+      seatsSold: 10 - spacesLeft,
+    };
+    expect(isOpenSession(session, window, party)).toBe(expected);
+  });
+
+  it('still wants the session inside the window', () => {
+    const before = { startsAt: at(-60_000), allocation: 10, seatsSold: 0 };
+    expect(isOpenSession(before, window, 2)).toBe(false);
+  });
+});

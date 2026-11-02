@@ -1,3 +1,4 @@
+import { EmailAddressSchema } from '@/lib/email/address';
 import type {
   CollectionInput,
   HomeModulesInput,
@@ -35,6 +36,20 @@ export function taxonomyRow(
   };
 }
 
+/**
+ * Where a seeded host's booking notices go. `.example` is reserved, so nothing reaches a real
+ * inbox even with email live. An address the database CHECK would refuse stops the seed here.
+ */
+export function hostNotificationEmail(slug: string): string {
+  const address = `bookings@${slug}.example`;
+  if (!EmailAddressSchema.safeParse(address).success) {
+    throw new SeedStepError(
+      `Host "${slug}" cannot have a notification address: "${address}" is not a valid address`,
+    );
+  }
+  return address;
+}
+
 export function hostRow(host: HostFixture) {
   return {
     id: hostId(host.slug),
@@ -42,6 +57,7 @@ export function hostRow(host: HostFixture) {
     name: host.name,
     description: host.description,
     timeZone: host.timeZone ?? defaultTimeZone,
+    notificationEmail: hostNotificationEmail(host.slug),
   };
 }
 

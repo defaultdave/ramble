@@ -11,6 +11,7 @@ import {
   eventIds,
   eventRetry,
   intakeResponse,
+  isDeliveryTaken,
   isPaymentEventType,
   isProviderMismatch,
   isRefusedSignature,
@@ -837,6 +838,19 @@ describe('intake helpers', () => {
     [{ kind: 'accepted' }, { status: 200 }],
   ] as const)('answers %j with %j', (outcome, response) => {
     expect(intakeResponse(outcome)).toEqual(response);
+  });
+
+  it.each([
+    [200, true],
+    [204, true],
+    [199, false],
+    [300, false],
+    [400, false],
+    [413, false],
+    [429, false],
+    [500, false],
+  ])('counts a %i answer as taken: %s', (status, taken) => {
+    expect(isDeliveryTaken(status)).toBe(taken);
   });
 
   it('knows a payment event from one that belongs to a later unit', () => {

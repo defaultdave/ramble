@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { BookingSheet } from '@/components/BookingSheet';
 import {
   BookingChoices,
@@ -7,6 +8,7 @@ import {
   BookingModeSwitch,
   BookingPausedNotice,
 } from '@/components/BookingChoices';
+import { focusBookingNotice } from '@/components/BookingChoices/focusBookingNotice';
 import { useBookingDraft } from '@/components/BookingChoices/useBookingDraft';
 import {
   canContinue,
@@ -18,6 +20,10 @@ import styles from './BookingSheetIsland.module.css';
 /** The booking sheet a phone opens from the bar: the choices, and Continue, which places the hold. */
 export function BookingSheetIsland({ offer }: { offer: BookingOffer }) {
   const { state, handlers, submit } = useBookingDraft(offer);
+  const { notice } = state;
+  useEffect(() => {
+    if (notice) focusBookingNotice('[role="dialog"]');
+  }, [notice]);
   const view = choicesView(offer, state);
   return (
     <BookingSheet

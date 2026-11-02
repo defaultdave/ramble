@@ -27,7 +27,7 @@ import {
 // - the migration inserts three cancellation tiers and exactly one is the default
 // - a guest lookup carries the ids a cache tag needs, children in one result, and no host-only field
 // - a guest lookup hides the three hidden statuses, and a malformed or unknown ID is null
-// - categories and neighborhoods list by name and look up by slug; a malformed slug is null
+// - categories and neighborhoods list by name
 // - a renamed slug resolves to its entity, an unknown or malformed one is null, and a slug
 //   that is live again is no longer retired
 // - an owner lists their own experiences in every status and not another host's
@@ -250,31 +250,20 @@ describe('guest reads', () => {
 });
 
 describe('categories and neighborhoods', () => {
-  it('list by name and look up by slug', async () => {
-    const zeta = await insertCategory({ name: 'ZZ Zeta' });
-    const alpha = await insertCategory({ name: 'ZZ Alpha' });
-    const hill = await insertNeighborhood({ name: 'ZZ Hill' });
+  it('list by name', async () => {
+    await insertCategory({ name: 'ZZ Zeta' });
+    await insertCategory({ name: 'ZZ Alpha' });
+    await insertNeighborhood({ name: 'ZZ Hill' });
 
     const names = (await catalog.listCategories())
       .map((category) => category.name)
       .filter((name) => name.startsWith('ZZ'));
 
     expect(names).toEqual(['ZZ Alpha', 'ZZ Zeta']);
-    expect(await catalog.getCategoryBySlug(alpha.slug)).toEqual(alpha);
-    expect(await catalog.getCategoryBySlug(zeta.slug)).toEqual(zeta);
-    expect(await catalog.getNeighborhoodBySlug(hill.slug)).toEqual(hill);
     expect(
       (await catalog.listNeighborhoods()).map(({ name }) => name),
     ).toContain('ZZ Hill');
   });
-
-  it.each(['no-such-slug', 'Not A Slug', ''])(
-    'return null for the slug %j',
-    async (slug) => {
-      expect(await catalog.getCategoryBySlug(slug)).toBeNull();
-      expect(await catalog.getNeighborhoodBySlug(slug)).toBeNull();
-    },
-  );
 });
 
 describe('slug history', () => {

@@ -75,12 +75,41 @@ describe('hero search', () => {
     expect(
       options.map((o) => [o.textContent, o.getAttribute('value')]),
     ).toEqual([
-      ['Anywhere in New York', ''],
+      ['Anywhere', ''],
       ['Carroll Gardens', 'carroll-gardens'],
       ['DUMBO', 'dumbo'],
       ['Greenpoint', 'greenpoint'],
     ]);
   });
+
+  it('starts the guests on two and offers one to six, named guests', () => {
+    render_([hero]);
+    const guests = screen.getByLabelText('Guests');
+    expect(guests).toHaveAttribute('name', 'guests');
+    expect(guests).toHaveValue('2');
+    expect(
+      within(guests)
+        .getAllByRole('option')
+        .map((option) => option.getAttribute('value')),
+    ).toEqual(['1', '2', '3', '4', '5', '6']);
+  });
+
+  it.each(['2', '4', '6'])(
+    'submits a party of %s as the guests of the browse address',
+    (party) => {
+      render_([hero]);
+      fireEvent.change(screen.getByLabelText('Guests'), {
+        target: { value: party },
+      });
+      const form = screen.getByRole('form', { name: 'Find something to do' });
+      const sent = Object.fromEntries(
+        [...new FormData(form as HTMLFormElement)].flatMap(([k, v]) =>
+          typeof v === 'string' ? [[k, v]] : [],
+        ),
+      );
+      expect(parseFilters(sent).filters.guests).toBe(Number(party));
+    },
+  );
 
   it('offers no day before the one it was given', () => {
     render_([hero]);
@@ -116,6 +145,7 @@ describe('hero search', () => {
         categories: [],
         neighborhoods: [],
         date: expected,
+        guests: 2,
       });
     },
   );

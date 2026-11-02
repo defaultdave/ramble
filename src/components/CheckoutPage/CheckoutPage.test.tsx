@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StartPaymentResult } from '@/lib/checkout';
@@ -18,6 +18,45 @@ import { CheckoutPage, type CheckoutActions } from './CheckoutPage';
 
 const push = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
+
+const renders = vi.hoisted(() => ({
+  summary: 0,
+  fields: new Map<string, number>(),
+}));
+const countField = (label: string) => {
+  renders.fields.set(label, (renders.fields.get(label) ?? 0) + 1);
+};
+vi.mock('@/components/Input', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/components/Input')>();
+  return {
+    ...actual,
+    Input: (props: React.ComponentProps<typeof actual.Input>) => {
+      countField(props.label);
+      return <actual.Input {...props} />;
+    },
+  };
+});
+vi.mock('@/components/Checkbox', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/components/Checkbox')>();
+  return {
+    ...actual,
+    Checkbox: (props: React.ComponentProps<typeof actual.Checkbox>) => {
+      countField(props.label);
+      return <actual.Checkbox {...props} />;
+    },
+  };
+});
+vi.mock('@/components/OrderSummary', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/components/OrderSummary')>();
+  return {
+    ...actual,
+    OrderSummary: (props: React.ComponentProps<typeof actual.OrderSummary>) => {
+      renders.summary += 1;
+      return <actual.OrderSummary {...props} />;
+    },
+  };
+});
 
 const uuid = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -78,6 +117,7 @@ function actions(
 
 beforeEach(() => {
   push.mockReset();
+  renders.fields.clear();
   vi.stubGlobal(
     'matchMedia',
     vi.fn(() => ({
@@ -461,6 +501,47 @@ describe('CheckoutPage', () => {
     ).toBeVisible();
   });
 
+  it('ticks the timer without re-rendering the rest of the page', () => {
+    vi.useFakeTimers();
+    try {
+      render(<CheckoutPage view={view} actions={actions()} />);
+      const before = renders.summary;
+      const text = screen.getByRole('timer').textContent;
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      expect(screen.getByRole('timer').textContent).not.toBe(text);
+      expect(renders.summary).toBe(before);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ends the hold from the timer when it runs out', () => {
+    vi.useFakeTimers();
+    try {
+      const soon = new Date(Date.now() + 2000).toISOString();
+      render(
+        <CheckoutPage
+          view={{
+            ...view,
+            expiresAt: soon,
+            serverNow: new Date().toISOString(),
+          }}
+          actions={actions()}
+        />,
+      );
+      expect(screen.queryByText('Your hold ended')).not.toBeInTheDocument();
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      expect(screen.getByText('Your hold ended')).toBeVisible();
+      expect(screen.getByRole('timer')).toHaveTextContent('Hold expired');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('holds again from the ended state and goes to the new checkout', async () => {
     const a = actions();
     a.reserve = vi.fn(() =>
@@ -492,6 +573,60 @@ describe('CheckoutPage', () => {
     });
     expect(a.reserve).toHaveBeenCalledWith({ holdId: view.holdId });
     expect(a.startPayment).not.toHaveBeenCalled();
+  });
+
+  it('re-renders only the field typed in, not the page or the other fields', async () => {
+    const user = userEvent.setup();
+    render(
+      <CheckoutPage
+        view={{
+          ...view,
+          children: 2,
+          ageSubject: { ageRule: 'all_ages', minAge: null, maxAge: null },
+        }}
+        actions={actions()}
+      />,
+    );
+    const others = [
+      'Phone',
+      'Lead guest name',
+      'Child 1 age',
+      'Child 2 age',
+      'Guardian name',
+      'Guardian phone or email',
+      'Send me the Ramble newsletter',
+      'I accept the waiver for everyone in my party',
+      "I accept Ramble's terms and the cancellation terms below",
+    ];
+    const typedIn = (label: string) => renders.fields.get(label) ?? 0;
+    const summaryBefore = renders.summary;
+    const before = new Map(others.map((label) => [label, typedIn(label)]));
+    const emailBefore = typedIn('Email');
+
+    await user.type(screen.getByLabelText('Email'), 'abc');
+    expect(screen.getByLabelText('Email')).toHaveValue('abc');
+    await user.type(screen.getByLabelText('Child 2 age'), '7');
+
+    expect(typedIn('Email')).toBe(emailBefore + 3);
+    expect(renders.summary).toBe(summaryBefore);
+    expect(typedIn('Child 2 age')).toBe((before.get('Child 2 age') ?? 0) + 1);
+    for (const label of others.filter((l) => l !== 'Child 2 age')) {
+      expect(typedIn(label), label).toBe(before.get(label));
+    }
+  });
+
+  it('ticking a box re-renders only that box', async () => {
+    const user = userEvent.setup();
+    render(<CheckoutPage view={view} actions={actions()} />);
+    const terms = "I accept Ramble's terms and the cancellation terms below";
+    const before = new Map(renders.fields);
+    await user.click(screen.getByLabelText(terms));
+    expect(screen.getByLabelText(terms)).toBeChecked();
+    expect(renders.fields.get(terms)).toBe((before.get(terms) ?? 0) + 1);
+    expect(renders.fields.get('Email')).toBe(before.get('Email'));
+    expect(renders.fields.get('Send me the Ramble newsletter')).toBe(
+      before.get('Send me the Ramble newsletter'),
+    );
   });
 
   it('asks for children ages and a guardian when children come', () => {

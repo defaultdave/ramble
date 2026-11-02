@@ -10,4 +10,9 @@ if [ "$VERCEL_ENV" = "preview" ]; then
   fi
 fi
 
-pnpm build
+# REACT_PROFILING=1 builds with React's profiler enabled, so DevTools' Profiler works on the deployed site.
+if [ "$REACT_PROFILING" = "1" ]; then
+  pnpm build --profile
+else
+  pnpm build
+fi

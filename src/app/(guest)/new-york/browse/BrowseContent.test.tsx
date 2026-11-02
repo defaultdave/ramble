@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { browseResultsId } from '@/lib/pages/browse';
 import { BrowseContent } from './BrowseContent';
 
 // Behaviours under test, one per decision, branch or risk:
@@ -10,6 +11,7 @@ import { BrowseContent } from './BrowseContent';
 // - a slug the catalog has no row for never reaches the cached reads, and the page keeps the address it was given
 // - filters that match nothing show the empty state without any date or result read
 // - a failed content read renders the error state
+// - both branches are wrapped in the element that is shown with scripting off, with the id the skip link targets
 
 const server = vi.hoisted(() => ({
   options: vi.fn(),
@@ -18,8 +20,10 @@ const server = vi.hoisted(() => ({
   logError: vi.fn(),
 }));
 vi.mock('next/server', () => ({ connection: () => Promise.resolve() }));
-vi.mock('@/server/browse', () => ({
+vi.mock('@/server/filterOptions', () => ({
   getFilterOptions: server.options,
+}));
+vi.mock('@/server/browse', () => ({
   getBrowseDates: server.dates,
   getBrowseResults: server.results,
 }));
@@ -103,6 +107,31 @@ describe('BrowseContent', () => {
     expect(screen.getByRole('status')).toBeEmptyDOMElement();
   });
 
+  // With scripting off, only a wrapper marked this way is shown, so a branch without it is a blank page.
+  it.each([
+    {
+      branch: 'read',
+      fail: false,
+      inside: () => screen.getByTestId('filters'),
+    },
+    {
+      branch: 'failed',
+      fail: true,
+      inside: () => screen.getByRole('alert'),
+    },
+  ])(
+    'marks the $branch branch to be shown with scripting off, and reachable by the skip link',
+    async ({ fail, inside }) => {
+      if (fail) server.results.mockRejectedValue(driverError);
+
+      const { container } = await render_();
+
+      const shown = container.querySelector('[data-reveal-without-script]');
+      expect(shown).toHaveAttribute('id', browseResultsId);
+      expect(shown).toContainElement(inside());
+    },
+  );
+
   it('offers the next day from the calendar days when a dated browse has no results', async () => {
     server.dates.mockResolvedValue(['2026-11-02', '2026-11-09']);
     server.results.mockResolvedValue({
@@ -165,12 +194,22 @@ describe('BrowseContent', () => {
       render(await withSlugs({ category: ['junk', 'cooking'] }));
 
       expect(server.dates).toHaveBeenCalledExactlyOnceWith(
-        { categories: ['cooking'], neighborhoods: [], date: null },
+        {
+          categories: ['cooking'],
+          neighborhoods: [],
+          date: null,
+          guests: null,
+        },
         expect.any(String),
       );
       expect(server.results).toHaveBeenCalledExactlyOnceWith(
         {
-          filters: { categories: ['cooking'], neighborhoods: [], date: null },
+          filters: {
+            categories: ['cooking'],
+            neighborhoods: [],
+            date: null,
+            guests: null,
+          },
           after: null,
         },
         expect.any(String),

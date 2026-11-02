@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { EntityIdSchema, httpUrlPattern } from './catalog';
-import { cardLookupLimit } from './experienceCards';
+import { coverLookupLimit } from './idLookup';
 
 /**
  * Every bound on a photo in one place. The input bounds are checked before any pixel is decoded;
@@ -20,8 +20,8 @@ export const photoLimits = {
   storedEdge: 2400,
   maxStoredBytes: 5 * 1024 * 1024,
   maxPerExperience: 20,
-  /** The experiences one batch read of cover photos looks up: the same bound as one card read (`cardLookupLimit`). */
-  maxCoverLookups: cardLookupLimit,
+  /** The experiences one batch read of cover photos looks up: the cards the home page draws. */
+  maxCoverLookups: coverLookupLimit,
   maxAltLength: 300,
   maxRightsTextLength: 200,
   maxUrlLength: 2048,

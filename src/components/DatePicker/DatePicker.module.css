@@ -102,10 +102,19 @@
   border-color: var(--color-border-strong);
 }
 
-.cell[data-unavailable],
+/* A day with no sessions is information, not an inert control, so it keeps readable contrast and a strike-through instead of the disabled color alone. */
+.cell[data-unavailable] {
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-secondary);
+  text-decoration: line-through;
+  cursor: default;
+}
+
+/* A day before today, or any day while the whole calendar is disabled, is inert. */
 .cell[data-disabled] {
   font-weight: var(--font-weight-regular);
   color: var(--color-text-disabled);
+  text-decoration: none;
   cursor: default;
 }
 

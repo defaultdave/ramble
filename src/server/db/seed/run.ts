@@ -189,6 +189,7 @@ async function writeHostsAndExperiences(catalog: ScaleFixtures, refs: RefMaps) {
             name: excluded('name'),
             description: excluded('description'),
             timeZone: excluded('time_zone'),
+            notificationEmail: excluded('notification_email'),
           },
         });
     }

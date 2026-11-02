@@ -56,6 +56,8 @@ A refusal prints the reason and never the connection string.
 
 `SEED_TARGET=production-demo` is the one explicit way to seed the production database, for the Prototype demo site. It loads the curated set only (`--scale` is refused), and it is idempotent: a rerun changes nothing, and a legal document that already has a published version is left alone.
 
+Every seeded host gets the notification address `bookings@<slug>.example`, on a reserved domain that nothing can deliver to, so a booking of a seeded host does not leave a `host-booking-notice` job failing. A rerun fills the address of an existing host that has none (it also resets one that was changed by hand to this derived value).
+
 Run `db-migrate-production` first (the GitHub Actions workflow; the seed needs the migrated schema). Then, from the repo root on your laptop, with the Vercel CLI linked to the Ramble project (`vercel link`):
 
 ```

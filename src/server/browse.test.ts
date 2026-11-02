@@ -1,13 +1,12 @@
 import { notFound } from 'next/navigation';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { browseTitle } from '@/lib/pages/browse';
-import { noFilters } from '@/lib/filters';
 import {
-  getBrowseDates,
-  getBrowseResults,
-  getBrowseTitle,
-  getFilterOptions,
-} from './browse';
+  cacheEntryTagCounts,
+  cacheTagBudget,
+} from '@/lib/pages/cacheTagBudget';
+import { browsePageSize, browseTitle } from '@/lib/pages/browse';
+import { noFilters } from '@/lib/filters';
+import { getBrowseDates, getBrowseResults, getBrowseTitle } from './browse';
 
 // Behaviours under test, one per decision, branch or risk:
 // - each cached read names its cache profile and tags itself, results with the catalog and every experience they list
@@ -70,6 +69,21 @@ describe('getBrowseResults', () => {
     ]);
   });
 
+  it('carries no more tags than the budget on a full page', async () => {
+    db.results.mockResolvedValue({
+      cursor: null,
+      items: Array.from({ length: browsePageSize }, (_, n) => ({
+        id: String(n),
+      })),
+      nextCursor: null,
+    });
+
+    await getBrowseResults(query, asOf);
+
+    expect(cache.tag.mock.calls).toHaveLength(cacheEntryTagCounts.browse);
+    expect(cache.tag.mock.calls.length).toBeLessThanOrEqual(cacheTagBudget);
+  });
+
   it('tags only the catalog when the cursor was not found', async () => {
     db.results.mockResolvedValue({ cursor: null, items: [], nextCursor: null });
 
@@ -120,7 +134,7 @@ describe('getBrowseDates', () => {
     });
 
     await expect(
-      getBrowseDates({ categories: [], neighborhoods: [] }, asOf),
+      getBrowseDates({ categories: [], neighborhoods: [], guests: null }, asOf),
     ).resolves.toEqual(['2026-11-08']);
 
     expect(cache.life).toHaveBeenCalledExactlyOnceWith('browse');
@@ -131,7 +145,7 @@ describe('getBrowseDates', () => {
     db.dates.mockRejectedValue(driverError);
 
     await expect(
-      getBrowseDates({ categories: [], neighborhoods: [] }, asOf),
+      getBrowseDates({ categories: [], neighborhoods: [], guests: null }, asOf),
     ).rejects.toThrow('Browse dates read failed: Error');
   });
 });
@@ -146,7 +160,7 @@ describe('getBrowseDates with a session the calendar cannot place', () => {
     });
 
     const failure = await getBrowseDates(
-      { categories: [], neighborhoods: [] },
+      { categories: [], neighborhoods: [], guests: null },
       asOf,
     ).catch((error: unknown) => error);
 
@@ -155,41 +169,6 @@ describe('getBrowseDates with a session the calendar cannot place', () => {
       message: 'Browse dates read failed: RangeError',
     });
     expect(JSON.stringify(failure)).not.toContain('Phobos');
-  });
-});
-
-describe('getFilterOptions', () => {
-  it('uses the catalog profile and returns both lists', async () => {
-    db.categories.mockResolvedValue([
-      { id: '1', slug: 'cooking', name: 'Cooking' },
-    ]);
-    db.neighborhoods.mockResolvedValue([]);
-
-    await expect(getFilterOptions()).resolves.toEqual({
-      categories: [{ id: '1', slug: 'cooking', name: 'Cooking' }],
-      neighborhoods: [],
-    });
-
-    expect(cache.life).toHaveBeenCalledExactlyOnceWith('catalog');
-    expect(cache.tag.mock.calls.flat()).toEqual(['catalog']);
-  });
-
-  it('throws only the kind of a failed read', async () => {
-    db.categories.mockRejectedValue(driverError);
-    db.neighborhoods.mockResolvedValue([]);
-
-    await expect(getFilterOptions()).rejects.toThrow(
-      'Filter options read failed: Error',
-    );
-  });
-
-  it('names a thrown value that is not an Error as unknown', async () => {
-    db.categories.mockRejectedValue('plain text');
-    db.neighborhoods.mockResolvedValue([]);
-
-    await expect(getFilterOptions()).rejects.toThrow(
-      'Filter options read failed: unknown',
-    );
   });
 });
 

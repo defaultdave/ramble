@@ -101,11 +101,15 @@ export function landingView(
   page: BrowsePage,
 ): BrowseView {
   // A landing page has no date, so the calendar days browse looks the next day up in are not needed.
-  return browseView(landingQuery(kind, slug), page, []);
+  const view = browseView(landingQuery(kind, slug), page, []);
+  // The page's filter is its subject, not a filter a guest can take off, so an empty page is not a filtered one.
+  return view.state === 'empty'
+    ? { state: 'empty', filtered: false, dated: null, wording: 'landing' }
+    : view;
 }
 
 /** Try again reloads this page, not browse: the failed read was the page's own. */
 export function landingErrorView(kind: LandingKind, slug: string): BrowseView {
   const retry: FormTarget = { action: landingPath(kind, slug), fields: [] };
-  return { state: 'error', retry };
+  return { state: 'error', retry, wording: 'landing' };
 }

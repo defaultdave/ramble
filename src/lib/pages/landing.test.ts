@@ -22,7 +22,7 @@ import type { BrowsePage } from './browse';
 // - the address, the cache tag, and the browse query follow the kind: a category page filters by category, a neighborhood page by neighborhood, and nothing else
 // - the target is found by kind and slug: a slug of the other kind, or none, finds nothing
 // - the heading is the editor's when there is one, otherwise made from the name for the kind; the head adds the meta description only when written
-// - the results are browse's first page for that query, with Show more going to browse and an empty page worded as filtered
+// - the results are browse's first page for that query, with Show more going to browse and an empty page worded for a page with no filters
 // - Try again returns to the page itself
 
 const options = {
@@ -156,14 +156,19 @@ describe('landingView', () => {
     });
   });
 
-  it('words a page with nothing on it as a filtered one', () => {
+  it('words a page with nothing on it for a page with no filters to take off', () => {
     expect(
       landingView('neighborhood', 'dumbo', {
         ok: true,
         items: [],
         nextCursor: null,
       }),
-    ).toEqual({ state: 'empty', filtered: true, dated: null });
+    ).toEqual({
+      state: 'empty',
+      filtered: false,
+      dated: null,
+      wording: 'landing',
+    });
   });
 });
 
@@ -172,6 +177,7 @@ describe('landingErrorView', () => {
     expect(landingErrorView(kind, 'cooking')).toEqual({
       state: 'error',
       retry: { action: landingPath(kind, 'cooking'), fields: [] },
+      wording: 'landing',
     });
   });
 });

@@ -250,31 +250,20 @@ describe('guest reads', () => {
 });
 
 describe('categories and neighborhoods', () => {
-  it('list by name and look up by slug', async () => {
-    const zeta = await insertCategory({ name: 'ZZ Zeta' });
-    const alpha = await insertCategory({ name: 'ZZ Alpha' });
-    const hill = await insertNeighborhood({ name: 'ZZ Hill' });
+  it('list by name', async () => {
+    await insertCategory({ name: 'ZZ Zeta' });
+    await insertCategory({ name: 'ZZ Alpha' });
+    await insertNeighborhood({ name: 'ZZ Hill' });
 
     const names = (await catalog.listCategories())
       .map((category) => category.name)
       .filter((name) => name.startsWith('ZZ'));
 
     expect(names).toEqual(['ZZ Alpha', 'ZZ Zeta']);
-    expect(await catalog.getCategoryBySlug(alpha.slug)).toEqual(alpha);
-    expect(await catalog.getCategoryBySlug(zeta.slug)).toEqual(zeta);
-    expect(await catalog.getNeighborhoodBySlug(hill.slug)).toEqual(hill);
     expect(
       (await catalog.listNeighborhoods()).map(({ name }) => name),
     ).toContain('ZZ Hill');
   });
-
-  it.each(['no-such-slug', 'Not A Slug', ''])(
-    'return null for the slug %j',
-    async (slug) => {
-      expect(await catalog.getCategoryBySlug(slug)).toBeNull();
-      expect(await catalog.getNeighborhoodBySlug(slug)).toBeNull();
-    },
-  );
 });
 
 describe('slug history', () => {

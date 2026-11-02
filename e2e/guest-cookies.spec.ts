@@ -1,6 +1,7 @@
 import { expect, test } from './fixtures';
 import {
   experiencePaths,
+  landingPaths,
   routes,
   unknownPaths,
   unprerenderedParamPath,
@@ -12,6 +13,7 @@ const guestPaths = [
   unknownPaths.guest,
   unprerenderedParamPath,
   ...Object.values(experiencePaths),
+  ...landingPaths.flatMap(({ notASlug, wellFormed }) => [notASlug, wellFormed]),
 ];
 
 for (const path of guestPaths) {

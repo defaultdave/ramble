@@ -4,6 +4,7 @@ import {
   notFoundHeading,
   perRequestFallbackPaths,
   experiencePaths,
+  landingPaths,
   perRequestGroups,
   routes,
   unknownPaths,
@@ -43,6 +44,10 @@ const paths: readonly PathRow[] = [
   { path: unprerenderedParamPath, dynamic: false, status: 200 },
   { path: experiencePaths.notFound, dynamic: false, status: 404 },
   { path: experiencePaths.readFails, dynamic: false, status: 200 },
+  ...landingPaths.flatMap(({ notASlug, wellFormed }) => [
+    { path: notASlug, dynamic: false, status: 404 },
+    { path: wellFormed, dynamic: false, status: 200 },
+  ]),
 ];
 
 const staticHeaders: readonly HeaderRow[] = [

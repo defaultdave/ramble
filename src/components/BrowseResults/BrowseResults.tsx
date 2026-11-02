@@ -1,7 +1,8 @@
 import Form from 'next/form';
-import { Alert } from '@/components/Alert';
 import { Button, ButtonLink } from '@/components/Button';
 import { ExperienceCardItem } from '@/components/ExperienceCard';
+import { HiddenFields } from '@/components/HiddenFields';
+import { RetryAlert } from '@/components/PageError';
 import type { BrowseView, FormTarget } from '@/lib/pages/browse';
 import { browsePath } from '@/lib/routes';
 import styles from './BrowseResults.module.css';
@@ -15,14 +16,7 @@ type TargetButtonProps = {
 function TargetButton({ target, label, variant }: TargetButtonProps) {
   return (
     <Form action={target.action} className={styles.form}>
-      {target.fields.map(([name, value]) => (
-        <input
-          key={`${name}=${value}`}
-          type="hidden"
-          name={name}
-          value={value}
-        />
-      ))}
+      <HiddenFields fields={target.fields} />
       <Button type="submit" variant={variant}>
         {label}
       </Button>
@@ -116,22 +110,20 @@ export function BrowseResults(props: BrowseResultsProps) {
       );
     case 'error':
       return (
-        <div className={styles.error}>
-          <Alert
-            tone="danger"
-            title="We couldn't load experiences"
-            body={
-              props.wording === 'landing'
-                ? 'Something went wrong on our side. Try again in a moment.'
-                : 'Something went wrong on our side. Your filters are saved.'
-            }
-          />
+        <RetryAlert
+          alertTitle="We couldn't load experiences"
+          alertBody={
+            props.wording === 'landing'
+              ? 'Something went wrong on our side. Try again in a moment.'
+              : 'Something went wrong on our side. Your filters are saved.'
+          }
+        >
           <TargetButton
             target={props.retry}
             label="Try again"
             variant="secondary"
           />
-        </div>
+        </RetryAlert>
       );
     case 'outdated':
       return (

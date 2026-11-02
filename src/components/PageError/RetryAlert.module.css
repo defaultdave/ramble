@@ -1,0 +1,19 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-4);
+  font-family: var(--font-family-body);
+}
+
+/* The button fills the form, which fills the phone width. */
+.root > form {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 768px) {
+  .root {
+    align-items: flex-start;
+  }
+}

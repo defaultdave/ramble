@@ -44,15 +44,6 @@
   flex-direction: column;
 }
 
-/* The retry button sits below the alert, full width on a phone like Show more. */
-.error {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: var(--space-4);
-  font-family: var(--font-family-body);
-}
-
 .notice {
   display: flex;
   flex-direction: column;
@@ -90,16 +81,7 @@
     align-items: center;
   }
 
-  .error {
-    align-items: flex-start;
-  }
-
-  .form {
+  .more .form {
     inline-size: 15rem;
-  }
-
-  /* The retry takes its label's width, as PageError's does. */
-  .error .form {
-    inline-size: auto;
   }
 }

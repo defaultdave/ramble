@@ -1,6 +1,7 @@
 import { Calendar, SlidersHorizontal } from 'lucide-react';
 import { Button, ButtonLink } from '@/components/Button';
 import { ChipLink } from '@/components/Chip';
+import { HiddenFields } from '@/components/HiddenFields';
 import { Input } from '@/components/Input';
 import { dateChipLabel } from '@/lib/pages/browse';
 import {
@@ -63,6 +64,28 @@ function ChipGroup({ legend, chips }: ChipGroupProps) {
         ))}
       </div>
     </fieldset>
+  );
+}
+
+type ChipGroupsProps = Pick<FilterBarProps, 'filters'> & {
+  categories: readonly FilterOption[];
+  neighborhoods: readonly FilterOption[];
+};
+
+/** The drawer's three chip groups, which the no-script bar shows again in the page. */
+function ChipGroups({ filters, categories, neighborhoods }: ChipGroupsProps) {
+  return (
+    <>
+      <ChipGroup legend="Guests" chips={guestChips(filters)} />
+      <ChipGroup
+        legend="Neighborhood"
+        chips={listChips(filters, 'neighborhoods', neighborhoods)}
+      />
+      <ChipGroup
+        legend="Category"
+        chips={listChips(filters, 'categories', categories)}
+      />
+    </>
   );
 }
 
@@ -144,14 +167,7 @@ function NoScriptFilters({
           method="get"
           aria-label="Choose a day"
         >
-          {kept.map(([name, value]) => (
-            <input
-              key={`${name}:${value}`}
-              type="hidden"
-              name={name}
-              value={value}
-            />
-          ))}
+          <HiddenFields fields={kept} />
           <Input
             type="date"
             name={browseParamNames.date}
@@ -161,14 +177,10 @@ function NoScriptFilters({
           />
           <Button type="submit">Show this day</Button>
         </form>
-        <ChipGroup legend="Guests" chips={guestChips(filters)} />
-        <ChipGroup
-          legend="Neighborhood"
-          chips={listChips(filters, 'neighborhoods', neighborhoods)}
-        />
-        <ChipGroup
-          legend="Category"
-          chips={listChips(filters, 'categories', categories)}
+        <ChipGroups
+          filters={filters}
+          categories={categories}
+          neighborhoods={neighborhoods}
         />
       </div>
     </noscript>
@@ -199,14 +211,10 @@ export function FilterBar({
               <legend className={styles.legend}>When</legend>
               <WhenControl {...when} placement="drawer" />
             </fieldset>
-            <ChipGroup legend="Guests" chips={guestChips(filters)} />
-            <ChipGroup
-              legend="Neighborhood"
-              chips={listChips(filters, 'neighborhoods', neighborhoods)}
-            />
-            <ChipGroup
-              legend="Category"
-              chips={listChips(filters, 'categories', categories)}
+            <ChipGroups
+              filters={filters}
+              categories={categories}
+              neighborhoods={neighborhoods}
             />
           </>
         }

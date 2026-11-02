@@ -15,6 +15,7 @@ import { BrowseResults } from './BrowseResults';
 // - the way back to the first results is there only on a later page
 // - empty says whether a filter is on and offers Clear all filters only then
 // - empty on a chosen day names the day and links to the next day with experiences and to any day, or only to any day when none follows; Clear all filters is offered only when another filter is on
+// - a page with no filters words its empty state without filters and offers browse, and its error without saying filters are saved
 // - an error is announced as an alert with a Try again form that carries the same address
 // - an outdated cursor says so and links to the first results
 
@@ -208,6 +209,34 @@ describe('BrowseResults empty', () => {
     expect(
       screen.queryByRole('link', { name: 'Clear all filters' }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('BrowseResults on a page with no filters', () => {
+  it('words empty without filters and offers all of browse', () => {
+    render(
+      <BrowseResults
+        state="empty"
+        filtered={false}
+        dated={null}
+        wording="landing"
+      />,
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Nothing here yet' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: 'Browse all experiences' }),
+    ).toHaveAttribute('href', '/new-york/browse');
+    expect(screen.queryByText(/filter/i)).not.toBeInTheDocument();
+  });
+
+  it('words an error without saying filters are saved', () => {
+    render(<BrowseResults state="error" retry={next} wording="landing" />);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Something went wrong on our side. Try again in a moment.',
+    );
+    expect(screen.queryByText(/filter/i)).not.toBeInTheDocument();
   });
 });
 

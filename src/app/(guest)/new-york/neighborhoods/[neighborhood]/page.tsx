@@ -1,22 +1,23 @@
 import type { Metadata } from 'next';
-import { use } from 'react';
-import { RoutePlaceholder } from '@/components/RoutePlaceholder';
+import { landingPlaceholderSlug } from '@/lib/pages/landing';
+import { LandingRoute, landingMetadata } from '../../_landing/LandingRoute';
 
-export const metadata: Metadata = { title: 'Neighborhood' };
-
+// The build has no database to list neighborhoods from, so it prerenders the placeholder; a real
+// neighborhood renders on its first request and is kept by the cached reads under it.
 export function generateStaticParams() {
-  return [{ neighborhood: 'sample' }];
+  return [{ neighborhood: landingPlaceholderSlug }];
 }
 
-export default function NeighborhoodPage({
+export async function generateMetadata({
+  params,
+}: PageProps<'/new-york/neighborhoods/[neighborhood]'>): Promise<Metadata> {
+  const { neighborhood } = await params;
+  return landingMetadata({ kind: 'neighborhood', slug: neighborhood });
+}
+
+export default async function NeighborhoodPage({
   params,
 }: PageProps<'/new-york/neighborhoods/[neighborhood]'>) {
-  const { neighborhood } = use(params);
-  return (
-    <RoutePlaceholder
-      name="Neighborhood"
-      covers="PRD-02, PRD-65"
-      param={neighborhood}
-    />
-  );
+  const { neighborhood } = await params;
+  return <LandingRoute kind="neighborhood" slug={neighborhood} />;
 }

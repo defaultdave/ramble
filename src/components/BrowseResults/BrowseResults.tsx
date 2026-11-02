@@ -86,6 +86,17 @@ export function BrowseResults(props: BrowseResultsProps) {
           </div>
         );
       }
+      if (props.wording === 'landing') {
+        return (
+          <div className={styles.notice}>
+            <h2 className={styles.noticeTitle}>Nothing here yet</h2>
+            <p className={styles.noticeText}>
+              New experiences are on their way.
+            </p>
+            <ButtonLink href={browsePath}>Browse all experiences</ButtonLink>
+          </div>
+        );
+      }
       return (
         <div className={styles.notice}>
           <h2 className={styles.noticeTitle}>
@@ -109,7 +120,11 @@ export function BrowseResults(props: BrowseResultsProps) {
           <Alert
             tone="danger"
             title="We couldn't load experiences"
-            body="Something went wrong on our side. Your filters are saved."
+            body={
+              props.wording === 'landing'
+                ? 'Something went wrong on our side. Try again in a moment.'
+                : 'Something went wrong on our side. Your filters are saved.'
+            }
           />
           <TargetButton
             target={props.retry}

@@ -851,7 +851,7 @@ export const retentionSchedule: readonly RetentionRow[] = [
     dataset: 'audit_log',
     startsAt: "The row's recorded time",
     period: pendingCounsel,
-    note: 'The table allows no delete, so rows stay in the database; the period is the lock on the nightly export objects, which only the storage lock can end',
+    note: 'The table allows no delete, so rows stay in the database. The nightly export is not switched on yet; once it is, the period is the lock on its objects, which only the storage lock can end',
   },
   {
     dataset: 'payment_tax_and_dispute_records',

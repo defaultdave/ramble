@@ -57,14 +57,13 @@ vi.mock('@/server/jobs/drain', async (original) => {
 //   hold, ledger rows, transfer, and the guest and host emails, from one stored event; the drain ran as a clock a few
 //   seconds ahead of now, and was handed to `after`
 // - the method the guest chose (card or a wallet) reaches the stored event, the fake's event, and the attempt
-// - a second Pay on the same payment is refused and adds no event, no stored event, and no drain
+// - a second Pay on a paid payment delivers the event again and adds no event and no stored event
 // - a decline delivers payment.failed (the attempt records the failed try and the order is not confirmed) and the
 //   guest's next try then confirms the order; the fifth decline ends the payment and a sixth Pay is refused
 // - 3-D Secure delivers payment.requires_action, then the success confirms the order
 // - a delivery the intake refuses throws without naming the payment or the body in the log, starts no drain, and
-//   leaves the fake holding the payment with its event
-// - a drain that fails does not fail the action and the failure is left to `after` to report; the job stays due for
-//   the next drain
+//   leaves the fake holding the payment with its event; the guest's next Pay delivers that event and confirms the order
+// - a drain that fails does not fail the action and is logged by name; the job stays due for the next drain
 
 let fresh: FreshDatabase;
 let client: typeof import('@/server/db/client');
@@ -213,14 +212,12 @@ describe('after Pay', () => {
     expect(await storedEvents()).toHaveLength(1);
   });
 
-  it('refuses a second Pay on a paid payment and adds no event', async () => {
+  it('answers a second Pay on a paid payment with the same event and adds no event', async () => {
     const { world, payment } = await atThePaymentForm();
     await pay(payment, card);
-    scheduled.length = 0;
 
-    await expect(pay(payment, card)).resolves.toEqual({ status: 'refused' });
+    await expect(pay(payment, card)).resolves.toEqual({ status: 'succeeded' });
 
-    expect(scheduled).toHaveLength(0);
     expect(await storedEvents()).toHaveLength(1);
     expect((await data.readFakeGatewayState()).events).toHaveLength(1);
     expect((await orderOf(world)).order.status).toBe('confirmed');
@@ -282,7 +279,7 @@ describe('after Pay', () => {
 
     expect(logged.error).toHaveBeenCalledExactlyOnceWith(
       'fake payment delivery refused',
-      { kind: 'delivery_refused', status: 429 },
+      { kind: 'delivery_refused', outcome: 'over_budget' },
     );
     const logs = JSON.stringify([
       logged.error.mock.calls,
@@ -298,14 +295,32 @@ describe('after Pay', () => {
     expect(held.events).toHaveLength(1);
   });
 
-  it('does not fail the action when the drain fails, and leaves the failure to after and the job due', async () => {
+  it('delivers the held event on the guest next Pay after the intake refused it, and confirms the order', async () => {
+    const { world, payment } = await atThePaymentForm();
+    intake.budget.mockResolvedValueOnce({
+      allowed: false,
+      retryAfterSeconds: 7,
+    });
+    await expect(pay(payment, card)).rejects.toThrow();
+
+    await expect(pay(payment, card)).resolves.toEqual({ status: 'succeeded' });
+
+    expect((await orderOf(world)).order.status).toBe('confirmed');
+    expect(await storedEvents()).toHaveLength(1);
+    expect((await data.readFakeGatewayState()).events).toHaveLength(1);
+  });
+
+  it('does not fail the action when the drain fails, and logs it and leaves the job due', async () => {
     const { world, payment } = await atThePaymentForm();
     drainer.drainJobs.mockRejectedValueOnce(new TypeError('connection lost'));
 
     await expect(pay(payment, card)).resolves.toEqual({ status: 'succeeded' });
 
-    await expect(scheduled[0]).rejects.toThrow('connection lost');
-    expect(logged.error).not.toHaveBeenCalled();
+    await expect(scheduled[0]).resolves.toBeUndefined();
+    expect(logged.error).toHaveBeenCalledExactlyOnceWith(
+      'fake payment drain failed',
+      { errorName: 'TypeError' },
+    );
     expect((await orderOf(world)).order.status).toBe('pending_payment');
     const due = await client.db.execute<{ status: string }>(
       sql`SELECT status FROM jobs WHERE kind = 'process-provider-event'`,

@@ -5,13 +5,9 @@ import {
   fakeDrainWaitMs,
   type FakeConfirmPlan,
 } from '@/lib/fakePayment';
-import { isDeliveryTaken } from '@/lib/providerEvents';
 import { drainJobs } from '@/server/jobs/drain';
 import { logger } from '@/server/monitoring/logger';
-import {
-  paymentWebhookResponse,
-  signatureHeader,
-} from '@/server/paymentWebhook';
+import { signatureHeader, takePaymentWebhook } from '@/server/paymentWebhook';
 import { fixedClock, systemClock } from '@/server/ports/clock';
 import { getFakePayments } from '@/server/ports/payments/gateway';
 
@@ -31,16 +27,29 @@ async function settleWithin(work: Promise<unknown>, ms: number): Promise<void> {
   }
 }
 
+/** A paid payment cannot be confirmed twice, so a retry of a success is answered with the event the first one emitted. */
+async function confirmOrRecall(
+  fake: ReturnType<typeof getFakePayments>,
+  paymentId: string,
+  plan: FakeConfirmPlan,
+) {
+  if (plan.outcome === 'succeeded') {
+    const last = await fake.lastEventFor(paymentId);
+    if (last?.type === 'payment.succeeded') return { event: last };
+  }
+  return fake.confirm(paymentId, plan);
+}
+
 /**
  * Plays the guest's confirmation at the fake gateway and hands its event to the webhook intake the way
  * a real provider would, so the order moves without anyone calling the webhook by hand. The event is
  * signed here and checked by the same route code in this process, which is why the fake's webhook
  * secret needs no setting. Once the intake has taken it, the job it queued is drained, and the reply
  * waits for that for a few seconds so the page the guest lands on already shows the result. `after`
- * keeps the work alive past the reply and reports a failure of it, so a failed drain is never
- * swallowed here and never fails the guest, who has paid: the job stays due. A refused delivery throws,
- * naming only the kind: the fake has the payment and Ramble does not, so the guest must be told to wait
- * rather than to pay again.
+ * keeps the work alive past the reply; a failed drain is logged here and never fails the guest, who has
+ * paid: the job stays due. A refused delivery throws, naming only the kind, and the fake keeps the
+ * payment's event: when the guest retries, that same event is delivered again (the intake stores it
+ * once however often it arrives) instead of the fake refusing a second success.
  */
 // TODO(U-046): Stripe delivers its own events; this stays for the fake only.
 export async function deliverFakeConfirmation(
@@ -48,23 +57,29 @@ export async function deliverFakeConfirmation(
   plan: FakeConfirmPlan,
 ): Promise<void> {
   const fake = getFakePayments();
-  const { event } = await fake.confirm(paymentId, plan);
+  const { event } = await confirmOrRecall(fake, paymentId, plan);
   const { rawBody, signature } = fake.signWebhook(event);
-  const response = await paymentWebhookResponse(
+  const outcome = await takePaymentWebhook(
     new Request(deliveryUrl, {
       method: 'POST',
       headers: { [signatureHeader]: signature },
       body: rawBody,
     }),
   );
-  if (!isDeliveryTaken(response.status)) {
+  if (outcome.kind !== 'accepted') {
     logger.error('fake payment delivery refused', {
       kind: 'delivery_refused',
-      status: response.status,
+      outcome: outcome.kind,
     });
     throw new Error('The fake payment event was not taken');
   }
-  const drained = drainJobs(fixedClock(fakeDrainTime(systemClock.now())));
+  const drained = drainJobs(fixedClock(fakeDrainTime(systemClock.now()))).catch(
+    (error: unknown) => {
+      logger.error('fake payment drain failed', {
+        errorName: error instanceof Error ? error.name : 'NonError',
+      });
+    },
+  );
   after(drained);
   await settleWithin(drained, fakeDrainWaitMs);
 }

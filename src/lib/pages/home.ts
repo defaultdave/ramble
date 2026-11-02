@@ -73,6 +73,14 @@ export const HomePickSchema = z.object({
 });
 export type HomePick = z.infer<typeof HomePickSchema>;
 
+/** What the home gift guide module reads of the gift guide: its copy, and nothing of its entries. */
+export const HomeGiftGuideSchema = z.object({
+  id: EntityIdSchema,
+  title: z.string(),
+  summary: z.string().nullable(),
+});
+export type HomeGiftGuide = z.infer<typeof HomeGiftGuideSchema>;
+
 /** The Pick IDs one home read looks up: at most one per module. */
 export const HomePickIdsSchema = idListSchema(editorialLimits.homeModules);
 
@@ -192,7 +200,7 @@ export type HomeInput = {
   modules: readonly HomeModule[];
   picks: readonly HomePick[];
   /** The published gift guide, which the gift guide module takes its copy from. */
-  giftGuide: Collection | null;
+  giftGuide: HomeGiftGuide | null;
   categories: readonly Category[];
   neighborhoods: readonly Neighborhood[];
   experiences: readonly CardExperience[];

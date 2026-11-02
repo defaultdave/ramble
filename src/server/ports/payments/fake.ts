@@ -121,6 +121,8 @@ export type FakePaymentsAdapter = PaymentsPort & {
   confirm(paymentId: string, input: ConfirmInput): Promise<ConfirmedPayment>;
   /** Every event emitted so far, oldest first. */
   emittedEvents(): ProviderEvent[];
+  /** The newest event emitted for a payment, as a copy, or null when it has emitted none: what a provider sends again when its delivery was not taken. */
+  lastEventFor(paymentId: string): Promise<ProviderEvent | null>;
   /** Signs an event as a delivery timestamped `signedAt` (now by default), so a late delivery is signed fresh. */
   signWebhook(event: ProviderEvent, signedAt?: Date): WebhookDelivery;
   /** Signs any body, for deliveries the fake would never emit itself. */
@@ -379,6 +381,13 @@ export function createFakePaymentsAdapter(
     }
   }
 
+  function lastEventFor(paymentId: string): ProviderEvent | null {
+    const found = state.events.findLast(
+      (event) => event.objectId === paymentId,
+    );
+    return found ? copy(found) : null;
+  }
+
   function createPayment(rawInput: unknown): Payment {
     const input = parseOrThrow(CreatePaymentInputSchema, rawInput);
     return idempotent(
@@ -626,6 +635,7 @@ export function createFakePaymentsAdapter(
       Promise.resolve({ availableMinor: state.balanceMinor, currency }),
     confirm: (paymentId, input) => settled(() => confirm(paymentId, input)),
     emittedEvents: () => state.events.map(copy),
+    lastEventFor: (paymentId) => settled(() => lastEventFor(paymentId)),
     signWebhook: (event, signedAt) => signBody(JSON.stringify(event), signedAt),
     signBody,
   };

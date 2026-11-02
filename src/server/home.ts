@@ -2,12 +2,13 @@ import 'server-only';
 import { cacheLife, cacheTag } from 'next/cache';
 import { tags } from '@/lib/cacheTags';
 import type { Category, Neighborhood } from '@/lib/catalog';
-import type { Collection, HomeModule } from '@/lib/editorial';
+import type { HomeModule } from '@/lib/editorial';
 import {
   homePickIds,
   homeExperienceIds,
   homeLimits,
   thisWeekExperienceIds,
+  type HomeGiftGuide,
   type HomePick,
 } from '@/lib/pages/home';
 import type { CardExperience } from '@/lib/experienceCards';
@@ -15,7 +16,7 @@ import { upcomingWindow } from '@/lib/sessionWindow';
 import { readOrRefuse } from '@/server/cache/readOrRefuse';
 import { tagExperiences } from '@/server/cache/tagExperiences';
 import {
-  getPublishedGiftGuide,
+  getHomeGiftGuide,
   listHomeModules,
   listHomePicks,
 } from '@/server/db/editorial';
@@ -25,7 +26,7 @@ import { getFilterOptions } from '@/server/filterOptions';
 export type HomeContent = {
   modules: HomeModule[];
   picks: HomePick[];
-  giftGuide: Collection | null;
+  giftGuide: HomeGiftGuide | null;
   categories: Category[];
   neighborhoods: Neighborhood[];
   experiences: CardExperience[];
@@ -50,7 +51,7 @@ export async function getHomeContent(): Promise<HomeContent> {
           modules: listed,
           picks: await listHomePicks(homePickIds(listed)),
         })),
-        getPublishedGiftGuide(),
+        getHomeGiftGuide(),
         getFilterOptions(),
       ]);
     const experienceIds = homeExperienceIds(modules, picks);

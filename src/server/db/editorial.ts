@@ -51,9 +51,11 @@ import {
 import type { Caller } from '@/server/auth/caller';
 import { updateTagsForChanges } from '@/server/cache/invalidate';
 import {
+  HomeGiftGuideSchema,
   HomePickIdsSchema,
   HomePickSchema,
   homeLimits,
+  type HomeGiftGuide,
   type HomePick,
 } from '@/lib/pages/home';
 import { guestVisible } from './catalog';
@@ -82,16 +84,10 @@ type CollectionRead = {
   intro: boolean;
 };
 
-const columnsWithoutIntro = {
-  id: collections.id,
-  kind: collections.kind,
-  slug: collections.slug,
-  title: collections.title,
-  summary: collections.summary,
-  status: collections.status,
-  publishedAt: collections.publishedAt,
-  updatedAt: collections.updatedAt,
-};
+const collectionColumns = getTableColumns(collections);
+const columnsWithoutIntro = Object.fromEntries(
+  Object.entries(collectionColumns).filter(([name]) => name !== 'intro'),
+) as Omit<typeof collectionColumns, 'intro'>;
 
 /**
  * The one read of collections with their entries. One query: the entries of each collection come
@@ -135,7 +131,7 @@ async function readCollectionRows(
     .as('entries');
   return dbRead
     .select({
-      collection: intro ? getTableColumns(collections) : columnsWithoutIntro,
+      collection: intro ? collectionColumns : columnsWithoutIntro,
       items: entries.list,
       itemCount: entries.total,
     })
@@ -206,6 +202,19 @@ export async function getPublishedPick(
     true,
   );
   return pick ?? null;
+}
+
+/**
+ * The published gift guide as the home page reads it: the copy only. It never reads the intro or
+ * the entries, which the home page does not show.
+ */
+export async function getHomeGiftGuide(): Promise<HomeGiftGuide | null> {
+  const [guide] = await readCollectionRows(
+    and(publishedCollection, eq(collections.kind, 'gift_guide')),
+    true,
+    { entryCap: 0, intro: false },
+  );
+  return guide ? HomeGiftGuideSchema.parse(guide.collection) : null;
 }
 
 export async function getPublishedGiftGuide(): Promise<Collection | null> {

@@ -8,7 +8,7 @@ import {
 } from '@/lib/pages/browse';
 import { upcomingWindow } from '@/lib/sessionWindow';
 import { noFilters } from '@/lib/filters';
-import { minuteAsOf, msPerDay } from '@/lib/time';
+import { isoDateOf, minuteAsOf, msPerDay } from '@/lib/time';
 import {
   coverage,
   coverageGaps,
@@ -241,14 +241,10 @@ describe('the curated seed', () => {
   it('yields zero browse results for kids in Williamsburg on every weeknight of the window, and the wheel class on a weekend', async () => {
     const asOf = minuteAsOf(now);
     const { from, to } = upcomingWindow(asOf, browseWindowDays);
-    const last = Date.parse(to.toISOString().slice(0, 10));
+    const last = Date.parse(isoDateOf(to));
     const dates: string[] = [];
-    for (
-      let day = Date.parse(from.toISOString().slice(0, 10));
-      day <= last;
-      day += msPerDay
-    ) {
-      dates.push(new Date(day).toISOString().slice(0, 10));
+    for (let day = Date.parse(isoDateOf(from)); day <= last; day += msPerDay) {
+      dates.push(isoDateOf(new Date(day)));
     }
     const slugsOn = async (date: string) =>
       (

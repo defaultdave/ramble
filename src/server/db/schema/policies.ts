@@ -11,6 +11,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { MAX_FULL_REFUND_HOURS } from '@/lib/catalog';
 import { editorialLimits } from '@/lib/editorial';
 import { acceptanceSubjectKinds, legalDocPattern } from '@/lib/legal';
 import type { RichTextDoc } from '@/lib/richText/format';
@@ -49,8 +50,8 @@ export const cancellationTiers = pgTable(
     check('cancellation_tiers_key_not_blank', notBlank(table.key)),
     check('cancellation_tiers_name_not_blank', notBlank(table.name)),
     check(
-      'cancellation_tiers_hours_not_negative',
-      sql`${table.fullRefundHoursBefore} >= 0`,
+      'cancellation_tiers_hours_in_range',
+      sql`${table.fullRefundHoursBefore} BETWEEN 0 AND ${sql.raw(String(MAX_FULL_REFUND_HOURS))}`,
     ),
     uniqueIndex('cancellation_tiers_one_default')
       .on(table.isDefault)

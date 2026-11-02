@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { EntityIdSchema, SlugSchema, guestVisibleStatuses } from './catalog';
+import {
+  EntityIdSchema,
+  HttpUrlSchema,
+  SlugSchema,
+  guestVisibleStatuses,
+} from './catalog';
 import { durationLabel } from './duration';
 import type { PhotoView } from './photoViews';
 import { cardPriceLabel, type CardPriceOption } from './pricing';
@@ -28,7 +33,7 @@ export const CardExperienceSchema = z.object({
   status: z.enum(guestVisibleStatuses),
   neighborhoodName: z.string().min(1),
   durationMinutes: z.int().positive().nullable(),
-  linkOutUrl: z.string().nullable(),
+  linkOutUrl: HttpUrlSchema.nullable(),
   priceOptions: z.array(CardPriceOptionSchema),
   /** The cover, for a read that joins it in; a read that does not leaves it out and the page sets it. */
   image: CardImageSchema.nullish(),

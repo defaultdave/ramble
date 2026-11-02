@@ -1,4 +1,5 @@
 export const msPerMinute = 60_000;
+export const msPerHour = 3_600_000;
 export const msPerDay = 86_400_000;
 
 /**

@@ -1,17 +1,13 @@
-import type { CancellationTier } from './catalog';
+import { MAX_FULL_REFUND_HOURS, type CancellationTier } from './catalog';
 import { PPM } from './pricing';
+import { isKnownTimeZone, TimeZoneSchema } from './sessions';
+import { msPerHour } from './time';
 
-// The longest tier is 7 days (PRD-46); a year is far past any tier and keeps the arithmetic small.
-export const MAX_FULL_REFUND_HOURS = 24 * 365;
+export { MAX_FULL_REFUND_HOURS };
 
-const MS_PER_HOUR = 3_600_000;
 // Local dates are printed with a four-digit year, so instants stay inside 1970 to 9999.
 const MIN_INSTANT_MS = 0;
 const MAX_INSTANT_MS = Date.UTC(9999, 11, 31, 23, 59, 59, 999);
-const MAX_TIME_ZONE_LENGTH = 64;
-// An IANA name is letters, digits, and `_+-` in up to three parts joined by `/`. A numeric offset such as
-// "+05:00", which newer engines accept as a time zone, is not a host's zone and fails the first-letter rule.
-const TIME_ZONE_NAME = /^[A-Za-z][A-Za-z0-9_+-]*(?:\/[A-Za-z0-9_+-]+){0,2}$/;
 
 type LocalDeadline = {
   /** `YYYY-MM-DD` in the host's time zone. */
@@ -41,29 +37,23 @@ function requireInstant(instant: Date, what: string): void {
 
 function formatterFor(timeZone: string): Intl.DateTimeFormat {
   if (
-    timeZone.length > MAX_TIME_ZONE_LENGTH ||
-    !TIME_ZONE_NAME.test(timeZone)
+    !TimeZoneSchema.safeParse(timeZone).success ||
+    !isKnownTimeZone(timeZone)
   ) {
     throw new RangeError(
       'Time zone must be an IANA name such as America/New_York',
     );
   }
-  try {
-    return new Intl.DateTimeFormat('en-US', {
-      timeZone,
-      hourCycle: 'h23',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZoneName: 'longOffset',
-    });
-  } catch {
-    throw new RangeError(
-      'Time zone must be an IANA name such as America/New_York',
-    );
-  }
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZoneName: 'longOffset',
+  });
 }
 
 function localDeadline(instant: Date, timeZone: string): LocalDeadline {
@@ -113,7 +103,7 @@ export function cancellationWindow(
   requireInstant(startsAt, 'Start time');
   requireInstant(now, 'Now');
 
-  const freeCancelUntil = new Date(startsAt.getTime() - hours * MS_PER_HOUR);
+  const freeCancelUntil = new Date(startsAt.getTime() - hours * msPerHour);
   requireInstant(freeCancelUntil, 'Free cancel deadline');
   const isFree = now.getTime() <= freeCancelUntil.getTime();
   return {

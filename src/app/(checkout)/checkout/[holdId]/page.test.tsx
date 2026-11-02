@@ -36,9 +36,7 @@ const props = (id: string, search: Record<string, string> = {}) => ({
 const view = { holdId } as never;
 
 function propsOf(element: unknown): Record<string, unknown> {
-  const found = (element as { props: { children: { props: object } } }).props
-    .children.props;
-  return found as Record<string, unknown>;
+  return (element as { props: Record<string, unknown> }).props;
 }
 
 beforeEach(() => {

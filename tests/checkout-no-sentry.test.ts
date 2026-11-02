@@ -1,79 +1,27 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import {
+  hasServerActionDirective,
+  importClosure,
+  listFiles,
+  root,
+  src,
+} from './support/importGraph';
 
 // ADR 0007: Sentry's browser script stays off checkout, which carries no third-party tags
 // (PCI SAQ A, ADR 0003). The check follows every import from the checkout route group, so a
 // script reached through a shared component is caught as well as one named in a layout.
 
-const root = path.resolve(import.meta.dirname, '..');
-const src = path.join(root, 'src');
 const checkoutGroup = path.join(src, 'app', '(checkout)');
-const extensions = ['.ts', '.tsx', '/index.ts', '/index.tsx'];
-
-function listFiles(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const full = path.join(dir, entry.name);
-    return entry.isDirectory() ? listFiles(full) : [full];
-  });
-}
-
-function isFile(candidate: string): boolean {
-  try {
-    return statSync(candidate).isFile();
-  } catch {
-    return false;
-  }
-}
-
-function resolveImport(specifier: string, from: string): string | null {
-  let base: string;
-  if (specifier.startsWith('@/')) base = path.join(src, specifier.slice(2));
-  else if (specifier.startsWith('.'))
-    base = path.resolve(path.dirname(from), specifier);
-  else return null;
-  const hit = ['', ...extensions].map((suffix) => base + suffix).find(isFile);
-  return hit && /\.tsx?$/.test(hit) ? hit : null;
-}
-
-/**
- * A `'use server'` module is the seam between the browser and the server: a client component that imports
- * it is given a reference to call, and the module's own imports run on the server only. Its imports are
- * not followed, so server work an action does (the fake payment's job drain reaches the server Sentry SDK)
- * is not mistaken for a script the browser loads.
- */
-function hasServerActionDirective(text: string): boolean {
-  return /^\s*(?:\/\/[^\n]*\n\s*)*['"]use server['"]/.test(text);
-}
-
-function importsOf(file: string): string[] {
-  const text = readFileSync(file, 'utf8');
-  return [...text.matchAll(/(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g)].map(
-    (match) => match[1] ?? '',
-  );
-}
 
 /** Every module the checkout route group can load, with the specifiers that reached it. */
 function checkoutClosure() {
-  const seen = new Set<string>();
-  const specifiers = new Set<string>();
-  // global-error replaces the root layout for every group, checkout included, when it renders.
-  const queue = [
+  return importClosure([
+    // global-error replaces the root layout for every group, checkout included, when it renders.
     path.join(src, 'app', 'global-error.tsx'),
     ...listFiles(checkoutGroup).filter((f) => /\.(ts|tsx)$/.test(f)),
-  ];
-  while (queue.length > 0) {
-    const file = queue.pop();
-    if (!file || seen.has(file)) continue;
-    seen.add(file);
-    if (hasServerActionDirective(readFileSync(file, 'utf8'))) continue;
-    for (const specifier of importsOf(file)) {
-      specifiers.add(specifier);
-      const next = resolveImport(specifier, file);
-      if (next) queue.push(next);
-    }
-  }
-  return { files: [...seen], specifiers: [...specifiers] };
+  ]);
 }
 
 describe('the checkout route group', () => {

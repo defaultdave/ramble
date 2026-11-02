@@ -43,6 +43,20 @@ const gift = {
   onToggle: vi.fn(),
 } satisfies GiftOrderSummaryProps;
 
+describe('OrderSummary open from the tablet width', () => {
+  it('puts the plain heading in block content, not in a span', () => {
+    render(<OrderSummary {...booking} openFrom="tablet" />);
+
+    const heading = screen.getByRole('heading', {
+      level: 2,
+      name: booking.title,
+      hidden: true,
+    });
+
+    expect(heading.closest('span')).toBeNull();
+  });
+});
+
 describe('OrderSummary collapsed', () => {
   it('shows the title, when, and total in one disclosure button', () => {
     render(<OrderSummary {...booking} />);

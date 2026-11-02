@@ -25,6 +25,7 @@ import type { ReserveResult } from '@/lib/holds';
 // - a reserve that throws says nothing was held, and the guest can try again
 // - gift mode says gifts are not open and cannot continue; with gifts off there is no switch
 // - Continue waits while the hold is placed and cannot be pressed twice
+// - a refusal in the panel or the sheet takes focus to its notice, since Continue may have disabled under it
 // - the party: children appear only where offered, a free adult beside children needs a child, and 21+ says so
 
 const mocks = vi.hoisted(() => ({ reserve: vi.fn(), push: vi.fn() }));
@@ -390,6 +391,24 @@ describe('where a refusal shows', () => {
       screen.getByRole('button', { name: 'Continue · $130.00' }),
     );
     expect(screen.getByRole('alert')).toHaveFocus();
+  });
+
+  it('moves focus to the notice when the sheet is refused, so the first Escape closes the sheet', async () => {
+    mocks.reserve.mockResolvedValue({
+      status: 'unavailable',
+      reason: 'session_cancelled',
+    });
+    render(<Page offer={kayakOffer} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Choose date' }));
+    await chooseSaturdayEvening();
+    await userEvent.click(
+      within(sheet()).getByRole('button', { name: 'Continue · $130.00' }),
+    );
+    expect(within(sheet()).getByRole('alert')).toHaveFocus();
+
+    await userEvent.keyboard('{Escape}');
+
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it("shows the notice in the sheet when the sheet's Continue is refused", async () => {

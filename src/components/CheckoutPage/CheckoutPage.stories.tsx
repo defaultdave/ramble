@@ -288,6 +288,19 @@ export const TooManyTries: Story = {
     }),
 };
 
+/** Arriving from holding the spaces again: focus lands on the heading, and the ring shows where. */
+export const AfterReholdFocusesTitle: Story = {
+  args: { focusTitle: true },
+  play: async () => {
+    const focused = document.activeElement;
+    await expect(focused).toHaveTextContent('Checkout');
+    await expect(focused?.tagName).toBe('H1');
+    const ring = getComputedStyle(focused as Element);
+    await expect(ring.outlineStyle).toBe('solid');
+    await expect(ring.outlineWidth).toBe('2px');
+  },
+};
+
 export const Maintenance: Story = { args: { maintenance: true } };
 
 /**

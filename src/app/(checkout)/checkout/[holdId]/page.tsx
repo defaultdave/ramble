@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation';
 import { Alert } from '@/components/Alert';
 import { ButtonLink } from '@/components/Button';
 import { CheckoutPage } from '@/components/CheckoutPage';
-import { CheckoutFrame } from '@/components/CheckoutPage/CheckoutFrame';
 import { EntityIdSchema } from '@/lib/catalog';
 import { checkoutPath } from '@/lib/routes';
 import { notFoundPerRequest } from '@/app/renderPerRequest';
@@ -40,35 +39,31 @@ export default async function CheckoutRoute({
   } catch (error) {
     rethrowOrLog('The checkout page could not be read', error);
     return (
-      <CheckoutFrame>
-        <main id="main">
-          <h1>Checkout</h1>
-          <Alert
-            tone="danger"
-            title="We couldn't load checkout"
-            body="Something went wrong on our side. Your spaces stay held until the timer ends. Try again in a moment."
-          />
-          <ButtonLink href={checkoutPath(holdId)} variant="secondary">
-            Try again
-          </ButtonLink>
-        </main>
-      </CheckoutFrame>
+      <main id="main">
+        <h1>Checkout</h1>
+        <Alert
+          tone="danger"
+          title="We couldn't load checkout"
+          body="Something went wrong on our side. Your spaces stay held until the timer ends. Try again in a moment."
+        />
+        <ButtonLink href={checkoutPath(holdId)} variant="secondary">
+          Try again
+        </ButtonLink>
+      </main>
     );
   }
 
   if (!read) notFound();
   return (
-    <CheckoutFrame>
-      <CheckoutPage
-        view={read.view}
-        maintenance={maintenance}
-        focusTitle={(await searchParams).rehold === '1'}
-        actions={{
-          startPayment,
-          confirm: confirmFakePayment,
-          reserve: reholdSpaces,
-        }}
-      />
-    </CheckoutFrame>
+    <CheckoutPage
+      view={read.view}
+      maintenance={maintenance}
+      focusTitle={(await searchParams).rehold === '1'}
+      actions={{
+        startPayment,
+        confirm: confirmFakePayment,
+        reserve: reholdSpaces,
+      }}
+    />
   );
 }

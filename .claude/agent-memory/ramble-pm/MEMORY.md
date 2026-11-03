@@ -1,6 +1,6 @@
 # ramble-pm memory
 
-Working memory for `ramble-pm`, the agent that runs this project's plan. It holds durable facts a new session needs that the rest of the repo does not make obvious. The spec is `docs/plan/BUILD-PLAN.md`, current state is `STATUS.md` and decisions with their reasons are `DECISIONS.md`, both in the `ramble-pm` repo.
+Working memory for `ramble-pm`, the agent that runs this project's plan. It holds durable facts a new session needs that the rest of the repo does not make obvious. The spec is `plan/BUILD-PLAN.md`, current state is `STATUS.md` and decisions with their reasons are `DECISIONS.md`, both in the `ramble-pm` repo.
 
 The project owner keeps a second, private memory on their own machine for personal preferences and account details. It is not part of this repository.
 
@@ -18,11 +18,12 @@ The project owner keeps a second, private memory on their own machine for person
 
 ## Planning scripts
 - All read `docs/plan/units.yaml`, the record of units.
-- `bun scripts/plan/breakdown.ts --write` regenerates `02-work-breakdown.md` in full; its fixed prose lives in the script.
-- `bun scripts/plan/critical-path.ts` (artifact 4) and `bun scripts/plan/execution-model.ts` (artifact 5) each take `--write` to refresh the generated block in their document.
-- `bun scripts/plan/forecast.ts --report estimate|resourcing|schedule` simulates the graph with the owner as a capacity-limited reviewer. Scenarios and levers are constants in the script; the owner's review minutes are in `scripts/plan/dave-time.ts`, shared with `execution-model.ts`.
-- Roadmap page: `roadmap/status.json` in `ramble-pm` (a hand digest of STATUS and DECISIONS) plus the schedule report, built by `bun scripts/plan/roadmap.ts` into that repo's `index.html` and README. `roadmap/template.html` reads fixed field names: `decisionsNeeded` items take `title`, `impact`, `detail`, `recommendation`, `blocks`; `actionsForDave` items take `title`, `detail`, `where`; `heldUp`, `decisionsMade` and `watch` take `what`. Digests written as `what`/`effect` rendered every decision and to-do as blank cards reading "Recommend: undefined" from 2026-10-28 until the owner spotted it on 2026-10-29. Since 2026-10-29 the page opens with a daily standup the owner asked for (done, in the works today, needs a decision, what held us up): `standups` in status.json, newest first, one entry per day, kept as history; the lead updates today's entry at each session end.
-- `ramble-pm` (since 2026-10-22) is the project's viewable state: status, decisions, delta log, roadmap. `scripts/plan/site.ts` finds its checkout (beside the main checkout, or `RAMBLE_PM_DIR`) and publishes it straight to `main` as the App. Unit status and actuals live on board #19.
+- The plan scripts live in `ramble-pm` under `tools/plan/` and read `units.yaml` from this checkout (`RAMBLE_DIR` overrides); run them from the `ramble-pm` checkout.
+- `bun tools/plan/breakdown.ts --write` regenerates `plan/02-work-breakdown.md` in full; its fixed prose lives in the script.
+- `bun tools/plan/critical-path.ts` (artifact 4) and `bun tools/plan/execution-model.ts` (artifact 5) each take `--write` to refresh the generated block in their document.
+- `bun tools/plan/forecast.ts --report estimate|resourcing|schedule` simulates the graph with the owner as a capacity-limited reviewer. Scenarios and levers are constants in the script; the owner's review minutes are in `tools/plan/dave-time.ts`, shared with `execution-model.ts`.
+- Roadmap page: `roadmap/status.json` in `ramble-pm` (a hand digest of STATUS and DECISIONS) plus the schedule report, built by `bun tools/plan/roadmap.ts` into that repo's `index.html` and README. `roadmap/template.html` reads fixed field names: `decisionsNeeded` items take `title`, `impact`, `detail`, `recommendation`, `blocks`; `actionsForDave` items take `title`, `detail`, `where`; `heldUp`, `decisionsMade` and `watch` take `what`. Digests written as `what`/`effect` rendered every decision and to-do as blank cards reading "Recommend: undefined" from 2026-10-28 until the owner spotted it on 2026-10-29. Since 2026-10-29 the page opens with a daily standup the owner asked for (done, in the works today, needs a decision, what held us up): `standups` in status.json, newest first, one entry per day, kept as history; the lead updates today's entry at each session end.
+- `ramble-pm` (since 2026-10-22) is the project's viewable state: status, decisions, delta log, roadmap. `scripts/pm/site.ts` finds its checkout (beside the main checkout, or `RAMBLE_PM_DIR`) and publishes it straight to `main` as the App. Unit status and actuals live on board #19.
 
 ## Settled decisions (do not reopen)
 Full list with reasons in `DECISIONS.md`.
@@ -50,7 +51,7 @@ Full list with reasons in `DECISIONS.md`.
 - Plan files live in the main checkout. Worktrees under `.claude/worktrees/` can be stale.
 
 ## Estimating (artifacts 6 and 7, 2026-10-20)
-- An estimate-day is 6 focused hours of the unit owner's time, from branch cut to merge-ready. It excludes waiting for merge and the owner's part-time hours (`06-estimate.md`). Solo estimates without agents live in `docs/plan/estimate-panel.json`, not `units.yaml`.
+- An estimate-day is 6 focused hours of the unit owner's time, from branch cut to merge-ready. It excludes waiting for merge and the owner's part-time hours (`plan/06-estimate.md` in `ramble-pm`). Solo estimates without agents live in `plan/estimate-panel.json` there, not `units.yaml`.
 - Summing 115 independent unit draws gives falsely narrow ranges. A per-run systemic factor (0.9 / 1.1 / 1.5) carries the shared error.
 - Once owner review time stops being the constraint, the WIP limit takes over (lever 4: reviewer idle at WIP 4).
 - The weakest assumption is about 1.1 h of owner review per fan-out gate (7x leverage against a measured 3.4x). Check it at the first three merges.
@@ -111,8 +112,8 @@ Full list with reasons in `DECISIONS.md`.
 
 ## Lessons from the lead lane (2026-10-29)
 - A refactor proposal written against one commit needs its move table re-verified against `main` before builders start: a workflow of one manifest agent per PR plus two verifiers per manifest (correctness, completeness) found stale lines in every PR and a wrong caller in most. The file-overlap matrix it produced showed every PR touching the same four page modules, so the PRs run one at a time, each merging `main` before its push, never in parallel.
-- `bun scripts/plan/forecast.ts --report schedule` takes any scenario name from its `SCENARIOS` list in `--scenarios "a|b"`; `Lever 4 too (money core to agents), Dave 12.5 h` models the human-led money units on agents. The model prices units at their estimates with review gates and does not carry measured agent actuals (merged units closed at 4 to 42 percent of estimate), so its dates are the slow case.
-- Inside the sandbox `gh` cannot read the keychain login (`Failed to log in to github.com account (keyring)`), so `scripts/plan/board-dates.ts --run` and other `gh` reads fail there; `site.ts publish` and the merge-desk scripts still work because they use the App token. Hand the board sync to the owner or run it outside the sandbox.
+- `bun tools/plan/forecast.ts --report schedule` takes any scenario name from its `SCENARIOS` list in `--scenarios "a|b"`; `Lever 4 too (money core to agents), Dave 12.5 h` models the human-led money units on agents. The model prices units at their estimates with review gates and does not carry measured agent actuals (merged units closed at 4 to 42 percent of estimate), so its dates are the slow case.
+- Inside the sandbox `gh` cannot read the keychain login (`Failed to log in to github.com account (keyring)`), so `tools/plan/board-dates.ts --run` and other `gh` reads fail there; `site.ts publish` and the merge-desk scripts still work because they use the App token. Hand the board sync to the owner or run it outside the sandbox.
 - The Prototype milestone in `07-resourcing.md` includes half a day of stub glue (checkout and confirmation placeholders filled with U-027's components and fixture data) that has no unit and was never built; a milestone's "glue outside units.yaml" needs a tracking row or it is forgotten.
 
 ## Working rule since 2026-10-29: proceed on the recommendation

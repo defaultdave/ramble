@@ -2,9 +2,9 @@
 
 Demo marketplace for bookable experiences, built to prove a planning method and an AI agent team workflow.
 
-- **Run the project:** `/ramble-pm` in a desktop chat (project skill in `.claude/skills/ramble-pm/`), or `claude --agent ramble-pm` in a terminal. The PM reads `docs/plan/BUILD-PLAN.md` (the spec) and `STATUS.md` (where things are) in the `ramble-pm` repo.
+- **Run the project:** `/ramble-pm` in a desktop chat (project skill in `.claude/skills/ramble-pm/`), or `claude --agent ramble-pm` in a terminal. The PM reads `plan/BUILD-PLAN.md` (the spec) and `STATUS.md` (where things are) in the `ramble-pm` repo.
 - **Discovery:** skipped on 2026-10-18; the PRD is drafted from the client brief. `ramble-client` stays available for follow-up questions in character. See `docs/product/discovery/README.md`.
-- **Project state:** https://github.com/defaultdave/ramble-pm holds `STATUS.md`, `DECISIONS.md`, `delta-log.md`, and the roadmap page, checked out beside this repo (`bun scripts/plan/site.ts dir`). The PM publishes it straight to `main`; status never needs a PR here. Unit status and actuals live on project board #19. ADRs in `docs/adr/`.
+- **Project state:** https://github.com/defaultdave/ramble-pm holds `STATUS.md`, `DECISIONS.md`, `delta-log.md`, and the roadmap page, checked out beside this repo (`bun scripts/pm/site.ts dir`). The PM publishes it straight to `main`; status never needs a PR here. Unit status and actuals live on project board #19. ADRs in `docs/adr/`.
 - **Design:** Figma `Ramble Core Flow Wireframes`, https://www.figma.com/design/tGNKJSWGHyx4UVmpnd5LUp
 
 ## Rules for any session in this repo

@@ -55,13 +55,13 @@ The walking skeleton (U-002) is in place: four route groups with placeholder pag
 
 The plan is seven artifacts, each built on the one before it:
 
-1. [Design doc](docs/plan/01-design-doc.md)
-2. [Work breakdown](docs/plan/02-work-breakdown.md): 134 units
-3. [Complexity and uncertainty scores](docs/plan/03-scores.md): uncertainty is its own axis, and risky unknowns get a spike before an estimate
-4. [Dependency graph and critical path](docs/plan/04-dependency-graph.md)
-5. [Execution model](docs/plan/05-execution-model.md): who builds what, and at which review tier
-6. [Estimate](docs/plan/06-estimate.md): three-point ranges from a simulation, cross-checked against a reference class
-7. [Resourcing](docs/plan/07-resourcing.md): staffing options and the dates each implies
+1. [Design doc](https://github.com/defaultdave/ramble-pm/blob/main/plan/01-design-doc.md)
+2. [Work breakdown](https://github.com/defaultdave/ramble-pm/blob/main/plan/02-work-breakdown.md): 134 units
+3. [Complexity and uncertainty scores](https://github.com/defaultdave/ramble-pm/blob/main/plan/03-scores.md): uncertainty is its own axis, and risky unknowns get a spike before an estimate
+4. [Dependency graph and critical path](https://github.com/defaultdave/ramble-pm/blob/main/plan/04-dependency-graph.md)
+5. [Execution model](https://github.com/defaultdave/ramble-pm/blob/main/plan/05-execution-model.md): who builds what, and at which review tier
+6. [Estimate](https://github.com/defaultdave/ramble-pm/blob/main/plan/06-estimate.md): three-point ranges from a simulation, cross-checked against a reference class
+7. [Resourcing](https://github.com/defaultdave/ramble-pm/blob/main/plan/07-resourcing.md): staffing options and the dates each implies
 
 Three rules keep it honest:
 
@@ -101,8 +101,8 @@ docs/
   product/     PRD, client brief, market scan
   adr/         architecture decisions and the research behind them
   design/      wireframe review, design system plan, tone checklist, Figma library ids
-  plan/        build plan, the seven artifacts, units.yaml, status, decisions, delta log
-scripts/plan/  Bun scripts that compute the plan from units.yaml
+  plan/        units.yaml and the merge desk runbook (the build plan and artifacts are in ramble-pm)
+scripts/pm/    publishes the ramble-pm repo (the plan scripts live there, in tools/plan/)
 .claude/       the PM agent, its skill, and its project memory
 ```
 
@@ -136,14 +136,14 @@ The integration makes a branch's database and URLs only when a deployment is red
 
 ## Running the planning scripts
 
-The scripts need [Bun](https://bun.sh) and have no other dependencies.
+The scripts live in the [ramble-pm](https://github.com/defaultdave/ramble-pm) repo under `tools/plan/`, read `docs/plan/units.yaml` from this checkout, and need [Bun](https://bun.sh) and nothing else. Run them from a ramble-pm checkout that sits beside this one.
 
 ```bash
-bun scripts/plan/critical-path.ts
+bun tools/plan/critical-path.ts
 ```
 
 ```bash
-bun scripts/plan/forecast.ts --report estimate
+bun tools/plan/forecast.ts --report estimate
 ```
 
 `critical-path.ts` prints the critical path through the dependency graph. `forecast.ts` simulates the build with review time as a limited resource; `--report resourcing` and `--report schedule` give the staffing options and the dated schedule.

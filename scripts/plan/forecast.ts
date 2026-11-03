@@ -16,6 +16,7 @@
 //   --start YYYY-MM-DD   first P5 working day (default 2026-10-26)
 //   --deadline YYYY-MM-DD  the client's date, for the chance of making it (default 2026-12-01, PRD Q-07)
 //   --remaining U=S,...  work already done before the start: each listed unit keeps share S (0 to 1) of its days
+//   --drop U,...         units out of the plan (Parked or Cut on the board): removed from the graph, with every edge to them
 //   --systemic O,M,P     one factor per run on every unit's days and Dave's gate minutes (default SYSTEMIC); 1,1,1 turns it off
 //   --write FILE         replace the generated block in FILE: <!-- forecast:BLOCK:start --> ... <!-- forecast:BLOCK:end -->,
 //                        where BLOCK is the report name, plus "-real-job" with --scope real-job and "+should" with --should
@@ -37,7 +38,7 @@ import {
   type Three,
   tieredGateTerms,
 } from "./dave-time";
-import { DAVE_SHARE, LAUNCH_REVIEW, points3, schedule, selectScope, type ScopeName } from "./graph";
+import { DAVE_SHARE, dropUnits, LAUNCH_REVIEW, points3, schedule, selectScope, type ScopeName } from "./graph";
 import { flag, loadUnits, lookup, option, writeBlock, type Unit } from "./units";
 
 /** Focused hours in one estimate-day. */
@@ -162,7 +163,9 @@ const remaining = new Map(
     }),
 );
 
-const all = await loadUnits();
+/** Units the owner has taken out of the plan: --drop U-004b,U-120 */
+const dropped = new Set(option("drop", "").split(",").filter(Boolean));
+const all = dropUnits(await loadUnits(), dropped);
 const picked = selectScope(all, scope satisfies ScopeName, withShould);
 if (picked.errors.length) throw new Error(picked.errors.join("; "));
 const { units, deps } = picked;
@@ -640,7 +643,7 @@ if (report === "schedule") {
     };
   });
   const json = {
-    generated: `bun scripts/plan/forecast.ts --report schedule --runs ${runs} --seed ${seed} --start ${start}${remaining.size ? ` --remaining ${[...remaining].map(([id, s]) => `${id}=${s}`).join(",")}` : ""} --scenarios "${names.join("|")}" --out docs/plan/roadmap/schedule.json`,
+    generated: `bun scripts/plan/forecast.ts --report schedule --runs ${runs} --seed ${seed} --start ${start}${remaining.size ? ` --remaining ${[...remaining].map(([id, s]) => `${id}=${s}`).join(",")}` : ""}${dropped.size ? ` --drop ${[...dropped].join(",")}` : ""} --scenarios "${names.join("|")}" --out docs/plan/roadmap/schedule.json`,
     start,
     deadline,
     runs,

@@ -9,6 +9,7 @@
 // A unit already started (board Status other than Todo) keeps the real Start date set on the board.
 // Units the schedule leaves out (the Shoulds, the real-job adapter, the post-launch tail) keep empty dates.
 
+import { isOutOfPlan } from "./board-plan";
 import { flag, option, siteDir } from "./units";
 
 const OWNER = "defaultdave";
@@ -84,7 +85,7 @@ if (run) fields = listFields();
 const field = (name: string) => fields.find((f) => f.name === name);
 
 // Board items carry the unit ID in the "Unit ID" field, which gh's JSON names "unit ID".
-type Item = { id: string; "unit ID"?: string; status?: string };
+type Item = { id: string; "unit ID"?: string; status?: string; plan?: string };
 const items = (
   JSON.parse(gh(["project", "item-list", String(BOARD), "--owner", OWNER, "--limit", "2000", "--format", "json"])) as {
     items: Item[];
@@ -98,6 +99,10 @@ let set = 0;
 for (const u of scenario.units) {
   const item = itemOf.get(u.id);
   if (!item) continue;
+  if (isOutOfPlan(item)) {
+    if (!run) console.log(`skip ${u.id}: Plan ${item.plan}`);
+    continue;
+  }
   const sp = sprintLabel(sprintOf(u));
   if (!run) {
     console.log(`${u.id}: ${u.startDate} to ${u.endDate}, ${sp}`);

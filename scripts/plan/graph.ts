@@ -104,6 +104,17 @@ export function checkRecord(all: Unit[]): string[] {
 }
 
 /**
+ * The record without the dropped units, and without any dependency on them, so a dependent no longer waits on a unit that is out of the plan.
+ * @throws when an id is not in the record
+ */
+export function dropUnits(all: Unit[], drop: ReadonlySet<string>): Unit[] {
+  const known = new Set(all.map((u) => u.id));
+  const unknown = [...drop].filter((id) => !known.has(id));
+  if (unknown.length) throw new Error(`--drop names ${unknown.join(", ")}, which is not in the record`);
+  return all.filter((u) => !drop.has(u.id)).map((u) => ({ ...u, depends_on: u.depends_on.filter((d) => !drop.has(d)) }));
+}
+
+/**
  * Selects a scope. P4 units count as met; post-launch units form the tail; the launch review gains an edge
  * from every in-scope unit that is not already upstream of it and that nothing else in scope needs.
  */

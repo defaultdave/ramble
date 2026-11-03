@@ -22,7 +22,7 @@ export function BookingSheetIsland({ offer }: { offer: BookingOffer }) {
   const { state, handlers, submit } = useBookingDraft(offer);
   const { notice } = state;
   useEffect(() => {
-    if (notice) focusBookingNotice('[role="dialog"]');
+    if (notice) focusBookingNotice('[data-booking-sheet]');
   }, [notice]);
   const view = choicesView(offer, state);
   return (
@@ -44,7 +44,7 @@ export function BookingSheetIsland({ offer }: { offer: BookingOffer }) {
       {state.paused ? (
         <BookingPausedNotice />
       ) : (
-        <div className={styles.content}>
+        <div className={styles.content} data-booking-sheet>
           {view.showModeSwitch ? (
             <div className={styles.mode}>
               <BookingModeSwitch mode={view.mode} onMode={handlers.onMode} />

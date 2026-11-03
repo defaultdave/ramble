@@ -8,6 +8,8 @@
 // NODE_ENV=production (the seed never runs inside the deployed app), an unreadable address, and the
 // scale fixture.
 
+import type { StorageProviderName } from '@/lib/storage';
+
 export const seedTargets = [
   'local',
   'staging',
@@ -24,6 +26,8 @@ export type SeedTargetInput = {
   databaseUrl: string | undefined;
   /** `SEED_HOST`. Must equal the database URL's host for every target but `local`. */
   seedHost: string | undefined;
+  /** `STORAGE_PROVIDER`. The photo step writes and deletes in this store, so a local target needs the fake one. */
+  storageProvider: StorageProviderName;
 };
 
 export type SeedTargetVerdict =
@@ -38,10 +42,14 @@ type SeedRefusal =
   | 'unreadable_database_url'
   | 'address_overridden'
   | 'not_local'
+  | 'storage_not_fake'
   | 'host_not_confirmed'
   | 'looks_like_production';
 
-const localHosts = ['localhost', '127.0.0.1', '[::1]', '::1', 'postgres'];
+/** The hosts that name this machine; `postgres` is the Docker Compose service name the seed also treats as local. */
+export const loopbackHosts = ['localhost', '127.0.0.1', '[::1]', '::1'];
+
+const localHosts = [...loopbackHosts, 'postgres'];
 
 // A whole word or a hyphen, dot, or underscore separated part: "prod", "production", "ramble-prod-db",
 // but not "product" or "reproduce".
@@ -164,10 +172,16 @@ export function checkSeedTarget(
       `SEED_TARGET is local but the database is on ${database.host}.`,
     );
   }
+  if (input.seedTarget === 'local' && input.storageProvider !== 'fake') {
+    return refuse(
+      'storage_not_fake',
+      `SEED_TARGET is local but STORAGE_PROVIDER is ${input.storageProvider}. The photo step would write to that store. Use the fake provider on a local database.`,
+    );
+  }
   if (input.seedTarget !== 'local' && input.seedHost !== database.host) {
     return refuse(
       'host_not_confirmed',
-      `SEED_TARGET is ${input.seedTarget} and DATABASE_URL points at ${database.host}. Set SEED_HOST=${database.host} to confirm that is the database to write.`,
+      `SEED_TARGET is ${input.seedTarget} and DATABASE_URL points at ${database.host}. Set SEED_HOST to that host to confirm it is the database to write.`,
     );
   }
   return { ok: true, target: input.seedTarget, host: database.host };

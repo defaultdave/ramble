@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { EntityIdSchema, httpUrlPattern } from './catalog';
 import { coverLookupLimit } from './idLookup';
+import { maxObjectBytes } from './storage';
 
 /**
  * Every bound on a photo in one place. The input bounds are checked before any pixel is decoded;
@@ -8,7 +9,7 @@ import { coverLookupLimit } from './idLookup';
  */
 export const photoLimits = {
   /** An upload larger than this is refused before it reaches the decoder. */
-  maxInputBytes: 10 * 1024 * 1024,
+  maxInputBytes: maxObjectBytes,
   /** ADR 0001 and PRD-50: 1,600 to 8,192 px on the long edge. */
   minLongEdge: 1600,
   maxLongEdge: 8192,
@@ -43,13 +44,14 @@ export const photoRefusalCodes = [
 ] as const;
 export type PhotoRefusalCode = (typeof photoRefusalCodes)[number];
 
+const mebibyte = 1024 * 1024;
+const pixels = (count: number) => count.toLocaleString('en-US');
+
 const refusalCopy: Record<PhotoRefusalCode, string> = {
-  too_large: 'That photo is larger than 10 MB. Choose a smaller file.',
+  too_large: `That photo is larger than ${String(photoLimits.maxInputBytes / mebibyte)} MB. Choose a smaller file.`,
   unsupported_format: 'Use a JPEG, PNG, or WebP photo.',
-  too_many_pixels:
-    'That photo is too big. It can be up to 8,192 pixels on its long edge.',
-  too_small:
-    'That photo is too small. It needs to be at least 1,600 pixels on its long edge.',
+  too_many_pixels: `That photo is too big. It can be up to ${pixels(photoLimits.maxLongEdge)} pixels on its long edge.`,
+  too_small: `That photo is too small. It needs to be at least ${pixels(photoLimits.minLongEdge)} pixels on its long edge.`,
   animated: 'Use a single still photo, not an animation.',
   corrupt: 'That file could not be read as a photo.',
 };

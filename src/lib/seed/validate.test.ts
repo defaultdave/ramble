@@ -175,7 +175,7 @@ describe('fixtureIssues', () => {
             startTime: '10:00',
             durationMinutes: 60,
             allocation: 5,
-            leaves: [{ occurrence: 10, spacesLeft: 1 }],
+            leaves: [{ occurrence: 9, spacesLeft: 1 }],
           },
         ],
       }),
@@ -283,6 +283,21 @@ describe('fixtureIssues', () => {
       expect(issuesOf(fixtures).join('\n')).toContain(text);
     },
   );
+});
+
+describe('a leave on the last date of the range', () => {
+  it('is accepted at the highest index the range can hold', () => {
+    const slots = [
+      {
+        weekday: 1,
+        startTime: '10:00',
+        durationMinutes: 60,
+        allocation: 5,
+        leaves: [{ occurrence: 8, spacesLeft: 1 }],
+      },
+    ];
+    expect(fixtureIssues(withExperience({ slots }))).toEqual([]);
+  });
 });
 
 describe('the tone checklist', () => {

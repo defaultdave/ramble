@@ -29,7 +29,7 @@ import {
 // - the next position is the lowest free one and is null once the experience is full
 // - alt text is required unless decorative; a decorative photo carries none; blank and long alt text are refused
 // - rights: licensed needs holder, licence, and a web link; the other bases take only a credit
-// - every refusal code has copy
+// - every refusal code has copy, and the copy states the limits the code is checked against
 // - a guest photo row reads, and one with an unusable blur placeholder does not
 // - the storage key is built from the two ids
 
@@ -334,6 +334,14 @@ describe('PhotoRightsSchema', () => {
 describe('photoRefusalMessage', () => {
   it.each(photoRefusalCodes)('has copy for %s', (code) => {
     expect(photoRefusalMessage(code).length).toBeGreaterThan(10);
+  });
+
+  it.each([
+    ['too_large', '10 MB'],
+    ['too_many_pixels', '8,192 pixels'],
+    ['too_small', '1,600 pixels'],
+  ] as const)('states the limit in the %s copy: %s', (code, limit) => {
+    expect(photoRefusalMessage(code)).toContain(limit);
   });
 });
 

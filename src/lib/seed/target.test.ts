@@ -16,6 +16,7 @@ import {
 // - SEED_TARGET=local refuses a remote host; staging and load-test accept one only when SEED_HOST equals its host
 // - every target but local refuses a missing or different SEED_HOST (host_not_confirmed), the message names the
 //   URL's host and never repeats the URL; local ignores SEED_HOST
+// - a local target refuses a storage provider that is not the fake one; the other targets do not look at it
 // - an unreadable URL is refused rather than assumed local
 // - a query parameter the driver reads in place of the address (host, hostaddr, dbname, database, any case)
 //   is refused for every target, including one that makes the address read as production or local
@@ -33,6 +34,7 @@ const local: SeedTargetInput = {
   seedTarget: 'local',
   databaseUrl: 'postgres://ramble:secret@localhost:5432/ramble',
   seedHost: undefined,
+  storageProvider: 'fake',
 };
 
 const neonHost = 'ep-quiet-cell-123.us-east-2.aws.neon.tech';
@@ -70,6 +72,28 @@ describe('checkSeedTarget', () => {
     expect(verdict.ok).toBe(true);
   });
 
+  describe('storage provider', () => {
+    it('refuses a local target with the Blob provider', () => {
+      const verdict = checkSeedTarget({
+        ...local,
+        storageProvider: 'vercel-blob',
+      });
+      expect(refusal(verdict)).toBe('storage_not_fake');
+      expect(verdict.ok ? '' : verdict.message).toContain('vercel-blob');
+    });
+
+    it('lets staging use the Blob provider', () => {
+      const verdict = checkSeedTarget({
+        ...local,
+        seedTarget: 'staging',
+        databaseUrl: neon,
+        seedHost: neonHost,
+        storageProvider: 'vercel-blob',
+      });
+      expect(verdict.ok).toBe(true);
+    });
+  });
+
   describe('SEED_HOST confirmation', () => {
     it.each(['staging', 'load-test', 'production-demo'] as const)(
       'refuses %s on a Neon address with no SEED_HOST',
@@ -81,6 +105,7 @@ describe('checkSeedTarget', () => {
         });
         expect(refusal(verdict)).toBe('host_not_confirmed');
         expect(verdict.ok ? '' : verdict.message).toContain(neonHost);
+        expect(verdict.ok ? '' : verdict.message).not.toContain('SEED_HOST=');
       },
     );
 
@@ -324,6 +349,7 @@ describe('checkSeedTarget', () => {
       seedTarget: 'production-demo',
       databaseUrl: neon,
       seedHost: neonHost,
+      storageProvider: 'fake',
     };
 
     it('accepts VERCEL_ENV production with a Neon-style host', () => {

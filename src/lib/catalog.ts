@@ -61,6 +61,14 @@ export const EntityIdSchema = z.guid();
  */
 export const WriteIdSchema = EntityIdSchema.transform((id) => id.toLowerCase());
 
+/** The slug of a name: lower case, runs of other characters become one hyphen. Its output passes `isSlug` unless nothing was left. */
+export function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 /**
  * Lower-case words joined by single hyphens. The database CHECK on every slug column spells the
  * pattern `^[a-z0-9]+(-[a-z0-9]+)*$`; this states it without a repeated group, because V8 matches

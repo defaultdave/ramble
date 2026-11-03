@@ -11,6 +11,7 @@ import {
   vi,
 } from 'vitest';
 import { editorialLimits } from '@/lib/editorial';
+import { guestHomeModules, type SeedSnapshot } from '@/lib/seed/coverage';
 import { homeLimits } from '@/lib/pages/home';
 import { ForbiddenError, Role, anonymousCaller } from '@/server/auth/caller';
 import { testCaller } from '@/server/auth/test-caller';
@@ -46,6 +47,7 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 //   an acceptance names a published version only, is unique per subject and version, and never changes
 // - an experience can name a legal document as its waiver, and an unknown one is refused
 // - the home Picks read finds the Picks it is asked for however many others are published, reads their first entries and a count of the rest, and never the intro
+// - the home modules a guest sees match the seed coverage probe's own reading of them
 // - guest reads return published content only; collection entries a guest cannot see are left out;
 //   a home module whose collection is a draft is left out; a malformed key is null
 // - a stored document that needs repair is repaired on read
@@ -1243,19 +1245,25 @@ describe('guest reads', () => {
   describe('home modules', () => {
     let draftPickId: string;
     let publishedPickId: string;
+    let draftPickSlug: string;
+    let publishedPickSlug: string;
 
     beforeAll(async () => {
-      draftPickId = (
+      const draft = (
         await saved(editorial.saveCollection(ops, collectionInput()))
-      ).value.id;
-      publishedPickId = (
+      ).value;
+      draftPickId = draft.id;
+      draftPickSlug = draft.slug;
+      const published = (
         await saved(
           editorial.saveCollection(
             ops,
             collectionInput({ status: 'published' }),
           ),
         )
-      ).value.id;
+      ).value;
+      publishedPickId = published.id;
+      publishedPickSlug = published.slug;
     });
 
     const homeModule = (
@@ -1298,6 +1306,55 @@ describe('guest reads', () => {
       expect(forEditing.map((entry) => entry.position)).toEqual([
         0, 1, 2, 3, 4,
       ]);
+    });
+
+    it('lists the same modules the seed coverage probe counts as visible to a guest', async () => {
+      await saved(
+        editorial.saveHomeModules(ops, [
+          homeModule('hero_search'),
+          homeModule('picks', { collectionId: draftPickId }),
+          homeModule('this_week', { enabled: false }),
+          homeModule('picks', { collectionId: publishedPickId }),
+          homeModule('picks', {
+            collectionId: publishedPickId,
+            enabled: false,
+          }),
+          homeModule('reassurance'),
+        ]),
+      );
+      const slugOf = new Map([
+        [draftPickId, draftPickSlug],
+        [publishedPickId, publishedPickSlug],
+      ]);
+      const snapshot = {
+        collections: [
+          { slug: draftPickSlug, status: 'draft' },
+          { slug: publishedPickSlug, status: 'published' },
+        ],
+        homeModules: (await editorial.listHomeModulesForEditing(ops)).map(
+          (entry) => ({
+            kind: entry.kind,
+            enabled: entry.enabled,
+            collectionSlug: entry.collectionId
+              ? (slugOf.get(entry.collectionId) ?? null)
+              : null,
+            hasBody: false,
+          }),
+        ),
+      } as unknown as SeedSnapshot;
+
+      const listed = (await editorial.listHomeModules()).map((entry) => [
+        entry.kind,
+        entry.collectionId ? slugOf.get(entry.collectionId) : null,
+      ]);
+
+      expect(listed).toHaveLength(3);
+      expect(
+        guestHomeModules(snapshot).map((entry) => [
+          entry.kind,
+          entry.collectionSlug,
+        ]),
+      ).toEqual(listed);
     });
 
     it('leaves out a switched-off module pinned to a published collection, and lists it once switched on', async () => {

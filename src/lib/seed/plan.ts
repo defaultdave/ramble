@@ -22,6 +22,9 @@ export function seedSessionRange(now: Date): {
   };
 }
 
+/** The most occurrences of one weekday the session range can hold: eight weeks plus the extra day it starts early. */
+export const maxOccurrencesPerSlot = Math.ceil((sessionWeeksAhead * 7 + 1) / 7);
+
 /** A slot as the template stores it: the start time carries its seconds. */
 export function storedStartTime(slot: Pick<SlotFixture, 'startTime'>): string {
   return `${slot.startTime}:00`;
@@ -54,12 +57,19 @@ function planSlot(
   now: Date,
 ): PlannedSession[] {
   const startTime = storedStartTime(slot);
-  const occurrences = occurrencesBetween(
-    { weekday: slot.weekday, startTime, durationMinutes: slot.durationMinutes },
-    timeZone,
-    range.fromDate,
-    range.toDate,
-  );
+  const occurrences = splitUpcoming(
+    occurrencesBetween(
+      {
+        weekday: slot.weekday,
+        startTime,
+        durationMinutes: slot.durationMinutes,
+      },
+      timeZone,
+      range.fromDate,
+      range.toDate,
+    ),
+    now,
+  ).upcoming;
   const leaves = new Map(
     (slot.leaves ?? []).map(({ occurrence, spacesLeft }) => [
       occurrence,
@@ -68,7 +78,6 @@ function planSlot(
   );
   const planned: PlannedSession[] = [];
   occurrences.forEach((occurrence, index) => {
-    if (splitUpcoming([occurrence], now).upcoming.length === 0) return;
     const spacesLeft = leaves.get(index);
     planned.push({
       experienceSlug,

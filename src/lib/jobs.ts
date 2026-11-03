@@ -19,6 +19,10 @@ export const jobLimits = {
   lastErrorMaxChars: 2000,
   claimBatch: 25,
   lockSeconds: 5 * 60,
+  /** A job's transaction may not outlive the lock that claims it: past that, another drain owns the job. */
+  transactionTimeoutSeconds: 5 * 60,
+  /** Jobs call providers between short transactions, so a transaction waiting on the app this long is stuck. */
+  idleInTransactionSeconds: 60,
   drainMaxJobs: 200,
   drainMaxMillis: 60_000,
   backoffBaseSeconds: 30,
@@ -170,10 +174,17 @@ export type FailureOutcome =
   | { status: 'dead'; lastError: string }
   | { status: 'pending'; runAfter: Date; lastError: string };
 
-/** Whether the error says a retry cannot help, by carrying `permanent: true`. */
-function isPermanentFailure(error: unknown): boolean {
+/**
+ * Set to `true` on an error that a retry cannot change. A symbol, so a provider error or a plain
+ * object that happens to carry a `permanent` field is never read as this marker.
+ */
+export const permanentFailure = Symbol.for('ramble.permanentFailure');
+
+/** Whether the error says a retry cannot help, by carrying the `permanentFailure` marker. */
+export function isPermanentFailure(error: unknown): boolean {
   return (
-    error instanceof Error && 'permanent' in error && error.permanent === true
+    error instanceof Error &&
+    (error as { [permanentFailure]?: unknown })[permanentFailure] === true
   );
 }
 

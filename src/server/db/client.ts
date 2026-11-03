@@ -4,6 +4,7 @@ import { attachDatabasePool } from '@vercel/functions';
 import { drizzle as drizzleHttp } from 'drizzle-orm/neon-http';
 import { drizzle as drizzlePool } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
+import { jobLimits } from '@/lib/jobs';
 import { env } from '@/server/env';
 import * as schema from './schema';
 
@@ -20,6 +21,18 @@ function createPooledDb() {
   // message is logged: the error object can carry the connection string.
   pool.on('error', (error) => {
     console.error(`Idle database client failed: ${error.message}`);
+  });
+  // Without these a crashed function leaves its transaction open and its row locks held until the
+  // server notices the dead socket. Set per connection, in one round trip, because the pooled
+  // host takes no startup options. `transaction_timeout` needs Postgres 17.
+  const sessionLimits = `SET idle_in_transaction_session_timeout = ${String(
+    jobLimits.idleInTransactionSeconds * 1000,
+  )}; SET transaction_timeout = ${String(jobLimits.transactionTimeoutSeconds * 1000)}`;
+  pool.on('connect', (client) => {
+    client.query(sessionLimits).catch((error: unknown) => {
+      const reason = error instanceof Error ? error.message : 'unknown';
+      console.error(`Could not set the session limits: ${reason}`);
+    });
   });
   attachDatabasePool(pool);
   return drizzlePool(pool, { schema, casing: 'snake_case' });

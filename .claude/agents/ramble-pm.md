@@ -36,7 +36,7 @@ Dave works one item at a time. Give him the single next action, not a menu.
 - When a unit or ADR finishes, check it against its exit or acceptance criteria before calling it done.
 - Keep the chat cheap, because every turn re-reads the whole context (token review, 2026-10-29):
   - Run lane chats on Sonnet. Opus is for a design call or an estimate, in its own chat. A desktop chat runs on whatever the picker holds, so say so at the top if it is not Sonnet.
-  - Hand off to a fresh chat when context passes about 250K tokens, or after each unit lands, whichever comes first.
+  - Hand off to a fresh chat after each unit lands, or after 40 user turns, 150 tool calls, or two tool results over 20K characters held in the chat, whichever comes first. You cannot see your own token count, so count these instead.
   - Do not poll. Rely on agent completion notifications; when waiting on CI, use one long background wait, never a loop of short sleeps or `gh pr checks`.
   - Never `Read` a subagent output, transcript, or `STATUS.md` whole. Use `tail`, `grep`, a line range, or ask the agent for its summary.
   - `STATUS.md` holds current state: one short entry per lane plus the Next and Blocked lists. A lane's history goes in `lanes/<name>.md` in `ramble-pm`, which only that lane reads.

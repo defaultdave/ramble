@@ -1,6 +1,6 @@
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { renderTestPhoto } from '@/lib/seed/testPhotos';
+import { renderTestPhoto } from '@/lib/seed/testPhotoImage';
 import { encodePng } from '@/server/db/seed/png';
 
 // Behaviours under test:

@@ -70,6 +70,7 @@ export const allowedContentTypes = {
   audit: ['application/x-ndjson'],
 } as const satisfies Record<StorageVisibility, readonly string[]>;
 
+/** The one 10 MiB bound: no stored object, and no uploaded photo, is larger. */
 export const maxObjectBytes = 10 * 1024 * 1024;
 
 /** A link to a private object lives for minutes, never days. */

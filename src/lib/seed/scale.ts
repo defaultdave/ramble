@@ -1,4 +1,5 @@
 import { maxScaleExperiences, type ScaleOptions } from './args';
+import { slugify } from '@/lib/catalog';
 import { createRandom, type Random } from './ids';
 import { categories, neighborhoods } from './fixtures/taxonomy';
 import type {
@@ -238,13 +239,6 @@ const startTimes = [
   '19:30',
 ];
 const allocations = [4, 6, 8, 10, 12, 16, 20, 30];
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
 
 /** A shuffled copy (Fisher-Yates), so the first few of it are a random sample without repeats. */
 function shuffled<T>(items: readonly T[], random: Random): T[] {

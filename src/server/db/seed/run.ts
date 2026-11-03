@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, lt, sql } from 'drizzle-orm';
 import { requireRole, Role, type Caller } from '@/server/auth/caller';
 import { db } from '@/server/db/client';
 import {
@@ -294,28 +294,40 @@ async function writeSessions(
     }
     const plans = planned.get(fixture.slug) ?? [];
     if (!hasPlannedSeats(plans)) continue;
-    const stored = await db
-      .select({
-        id: sessions.id,
-        seatsSold: sessions.seatsSold,
-        localDate: sessions.localDate,
-        weekday: sessionTemplates.weekday,
-        startTime: sessionTemplates.startTime,
-      })
-      .from(sessions)
-      .innerJoin(sessionTemplates, eq(sessions.templateId, sessionTemplates.id))
-      .where(eq(sessions.experienceId, experienceId(fixture.slug)))
-      .limit(500);
-    const updates = seatUpdates(plans, stored);
-    await db.transaction(async (tx) => {
-      for (const update of updates) {
-        await tx
+    // The read and the writes share one transaction, and each write holds only while the stored
+    // count is still below the plan, so a booking that lands in between is never lowered.
+    counts.seatsAdjusted += await db.transaction(async (tx) => {
+      const stored = await tx
+        .select({
+          id: sessions.id,
+          seatsSold: sessions.seatsSold,
+          localDate: sessions.localDate,
+          weekday: sessionTemplates.weekday,
+          startTime: sessionTemplates.startTime,
+        })
+        .from(sessions)
+        .innerJoin(
+          sessionTemplates,
+          eq(sessions.templateId, sessionTemplates.id),
+        )
+        .where(eq(sessions.experienceId, experienceId(fixture.slug)))
+        .limit(500);
+      let adjusted = 0;
+      for (const update of seatUpdates(plans, stored)) {
+        const written = await tx
           .update(sessions)
           .set({ seatsSold: update.seatsSold })
-          .where(eq(sessions.id, update.sessionId));
+          .where(
+            and(
+              eq(sessions.id, update.sessionId),
+              lt(sessions.seatsSold, update.seatsSold),
+            ),
+          )
+          .returning({ id: sessions.id });
+        adjusted += written.length;
       }
+      return adjusted;
     });
-    counts.seatsAdjusted += updates.length;
   }
   return counts;
 }

@@ -11,10 +11,10 @@ import {
   photoCoverageGaps,
   planTestPhotos,
   reconcileTestPhotos,
-  renderTestPhoto,
   tallyTestPhotos,
   type TestPhotoPlan,
 } from '@/lib/seed/testPhotos';
+import { renderTestPhoto } from '@/lib/seed/testPhotoImage';
 import { ingestPhoto, type IngestedPhoto } from '@/server/photos/ingest';
 import { storeIngestedPhoto } from '@/server/photos/store';
 import type { StoragePort } from '@/server/ports/storage';

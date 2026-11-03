@@ -3,6 +3,7 @@ import { curated } from './fixtures';
 import {
   groupPlanned,
   hasPlannedSeats,
+  maxOccurrencesPerSlot,
   planSessions,
   seatsSoldFor,
   seedSessionRange,
@@ -16,7 +17,7 @@ import type { ExperienceFixture, HostFixture } from './types';
 // - a stored start time carries seconds; seats sold is allocation less spaces left, clamped
 // - only sessions that start after now are planned; one weekday gives one session a week
 // - the wall time holds across the clock change, in the host's zone
-// - a leave applies to the slot's n-th date counted from the range start, and only to that date
+// - a leave applies to the slot's n-th upcoming date, a date already started not counted, and only to that date
 // - a host's own zone is used; the default is New York
 // - planned sessions group by experience; a plan with no seats sold needs no second pass
 
@@ -112,6 +113,20 @@ describe('planSessions', () => {
     );
   });
 
+  it('sizes the most occurrences of a weekday to the range', () => {
+    const { fromDate, toDate } = seedSessionRange(now);
+    const perWeekday = new Array<number>(7).fill(0);
+    for (
+      let day = Date.parse(`${fromDate}T00:00:00Z`);
+      day <= Date.parse(`${toDate}T00:00:00Z`);
+      day += 86_400_000
+    ) {
+      const weekday = new Date(day).getUTCDay();
+      perWeekday[weekday] = (perWeekday[weekday] ?? 0) + 1;
+    }
+    expect(Math.max(...perWeekday)).toBe(maxOccurrencesPerSlot);
+  });
+
   it('applies a leave to the n-th date of the slot only', () => {
     const planned = planSessions(
       [host],
@@ -121,6 +136,18 @@ describe('planSessions', () => {
     const sold = planned.filter((s) => s.seatsSold > 0);
     expect(sold).toHaveLength(1);
     expect(sold[0]).toMatchObject({ seatsSold: 12, localDate: '2026-11-07' });
+  });
+
+  it('counts a leave from the first date that has not started', () => {
+    const afterFirstStart = new Date('2026-10-31T23:00:00Z');
+    const planned = planSessions(
+      [host],
+      [experience([{ ...slot, leaves: [{ occurrence: 0, spacesLeft: 0 }] }])],
+      afterFirstStart,
+    );
+    const sold = planned.filter((s) => s.seatsSold > 0);
+    expect(sold).toHaveLength(1);
+    expect(sold[0]).toMatchObject({ localDate: '2026-11-07' });
   });
 
   it('leaves the allocation source and the template time on every session', () => {

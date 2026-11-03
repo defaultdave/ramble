@@ -4,6 +4,17 @@
   gap: var(--space-5);
 }
 
+/* Mirrors BookingChoices: seven 44 px days need 308 px, so the calendar borrows the sheet's side padding below 360 px. */
+.calendar {
+  margin-inline: calc(-1 * var(--space-5));
+}
+
+@media (min-width: 360px) {
+  .calendar {
+    margin-inline: 0;
+  }
+}
+
 .heading {
   margin: 0;
   font-size: var(--font-size-heading-s);

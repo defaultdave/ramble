@@ -12,13 +12,15 @@ import styles from './BookingSheet.stories.module.css';
 const content = (
   <div className={styles.content}>
     <h3 className={styles.heading}>Pick a date</h3>
-    <DatePicker
-      label="Choose a date"
-      value="2026-10-24"
-      today="2026-10-18"
-      availableDates={['2026-10-22', '2026-10-24', '2026-10-25']}
-      onChange={fn()}
-    />
+    <div className={styles.calendar}>
+      <DatePicker
+        label="Choose a date"
+        value="2026-10-24"
+        today="2026-10-18"
+        availableDates={['2026-10-22', '2026-10-24', '2026-10-25']}
+        onChange={fn()}
+      />
+    </div>
     <h3 className={styles.heading}>Who&apos;s coming</h3>
     <Stepper
       label="Guests"

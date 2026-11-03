@@ -4,6 +4,7 @@ import {
   paymentTriesRefusal,
   providerStep,
   requiresPaymentResult,
+  spendsPaymentTry,
   storesPayment,
   type ProviderStep,
   type StartPaymentInput,
@@ -11,6 +12,7 @@ import {
 } from '@/lib/checkout';
 import { orderCurrency } from '@/lib/orders';
 import {
+  readPaymentTryState,
   recordProviderPayment,
   startPaymentTx,
   type StartedPayment,
@@ -76,17 +78,23 @@ async function rememberPayment(
 
 /**
  * The whole of `startPayment` once the form has parsed: the hold's tries are spent before any lock
- * (a failed limit store throws, so it fails closed), then the first transaction, then the provider
+ * unless the call only re-reads a confirmed order or an existing payment (a failed limit store
+ * throws, so it fails closed), then the first transaction, then the provider
  * between two short transactions, never inside one. Each decision is a function in `src/lib`.
  */
 export async function startCheckoutPayment(
   device: Device,
   input: StartPaymentInput,
 ): Promise<StartPaymentResult> {
-  const refused = paymentTriesRefusal(
-    await consumeRateLimit('payment_tries', input.holdId),
+  const spends = spendsPaymentTry(
+    await readPaymentTryState(device, input.holdId),
   );
-  if (refused) return refused;
+  if (spends) {
+    const refused = paymentTriesRefusal(
+      await consumeRateLimit('payment_tries', input.holdId),
+    );
+    if (refused) return refused;
+  }
 
   const payments = getFakePayments();
   const started = await startPaymentTx(device, input, payments.provider);

@@ -25,6 +25,7 @@ import {
   storeProviderPayment,
   unknownHold,
   type HeldItem,
+  type PaymentTryState,
   type StartDecision,
   type StartPaymentInput,
   type StartPaymentResult,
@@ -138,6 +139,50 @@ async function readLatestAttempt(tx: Transaction, orderId: string) {
     .orderBy(desc(paymentAttempts.attemptNo))
     .limit(1);
   return row ? PaymentAttemptSchema.parse(row) : null;
+}
+
+/**
+ * The hold, order, and latest attempt of a hold id for `spendsPaymentTry`, read with no lock. A
+ * malformed id reads as nothing, so it spends like any guess.
+ */
+export async function readPaymentTryState(
+  device: Device,
+  holdId: string,
+): Promise<PaymentTryState> {
+  const id = WriteIdSchema.safeParse(holdId);
+  const none = {
+    deviceKey: device.deviceKey,
+    hold: null,
+    order: null,
+    latestAttempt: null,
+  };
+  if (!id.success) return none;
+  const [hold] = await db
+    .select({ deviceKey: holds.deviceKey })
+    .from(holds)
+    .where(eq(holds.id, id.data));
+  if (!isHoldOfDevice(hold, device.deviceKey)) return none;
+  const [order] = await db
+    .select({ id: orders.id, status: orders.status })
+    .from(orders)
+    .where(eq(orders.idempotencyKey, bookingIdempotencyKey(id.data)));
+  if (!order) return { ...none, hold };
+  const [latest] = await db
+    .select({
+      status: paymentAttempts.status,
+      failedTries: paymentAttempts.failedTries,
+      providerPaymentId: paymentAttempts.providerPaymentId,
+    })
+    .from(paymentAttempts)
+    .where(eq(paymentAttempts.orderId, order.id))
+    .orderBy(desc(paymentAttempts.attemptNo))
+    .limit(1);
+  return {
+    ...none,
+    hold,
+    order: { status: order.status },
+    latestAttempt: latest ?? null,
+  };
 }
 
 /**

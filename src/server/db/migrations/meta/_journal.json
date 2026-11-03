@@ -162,6 +162,13 @@
       "when": 1793594718246,
       "tag": "0022_cancellation_hours_max",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1793676867976,
+      "tag": "0023_consents_guard",
+      "breakpoints": true
     }
   ]
 }

@@ -14,7 +14,8 @@ import {
 // - guests: email shape, case, length, uniqueness; the reserved domain only on erased rows; the erased
 //   address derived from the row id; erased time not before created; times in range
 // - consents: each source records only the statuses it may; the guest must exist and cannot be deleted;
-//   enums; time in range
+//   enums; time in range; append-only: update, delete, truncate (with or without cascade) refused and the
+//   row stays, insert still works
 // - privacy requests: open exactly when unresolved; resolved not before created; one open per guest and kind
 // Functions:
 // - findOrCreateGuest: one guest per address across spellings, a refused address writes nothing, a
@@ -120,6 +121,7 @@ async function eraseDirectly(tx: Tx, guestId: string) {
 }
 
 const constraint = (name: string) => ({ cause: { constraint: name } });
+const restricted = { cause: { code: '23001' } };
 
 describe('guests constraints', () => {
   const insert = (email: string, extra = sql``) =>
@@ -309,6 +311,59 @@ describe('consents constraints', () => {
       ),
     ).rejects.toMatchObject(constraint('consents_recorded_at_in_range'));
   });
+});
+
+describe('consents are append-only', () => {
+  const withdrawn = (guestId: string) =>
+    client.db.execute(
+      sql`INSERT INTO consents (guest_id, kind, status, source) VALUES (${guestId}, 'newsletter', 'withdrawn', 'unsubscribe')`,
+    );
+
+  it('still accepts a new row', async () => {
+    const guest = await newGuest();
+    await consent(guest.id);
+    await withdrawn(guest.id);
+
+    expect((await consentRows(guest.id)).map((row) => row.status)).toEqual([
+      'granted',
+      'withdrawn',
+    ]);
+  });
+
+  it.each([
+    [
+      'update',
+      (id: string) =>
+        sql`UPDATE consents SET status = 'withdrawn' WHERE guest_id = ${id}`,
+    ],
+    [
+      'delete',
+      (id: string) => sql`DELETE FROM consents WHERE guest_id = ${id}`,
+    ],
+  ])('refuses an %s, and the row stays', async (_name, statement) => {
+    const guest = await newGuest();
+    await consent(guest.id);
+    const before = await consentRows(guest.id);
+
+    await expect(client.db.execute(statement(guest.id))).rejects.toMatchObject(
+      restricted,
+    );
+    expect(await consentRows(guest.id)).toEqual(before);
+  });
+
+  it.each([['TRUNCATE consents'], ['TRUNCATE consents CASCADE']])(
+    'refuses %s, and the rows stay',
+    async (statement) => {
+      const guest = await newGuest();
+      await consent(guest.id);
+      const before = await consentRows(guest.id);
+
+      await expect(client.db.execute(sql.raw(statement))).rejects.toMatchObject(
+        restricted,
+      );
+      expect(await consentRows(guest.id)).toEqual(before);
+    },
+  );
 });
 
 describe('privacy_requests constraints', () => {

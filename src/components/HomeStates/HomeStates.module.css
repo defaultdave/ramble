@@ -76,10 +76,10 @@
 }
 
 .bar {
+  composes: pulse from '../../styles/pulse.module.css';
   display: block;
   border-radius: var(--radius-sm);
   background: var(--color-bg-disabled);
-  animation: pulse 1.5s ease-in-out infinite;
 }
 
 .eyebrowBar {
@@ -145,21 +145,15 @@
 }
 
 .copy {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: var(--space-4);
-  min-width: 0;
-  container-type: inline-size;
+  composes: copy from '../HomeModules/HomeHero.module.css';
 }
 
 .art {
-  order: -1;
-  width: calc(var(--space-10) * 4);
+  composes: art from '../HomeModules/HomeHero.module.css';
+  composes: pulse from '../../styles/pulse.module.css';
   aspect-ratio: 4 / 3;
   border-radius: var(--radius-lg);
   background: var(--color-bg-disabled);
-  animation: pulse 1.5s ease-in-out infinite;
 }
 
 /* The hero's search: a bordered box of two label-and-field blocks and a button, stacked until the copy column is wide enough for a row. */
@@ -229,20 +223,7 @@
 }
 
 .visuallyHidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-@keyframes pulse {
-  50% {
-    opacity: 0.5;
-  }
+  composes: visuallyHidden from '../../styles/visually-hidden.module.css';
 }
 
 /* Forced colors replaces the fill, so the shape would vanish; an inset outline keeps it visible without changing its size. */
@@ -251,13 +232,6 @@
   .bar {
     outline: 1px solid GrayText;
     outline-offset: -1px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .art,
-  .bar {
-    animation: none;
   }
 }
 
@@ -286,17 +260,6 @@
     flex-direction: row;
     align-items: center;
     gap: var(--space-12);
-  }
-
-  .copy {
-    gap: var(--space-5);
-  }
-
-  .art {
-    order: 0;
-    flex: 0 1 40%;
-    width: auto;
-    max-width: calc(var(--space-16) * 6 + var(--space-8));
   }
 
   .pills {

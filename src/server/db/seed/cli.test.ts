@@ -15,6 +15,7 @@ import { seedCaller } from './caller';
 // - after the coverage matrix the photo step opens the store, writes the photos, and checks the cover and
 //   the three-photo floor; a gap exits 1 and names the experience
 // - the fake provider on any target, local included, skips the photo step without opening the store
+// - a local target with the Blob provider is refused before the seed runs
 // - a refusal never opens the store
 // - a failure prints only a safe message, exits 1, and still closes the pool
 
@@ -38,9 +39,9 @@ const command = (overrides: Partial<SeedCommand> = {}): SeedCommand => ({
   target: {
     nodeEnv: 'development',
     vercelEnv: undefined,
-    seedTarget: 'local',
-    databaseUrl: 'postgres://ramble:ramble@localhost:5432/ramble',
-    seedHost: undefined,
+    seedTarget: 'staging',
+    databaseUrl: 'postgres://u:secret@db.example.com/ramble',
+    seedHost: 'db.example.com',
   },
   now,
   storage: { provider: 'vercel-blob', open: openStorage },
@@ -88,7 +89,7 @@ describe('runSeedCommand', () => {
     ['no database', { databaseUrl: undefined }, 'DATABASE_URL is not set'],
     [
       'a remote host declared local',
-      { databaseUrl: 'postgres://u:secret@db.example.com/ramble' },
+      { seedTarget: 'local' as const },
       'SEED_TARGET is local',
     ],
     [
@@ -181,13 +182,13 @@ describe('runSeedCommand', () => {
           storage: { provider: 'fake', open: openStorage },
           target:
             seedTarget === 'local'
-              ? base
-              : {
+              ? {
                   ...base,
                   seedTarget,
-                  databaseUrl: 'postgres://u:secret@db.example.com/ramble',
-                  seedHost: 'db.example.com',
-                },
+                  databaseUrl: 'postgres://ramble:ramble@localhost:5432/ramble',
+                  seedHost: undefined,
+                }
+              : base,
         });
         expect(code).toBe(0);
         expect(lines.join('\n')).toContain('Photos skipped');
@@ -196,6 +197,22 @@ describe('runSeedCommand', () => {
         expect(readPhotoCoverageGaps).not.toHaveBeenCalled();
       },
     );
+
+    it('refuses a local target with the Blob provider before anything runs or the store opens', async () => {
+      const base = command().target;
+      const code = await run({
+        target: {
+          ...base,
+          seedTarget: 'local',
+          databaseUrl: 'postgres://ramble:ramble@localhost:5432/ramble',
+          seedHost: undefined,
+        },
+      });
+      expect(code).toBe(1);
+      expect(lines.join('\n')).toContain('STORAGE_PROVIDER is vercel-blob');
+      expect(runSeed).not.toHaveBeenCalled();
+      expect(openStorage).not.toHaveBeenCalled();
+    });
 
     it('does not open the store when the target is refused', async () => {
       const base = command().target;

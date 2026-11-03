@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { hasSpaceForParty, hasSpaceLeft } from './spaces';
-import { msPerDay } from './time';
+import { msPerDay, msPerHour } from './time';
 
 /** The minute key a cached read takes, as `minuteAsOf` writes it. */
 const AsOfSchema = z.iso.datetime();
@@ -19,6 +19,24 @@ type WindowedSession = {
 export function upcomingWindow(asOf: string, days: number): SessionWindow {
   const from = new Date(AsOfSchema.parse(asOf));
   return { from, to: new Date(from.getTime() + days * msPerDay) };
+}
+
+// Host zones run from UTC-12 to UTC+14, so one instant is on a different calendar date in each of them.
+const westmostZoneOffsetMs = -12 * msPerHour;
+const eastmostZoneOffsetMs = 14 * msPerHour;
+
+/**
+ * Whether a session in the window could fall on the calendar `date` (YYYY-MM-DD) in some host zone.
+ * A day outside this has no session to find, so a read for it is wasted.
+ */
+export function isDateInWindow(date: string, window: SessionWindow): boolean {
+  const first = new Date(window.from.getTime() + westmostZoneOffsetMs);
+  // `to` is not in the window, so the last instant is a millisecond before it.
+  const last = new Date(window.to.getTime() - 1 + eastmostZoneOffsetMs);
+  return (
+    date >= first.toISOString().slice(0, 10) &&
+    date <= last.toISOString().slice(0, 10)
+  );
 }
 
 /** A session that starts at `from` or later and before `to`: a start exactly at `from` is in, one exactly at `to` is out. */

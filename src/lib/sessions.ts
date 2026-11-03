@@ -6,6 +6,7 @@ import {
 } from '@internationalized/date';
 import { z } from 'zod';
 import { EntityIdSchema } from './catalog';
+import { isoDateOf, msPerDay } from './time';
 
 export const sessionSources = ['ramble', 'allocation', 'external'] as const;
 
@@ -153,7 +154,7 @@ function daysInRange(fromDate: string, toDate: string): number {
     const [year = 0, month = 0, day = 0] = value.split('-').map(Number);
     return Date.UTC(year, month - 1, day);
   };
-  return Math.round((utc(toDate) - utc(fromDate)) / 86_400_000) + 1;
+  return Math.round((utc(toDate) - utc(fromDate)) / msPerDay) + 1;
 }
 
 function parseLocalDate(value: string): CalendarDate {
@@ -306,9 +307,9 @@ export function generationHorizon(now: Date): string {
     );
   }
   const limit = Date.UTC(9999, 11, 29);
-  const reach = now.getTime() + generationHorizonDays * 86_400_000;
+  const reach = now.getTime() + generationHorizonDays * msPerDay;
   if (reach >= limit) return lastGenerableDate;
-  return new Date(reach).toISOString().slice(0, 10);
+  return isoDateOf(new Date(reach));
 }
 
 /** Whether `toDate` reaches past what a call made at `now` may generate for. */

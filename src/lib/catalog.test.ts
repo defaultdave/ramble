@@ -7,6 +7,7 @@ import {
   PriceOptionSchema,
   SlugSchema,
   isSlug,
+  slugify,
   priceKindLabel,
   type PriceOption,
 } from './catalog';
@@ -249,6 +250,33 @@ describe('identifiers', () => {
     expect(() =>
       CancellationTierSchema.parse({ ...tier, fullRefundHoursBefore: -1 }),
     ).toThrow();
+  });
+
+  it.each([
+    [8760, true],
+    [8761, false],
+  ])('notice of %i hours parses: %s', (hours, ok) => {
+    expect(
+      CancellationTierSchema.safeParse({
+        ...tier,
+        fullRefundHoursBefore: hours,
+      }).success,
+    ).toBe(ok);
+  });
+});
+
+describe('slugify', () => {
+  it.each([
+    ['Sunset Kayak on the Hudson', 'sunset-kayak-on-the-hudson'],
+    ['  --Café & Bar!  ', 'caf-bar'],
+    ['A  B', 'a-b'],
+  ])('turns %j into %j, and the result is a slug', (text, slug) => {
+    expect(slugify(text)).toBe(slug);
+    expect(isSlug(slug)).toBe(true);
+  });
+
+  it('leaves nothing for a name with no letters or digits', () => {
+    expect(slugify('!!!')).toBe('');
   });
 });
 

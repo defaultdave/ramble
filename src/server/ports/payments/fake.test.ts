@@ -190,6 +190,51 @@ describe('fake adapter', () => {
     ).rejects.toMatchObject({ code: 'invalid_state' });
   });
 
+  it('keeps the method the guest paid with on the payment', async () => {
+    const fake = makeFake();
+    const payment = await fake.createPayment(paymentInput(1));
+    expect(
+      (await fake.retrieve({ kind: 'payment', id: payment.id }))?.method,
+    ).toBeNull();
+
+    await fake.confirm(payment.id, {
+      outcome: 'succeeded',
+      method: 'apple_pay',
+    });
+
+    expect(
+      (await fake.retrieve({ kind: 'payment', id: payment.id }))?.method,
+    ).toBe('apple_pay');
+  });
+
+  describe('lastEventFor', () => {
+    it('is null for a payment that has emitted nothing and for an unknown id', async () => {
+      const fake = makeFake();
+      const payment = await fake.createPayment(paymentInput(1));
+
+      expect(await fake.lastEventFor(payment.id)).toBeNull();
+      expect(await fake.lastEventFor('pay_unknown')).toBeNull();
+    });
+
+    it('returns the newest event of that payment only, as a copy', async () => {
+      const fake = makeFake();
+      const first = await fake.createPayment(paymentInput(1));
+      const second = await fake.createPayment(paymentInput(2));
+      await fake.confirm(first.id, { outcome: 'declined' });
+      const succeeded = await fake.confirm(first.id, { outcome: 'succeeded' });
+      await fake.confirm(second.id, { outcome: 'declined' });
+
+      const last = await fake.lastEventFor(first.id);
+
+      expect(last).toEqual(succeeded.event);
+      expect(last?.type).toBe('payment.succeeded');
+      if (last) last.type = 'payment.canceled';
+      expect((await fake.lastEventFor(first.id))?.type).toBe(
+        'payment.succeeded',
+      );
+    });
+  });
+
   it('refuses a secret shorter than 16 characters', () => {
     expect(() => makeFake({ webhookSecret: 'short' })).toThrow(PaymentsError);
   });

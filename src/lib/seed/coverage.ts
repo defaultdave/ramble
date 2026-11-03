@@ -1,5 +1,6 @@
 import { browseWindowDays } from '@/lib/pages/browse';
 import { guestVisibleStatuses } from '@/lib/catalog';
+import { homeModuleKinds } from '@/lib/editorial';
 import { homeLimits } from '@/lib/pages/home';
 import {
   isOpenSession,
@@ -174,7 +175,7 @@ function browseResults(
 }
 
 /** The home modules a guest sees: enabled, and a collection only once published. Mirrors `listHomeModules`. */
-function guestHomeModules(snapshot: SeedSnapshot): SnapshotHomeModule[] {
+export function guestHomeModules(snapshot: SeedSnapshot): SnapshotHomeModule[] {
   return snapshot.homeModules.filter((module) => {
     if (!module.enabled) return false;
     if (module.collectionSlug === null) return true;
@@ -183,15 +184,6 @@ function guestHomeModules(snapshot: SeedSnapshot): SnapshotHomeModule[] {
     );
   });
 }
-
-const homeOrder = [
-  'hero_search',
-  'category_rail',
-  'picks',
-  'gift_guide',
-  'this_week',
-  'reassurance',
-];
 
 export type Probe = {
   /** What the seed holds, naming the rows. It is printed in the matrix. */
@@ -274,7 +266,7 @@ export const probes = {
           (c) => c.slug === slug && c.kind === kind && c.status === 'published',
         );
       return (
-        kinds.join(',') === homeOrder.join(',') &&
+        kinds.join(',') === homeModuleKinds.join(',') &&
         shows(picks?.collectionSlug, 'pick') &&
         shows(gift?.collectionSlug, 'gift_guide') &&
         byKind('hero_search')?.hasBody === true &&

@@ -139,6 +139,8 @@ describe('resultsSummary', () => {
     [12, false, '12 experiences'],
     [12, true, 'Showing 12 experiences'],
     [1, true, 'Showing 1 experience'],
+    [0, true, 'No experiences on this page'],
+    [0, false, '0 experiences'],
   ])('writes %i shown, more=%s', (shown, hasMore, text) => {
     expect(resultsSummary(shown, hasMore)).toBe(text);
   });
@@ -192,6 +194,15 @@ describe('browseView', () => {
     ).toEqual({
       state: 'outdated',
       startHref: '/new-york/browse?category=cooking',
+    });
+  });
+
+  it('does not say it shows none when every card was left out but a next page exists', () => {
+    const page: BrowsePage = { ok: true, items: [], nextCursor: id(5) };
+    expect(browseView(firstPage, page, [])).toMatchObject({
+      state: 'results',
+      cards: [],
+      summary: 'No experiences on this page',
     });
   });
 

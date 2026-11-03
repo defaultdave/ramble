@@ -13,7 +13,7 @@ import {
 } from '@/lib/pages/browse';
 import { guestCounts, noFilters, type BrowseFilters } from '@/lib/filters';
 import { isOpenSession, upcomingWindow } from '@/lib/sessionWindow';
-import { msPerDay } from '@/lib/time';
+import { isoDateOf, msPerDay } from '@/lib/time';
 import {
   cancellationTiers,
   categories,
@@ -240,9 +240,7 @@ async function insertTemplate(experienceId: string) {
 }
 
 function shiftDay(date: string, days: number): string {
-  const shifted = new Date(`${date}T00:00:00Z`);
-  shifted.setUTCDate(shifted.getUTCDate() + days);
-  return shifted.toISOString().slice(0, 10);
+  return isoDateOf(new Date(Date.parse(`${date}T00:00:00Z`) + days * msPerDay));
 }
 
 describe('what a guest sees', () => {
@@ -764,7 +762,7 @@ describe('the calendar read', () => {
     ).toEqual({ storedDates: [], handEntered: [] });
   });
 
-  it('cuts the stored dates at the cap, earliest first', async () => {
+  it('refuses a read with more stored dates than the cap rather than cutting it', async () => {
     const where = await scope();
     const exp = await insertExperience(where);
     const template = await insertTemplate(exp.id);
@@ -786,19 +784,15 @@ describe('the calendar read', () => {
       }),
     );
 
-    const { storedDates } = await browse.listBrowseDayRows(
-      { categories: [where.category.slug], neighborhoods: [], guests: null },
-      asOf,
-    );
-
-    expect(storedDates).toHaveLength(maxStoredDayRows);
-    expect(storedDates[0]).toBe('2026-11-01');
-    expect(storedDates.at(-1)).toBe(
-      shiftDay('2026-11-01', maxStoredDayRows - 1),
-    );
+    await expect(
+      browse.listBrowseDayRows(
+        { categories: [where.category.slug], neighborhoods: [], guests: null },
+        asOf,
+      ),
+    ).rejects.toThrow();
   });
 
-  it('cuts the hand-entered sessions at the cap, earliest first', async () => {
+  it('refuses a read with more hand-entered sessions than the cap rather than cutting it', async () => {
     const where = await scope();
     const exp = await insertExperience(where);
     const total = maxHandEnteredDayRows + 3;
@@ -816,13 +810,12 @@ describe('the calendar read', () => {
       }),
     );
 
-    const { handEntered } = await browse.listBrowseDayRows(
-      { categories: [where.category.slug], neighborhoods: [], guests: null },
-      asOf,
-    );
-
-    expect(handEntered).toHaveLength(maxHandEnteredDayRows);
-    expect(handEntered[0]?.startsAt).toEqual(new Date(Date.UTC(2026, 10, 1)));
+    await expect(
+      browse.listBrowseDayRows(
+        { categories: [where.category.slug], neighborhoods: [], guests: null },
+        asOf,
+      ),
+    ).rejects.toThrow();
   });
 });
 

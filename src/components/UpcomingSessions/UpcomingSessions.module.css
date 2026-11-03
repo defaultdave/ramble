@@ -94,10 +94,10 @@
 }
 
 .bar {
+  composes: pulse from '../../styles/pulse.module.css';
   display: block;
   border-radius: var(--radius-sm);
   background: var(--color-bg-disabled);
-  animation: pulse 1.5s ease-in-out infinite;
 }
 
 .barWhen {
@@ -118,24 +118,7 @@
 }
 
 .visuallyHidden {
-  position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-@keyframes pulse {
-  50% {
-    opacity: 0.5;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .bar {
-    animation: none;
-  }
+  composes: visuallyHidden from '../../styles/visually-hidden.module.css';
 }
 
 @media (forced-colors: active) {

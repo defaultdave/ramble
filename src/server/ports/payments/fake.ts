@@ -1,5 +1,6 @@
 import 'server-only';
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac } from 'node:crypto';
+import { secureEqual, sha256Hex } from '@/server/hash';
 import { z } from 'zod';
 import { fakeCardFeeMinor } from '@/lib/fakeCardFee';
 import { orderCurrency as currency } from '@/lib/orders';
@@ -121,6 +122,8 @@ export type FakePaymentsAdapter = PaymentsPort & {
   confirm(paymentId: string, input: ConfirmInput): Promise<ConfirmedPayment>;
   /** Every event emitted so far, oldest first. */
   emittedEvents(): ProviderEvent[];
+  /** The newest event emitted for a payment, as a copy, or null when it has emitted none: what a provider sends again when its delivery was not taken. */
+  lastEventFor(paymentId: string): Promise<ProviderEvent | null>;
   /** Signs an event as a delivery timestamped `signedAt` (now by default), so a late delivery is signed fresh. */
   signWebhook(event: ProviderEvent, signedAt?: Date): WebhookDelivery;
   /** Signs any body, for deliveries the fake would never emit itself. */
@@ -156,7 +159,7 @@ const settleableStatuses: ReadonlySet<Payment['status']> = new Set([
 ]);
 
 function fakeId(prefix: string, seed: string): string {
-  const digest = createHash('sha256').update(seed).digest('hex');
+  const digest = sha256Hex(seed);
   return `${prefix}_${digest.slice(0, 24)}`;
 }
 
@@ -379,6 +382,13 @@ export function createFakePaymentsAdapter(
     }
   }
 
+  function lastEventFor(paymentId: string): ProviderEvent | null {
+    const found = state.events.findLast(
+      (event) => event.objectId === paymentId,
+    );
+    return found ? copy(found) : null;
+  }
+
   function createPayment(rawInput: unknown): Payment {
     const input = parseOrThrow(CreatePaymentInputSchema, rawInput);
     return idempotent(
@@ -576,10 +586,7 @@ export function createFakePaymentsAdapter(
     }
     const [, timestamp = '', given = ''] = match;
     const expected = hmacHex(webhookSecret, `${timestamp}.${delivery.rawBody}`);
-    const matches = timingSafeEqual(
-      Buffer.from(given, 'hex'),
-      Buffer.from(expected, 'hex'),
-    );
+    const matches = secureEqual(given, expected);
     if (!matches) {
       throw new PaymentsError('invalid_signature', 'Signature does not match');
     }
@@ -626,6 +633,7 @@ export function createFakePaymentsAdapter(
       Promise.resolve({ availableMinor: state.balanceMinor, currency }),
     confirm: (paymentId, input) => settled(() => confirm(paymentId, input)),
     emittedEvents: () => state.events.map(copy),
+    lastEventFor: (paymentId) => settled(() => lastEventFor(paymentId)),
     signWebhook: (event, signedAt) => signBody(JSON.stringify(event), signedAt),
     signBody,
   };

@@ -1,7 +1,7 @@
 import 'server-only';
 import { createHmac, randomBytes } from 'node:crypto';
 import type { StorageCapabilities } from '@/lib/storage';
-import { secureEqual } from '@/server/secureEqual';
+import { secureEqual } from '@/server/hash';
 import {
   parseDeleteInput,
   parsePutInput,

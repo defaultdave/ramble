@@ -8,7 +8,7 @@ import {
 import { emailAdapterNames } from '@/lib/email/message';
 import { emailModes } from '@/lib/email/route';
 import { emailSettingIssues } from '@/lib/email/settings';
-import { seedTargets } from '@/lib/seed/target';
+import { loopbackHosts, seedTargets } from '@/lib/seed/target';
 import { storageProviderNames, storageSettingIssues } from '@/lib/storage';
 
 const postgresUrl = z.url({ protocol: /^postgres(ql)?$/ });
@@ -34,8 +34,6 @@ const hostname = z
     (value) => value.length > 253 || /^[A-Za-z0-9.-]+$/.test(value),
     'not a hostname',
   );
-
-const loopbackHosts = ['localhost', '127.0.0.1', '[::1]', '::1'];
 
 const httpsUrl = z.url({ protocol: /^https$/ });
 

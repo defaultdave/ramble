@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { browseResultsId } from '@/lib/pages/browse';
 import { BrowseContent } from './BrowseContent';
 
@@ -11,6 +11,8 @@ import { BrowseContent } from './BrowseContent';
 // - a slug the catalog has no row for never reaches the cached reads, and the page keeps the address it was given
 // - filters that match nothing show the empty state without any date or result read
 // - a failed content read renders the error state
+// - the calendar read gets the picked fields only, so a date never keys it
+// - a date no session can be on reads no results but still reads the calendar, and keeps the address
 // - both branches are wrapped in the element that is shown with scripting off, with the id the skip link targets
 
 const server = vi.hoisted(() => ({
@@ -66,6 +68,8 @@ const render_ = async () =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-11-02T15:00:00Z'));
   server.options.mockResolvedValue({ categories: [], neighborhoods: [] });
   server.dates.mockResolvedValue([]);
   server.results.mockResolvedValue({
@@ -73,6 +77,10 @@ beforeEach(() => {
     items: [{ ...item(2), image }, item(1)],
     nextCursor: null,
   });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('BrowseContent', () => {
@@ -155,6 +163,38 @@ describe('BrowseContent', () => {
     );
   });
 
+  it('reads the calendar from the picked fields only, so the date is no part of its key', async () => {
+    render(
+      await BrowseContent({
+        searchParams: Promise.resolve({ date: '2026-11-07', guests: '3' }),
+      }),
+    );
+
+    expect(server.dates).toHaveBeenCalledExactlyOnceWith(
+      { categories: [], neighborhoods: [], guests: 3 },
+      expect.any(String),
+    );
+  });
+
+  it('reads no results for a date outside the window, keeps the calendar, and words the empty state for the address', async () => {
+    server.dates.mockResolvedValue(['2026-11-02', '2026-11-09']);
+
+    render(
+      await BrowseContent({
+        searchParams: Promise.resolve({ date: '1999-01-01' }),
+      }),
+    );
+
+    expect(server.results).not.toHaveBeenCalled();
+    expect(server.dates).toHaveBeenCalledOnce();
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Nothing on Fri, Jan 1',
+    );
+    expect(
+      screen.getByRole('link', { name: 'See Mon, Nov 2' }),
+    ).toHaveAttribute('href', '/new-york/browse?date=2026-11-02');
+  });
+
   it('carries the count in a live region', async () => {
     await render_();
 
@@ -194,12 +234,7 @@ describe('BrowseContent', () => {
       render(await withSlugs({ category: ['junk', 'cooking'] }));
 
       expect(server.dates).toHaveBeenCalledExactlyOnceWith(
-        {
-          categories: ['cooking'],
-          neighborhoods: [],
-          date: null,
-          guests: null,
-        },
+        { categories: ['cooking'], neighborhoods: [], guests: null },
         expect.any(String),
       );
       expect(server.results).toHaveBeenCalledExactlyOnceWith(

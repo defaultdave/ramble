@@ -12,6 +12,7 @@ import {
   partyReserveInput,
   ReholdInputSchema,
   reholdRequest,
+  showsHoldTimer,
   reholdOutcome,
   soldOutCopy,
   type CheckoutStep,
@@ -84,6 +85,19 @@ describe('checkoutReducer', () => {
     expect(sending).toMatchObject({ step: 'details', sending: true });
     expect(canSend(sending)).toBe(false);
     expect(canSend(payment)).toBe(false);
+  });
+
+  it('shows the hold timer on every step except sold out, which is the only message about the spaces', () => {
+    expect(showsHoldTimer(initialStep)).toBe(true);
+    expect(showsHoldTimer(payment)).toBe(true);
+    expect(
+      showsHoldTimer(
+        checkoutReducer(initialStep, {
+          type: 'answered',
+          result: { status: 'sold_out', alternatives: [] },
+        }),
+      ),
+    ).toBe(false);
   });
 
   it('opens the payment form with the secret and the order token', () => {

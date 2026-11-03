@@ -8,7 +8,7 @@ import {
 import { deliverFakeConfirmation } from '@/server/fakePaymentDelivery';
 import { PaymentsError } from '@/server/ports/payments';
 import { getFakePayments } from '@/server/ports/payments/gateway';
-import { secureEqual } from '@/server/secureEqual';
+import { secureEqual } from '@/server/hash';
 
 const refused: FakeConfirmResult = { status: 'refused' };
 

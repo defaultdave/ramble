@@ -22,8 +22,12 @@ export const cacheProfiles = {
   editorial: { stale: 300, revalidate: 3_600, expire: 86_400 },
   /** The experience and guide shells and the cover photos of a page's cards. */
   catalog: { stale: 300, revalidate: 900, expire: 86_400 },
-  /** Short-lived schedule reads: browse results for one filter combination, and home's "On this week". */
-  browse: { stale: 30, revalidate: 60, expire: 600 },
+  /**
+   * Short-lived schedule reads: browse results for one filter combination, and home's "On this week".
+   * Each is keyed by the minute (`minuteAsOf`), so an entry is asked for during its own minute only. A
+   * `revalidate` past 60 or an `expire` far past it would keep entries nobody can ask for again.
+   */
+  browse: { stale: 30, revalidate: 60, expire: 120 },
   /** The site banner and other ops switches that guest pages show. */
   settings: { stale: 60, revalidate: 300, expire: 3_600 },
   /** A read that found nothing: a missing experience or a cursor nobody can see. A production build stores nothing for it (dev keeps it), so a stream of made-up addresses fills nothing. */

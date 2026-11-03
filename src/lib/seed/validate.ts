@@ -12,6 +12,7 @@ import { textOf } from './richText';
 import { SessionTemplateInputSchema } from '@/lib/sessions';
 import { SeedStepError } from './decide';
 import { seedId } from './ids';
+import { maxOccurrencesPerSlot } from './plan';
 import { experienceRow, experienceId } from './rows';
 import type {
   CuratedFixtures,
@@ -39,8 +40,7 @@ const bannedWords = [
   'successfully',
 ] as const;
 
-/** The most spaces an occurrence index in a slot can name: eight weeks of one weekday, plus a day's slack. */
-const maxOccurrenceIndex = 9;
+const maxOccurrenceIndex = maxOccurrencesPerSlot - 1;
 
 function describe(error: ZodError): string {
   return error.issues

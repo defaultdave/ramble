@@ -48,19 +48,14 @@ describe('FakePaymentForm', () => {
     expect(screen.getByText('4242 4242 4242 4242')).toBeInTheDocument();
   });
 
-  it('labels every field and asks the browser to keep real cards out', () => {
+  it.each([
+    ['Card number', 'cc-number'],
+    ['Expiry date, month and year', 'cc-exp'],
+    ['Security code', 'cc-csc'],
+    ['ZIP code', 'postal-code'],
+  ])('labels %s and names it for the browser as %s', (name, token) => {
     setup(ok);
-    for (const name of [
-      'Card number',
-      'Expiry date, month and year',
-      'Security code',
-      'ZIP code',
-    ]) {
-      expect(screen.getByLabelText(name)).toHaveAttribute(
-        'autocomplete',
-        'off',
-      );
-    }
+    expect(screen.getByLabelText(name)).toHaveAttribute('autocomplete', token);
   });
 
   it('formats what is typed', async () => {

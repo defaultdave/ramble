@@ -215,3 +215,18 @@
     display: flex;
   }
 }
+
+/* With scripting off the toggle does nothing, so a summary that opens by itself on a wide screen is open here too. */
+@media (scripting: none) {
+  .summary[data-open-from='tablet'] .toggle {
+    display: none;
+  }
+
+  .summary[data-open-from='tablet'] .fixedHead {
+    display: flex;
+  }
+
+  .summary[data-open-from='tablet'] .details[hidden] {
+    display: flex;
+  }
+}

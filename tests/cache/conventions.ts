@@ -193,7 +193,8 @@ export function cacheConventionViolations(
     }
 
     const tagCalls = callsOf(fn, 'cacheTag');
-    if (tagCalls.length === 0) {
+    // The helper calls cacheTag once per experience ID, with tags the tag module builds.
+    if (tagCalls.length === 0 && callsOf(fn, 'tagExperiences').length === 0) {
       report(fn, 'cached function does not call cacheTag');
     }
     for (const call of tagCalls) {

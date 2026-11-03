@@ -24,7 +24,7 @@ import { runSeed } from './run';
 export type SeedCommand = {
   argv: readonly string[];
   /** The environment as the validated env module read it. */
-  target: SeedTargetInput;
+  target: Omit<SeedTargetInput, 'storageProvider'>;
   now: Date;
   /** The photo store, opened only when the photo step runs, so a run that skips it needs no Blob token. */
   storage: { provider: StorageProviderName; open: () => StoragePort };
@@ -60,9 +60,10 @@ export async function runSeedCommand(command: SeedCommand): Promise<number> {
     write(args.message);
     return 2;
   }
-  const verdict = checkSeedTarget(command.target, {
-    scale: args.scale !== undefined,
-  });
+  const verdict = checkSeedTarget(
+    { ...command.target, storageProvider: command.storage.provider },
+    { scale: args.scale !== undefined },
+  );
   if (!verdict.ok) {
     write(refusalLine(verdict));
     return 1;

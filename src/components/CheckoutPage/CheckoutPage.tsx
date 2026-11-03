@@ -37,6 +37,7 @@ import {
   initialStep,
   maintenanceCopy,
   reholdRequest,
+  showsHoldTimer,
   soldOutCopy,
   tooManyTriesCopy,
   type CheckoutStep,
@@ -154,13 +155,15 @@ export function CheckoutPage({
       <Header
         variant="checkout"
         holdTimer={
-          <CheckoutHoldTimer
-            expiresAt={view.expiresAt}
-            serverNow={view.serverNow}
-            onEnd={() => {
-              dispatch({ type: 'timer_ended' });
-            }}
-          />
+          showsHoldTimer(step) ? (
+            <CheckoutHoldTimer
+              expiresAt={view.expiresAt}
+              serverNow={view.serverNow}
+              onEnd={() => {
+                dispatch({ type: 'timer_ended' });
+              }}
+            />
+          ) : null
         }
       />
       <main id="main" className={styles.main}>

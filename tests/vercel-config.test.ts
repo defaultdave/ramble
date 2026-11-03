@@ -12,17 +12,30 @@ const config = JSON.parse(
 ) as VercelConfig;
 const rules = Object.entries(config.git?.deploymentEnabled ?? {});
 
-const offPatterns = ['main', 'unit/*', 'pm/*', 'sync/*', 'promote/*'];
+const offPatterns = [
+  'main',
+  'unit/*',
+  'pm/*',
+  'sync/*',
+  'promote/*',
+  'revert/*',
+  'dependabot/**',
+];
 const mustDeploy = ['integration', 'production'];
 
-// Vercel documents minimatch globs; in them `*` does not cross a slash. This matcher
-// approximates that and supports only `*`: a pattern using `?`, `**`, braces or `!`
+// Vercel documents minimatch globs; in them `*` does not cross a slash and `**` does. This
+// matcher approximates that and supports only those two: a pattern using `?`, braces or `!`
 // must extend it.
 function matches(pattern: string, branch: string): boolean {
   const source = pattern
-    .split('*')
-    .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
-    .join('[^/]*');
+    .split('**')
+    .map((segment) =>
+      segment
+        .split('*')
+        .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+        .join('[^/]*'),
+    )
+    .join('.*');
   return new RegExp(`^${source}$`).test(branch);
 }
 
@@ -53,12 +66,16 @@ describe('vercel.json deployment creation', () => {
     expect(deploys(branch)).toBe(true);
   });
 
-  it.each(['unit/U-001-deploy-config', 'pm/status', 'sync/main', 'promote/x'])(
-    'does not deploy %s',
-    (branch) => {
-      expect(deploys(branch)).toBe(false);
-    },
-  );
+  it.each([
+    'unit/U-001-deploy-config',
+    'pm/status',
+    'sync/main',
+    'promote/x',
+    'revert/pr-12',
+    'dependabot/npm_and_yarn/next-16',
+  ])('does not deploy %s', (branch) => {
+    expect(deploys(branch)).toBe(false);
+  });
 
   it('still deploys a branch no rule names', () => {
     expect(deploys('feature/anything')).toBe(true);

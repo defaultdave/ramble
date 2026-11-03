@@ -137,8 +137,12 @@ export function dateChipLabel(date: string): string {
   return chipDate.format(new Date(`${date}T00:00:00Z`));
 }
 
-/** The line above the grid: how many experiences the page shows. */
+/**
+ * The line above the grid: how many experiences the page shows. A page whose every card was left out
+ * but which has a next page says so, rather than "Showing 0 experiences" over a button for more.
+ */
 export function resultsSummary(shown: number, hasMore: boolean): string {
+  if (shown === 0 && hasMore) return 'No experiences on this page';
   const count = `${String(shown)} ${shown === 1 ? 'experience' : 'experiences'}`;
   return hasMore ? `Showing ${count}` : count;
 }

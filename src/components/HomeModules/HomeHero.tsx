@@ -105,7 +105,7 @@ export function HomeHero({
               label="Guests"
               name={browseParamNames.guests}
               defaultValue={String(defaultGuests)}
-              options={guestOptions()}
+              options={guestOptions}
             />
             <div className={styles.submit}>
               <Button type="submit" size="lg" iconStart={<Search />}>

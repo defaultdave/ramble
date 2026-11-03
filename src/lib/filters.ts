@@ -4,6 +4,7 @@ import { holdLimits, PartySizeSchema } from './holds';
 import { guestsLabel } from './orderSummary';
 import { browsePath } from './routes';
 import { IsoDateSchema } from './sessions';
+import { isDateInWindow, type SessionWindow } from './sessionWindow';
 
 /** A list parameter with more values than this is refused whole, never cut to fit. */
 export const maxFilterValues = 8;
@@ -130,16 +131,31 @@ type SlugOptions = {
  * The filters the catalog has a category or neighborhood for. A slug nobody has is dropped, so a
  * made-up one never becomes a cache key or reaches the database. `matchesNothing` is set when a list
  * had slugs and none is known: that list matches no experience, as a slug with no row always did, and
- * the browse is empty without a read. A list with some known slugs shows what they match.
+ * the browse is empty without a read. A list with some known slugs shows what they match. A date no
+ * session in `window` could be on is dropped the same way, so it never becomes a cache key either:
+ * `dateOutsideWindow` is set and the results are empty without a read.
  */
 export function knownFilters(
   filters: BrowseFilters,
   options: SlugOptions,
-): { filters: BrowseFilters; matchesNothing: boolean } {
+  window: SessionWindow,
+): {
+  filters: BrowseFilters;
+  matchesNothing: boolean;
+  dateOutsideWindow: boolean;
+} {
   const categories = keepKnown(filters.categories, options.categories);
   const neighborhoods = keepKnown(filters.neighborhoods, options.neighborhoods);
+  const dateOutsideWindow =
+    filters.date !== null && !isDateInWindow(filters.date, window);
   return {
-    filters: { ...filters, categories, neighborhoods },
+    filters: {
+      ...filters,
+      categories,
+      neighborhoods,
+      date: dateOutsideWindow ? null : filters.date,
+    },
+    dateOutsideWindow,
     matchesNothing:
       (filters.categories.length > 0 && categories.length === 0) ||
       (filters.neighborhoods.length > 0 && neighborhoods.length === 0),
@@ -205,10 +221,10 @@ export function canAddFilterValue(
   return filters[key].length < maxFilterValues;
 }
 
-export type ChipState = { selected: boolean; disabled: boolean };
+type ChipState = { selected: boolean; disabled: boolean };
 
 /** A chosen chip can always be turned off; one that is not chosen is disabled once its list is full. */
-export function chipState(
+function chipState(
   filters: BrowseFilters,
   key: FilterListKey,
   slug: string,
@@ -268,12 +284,9 @@ export function neighborhoodOptions(
 }
 
 /** Each party size a search offers, by its number. */
-export function guestOptions(): SelectOption[] {
-  return guestCounts.map((count) => ({
-    value: String(count),
-    label: String(count),
-  }));
-}
+export const guestOptions: readonly SelectOption[] = guestCounts.map(
+  (count) => ({ value: String(count), label: String(count) }),
+);
 
 /** Adds the slug, or removes it when it is already chosen. A full list refuses a new value. */
 export function toggleFilterValue(

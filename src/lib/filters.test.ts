@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { browseWindowDays } from './pages/browse';
+import { upcomingWindow } from './sessionWindow';
 import {
   activeFilterCount,
   BrowseQuerySchema,
@@ -6,7 +8,6 @@ import {
   browseParamNames,
   defaultGuests,
   canAddFilterValue,
-  chipState,
   guestChips,
   guestOptions,
   guestCounts,
@@ -379,9 +380,16 @@ describe('changing filters', () => {
     ['chosen on a list with room', ['cooking'], 'cooking', true, false],
     ['not chosen on a list with room', ['cooking'], 'arts', false, false],
   ])('reads a chip that is %s', (_name, chosen, slug, selected, disabled) => {
-    expect(
-      chipState({ ...noFilters, categories: chosen }, 'categories', slug),
-    ).toEqual({ selected, disabled });
+    const options = [
+      { slug: 'cooking', name: 'Cooking' },
+      { slug: 'arts', name: 'Arts' },
+    ];
+    const chip = listChips(
+      { ...noFilters, categories: chosen },
+      'categories',
+      options,
+    ).find(({ key }) => key === slug);
+    expect(chip).toMatchObject({ selected, disabled });
   });
 
   it('disables a chip that is not chosen on a full list and not one that is', () => {
@@ -392,14 +400,13 @@ describe('changing filters', () => {
         (_, i) => `c${String(i)}`,
       ),
     };
-    expect(chipState(full, 'categories', 'extra')).toEqual({
-      selected: false,
-      disabled: true,
-    });
-    expect(chipState(full, 'categories', 'c3')).toEqual({
-      selected: true,
-      disabled: false,
-    });
+    const options = [
+      { slug: 'extra', name: 'Extra' },
+      { slug: 'c3', name: 'C3' },
+    ];
+    const [extra, chosen] = listChips(full, 'categories', options);
+    expect(extra).toMatchObject({ selected: false, disabled: true });
+    expect(chosen).toMatchObject({ selected: true, disabled: false });
   });
 
   it('sets and clears the date', () => {
@@ -447,6 +454,8 @@ describe('isIndexable', () => {
 });
 
 describe('knownFilters', () => {
+  // The window opens 2026-11-02T15:00Z and runs 121 days, so zones from UTC-12 to UTC+14 reach 2026-11-02 to 2027-03-04.
+  const window = upcomingWindow('2026-11-02T15:00:00.000Z', browseWindowDays);
   const options = {
     categories: [{ slug: 'cooking' }, { slug: 'outdoors' }],
     neighborhoods: [{ slug: 'dumbo' }],
@@ -497,9 +506,35 @@ describe('knownFilters', () => {
       true,
     ],
   ])('%s', (_name, input, expected, matchesNothing) => {
-    expect(knownFilters(input, options)).toEqual({
+    expect(knownFilters(input, options, window)).toEqual({
       filters: expected,
       matchesNothing,
+      dateOutsideWindow: false,
+    });
+  });
+
+  it.each([
+    ['a day long past', '2020-01-01'],
+    ['the day before the window can reach', '2026-11-01'],
+    ['a day past the last the window can reach', '2027-03-05'],
+    ['a far future day', '9999-12-31'],
+  ])('drops %s and says so, whatever else it keeps', (_name, date) => {
+    expect(
+      knownFilters(filters({ categories: ['cooking'], date }), options, window),
+    ).toEqual({
+      filters: filters({ categories: ['cooking'] }),
+      matchesNothing: false,
+      dateOutsideWindow: true,
+    });
+  });
+
+  it.each([
+    ['the first day the window can reach', '2026-11-02'],
+    ['the last day the window can reach', '2027-03-04'],
+  ])('keeps %s', (_name, date) => {
+    expect(knownFilters(filters({ date }), options, window)).toMatchObject({
+      filters: { date },
+      dateOutsideWindow: false,
     });
   });
 });
@@ -609,7 +644,7 @@ describe('search select options', () => {
   });
 
   it('offers each party size by its number', () => {
-    expect(guestOptions()).toEqual(
+    expect(guestOptions).toEqual(
       [1, 2, 3, 4, 5, 6].map((n) => ({ value: String(n), label: String(n) })),
     );
   });

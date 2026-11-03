@@ -163,8 +163,7 @@ async function attachPriceOptions(
           priceOptions.experienceId,
           rows.map((row) => row.id),
         ),
-      )
-      .orderBy(asc(priceOptions.priceMinor)),
+      ),
   );
   return withPriceOptions(rows, prices).map((row) =>
     CardExperienceSchema.parse(row),
@@ -250,7 +249,7 @@ export async function listBrowseExperiences(
  * chosen. The date filter itself is not applied:
  * the calendar must show every day a guest could switch to. No day is decided here: a generated
  * session brings its stored date and a session entered by hand its start and zone, and `browseDays`
- * turns them into days. Each list has a hard cap.
+ * turns them into days. Each list has a hard cap, and a read past it is refused, not cut.
  */
 export async function listBrowseDayRows(
   filters: Pick<BrowseFilters, 'categories' | 'neighborhoods' | 'guests'>,
@@ -280,7 +279,8 @@ export async function listBrowseDayRows(
       .innerJoin(experiences, eq(experiences.id, sessions.experienceId))
       .where(and(shown, isNotNull(sessions.localDate)))
       .orderBy(asc(sessions.localDate))
-      .limit(maxStoredDayRows),
+      // One past the cap, so a flood trips the schema's bound instead of being cut to fit.
+      .limit(maxStoredDayRows + 1),
     dbRead
       .selectDistinct({
         startsAt: sessions.startsAt,
@@ -290,7 +290,7 @@ export async function listBrowseDayRows(
       .innerJoin(experiences, eq(experiences.id, sessions.experienceId))
       .where(and(shown, isNull(sessions.localDate)))
       .orderBy(asc(sessions.startsAt), asc(sessions.timeZone))
-      .limit(maxHandEnteredDayRows),
+      .limit(maxHandEnteredDayRows + 1),
   ]);
   return BrowseDayRowsSchema.parse({
     storedDates: storedDates.map(({ localDate }) => localDate),

@@ -256,13 +256,6 @@
   margin-top: calc(var(--space-1) / 2);
 }
 
-.empty {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  align-items: flex-start;
-}
-
 @media (min-width: 768px) {
   .section {
     padding-block: var(--space-12);

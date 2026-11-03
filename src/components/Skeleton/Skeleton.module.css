@@ -12,7 +12,30 @@
   display: block;
   border-radius: var(--radius-sm);
   background: var(--color-bg-disabled);
-  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.image {
+  composes: pulse from '../../styles/pulse.module.css';
+}
+
+.tag {
+  composes: pulse from '../../styles/pulse.module.css';
+}
+
+.title {
+  composes: pulse from '../../styles/pulse.module.css';
+}
+
+.meta {
+  composes: pulse from '../../styles/pulse.module.css';
+}
+
+.price {
+  composes: pulse from '../../styles/pulse.module.css';
+}
+
+.line {
+  composes: pulse from '../../styles/pulse.module.css';
 }
 
 .card,
@@ -116,23 +139,6 @@
 
 .line:nth-child(3) {
   width: 58%;
-}
-
-@keyframes pulse {
-  50% {
-    opacity: 0.5;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .image,
-  .tag,
-  .title,
-  .meta,
-  .price,
-  .line {
-    animation: none;
-  }
 }
 
 /* Forced colors replaces the fill, so the shape would vanish; an inset outline keeps it visible without changing its size. */

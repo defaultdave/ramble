@@ -1,5 +1,6 @@
 import 'server-only';
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac } from 'node:crypto';
+import { secureEqual, sha256Hex } from '@/server/hash';
 import { z } from 'zod';
 import { fakeCardFeeMinor } from '@/lib/fakeCardFee';
 import { orderCurrency as currency } from '@/lib/orders';
@@ -158,7 +159,7 @@ const settleableStatuses: ReadonlySet<Payment['status']> = new Set([
 ]);
 
 function fakeId(prefix: string, seed: string): string {
-  const digest = createHash('sha256').update(seed).digest('hex');
+  const digest = sha256Hex(seed);
   return `${prefix}_${digest.slice(0, 24)}`;
 }
 
@@ -585,10 +586,7 @@ export function createFakePaymentsAdapter(
     }
     const [, timestamp = '', given = ''] = match;
     const expected = hmacHex(webhookSecret, `${timestamp}.${delivery.rawBody}`);
-    const matches = timingSafeEqual(
-      Buffer.from(given, 'hex'),
-      Buffer.from(expected, 'hex'),
-    );
+    const matches = secureEqual(given, expected);
     if (!matches) {
       throw new PaymentsError('invalid_signature', 'Signature does not match');
     }

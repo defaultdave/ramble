@@ -4,7 +4,7 @@ import {
   isPermanentBounce,
   maxProviderMessageIdLength,
 } from '@/lib/email/message';
-import { secureEqual } from '@/server/secureEqual';
+import { secureEqual } from '@/server/hash';
 import { EmailProviderError } from './errors';
 import type { EmailAdapter } from './types';
 import { parseSendResponse, parseWebhookBody, postJson } from './wire';

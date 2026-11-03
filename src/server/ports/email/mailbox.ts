@@ -8,7 +8,7 @@ import {
 } from '@/lib/email/message';
 import { findMailboxMessage, listMailboxSummaries } from '@/server/db/messages';
 import { env } from '@/server/env';
-import { secureEqual } from '@/server/secureEqual';
+import { secureEqual } from '@/server/hash';
 
 export const mailboxCookieName = 'ramble_dev_mailbox';
 export const mailboxCookieMaxAgeSeconds = 8 * 60 * 60;

@@ -1,5 +1,6 @@
 import 'server-only';
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac } from 'node:crypto';
+import { secureEqual } from '@/server/hash';
 import {
   evaluateFormGuard,
   FORM_TOKEN_FIELD,
@@ -26,9 +27,7 @@ export function issueFormGuardToken(now: Date): string {
 }
 
 function signatureMatches(issuedAtMs: string, signature: string): boolean {
-  const given = Buffer.from(signature);
-  const expected = Buffer.from(sign(issuedAtMs));
-  return given.length === expected.length && timingSafeEqual(given, expected);
+  return secureEqual(signature, sign(issuedAtMs));
 }
 
 // TODO(U-038): first caller, `submitSupportRequest`; U-043 (`requestPrivateSession`) follows.

@@ -1,5 +1,5 @@
 import 'server-only';
-import { createHash } from 'node:crypto';
+import { sha256Hex } from '@/server/hash';
 import {
   ConsumeInputSchema,
   rateLimitPolicies,
@@ -28,7 +28,7 @@ export type RateLimiter = {
 
 function rateLimitKey(surface: RateLimitSurface, subject: string): string {
   const normalized = normalizeSubject(surface, subject);
-  const digest = createHash('sha256').update(normalized).digest('hex');
+  const digest = sha256Hex(normalized);
   return `${surface}:${digest}`;
 }
 

@@ -15,7 +15,7 @@ import {
 import { env } from '@/server/env';
 import { logger } from '@/server/monitoring/logger';
 import { sendEmail } from '@/server/ports/email';
-import { secureEqual } from '@/server/secureEqual';
+import { secureEqual } from '@/server/hash';
 import { capabilityToken, hashToken } from '@/server/tokens';
 
 // The guest-confirmation and host-booking-notice jobs (PRD-25, PRD-44). The payload is the order id

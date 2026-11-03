@@ -7,7 +7,7 @@ import {
   maxProviderMessageIdLength,
   type DeliveryEventKind,
 } from '@/lib/email/message';
-import { secureEqual } from '@/server/secureEqual';
+import { secureEqual } from '@/server/hash';
 import type { EmailAdapter } from './types';
 import { parseSendResponse, parseWebhookBody, postJson } from './wire';
 

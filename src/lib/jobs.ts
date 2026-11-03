@@ -170,10 +170,17 @@ export type FailureOutcome =
   | { status: 'dead'; lastError: string }
   | { status: 'pending'; runAfter: Date; lastError: string };
 
-/** Whether the error says a retry cannot help, by carrying `permanent: true`. */
-function isPermanentFailure(error: unknown): boolean {
+/**
+ * Set to `true` on an error that a retry cannot change. A symbol, so a provider error or a plain
+ * object that happens to carry a `permanent` field is never read as this marker.
+ */
+export const permanentFailure = Symbol.for('ramble.permanentFailure');
+
+/** Whether the error says a retry cannot help, by carrying the `permanentFailure` marker. */
+export function isPermanentFailure(error: unknown): boolean {
   return (
-    error instanceof Error && 'permanent' in error && error.permanent === true
+    error instanceof Error &&
+    (error as { [permanentFailure]?: unknown })[permanentFailure] === true
   );
 }
 

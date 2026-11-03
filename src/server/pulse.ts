@@ -12,6 +12,7 @@ import {
   parsePulseBody,
   purgeMayContinue,
 } from '@/lib/jobs';
+import { alerts } from '@/server/monitoring/alerts';
 import { readBodyText } from '@/server/boundedBody';
 import { releaseLapsedHolds, scrubReleasedHolds } from '@/server/db/holds';
 import { PURGE_BATCH, purgeExpiredRateLimits } from '@/server/db/rateLimits';
@@ -96,9 +97,9 @@ async function queueAuditExports(): Promise<void> {
   try {
     await scheduleAuditExports();
   } catch (error) {
-    logger.error('audit exports could not be queued', {
-      errorName: error instanceof Error ? error.name : 'NonError',
-    });
+    const errorName = error instanceof Error ? error.name : 'NonError';
+    logger.error('audit exports could not be queued', { errorName });
+    alerts.raise('audit-export-queue-failed', 'error', 'queue', { errorName });
   }
 }
 

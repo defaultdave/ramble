@@ -17,6 +17,7 @@ import {
   heartbeatDue,
   jobLimits,
   lockExpiry,
+  permanentFailure,
   nextClaimSize,
   ownsClaim,
   parsePulseBody,
@@ -263,16 +264,25 @@ describe('failureOutcome', () => {
 
   it.each([
     [
-      'an error marked permanent',
-      Object.assign(new Error('x'), { permanent: true }),
+      'an error carrying the marker',
+      Object.assign(new Error('x'), { [permanentFailure]: true }),
       'dead',
     ],
     [
-      'an error marked not permanent',
-      Object.assign(new Error('x'), { permanent: false }),
+      'an error whose marker is false',
+      Object.assign(new Error('x'), { [permanentFailure]: false }),
       'pending',
     ],
-    ['a value that is not an error', { permanent: true }, 'pending'],
+    [
+      'an error with only a plain permanent field',
+      Object.assign(new Error('x'), { permanent: true }),
+      'pending',
+    ],
+    [
+      'a value with the marker that is not an error',
+      { [permanentFailure]: true },
+      'pending',
+    ],
   ])('on the first attempt, %s is %s', (_name, error, status) => {
     expect(failureOutcome({ ...base, attempts: 1, error }).status).toBe(status);
   });

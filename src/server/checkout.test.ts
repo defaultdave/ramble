@@ -6,6 +6,7 @@ import { testDevice } from '../../tests/deviceFixture';
 
 const mocks = vi.hoisted(() => ({
   consumeRateLimit: vi.fn(),
+  readPaymentTryState: vi.fn(),
   startPaymentTx: vi.fn(),
   recordProviderPayment: vi.fn(),
   createPayment: vi.fn(),
@@ -22,6 +23,7 @@ vi.mock('@/server/ports/rate-limit', () => ({
   consumeRateLimit: mocks.consumeRateLimit,
 }));
 vi.mock('@/server/db/checkout', () => ({
+  readPaymentTryState: mocks.readPaymentTryState,
   startPaymentTx: mocks.startPaymentTx,
   recordProviderPayment: mocks.recordProviderPayment,
 }));
@@ -41,6 +43,8 @@ import { startCheckoutPayment } from './checkout';
 // Behaviours under test, one per decision, branch or risk:
 // - one try is spent on the payment_tries surface for the hold id; a try over the limit is too_many_tries and
 //   reaches no data layer or provider; a failed limit store rejects, so nothing is paid (fail closed)
+// - a re-read of a confirmed order or an existing payment spends no try and reaches the limiter never; a hold that
+//   is not the device's, or a new attempt, still spends
 // - a refusal from the data layer is returned as it is, with no provider call
 // - an attempt with a provider payment is read again by its id, spends no create, and is not stored again; a
 //   payment id the provider no longer knows rejects and creates nothing
@@ -88,9 +92,17 @@ const started = (
   },
 });
 
+const noHold = {
+  deviceKey: device.deviceKey,
+  hold: null,
+  order: null,
+  latestAttempt: null,
+};
+
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.consumeRateLimit.mockResolvedValue({ allowed: true, remaining: 4 });
+  mocks.readPaymentTryState.mockResolvedValue(noHold);
   mocks.startPaymentTx.mockResolvedValue(started());
   mocks.recordProviderPayment.mockResolvedValue(true);
   mocks.createPayment.mockResolvedValue(payment);
@@ -109,6 +121,35 @@ describe('the tries limit', () => {
       device,
       expect.objectContaining({ holdId }),
       'fake',
+    );
+  });
+
+  it('spends no try on a re-read of a confirmed order or an existing payment, and still answers', async () => {
+    mocks.readPaymentTryState.mockResolvedValue({
+      ...noHold,
+      hold: { deviceKey: device.deviceKey },
+      order: { status: 'pending_payment' },
+      latestAttempt: {
+        status: 'created',
+        failedTries: 0,
+        providerPaymentId: 'pay_1',
+      },
+    });
+
+    await startCheckoutPayment(device, input);
+
+    expect(mocks.consumeRateLimit).not.toHaveBeenCalled();
+    expect(mocks.startPaymentTx).toHaveBeenCalled();
+  });
+
+  it('spends a try for a hold the device does not hold, so random hold ids stay limited', async () => {
+    mocks.readPaymentTryState.mockResolvedValue(noHold);
+
+    await startCheckoutPayment(device, input);
+
+    expect(mocks.consumeRateLimit).toHaveBeenCalledWith(
+      'payment_tries',
+      holdId,
     );
   });
 

@@ -20,6 +20,7 @@ import {
   paymentTriesRefusal,
   priceHold,
   providerStep,
+  spendsPaymentTry,
   requiresPaymentResult,
   startPaymentDecision,
   statusOnRetry,
@@ -31,6 +32,7 @@ import {
   unknownHold,
   type DecisionState,
   type HeldItem,
+  type PaymentTryState,
   type StartPaymentInput,
 } from './checkout';
 import { OrderItemSchema, OrderSchema, orderStatuses } from './orders';
@@ -706,6 +708,82 @@ describe('the tries limit', () => {
     );
     expect(paymentTriesRefusal({ allowed: true, remaining: 0 })).toBeNull();
   });
+});
+
+describe('which calls spend a payment try', () => {
+  const deviceKey = 'a'.repeat(64);
+  const owned = { deviceKey };
+  const withPayment = {
+    status: 'created' as const,
+    failedTries: 0,
+    providerPaymentId: 'pay_1',
+  };
+  const tryState = (change: Partial<PaymentTryState>): PaymentTryState => ({
+    deviceKey,
+    hold: owned,
+    order: { status: 'pending_payment' },
+    latestAttempt: null,
+    ...change,
+  });
+
+  it.each([
+    ['a hold with no order yet (a first attempt)', { order: null }],
+    ['an order with no attempt', { latestAttempt: null }],
+    [
+      'a next attempt after a canceled one',
+      { latestAttempt: { ...withPayment, status: 'canceled' as const } },
+    ],
+    [
+      'a resume of an attempt with no provider payment yet',
+      { latestAttempt: { ...withPayment, providerPaymentId: null } },
+    ],
+    [
+      'an attempt out of failed tries',
+      { latestAttempt: { ...withPayment, failedTries: maxFailedTries } },
+    ],
+    [
+      'a retry after a decline with a canceled attempt',
+      {
+        order: { status: 'payment_failed' as const },
+        latestAttempt: { ...withPayment, status: 'canceled' as const },
+      },
+    ],
+    [
+      'an order that cannot be paid',
+      { order: { status: 'cancelled' as const } },
+    ],
+    ['a hold that is missing', { hold: null }],
+    ['a hold of another device', { hold: { deviceKey: 'b'.repeat(64) } }],
+    [
+      'a missing hold even when sent with a confirmed order',
+      { hold: null, order: { status: 'confirmed' as const } },
+    ],
+  ] satisfies [string, Partial<PaymentTryState>][])(
+    'spends for %s',
+    (_, change) => {
+      expect(spendsPaymentTry(tryState(change))).toBe(true);
+    },
+  );
+
+  it.each([
+    ['a confirmed order', { order: { status: 'confirmed' as const } }],
+    [
+      'an idempotent refresh of an existing payment',
+      { latestAttempt: withPayment },
+    ],
+    [
+      'a refresh after a decline that kept its payment',
+      {
+        order: { status: 'payment_failed' as const },
+        latestAttempt: { ...withPayment, failedTries: 2 },
+      },
+    ],
+  ] satisfies [string, Partial<PaymentTryState>][])(
+    'spends nothing for %s',
+    (_, change) => {
+      expect(spendsPaymentTry(tryState(change))).toBe(false);
+    },
+  );
 });
 
 const baseHold = {

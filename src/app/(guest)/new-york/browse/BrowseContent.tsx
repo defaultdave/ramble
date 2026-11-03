@@ -5,6 +5,7 @@ import {
   browseHeading,
   browseResultsId,
   browseView,
+  browseWindowDays,
   emptyBrowsePage,
   errorView,
 } from '@/lib/pages/browse';
@@ -13,6 +14,7 @@ import {
   parseFilters,
   type RawSearchParams,
 } from '@/lib/filters';
+import { upcomingWindow } from '@/lib/sessionWindow';
 import { minuteAsOf } from '@/lib/time';
 import { venueToday } from '@/lib/venue';
 import { getBrowseDates, getBrowseResults } from '@/server/browse';
@@ -37,12 +39,20 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
   try {
     const options = await getFilterOptions();
     // Only slugs the catalog has reach a cache key or the database; the view below keeps the address as it was.
-    const known = knownFilters(filters, options);
+    const known = knownFilters(
+      filters,
+      options,
+      upcomingWindow(asOf, browseWindowDays),
+    );
+    const { categories, neighborhoods, guests } = known.filters;
+    // The calendar ignores the date, so the date is no part of its cache key. A date no session can be on still needs the calendar, for the way out of its empty state.
     const [dates, page] = known.matchesNothing
       ? [[], emptyBrowsePage]
       : await Promise.all([
-          getBrowseDates(known.filters, asOf),
-          getBrowseResults({ ...query, filters: known.filters }, asOf),
+          getBrowseDates({ categories, neighborhoods, guests }, asOf),
+          known.dateOutsideWindow
+            ? emptyBrowsePage
+            : getBrowseResults({ ...query, filters: known.filters }, asOf),
         ]);
     loaded = { options, dates, page };
   } catch (error) {

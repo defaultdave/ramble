@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ZodError } from 'zod';
 import {
+  isDateInWindow,
   isOpenSession,
   isUpcomingSession,
   upcomingWindow,
@@ -87,5 +88,18 @@ describe('isOpenSession for a party', () => {
   it('still wants the session inside the window', () => {
     const before = { startsAt: at(-60_000), allocation: 10, seatsSold: 0 };
     expect(isOpenSession(before, window, 2)).toBe(false);
+  });
+});
+
+describe('isDateInWindow', () => {
+  // Opens 2026-11-02T15:00Z and ends 2026-11-09T15:00Z: UTC-12 is still on 2026-11-02 at the start, and UTC+14 is on 2026-11-10 just before the end.
+  it.each([
+    ['the day before the earliest zone reaches', '2026-11-01', false],
+    ['the first day the earliest zone reaches', '2026-11-02', true],
+    ['a day in the middle', '2026-11-05', true],
+    ['the last day the latest zone reaches', '2026-11-10', true],
+    ['the day after the latest zone reaches', '2026-11-11', false],
+  ])('says %s is in the window: %s', (_name, date, expected) => {
+    expect(isDateInWindow(date, window)).toBe(expected);
   });
 });

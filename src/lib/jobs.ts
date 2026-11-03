@@ -19,10 +19,6 @@ export const jobLimits = {
   lastErrorMaxChars: 2000,
   claimBatch: 25,
   lockSeconds: 5 * 60,
-  /** A job's transaction may not outlive the lock that claims it: past that, another drain owns the job. */
-  transactionTimeoutSeconds: 5 * 60,
-  /** Jobs call providers between short transactions, so a transaction waiting on the app this long is stuck. */
-  idleInTransactionSeconds: 60,
   drainMaxJobs: 200,
   drainMaxMillis: 60_000,
   backoffBaseSeconds: 30,

@@ -54,35 +54,3 @@ describe('the database client without DATABASE_URL', () => {
     expect(() => db.$client).toThrow('DATABASE_URL is not set');
   });
 });
-
-describe('the pooled client session limits', () => {
-  afterEach(() => {
-    vi.doUnmock('pg');
-    vi.doUnmock('drizzle-orm/node-postgres');
-    vi.doUnmock('@vercel/functions');
-    vi.unstubAllEnvs();
-  });
-
-  it('sets both transaction timeouts on every new connection', async () => {
-    vi.stubEnv('DATABASE_URL', 'postgres://localhost/ramble');
-    const handlers: Record<string, (client: unknown) => void> = {};
-    vi.doMock('pg', () => ({
-      Pool: class {
-        on(event: string, handler: (client: unknown) => void) {
-          handlers[event] = handler;
-        }
-      },
-    }));
-    vi.doMock('drizzle-orm/node-postgres', () => ({ drizzle: () => ({}) }));
-    vi.doMock('@vercel/functions', () => ({ attachDatabasePool: vi.fn() }));
-    const { db } = await loadClient();
-    Reflect.get(db, 'select');
-    const query = vi.fn().mockResolvedValue({});
-
-    handlers.connect?.({ query });
-
-    expect(query).toHaveBeenCalledExactlyOnceWith(
-      'SET idle_in_transaction_session_timeout = 60000; SET transaction_timeout = 300000',
-    );
-  });
-});

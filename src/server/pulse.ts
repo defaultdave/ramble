@@ -22,7 +22,7 @@ import { sendHeartbeat } from '@/server/monitoring/heartbeat';
 import { logger } from '@/server/monitoring/logger';
 import { fixedClock, systemClock } from '@/server/ports/clock';
 import { consumeRateLimit } from '@/server/ports/rate-limit';
-import { secureEqual } from '@/server/secureEqual';
+import { secureEqual } from '@/server/hash';
 
 type PulseCounts = DrainReport & {
   purged: number;

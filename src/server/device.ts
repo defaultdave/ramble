@@ -1,5 +1,6 @@
 import 'server-only';
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
+import { sha256Hex } from '@/server/hash';
 import { cookies, headers } from 'next/headers';
 import { clientAddress } from '@/lib/clientAddress';
 import {
@@ -24,7 +25,7 @@ export type Device = {
 };
 
 function sha256(value: string): string {
-  return createHash('sha256').update(value).digest('hex');
+  return sha256Hex(value);
 }
 
 /**

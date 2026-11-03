@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { maxProviderMessageIdLength } from '@/lib/email/message';
 import { bearerToken } from '@/lib/http';
-import { secureEqual } from '@/server/secureEqual';
+import { secureEqual } from '@/server/hash';
 import type { EmailAdapter } from './types';
 import { parseWebhookBody } from './wire';
 

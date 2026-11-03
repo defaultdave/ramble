@@ -1,5 +1,5 @@
 import 'server-only';
-import { createHash, createHmac } from 'node:crypto';
+import { createHmac } from 'node:crypto';
 import {
   capabilityTokenMessage,
   isCapabilityTokenShape,
@@ -25,7 +25,7 @@ import {
   type OrderTokenRow,
 } from '@/server/db/orderTokens';
 import { env } from '@/server/env';
-import { secureEqual } from '@/server/secureEqual';
+import { secureEqual, sha256Hex } from '@/server/hash';
 
 // Capability links (design doc 4.2.3, the accepted amendment, option A): a token is derived from
 // the row, so any server code can rebuild a link, and the version bumps to void the earlier ones.
@@ -55,7 +55,7 @@ export function capabilityToken(
 
 /** What is stored for a `manage` token: the lower-case hex SHA-256 of the token. */
 export function hashToken(token: string): string {
-  return createHash('sha256').update(token).digest('hex');
+  return sha256Hex(token);
 }
 
 export type ResolvedToken = OrderTokenRow;

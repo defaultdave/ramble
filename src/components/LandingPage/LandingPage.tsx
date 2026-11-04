@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { ButtonLink } from '@/components/Button';
+import { landingResultsId } from '@/lib/pages/landing';
 import styles from './LandingPage.module.css';
 
 export type LandingPageProps = {
@@ -33,6 +34,12 @@ export function LandingPage({
           </ButtonLink>
         </div>
       </header>
+      {/* With scripting off the results sit after the footer in the document, so this is the way to them. */}
+      <noscript>
+        <a className={styles.skipToResults} href={`#${landingResultsId}`}>
+          Skip to results
+        </a>
+      </noscript>
       {results}
       {body ? <div className={styles.body}>{body}</div> : null}
     </div>

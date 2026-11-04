@@ -5,14 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { GuestPhotoSchema, photoLimits } from '@/lib/photos';
 import { anonymousCaller, ForbiddenError, Role } from '@/server/auth/caller';
 import { testCaller } from '@/server/auth/test-caller';
-import {
-  cancellationTiers,
-  categories,
-  experiences,
-  hosts,
-  neighborhoods,
-  photos,
-} from '@/server/db/schema';
+import { experiences, photos } from '@/server/db/schema';
 import { StorageError, type StoragePort } from '@/server/ports/storage';
 import {
   createFakeStorageAdapter,
@@ -23,6 +16,7 @@ import {
   serveNeonHttp,
   type FreshDatabase,
 } from './harness';
+import { catalogFixtures } from './catalogFixtures';
 
 // Behaviours under test, one per decision, branch or risk:
 // - an added photo is stored, re-encoded, under a key made of its ids, and recorded with its size,
@@ -63,55 +57,16 @@ afterAll(async () => {
   vi.unstubAllEnvs();
 });
 
-let counter = 0;
-function unique(prefix: string) {
-  counter += 1;
-  return `${prefix}-${String(counter)}`;
-}
+const fixtures = catalogFixtures(() => client.db);
 
 async function insertExperience(
   hostId?: string,
   status: 'live' | 'draft' | 'guide_only' = 'live',
 ) {
-  const [tier] = await client.db.select().from(cancellationTiers).limit(1);
-  const [host] = hostId
-    ? [{ id: hostId }]
-    : await client.db
-        .insert(hosts)
-        .values({
-          slug: unique('host'),
-          name: unique('Host'),
-          timeZone: 'America/New_York',
-        })
-        .returning();
-  const [category] = await client.db
-    .insert(categories)
-    .values({ slug: unique('category'), name: unique('Category') })
-    .returning();
-  const [neighborhood] = await client.db
-    .insert(neighborhoods)
-    .values({ slug: unique('neighborhood'), name: unique('Neighborhood') })
-    .returning();
-  if (!tier || !category || !neighborhood) {
-    throw new Error('fixture insert returned no row');
-  }
-  const [row] = await client.db
-    .insert(experiences)
-    .values({
-      hostId: host.id,
-      categoryId: category.id,
-      neighborhoodId: neighborhood.id,
-      cancellationTierId: tier.id,
-      slug: unique('experience'),
-      name: unique('Experience'),
-      status,
-      ...(status === 'guide_only'
-        ? { linkOutUrl: 'https://example.com/' }
-        : {}),
-    })
-    .returning();
-  if (!row) throw new Error('fixture insert returned no experience');
-  return row;
+  return fixtures.insertExperience(await fixtures.parents(hostId), {
+    status,
+    ...(status === 'guide_only' ? { linkOutUrl: 'https://example.com/' } : {}),
+  });
 }
 
 let validUpload: Buffer;

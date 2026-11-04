@@ -16,6 +16,7 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { neonConfig } from '@neondatabase/serverless';
+import { sql, type SQL } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
@@ -193,43 +194,132 @@ export async function serveNeonHttp(url: string) {
   return stop;
 }
 
-export const aFewMoments = () =>
-  new Promise((resolve) => setTimeout(resolve, 300));
+export function deferred<T = void>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((onResolve, onReject) => {
+    resolve = onResolve;
+    reject = onReject;
+  });
+  return { promise, resolve, reject };
+}
+
+type Observer = {
+  query: (text: string) => Promise<{ rows: Array<{ n: number }> }>;
+};
+
+/** Which blocked backends to wait for: `count` of them held up by `blockedBy`, or the one backend `pid`. */
+export type BlockedTarget =
+  { blockedBy: number; count?: number } | { pid: number };
+
+function blockedQuery(target: BlockedTarget) {
+  const pid = String('pid' in target ? target.pid : target.blockedBy);
+  if (!/^\d+$/.test(pid)) throw new Error(`Not a backend pid: ${pid}`);
+  const where =
+    'pid' in target
+      ? `pid = ${pid} AND cardinality(pg_blocking_pids(pid)) > 0`
+      : `${pid} = ANY(pg_blocking_pids(pid))`;
+  return `SELECT count(*)::int AS n FROM pg_stat_activity WHERE ${where}`;
+}
+
+const neededOf = (target: BlockedTarget) =>
+  'pid' in target ? 1 : (target.count ?? 1);
+
+async function pollUntil(
+  isDone: () => Promise<boolean>,
+  { timeoutMs, giveUp }: { timeoutMs: number; giveUp?: () => boolean },
+) {
+  const deadline = performance.now() + timeoutMs;
+  while (!(await isDone())) {
+    if (giveUp?.() === true || performance.now() > deadline) return false;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  return true;
+}
+
+/**
+ * Polls Postgres until the backends `target` names are blocked on a lock, so a slow machine only
+ * makes a test slower and never lets a challenger be asserted on before it reached the lock.
+ */
+export async function waitUntilBlocked(
+  observer: Observer,
+  target: BlockedTarget,
+  timeoutMs = 15_000,
+) {
+  const query = blockedQuery(target);
+  const needed = neededOf(target);
+  const blocked = await pollUntil(
+    async () => ((await observer.query(query)).rows[0]?.n ?? 0) >= needed,
+    { timeoutMs },
+  );
+  if (!blocked) throw new Error(`Nothing was blocked: ${query}`);
+}
+
+/** The Postgres backend pid of a connection. */
+export async function backendPid(connection: {
+  query: (text: string) => Promise<{ rows: Array<{ pid: number }> }>;
+}) {
+  const { rows } = await connection.query('SELECT pg_backend_pid() AS pid');
+  return (rows[0] as { pid: number }).pid;
+}
+
+/** Fails unless the attempt is refused by the database with this constraint named. */
+export function expectConstraint(attempt: PromiseLike<unknown>, name: string) {
+  return expect(attempt).rejects.toMatchObject({ cause: { constraint: name } });
+}
+
+export type RaceHooks<Tx> = {
+  whileWaiting?: () => Promise<void>;
+  beforeCommit?: (tx: Tx) => Promise<void>;
+};
 
 /**
  * Runs `holder` in a transaction that stays open, starts `challenger` on another connection,
- * checks the challenger is still waiting, then commits the holder and returns what the challenger
- * answered. A challenger that does not wait was not serialized by the lock. `openTransaction` is
- * the client's `db.transaction`, so the helper does not import the lazy client.
+ * waits until Postgres reports the challenger blocked by the holder, then commits the holder and
+ * returns what the challenger answered. A challenger that does not wait was not serialized by the
+ * lock. `whileWaiting` runs on a third connection during the wait, and `beforeCommit` runs in the
+ * holder just before it commits. `openTransaction` is the client's `db.transaction`, so the helper
+ * does not import the lazy client.
  */
-export async function raceAgainstOpenTransaction<Tx, T>(
+export async function raceAgainstOpenTransaction<
+  Tx extends { execute: (query: SQL) => PromiseLike<{ rows: unknown[] }> },
+  T,
+>(
   openTransaction: (body: (tx: Tx) => Promise<void>) => Promise<unknown>,
   holder: (tx: Tx) => Promise<void>,
   challenger: () => Promise<T>,
+  hooks: RaceHooks<Tx> = {},
 ): Promise<T> {
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  let held!: () => void;
-  const holding = new Promise<void>((resolve) => {
-    held = resolve;
-  });
+  const release = deferred();
+  const holding = deferred<{ tx: Tx; pid: number }>();
   const holderDone = openTransaction(async (tx) => {
     await holder(tx);
-    held();
-    await gate;
+    const { rows } = await tx.execute(sql`SELECT pg_backend_pid() AS pid`);
+    holding.resolve({ tx, pid: (rows[0] as { pid: number }).pid });
+    await release.promise;
+    await hooks.beforeCommit?.(tx);
   });
-  await holding;
+  holderDone.catch(holding.reject);
+  const { tx, pid } = await holding.promise;
 
   let settled = false;
   const answer = challenger().finally(() => {
     settled = true;
   });
   answer.catch(() => undefined);
-  await aFewMoments();
-  const waited = !settled;
-  release();
+  const query = blockedQuery({ blockedBy: pid });
+  const waited = await pollUntil(
+    async () => {
+      // Inside a transaction pg_stat_activity is read once and cached, so a later poll would not see
+      // the challenger arrive.
+      await tx.execute(sql`SELECT pg_stat_clear_snapshot()`);
+      const { rows } = await tx.execute(sql.raw(query));
+      return ((rows[0] as { n: number } | undefined)?.n ?? 0) > 0;
+    },
+    { timeoutMs: 15_000, giveUp: () => settled },
+  );
+  await hooks.whileWaiting?.();
+  release.resolve();
   await holderDone;
   expect(waited, 'the challenger waited for the holder').toBe(true);
   return answer;

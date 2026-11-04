@@ -1,4 +1,3 @@
-import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ZodError } from 'zod';
 import { upcomingWindow } from '@/lib/sessionWindow';
@@ -6,19 +5,13 @@ import {
   bookingSessionLimits,
   upcomingSessionLimits,
 } from '@/lib/upcomingSessions';
-import {
-  cancellationTiers,
-  categories,
-  experiences,
-  hosts,
-  neighborhoods,
-  sessions,
-} from '@/server/db/schema';
+import { experiences, sessions } from '@/server/db/schema';
 import {
   createFreshDatabase,
   serveNeonHttp,
   type FreshDatabase,
 } from './harness';
+import { catalogFixtures } from './catalogFixtures';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the read returns the experience's scheduled sessions inside the window, soonest first, with the zone each starts in
@@ -49,53 +42,16 @@ afterAll(async () => {
   vi.unstubAllEnvs();
 });
 
-let counter = 0;
-function unique(prefix: string) {
-  counter += 1;
-  return `${prefix}-${String(counter)}`;
-}
+const fixtures = catalogFixtures(() => client.db);
+const { insertSession } = fixtures;
 
 async function insertExperience(
   overrides: Partial<typeof experiences.$inferInsert> = {},
 ) {
-  const [host] = await client.db
-    .insert(hosts)
-    .values({
-      slug: unique('host'),
-      name: unique('Host'),
-      timeZone: 'America/New_York',
-    })
-    .returning();
-  const [category] = await client.db
-    .insert(categories)
-    .values({ slug: unique('category'), name: unique('Category') })
-    .returning();
-  const [neighborhood] = await client.db
-    .insert(neighborhoods)
-    .values({ slug: unique('neighborhood'), name: unique('Neighborhood') })
-    .returning();
-  const [tier] = await client.db
-    .select()
-    .from(cancellationTiers)
-    .where(eq(cancellationTiers.isDefault, true));
-  if (!host || !category || !neighborhood || !tier) {
-    throw new Error('missing parents');
-  }
-  const [row] = await client.db
-    .insert(experiences)
-    .values({
-      hostId: host.id,
-      categoryId: category.id,
-      neighborhoodId: neighborhood.id,
-      cancellationTierId: tier.id,
-      slug: unique('experience'),
-      name: unique('Experience'),
-      status: 'live',
-      ...overrides,
-    })
-    .returning();
-  if (!row) throw new Error('insert returned no experience');
-  return row;
+  return fixtures.insertExperience(await fixtures.parents(), {
+    status: 'live',
+    ...overrides,
+  });
 }
 
 const opens = new Date('2026-11-02T15:00:00.000Z');
@@ -104,27 +60,6 @@ const window = upcomingWindow(
   upcomingSessionLimits.windowDays,
 );
 const hour = 3_600_000;
-
-async function insertSession(
-  experienceId: string,
-  startsAt: Date,
-  overrides: Partial<typeof sessions.$inferInsert> = {},
-) {
-  const [row] = await client.db
-    .insert(sessions)
-    .values({
-      experienceId,
-      startsAt,
-      endsAt: new Date(startsAt.getTime() + 2 * hour),
-      timeZone: 'America/New_York',
-      allocation: 8,
-      source: 'ramble',
-      ...overrides,
-    })
-    .returning();
-  if (!row) throw new Error('insert returned no session');
-  return row;
-}
 
 describe('listUpcomingSessions', () => {
   it('returns the scheduled sessions inside the window, soonest first, with their zone', async () => {

@@ -15,19 +15,26 @@ import { guestHomeModules, type SeedSnapshot } from '@/lib/seed/coverage';
 import { ForbiddenError, Role, anonymousCaller } from '@/server/auth/caller';
 import { testCaller } from '@/server/auth/test-caller';
 import {
-  categories,
   collectionItems,
   collections,
   experiences,
   helpArticles,
   homeModules,
-  hosts,
   legalAcceptances,
   legalDocuments,
-  neighborhoods,
   pages,
   settings,
 } from '@/server/db/schema';
+import { id as uuid } from '../support/ids';
+import { unique } from './catalogFixtures';
+import {
+  collectionInput,
+  doc,
+  editorialFixtures,
+  helpInput,
+  insertOne,
+  saved,
+} from './editorialFixtures';
 import {
   createFreshDatabase,
   serveNeonHttp,
@@ -96,132 +103,10 @@ const admin = testCaller({ roles: [Role.Admin] });
 const guest = testCaller();
 const hostOwner = testCaller({ roles: [Role.HostOwner], hostIds: ['h'] });
 
-let counter = 0;
-function unique(prefix: string) {
-  counter += 1;
-  return `${prefix}-${String(counter)}`;
-}
-
-function uuid(n: number) {
-  return `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
-}
-
-function doc(text = 'Hello') {
-  return {
-    type: 'doc',
-    content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
-  } as never;
-}
+const { insertCategory, insertNeighborhood, insertExperience } =
+  editorialFixtures(() => client.db);
 
 const tagsUpdated = () => vi.mocked(updateTag).mock.calls.map(([tag]) => tag);
-
-async function insertOne<T>(rows: Promise<T[]>): Promise<T> {
-  const [row] = await rows;
-  if (!row) throw new Error('insert returned no row');
-  return row;
-}
-
-async function insertCategory(slug = unique('category')) {
-  return insertOne(
-    client.db.insert(categories).values({ slug, name: slug }).returning(),
-  );
-}
-
-async function insertNeighborhood(slug = unique('neighborhood')) {
-  return insertOne(
-    client.db.insert(neighborhoods).values({ slug, name: slug }).returning(),
-  );
-}
-
-type Parents = {
-  hostId: string;
-  categoryId: string;
-  neighborhoodId: string;
-  cancellationTierId: string;
-};
-
-let sharedParents: Promise<Parents> | undefined;
-
-function parents(): Promise<Parents> {
-  sharedParents ??= (async () => {
-    const host = await insertOne(
-      client.db
-        .insert(hosts)
-        .values({
-          slug: unique('host'),
-          name: 'Host',
-          timeZone: 'America/New_York',
-        })
-        .returning(),
-    );
-    const tier = await client.db.query.cancellationTiers.findFirst();
-    if (!tier) throw new Error('The migration inserts the tiers');
-    return {
-      hostId: host.id,
-      categoryId: (await insertCategory()).id,
-      neighborhoodId: (await insertNeighborhood()).id,
-      cancellationTierId: tier.id,
-    };
-  })();
-  return sharedParents;
-}
-
-async function insertExperience(
-  status: 'draft' | 'live' | 'paused' = 'live',
-  overrides: Partial<typeof experiences.$inferInsert> = {},
-) {
-  return insertOne(
-    client.db
-      .insert(experiences)
-      .values({
-        ...(await parents()),
-        slug: unique('experience'),
-        name: unique('Experience'),
-        status,
-        ...overrides,
-      })
-      .returning(),
-  );
-}
-
-function collectionInput(
-  overrides: Partial<import('@/lib/editorial').CollectionInput> = {},
-): import('@/lib/editorial').CollectionInput {
-  return {
-    kind: 'pick',
-    slug: unique('pick'),
-    title: 'A pick',
-    summary: null,
-    intro: null,
-    status: 'draft',
-    items: [],
-    ...overrides,
-  };
-}
-
-function helpInput(
-  overrides: Partial<import('@/lib/editorial').HelpArticleInput> = {},
-): import('@/lib/editorial').HelpArticleInput {
-  return {
-    slug: unique('help'),
-    title: 'How do I cancel?',
-    summary: null,
-    position: 0,
-    status: 'draft',
-    body: doc(),
-    ...overrides,
-  };
-}
-
-async function saved<T extends { status: string }>(
-  result: Promise<T>,
-): Promise<Extract<T, { status: 'saved' | 'published' }>> {
-  const outcome = await result;
-  if (outcome.status !== 'saved' && outcome.status !== 'published') {
-    throw new Error(`Expected a save, got ${outcome.status}`);
-  }
-  return outcome as Extract<T, { status: 'saved' | 'published' }>;
-}
 
 describe('constraints on editorial tables', () => {
   const collection = (overrides: Record<string, unknown> = {}) => ({

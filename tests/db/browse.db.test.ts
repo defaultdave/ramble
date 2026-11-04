@@ -13,20 +13,18 @@ import {
 } from '@/lib/pages/browse';
 import { guestCounts, noFilters, type BrowseFilters } from '@/lib/filters';
 import { isOpenSession, upcomingWindow } from '@/lib/sessionWindow';
-import { isoDateOf, msPerDay } from '@/lib/time';
+import { msPerDay } from '@/lib/time';
 import {
-  cancellationTiers,
-  categories,
   experiences,
-  hosts,
-  neighborhoods,
   photos,
   priceOptions,
-  sessionTemplates,
   sessions,
 } from '@/server/db/schema';
+import { browseFixtures, shiftDay, type Scope } from './browseFixtures';
+import { catalogFixtures, unique } from './catalogFixtures';
 import {
   createFreshDatabase,
+  expectConstraint,
   serveNeonHttp,
   type FreshDatabase,
 } from './harness';
@@ -79,121 +77,9 @@ afterAll(async () => {
 
 const asOf = '2026-10-26T12:00:00.000Z';
 
-let counter = 0;
-function unique(prefix: string) {
-  counter += 1;
-  return `${prefix}-${String(counter)}`;
-}
-
-async function insertHost(timeZone = 'America/New_York') {
-  const [row] = await client.db
-    .insert(hosts)
-    .values({ slug: unique('host'), name: unique('Host'), timeZone })
-    .returning();
-  if (!row) throw new Error('insert returned no host');
-  return row;
-}
-
-async function insertCategory() {
-  const [row] = await client.db
-    .insert(categories)
-    .values({ slug: unique('category'), name: unique('Category') })
-    .returning();
-  if (!row) throw new Error('insert returned no category');
-  return row;
-}
-
-async function insertNeighborhood(name = unique('Neighborhood')) {
-  const [row] = await client.db
-    .insert(neighborhoods)
-    .values({ slug: unique('neighborhood'), name })
-    .returning();
-  if (!row) throw new Error('insert returned no neighborhood');
-  return row;
-}
-
-async function defaultTierId() {
-  const [tier] = await client.db
-    .select()
-    .from(cancellationTiers)
-    .where(eq(cancellationTiers.isDefault, true));
-  if (!tier) throw new Error('The migration inserts a default tier');
-  return tier.id;
-}
-
-type Scope = {
-  hostId: string;
-  category: { id: string; slug: string };
-  neighborhood: { id: string; slug: string; name: string };
-  cancellationTierId: string;
-};
-
-/** A category and neighborhood of their own, so a test reads only the rows it made. */
-async function scope(timeZone?: string): Promise<Scope> {
-  return {
-    hostId: (await insertHost(timeZone)).id,
-    category: await insertCategory(),
-    neighborhood: await insertNeighborhood(),
-    cancellationTierId: await defaultTierId(),
-  };
-}
-
-async function insertExperience(
-  where: Scope,
-  overrides: Partial<typeof experiences.$inferInsert> & {
-    price?: number | null;
-  } = {},
-) {
-  const { price = 5000, ...rest } = overrides;
-  const status = rest.status ?? 'live';
-  const [row] = await client.db
-    .insert(experiences)
-    .values({
-      hostId: where.hostId,
-      categoryId: where.category.id,
-      neighborhoodId: where.neighborhood.id,
-      cancellationTierId: where.cancellationTierId,
-      slug: unique('experience'),
-      name: unique('Experience'),
-      status,
-      ...(status === 'guide_only'
-        ? { linkOutUrl: 'https://example.com/class' }
-        : {}),
-      ...rest,
-    })
-    .returning();
-  if (!row) throw new Error('insert returned no experience');
-  if (price !== null && status !== 'guide_only') {
-    await client.db
-      .insert(priceOptions)
-      .values({ experienceId: row.id, kind: 'adult', priceMinor: price });
-  }
-  return row;
-}
-
-type SessionInsert = typeof sessions.$inferInsert;
-
-async function insertSession(
-  experienceId: string,
-  startsAt: string,
-  overrides: Partial<SessionInsert> = {},
-) {
-  const start = new Date(startsAt);
-  const [row] = await client.db
-    .insert(sessions)
-    .values({
-      experienceId,
-      startsAt: start,
-      endsAt: new Date(start.getTime() + 2 * 3_600_000),
-      timeZone: 'America/New_York',
-      allocation: 8,
-      source: 'ramble',
-      ...overrides,
-    })
-    .returning();
-  if (!row) throw new Error('insert returned no session');
-  return row;
-}
+const { insertNeighborhood } = catalogFixtures(() => client.db);
+const { scope, insertExperience, insertSession, insertTemplate } =
+  browseFixtures(() => client.db);
 
 const filtersFor = (where: Scope, extra: Partial<BrowseFilters> = {}) => ({
   ...noFilters,
@@ -221,26 +107,6 @@ async function daysFor(
   return browseDays(
     await browse.listBrowseDayRows({ guests: null, ...filters }, asOf),
   );
-}
-
-async function insertTemplate(experienceId: string) {
-  const [template] = await client.db
-    .insert(sessionTemplates)
-    .values({
-      experienceId,
-      weekday: 6,
-      startTime: '10:00:00',
-      durationMinutes: 120,
-      allocation: 8,
-      source: 'ramble',
-    })
-    .returning();
-  if (!template) throw new Error('insert returned no template');
-  return template;
-}
-
-function shiftDay(date: string, days: number): string {
-  return isoDateOf(new Date(Date.parse(`${date}T00:00:00Z`) + days * msPerDay));
 }
 
 describe('what a guest sees', () => {
@@ -360,9 +226,10 @@ describe('what a guest sees', () => {
       },
     ],
   ])('refuses a guide-only row with no link by %s', async (_name, attempt) => {
-    await expect(attempt(await scope())).rejects.toMatchObject({
-      cause: { constraint: 'experiences_guide_only_has_link' },
-    });
+    await expectConstraint(
+      attempt(await scope()),
+      'experiences_guide_only_has_link',
+    );
   });
 
   it('carries what a card shows and nothing a guest may not see', async () => {

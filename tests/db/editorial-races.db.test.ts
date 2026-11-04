@@ -21,12 +21,14 @@ import {
   legalDocuments,
   pages,
 } from '@/server/db/schema';
+import { unique } from './catalogFixtures';
+import { doc } from './editorialFixtures';
 import {
-  aFewMoments,
   createFreshDatabase,
   raceAgainstOpenTransaction as race,
   serveNeonHttp,
   type FreshDatabase,
+  type RaceHooks,
 } from './harness';
 
 vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
@@ -74,26 +76,19 @@ beforeEach(() => {
 
 const ops = testCaller({ roles: [Role.Ops] });
 
-let counter = 0;
-function unique(prefix: string) {
-  counter += 1;
-  return `${prefix}-${String(counter)}`;
-}
-
-function doc(text = 'Hello') {
-  return {
-    type: 'doc',
-    content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
-  } as never;
-}
-
 type Tx = Parameters<Parameters<typeof client.db.transaction>[0]>[0];
 
 function raceAgainstOpenTransaction<T>(
   holder: (tx: Tx) => Promise<void>,
   challenger: () => Promise<T>,
+  hooks: RaceHooks<Tx> = {},
 ): Promise<T> {
-  return race<Tx, T>((body) => client.db.transaction(body), holder, challenger);
+  return race<Tx, T>(
+    (body) => client.db.transaction(body),
+    holder,
+    challenger,
+    hooks,
+  );
 }
 
 const draftOf = (docKey: string, title = 'Draft') =>
@@ -518,40 +513,30 @@ describe('the publication time of a legal version', () => {
     const key = unique('waiver-row-lock');
     const low = await draftOf(key);
     const high = await draftOf(key);
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    let held!: () => void;
-    const holding = new Promise<void>((resolve) => {
-      held = resolve;
-    });
     // An editor holds the row lock of the higher draft, so its publish statement starts first and
     // waits on that lock before the trigger runs.
-    const editor = client.db.transaction(async (tx) => {
-      await tx
-        .update(legalDocuments)
-        .set({ title: 'edited' })
-        .where(eq(legalDocuments.id, high.id));
-      held();
-      await gate;
-    });
-    await holding;
-    // A query builder runs only when awaited, so this starts the statement now.
-    const highPublish = (async () => {
-      await client.db
-        .update(legalDocuments)
-        .set({ status: 'published' })
-        .where(eq(legalDocuments.id, high.id));
-    })();
-    await aFewMoments();
-    await client.db
-      .update(legalDocuments)
-      .set({ status: 'published' })
-      .where(eq(legalDocuments.id, low.id));
-    release();
-    await editor;
-    await highPublish;
+    await raceAgainstOpenTransaction(
+      async (tx) => {
+        await tx
+          .update(legalDocuments)
+          .set({ title: 'edited' })
+          .where(eq(legalDocuments.id, high.id));
+      },
+      async () => {
+        await client.db
+          .update(legalDocuments)
+          .set({ status: 'published' })
+          .where(eq(legalDocuments.id, high.id));
+      },
+      {
+        whileWaiting: async () => {
+          await client.db
+            .update(legalDocuments)
+            .set({ status: 'published' })
+            .where(eq(legalDocuments.id, low.id));
+        },
+      },
+    );
 
     const rows = await client.db
       .select({

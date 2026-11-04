@@ -1,5 +1,6 @@
 import 'server-only';
 import { env } from '@/server/env';
+import { requireEnv } from '@/server/ports/requireEnv';
 import { createFakeStorageAdapter, createFakeStorageState } from './fake';
 import type { StoragePort } from './index';
 import { createVercelBlobAdapter } from './vercel-blob';
@@ -17,20 +18,15 @@ export function getStorage(now: () => Date): StoragePort {
       return createFakeStorageAdapter({ now, state: fakeState });
     case 'vercel-blob':
       return createVercelBlobAdapter({
-        publicToken: required(
+        publicToken: requireEnv(
           env.BLOB_PUBLIC_READ_WRITE_TOKEN,
           'BLOB_PUBLIC_READ_WRITE_TOKEN',
         ),
-        privateToken: required(
+        privateToken: requireEnv(
           env.BLOB_PRIVATE_READ_WRITE_TOKEN,
           'BLOB_PRIVATE_READ_WRITE_TOKEN',
         ),
         now,
       });
   }
-}
-
-function required(value: string | undefined, name: string): string {
-  if (value === undefined) throw new Error(`${name} is not set`);
-  return value;
 }

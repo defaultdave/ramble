@@ -8,6 +8,7 @@ import {
   presignUrl,
   put,
 } from '@vercel/blob';
+import { signedUrlDeadline, visibilityOfKey } from '@/lib/storage';
 import {
   parseDeleteInput,
   parsePutInput,
@@ -84,7 +85,10 @@ export function createVercelBlobAdapter(
       const token = options.privateToken;
       try {
         await head(key, { token });
-        const validUntil = options.now().getTime() + expiresInSeconds * 1000;
+        const validUntil = signedUrlDeadline(
+          options.now(),
+          expiresInSeconds,
+        ).getTime();
         const signed = await issueSignedToken({
           token,
           pathname: key,
@@ -105,7 +109,8 @@ export function createVercelBlobAdapter(
 
     async delete(input) {
       const { key } = parseDeleteInput(input);
-      const visibility = key.startsWith('public/') ? 'public' : 'private';
+      const visibility =
+        visibilityOfKey(key) === 'public' ? 'public' : 'private';
       try {
         await del(key, { token: tokenFor(visibility) });
       } catch (error) {

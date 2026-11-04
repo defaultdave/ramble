@@ -519,23 +519,23 @@ describe('experienceHead', () => {
     });
   });
 
-  it.each([
-    ['an experience that is not there', null],
-    [
-      'a guide entry',
-      {
+  it('titles an experience that is not there as not found', () => {
+    expect(experienceHead(null)).toEqual({
+      title: 'Experience not found',
+      description: null,
+    });
+  });
+
+  it('gives the plain title for a guide entry', () => {
+    expect(
+      experienceHead({
         experience: experience({
           status: 'guide_only',
           linkOutUrl: 'https://host.example/',
         }),
         place,
-      },
-    ],
-  ])('gives the plain title for %s', (_name, data) => {
-    expect(experienceHead(data)).toEqual({
-      title: 'Experience',
-      description: null,
-    });
+      }),
+    ).toEqual({ title: 'Experience', description: null });
   });
 });
 

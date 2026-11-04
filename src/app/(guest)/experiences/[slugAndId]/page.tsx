@@ -9,6 +9,7 @@ import {
   buildExperiencePage,
   experienceHead,
   fallbackTitle,
+  notFoundTitle,
 } from '@/lib/pages/experience';
 import { experiencePath, parseExperienceAddress } from '@/lib/routes';
 import { getExperiencePage } from '@/server/experiencePage';
@@ -25,7 +26,7 @@ export async function generateMetadata({
   params,
 }: PageProps<'/experiences/[slugAndId]'>): Promise<Metadata> {
   const address = parseExperienceAddress((await params).slugAndId);
-  if (!address) return { title: fallbackTitle };
+  if (!address) return { title: notFoundTitle };
   try {
     const { title, description } = experienceHead(
       await getExperiencePage(address.id),

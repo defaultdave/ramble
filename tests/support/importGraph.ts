@@ -45,19 +45,51 @@ export function hasClientDirective(text: string): boolean {
   return /^\s*(?:\/\/[^\n]*\n\s*)*['"]use client['"]/.test(text);
 }
 
+const specifierPosition = /\b(?:from|import)\s*\(?\s*$/;
+
+/**
+ * The source with comments removed and every string or template literal emptied, except a literal in the
+ * position of a module specifier, so a keyword inside a comment or a string is never read as an import.
+ */
+function withoutCommentsAndStrings(text: string): string {
+  let out = '';
+  let index = 0;
+  while (index < text.length) {
+    const char = text.charAt(index);
+    const next = text.charAt(index + 1);
+    if (char === '/' && next === '/') {
+      while (index < text.length && text.charAt(index) !== '\n') index += 1;
+    } else if (char === '/' && next === '*') {
+      const end = text.indexOf('*/', index + 2);
+      index = end === -1 ? text.length : end + 2;
+      out += ' ';
+    } else if (char === '"' || char === "'" || char === '`') {
+      let end = index + 1;
+      while (end < text.length && text.charAt(end) !== char) {
+        end += text.charAt(end) === '\\' ? 2 : 1;
+      }
+      const literal = text.slice(index, end + 1);
+      out +=
+        char !== '`' && specifierPosition.test(out)
+          ? literal
+          : `${char}${char}`;
+      index = end + 1;
+    } else {
+      out += char;
+      index += 1;
+    }
+  }
+  return out;
+}
+
 /** The specifiers a module loads at run time. A type-only import is erased by the compiler, so it is left out. */
 export function importsOf(text: string): string[] {
-  const code = text
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^\s*\/\/.*$/gm, '');
-  const runtime = code.replace(
+  const runtime = withoutCommentsAndStrings(text).replace(
     /\b(?:import|export)\s+type\b[^;'"]*?from\s*['"][^'"]+['"]/g,
     '',
   );
   return [
-    ...runtime.matchAll(
-      /^\s*(?:[^'"\n]*?\b)?(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/gm,
-    ),
+    ...runtime.matchAll(/\b(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g),
   ].map((match) => match[1] ?? '');
 }
 

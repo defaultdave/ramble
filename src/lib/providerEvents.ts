@@ -343,7 +343,8 @@ export type ProviderEventAction =
       markSucceeded: boolean;
       method: PaymentMethod | null;
     }
-  /** A success for a payment that is not the live attempt: alert, leave unprocessed for U-109's refund. */
+  // TODO(U-109): refund the duplicate payment.
+  /** A success for a payment that is not the live attempt: alert and leave unprocessed. */
   | { kind: 'duplicate_payment' }
   | FailedTryAction
   | {

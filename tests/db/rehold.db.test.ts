@@ -158,7 +158,7 @@ describe('reholdSpaces', () => {
     const result = await rehold.reholdSpaces({ holdId: lapsed.id });
 
     expect(result.status).toBe('held');
-    // U-014b's supersede ends the live hold; the lapsed one is already released, so exactly the new hold is open.
+    // The supersede ends the live hold; the lapsed one is already released, so exactly the new hold is open.
     expect(await openHolds(bookable.session.id, guestA)).toBe(1);
     const [old] = await client.db
       .select({ status: schema.holds.status })

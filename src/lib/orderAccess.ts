@@ -3,7 +3,7 @@ import { isOrderReference } from './orders';
 import { orderPath, orderTokenParam } from './routes';
 
 // How a guest keeps access to one order's confirmation page after the token has left the address
-// bar (audit BC-20): the token arrives once in the URL, the proxy moves it into a cookie scoped to
+// bar: the token arrives once in the URL, the proxy moves it into a cookie scoped to
 // that order's path, and every later view reads the cookie. The page still checks the token
 // against the order, so a cookie holds no more power than the link it came from.
 

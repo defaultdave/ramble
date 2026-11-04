@@ -123,7 +123,7 @@ export const orders = pgTable(
     attributionIssue: text(),
     manageTokenHash: text(),
     manageTokenVersion: integer().notNull().default(1),
-    // Set by U-114 on the orders it makes for the demo.
+    // TODO(U-114): set on the orders the demo makes.
     synthetic: boolean().notNull().default(false),
     createdAt: timestampTz()
       .notNull()

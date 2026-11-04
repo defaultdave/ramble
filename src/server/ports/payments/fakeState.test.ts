@@ -6,6 +6,7 @@ import {
   parseFakeState,
   serializeFakeState,
 } from './fakeState';
+import { id as uuid } from '../../../../tests/support/ids';
 
 // Behaviours under test:
 // - a state that holds every kind of object, an idempotency record of each kind, action rounds, events, and a negative
@@ -14,8 +15,6 @@ import {
 // - a row that is not exactly what the serializer writes is refused, never repaired
 
 const now = new Date('2026-10-30T12:00:00.000Z');
-const uuid = (n: number) =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const metadata = (n: number) => ({ orderId: uuid(n), recordId: uuid(n + 100) });
 
 /** A state every map of which holds something, built by the adapter itself so it is a state the fake can reach. */

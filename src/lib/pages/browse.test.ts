@@ -22,6 +22,7 @@ import {
 } from './browse';
 import type { CardExperience } from '../experienceCards';
 import { noFilters, type BrowseFilters } from '../filters';
+import { id } from '../../../tests/support/ids';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the window runs from the cache time to the horizon
@@ -35,9 +36,6 @@ import { noFilters, type BrowseFilters } from '../filters';
 // - each results state is chosen from the page: outdated cursor, empty (filtered or not), results with or without more, later page, error
 // - a dated empty page offers the next day with sessions (other filters kept) and any day; when the window has none it offers only any day
 // - the next day is the first listed day after the chosen one: the day after, a gap, none left, today whose sessions have all started (not listed), a date before every listed day, an empty list
-
-const id = (n: number) =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
 function experience(
   n: number,

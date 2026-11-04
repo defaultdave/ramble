@@ -10,9 +10,8 @@ import {
   it,
   vi,
 } from 'vitest';
-import { editorialLimits } from '@/lib/editorial';
+import { editorialLimits, picksCandidates } from '@/lib/editorial';
 import { guestHomeModules, type SeedSnapshot } from '@/lib/seed/coverage';
-import { homeLimits } from '@/lib/pages/home';
 import { ForbiddenError, Role, anonymousCaller } from '@/server/auth/caller';
 import { testCaller } from '@/server/auth/test-caller';
 import {
@@ -2654,7 +2653,7 @@ describe('the home Picks read when many Picks are published', () => {
 
   it('finds a named pick past the list limit, with the first entries and the full count, and no intro', async () => {
     const experienceIds = [];
-    for (let n = 0; n < homeLimits.picksCandidates + 3; n += 1) {
+    for (let n = 0; n < picksCandidates + 3; n += 1) {
       experienceIds.push((await insertExperience('live')).id);
     }
     const named = await saved(
@@ -2689,7 +2688,7 @@ describe('the home Picks read when many Picks are published', () => {
     expect(pick?.id).toBe(named.value.id);
     expect(pick?.itemCount).toBe(experienceIds.length);
     expect(pick?.experienceIds).toEqual(
-      experienceIds.slice(0, homeLimits.picksCandidates),
+      experienceIds.slice(0, picksCandidates),
     );
     expect(pick).not.toHaveProperty('intro');
     expect(pick).not.toHaveProperty('items');

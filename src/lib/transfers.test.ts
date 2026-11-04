@@ -9,14 +9,13 @@ import {
   transferTransitions,
   type TransferStatus,
 } from './transfers';
+import { id } from '../../tests/support/ids';
 
 // Behaviours under test, one per decision, branch or risk.
 // - transfer transitions: the weekly job's moves; paid never changes; a failed transfer is released again
 // - provider key from the order
 // - TransferSchema: the amount is unset while scheduled and above zero once sent; reversals stay within it
 
-const id = (n: number) =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const orderId = id(1);
 
 describe('transfer transitions', () => {

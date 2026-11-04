@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getFilterOptions } from './filterOptions';
+import { makeDriverError } from '../../tests/support/driverError';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the read uses the editorial profile, tags the names and not the catalog, and returns both lists
@@ -17,9 +18,7 @@ vi.mock('@/server/db/catalog', () => ({
   listNeighborhoods: db.neighborhoods,
 }));
 
-const driverError = new Error(
-  'Failed query: select ... where slug in ($1)\nparams: secret-slug',
-);
+const driverError = makeDriverError('secret-slug');
 
 beforeEach(() => {
   vi.clearAllMocks();

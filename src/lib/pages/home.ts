@@ -4,6 +4,7 @@ import type { Category, Neighborhood } from '../catalog';
 import {
   collectionIdsOf,
   editorialLimits,
+  picksCandidates,
   type Collection,
   type HomeModule,
 } from '../editorial';
@@ -12,25 +13,22 @@ import {
   type CardExperience,
   type ExperienceCard,
 } from '../experienceCards';
-import { hrefForFilters, noFilters } from '../filters';
 import {
   cardLookupLimit,
   idListSchema,
-  picksCandidates,
   picksShown,
   thisWeekShown,
 } from '../idLookup';
 import { withCovers, type PhotoView } from '../photoViews';
 import type { RichTextDoc } from '../richText/format';
 import { hasContent, paragraphs } from '../richText/paragraphs';
-import { giftGuidePath, picksAnchor, picksPath } from '../routes';
+import { categoryPath, giftGuidePath, picksAnchor, picksPath } from '../routes';
 import type { GuestSettings } from '../settings';
 import { isOpenSession, type SessionWindow } from '../sessionWindow';
 
 /** Every bound the home page reads or shows, so a read cannot grow with the catalog. */
 export const homeLimits = {
   picksShown,
-  picksCandidates,
   thisWeekShown,
   /** Experiences "On this week" looks up, twice what it shows, so one that cannot be a card does not leave the module short. */
   thisWeekCandidates: 2 * thisWeekShown,
@@ -234,7 +232,7 @@ function pickModuleIds(
   const pick = picks.find(
     (collection) => collection.id === module.collectionId,
   );
-  return pick?.experienceIds.slice(0, homeLimits.picksCandidates) ?? [];
+  return pick?.experienceIds.slice(0, picksCandidates) ?? [];
 }
 
 /** The experiences the Picks modules might show, each once and at most `maxCardIds`, for one read by ID. */
@@ -280,7 +278,7 @@ function viewOf(
             categories: context.categories.map(({ slug, name }) => ({
               slug,
               name,
-              href: hrefForFilters({ ...noFilters, categories: [slug] }),
+              href: categoryPath(slug),
             })),
           };
     case 'picks': {

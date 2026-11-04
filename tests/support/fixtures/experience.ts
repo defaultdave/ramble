@@ -1,7 +1,7 @@
-import type { GuestExperience } from '../catalog';
+import type { GuestExperience } from '@/lib/catalog';
+import { id } from '../ids';
 
-export const id = (n: number) =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+export { id };
 
 /** An ID with hex letters, so a test of lower-casing has something to change. */
 export const idWithLetters = '0000000a-0000-4000-8000-00000000000b';

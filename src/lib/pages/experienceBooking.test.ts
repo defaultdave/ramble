@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { basicsOf, kayakOffer } from '../bookingDraft.fixtures';
 import type { SessionWithSpaces } from '../upcomingSessions';
-import { id } from './experience.fixtures';
+import { id } from '../../../tests/support/fixtures/experience';
 import {
   buildBookingOffer,
   cancelNote,

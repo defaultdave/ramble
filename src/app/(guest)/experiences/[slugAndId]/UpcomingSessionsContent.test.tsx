@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { id } from '@/lib/pages/experience.fixtures';
+import { id } from '../../../../../tests/support/fixtures/experience';
 import { UpcomingSessionsContent } from './UpcomingSessionsContent';
 
 // Behaviours under test, one per decision, branch or risk:

@@ -194,7 +194,7 @@ export async function serveNeonHttp(url: string) {
   return stop;
 }
 
-export function deferred<T = void>() {
+function deferred<T = void>() {
   let resolve!: (value: T) => void;
   let reject!: (reason: unknown) => void;
   const promise = new Promise<T>((onResolve, onReject) => {

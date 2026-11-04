@@ -14,7 +14,7 @@ import {
   calendarLoadingMessage,
 } from '@/lib/filterBar';
 import { noFilters } from '@/lib/filters';
-import { dateChipLabel } from '@/lib/pages/browse';
+import { dateChipLabel } from '@/lib/time';
 import {
   bar,
   calendarCard,
@@ -33,7 +33,7 @@ import {
 } from './FilterBar.testkit';
 
 // Behaviours under test, one per decision, branch or risk:
-// - the date chip shows the chosen day or "Pick a date"; the calendar opens, picks, clears, and closes on Escape or a press outside
+// - the date chip shows the chosen day or "Pick a date"; the calendar opens, picks, clears, and closes on Escape, a press outside, or focus tabbing out
 // - a calendar card fixed over the chip scrolls the page by the overlap; one that clears it or sits against the chip does not
 // - a press on blank space forgets the focus a history change would then wrongly claim
 // - the calendar's code is not fetched before the date disclosure opens, is fetched on its first open (row and drawer), and a press of the chip's neighbour fetches nothing
@@ -78,6 +78,17 @@ describe('the date chip', () => {
     const { details } = setup();
     await userEvent.click(dateChip());
     await userEvent.click(document.body);
+    expect(details.open).toBe(false);
+  });
+
+  it('closes the calendar when focus tabs on past Clear date', async () => {
+    const { details } = setup({ ...noFilters, date: chosenDay });
+    await userEvent.click(dateChip(chosenLabel));
+    row().getByRole('link', { name: 'Clear date' }).focus();
+    expect(details.open).toBe(true);
+
+    await userEvent.tab();
+
     expect(details.open).toBe(false);
   });
 
@@ -222,7 +233,7 @@ describe('the date chip', () => {
 });
 
 describe('the calendar fetched when the date disclosure opens', () => {
-  const placeholder = () => screen.getByRole('status', { busy: true });
+  const placeholder = () => within(disclosure()).getByRole('status');
 
   it('is not fetched before the disclosure opens, nor by the other chips', async () => {
     setup();
@@ -241,13 +252,13 @@ describe('the calendar fetched when the date disclosure opens', () => {
     });
     expect(calendarFetch).toHaveBeenCalledOnce();
     expect(placeholder()).toHaveTextContent(calendarLoadingMessage());
+    // A busy live region is held back from a screen reader, so the loading text would never be said.
+    expect(placeholder()).not.toHaveAttribute('aria-busy');
     expect(screen.queryByRole('grid')).not.toBeInTheDocument();
 
     calendar.finish();
     expect(await screen.findByRole('grid')).toBeVisible();
-    expect(
-      screen.queryByRole('status', { busy: true }),
-    ).not.toBeInTheDocument();
+    expect(within(disclosure()).queryByRole('status')).not.toBeInTheDocument();
   });
 
   it.each([
@@ -310,9 +321,7 @@ describe('the calendar fetched when the date disclosure opens', () => {
     calendarHeld.mockReturnValue(await real.loadDatePicker());
     await userEvent.click(dateChip());
     expect(screen.getByRole('grid')).toBeVisible();
-    expect(
-      screen.queryByRole('status', { busy: true }),
-    ).not.toBeInTheDocument();
+    expect(within(disclosure()).queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('holds one fetch for a card closed and opened again while the code is on its way', async () => {
@@ -355,9 +364,7 @@ describe('the calendar fetched when the date disclosure opens', () => {
     setup();
     await userEvent.click(dateChip());
     expect(screen.getByRole('grid')).toBeVisible();
-    expect(
-      screen.queryByRole('status', { busy: true }),
-    ).not.toBeInTheDocument();
+    expect(within(disclosure()).queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('says the calendar could not load, and a later open tries again', async () => {

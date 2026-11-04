@@ -1,4 +1,5 @@
 import { MAX_FULL_REFUND_HOURS, type CancellationTier } from './catalog';
+import { requireIntegerInRange } from './integers';
 import { PPM } from './pricing';
 import { isKnownTimeZone, TimeZoneSchema } from './sessions';
 import { msPerHour } from './time';
@@ -91,15 +92,7 @@ export function cancellationWindow(
   timeZone: string,
 ): CancellationWindow {
   const hours = tier.fullRefundHoursBefore;
-  if (
-    !Number.isSafeInteger(hours) ||
-    hours < 0 ||
-    hours > MAX_FULL_REFUND_HOURS
-  ) {
-    throw new RangeError(
-      `Full refund hours must be an integer from 0 to ${String(MAX_FULL_REFUND_HOURS)}, got ${String(hours)}`,
-    );
-  }
+  requireIntegerInRange(hours, 0, MAX_FULL_REFUND_HOURS, 'Full refund hours');
   requireInstant(startsAt, 'Start time');
   requireInstant(now, 'Now');
 

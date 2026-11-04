@@ -2,19 +2,19 @@ import 'server-only';
 import { z } from 'zod';
 import { permanentFailure } from '@/lib/jobs';
 import {
-  allowedContentTypes,
   canDeleteKey,
   canStoreVisibility,
   defaultSignedUrlSeconds,
   isPermanentStorageCode,
-  maxObjectBytes,
   maxSignedUrlSeconds,
+  putRefusals,
   StorageKeySchema,
   visibilityOfKey,
   type StorageCapabilities,
   type StorageProviderName,
   type StorageVisibility,
 } from '@/lib/storage';
+import { PortError } from '@/server/ports/portError';
 
 export type StorageErrorCode =
   /** The input failed the port's schema; nothing was sent. */
@@ -27,17 +27,14 @@ export type StorageErrorCode =
   /** The adapter has no store for this kind of object, and asking again will not give it one. */
   | 'unsupported';
 
-export class StorageError extends Error {
-  readonly code: StorageErrorCode;
+export class StorageError extends PortError<StorageErrorCode> {
   /** True when a retry cannot change the outcome. */
   readonly permanent: boolean;
   /** The marker the job drain reads (`isPermanentFailure`) to dead-letter such a failure at once. */
   readonly [permanentFailure]: boolean;
 
   constructor(code: StorageErrorCode, message?: string, cause?: unknown) {
-    super(message ?? code, cause === undefined ? undefined : { cause });
-    this.name = 'StorageError';
-    this.code = code;
+    super('StorageError', code, message, cause);
     this.permanent = isPermanentStorageCode(code);
     this[permanentFailure] = this.permanent;
   }
@@ -50,28 +47,22 @@ const PutInputSchema = z
     contentType: z.string().max(100),
   })
   .superRefine((input, ctx) => {
-    const visibility = visibilityOfKey(input.key);
-    if (!visibility) return;
-    const allowed: readonly string[] = allowedContentTypes[visibility];
-    if (!allowed.includes(input.contentType)) {
+    for (const refusal of putRefusals(
+      input.key,
+      input.contentType,
+      input.body.byteLength,
+    )) {
       ctx.addIssue({
         code: 'custom',
-        path: ['contentType'],
-        message: `${input.contentType} is not allowed under ${visibility}/`,
-      });
-    }
-    if (input.body.byteLength === 0 || input.body.byteLength > maxObjectBytes) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['body'],
-        message: `An object is 1 to ${String(maxObjectBytes)} bytes`,
+        path: [refusal.path],
+        message: refusal.message,
       });
     }
   });
 export type PutInput = z.input<typeof PutInputSchema>;
 
 const SignedUrlInputSchema = z.object({
-  key: StorageKeySchema.refine((key) => key.startsWith('private/'), {
+  key: StorageKeySchema.refine((key) => visibilityOfKey(key) === 'private', {
     message: 'Only a private object has a signed link',
   }),
   expiresInSeconds: z

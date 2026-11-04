@@ -79,15 +79,17 @@
   gap: var(--space-1) var(--space-3);
 }
 
+/* The amount and the unit each stay on one line, but the unit may drop below a long amount: a four-digit price beside the horizontal card's image would otherwise run past the card's edge at 320px. */
 .price {
   display: flex;
+  flex-wrap: wrap;
   margin: 0;
-  gap: var(--space-1);
+  column-gap: var(--space-1);
   align-items: baseline;
-  white-space: nowrap;
 }
 
 .priceAmount {
+  white-space: nowrap;
   font-size: var(--font-size-body-m);
   line-height: var(--font-line-height-body-m);
   font-weight: var(--font-weight-semibold);
@@ -95,6 +97,7 @@
 }
 
 .priceUnit {
+  white-space: nowrap;
   font-size: var(--font-size-body-s);
   line-height: var(--font-line-height-body-s);
   color: var(--color-text-secondary);

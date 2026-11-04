@@ -10,6 +10,7 @@ import {
   type StartPaymentInput,
   type StartPaymentResult,
 } from '@/lib/checkout';
+import { errorKind } from '@/lib/errorKind';
 import { orderCurrency } from '@/lib/orders';
 import {
   readPaymentTryState,
@@ -71,7 +72,7 @@ async function rememberPayment(
   } catch (error) {
     logger.error('Provider payment id not stored', {
       attemptId,
-      errorKind: error instanceof Error ? error.name : 'unknown',
+      errorKind: errorKind(error),
     });
   }
 }

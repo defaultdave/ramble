@@ -1,7 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { upcomingSessionLimits } from '@/lib/upcomingSessions';
 import {
   UpcomingSessions,
   UpcomingSessionsError,
@@ -22,8 +21,8 @@ import {
 // - the low-spaces wording ("3 left", "1 left") reads in the row, and "Sold out" for none or fewer
 // - the date the address asked for is marked as the current date, and no other row is
 // - no dates says so in words instead of an empty list
-// - the skeleton announces loading and draws one hidden row per bounded row, in the loaded rows' class
-// - the error state says what failed and retries with a GET form to the page's own address
+// - the skeleton announces loading and draws three hidden rows by default, or the count it is given, in the loaded rows' class
+// - the error state says what failed and retries with a GET form to the page's own address, carrying the selected date when there is one
 
 describe('UpcomingSessions', () => {
   it('lists each date with its time, spaces left, and price', () => {
@@ -87,18 +86,24 @@ describe('UpcomingSessions', () => {
 });
 
 describe('UpcomingSessionsSkeleton', () => {
-  it('announces the load and holds the space of every row it can be replaced by', () => {
+  it('announces the load and holds the space of a few rows', () => {
     const { container } = render(<UpcomingSessionsSkeleton />);
 
     expect(screen.getByRole('status')).toHaveTextContent('Loading dates');
     const list = container.querySelector('ul');
     expect(list).toHaveAttribute('aria-hidden', 'true');
-    expect(list?.children).toHaveLength(upcomingSessionLimits.maxRows);
+    expect(list?.children).toHaveLength(3);
     const loaded = render(<UpcomingSessions view={withSpaces} />);
     const loadedRow = loaded.container.querySelector('li > a, li > div');
     expect(list?.firstElementChild?.className).toBe(
       loadedRow?.className.split(' ').find((name) => name.includes('row')),
     );
+  });
+
+  it('draws the row count it is given', () => {
+    const { container } = render(<UpcomingSessionsSkeleton rows={5} />);
+
+    expect(container.querySelector('ul')?.children).toHaveLength(5);
   });
 });
 
@@ -114,5 +119,21 @@ describe('UpcomingSessionsError', () => {
       .closest('form');
     expect(form).toHaveAttribute('action', '/experiences/sunset-kayak-1');
     expect(form).toHaveAttribute('method', 'get');
+  });
+
+  it('keeps the selected date on the retry, and sends no date when none was asked for', () => {
+    const { container, rerender } = render(
+      <UpcomingSessionsError
+        retryHref="/experiences/sunset-kayak-1"
+        selectedDate="2026-10-31"
+      />,
+    );
+    const date = () => container.querySelector('input[name="date"]');
+
+    expect(date()).toHaveAttribute('type', 'hidden');
+    expect(date()).toHaveAttribute('value', '2026-10-31');
+
+    rerender(<UpcomingSessionsError retryHref="/experiences/sunset-kayak-1" />);
+    expect(date()).toBeNull();
   });
 });

@@ -2,8 +2,13 @@ import { notFound, redirect } from 'next/navigation';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readRemoteOrFallback } from './remote';
 
+const log = vi.hoisted(() => ({ error: vi.fn() }));
+
+vi.mock('@/server/monitoring/logger', () => ({ logger: log }));
+
 afterEach(() => {
   vi.restoreAllMocks();
+  log.error.mockReset();
 });
 
 describe('readRemoteOrFallback', () => {
@@ -16,37 +21,33 @@ describe('readRemoteOrFallback', () => {
     expect(fallback).not.toHaveBeenCalled();
   });
 
-  it('reads Postgres and logs the message when the runtime cache fails', async () => {
-    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-
+  it('reads Postgres and logs only the kind when the runtime cache fails', async () => {
     const value = await readRemoteOrFallback(
-      () => Promise.reject(new Error('simulated remote cache outage: get')),
+      () => Promise.reject(new TypeError('simulated outage: host db.example')),
       () => Promise.resolve(3),
     );
 
     expect(value).toBe(3);
-    expect(log).toHaveBeenCalledWith(
-      '[readRemoteOrFallback] Runtime cache read failed, reading Postgres instead: simulated remote cache outage: get',
+    expect(log.error).toHaveBeenCalledExactlyOnceWith(
+      'Runtime cache read failed, reading Postgres instead',
+      { kind: 'TypeError' },
     );
   });
 
-  it('logs a thrown value that is not an Error', async () => {
-    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-
+  it('logs the unknown kind for a thrown value that is not an Error, and not its text', async () => {
     await readRemoteOrFallback(
       // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- a handler can throw anything
       () => Promise.reject('plain text'),
       () => Promise.resolve(1),
     );
 
-    expect(log).toHaveBeenLastCalledWith(
-      '[readRemoteOrFallback] Runtime cache read failed, reading Postgres instead: plain text',
+    expect(log.error).toHaveBeenCalledExactlyOnceWith(
+      'Runtime cache read failed, reading Postgres instead',
+      { kind: 'unknown' },
     );
   });
 
   it('lets a failing Postgres read surface', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
-
     await expect(
       readRemoteOrFallback(
         () => Promise.reject(new Error('cache down')),

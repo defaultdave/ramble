@@ -2,6 +2,7 @@ import 'server-only';
 import type { EmailAdapterName } from '@/lib/email/message';
 import type { EmailMode } from '@/lib/email/route';
 import { env } from '@/server/env';
+import { requireEnv } from '@/server/ports/requireEnv';
 import { createFakeAdapter } from './fake';
 import { createPostmarkAdapter } from './postmark';
 import { createResendAdapter } from './resend';
@@ -31,30 +32,25 @@ export function getEmailConfig(): EmailConfig {
   };
 }
 
-function required(value: string | undefined, name: string): string {
-  if (value === undefined) throw new Error(`${name} is not set`);
-  return value;
-}
-
 export function getAdapter(name: EmailAdapterName): EmailAdapter {
   switch (name) {
     case 'fake':
       return createFakeAdapter(env.EMAIL_WEBHOOK_SECRET);
     case 'resend':
       return createResendAdapter({
-        apiKey: required(env.RESEND_API_KEY, 'RESEND_API_KEY'),
-        webhookSecret: required(
+        apiKey: requireEnv(env.RESEND_API_KEY, 'RESEND_API_KEY'),
+        webhookSecret: requireEnv(
           env.EMAIL_WEBHOOK_SECRET,
           'EMAIL_WEBHOOK_SECRET',
         ),
       });
     case 'postmark':
       return createPostmarkAdapter({
-        serverToken: required(
+        serverToken: requireEnv(
           env.POSTMARK_SERVER_TOKEN,
           'POSTMARK_SERVER_TOKEN',
         ),
-        webhookSecret: required(
+        webhookSecret: requireEnv(
           env.EMAIL_WEBHOOK_SECRET,
           'EMAIL_WEBHOOK_SECRET',
         ),

@@ -1,6 +1,7 @@
 import 'server-only';
 import { unstable_rethrow } from 'next/navigation';
 import { errorDigest } from '@/lib/errorDigest';
+import { errorKind } from '@/lib/errorKind';
 import { isPrerenderEnd } from '@/lib/prerender';
 import { logger } from '@/server/monitoring/logger';
 
@@ -17,6 +18,6 @@ export function rethrowOrLog(message: string, error: unknown): void {
   if (isPrerenderEnd(error)) throw error;
   logger.error(message, {
     digest: errorDigest(error),
-    kind: error instanceof Error ? error.name : 'unknown',
+    kind: errorKind(error),
   });
 }

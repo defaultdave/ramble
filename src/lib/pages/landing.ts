@@ -26,8 +26,23 @@ type Named = { slug: string; name: string };
  */
 export const landingPlaceholderSlug = 'not_a_slug';
 
-/** The title of a landing page that has no name to show: its read failed, or the address names nothing. */
+/** The title of a landing page that has no name to show because the address names nothing. */
 export const landingFallbackTitle = 'Things to do in New York';
+
+/**
+ * The h1 of a landing page whose read failed, so the page still names what the guest asked for. The
+ * name is only the slug's words: the stored name is what the failed read would have given.
+ */
+export function landingErrorTitle(kind: LandingKind, slug: string): string {
+  const words = slug.split('-');
+  const name =
+    kind === 'category'
+      ? words.join(' ').replace(/^./, (first) => first.toUpperCase())
+      : words
+          .map((word) => word.replace(/^./, (first) => first.toUpperCase()))
+          .join(' ');
+  return landingHeading(kind, name, null);
+}
 
 /** The address of a landing page. */
 export function landingPath(kind: LandingKind, slug: string): string {

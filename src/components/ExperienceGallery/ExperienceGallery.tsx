@@ -39,7 +39,7 @@ export function ExperienceGallery({ title, gallery }: ExperienceGalleryProps) {
 
   return (
     <div className={styles.gallery}>
-      {/* A scrolling region takes focus so a keyboard can scroll it. */}
+      {/* A scrolling region takes focus so a keyboard can scroll it. The strip scrolls on a phone, and the story browser flags a scroller without a tab stop. */}
       <div
         className={styles.strip}
         role="group"

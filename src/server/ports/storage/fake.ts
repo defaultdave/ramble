@@ -1,6 +1,6 @@
 import 'server-only';
 import { createHmac, randomBytes } from 'node:crypto';
-import type { StorageCapabilities } from '@/lib/storage';
+import { signedUrlDeadline, type StorageCapabilities } from '@/lib/storage';
 import { secureEqual } from '@/server/hash';
 import {
   parseDeleteInput,
@@ -93,7 +93,9 @@ export function createFakeStorageAdapter(
       settle(() => {
         const { key, expiresInSeconds } = parseSignedUrlInput(input);
         if (!objects.has(key)) throw new StorageError('not_found');
-        const expires = Math.floor(now().getTime() / 1000) + expiresInSeconds;
+        const expires = Math.ceil(
+          signedUrlDeadline(now(), expiresInSeconds).getTime() / 1000,
+        );
         return `${fakeOrigin}/${key}?expires=${String(expires)}&signature=${sign(key, expires)}`;
       }),
 

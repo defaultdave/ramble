@@ -1,5 +1,6 @@
 import { Skeleton } from '@/components/Skeleton';
 import { classNames } from '@/lib/classNames';
+import { brandName } from '@/lib/pages/brand';
 import styles from './HomeStates.module.css';
 
 const bar = styles.bar;
@@ -12,7 +13,7 @@ const bar = styles.bar;
 export function HomeSkeleton() {
   return (
     <>
-      <h1 className={styles.visuallyHidden}>Ramble</h1>
+      <h1 className={styles.visuallyHidden}>{brandName}</h1>
       <div role="status">
         <span className={styles.visuallyHidden}>Loading the home page</span>
         <div

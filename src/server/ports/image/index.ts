@@ -1,6 +1,7 @@
 import 'server-only';
 import { z } from 'zod';
 import type { ImageHeader } from '@/lib/photos';
+import { PortError } from '@/server/ports/portError';
 
 export type ImageErrorCode =
   /** The input failed the port's schema; nothing was decoded. */
@@ -8,13 +9,9 @@ export type ImageErrorCode =
   /** The bytes are not an image the decoder can read to the end, or exceed the pixel limit. */
   | 'unreadable';
 
-export class ImageError extends Error {
-  readonly code: ImageErrorCode;
-
+export class ImageError extends PortError<ImageErrorCode> {
   constructor(code: ImageErrorCode, message?: string, cause?: unknown) {
-    super(message ?? code, cause === undefined ? undefined : { cause });
-    this.name = 'ImageError';
-    this.code = code;
+    super('ImageError', code, message, cause);
   }
 }
 

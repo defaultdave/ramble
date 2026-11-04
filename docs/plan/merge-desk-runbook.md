@@ -8,11 +8,11 @@ unit: U-118 Merge desk and agent identity (units.yaml)
 
 # Merge desk runbook
 
-This sets up tiered auto-merge.
+This sets up tiered auto-merge. Since 2026-11-04 there is one merge lane (ADR 0010, amended 2026-11-04):
 
-- **Standard-tier units** merge to `main` themselves when every required check passes.
-- **Critical-tier units** merge to `integration` the same way.
-- **Only you** promote `integration` to `main`.
+- **Every unit** merges to `main` itself when every required check passes.
+- **Critical-tier units** also need the `human-read` check, which passes only once you approve the PR's current head.
+- `integration`, its ruleset, sync PRs, and promotions are retired. Setup steps C2 and C3 below still name `integration`; they record how it was set up, and E1 replaces the promotion.
 
 Every step is labelled **[Dave]** or **[PM]**.
 
@@ -116,17 +116,17 @@ bun scripts/merge-desk/post-check.ts --name review-agent --sha <head sha> --conc
 
 | Subcommand | What it does | Refuses |
 |---|---|---|
-| `push <branch>` | Pushes the branch with the App token in an `http.extraheader`, never in the URL | Any branch not named `unit/U-…`, `pm/…`, `revert/…`, or `sync/…`; `main`; `integration` |
-| `pr <base> <title> <body-file>` | `gh pr create` as the App | A base other than `main` or `integration`; a head of `integration` |
-| `automerge <pr or branch>` | `gh pr merge <pr> --auto --squash` as the App | `--admin`; any PR whose head is `integration` |
+| `push <branch>` | Pushes the branch with the App token in an `http.extraheader`, never in the URL | Any branch not named `unit/U-…`, `pm/…`, or `revert/…`; `main` |
+| `pr <base> <title> <body-file>` | `gh pr create` as the App | A base other than `main` |
+| `automerge <pr or branch>` | `gh pr merge <pr> --auto --squash` as the App | `--admin` |
 
 **`scripts/merge-desk/scope-check.ts`** is the `scope-manifest` check. It reads git metadata only and never runs code from the PR. Its rules:
 
-1. **Promotion PRs:** head `integration`, base `main`. Always fails, with the message "Promotion: Dave merges with bypass after the nightly smoke (runbook E1)."
-2. **Sync PRs:** head `main` or `sync/…`, base `integration`. They pass.
-3. **The title** must start with a unit ID in `units.yaml`, or with `PM bookkeeping:`. A leading `Revert: ` is stripped first.
-4. **Protected paths.** Changed files (`git diff --name-only base...PR head`) must not touch `.github/`, `.claude/`, `CLAUDE.md`, `scripts/merge-desk/`, `docs/adr/`, or `docs/plan/`. A bookkeeping PR may touch only `docs/plan/units.yaml`, `docs/plan/STATUS.md`, and `docs/plan/delta-log.md`, and only into `main`.
-5. **Tier.** A `review: critical` unit must target `integration`. A standard unit targets `main`, unless its branch carries commits that are on `integration` and not on `main`. Then it must target `integration` too, so nothing reaches `main` around the promotion.
+1. **Base.** Every PR targets `main`.
+2. **The title** must start with a unit ID in `units.yaml`, or with `PM bookkeeping:`. A leading `Revert: ` is stripped first.
+3. **Protected paths.** Changed files (`git diff --name-only base...PR head`) must not touch `.github/`, `.claude/`, `CLAUDE.md`, `scripts/merge-desk/`, `docs/adr/`, or `docs/plan/`. A bookkeeping PR may touch only `docs/plan/units.yaml`, `docs/plan/STATUS.md`, and `docs/plan/delta-log.md`.
+
+**`scripts/merge-desk/human-read.ts`** is the `human-read` check (`.github/workflows/human-read.yml`). It reads the tier from `units.yaml` at the PR's base commit, so a PR cannot pick its own tier. Standard-tier and bookkeeping PRs pass at once. A critical-tier PR, or the revert of one, passes only when your latest approving or change-requesting review approves the PR's current head; a new push sends it back to waiting. It reruns when you submit or dismiss a review. Agents act as the App, so they cannot approve as you.
 
 **`scripts/merge-desk/revert.sh`** opens a revert PR that goes through the same checks and auto-merges:
 
@@ -395,40 +395,47 @@ It reports each result to you. The first real standard-tier merge is U-001, and 
 
   > each verdict posted as a check run with `scripts/merge-desk/post-check.ts`
 
-## E. Weekly promotion
+## E. The human read
 
-**E1 [Dave] Promote `integration` to `main`,** weekly by default.
-
-Check that last night's smoke on `integration` passed. The answer must be `success`:
+**E0 [Dave] Switch to one lane, once,** after the PR that brings in `human-read` merges. Check that `integration` holds nothing `main` lacks; the answer must be `0`:
 
 ```bash
-gh api repos/defaultdave/ramble/commits/integration/status -q '.statuses[] | select(.context=="nightly-smoke") | .state'
+git fetch origin && git rev-list --count origin/main..origin/integration
 ```
 
-Open the promotion PR. The PM drafts the body (E2):
+Require `human-read` on the `main` ruleset (posted by GitHub Actions, integration ID 15368):
 
 ```bash
-gh pr create --repo defaultdave/ramble --base main --head integration --title "Promote integration $(date +%F)" --body-file <path the PM gives you>
+gh api repos/defaultdave/ramble/rulesets/25513279 |
+  jq '{name, target, enforcement, conditions, bypass_actors,
+    rules: [.rules[] | if .type == "required_status_checks"
+      then .parameters.required_status_checks |= (map(select(.context != "human-read")) + [{context: "human-read", integration_id: 15368}])
+      else . end]}' |
+  gh api -X PUT repos/defaultdave/ramble/rulesets/25513279 --input - -q '.name'
 ```
 
-Read the critical-tier diffs:
+Delete the `integration` ruleset, then the branch:
 
 ```bash
-gh pr diff <promotion PR number>
+gh api -X DELETE repos/defaultdave/ramble/rulesets/25513280
 ```
-
-Merge with your bypass. `scope-manifest` fails on purpose for promotions:
 
 ```bash
-gh pr merge <promotion PR number> --admin --merge
+gh api -X DELETE repos/defaultdave/ramble/git/refs/heads/integration
 ```
 
-Promotion is a production change only when you also promote a deploy. Deploys stay yours (ADR 0010).
+A PR already open into `main` gets its first `human-read` run on its next push or title edit.
 
-**E2 [PM] Prepare the promotion and keep `integration` current.**
+**E1 [Dave] Read and approve a critical-tier PR.** The PM requests your review with `agent-git.ts review <pr>` when a critical-tier PR's agent checks pass. Read the diff, then approve it; `human-read` reruns, and auto-merge lands the PR once every required check passes:
 
-- **The promotion body** lists the critical units in the batch with their review verdicts and the overnight race and access results. The PM writes it to a local file, not committed, and gives you its path.
-- **The sync.** After each promotion, and whenever standard units land that critical work needs, the PM brings `main` into `integration`. It pushes a `sync/YYYY-MM-DD` branch from `main` with `agent-git.ts`, opens it into `integration`, and sets auto-merge.
+```bash
+gh pr diff <PR number>
+gh pr review <PR number> --approve
+```
+
+To send it back, `gh pr review <PR number> --request-changes --body "<what to fix>"`. A later push needs a new approval.
+
+Merging to `main` is not a deploy. Production promotion stays yours (ADR 0007, ADR 0010).
 
 ## F. Revert and break-glass
 

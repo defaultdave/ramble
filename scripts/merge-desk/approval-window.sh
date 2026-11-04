@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Dave only: opens or closes the approval window on both rulesets (DECISIONS 2026-10-21).
-#   on:  every PR into main or integration needs 1 approval, dismissed when new commits land
+# Dave only: opens or closes the approval window on the main ruleset (DECISIONS 2026-10-21).
+#   on:  every PR into main needs 1 approval, dismissed when new commits land
 #   off: back to 0 approvals; the four required checks alone merge a PR
 # Usage: scripts/merge-desk/approval-window.sh on|off   (needs Dave's gh login; the App cannot change rulesets)
 set -euo pipefail
@@ -9,7 +9,7 @@ case "${1:-}" in
   off) count=0 dismiss=false ;;
   *) echo "usage: $0 on|off" >&2; exit 1 ;;
 esac
-for id in 25513279 25513280; do
+for id in 25513279; do
   gh api "repos/defaultdave/ramble/rulesets/$id" |
     jq --argjson count "$count" --argjson dismiss "$dismiss" '{name, target, enforcement, conditions, bypass_actors,
       rules: [.rules[] | if .type == "pull_request"

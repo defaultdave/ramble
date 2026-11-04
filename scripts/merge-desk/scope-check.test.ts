@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { checkScope, parseUnits, PROMOTION_MESSAGE, type ScopeInput, unitsYamlViolations } from "./scope-check.ts";
+import { checkScope, parseUnits, type ScopeInput, unitsYamlViolations } from "./scope-check.ts";
 
 const units = parseUnits(`units:
   - id: U-001
@@ -17,8 +17,6 @@ const baseInput: ScopeInput = {
   head: "unit/U-001",
   changedFiles: ["src/app/page.tsx"],
   units,
-  carriesIntegrationCommits: false,
-  aheadOfMain: true,
 };
 const check = (patch: Partial<ScopeInput>) => checkScope({ ...baseInput, ...patch });
 
@@ -43,20 +41,14 @@ test("a standard unit into main passes", () => {
   expect(check({}).ok).toBe(true);
 });
 
-test("rule 1: a promotion PR always fails with the runbook message", () => {
-  expect(check({ head: "integration", base: "main", title: "Promote integration" })).toEqual({
-    ok: false,
-    reason: PROMOTION_MESSAGE,
-  });
-});
-
-test("rule 2: a sync PR from main or sync/ into integration passes", () => {
-  expect(check({ head: "sync/2026-10-27", base: "integration", title: "Sync", aheadOfMain: false }).ok).toBe(true);
-  expect(check({ head: "main", base: "integration", title: "Sync", aheadOfMain: false }).ok).toBe(true);
-});
-
-test("rule 2: a sync branch with commits beyond main fails", () => {
-  expect(check({ head: "sync/x", base: "integration", title: "Sync", aheadOfMain: true }).ok).toBe(false);
+test.each([
+  ["a standard unit", { title: "U-001: Repo and CI", head: "unit/U-001" }],
+  ["a critical unit", { title: "U-002: skeleton", head: "unit/U-002" }],
+  ["a bookkeeping PR", { title: "PM bookkeeping: x", head: "pm/x", changedFiles: ["docs/plan/STATUS.md"] }],
+  ["a critical revert", { title: "Revert: U-002: skeleton", head: "revert/pr-9" }],
+])("rule 1: %s into any base but main fails, into main passes", (_, patch: Partial<ScopeInput>) => {
+  expect(check({ ...patch, base: "integration" })).toEqual({ ok: false, reason: "Base must be main, not integration." });
+  expect(check(patch).ok).toBe(true);
 });
 
 test.each([
@@ -64,40 +56,35 @@ test.each([
   ["an unknown unit ID", "U-999: ghost"],
   ["a unit ID that only prefixes another", "U-0011: nope"],
   ["a revert of a title without a unit ID", "Revert: Fix things"],
-])("rule 3: %s fails", (_label, title) => {
+])("rule 2: %s fails", (_label, title) => {
   expect(check({ title }).ok).toBe(false);
 });
 
-test("rule 3: a letter-suffixed unit passes from its own branch", () => {
+test("rule 2: a letter-suffixed unit passes from its own branch", () => {
   expect(check({ title: "U-064a: gift chain", head: "unit/U-064a-gifts" }).ok).toBe(true);
 });
 
-test.each(["Revert: U-001: Repo and CI", "Revert: Revert: U-001: Repo and CI"])("rule 3: %s passes from a revert branch", (title) => {
+test.each(["Revert: U-001: Repo and CI", "Revert: Revert: U-001: Repo and CI"])("rule 2: %s passes from a revert branch", (title) => {
   expect(check({ title, head: "revert/pr-12" }).ok).toBe(true);
 });
 
-test("rule 3: a critical unit cannot borrow a standard unit's title (branch and title must agree)", () => {
+test("rule 2: a critical unit cannot borrow a standard unit's title (branch and title must agree)", () => {
   const verdict = check({ title: "U-001: Repo and CI", head: "unit/U-002", base: "main" });
   expect(verdict.ok).toBe(false);
   expect(verdict.reason).toContain("must be unit/U-001");
 });
 
-test.each(["feature/x", "unit/U-0011", "unit/U-001x", "pm/U-001", "unit/u-001"])("rule 3: branch %s does not match title U-001", (head) => {
+test.each(["feature/x", "unit/U-0011", "unit/U-001x", "pm/U-001", "unit/u-001"])("rule 2: branch %s does not match title U-001", (head) => {
   expect(check({ head }).ok).toBe(false);
 });
 
-test("rule 3: a unit branch may carry a suffix", () => {
+test("rule 2: a unit branch may carry a suffix", () => {
   expect(check({ head: "unit/U-001-hardening" }).ok).toBe(true);
 });
 
-test("rule 3: a revert PR must come from revert/pr-<number>", () => {
+test("rule 2: a revert PR must come from revert/pr-<number>", () => {
   expect(check({ title: "Revert: U-001: x", head: "unit/U-001" }).ok).toBe(false);
   expect(check({ title: "Revert: U-001: x", head: "revert/pr-1x" }).ok).toBe(false);
-});
-
-test("rule 3: reverting a critical unit into main fails, into integration passes", () => {
-  expect(check({ title: "Revert: U-002: skeleton", head: "revert/pr-9", base: "main" }).ok).toBe(false);
-  expect(check({ title: "Revert: U-002: skeleton", head: "revert/pr-9", base: "integration" }).ok).toBe(true);
 });
 
 test.each([
@@ -107,13 +94,13 @@ test.each([
   "scripts/merge-desk/agent-git.ts",
   "docs/adr/0010.md",
   "docs/plan/units.yaml",
-])("rule 4: a unit PR touching %s fails", (file) => {
+])("rule 3: a unit PR touching %s fails", (file) => {
   const verdict = check({ changedFiles: ["src/a.ts", file] });
   expect(verdict.ok).toBe(false);
   expect(verdict.reason).toContain(file);
 });
 
-test("rule 4: a bookkeeping PR touching only the three plan files into main passes", () => {
+test("rule 3: a bookkeeping PR touching only the three plan files into main passes", () => {
   const verdict = check({
     title: "PM bookkeeping: mark U-118 done",
     head: "pm/status",
@@ -122,32 +109,13 @@ test("rule 4: a bookkeeping PR touching only the three plan files into main pass
   expect(verdict.ok).toBe(true);
 });
 
-test("rule 4: a bookkeeping PR touching any other file fails", () => {
+test("rule 3: a bookkeeping PR touching any other file fails", () => {
   const changedFiles = ["docs/plan/units.yaml", "docs/plan/DECISIONS.md"];
   expect(check({ title: "PM bookkeeping: x", head: "pm/x", changedFiles }).ok).toBe(false);
 });
 
-test("rule 4: a bookkeeping PR into integration fails", () => {
-  const verdict = check({ title: "PM bookkeeping: x", head: "pm/x", base: "integration", changedFiles: ["docs/plan/STATUS.md"] });
-  expect(verdict.ok).toBe(false);
-});
-
-test("rule 5: a critical unit into main fails, into integration passes", () => {
-  expect(check({ title: "U-002: skeleton", head: "unit/U-002", base: "main" }).ok).toBe(false);
-  expect(check({ title: "U-002: skeleton", head: "unit/U-002", base: "integration" }).ok).toBe(true);
-});
-
-test("rule 5: a standard unit that carries integration commits must target integration", () => {
-  expect(check({ carriesIntegrationCommits: true, base: "main" }).ok).toBe(false);
-  expect(check({ carriesIntegrationCommits: true, base: "integration" }).ok).toBe(true);
-});
-
-test("rule 5: a standard unit may target integration without integration commits", () => {
-  expect(check({ base: "integration" }).ok).toBe(true);
-});
-
 test.each(["docs/plan/units.yaml", "Docs/Plan/UNITS.yaml", "CLAUDE.MD", ".GitHub/workflows/x.yml", "Scripts/Merge-Desk/a.ts"])(
-  "rule 4: protected paths match case-insensitively (%s)",
+  "rule 3: protected paths match case-insensitively (%s)",
   (file) => {
     expect(check({ changedFiles: [file] }).ok).toBe(false);
   },
@@ -225,8 +193,3 @@ test("bookkeeping changing units.yaml without the before/after text fails closed
   expect(verdict.ok).toBe(false);
 });
 
-test("a bookkeeping PR whose branch carries integration commits cannot land on main", () => {
-  const verdict = check({ title: "PM bookkeeping: x", head: "pm/x", changedFiles: ["docs/plan/STATUS.md"], carriesIntegrationCommits: true });
-  expect(verdict.ok).toBe(false);
-  expect(verdict.reason).toContain("integration");
-});

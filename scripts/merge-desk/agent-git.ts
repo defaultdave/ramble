@@ -8,7 +8,7 @@ import { mintToken } from "./app-token.ts";
 export const REPO = "defaultdave/ramble";
 /** The owner's login. An approval from it counts because agents author PRs as the App, not as the owner. */
 export const REVIEWER = "defaultdave";
-const BRANCH_PATTERN = /^(unit\/U-[0-9A-Za-z][0-9A-Za-z._-]*|(pm|revert|sync)\/[0-9A-Za-z][0-9A-Za-z._/-]*)$/;
+const BRANCH_PATTERN = /^(unit\/U-[0-9A-Za-z][0-9A-Za-z._-]*|(pm|revert)\/[0-9A-Za-z][0-9A-Za-z._/-]*)$/;
 
 export class Refused extends Error {}
 
@@ -23,19 +23,15 @@ export interface Deps {
   currentBranch: () => string;
 }
 
-/** Only unit/U-…, pm/…, revert/…, and sync/… branches may be pushed; main and integration never. */
+/** Only unit/U-…, pm/…, and revert/… branches may be pushed; main never. */
 export function assertPushable(branch: string): void {
   if (!BRANCH_PATTERN.test(branch) || branch.includes("..") || branch.endsWith("/") || branch.endsWith(".lock")) {
-    throw new Refused(`refused: ${branch} is not a unit/U-…, pm/…, revert/…, or sync/… branch`);
+    throw new Refused(`refused: ${branch} is not a unit/U-…, pm/…, or revert/… branch`);
   }
 }
 
 export function assertBase(base: string): void {
-  if (base !== "main" && base !== "integration") throw new Refused(`refused: base must be main or integration, not ${base}`);
-}
-
-export function assertNotPromotion(head: string): void {
-  if (head === "integration") throw new Refused("refused: integration is promoted by Dave, not by an agent");
+  if (base !== "main") throw new Refused(`refused: base must be main, not ${base}`);
 }
 
 /** Git config passed through the environment so the token never appears in a command line or URL. */
@@ -79,7 +75,6 @@ export async function push(branch: string, deps: Deps): Promise<void> {
 export async function pr(base: string, title: string, bodyFile: string, deps: Deps): Promise<void> {
   assertBase(base);
   const head = deps.currentBranch();
-  assertNotPromotion(head);
   if (head === base) throw new Refused(`refused: head and base are both ${base}`);
   const command = [
     "gh", "pr", "create", "--repo", REPO, "--base", base, "--head", head, "--title", title, "--body-file", bodyFile,
@@ -87,25 +82,13 @@ export async function pr(base: string, title: string, bodyFile: string, deps: De
   must(deps.run(command, { GH_TOKEN: await deps.token() }), "gh pr create");
 }
 
-export function isSync(head: string, base: string): boolean {
-  return base === "integration" && (head === "main" || head.startsWith("sync/"));
-}
-
 export async function automerge(target: string, deps: Deps): Promise<void> {
   if (target.startsWith("-")) throw new Refused(`refused: ${target} is not a PR number or branch`);
   const token = await deps.token();
-  const view = must(
-    deps.run(["gh", "pr", "view", target, "--repo", REPO, "--json", "headRefName,baseRefName"], { GH_TOKEN: token }),
-    "gh pr view",
-  );
-  const { headRefName, baseRefName } = JSON.parse(view.stdout) as { headRefName: string; baseRefName: string };
-  assertNotPromotion(headRefName);
-  // A sync PR keeps main's commits as ancestors (merge commit); squashing would make the next sync conflict.
-  const method = isSync(headRefName, baseRefName) ? "--merge" : "--squash";
-  must(deps.run(["gh", "pr", "merge", target, "--repo", REPO, "--auto", method], { GH_TOKEN: token }), "gh pr merge");
+  must(deps.run(["gh", "pr", "merge", target, "--repo", REPO, "--auto", "--squash"], { GH_TOKEN: token }), "gh pr merge");
 }
 
-/** Requests the owner's review as the App: every PR while approvals are required, and people checks and escalations after. */
+/** Requests the owner's review as the App: every PR while approvals are required, and critical-tier PRs, people checks, and escalations after. */
 export async function review(target: string, deps: Deps): Promise<void> {
   if (target.startsWith("-")) throw new Refused(`refused: ${target} is not a PR number or branch`);
   must(

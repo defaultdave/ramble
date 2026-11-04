@@ -15,6 +15,7 @@ import {
   landingHead,
   landingHeading,
   landingPath,
+  landingResultsId,
   landingQuery,
   landingView,
   type LandingKind,
@@ -56,13 +57,13 @@ async function LandingResults({ kind, slug }: LandingProps) {
   } catch (error) {
     rethrowOrLog('The landing page experiences could not be read', error);
     return (
-      <div data-reveal-without-script>
+      <div id={landingResultsId} data-reveal-without-script>
         <BrowseResults {...landingErrorView(kind, slug)} />
       </div>
     );
   }
   return (
-    <div data-reveal-without-script>
+    <div id={landingResultsId} data-reveal-without-script>
       <BrowseResults {...landingView(kind, slug, page)} />
     </div>
   );

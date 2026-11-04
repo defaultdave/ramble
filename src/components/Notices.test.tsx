@@ -2,6 +2,8 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { moduleClass } from '../../tests/support/moduleClass';
+import buttonStyles from './Button/Button.module.css';
 import { ErrorNotice } from './ErrorNotice';
 import { NotFoundNotice } from './NotFoundNotice';
 import { PageHeading } from './PageHeading';
@@ -20,7 +22,7 @@ describe('NotFoundNotice', () => {
       name: 'Go to the Ramble home page',
     });
     expect(home).toHaveAttribute('href', '/');
-    expect(home.className).toMatch(/primary/);
+    expect(home).toHaveClass(moduleClass(buttonStyles.primary));
   });
 });
 
@@ -36,7 +38,7 @@ describe('ErrorNotice', () => {
       }),
     ).toBeInTheDocument();
     const retry = screen.getByRole('button', { name: 'Try again' });
-    expect(retry.className).toMatch(/secondary/);
+    expect(retry).toHaveClass(moduleClass(buttonStyles.secondary));
     await userEvent.click(retry);
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
@@ -72,7 +74,10 @@ describe('PageHeading', () => {
       screen.getByRole('heading', { level: 1, name: 'Plan your day' }),
     ).toBeInTheDocument();
     const child = screen.getByText('Pick a time');
-    expect(child).toBeInTheDocument();
-    expect(screen.getByRole('banner').className).toMatch(/page/);
+    const container = screen.getByRole('banner');
+    expect(container).toContainElement(child);
+    expect(container).toContainElement(
+      screen.getByRole('heading', { level: 1 }),
+    );
   });
 });

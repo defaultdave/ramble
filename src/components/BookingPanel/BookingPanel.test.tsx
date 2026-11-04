@@ -3,7 +3,9 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, expectTypeOf } from 'vitest';
 import type { ComponentProps } from 'react';
+import { moduleClass } from '../../../tests/support/moduleClass';
 import { BookingPanel, type DefaultBookingPanelProps } from './BookingPanel';
+import styles from './BookingPanel.module.css';
 
 const total = {
   label: '$65 × 2 guests',
@@ -52,6 +54,7 @@ describe('BookingPanel layout', () => {
       );
     expect(follows(choices, modeSwitch)).toBe(true);
     expect(follows(modeSwitch, next)).toBe(true);
+    expect(modeSwitch.parentElement).toHaveClass(moduleClass(styles.mode));
   });
 });
 
@@ -87,7 +90,7 @@ describe('BookingPanel without a mode switch', () => {
         <p>Choices</p>
       </BookingPanel>,
     );
-    expect(container.querySelector('[class*="mode"]')).toBeNull();
+    expect(container.querySelector(`.${moduleClass(styles.mode)}`)).toBeNull();
     expect(screen.getByText('Choices')).toBeVisible();
   });
 });

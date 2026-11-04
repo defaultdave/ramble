@@ -363,16 +363,19 @@ describe('the publication time of a legal version', () => {
       },
     );
 
+    // Compared in the database: a JS Date holds milliseconds, and two stamps a few hundred
+    // microseconds apart can land in the same one.
     const rows = await client.db
       .select({
         version: legalDocuments.version,
-        publishedAt: legalDocuments.publishedAt,
+        stampedAfterPrevious: sql<boolean | null>`${legalDocuments.publishedAt} > lag(${legalDocuments.publishedAt}) over (order by ${legalDocuments.version})`,
       })
       .from(legalDocuments)
       .where(eq(legalDocuments.doc, key))
       .orderBy(legalDocuments.version);
-    expect(rows.map((row) => row.version)).toEqual([1, 2]);
-    const [first, second] = rows.map((row) => row.publishedAt?.getTime() ?? 0);
-    expect(second).toBeGreaterThan(first ?? Number.MAX_SAFE_INTEGER);
+    expect(rows).toEqual([
+      { version: 1, stampedAfterPrevious: null },
+      { version: 2, stampedAfterPrevious: true },
+    ]);
   });
 });

@@ -65,7 +65,11 @@ afterAll(async () => {
   vi.unstubAllEnvs();
 });
 
+// One instant per test, so every time derived inside a test shares the same base.
+let at = Date.now();
+
 beforeEach(async () => {
+  at = Date.now();
   // The limits count a device's holds in every session, so a test starts with none.
   await clearHolds(client.db);
   cache.updateTag.mockClear();
@@ -290,8 +294,8 @@ describe('sold out', () => {
     const bookable = await seedBookable(client.db, { allocation: 1 });
     const experienceId = bookable.experience.id;
     const startsIn = (days: number) => ({
-      startsAt: new Date(Date.now() + days * day),
-      endsAt: new Date(Date.now() + days * day + 60 * minute),
+      startsAt: new Date(at + days * day),
+      endsAt: new Date(at + days * day + 60 * minute),
     });
     const soon = await insertSession(client.db, experienceId, startsIn(2));
     const later = await insertSession(client.db, experienceId, startsIn(9));
@@ -340,8 +344,8 @@ describe('sold out', () => {
     const bookable = await seedBookable(client.db, { allocation: 1 });
     const experienceId = bookable.experience.id;
     const startsIn = (days: number) => ({
-      startsAt: new Date(Date.now() + days * day),
-      endsAt: new Date(Date.now() + days * day + 60 * minute),
+      startsAt: new Date(at + days * day),
+      endsAt: new Date(at + days * day + 60 * minute),
     });
     await insertSession(client.db, experienceId, {
       ...startsIn(2),

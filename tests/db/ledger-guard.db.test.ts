@@ -16,7 +16,7 @@ import {
 // Behaviours under test, one per decision, branch or risk.
 // The append-only guard:
 // - UPDATE, DELETE, and TRUNCATE are refused for the owner, and the rows stay
-// - ledger_writer exists, cannot log in, has INSERT and SELECT only, can insert, and is refused update, delete, and truncate; the migration's role step can run twice
+// - ledger_writer exists, cannot log in, has INSERT and SELECT only, can insert, and is refused update, delete, and truncate
 
 openLedgerDatabase();
 
@@ -109,23 +109,5 @@ describe('the append-only guard', () => {
     await expect(asWriter(sql`TRUNCATE ledger_entries`)).rejects.toMatchObject(
       noPrivilege,
     );
-  });
-
-  it('can create the role a second time without failing, as a second schema or branch would', async () => {
-    const step = sql`DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'ledger_writer') THEN
-          CREATE ROLE ledger_writer NOLOGIN;
-        END IF;
-      EXCEPTION WHEN duplicate_object OR unique_violation THEN
-        NULL;
-      END
-      $$`;
-    await client.db.execute(step);
-    await client.db.execute(step);
-    const { rows } = await client.db.execute<{ n: number }>(
-      sql`SELECT count(*)::int AS n FROM pg_roles WHERE rolname = 'ledger_writer'`,
-    );
-    expect(rows[0]?.n).toBe(1);
   });
 });

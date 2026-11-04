@@ -2,6 +2,7 @@ import { ImageOff } from 'lucide-react';
 import { Photo } from '@/components/Photo';
 import type { GalleryView } from '@/lib/pages/experience';
 import styles from './ExperienceGallery.module.css';
+import { GalleryStrip } from './GalleryStrip';
 
 export type ExperienceGalleryProps = {
   /** The experience's name, which names the gallery for a screen reader. */
@@ -12,7 +13,6 @@ export type ExperienceGalleryProps = {
 
 const leadSizes = '(min-width: 1200px) 792px, (min-width: 768px) 66vw, 100vw';
 const sideSizes = '(min-width: 1200px) 384px, (min-width: 768px) 33vw, 100vw';
-const moreSizes = '(min-width: 1200px) 384px, 33vw';
 
 function Placeholder() {
   return (
@@ -25,8 +25,10 @@ function Placeholder() {
 
 /**
  * On a phone, the photos in a strip that scrolls sideways and snaps to each, the lead first. From
- * the tablet width, the lead beside two more, and the rest behind "See all". Every photo holds its
- * space before it loads, and only the lead is fetched ahead of the rest. It needs no script.
+ * the tablet width, the lead beside two more, and the rest behind "See all". Every photo is drawn
+ * once; the stylesheet decides which show, and "See all" is a bare disclosure the list reacts to.
+ * Every photo holds its space before it loads, and only the lead is fetched ahead of the rest. The
+ * photos and "See all" need no script.
  */
 export function ExperienceGallery({ title, gallery }: ExperienceGalleryProps) {
   if (gallery.layout === 'none') {
@@ -39,13 +41,7 @@ export function ExperienceGallery({ title, gallery }: ExperienceGalleryProps) {
 
   return (
     <div className={styles.gallery}>
-      {/* A scrolling region takes focus so a keyboard can scroll it. The strip scrolls on a phone, and the story browser flags a scroller without a tab stop. */}
-      <div
-        className={styles.strip}
-        role="group"
-        aria-label={`Photos of ${title}`}
-        tabIndex={0}
-      >
+      <GalleryStrip label={`Photos of ${title}`}>
         <ul className={styles.list} data-layout={gallery.layout}>
           {gallery.photos.map(({ photo, isLead, counter }) => (
             <li key={photo.src} className={styles.item}>
@@ -60,17 +56,10 @@ export function ExperienceGallery({ title, gallery }: ExperienceGalleryProps) {
             </li>
           ))}
         </ul>
-      </div>
+      </GalleryStrip>
       {gallery.seeAllLabel ? (
         <details className={styles.more}>
           <summary className={styles.summary}>{gallery.seeAllLabel}</summary>
-          <ul className={styles.moreList}>
-            {gallery.more.map((photo) => (
-              <li key={photo.src} className={styles.moreItem}>
-                <Photo photo={photo} sizes={moreSizes} />
-              </li>
-            ))}
-          </ul>
         </details>
       ) : null}
     </div>

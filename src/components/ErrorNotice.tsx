@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect, useRef } from 'react';
 import { Button } from '@/components/Button';
 import { PageHeading } from '@/components/PageHeading';

@@ -3,6 +3,7 @@ import { isSlug } from '../catalog';
 import type { CardExperience } from '../experienceCards';
 import {
   landingBrowseHref,
+  landingErrorTitle,
   landingErrorView,
   landingFilters,
   landingHead,
@@ -169,6 +170,21 @@ describe('landingView', () => {
       dated: null,
       wording: 'landing',
     });
+  });
+});
+
+describe('landingErrorTitle', () => {
+  it.each([
+    [
+      'category',
+      'ceramics-and-crafts',
+      'Ceramics and crafts experiences in New York',
+    ],
+    ['category', 'cooking', 'Cooking experiences in New York'],
+    ['neighborhood', 'park-slope', 'Things to do in Park Slope'],
+    ['neighborhood', 'dumbo', 'Things to do in Dumbo'],
+  ] as const)('names a %s page from its slug %s', (kind, slug, title) => {
+    expect(landingErrorTitle(kind, slug)).toBe(title);
   });
 });
 

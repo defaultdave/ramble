@@ -122,6 +122,12 @@ describe('the landing route', () => {
     expect(JSON.stringify(server.logError.mock.calls)).not.toMatch(
       /secret|Failed query/,
     );
+    expect(
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'Cooking experiences in New York',
+      }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent(
       "We couldn't load this page",
     );
@@ -290,12 +296,12 @@ describe('the landing head', () => {
     });
   });
 
-  it('falls back to the plain title when the read fails, and logs only its digest and kind', async () => {
+  it('names the page by its address when the read fails, and logs only its digest and kind', async () => {
     server.landing.mockRejectedValue(driverError);
 
     expect(
       await landingMetadata({ kind: 'category', slug: 'cooking' }),
-    ).toEqual({ title: 'Things to do in New York' });
+    ).toEqual({ title: 'Cooking experiences in New York' });
     expect(server.logError).toHaveBeenCalledExactlyOnceWith(
       'The landing page head could not be read',
       { digest: undefined, kind: 'Error' },

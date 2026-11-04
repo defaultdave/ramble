@@ -6,7 +6,8 @@ import { mintToken } from "./app-token.ts";
 
 export const REPO = "defaultdave/ramble";
 export const CHECK_NAMES = ["review-agent", "qa-agent", "spec-compliance", "architecture-audit"] as const;
-export const CONCLUSIONS = ["success", "failure"] as const;
+/** `action_required` is a check that could not run its evidence (no browser, no database): it holds the merge like a failure, and no code fix clears it. */
+export const CONCLUSIONS = ["success", "failure", "action_required"] as const;
 export const SUMMARY_LIMIT = 65_000;
 
 export interface CheckInput {

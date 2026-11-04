@@ -11,12 +11,19 @@ export type SiteMenuProps = { links: readonly SiteLink[] };
 /**
  * The phone header's menu. A native disclosure, so it opens and closes with no script and the
  * browser keeps its expanded state for assistive technology. Script adds Escape (focus returns
- * to the button) and a press outside, which close it.
+ * to the button), a press outside, focus tabbing out, and a link click, which close it.
  */
 export function SiteMenu({ links }: SiteMenuProps) {
-  const { details, summary, onKeyDown } = useDismissableDetails();
+  const { details, summary, onKeyDown, onBlur, onClick } =
+    useDismissableDetails();
   return (
-    <details ref={details} className={styles.menu} onKeyDown={onKeyDown}>
+    <details
+      ref={details}
+      className={styles.menu}
+      onKeyDown={onKeyDown}
+      onBlur={onBlur}
+      onClick={onClick}
+    >
       <summary ref={summary} className={styles.summary}>
         <Menu aria-hidden="true" />
         <span className={styles.visuallyHidden}>Menu</span>

@@ -33,7 +33,7 @@ import {
 } from './FilterBar.testkit';
 
 // Behaviours under test, one per decision, branch or risk:
-// - the date chip shows the chosen day or "Pick a date"; the calendar opens, picks, clears, and closes on Escape or a press outside
+// - the date chip shows the chosen day or "Pick a date"; the calendar opens, picks, clears, and closes on Escape, a press outside, or focus tabbing out
 // - a calendar card fixed over the chip scrolls the page by the overlap; one that clears it or sits against the chip does not
 // - a press on blank space forgets the focus a history change would then wrongly claim
 // - the calendar's code is not fetched before the date disclosure opens, is fetched on its first open (row and drawer), and a press of the chip's neighbour fetches nothing
@@ -78,6 +78,17 @@ describe('the date chip', () => {
     const { details } = setup();
     await userEvent.click(dateChip());
     await userEvent.click(document.body);
+    expect(details.open).toBe(false);
+  });
+
+  it('closes the calendar when focus tabs on past Clear date', async () => {
+    const { details } = setup({ ...noFilters, date: chosenDay });
+    await userEvent.click(dateChip(chosenLabel));
+    row().getByRole('link', { name: 'Clear date' }).focus();
+    expect(details.open).toBe(true);
+
+    await userEvent.tab();
+
     expect(details.open).toBe(false);
   });
 

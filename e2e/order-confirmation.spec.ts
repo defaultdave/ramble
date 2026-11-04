@@ -42,6 +42,7 @@ test('a link with no token shows the one not-found page (a streamed 200, like th
   await expect(
     page.getByRole('heading', { level: 1, name: notFoundHeading }),
   ).toBeVisible();
+  await expect(page.getByRole('main')).toBeVisible();
   const headers = response?.headers() ?? {};
   expect(headers['x-robots-tag']).toMatch(/noindex/);
   expect(headers['cache-control']).toBe('no-store');

@@ -4,18 +4,19 @@ import { RichText } from '@/components/RichText';
 import { HomeEmpty, HomeTitle } from '@/components/HomeStates';
 import { PageError } from '@/components/PageError';
 import { buildHomePage, homeCardIds, withHomeCovers } from '@/lib/pages/home';
+import { brandName } from '@/lib/pages/brand';
 import { minuteAsOf } from '@/lib/time';
 import { venueToday } from '@/lib/venue';
 import { readGuestCovers } from '@/server/guestCovers';
 import { getHomeContent, getThisWeek } from '@/server/home';
 import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
+import { systemClock } from '@/server/ports/clock';
 import { getCachedGuestSettings } from '@/server/siteSettings';
 
 export async function HomeContent() {
   // The day and the week are request-time values, so a prefetch of this page stops here instead of reading them.
   await connection();
-  // TODO(U-005): read the time from the Clock port once it exists.
-  const now = new Date();
+  const now = systemClock.now();
 
   let page;
   try {
@@ -34,7 +35,7 @@ export async function HomeContent() {
     rethrowOrLog('The home page could not be read', error);
     return (
       <PageError
-        title="Ramble"
+        title={brandName}
         alertTitle="We couldn't load the home page"
         alertBody="Something went wrong on our side. Try again in a moment."
         retryHref="/"

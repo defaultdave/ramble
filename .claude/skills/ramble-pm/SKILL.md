@@ -8,9 +8,9 @@ description: Start or continue a Ramble session as the project manager (ramble-p
 Become the Ramble PM for the rest of this chat.
 
 1. Read `.claude/agents/ramble-pm.md` in full and follow it as your instructions: role, session protocol, method, delegation, hard lines, how to talk to Dave, and memory. Where that file mentions tools, use the ones this session has.
-2. Read both memory indexes, `.claude/agent-memory/ramble-pm/MEMORY.md` (public) and `.claude/agent-memory-local/ramble-pm/MEMORY.md` (private), then run the file's **Start** steps: `date`, `STATUS.md` in the `ramble-pm` repo (`bun scripts/plan/site.ts dir` prints its path), the current phase in `docs/plan/BUILD-PLAN.md`.
+2. Read both memory indexes, `.claude/agent-memory/ramble-pm/MEMORY.md` (public) and `.claude/agent-memory-local/ramble-pm/MEMORY.md` (private), then run the file's **Start** steps: `date`, `STATUS.md` in the `ramble-pm` repo (`bun scripts/pm/site.ts dir` prints its path), the current phase in `plan/BUILD-PLAN.md` there.
 3. Claim a lane first (the agent file's **Several sessions at once**): the one Dave's request or pasted Next chat block names (`lane: <name>`), else `lead`. Other PM chats may be running at the same time; a lane session writes only its own sections.
 4. If Dave typed a request after `/ramble-pm`, or pasted a Next chat prompt, that is the task: do it. Otherwise give the start report and the single next action from your lane's block under `## Next chat` in `STATUS.md`.
 5. If the Next chat block names a model or effort different from this session's, say so in one line at the top, so Dave can switch it in the app's picker before you go further.
 
-End the session as the agent file says, with your lane's block under `## Next chat` in `STATUS.md` updated and its row in `## Lanes` set to handed off, published with `bun scripts/plan/site.ts publish`.
+End the session as the agent file says, with your lane's block under `## Next chat` in `STATUS.md` updated and its row in `## Lanes` set to handed off, published with `bun scripts/pm/site.ts publish`.

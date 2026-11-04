@@ -1,5 +1,6 @@
 import 'server-only';
 import { unstable_rethrow } from 'next/navigation';
+import { errorKind } from '@/lib/errorKind';
 
 /**
  * What leaves a failed read inside a cached function. A database error carries its query and
@@ -23,9 +24,6 @@ export async function readOrRefuse<T>(
   } catch (error) {
     // Next.js ends a prerender by throwing; swallowing that breaks the render.
     unstable_rethrow(error);
-    throw new CachedReadError(
-      read,
-      error instanceof Error ? error.name : 'unknown',
-    );
+    throw new CachedReadError(read, errorKind(error));
   }
 }

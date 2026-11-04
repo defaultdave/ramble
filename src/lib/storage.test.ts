@@ -6,6 +6,9 @@ import {
   isAlreadyWritten,
   isPermanentStorageCode,
   publicStoreIdFromToken,
+  putRefusals,
+  maxObjectBytes,
+  signedUrlDeadline,
   defaultSignedUrlSeconds,
   maxSignedUrlSeconds,
   storageSettingIssues,
@@ -206,5 +209,39 @@ describe('store error codes', () => {
     ['not_found', false],
   ])('%s: permanent is %s', (code, expected) => {
     expect(isPermanentStorageCode(code)).toBe(expected);
+  });
+});
+
+describe('putRefusals', () => {
+  it.each([
+    ['public/photos/a.jpg', 'image/jpeg', 1, []],
+    ['private/documents/a.pdf', 'application/pdf', maxObjectBytes, []],
+    ['audit/2026-10-26.ndjson', 'application/x-ndjson', 10, []],
+    ['public/photos/a.jpg', 'application/pdf', 10, ['contentType']],
+    ['audit/2026-10-26.ndjson', 'image/png', 10, ['contentType']],
+    ['public/photos/a.jpg', 'image/jpeg', 0, ['body']],
+    ['public/photos/a.jpg', 'image/jpeg', maxObjectBytes + 1, ['body']],
+    ['public/photos/a.jpg', 'text/html', 0, ['contentType', 'body']],
+    ['elsewhere/a.jpg', 'text/html', 0, []],
+  ])('%s as %s at %i bytes refuses %j', (key, contentType, bytes, paths) => {
+    expect(putRefusals(key, contentType, bytes).map((r) => r.path)).toEqual(
+      paths,
+    );
+  });
+
+  it('names the prefix in the content type refusal', () => {
+    expect(
+      putRefusals('private/documents/a.pdf', 'image/webp', 5)[0]?.message,
+    ).toBe('image/webp is not allowed under private/');
+  });
+});
+
+describe('signedUrlDeadline', () => {
+  it('keeps the milliseconds of now', () => {
+    const now = new Date('2026-10-26T12:00:00.999Z');
+
+    expect(signedUrlDeadline(now, 300).toISOString()).toBe(
+      '2026-10-26T12:05:00.999Z',
+    );
   });
 });

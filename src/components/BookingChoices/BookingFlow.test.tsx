@@ -6,6 +6,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BookingBarIsland } from '@/components/BookingBar/BookingBarIsland';
 import { BookingPanelIsland } from '@/components/BookingPanel/BookingPanelIsland';
 import { BookingSheetIsland } from '@/components/BookingSheet/BookingSheetIsland';
+import {
+  chosenPartyLabel,
+  continueLabel,
+  holdNote,
+  pausedNotice,
+  perPersonLabel,
+} from '@/lib/booking';
 import type { BookingOffer } from '@/lib/bookingDraft';
 import {
   kayakOffer,
@@ -15,6 +22,9 @@ import {
   twentyOneOffer,
 } from '@/lib/bookingDraft.fixtures';
 import type { ReserveResult } from '@/lib/holds';
+import { formatMoney, formatPrice } from '@/lib/money';
+import { guestsLabel } from '@/lib/orderSummary';
+import { fromPriceLabel } from '@/lib/pricing';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the bar opens the sheet from Choose date; the sheet picks a date, a time, and a party, and Continue asks for the hold and goes to checkout
@@ -36,19 +46,38 @@ vi.mock('next/navigation', () => {
   return { useRouter: () => router };
 });
 
+function priceOf(offer: BookingOffer, kind: 'adult' | 'child'): number {
+  const option = offer.options.find((candidate) => candidate.kind === kind);
+  if (!option) throw new Error(`The offer has no ${kind} price`);
+  return option.priceMinor;
+}
+
+function firstOpenDay(offer: BookingOffer): string {
+  const open = offer.sessions.find((candidate) => candidate.spacesLeft > 0);
+  if (!open) throw new Error('The offer has no open session');
+  return open.dayLabel;
+}
+
+// Prices and the next date come from the fixture, so a changed fixture moves the expected text with it.
+const unitMinor = priceOf(kayakOffer, 'adult');
+const twoGuestsMinor = unitMinor * 2;
+const nextDayLabel = firstOpenDay(kayakOffer);
+const unitLine = (guests: number) =>
+  `${formatPrice(unitMinor)} × ${guestsLabel(guests)}`;
+
 const held: ReserveResult = {
   status: 'held',
   holdId: 'hold-1',
   expiresAt: '2026-10-24T20:00:00Z',
-  totalMinor: 13000,
+  totalMinor: twoGuestsMinor,
   lines: [
     {
       priceOptionId: optionId(11),
       kind: 'adult',
       quantity: 2,
-      unitPriceMinor: 6500,
+      unitPriceMinor: unitMinor,
       usesSpace: true,
-      lineTotalMinor: 13000,
+      lineTotalMinor: twoGuestsMinor,
     },
   ],
 };
@@ -85,8 +114,8 @@ async function chooseSaturdayEvening() {
 describe('the bar and the sheet', () => {
   it('shows the lowest price and the next date, and opens the sheet from Choose date', async () => {
     render(<Page offer={kayakOffer} />);
-    expect(screen.getByText('From $65')).toBeVisible();
-    expect(screen.getByText('per person · next Thu, Oct 22')).toBeVisible();
+    expect(screen.getByText(fromPriceLabel(unitMinor))).toBeVisible();
+    expect(screen.getByText(perPersonLabel(nextDayLabel))).toBeVisible();
     expect(screen.queryByRole('dialog')).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: 'Choose date' }));
@@ -103,8 +132,10 @@ describe('the bar and the sheet', () => {
 
     expect(within(sheet()).getByText('Time on Sat, Oct 24')).toBeVisible();
     expect(within(sheet()).getByText("Who's coming")).toBeVisible();
-    expect(within(sheet()).getByText('$65 × 2 guests')).toBeVisible();
-    expect(within(sheet()).getByText('$130.00')).toBeVisible();
+    expect(within(sheet()).getByText(unitLine(2))).toBeVisible();
+    expect(
+      within(sheet()).getByText(formatMoney(twoGuestsMinor)),
+    ).toBeVisible();
     expect(
       within(sheet()).getByText(
         'Free cancellation until Sat, Oct 24, 5:30 PM EDT.',
@@ -115,7 +146,9 @@ describe('the bar and the sheet', () => {
       within(sheet()).getByRole('button', { name: 'Increase Guests' }),
     );
     await userEvent.click(
-      within(sheet()).getByRole('button', { name: 'Continue · $195.00' }),
+      within(sheet()).getByRole('button', {
+        name: continueLabel(unitMinor * 3),
+      }),
     );
 
     expect(mocks.reserve).toHaveBeenCalledExactlyOnceWith({
@@ -143,7 +176,7 @@ describe('the bar and the sheet', () => {
     );
 
     expect(screen.getByText('Sat, Oct 24 · 5:30 PM EDT')).toBeVisible();
-    expect(screen.getByText('2 guests · $130.00')).toBeVisible();
+    expect(screen.getByText(chosenPartyLabel(2, twoGuestsMinor))).toBeVisible();
 
     await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
 
@@ -172,7 +205,7 @@ describe('the bar and the sheet', () => {
   it('preselects the date in the address, and its only time', () => {
     render(<Page offer={{ ...kayakOffer, preselectedDate: '2026-10-22' }} />);
     expect(screen.getByText('Thu, Oct 22 · 5:30 PM EDT')).toBeVisible();
-    expect(screen.getByText('2 guests · $130.00')).toBeVisible();
+    expect(screen.getByText(chosenPartyLabel(2, twoGuestsMinor))).toBeVisible();
   });
 
   it('sends the guest to similar experiences when no date has room', () => {
@@ -204,7 +237,7 @@ describe('one draft for the bar, the sheet, and the panel', () => {
     await userEvent.click(screen.getByRole('button', { name: /5:30 PM EDT/ }));
 
     expect(screen.getByText('Sat, Oct 24 · 5:30 PM EDT')).toBeVisible();
-    expect(screen.getByText('$65 × 2 guests')).toBeVisible();
+    expect(screen.getByText(unitLine(2))).toBeVisible();
   });
 
   it('starts the next visit from the address again, not from the last choices', async () => {
@@ -230,14 +263,14 @@ describe('the panel', () => {
     await userEvent.click(screen.getByRole('button', { name: /5:30 PM EDT/ }));
 
     await userEvent.click(
-      within(panel).getByRole('button', { name: 'Continue · $130.00' }),
+      within(panel).getByRole('button', {
+        name: continueLabel(twoGuestsMinor),
+      }),
     );
 
     expect(mocks.reserve).toHaveBeenCalledOnce();
     expect(mocks.push).toHaveBeenCalledWith('/checkout/hold-1');
-    expect(
-      within(panel).getByText(/We hold your spaces while you pay/),
-    ).toBeVisible();
+    expect(within(panel).getByText(holdNote)).toBeVisible();
   });
 
   it('says there are no open dates, and offers similar experiences and a private session', () => {
@@ -257,7 +290,9 @@ describe('the answers of the reserve', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Choose date' }));
     await chooseSaturdayEvening();
     await userEvent.click(
-      within(sheet()).getByRole('button', { name: 'Continue · $130.00' }),
+      within(sheet()).getByRole('button', {
+        name: continueLabel(twoGuestsMinor),
+      }),
     );
   }
 
@@ -291,7 +326,9 @@ describe('the answers of the reserve', () => {
     expect(within(sheet()).queryByRole('alert')).toBeNull();
     expect(within(sheet()).getByText('Time on Sat, Nov 7')).toBeVisible();
     expect(
-      within(sheet()).getByRole('button', { name: 'Continue · $130.00' }),
+      within(sheet()).getByRole('button', {
+        name: continueLabel(twoGuestsMinor),
+      }),
     ).toBeEnabled();
   });
 
@@ -348,7 +385,9 @@ describe('the answers of the reserve', () => {
     mocks.reserve.mockResolvedValue(held);
 
     await userEvent.click(
-      within(sheet()).getByRole('button', { name: 'Continue · $130.00' }),
+      within(sheet()).getByRole('button', {
+        name: continueLabel(twoGuestsMinor),
+      }),
     );
 
     expect(mocks.push).toHaveBeenCalledWith('/checkout/hold-1');
@@ -371,7 +410,9 @@ describe('where a refusal shows', () => {
     const panel = screen.getByRole('region', { name: 'Book this experience' });
 
     await userEvent.click(
-      within(panel).getByRole('button', { name: 'Continue · $130.00' }),
+      within(panel).getByRole('button', {
+        name: continueLabel(twoGuestsMinor),
+      }),
     );
 
     expect(within(panel).getByRole('alert')).toHaveTextContent(
@@ -389,7 +430,7 @@ describe('where a refusal shows', () => {
     await userEvent.click(day('Saturday, October 24, 2026'));
     await userEvent.click(screen.getByRole('button', { name: /5:30 PM EDT/ }));
     await userEvent.click(
-      screen.getByRole('button', { name: 'Continue · $130.00' }),
+      screen.getByRole('button', { name: continueLabel(twoGuestsMinor) }),
     );
     expect(screen.getByRole('alert')).toHaveFocus();
   });
@@ -403,7 +444,9 @@ describe('where a refusal shows', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Choose date' }));
     await chooseSaturdayEvening();
     await userEvent.click(
-      within(sheet()).getByRole('button', { name: 'Continue · $130.00' }),
+      within(sheet()).getByRole('button', {
+        name: continueLabel(twoGuestsMinor),
+      }),
     );
     expect(within(sheet()).getByRole('alert')).toHaveFocus();
 
@@ -418,7 +461,9 @@ describe('where a refusal shows', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Choose date' }));
     await chooseSaturdayEvening();
     await userEvent.click(
-      within(sheet()).getByRole('button', { name: 'Continue · $130.00' }),
+      within(sheet()).getByRole('button', {
+        name: continueLabel(twoGuestsMinor),
+      }),
     );
     expect(within(sheet()).getByRole('alert')).toHaveTextContent(
       'Those spaces just sold out',
@@ -466,12 +511,16 @@ describe('leaving the page', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Choose date' }));
     await chooseSaturdayEvening();
     await userEvent.click(
-      within(sheet()).getByRole('button', { name: 'Continue · $130.00' }),
+      within(sheet()).getByRole('button', {
+        name: continueLabel(twoGuestsMinor),
+      }),
     );
     expect(mocks.push).toHaveBeenCalledWith('/checkout/hold-1');
     expect(within(sheet()).queryByRole('alert')).toBeNull();
     expect(
-      within(sheet()).getByRole('button', { name: 'Continue · $130.00' }),
+      within(sheet()).getByRole('button', {
+        name: continueLabel(twoGuestsMinor),
+      }),
     ).toHaveAttribute('aria-busy', 'true');
   });
 });
@@ -489,7 +538,7 @@ describe('paused', () => {
     expect(screen.getByText('Please check back soon')).toBeVisible();
     expect(
       screen.getByRole('region', { name: 'Book this experience' }),
-    ).toHaveTextContent('Bookings are paused');
+    ).toHaveTextContent(pausedNotice.title);
     expect(screen.queryByRole('button', { name: 'Choose date' })).toBeNull();
   });
 });
@@ -535,7 +584,9 @@ describe('the party', () => {
       screen.getByText("You'll add each child's age at checkout."),
     ).toBeVisible();
     expect(screen.getByText('2 adults, 1 child')).toBeVisible();
-    expect(screen.getByText('$45.00')).toBeVisible();
+    expect(
+      screen.getByText(formatMoney(priceOf(kidsOffer, 'child'))),
+    ).toBeVisible();
   });
 
   it('takes one stepper where no children come, and says 21 and over with the door check', async () => {
@@ -554,6 +605,6 @@ describe('the party', () => {
     const increase = screen.getByRole('button', { name: 'Increase Guests' });
     await userEvent.click(increase);
     expect(increase).toHaveAttribute('aria-disabled', 'true');
-    expect(screen.getByText('$65 × 2 guests')).toBeVisible();
+    expect(screen.getByText(unitLine(2))).toBeVisible();
   });
 });

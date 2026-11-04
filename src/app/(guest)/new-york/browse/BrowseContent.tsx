@@ -21,6 +21,7 @@ import { getBrowseDates, getBrowseResults } from '@/server/browse';
 import { getFilterOptions } from '@/server/filterOptions';
 import { chooseBrowseDate } from '@/server/actions/browse';
 import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
+import { systemClock } from '@/server/ports/clock';
 
 import styles from './page.module.css';
 
@@ -31,8 +32,7 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
   const { filters } = query;
   // The time is a request-time value, so a prefetch of this page stops here instead of reading it.
   await connection();
-  // TODO(U-005): read the time from the Clock port once it exists.
-  const now = new Date();
+  const now = systemClock.now();
   const asOf = minuteAsOf(now);
 
   let loaded;

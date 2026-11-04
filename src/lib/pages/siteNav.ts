@@ -1,3 +1,4 @@
+import { brandName } from './brand';
 import { browseHref, defaultGuests, noFilters } from '../filters';
 import { guestsLabel } from '../orderSummary';
 import {
@@ -57,5 +58,5 @@ export const siteChrome = {
   /** What the header's search pill says. It links to `searchHref`, so it names no filter that link does not apply. */
   searchLabel: `Anywhere · Any day · ${guestsLabel(defaultGuests)}`,
   tagline: 'The friend who always knows what to do in New York.',
-  copyright: '© 2026 Ramble. Made in Brooklyn.',
+  copyright: `© 2026 ${brandName}. Made in Brooklyn.`,
 } as const;

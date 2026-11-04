@@ -1,7 +1,8 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { cacheProfiles } from '@/lib/cacheProfiles';
+import { listFiles } from '../support/importGraph';
 import { cacheConventionViolations } from './conventions';
 
 const profiles = Object.keys(cacheProfiles);
@@ -220,13 +221,9 @@ describe('cacheConventionViolations', () => {
 });
 
 function sourceFiles(directory: string): string[] {
-  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const entryPath = path.join(directory, entry.name);
-    if (entry.isDirectory()) return sourceFiles(entryPath);
-    return /\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)
-      ? [entryPath]
-      : [];
-  });
+  return listFiles(directory).filter(
+    (file) => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file),
+  );
 }
 
 describe('the app source', () => {

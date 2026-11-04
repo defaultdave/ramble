@@ -56,6 +56,18 @@ for (const [group, path] of Object.entries(unknownPaths) as [
   });
 }
 
+for (const path of ['/orders', '/gift']) {
+  test(`${path} with no token shows the not-found page`, async ({ page }) => {
+    const response = await page.goto(path);
+
+    expect(response?.status()).toBe(200);
+    await expect(
+      page.getByRole('heading', { level: 1, name: notFoundHeading }),
+    ).toBeVisible();
+    await expect(page.getByRole('main')).toBeVisible();
+  });
+}
+
 test('a cached route renders for a parameter that was not prerendered', async ({
   page,
 }) => {

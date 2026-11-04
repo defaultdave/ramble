@@ -1,23 +1,18 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { listFiles } from './support/importGraph';
 
 const checkoutGroup = path.resolve(
   import.meta.dirname,
   '../src/app/(checkout)',
 );
 
-function sourceFiles(folder: string): string[] {
-  return readdirSync(folder, { withFileTypes: true }).flatMap((entry) => {
-    const full = path.join(folder, entry.name);
-    if (entry.isDirectory()) return sourceFiles(full);
-    return /\.(ts|tsx)$/.test(entry.name) ? [full] : [];
-  });
-}
-
 describe('bot check scope', () => {
   it('keeps BotID out of every checkout route file (ADR 0007)', () => {
-    const files = sourceFiles(checkoutGroup);
+    const files = listFiles(checkoutGroup).filter((file) =>
+      /\.(ts|tsx)$/.test(file),
+    );
     expect(files.length).toBeGreaterThan(0);
 
     const offenders = files.filter((file) =>

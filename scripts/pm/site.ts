@@ -1,10 +1,9 @@
 #!/usr/bin/env bun
 // The PM's only route to the ramble-pm repo, which needs no PR: commit everything changed there and push main as the App.
-//   bun scripts/plan/site.ts dir                  print the ramble-pm checkout's path
-//   bun scripts/plan/site.ts publish "<message>"  commit all changes in it and push main
+//   bun scripts/pm/site.ts dir                  print the ramble-pm checkout's path
+//   bun scripts/pm/site.ts publish "<message>"  commit all changes in it and push main
 import { mintToken } from "../merge-desk/app-token.ts";
 import { gitAuthEnv, Refused, type RunResult } from "../merge-desk/agent-git.ts";
-import { siteDir } from "./units";
 
 export const SITE_REPO = "defaultdave/ramble-pm";
 const HTTPS_REMOTE = new RegExp(`^https://github\\.com/${SITE_REPO}(\\.git)?$`);
@@ -13,6 +12,23 @@ export interface SiteDeps {
   dir: string;
   token: () => Promise<string>;
   run: (command: string[], env: Record<string, string>) => RunResult;
+}
+
+/**
+ * The ramble-pm checkout. `RAMBLE_PM_DIR` points elsewhere; the default sits beside the main checkout, so it resolves
+ * the same from any worktree.
+ * @throws when git cannot find this repository
+ */
+function siteDir(): string {
+  if (process.env.RAMBLE_PM_DIR) return process.env.RAMBLE_PM_DIR;
+  const p = Bun.spawnSync(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], {
+    cwd: new URL(".", import.meta.url).pathname,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  if (p.exitCode !== 0) throw new Error(`git rev-parse failed: ${p.stderr.toString().trim()}`);
+  const commonDir = p.stdout.toString().trim();
+  return `${commonDir.replace(/\/\.git\/?$/, "").replace(/\/[^/]+$/, "")}/ramble-pm`;
 }
 
 /** The App token rides an HTTPS header, so any other push URL would push as Dave or to another repo. */
@@ -66,7 +82,7 @@ if (import.meta.main) {
       });
       console.error(`published ${SITE_REPO}`);
     } else {
-      throw new Refused('usage: bun scripts/plan/site.ts dir | publish "<message>"');
+      throw new Refused('usage: bun scripts/pm/site.ts dir | publish "<message>"');
     }
   } catch (error) {
     console.error((error as Error).message);

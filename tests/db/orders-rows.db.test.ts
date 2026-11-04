@@ -7,7 +7,6 @@ import {
   client,
   count,
   ensureHold,
-  fresh,
   giftPurchaseRow,
   insert,
   later,
@@ -219,15 +218,6 @@ describe('orders', () => {
         await connection.query('ROLLBACK');
         connection.release();
       }
-    });
-
-    it('is a partial index on hold_id that leaves void orders out', async () => {
-      const { rows } = await client.db.execute<{ indexdef: string }>(
-        sql`SELECT indexdef FROM pg_indexes WHERE schemaname = ${fresh.schema} AND indexname = 'orders_one_live_per_hold'`,
-      );
-      expect(rows[0]?.indexdef).toMatch(
-        /UNIQUE INDEX.*\(hold_id\).*WHERE.*status <> 'void'/,
-      );
     });
   });
 

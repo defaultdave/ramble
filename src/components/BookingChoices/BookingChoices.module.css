@@ -88,3 +88,7 @@
 .footerAction {
   display: grid;
 }
+
+.visuallyHidden {
+  composes: visuallyHidden from '../../styles/visually-hidden.module.css';
+}

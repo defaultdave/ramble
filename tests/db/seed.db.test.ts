@@ -39,8 +39,10 @@ import {
   settings,
 } from '@/server/db/schema';
 import {
+  backendPid,
   createFreshDatabase,
   serveNeonHttp,
+  waitUntilBlocked,
   type FreshDatabase,
 } from './harness';
 
@@ -63,6 +65,10 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 //   kayak names is that published version
 // - a rerun is idempotent: no row is added, no id changes, no legal version is added, and a
 //   created-at stays; a booking that sold more than the plan is not lowered
+// - the seat guard, one case per side of its comparison: a count equal to the plan is not written,
+//   a count below it is raised, a session of an experience with no planned seats is not written,
+//   and a booking that lands between the seed's read and its write is not lowered (the write waits
+//   on the row lock the booking holds, and the guard is re-read after it)
 // - a document left as a draft by a stopped run is published by the next run, not duplicated
 // - every seeded host has the address bookings@<slug>.example, a rerun fills a host whose address
 //   is null, and the database CHECK accepts the address of the longest slug the seed can write
@@ -128,6 +134,59 @@ async function tableCounts() {
     modules: await one(db.select({ n: count() }).from(homeModules)),
     pages: await one(db.select({ n: count() }).from(pages)),
   };
+}
+
+const plannedKayakSeats = 11;
+
+/** A seeded kayak session whose planned seats sold is `plannedKayakSeats`, as the first run left it. */
+async function plannedKayakSession() {
+  const [target] = await client.db
+    .select({ id: sessions.id, allocation: sessions.allocation })
+    .from(sessions)
+    .innerJoin(experiences, eq(sessions.experienceId, experiences.id))
+    .where(
+      and(
+        eq(experiences.slug, 'sunset-kayak-on-the-hudson'),
+        eq(sessions.seatsSold, plannedKayakSeats),
+      ),
+    )
+    .limit(1);
+  if (!target) throw new Error('The seed holds no planned kayak session');
+  return target;
+}
+
+/** A curated experience whose plan sells no seats, so the seed's seat pass skips it. */
+function unplannedSlug() {
+  const planned = planSessions(curated.hosts, curated.experiences, now);
+  const slug = curated.experiences
+    .map((e) => e.slug)
+    .find(
+      (s) =>
+        planned.some((p) => p.experienceSlug === s) &&
+        planned.every((p) => p.experienceSlug !== s || p.seatsSold === 0),
+    );
+  if (!slug) throw new Error('Every curated experience plans sold seats');
+  return slug;
+}
+
+function setSeatsSold(id: string, seatsSold: number) {
+  return client.db
+    .update(sessions)
+    .set({ seatsSold })
+    .where(eq(sessions.id, id));
+}
+
+/** The count and the row version Postgres keeps: a write, even of the same value, changes `xmin`. */
+async function seatsAndVersion(id: string) {
+  const { rows } = await client.db.execute<{
+    seatsSold: number;
+    xmin: string;
+  }>(
+    sql`SELECT seats_sold AS "seatsSold", xmin::text AS xmin FROM sessions WHERE id = ${id}`,
+  );
+  const row = rows[0];
+  if (!row) throw new Error('The session is gone');
+  return row;
 }
 
 /** Every stored experience through the guest read, which answers null for one a guest may not see. */
@@ -555,33 +614,84 @@ describe('the curated seed', () => {
     });
 
     it('does not lower a session that has sold more than the plan', async () => {
-      const [target] = await client.db
-        .select({ id: sessions.id, allocation: sessions.allocation })
-        .from(sessions)
-        .innerJoin(experiences, eq(sessions.experienceId, experiences.id))
-        .where(
-          and(
-            eq(experiences.slug, 'sunset-kayak-on-the-hudson'),
-            eq(sessions.seatsSold, 11),
-          ),
-        )
-        .limit(1);
-      expect(target).toBeDefined();
+      const target = await plannedKayakSession();
       await client.db
         .update(sessions)
-        .set({ seatsSold: target?.allocation ?? 0 })
-        .where(eq(sessions.id, target?.id ?? ''));
+        .set({ seatsSold: target.allocation })
+        .where(eq(sessions.id, target.id));
       await runner.runSeed({ caller: seedCaller, now });
-      const [after] = await client.db
-        .select({ seatsSold: sessions.seatsSold })
-        .from(sessions)
-        .where(eq(sessions.id, target?.id ?? ''));
-      expect(after?.seatsSold).toBe(target?.allocation);
+      const after = await seatsAndVersion(target.id);
+      expect(after.seatsSold).toBe(target.allocation);
       // Put the planned value back, so the states the later tests read are as the seed left them.
-      await client.db
-        .update(sessions)
-        .set({ seatsSold: 11 })
-        .where(eq(sessions.id, target?.id ?? ''));
+      await setSeatsSold(target.id, plannedKayakSeats);
+    });
+
+    describe('the seat guard', () => {
+      it('leaves a session whose count equals the plan unwritten', async () => {
+        const target = await plannedKayakSession();
+        const before = await seatsAndVersion(target.id);
+        const result = await runner.runSeed({ caller: seedCaller, now });
+        expect(before.seatsSold).toBe(plannedKayakSeats);
+        expect(await seatsAndVersion(target.id)).toEqual(before);
+        expect(result.curated.seatsAdjusted).toBe(0);
+      });
+
+      it('raises a session whose count is below the plan, and only that one', async () => {
+        const target = await plannedKayakSession();
+        await setSeatsSold(target.id, 3);
+        const result = await runner.runSeed({ caller: seedCaller, now });
+        expect((await seatsAndVersion(target.id)).seatsSold).toBe(
+          plannedKayakSeats,
+        );
+        expect(result.curated.seatsAdjusted).toBe(1);
+      });
+
+      it('does not write a session of an experience with no planned seats', async () => {
+        const slug = unplannedSlug();
+        const [target] = await client.db
+          .select({ id: sessions.id })
+          .from(sessions)
+          .where(eq(sessions.experienceId, experienceId(slug)))
+          .limit(1);
+        expect(target).toBeDefined();
+        const id = target?.id ?? '';
+        await setSeatsSold(id, 1);
+        const before = await seatsAndVersion(id);
+        const result = await runner.runSeed({ caller: seedCaller, now });
+        expect(await seatsAndVersion(id)).toEqual(before);
+        expect(result.curated.seatsAdjusted).toBe(0);
+        await setSeatsSold(id, 0);
+      });
+
+      it('does not lower a booking that lands between the seed read and its write', async () => {
+        const target = await plannedKayakSession();
+        expect(target.allocation).toBeGreaterThan(plannedKayakSeats);
+        await setSeatsSold(target.id, 3);
+        const booked = target.allocation;
+        const held = await client.db.$client.connect();
+        let result: Awaited<ReturnType<typeof runner.runSeed>>;
+        try {
+          await held.query('BEGIN');
+          await held.query('SELECT id FROM sessions WHERE id = $1 FOR UPDATE', [
+            target.id,
+          ]);
+          const holderPid = await backendPid(held);
+          const run = runner.runSeed({ caller: seedCaller, now });
+          // The seed has read the count of 3 and its write is queued behind the booking's lock.
+          await waitUntilBlocked(client.db.$client, { blockedBy: holderPid });
+          await held.query(
+            'UPDATE sessions SET seats_sold = $2 WHERE id = $1',
+            [target.id, booked],
+          );
+          await held.query('COMMIT');
+          result = await run;
+        } finally {
+          held.release();
+        }
+        expect((await seatsAndVersion(target.id)).seatsSold).toBe(booked);
+        expect(result.curated.seatsAdjusted).toBe(0);
+        await setSeatsSold(target.id, plannedKayakSeats);
+      });
     });
 
     it('publishes a draft that a stopped run left behind instead of starting another', async () => {

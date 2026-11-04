@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
 import { Alert } from '@/components/Alert';
 import { ButtonLink } from '@/components/Button';
 import { CheckoutPage } from '@/components/CheckoutPage';
+import { Header } from '@/components/Header';
+import { NotFoundNotice } from '@/components/NotFoundNotice';
 import { EntityIdSchema } from '@/lib/catalog';
 import { checkoutPath } from '@/lib/routes';
-import { notFoundPerRequest } from '@/app/renderPerRequest';
 import { readCheckoutView } from '@/server/db/checkoutView';
 import { readDevice } from '@/server/device';
 import { startPayment } from '@/server/actions/checkout';
@@ -16,18 +16,33 @@ import { getCachedGuestSettings } from '@/server/siteSettings';
 
 export const metadata: Metadata = { title: 'Checkout' };
 
+/**
+ * Rendered, not thrown with `notFound()`: a thrown not-found leaves the first flush an empty shell
+ * that the browser must fill by running script, with no heading and no stylesheet link.
+ */
+function HoldNotFound() {
+  return (
+    <>
+      <Header variant="checkout" holdTimer={null} />
+      <main id="main">
+        <NotFoundNotice />
+      </main>
+    </>
+  );
+}
+
 export default async function CheckoutRoute({
   params,
   searchParams,
 }: PageProps<'/checkout/[holdId]'>) {
   const parsed = EntityIdSchema.safeParse((await params).holdId);
   // A malformed id is no hold, and no query is made for it.
-  if (!parsed.success) return notFoundPerRequest();
+  if (!parsed.success) return <HoldNotFound />;
   const holdId = parsed.data.toLowerCase();
 
   // Reading the cookie never sets one: a guest with no device has no hold.
   const device = await readDevice();
-  if (!device) notFound();
+  if (!device) return <HoldNotFound />;
 
   let read;
   let maintenance;
@@ -53,7 +68,7 @@ export default async function CheckoutRoute({
     );
   }
 
-  if (!read) notFound();
+  if (!read) return <HoldNotFound />;
   return (
     <CheckoutPage
       view={read.view}

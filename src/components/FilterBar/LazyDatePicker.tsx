@@ -67,7 +67,6 @@ export function LazyDatePicker({
   return (
     <div
       role="status"
-      aria-busy={asked && !failed ? true : undefined}
       data-failed={failed || undefined}
       data-weeks={weeksInMonthOf(visibleDate(props))}
       className={styles.calendarPlaceholder}

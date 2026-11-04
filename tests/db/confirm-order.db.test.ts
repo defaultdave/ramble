@@ -22,7 +22,12 @@ import { fakeCardFeeMinor } from '@/lib/fakeCardFee';
 import { setEnv } from '../email/testEnv';
 import { testDevice } from '../deviceFixture';
 import { dueClock } from '../support/dueClock';
-import { createFreshDatabase, type FreshDatabase } from './harness';
+import {
+  backendPid,
+  createFreshDatabase,
+  waitUntilBlocked,
+  type FreshDatabase,
+} from './harness';
 import {
   insertOtherOpenHold,
   seedBooking,
@@ -85,10 +90,8 @@ let parents: Awaited<ReturnType<typeof createOrderParents>>;
 
 beforeAll(async () => {
   fresh = await createFreshDatabase(process.env.DATABASE_URL_UNPOOLED ?? '');
-  const handlerUrl = new URL(fresh.url);
-  handlerUrl.searchParams.set('application_name', fresh.schema);
   setEnv(testEnv, {
-    DATABASE_URL: handlerUrl.toString(),
+    DATABASE_URL: fresh.url,
     APP_URL: 'https://ramble.example',
   });
   client = await import('@/server/db/client');
@@ -537,19 +540,6 @@ function handle(eventId: string) {
   );
 }
 
-async function waitUntilBlocked(count: number) {
-  const deadline = Date.now() + 5000;
-  for (;;) {
-    const { rows } = await side.query<{ n: number }>(
-      `SELECT count(*)::int AS n FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND application_name = $1`,
-      [fresh.schema],
-    );
-    if ((rows[0]?.n ?? 0) >= count) return;
-    if (Date.now() > deadline) throw new Error('the handler never waited');
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
-}
-
 describe('concurrency', () => {
   it('confirms once when two success events for one order are processed at once', async () => {
     const world = await seed();
@@ -588,7 +578,9 @@ describe('concurrency', () => {
     ]);
 
     const handled = handle(id);
-    await waitUntilBlocked(1);
+    await waitUntilBlocked(side, {
+      blockedBy: await backendPid(holder),
+    });
     await holder.query(
       `INSERT INTO holds (session_id, purpose, status, seats, device_key, ip_hash, expires_at, created_at, updated_at)
        VALUES ($1, 'booking', 'active', 1, $2, $3, now() + interval '10 minutes', now(), now())`,

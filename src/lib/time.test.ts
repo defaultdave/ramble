@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   calendarDateFormat,
+  dateChipLabel,
   isoDateOf,
   isReadableInstant,
   minuteAsOf,
@@ -14,6 +15,7 @@ import {
 //   ISO form a datetime schema accepts
 // - a calendar date formatter writes the date in its own zone: east of UTC, west of UTC, across the
 //   day line, and on a clock-change day
+// - a date chip writes the weekday, month and day of the calendar date, whatever the time zone of the machine
 // - an ISO date is the UTC day, not the local one
 // - a readable instant is a real date from the first moment of year 1000 to the last of year 9999 UTC; an invalid date and the edges outside fail
 
@@ -83,5 +85,15 @@ describe('isReadableInstant', () => {
 
   it('refuses an invalid date', () => {
     expect(isReadableInstant(new Date('not a date'))).toBe(false);
+  });
+});
+
+describe('dateChipLabel', () => {
+  it.each([
+    ['2026-11-07', 'Sat, Nov 7'],
+    ['2026-12-31', 'Thu, Dec 31'],
+    ['2027-01-01', 'Fri, Jan 1'],
+  ])('writes %s as %s', (date, label) => {
+    expect(dateChipLabel(date)).toBe(label);
   });
 });

@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { useDismissableDetails } from './useDismissableDetails';
@@ -9,15 +9,25 @@ import { useDismissableDetails } from './useDismissableDetails';
 // - Escape reaches a surrounding handler unless stopEscapePropagation is set
 // - unmounting removes the document listener it added
 // - a press outside closes it, even when the page stops the event in the bubble phase
+// - Tab out to another element closes it; Tab within, and focus that goes to nothing (relatedTarget null), leave it open
+// - a click on a link inside closes it, also on an element inside the link; a click on other content does not
 
 function Harness({ stop }: { stop: boolean }) {
-  const { details, summary, onKeyDown } = useDismissableDetails({
-    stopEscapePropagation: stop,
-  });
+  const { details, summary, onKeyDown, onBlur, onClick } =
+    useDismissableDetails({ stopEscapePropagation: stop });
   return (
-    <details ref={details} onKeyDown={onKeyDown}>
+    <details
+      ref={details}
+      onKeyDown={onKeyDown}
+      onBlur={onBlur}
+      onClick={onClick}
+    >
       <summary ref={summary}>Toggle</summary>
       <button type="button">Inside</button>
+      <a href="#target">
+        <span>Go</span>
+      </a>
+      <p>Words</p>
     </details>
   );
 }
@@ -78,6 +88,75 @@ describe('useDismissableDetails', () => {
     expect(screen.getByText('Toggle').closest('details')).not.toHaveAttribute(
       'open',
     );
+  });
+
+  describe('when focus leaves', () => {
+    const isOpen = () =>
+      screen.getByText('Toggle').closest('details')?.hasAttribute('open');
+
+    it('closes on Tab out to another element', async () => {
+      render(
+        <>
+          <Harness stop={false} />
+          <button type="button">After</button>
+        </>,
+      );
+      await userEvent.click(screen.getByText('Toggle'));
+      screen.getByRole('link').focus();
+
+      await userEvent.tab();
+
+      expect(screen.getByRole('button', { name: 'After' })).toHaveFocus();
+      expect(isOpen()).toBe(false);
+    });
+
+    it('stays open on Tab to another element inside', async () => {
+      render(<Harness stop={false} />);
+      await userEvent.click(screen.getByText('Toggle'));
+      screen.getByRole('button', { name: 'Inside' }).focus();
+
+      await userEvent.tab();
+
+      expect(screen.getByRole('link')).toHaveFocus();
+      expect(isOpen()).toBe(true);
+    });
+
+    it('stays open when focus goes to nothing', async () => {
+      render(<Harness stop={false} />);
+      await userEvent.click(screen.getByText('Toggle'));
+      const inside = screen.getByRole('button', { name: 'Inside' });
+      inside.focus();
+
+      act(() => {
+        inside.blur();
+      });
+
+      expect(isOpen()).toBe(true);
+    });
+  });
+
+  describe('when a click lands inside', () => {
+    it('closes on a link, even on an element inside the link', async () => {
+      render(<Harness stop={false} />);
+      await userEvent.click(screen.getByText('Toggle'));
+
+      await userEvent.click(screen.getByText('Go'));
+
+      expect(screen.getByText('Toggle').closest('details')).not.toHaveAttribute(
+        'open',
+      );
+    });
+
+    it('stays open on other content', async () => {
+      render(<Harness stop={false} />);
+      await userEvent.click(screen.getByText('Toggle'));
+
+      await userEvent.click(screen.getByText('Words'));
+
+      expect(screen.getByText('Toggle').closest('details')).toHaveAttribute(
+        'open',
+      );
+    });
   });
 
   it('removes its document listener, the very one it added, when unmounted', () => {

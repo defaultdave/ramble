@@ -1,6 +1,10 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  restoreWidths,
+  stubResizeObserver,
+} from '../../../tests/support/resizeObserver';
 import { BookingSlots, ExperiencePage } from './ExperiencePage';
 import {
   bareExperience,
@@ -11,6 +15,7 @@ import {
 const dates = <p>The dates</p>;
 
 beforeEach(() => {
+  stubResizeObserver();
   // The aside that follows the scroll asks for a width match, which jsdom has no answer for; a narrow one starts nothing.
   vi.stubGlobal(
     'matchMedia',
@@ -24,6 +29,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  restoreWidths();
 });
 
 // Behaviours under test, one per decision, branch or risk:

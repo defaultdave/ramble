@@ -7,6 +7,14 @@
   font-family: var(--font-family-body);
 }
 
+/* Alerts take focus from code (a refusal notice), so the ring shows however focus arrived; the transparent outline keeps a ring in forced colours. */
+.alert:focus {
+  outline: 2px solid transparent;
+  box-shadow:
+    0 0 0 2px var(--color-bg-canvas),
+    0 0 0 4px var(--color-focus-ring);
+}
+
 .info {
   --alert-tone: var(--color-status-info-text);
 

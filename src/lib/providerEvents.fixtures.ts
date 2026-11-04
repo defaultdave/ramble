@@ -1,11 +1,11 @@
-import { type OrderStatus } from './orders';
-import {
-  type AttemptMatch,
-  type EventAttempt,
-  type EventFacts,
-  type EventHold,
-  type PaymentEventType,
-  type EventOrder,
+import type { OrderStatus } from './orders';
+import type {
+  AttemptMatch,
+  EventAttempt,
+  EventFacts,
+  EventHold,
+  EventOrder,
+  PaymentEventType,
 } from './providerEvents';
 
 export const now = new Date('2026-10-29T12:00:00.000Z');
@@ -13,11 +13,10 @@ export const later = new Date('2026-10-29T12:05:00.000Z');
 export const earlier = new Date('2026-10-29T11:55:00.000Z');
 export const orderId = '00000000-0000-4000-8000-0000000000a1';
 export const recordId = '00000000-0000-4000-8000-0000000000b2';
-const attemptId = recordId;
 
 export function attempt(over: Partial<EventAttempt> = {}): EventAttempt {
   return {
-    id: attemptId,
+    id: recordId,
     status: 'created',
     failedTries: 0,
     providerPaymentId: 'pay_1',

@@ -191,9 +191,15 @@ describe('focusTarget', () => {
     ],
     ['a sheet closes with none', true, initialFlow, 'pay'],
     [
-      'the form shows a notice but no sheet was open',
+      'a card is declined from the form with no sheet open',
       false,
       { step: 'entering', notice: refusedNotice },
+      'notice',
+    ],
+    [
+      'the form shows with no notice and no sheet was open',
+      false,
+      initialFlow,
       null,
     ],
     [

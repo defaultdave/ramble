@@ -1,9 +1,6 @@
 import { Calendar, SlidersHorizontal } from 'lucide-react';
-import { Button, ButtonLink } from '@/components/Button';
+import { ButtonLink } from '@/components/Button';
 import { ChipLink } from '@/components/Chip';
-import { HiddenFields } from '@/components/HiddenFields';
-import { Input } from '@/components/Input';
-import { dateChipLabel } from '@/lib/pages/browse';
 import {
   calendarLoadFailedMessage,
   calendarLoadingMessage,
@@ -20,12 +17,14 @@ import {
   toQueryEntries,
   withDate,
   type BrowseFilters,
-  type ChipView,
 } from '@/lib/filters';
 import { browsePath } from '@/lib/routes';
+import { dateChipLabel } from '@/lib/time';
+import { ChipGroup, type ChipGroupProps } from './ChipGroup';
 import styles from './FilterBar.module.css';
 import { DrawerButton, FilterRow } from './FilterDrawerHost';
 import { LazyDatePicker } from './LazyDatePicker';
+import { NoScriptFilters } from './NoScriptFilters';
 import { WhenDetails } from './WhenDetails';
 
 export type FilterOption = { slug: string; name: string };
@@ -43,50 +42,25 @@ export type FilterBarProps = {
   onPickDate: (date: string) => unknown;
 };
 
-type ChipGroupProps = {
-  legend: string;
-  chips: readonly ChipView[];
-};
-
-function ChipGroup({ legend, chips }: ChipGroupProps) {
-  return (
-    <fieldset className={styles.group}>
-      <legend className={styles.legend}>{legend}</legend>
-      <div className={styles.chips}>
-        {chips.map(({ key, label, selected, disabled, href }) => (
-          <ChipLink
-            key={key}
-            label={label}
-            selected={selected}
-            disabled={disabled}
-            href={href}
-          />
-        ))}
-      </div>
-    </fieldset>
-  );
-}
-
-type ChipGroupsProps = Pick<FilterBarProps, 'filters'> & {
+type ChipGroupsOptions = Pick<FilterBarProps, 'filters'> & {
   categories: readonly FilterOption[];
   neighborhoods: readonly FilterOption[];
 };
 
 /** The drawer's three chip groups, which the no-script bar shows again in the page. */
-function ChipGroups({ filters, categories, neighborhoods }: ChipGroupsProps) {
-  return (
-    <>
-      <ChipGroup legend="Guests" chips={guestChips(filters)} />
-      <ChipGroup
-        legend="Neighborhood"
-        chips={listChips(filters, 'neighborhoods', neighborhoods)}
-      />
-      <ChipGroup
-        legend="Category"
-        chips={listChips(filters, 'categories', categories)}
-      />
-    </>
-  );
+function chipGroups({
+  filters,
+  categories,
+  neighborhoods,
+}: ChipGroupsOptions): ChipGroupProps[] {
+  return [
+    { legend: 'Guests', chips: guestChips(filters) },
+    {
+      legend: 'Neighborhood',
+      chips: listChips(filters, 'neighborhoods', neighborhoods),
+    },
+    { legend: 'Category', chips: listChips(filters, 'categories', categories) },
+  ];
 }
 
 type WhenControlProps = Pick<
@@ -139,54 +113,6 @@ function WhenControl({
   );
 }
 
-type NoScriptFiltersProps = Pick<FilterBarProps, 'filters' | 'today'> & {
-  categories: readonly FilterOption[];
-  neighborhoods: readonly FilterOption[];
-};
-
-/**
- * What the drawer and the calendar hold, for a browser with scripting off, where neither opens:
- * every chip is a link and the day is a plain GET form that keeps the other filters.
- */
-function NoScriptFilters({
-  filters,
-  today,
-  categories,
-  neighborhoods,
-}: NoScriptFiltersProps) {
-  const kept = toQueryEntries({
-    filters: withDate(filters, null),
-    after: null,
-  });
-  return (
-    <noscript>
-      <div className={styles.noScript}>
-        <form
-          className={styles.dayForm}
-          action={browsePath}
-          method="get"
-          aria-label="Choose a day"
-        >
-          <HiddenFields fields={kept} />
-          <Input
-            type="date"
-            name={browseParamNames.date}
-            label="When"
-            min={today}
-            {...(filters.date ? { defaultValue: filters.date } : {})}
-          />
-          <Button type="submit">Show this day</Button>
-        </form>
-        <ChipGroups
-          filters={filters}
-          categories={categories}
-          neighborhoods={neighborhoods}
-        />
-      </div>
-    </noscript>
-  );
-}
-
 export function FilterBar({
   categories,
   neighborhoods,
@@ -197,6 +123,7 @@ export function FilterBar({
 }: FilterBarProps) {
   const count = activeFilterCount(filters);
   const when = { filters, today, availableDates, onPickDate };
+  const groups = chipGroups({ filters, categories, neighborhoods });
   return (
     <div className={styles.bar}>
       <FilterRow
@@ -211,11 +138,9 @@ export function FilterBar({
               <legend className={styles.legend}>When</legend>
               <WhenControl {...when} placement="drawer" />
             </fieldset>
-            <ChipGroups
-              filters={filters}
-              categories={categories}
-              neighborhoods={neighborhoods}
-            />
+            {groups.map((group) => (
+              <ChipGroup key={group.legend} {...group} />
+            ))}
           </>
         }
       >
@@ -245,10 +170,12 @@ export function FilterBar({
         ) : null}
       </FilterRow>
       <NoScriptFilters
-        filters={filters}
+        action={browsePath}
+        dateName={browseParamNames.date}
+        kept={toQueryEntries({ filters: withDate(filters, null), after: null })}
         today={today}
-        categories={categories}
-        neighborhoods={neighborhoods}
+        date={filters.date}
+        groups={groups}
       />
     </div>
   );

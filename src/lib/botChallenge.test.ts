@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { botProtectedRoutes, shouldLoadBotId } from './botChallenge';
+import { botCheckIsLive } from './botCheck';
+import {
+  botChallengeIsLive,
+  botProtectedRoutes,
+  shouldLoadBotId,
+} from './botChallenge';
 
 // Behaviours under test:
 // - guest pages load the challenge; checkout, gift, manage, orders, host, and ops paths do not
@@ -27,5 +32,16 @@ describe('botProtectedRoutes', () => {
     expect(botProtectedRoutes).toEqual([
       { path: '/experiences/*', method: 'POST' },
     ]);
+  });
+});
+
+describe('botChallengeIsLive', () => {
+  it.each([
+    [undefined, false],
+    ['', false],
+    ['1', true],
+  ])('with VERCEL %j: %s, as botCheckIsLive says', (vercel, expected) => {
+    expect(botChallengeIsLive(vercel)).toBe(expected);
+    expect(botCheckIsLive(vercel)).toBe(expected);
   });
 });

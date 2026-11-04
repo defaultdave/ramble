@@ -16,6 +16,7 @@ import {
 } from '@/lib/audit';
 import {
   createFreshDatabase,
+  expectConstraint,
   serveNeonHttp,
   type FreshDatabase,
 } from './harness';
@@ -71,6 +72,10 @@ let audit: typeof import('@/server/db/audit');
 let exporter: typeof import('@/server/jobs/auditExport');
 let schedule: typeof import('@/server/jobs/auditSchedule');
 let fakeStore: typeof import('@/server/ports/storage/fake');
+let drainJobs: typeof import('@/server/jobs/drain').drainJobs;
+let enqueue: typeof import('@/server/jobs/enqueue').enqueue;
+let getStorage: typeof import('@/server/ports/storage/config').getStorage;
+let pulseResponse: typeof import('@/server/pulse').pulseResponse;
 
 beforeAll(async () => {
   fresh = await createFreshDatabase(process.env.DATABASE_URL_UNPOOLED ?? '');
@@ -82,6 +87,10 @@ beforeAll(async () => {
   exporter = await import('@/server/jobs/auditExport');
   schedule = await import('@/server/jobs/auditSchedule');
   fakeStore = await import('@/server/ports/storage/fake');
+  ({ drainJobs } = await import('@/server/jobs/drain'));
+  ({ enqueue } = await import('@/server/jobs/enqueue'));
+  ({ getStorage } = await import('@/server/ports/storage/config'));
+  ({ pulseResponse } = await import('@/server/pulse'));
 });
 
 afterAll(async () => {
@@ -92,10 +101,11 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  raiseAlert.mockClear();
+  store.locked = true;
   await client.db.execute(sql`DELETE FROM jobs`);
 });
 
-const constraint = (name: string) => ({ cause: { constraint: name } });
 const code = (value: string) => ({ cause: { code: value } });
 const restricted = code('23001');
 const noPrivilege = code('42501');
@@ -178,9 +188,7 @@ describe('the table', () => {
       'audit_log_recorded_at_in_range',
     ],
   ])('refuses %s', async (_label, over, name) => {
-    await expect(insertRaw(userRow(over))).rejects.toMatchObject(
-      constraint(name),
-    );
+    await expectConstraint(insertRaw(userRow(over)), name);
   });
 
   it('refuses an unknown actor kind and a missing subject', async () => {
@@ -267,11 +275,12 @@ describe('the table', () => {
     ['the details are an array', '[]'],
     ['the details are a string', '"x"'],
   ])('refuses a row when %s', async (_label, json) => {
-    await expect(
+    await expectConstraint(
       client.db.execute(
         sql`INSERT INTO audit_log (actor_kind, action, subject_kind, subject_id, details) VALUES ('system', 'a.b', 'k', ${subject}, ${json}::jsonb)`,
       ),
-    ).rejects.toMatchObject(constraint('audit_log_details_shape'));
+      'audit_log_details_shape',
+    );
   });
 
   it('refuses details over the byte ceiling', async () => {
@@ -281,8 +290,9 @@ describe('the table', () => {
         'a'.repeat(100),
       ]),
     );
-    await expect(insertRaw(userRow({ details: wide }))).rejects.toMatchObject(
-      constraint('audit_log_details_shape'),
+    await expectConstraint(
+      insertRaw(userRow({ details: wide })),
+      'audit_log_details_shape',
     );
   });
 
@@ -293,8 +303,9 @@ describe('the table', () => {
     ['a trailing dot', 'order.'],
     ['65 characters', `${'a'.repeat(32)}.${'b'.repeat(32)}`],
   ])('refuses an action with %s', async (_label, action) => {
-    await expect(insertRaw(userRow({ action }))).rejects.toMatchObject(
-      constraint('audit_log_action_shape'),
+    await expectConstraint(
+      insertRaw(userRow({ action })),
+      'audit_log_action_shape',
     );
   });
 
@@ -304,9 +315,10 @@ describe('the table', () => {
     ['41 characters', 'a'.repeat(41)],
     ['nothing', ''],
   ])('refuses a subject kind with %s', async (_label, subjectKind) => {
-    await expect(
+    await expectConstraint(
       insertRaw(userRow({ subject_kind: subjectKind })),
-    ).rejects.toMatchObject(constraint('audit_log_subject_kind_shape'));
+      'audit_log_subject_kind_shape',
+    );
   });
 });
 
@@ -586,11 +598,9 @@ describe('the export', () => {
       ]),
     );
 
-    const { drainJobs } = await import('@/server/jobs/drain');
     const report = await drainJobs(dueClock);
 
     expect(report).toMatchObject({ claimed: 7, succeeded: 7, dead: 0 });
-    const { getStorage } = await import('@/server/ports/storage/config');
     const store = getStorage(() => new Date()) as ReturnType<
       typeof fakeStore.createFakeStorageAdapter
     >;
@@ -598,9 +608,6 @@ describe('the export', () => {
   });
 
   it('dead-letters a day at the first attempt, with one job-dead alert, when the store has no locked storage', async () => {
-    const { enqueue } = await import('@/server/jobs/enqueue');
-    const { drainJobs } = await import('@/server/jobs/drain');
-    raiseAlert.mockClear();
     await client.db.transaction((tx) =>
       enqueue(tx, {
         kind: 'audit-export',
@@ -610,12 +617,7 @@ describe('the export', () => {
     );
 
     store.locked = false;
-    let report: Awaited<ReturnType<typeof drainJobs>>;
-    try {
-      report = await drainJobs(dueClock);
-    } finally {
-      store.locked = true;
-    }
+    const report = await drainJobs(dueClock);
 
     expect(report).toMatchObject({ claimed: 1, dead: 1, retried: 0 });
     const { rows } = await client.db.execute<{
@@ -635,7 +637,6 @@ describe('the export', () => {
 
 describe('the pulse', () => {
   const pulseCall = async () => {
-    const { pulseResponse } = await import('@/server/pulse');
     const response = await pulseResponse(
       new Request('http://localhost/api/pulse', {
         method: 'POST',
@@ -649,14 +650,23 @@ describe('the pulse', () => {
   };
 
   it('queues the exports and runs them in the same call, and the next pulse queues nothing new', async () => {
-    const first = await pulseCall();
-    const second = await pulseCall();
+    // Noon tomorrow UTC: after every grace hour, so the whole lookback is due, and ahead of the
+    // database clock, so the jobs the pulse queues are already due on this one.
+    const tomorrowNoon = new Date();
+    tomorrowNoon.setUTCDate(tomorrowNoon.getUTCDate() + 1);
+    tomorrowNoon.setUTCHours(12, 0, 0, 0);
+    vi.useFakeTimers({ toFake: ['Date'], now: tomorrowNoon });
+    let first: Awaited<ReturnType<typeof pulseCall>>;
+    let second: Awaited<ReturnType<typeof pulseCall>>;
+    try {
+      first = await pulseCall();
+      second = await pulseCall();
+    } finally {
+      vi.useRealTimers();
+    }
 
-    // Six or seven days, by whether yesterday's grace hour has passed.
     expect(first.status).toBe(200);
-    expect(first.counts.claimed).toBeGreaterThanOrEqual(
-      auditLimits.exportLookbackDays - 1,
-    );
+    expect(first.counts.claimed).toBe(auditLimits.exportLookbackDays);
     expect(first.counts).toMatchObject({
       succeeded: first.counts.claimed,
       dead: 0,

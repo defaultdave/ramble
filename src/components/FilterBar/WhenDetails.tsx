@@ -53,7 +53,8 @@ type WhenDetailsProps = {
  * It stays mounted when a day is picked (a new key would drop focus to the page), so this closes it
  * and, when focus was in the control, puts focus back on the chip, where a keyboard user was. A day
  * that changes by Back or Forward, or from elsewhere on the page, moves no focus. Escape closes it
- * too, and so does a press anywhere outside it, because the calendar can float over the page.
+ * too, and so do a press anywhere outside it, because the calendar can float over the page, and
+ * focus tabbing out of it.
  * What is inside learns when it is opened (see `useWhenDisclosure`), so its code can be fetched then.
  */
 export function WhenDetails({
@@ -67,6 +68,7 @@ export function WhenDetails({
     details,
     summary: chip,
     onKeyDown,
+    onBlur,
     close,
   } = useDismissableDetails({ stopEscapePropagation: true });
   const previous = useRef(date);
@@ -107,7 +109,10 @@ export function WhenDetails({
       ref={details}
       className={className}
       onFocus={memory.onFocus}
-      onBlur={memory.onBlur}
+      onBlur={(event) => {
+        memory.onBlur(event);
+        onBlur(event);
+      }}
       onToggle={(event) => {
         if (!event.currentTarget.open) return;
         setOpens((count) => count + 1);

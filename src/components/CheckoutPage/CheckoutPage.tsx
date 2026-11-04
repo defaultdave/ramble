@@ -90,6 +90,16 @@ export function CheckoutPage({
     if (step.step !== 'details') stepRef.current?.focus();
   }, [step.step]);
 
+  // A refused re-hold swaps the button the guest pressed for a notice; it takes focus so it is read out.
+  const reholdNotice = step.step === 'expired' ? step.notice : null;
+  useEffect(() => {
+    if (reholdNotice) {
+      stepRef.current
+        ?.querySelector<HTMLElement>('[data-rehold-notice]')
+        ?.focus();
+    }
+  }, [reholdNotice]);
+
   // A new hold is a new page, which loads with focus on the body.
   useEffect(() => {
     if (focusTitle) titleRef.current?.focus();
@@ -287,7 +297,13 @@ function Step({
         <div ref={focusRef} tabIndex={-1} className={styles.state}>
           <Alert tone="danger" title={copy.title} body={copy.body} />
           {step.notice ? (
-            <Alert tone="warning" title="Not held" body={step.notice} />
+            <Alert
+              data-rehold-notice=""
+              tabIndex={-1}
+              tone="warning"
+              title="Not held"
+              body={step.notice}
+            />
           ) : null}
           {copy.canRehold ? (
             <Button size="lg" loading={step.reholding} onClick={holdAgain}>

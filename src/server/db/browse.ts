@@ -14,13 +14,13 @@ import {
   type SQL,
 } from 'drizzle-orm';
 import { z } from 'zod';
+import { splitPage } from '@/lib/pagination';
 import {
   BrowseDayRowsSchema,
   browsePageSize,
   browseWindowDays,
   maxHandEnteredDayRows,
   maxStoredDayRows,
-  splitPage,
   type BrowseCursorRow,
   type BrowseDayRows,
   type BrowseRead,

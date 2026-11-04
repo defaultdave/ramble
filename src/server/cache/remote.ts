@@ -1,5 +1,7 @@
 import 'server-only';
 import { unstable_rethrow } from 'next/navigation';
+import { errorKind } from '@/lib/errorKind';
+import { logger } from '@/server/monitoring/logger';
 
 /**
  * The only way to call a `'use cache: remote'` function. When the runtime cache is unreachable the
@@ -15,12 +17,10 @@ export async function readRemoteOrFallback<T>(
   } catch (error) {
     // Next.js ends a prerender or a navigation by throwing; swallowing that breaks the render.
     unstable_rethrow(error);
-    // Only the message is logged: the error can carry connection details.
-    console.error(
-      `[readRemoteOrFallback] Runtime cache read failed, reading Postgres instead: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    );
+    // Only the kind is logged: the message and cause can carry connection details.
+    logger.error('Runtime cache read failed, reading Postgres instead', {
+      kind: errorKind(error),
+    });
     return fallback();
   }
 }

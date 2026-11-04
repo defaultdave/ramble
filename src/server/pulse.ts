@@ -1,6 +1,7 @@
 import 'server-only';
 import { clientAddress } from '@/lib/clientAddress';
 import { declaredLengthExceeds } from '@/lib/email/message';
+import { errorKind } from '@/lib/errorKind';
 import { cleanupMayContinue } from '@/lib/holds';
 import { bearerToken } from '@/lib/http';
 import {
@@ -97,7 +98,7 @@ async function queueAuditExports(): Promise<void> {
     await scheduleAuditExports();
   } catch (error) {
     logger.error('audit exports could not be queued', {
-      errorName: error instanceof Error ? error.name : 'NonError',
+      errorName: errorKind(error, 'NonError'),
     });
   }
 }

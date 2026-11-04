@@ -248,18 +248,18 @@ describe('the experience head', () => {
     });
   });
 
-  it('is the plain title for an address that is not one, without reading', async () => {
+  it('is the not-found title for an address that is not one, without reading', async () => {
     expect(await generateMetadata(props('sample'))).toEqual({
-      title: 'Experience',
+      title: 'Experience not found',
     });
     expect(server.page).not.toHaveBeenCalled();
   });
 
-  it('is the plain title when the experience is not there', async () => {
+  it('is the not-found title when the experience is not there', async () => {
     server.page.mockResolvedValue(null);
 
     expect(await generateMetadata(props(address))).toEqual({
-      title: 'Experience',
+      title: 'Experience not found',
     });
   });
 

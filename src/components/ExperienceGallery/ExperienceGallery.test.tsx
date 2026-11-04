@@ -9,7 +9,7 @@ import { ExperienceGallery } from './ExperienceGallery';
 
 // Behaviours under test, one per decision, branch or risk:
 // - with no photo the gallery shows its placeholder and no image
-// - the photos are in the order given, each named by its alt text, inside a keyboard-focusable group named for the experience
+// - the photos are in the order given, each named by its alt text, inside a group named for the experience, with no fixed tab stop
 // - only the lead photo is the preload photo
 // - with more than one photo each says where it is in the set; a single photo says nothing
 // - up to three photos need no "See all"; more offer it, with the count, and list the rest behind it
@@ -39,12 +39,12 @@ describe('ExperienceGallery', () => {
     expect(screen.queryByRole('group')).not.toBeInTheDocument();
   });
 
-  it('lists the photos in order inside a focusable group named for the experience', () => {
+  it('lists the photos in order inside a group named for the experience, leaving focus to the browser', () => {
     gallery(3);
     const group = screen.getByRole('group', {
       name: 'Photos of Sunset kayak on the Hudson',
     });
-    expect(group).toHaveAttribute('tabindex', '0');
+    expect(group).not.toHaveAttribute('tabindex');
     expect(
       within(group)
         .getAllByRole('img')

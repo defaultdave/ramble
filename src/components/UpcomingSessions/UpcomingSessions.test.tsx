@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { moduleClass } from '../../../tests/support/moduleClass';
 import {
   UpcomingSessions,
   UpcomingSessionsError,
@@ -14,6 +15,7 @@ import {
   withSelectedDate,
   withSpaces,
 } from './UpcomingSessions.fixtures';
+import styles from './UpcomingSessions.module.css';
 
 // Behaviours under test, one per decision, branch or risk:
 // - each date is one list item with its day and time, the spaces left, and the price
@@ -95,9 +97,9 @@ describe('UpcomingSessionsSkeleton', () => {
     expect(list?.children).toHaveLength(3);
     const loaded = render(<UpcomingSessions view={withSpaces} />);
     const loadedRow = loaded.container.querySelector('li > a, li > div');
-    expect(list?.firstElementChild?.className).toBe(
-      loadedRow?.className.split(' ').find((name) => name.includes('row')),
-    );
+    const rowClass = moduleClass(styles.row);
+    expect(list?.firstElementChild).toHaveClass(rowClass);
+    expect(loadedRow).toHaveClass(rowClass);
   });
 
   it('draws the row count it is given', () => {

@@ -1,6 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { moduleClass } from '../../../tests/support/moduleClass';
+import styles from './Button.module.css';
 import { ButtonLink } from './ButtonLink';
 
 describe('ButtonLink', () => {
@@ -24,8 +26,10 @@ describe('ButtonLink', () => {
 
   it('takes the ghost look at medium size unless told otherwise', () => {
     render(<ButtonLink href="/a">Ghost</ButtonLink>);
-    expect(screen.getByRole('link').className).toMatch(/ghost/);
-    expect(screen.getByRole('link').className).toMatch(/md/);
+    expect(screen.getByRole('link')).toHaveClass(
+      moduleClass(styles.ghost),
+      moduleClass(styles.md),
+    );
   });
 
   it.each(['primary', 'secondary'] as const)(
@@ -36,7 +40,9 @@ describe('ButtonLink', () => {
           Go
         </ButtonLink>,
       );
-      expect(screen.getByRole('link').className).toMatch(new RegExp(variant));
+      expect(screen.getByRole('link')).toHaveClass(
+        moduleClass(styles[variant]),
+      );
     },
   );
 

@@ -1,12 +1,11 @@
-import { flushSync } from 'react-dom';
-import { createRoot, type Root } from 'react-dom/client';
 import { page } from 'vitest/browser';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { HomeHero } from '@/components/HomeModules/HomeHero';
 import { RichText } from '@/components/RichText';
 import { homeCopy } from '@/lib/pages/home';
 import { paragraphs } from '@/lib/richText/paragraphs';
 import { HomeSkeleton } from './HomeSkeleton';
+import { useMount } from '../../../tests/support/mount';
 import styles from './HomeStates.module.css';
 
 // next/link, reached through the Button barrel, reads process.env when it loads, and a browser has no process.
@@ -28,14 +27,7 @@ const widths = [320, 390, 768, 1024, 1280, 1440];
 // A pixel of slack for sub-pixel line boxes.
 const slack = 1;
 
-let container: HTMLDivElement;
-let root: Root;
-
-function mount(node: React.ReactNode) {
-  flushSync(() => {
-    root.render(node);
-  });
-}
+const { mount, container } = useMount();
 
 const heightOf = (element: Element) => element.getBoundingClientRect().height;
 const expectSame = (actual: number, expected: number | null) => {
@@ -54,17 +46,20 @@ const resolvedColor = (token: string) => {
 };
 
 function heroSizes() {
-  const form = container.querySelector(
-    `${dot(styles.search)}, form[aria-label="Find something to do"]`,
-  );
+  const form = container().querySelector(`${dot(styles.search)}, form`);
   if (!form) throw new Error('No search box');
-  const headingLines = container.querySelector(dot(styles.headingLines));
-  const bodyLines = container.querySelector(dot(styles.bodyLines));
-  const heading = container.querySelector('h1:not([class*="visuallyHidden"])');
-  const body = heading?.nextElementSibling?.firstElementChild;
-  const eyebrow = container.querySelector(
-    `${dot(styles.eyebrowBar)}, [class*="eyebrow"]`,
+  const headingLines = container().querySelector(dot(styles.headingLines));
+  const bodyLines = container().querySelector(dot(styles.bodyLines));
+  const heading = container().querySelector(
+    `h1:not(${dot(styles.visuallyHidden)})`,
   );
+  const body = heading?.nextElementSibling?.firstElementChild;
+  const eyebrow =
+    container().querySelector(dot(styles.eyebrowBar)) ??
+    // The loaded eyebrow is the one span that reads as its label.
+    [...container().querySelectorAll('span')].find(
+      (span) => span.textContent === homeCopy.heroEyebrow,
+    );
   if (!eyebrow) throw new Error('No eyebrow');
   const lineOf = (loaded: Element | null | undefined) =>
     loaded ? pixels(getComputedStyle(loaded).lineHeight) : null;
@@ -83,17 +78,6 @@ function heroSizes() {
     bodyColor: paragraph ? getComputedStyle(paragraph).color : null,
   };
 }
-
-beforeEach(() => {
-  container = document.createElement('div');
-  document.body.append(container);
-  root = createRoot(container);
-});
-
-afterEach(() => {
-  root.unmount();
-  container.remove();
-});
 
 describe('HomeSkeleton against the loaded hero', () => {
   it.each(widths)('takes the same space at %ipx', async (width) => {

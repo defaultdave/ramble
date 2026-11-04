@@ -1,9 +1,8 @@
-import { flushSync } from 'react-dom';
-import { createRoot, type Root } from 'react-dom/client';
 import { commands, userEvent } from 'vitest/browser';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Chip } from '@/components/Chip/Chip';
 import { DatePicker } from '@/components/DatePicker/DatePicker';
+import { useMount } from '../../tests/support/mount';
 
 declare module 'vitest/browser' {
   interface BrowserCommands {
@@ -37,14 +36,7 @@ function expectSelectedBorder(element: Element) {
   expect(style.borderTopColor).toBe(systemColor('Highlight'));
 }
 
-let container: HTMLDivElement;
-let root: Root;
-
-function mount(node: React.ReactNode) {
-  flushSync(() => {
-    root.render(node);
-  });
-}
+const { mount, container } = useMount();
 
 async function tabTo(find: () => Element | null) {
   for (let presses = 0; presses < 20; presses += 1) {
@@ -57,28 +49,23 @@ async function tabTo(find: () => Element | null) {
 
 beforeEach(async () => {
   await commands.setForcedColors(true);
-  container = document.createElement('div');
-  document.body.append(container);
-  root = createRoot(container);
 });
 
 afterEach(async () => {
-  root.unmount();
-  container.remove();
   await commands.setForcedColors(false);
 });
 
 describe('a selected control that is also focused, in forced-colors mode', () => {
   it('a selected chip shows a Highlight border', () => {
     mount(<Chip label="Outdoor" selected onToggle={() => undefined} />);
-    const chip = container.querySelector('button');
+    const chip = container().querySelector('button');
     if (!chip) throw new Error('The chip did not render');
     expectSelectedBorder(chip);
   });
 
   it('a focused selected chip keeps its Highlight border and gains a separate CanvasText outline', async () => {
     mount(<Chip label="Outdoor" selected onToggle={() => undefined} />);
-    const chip = await tabTo(() => container.querySelector('button'));
+    const chip = await tabTo(() => container().querySelector('button'));
     expect(chip.matches(':focus-visible')).toBe(true);
     expectSelectedBorder(chip);
     expectFocusRing(chip);
@@ -95,7 +82,7 @@ describe('a selected control that is also focused, in forced-colors mode', () =>
       />,
     );
     const day = await tabTo(() =>
-      container.querySelector('[data-selected][data-focus-visible]'),
+      container().querySelector('[data-selected][data-focus-visible]'),
     );
     expectSelectedBorder(day);
     expectFocusRing(day);

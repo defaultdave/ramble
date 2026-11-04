@@ -53,14 +53,24 @@ function isStringLike(node: ts.Node | undefined): node is ts.StringLiteralLike {
   );
 }
 
+/** `<T>x` is a type assertion in a `.ts` file and the start of an element in a `.tsx` file, so the extension decides how the text parses. */
+function scriptKindOf(fileName: string): ts.ScriptKind {
+  const extension = path.extname(fileName);
+  if (extension === '.tsx') return ts.ScriptKind.TSX;
+  if (extension === '.jsx') return ts.ScriptKind.JSX;
+  if (extension === '.js' || extension === '.mjs' || extension === '.cjs')
+    return ts.ScriptKind.JS;
+  return ts.ScriptKind.TS;
+}
+
 /** The specifiers a module loads at run time. A type-only import is erased by the compiler, so it is left out. */
-export function importsOf(text: string): string[] {
+export function importsOf(text: string, fileName: string): string[] {
   const file = ts.createSourceFile(
-    'module.tsx',
+    fileName,
     text,
     ts.ScriptTarget.Latest,
     false,
-    ts.ScriptKind.TSX,
+    scriptKindOf(fileName),
   );
   const specifiers: string[] = [];
   const visit = (node: ts.Node): void => {
@@ -96,7 +106,7 @@ export function importClosure(roots: readonly string[]) {
     seen.add(file);
     const text = readFileSync(file, 'utf8');
     if (hasServerActionDirective(text)) continue;
-    for (const specifier of importsOf(text)) {
+    for (const specifier of importsOf(text, file)) {
       specifiers.add(specifier);
       const next = resolveImport(specifier, file);
       if (next) queue.push(next);

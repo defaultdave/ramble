@@ -61,19 +61,56 @@ describe('importsOf', () => {
       ['x'],
     ],
   ])('finds %s', (_name, text, expected) => {
-    expect(importsOf(text)).toEqual(expected);
+    expect(importsOf(text, 'module.tsx')).toEqual(expected);
   });
 
   it('leaves out a type-only import', () => {
-    expect(importsOf("import type { A } from 'a';\nimport 'b';")).toEqual([
-      'b',
-    ]);
+    expect(
+      importsOf("import type { A } from 'a';\nimport 'b';", 'module.tsx'),
+    ).toEqual(['b']);
   });
 
   it('leaves out a type-only re-export', () => {
     expect(
-      importsOf("export type { A } from 'a';\nexport * from 'b';"),
+      importsOf(
+        "export type { A } from 'a';\nexport * from 'b';",
+        'module.tsx',
+      ),
     ).toEqual(['b']);
+  });
+
+  it.each([
+    [
+      'a .ts file with a generic arrow before a dynamic import',
+      "import 'a'; const id = <T>(x: T) => x; const m = () => import('after');",
+      'module.ts',
+      ['a', 'after'],
+    ],
+    [
+      'a .ts file with a type assertion before a static import',
+      "const a = <string>x;\nimport 'r';",
+      'module.ts',
+      ['r'],
+    ],
+    [
+      'a .tsx file with JSX text before a dynamic import',
+      "const a = <p>Don't</p>;\nconst m = () => import('z');",
+      'module.tsx',
+      ['z'],
+    ],
+  ])('reads %s by its extension', (_name, text, fileName, expected) => {
+    expect(importsOf(text, fileName)).toEqual(expected);
+  });
+
+  it.each([
+    ['a typeof import type', "type A = typeof import('x');"],
+    ['an import type with a member', "type A = import('x').Foo;"],
+    [
+      'a typeof import in a type argument',
+      "const m = await load<typeof import('x')>();",
+    ],
+  ])('leaves out %s', (_name, text) => {
+    expect(importsOf(`${text}\nimport 'real';`, 'module.ts')).toEqual(['real']);
   });
 
   it.each([
@@ -84,6 +121,6 @@ describe('importsOf', () => {
     ['a template literal', "const text = `import 'x'`;\nimport 'real';"],
     ['a string', "const text = \"import { a } from 'x'\";\nimport 'real';"],
   ])('does not find an import inside %s', (_name, text) => {
-    expect(importsOf(text)).toEqual(['real']);
+    expect(importsOf(text, 'module.tsx')).toEqual(['real']);
   });
 });

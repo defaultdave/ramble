@@ -19,7 +19,7 @@ function freshNonce(): string {
 export function proxy(request: NextRequest) {
   // A confirmation link carries its token in the address once: it moves into a cookie for that
   // order's path and the guest is sent to the same page without it, so the token is not in
-  // history, the next request's Referer, or a refresh (audit BC-20).
+  // history, the next request's Referer, or a refresh.
   const handoff = orderAccessHandoff(
     request.nextUrl.pathname,
     request.nextUrl.searchParams,

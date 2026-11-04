@@ -33,6 +33,8 @@ vi.mock('@/server/monitoring/logger', () => ({
 // - a job whose kind the registry no longer knows fails like any other
 // - a running row with a live lock is left alone; one with a lapsed lock is taken again and spends an attempt;
 //   one with a lapsed lock and no attempts left is dead, not run
+// - a job inserted without run_after is stamped from the clock port, so it is claimable at that clock's now even when
+//   the clock runs behind the database's
 // - one call stops at 200 jobs and reports the rest as left
 // - two drains at once never run the same job twice (the claim takes SKIP LOCKED)
 // - a claim skips rows another transaction has locked
@@ -657,6 +659,23 @@ describe('claim', () => {
     expect(claimed.map((job) => job.id)).toEqual([first, second]);
     expect(claimed.every((job) => job.attempts === 1)).toBe(true);
     expect(claimed[0]?.lockedUntil).toEqual(new Date('2030-01-01T00:05:00Z'));
+  });
+});
+
+describe('insertJob run_after', () => {
+  it('stamps run_after from the clock when the caller gives none', async () => {
+    const skewedNow = new Date('2000-01-01T00:00:00Z');
+
+    await client.db.transaction((tx) =>
+      jobsDb.insertJob(
+        tx,
+        { kind: 'ok', payload: {}, maxAttempts: 3 },
+        clockModule.fixedClock(skewedNow),
+      ),
+    );
+
+    const { claimed } = await jobsDb.claimDueJobs(skewedNow, 25);
+    expect(claimed).toHaveLength(1);
   });
 });
 

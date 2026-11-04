@@ -39,11 +39,12 @@ export function ExperienceGallery({ title, gallery }: ExperienceGalleryProps) {
 
   return (
     <div className={styles.gallery}>
-      {/* No tabIndex: a browser puts a scroller in the tab order only while it overflows, so the strip is a tab stop on a phone and not once the grid takes over. */}
+      {/* A scrolling region takes focus so a keyboard can scroll it. The strip scrolls on a phone, and the story browser flags a scroller without a tab stop. */}
       <div
         className={styles.strip}
         role="group"
         aria-label={`Photos of ${title}`}
+        tabIndex={0}
       >
         <ul className={styles.list} data-layout={gallery.layout}>
           {gallery.photos.map(({ photo, isLead, counter }) => (

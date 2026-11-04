@@ -39,12 +39,12 @@ describe('ExperienceGallery', () => {
     expect(screen.queryByRole('group')).not.toBeInTheDocument();
   });
 
-  it('lists the photos in order inside a group named for the experience, leaving focus to the browser', () => {
+  it('lists the photos in order inside a focusable group named for the experience', () => {
     gallery(3);
     const group = screen.getByRole('group', {
       name: 'Photos of Sunset kayak on the Hudson',
     });
-    expect(group).not.toHaveAttribute('tabindex');
+    expect(group).toHaveAttribute('tabindex', '0');
     expect(
       within(group)
         .getAllByRole('img')

@@ -1,12 +1,11 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   dynamicRoutePrefixes,
   isDynamicRoutePath,
   securityHeaders,
 } from '@/lib/securityHeaders';
-import nextConfig from '../next.config';
 import { listFiles } from './support/importGraph';
 
 const root = path.resolve(import.meta.dirname, '..');
@@ -115,21 +114,43 @@ function isGroupName(segment: string): boolean {
   return segment.startsWith('(');
 }
 
+// The config reads `VERCEL` once at import, so each case needs a fresh module.
+async function headerRulesWithVercel(vercel: string) {
+  vi.stubEnv('VERCEL', vercel);
+  vi.resetModules();
+  const { default: config } = await import('../next.config');
+  return (await config.headers?.()) ?? [];
+}
+
 describe('next.config headers', () => {
-  it('applies the security header set to every path', async () => {
-    const rules = (await nextConfig.headers?.()) ?? [];
-    expect(rules[0]).toEqual({
-      source: '/:path*',
-      headers: [...securityHeaders],
-    });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
   });
 
-  it('adds nothing else but the BotID challenge proxy rule', async () => {
-    const rules = (await nextConfig.headers?.()) ?? [];
+  it.each(['1', ''])(
+    'applies the security header set to every path with VERCEL=%j',
+    async (vercel) => {
+      const rules = await headerRulesWithVercel(vercel);
+      expect(rules[0]).toEqual({
+        source: '/:path*',
+        headers: [...securityHeaders],
+      });
+    },
+  );
+
+  it('adds nothing else but the BotID challenge proxy rule on Vercel', async () => {
+    const rules = await headerRulesWithVercel('1');
     const others = rules.slice(1).map((rule) => rule.source);
 
     expect(others).toHaveLength(1);
     expect(others[0]).toMatch(/^\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/:path\*$/);
+  });
+
+  it('adds nothing else off Vercel', async () => {
+    const rules = await headerRulesWithVercel('');
+
+    expect(rules).toHaveLength(1);
   });
 });
 

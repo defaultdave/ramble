@@ -1,11 +1,11 @@
 // Run by `pnpm lint`. Lists test files over the warning size so they get split before they sprawl.
-// The hard limit is coded but off: switch ENFORCE_HARD_LIMIT on once the existing oversized files are split.
+// The hard limit is enforced: a test file over HARD_LIMIT_LINES fails lint. Split it by concern before it grows.
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 export const WARN_LINES = 500;
 export const HARD_LIMIT_LINES = 800;
-export const ENFORCE_HARD_LIMIT = false;
+export const ENFORCE_HARD_LIMIT = true;
 export const ROOTS = ["src", "tests", "e2e"];
 const TEST_FILE = /\.(test\.tsx?|spec\.ts)$/;
 const SKIPPED_DIRS = new Set(["node_modules", ".next"]);

@@ -496,7 +496,28 @@ export type ChoicesView = {
   summary: Summary | null;
   notice: BookingNotice | null;
   alternatives: SessionSummary[];
+  /** Spoken politely when a date or a time makes the next section appear; empty before a date. */
+  status: string;
+  /** What Continue is waiting for, while a date or a time is still missing; null once both are chosen. */
+  missing: string | null;
 };
+
+/** The live-region text for what just appeared below the date or time the guest chose. */
+function choicesStatus(dayLabel: string | null, hasTime: boolean): string {
+  if (hasTime) return "Who's coming is listed below.";
+  return dayLabel ? `Times for ${dayLabel} are listed below.` : '';
+}
+
+/** What a disabled Continue is waiting for, or null when a date and a time are both chosen (or in gift mode, where the notice says why). */
+function choicesMissing(
+  mode: BookingMode,
+  hasDate: boolean,
+  hasTime: boolean,
+): string | null {
+  if (mode === 'gift') return null;
+  if (!hasDate) return 'Choose a date to continue.';
+  return hasTime ? null : 'Choose a time to continue.';
+}
 
 function summaryOf(
   offer: BookingOffer,
@@ -566,6 +587,8 @@ export function choicesView(
         : null,
     notice: state.notice,
     alternatives: state.alternatives,
+    status: choicesStatus(chosenDay?.dayLabel ?? null, session !== null),
+    missing: choicesMissing(state.mode, state.date !== null, session !== null),
   };
 }
 

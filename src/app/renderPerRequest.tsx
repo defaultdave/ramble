@@ -17,7 +17,9 @@ export async function RenderPerRequest() {
  * is captured at build time as a static 404 shell whose scripts carry no nonce, so the
  * enforcing policy would block them. Read after the request, it renders the tree's own
  * not-found page with the nonce; the status is then 200, because a render resumed from the
- * route's empty shell cannot change it.
+ * route's empty shell cannot change it. That shell has no heading and no stylesheet link, so
+ * the not-found page appears only once the browser runs script: a page that can render its own
+ * not-found state as JSX, as the checkout page does, should.
  */
 export async function notFoundPerRequest(): Promise<never> {
   await connection();

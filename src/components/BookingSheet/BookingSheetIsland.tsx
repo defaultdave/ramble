@@ -34,6 +34,7 @@ export function BookingSheetIsland({ offer }: { offer: BookingOffer }) {
         state.paused ? undefined : (
           <BookingFooter
             summary={view.summary}
+            missing={view.missing}
             canContinue={canContinue(offer, state)}
             pending={state.pending}
             onContinue={() => void submit('phone')}

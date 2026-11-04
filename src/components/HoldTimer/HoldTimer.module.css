@@ -29,6 +29,28 @@
   color: var(--color-status-danger-text);
 }
 
+.note {
+  padding-inline-start: var(--space-2);
+  border-inline-start: 1px solid currentcolor;
+}
+
+/* Forced colours drop the backgrounds, so each state keeps a border that tells it apart. */
+@media (forced-colors: active) {
+  .timer {
+    border: 1px solid CanvasText;
+  }
+
+  .warning {
+    border-style: dashed;
+    border-width: 2px;
+  }
+
+  .expired {
+    border-style: double;
+    border-width: 3px;
+  }
+}
+
 .icon {
   flex: none;
   width: var(--space-4);

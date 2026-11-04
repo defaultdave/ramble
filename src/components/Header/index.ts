@@ -3,5 +3,6 @@ export type {
   CheckoutHeaderProps,
   DefaultHeaderProps,
   NavLink,
+  PlainHeaderProps,
   HeaderProps,
 } from './Header';

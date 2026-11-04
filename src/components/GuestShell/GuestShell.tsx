@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Footer } from '@/components/Footer';
 import { Header } from '@/components/Header';
+import { SkipLink } from '@/components/SkipLink';
 import { giftGuidePath } from '@/lib/routes';
 import {
   footerGroups,
@@ -8,7 +9,6 @@ import {
   searchHref,
   siteChrome,
 } from '@/lib/pages/siteNav';
-import styles from './GuestShell.module.css';
 import { SiteMenu } from './SiteMenu';
 
 export type GuestShellProps = {
@@ -21,9 +21,7 @@ export type GuestShellProps = {
 export function GuestShell({ banner, children }: GuestShellProps) {
   return (
     <>
-      <a className={styles.skip} href="#main">
-        Skip to main content
-      </a>
+      <SkipLink />
       {banner}
       <Header
         links={mainLinks}

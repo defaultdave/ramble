@@ -1,19 +1,12 @@
 import { z } from 'zod';
 import { EntityIdSchema } from './catalog';
-import { editorialLimits } from './editorial';
+import { editorialLimits, picksCandidates } from './editorial';
 
 /** Cards in one Ramble Picks module; the rest are behind its "See all" link. */
 export const picksShown = 3;
 
 /** Cards in the "On this week" module. */
 export const thisWeekShown = 4;
-
-/**
- * Entries of one collection the home page looks at to find `picksShown` cards, in case some cannot
- * be shown. The most the tag budget leaves room for (`cacheTagBudget.test.ts` fails if it grows): every
- * candidate is one cache tag on the home entry.
- */
-export const picksCandidates = 5;
 
 /**
  * The experiences one card read looks up by ID, and so the tags of the home entry: the most the
@@ -30,9 +23,12 @@ export const coverLookupLimit =
   editorialLimits.homeModules * Math.max(picksShown, thisWeekShown);
 
 /**
- * A list of at most `max` IDs. The length is checked before any ID is, as Zod checks every ID of
- * an array even when the array is already too long.
+ * A list of at most `max` IDs. Two stages, because a single `z.array(EntityIdSchema).max(max)`
+ * parses every element before it looks at the length, so a huge list costs a huge parse. The first
+ * stage refuses a list that is too long on its length alone; only a list within the bound reaches
+ * the ID check.
  */
 export function idListSchema(max: number) {
-  return z.array(z.unknown()).max(max).pipe(z.array(EntityIdSchema));
+  const withinBound = z.array(z.unknown()).max(max);
+  return withinBound.pipe(z.array(EntityIdSchema));
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { editorialLimits } from './editorial';
-import { cardLookupLimit, idListSchema, picksCandidates } from './idLookup';
+import { editorialLimits, picksCandidates } from './editorial';
+import { cardLookupLimit, idListSchema } from './idLookup';
 import { homeLimits } from './pages/home';
 import { photoLimits } from './photos';
 
@@ -10,11 +10,11 @@ const id = (n: number) =>
 describe('cardLookupLimit', () => {
   it('is the home modules times the Picks candidates of each', () => {
     expect(cardLookupLimit).toBe(editorialLimits.homeModules * picksCandidates);
+    expect(cardLookupLimit).toBe(100);
   });
 
   it('is the bound the home read is built for', () => {
     expect(homeLimits.maxCardIds).toBe(cardLookupLimit);
-    expect(homeLimits.picksCandidates).toBe(picksCandidates);
   });
 
   it('is not the bound of the cover read, which asks only for the cards shown', () => {

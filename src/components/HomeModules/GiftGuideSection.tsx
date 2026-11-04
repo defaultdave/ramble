@@ -1,6 +1,6 @@
 import { Gift } from 'lucide-react';
-import Link from 'next/link';
 import { useId, type ReactNode } from 'react';
+import { ButtonLink } from '@/components/Button';
 import { Illustration } from '@/components/Illustration';
 import { Eyebrow } from './Eyebrow';
 import styles from './HomeModules.module.css';
@@ -34,10 +34,15 @@ export function GiftGuideSection({
               {heading}
             </h2>
             {body ? <div className={styles.giftBody}>{body}</div> : null}
-            <Link className={styles.action} href={action.href}>
-              <Gift className={styles.actionIcon} aria-hidden="true" />
-              {action.label}
-            </Link>
+            <div className={styles.giftAction}>
+              <ButtonLink
+                href={action.href}
+                variant="secondary"
+                iconStart={<Gift />}
+              >
+                {action.label}
+              </ButtonLink>
+            </div>
             <p className={styles.sponsor}>{sponsor}</p>
           </div>
           <div className={styles.giftArt}>

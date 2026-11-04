@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { ZodError } from 'zod';
-import type { Collection, HomeModule } from '../editorial';
+import {
+  picksCandidates,
+  type Collection,
+  type HomeModule,
+} from '../editorial';
 import type { CardExperience } from '../experienceCards';
 import {
   buildHomePage,
@@ -274,9 +278,7 @@ describe('homeExperienceIds', () => {
     const many = Array.from({ length: 30 }, (_, i) => i + 1);
     const picks = [pick(1, many)];
     const modules = [module(1, 'picks', { collectionId: id(801) })];
-    expect(homeExperienceIds(modules, picks)).toHaveLength(
-      homeLimits.picksCandidates,
-    );
+    expect(homeExperienceIds(modules, picks)).toHaveLength(picksCandidates);
   });
 
   it('is bounded in all, whatever the modules and collections hold', () => {
@@ -346,12 +348,12 @@ describe('buildHomePage category rail', () => {
         {
           slug: 'cooking',
           name: 'Cooking',
-          href: '/new-york/browse?category=cooking',
+          href: '/new-york/things-to-do/cooking',
         },
         {
           slug: 'wine',
           name: 'Wine and cocktails',
-          href: '/new-york/browse?category=wine',
+          href: '/new-york/things-to-do/wine',
         },
       ],
     });

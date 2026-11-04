@@ -26,6 +26,7 @@ import {
   changesWhenSaved,
   collectionChange,
   editorialLimits,
+  picksCandidates,
   collectionIdsOf,
   collectionKindsById,
   experienceIdsOf,
@@ -54,7 +55,6 @@ import {
   HomeGiftGuideSchema,
   HomePickIdsSchema,
   HomePickSchema,
-  homeLimits,
   type HomeGiftGuide,
   type HomePick,
 } from '@/lib/pages/home';
@@ -172,7 +172,7 @@ export async function listHomePicks(
       eq(collections.kind, 'pick'),
     ),
     true,
-    { entryCap: homeLimits.picksCandidates, intro: false },
+    { entryCap: picksCandidates, intro: false },
   );
   return HomePickSchema.array().parse(
     rows.map(({ collection, items, itemCount }) => ({

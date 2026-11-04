@@ -4,7 +4,7 @@ import { EntityIdSchema } from './catalog';
 // random: an HMAC of its kind, the row id, and a version, so any server code can rebuild a link and
 // a bump of the version voids the earlier ones (design doc 4.2.3, the capability-token amendment).
 
-/** `gift` joins these when the gifts table exists (U-017). */
+// TODO(U-017): `gift` joins these kinds when the gifts table exists.
 export const capabilityTokenKinds = ['manage', 'order'] as const;
 export type CapabilityTokenKind = (typeof capabilityTokenKinds)[number];
 

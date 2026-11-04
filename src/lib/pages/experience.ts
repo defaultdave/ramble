@@ -9,6 +9,7 @@ import { MAX_FULL_REFUND_HOURS } from '../cancellation';
 import { allowedChildAges } from '../checkout';
 import { presentText, textLines } from '../displayText';
 import { holdLimits } from '../holds';
+import { isSafeIntegerInRange } from '../integers';
 import { mapsHref } from '../maps';
 import type { GuestPhoto } from '../photos';
 import { photoView, type PhotoView } from '../photoViews';
@@ -103,11 +104,7 @@ export function cancellationTerms(
   tier: Pick<CancellationTier, 'fullRefundHoursBefore'>,
 ): { fact: string; detail: string } {
   const hours = tier.fullRefundHoursBefore;
-  if (
-    !Number.isSafeInteger(hours) ||
-    hours < 0 ||
-    hours > MAX_FULL_REFUND_HOURS
-  ) {
+  if (!isSafeIntegerInRange(hours, 0, MAX_FULL_REFUND_HOURS)) {
     throw new RangeError('The cancellation window is out of range');
   }
   const refunded =

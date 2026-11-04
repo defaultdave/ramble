@@ -1,4 +1,4 @@
-import { count, eq } from 'drizzle-orm';
+import { count, eq, sql } from 'drizzle-orm';
 import {
   afterAll,
   beforeAll,
@@ -9,6 +9,7 @@ import {
   vi,
 } from 'vitest';
 import type { StartPaymentResult } from '@/lib/checkout';
+import { bookingIdempotencyKey } from '@/lib/orders';
 import { orders, paymentAttempts } from '@/server/db/schema';
 import type { Device } from '@/server/device';
 import {
@@ -227,10 +228,13 @@ describe('two calls on one hold', () => {
 });
 
 describe('the tries limit', () => {
-  it('lets five calls through and answers the sixth too_many_tries, writing and asking for nothing', async () => {
+  it('spends a try on each genuine attempt and answers the sixth too_many_tries, writing and asking for nothing', async () => {
     const hold = await newHold();
+    createPayment.mockRejectedValue(new PaymentsError('provider_unavailable'));
     for (let call = 1; call <= 5; call += 1) {
-      paying(await startAs('a', hold.id));
+      await expect(startAs('a', hold.id)).rejects.toMatchObject({
+        code: 'provider_unavailable',
+      });
     }
     const before = await rowCounts();
     createPayment.mockClear();
@@ -242,6 +246,38 @@ describe('the tries limit', () => {
     expect(await rowCounts()).toEqual(before);
     expect(createPayment).not.toHaveBeenCalled();
     expect(retrieve).not.toHaveBeenCalled();
+  });
+
+  it('spends nothing on refreshes of an existing payment, however many', async () => {
+    const hold = await newHold();
+    for (let call = 1; call <= 9; call += 1) {
+      paying(await startAs('a', hold.id));
+    }
+  });
+
+  it('spends nothing on a confirmed order, however many calls', async () => {
+    const hold = await newHold();
+    paying(await startAs('a', hold.id));
+    await client.db
+      .update(orders)
+      .set({ status: 'confirmed', confirmedAt: sql`clock_timestamp()` })
+      .where(eq(orders.idempotencyKey, bookingIdempotencyKey(hold.id)));
+
+    for (let call = 1; call <= 9; call += 1) {
+      expect((await startAs('a', hold.id)).status).toBe('already_confirmed');
+    }
+  });
+
+  it.each([
+    ['a hold id nobody has', () => Promise.resolve(crypto.randomUUID())],
+    ['a hold of another device', async () => (await newHold(guestA)).id],
+  ])('still spends a try on %s, so guessing is limited', async (_, holdId) => {
+    const id = await holdId();
+    for (let call = 1; call <= 5; call += 1) {
+      expect((await startAs('b', id)).status).toBe('hold_expired');
+    }
+
+    expect(await startAs('b', id)).toEqual({ status: 'too_many_tries' });
   });
 
   it('counts each hold on its own', async () => {

@@ -24,6 +24,8 @@ vi.mock('@/server/db/holds', () => ({
   scrubReleasedHolds: vi.fn(),
 }));
 vi.mock('@/server/monitoring/heartbeat', () => ({ sendHeartbeat: vi.fn() }));
+const raise = vi.hoisted(() => vi.fn());
+vi.mock('@/server/monitoring/alerts', () => ({ alerts: { raise } }));
 vi.mock('@/server/monitoring/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
@@ -92,6 +94,7 @@ beforeEach(() => {
   vi.mocked(scrubReleasedHolds).mockReset().mockResolvedValue(0);
   vi.mocked(sendHeartbeat).mockReset().mockResolvedValue('sent');
   vi.mocked(logger.error).mockReset();
+  raise.mockReset();
 });
 
 describe('refusals', () => {
@@ -392,7 +395,7 @@ describe('a good pulse', () => {
     expect(order).toEqual(['schedule', 'drain']);
   });
 
-  it('logs a failure queueing the exports by name and carries on with the rest of the pulse', async () => {
+  it('logs and alerts on a failure queueing the exports by name and carries on with the rest of the pulse', async () => {
     vi.mocked(scheduleAuditExports).mockRejectedValue(
       new TypeError('schedule down at postgres://user:pw@host'),
     );
@@ -402,6 +405,12 @@ describe('a good pulse', () => {
     expect(response.status).toBe(200);
     expect(logger.error).toHaveBeenCalledExactlyOnceWith(
       'audit exports could not be queued',
+      { errorName: 'TypeError' },
+    );
+    expect(raise).toHaveBeenCalledExactlyOnceWith(
+      'audit-export-queue-failed',
+      'error',
+      'queue',
       { errorName: 'TypeError' },
     );
     expect(drainJobs).toHaveBeenCalled();

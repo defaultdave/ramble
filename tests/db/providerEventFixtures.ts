@@ -202,7 +202,7 @@ export async function store(event: IncomingProviderEvent): Promise<string> {
 
 export const confirmed = vi.fn<ConfirmOrder>();
 
-/** A stand-in for U-049's confirm step: it confirms the order, so the rest of the handler can be seen. */
+/** A ConfirmOrder that only marks the order confirmed, so the rest of the handler can be seen without the real confirm step. */
 export const confirmsOrder: ConfirmOrder = async (tx, input) => {
   void confirmed(tx, input);
   await tx

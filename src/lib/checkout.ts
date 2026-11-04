@@ -108,6 +108,7 @@ export type StartPaymentResult =
   | { status: 'hold_expired'; canRehold: boolean; spacesLeft: number }
   | { status: 'sold_out'; alternatives: SessionSummary[] }
   | { status: 'too_many_tries' }
+  | { status: 'maintenance' }
   | { status: 'invalid'; fieldErrors: FieldErrors };
 
 type Issue = { path: readonly PropertyKey[]; message: string };
@@ -499,11 +500,51 @@ export const unknownHold: StartPaymentResult = {
 
 export const tooManyTries: StartPaymentResult = { status: 'too_many_tries' };
 
+/** The ops switch (ADR 0002): while checkout is in maintenance no payment starts, and nothing is written. */
+export function maintenanceRefusal(
+  checkoutMaintenance: boolean,
+): StartPaymentResult | null {
+  return checkoutMaintenance ? { status: 'maintenance' } : null;
+}
+
 /** The `payment_tries` limit, spent before any lock: a try over it is refused and writes nothing. */
 export function paymentTriesRefusal(
   tried: RateLimitDecision,
 ): StartPaymentResult | null {
   return tried.allowed ? null : tooManyTries;
+}
+
+/** What is known about a hold's payment before any lock, read without one: stale is fine, see `spendsPaymentTry`. */
+export type PaymentTryState = {
+  deviceKey: string;
+  hold: { deviceKey: string } | null;
+  order: { status: OrderStatus } | null;
+  latestAttempt: {
+    status: AttemptStatus;
+    failedTries: number;
+    providerPaymentId: string | null;
+  } | null;
+};
+
+/**
+ * Whether a `startPayment` call spends one `payment_tries`. Only a call that is a pure re-read
+ * stays free, and only for the device that holds the hold: a confirmed order, or an attempt that
+ * already has its provider payment and still has tries (the decision's `already_confirmed` and
+ * `in_flight`). Everything else spends: a new or next attempt, a resume, a refusal, and any hold
+ * that is missing or another device's, so guessing hold ids is never free. The state is read
+ * without a lock, so a race can only spend one try too many or let one extra re-read through.
+ */
+export function spendsPaymentTry(state: PaymentTryState): boolean {
+  const { hold, order, latestAttempt } = state;
+  if (!isHoldOfDevice(hold, state.deviceKey) || order === null) return true;
+  if (order.status === 'confirmed') return false;
+  if (!payableOrderStatuses.includes(order.status)) return true;
+  return !(
+    latestAttempt !== null &&
+    latestAttempt.status !== 'canceled' &&
+    latestAttempt.providerPaymentId !== null &&
+    latestAttempt.failedTries < maxFailedTries
+  );
 }
 
 type DecisionHold = HoldTimes & {

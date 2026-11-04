@@ -1,5 +1,6 @@
 import 'server-only';
 import { z } from 'zod';
+import { permanentFailure } from '@/lib/jobs';
 import {
   canDeleteKey,
   canStoreVisibility,
@@ -27,12 +28,15 @@ export type StorageErrorCode =
   | 'unsupported';
 
 export class StorageError extends PortError<StorageErrorCode> {
-  /** True when a retry cannot change the outcome; the job drain dead-letters such a failure at once. */
+  /** True when a retry cannot change the outcome. */
   readonly permanent: boolean;
+  /** The marker the job drain reads (`isPermanentFailure`) to dead-letter such a failure at once. */
+  readonly [permanentFailure]: boolean;
 
   constructor(code: StorageErrorCode, message?: string, cause?: unknown) {
     super('StorageError', code, message, cause);
     this.permanent = isPermanentStorageCode(code);
+    this[permanentFailure] = this.permanent;
   }
 }
 

@@ -35,6 +35,8 @@ import { day, insertSession, minute, seedBookable } from './holdFixtures';
 //   other dates; a cancelled session, a missing hold, another device's hold, and a gift hold are not told apart
 // - two calls on one hold are one order and one attempt; once the provider's payment is stored the second call
 //   hands it back as it is, even after the hold lapsed; a decline puts the order back to pending on the same attempt
+// - readPaymentTryState reads nothing for a hold that is missing, malformed or another device's, and follows the order
+//   and its latest attempt from a first attempt to a confirmed order
 // - a confirmed order answers already_confirmed with the order token for its device only, whatever the form held
 // - five failed tries are too_many_tries; a canceled attempt with fewer gets the next number; an amount the
 //   provider would refuse writes nothing
@@ -70,9 +72,8 @@ beforeEach(async () => {
   await resetCheckoutSettings(client.db);
 });
 
-const { start, tally, storedHold, orderOf, attemptsOf } = checkoutReaders(
-  () => ({ client, checkout, terms, guestA }),
-);
+const { payId, start, tally, storedHold, orderOf, attemptsOf } =
+  checkoutReaders(() => ({ client, checkout, terms, guestA }));
 
 describe('a hold that is not open', () => {
   const lapsed = async (
@@ -355,6 +356,52 @@ describe('two calls on one hold', () => {
     });
     expect(next.attempt.id).not.toBe(first.attempt.id);
     expect(await attemptsOf(order.id)).toHaveLength(2);
+  });
+});
+
+describe('the state that decides whether a try is spent', () => {
+  it('reads nothing for a hold that is missing, malformed, or another device', async () => {
+    const hold = await holdFor(client.db, bookable, guestA);
+    await start({}, hold.id);
+
+    const none = { hold: null, order: null, latestAttempt: null };
+    await expect(
+      checkout.readPaymentTryState(guestA, 'not-an-id'),
+    ).resolves.toMatchObject(none);
+    await expect(
+      checkout.readPaymentTryState(guestA, crypto.randomUUID()),
+    ).resolves.toMatchObject(none);
+    await expect(
+      checkout.readPaymentTryState(guestB, hold.id),
+    ).resolves.toMatchObject(none);
+  });
+
+  it('follows the order and its latest attempt from a first attempt to a confirmed order', async () => {
+    const hold = await holdFor(client.db, bookable, guestA);
+    expect(await checkout.readPaymentTryState(guestA, hold.id)).toMatchObject({
+      hold: { deviceKey: guestA.deviceKey },
+      order: null,
+    });
+
+    const first = proceeded(await start({}, hold.id));
+    expect(await checkout.readPaymentTryState(guestA, hold.id)).toMatchObject({
+      order: { status: 'pending_payment' },
+      latestAttempt: { status: 'created', providerPaymentId: null },
+    });
+
+    await checkout.recordProviderPayment(
+      guestA,
+      first.attempt.id,
+      payId('try'),
+    );
+    const order = await orderOf(hold.id);
+    await client.db
+      .update(orders)
+      .set({ status: 'confirmed', confirmedAt: sql`clock_timestamp()` })
+      .where(eq(orders.id, order.id));
+    const state = await checkout.readPaymentTryState(guestA, hold.id);
+    expect(state.order).toEqual({ status: 'confirmed' });
+    expect(state.latestAttempt?.providerPaymentId).not.toBeNull();
   });
 });
 

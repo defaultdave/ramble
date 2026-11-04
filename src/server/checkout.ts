@@ -1,9 +1,11 @@
 import 'server-only';
 import {
   lookupVerdict,
+  maintenanceRefusal,
   paymentTriesRefusal,
   providerStep,
   requiresPaymentResult,
+  spendsPaymentTry,
   storesPayment,
   type ProviderStep,
   type StartPaymentInput,
@@ -12,10 +14,12 @@ import {
 import { errorKind } from '@/lib/errorKind';
 import { orderCurrency } from '@/lib/orders';
 import {
+  readPaymentTryState,
   recordProviderPayment,
   startPaymentTx,
   type StartedPayment,
 } from '@/server/db/checkout';
+import { getGuestSettings } from '@/server/db/settings';
 import type { Device } from '@/server/device';
 import { logger } from '@/server/monitoring/logger';
 import {
@@ -76,18 +80,30 @@ async function rememberPayment(
 }
 
 /**
- * The whole of `startPayment` once the form has parsed: the hold's tries are spent before any lock
- * (a failed limit store throws, so it fails closed), then the first transaction, then the provider
+ * The whole of `startPayment` once the form has parsed: the maintenance switch is read first (a failed
+ * read throws, so it fails closed), then the hold's tries are spent before any lock
+ * unless the call only re-reads a confirmed order or an existing payment (a failed limit store
+ * throws, so it fails closed), then the first transaction, then the provider
  * between two short transactions, never inside one. Each decision is a function in `src/lib`.
  */
 export async function startCheckoutPayment(
   device: Device,
   input: StartPaymentInput,
 ): Promise<StartPaymentResult> {
-  const refused = paymentTriesRefusal(
-    await consumeRateLimit('payment_tries', input.holdId),
+  const closed = maintenanceRefusal(
+    (await getGuestSettings()).checkoutMaintenance,
   );
-  if (refused) return refused;
+  if (closed) return closed;
+
+  const spends = spendsPaymentTry(
+    await readPaymentTryState(device, input.holdId),
+  );
+  if (spends) {
+    const refused = paymentTriesRefusal(
+      await consumeRateLimit('payment_tries', input.holdId),
+    );
+    if (refused) return refused;
+  }
 
   const payments = getFakePayments();
   const started = await startPaymentTx(device, input, payments.provider);

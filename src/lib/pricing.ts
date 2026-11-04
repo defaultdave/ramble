@@ -1,4 +1,5 @@
 import type { PriceOption, taxTreatments } from './catalog';
+import { requireIntegerInRange } from './integers';
 import { formatPrice } from './money';
 
 // Integer minor units (cents) and parts per million only: no float touches an amount.
@@ -37,19 +38,6 @@ export type PricingLines = {
   taxMinor: number;
   totalMinor: number;
 };
-
-function requireInt(
-  value: number,
-  min: number,
-  max: number,
-  what: string,
-): void {
-  if (!Number.isSafeInteger(value) || value < min || value > max) {
-    throw new RangeError(
-      `${what} must be an integer from ${String(min)} to ${String(max)}, got ${String(value)}`,
-    );
-  }
-}
 
 /**
  * `round_half_up(amountMinor * ratePpm / 1_000_000)` (design doc 4.2.3) on integers: the quotient
@@ -91,7 +79,7 @@ export function taxRatePpm(
   taxTreatment: TaxTreatment,
   configuredRatePpm: number,
 ): number {
-  requireInt(configuredRatePpm, 0, PPM, 'Tax rate (ppm)');
+  requireIntegerInRange(configuredRatePpm, 0, PPM, 'Tax rate (ppm)');
   switch (taxTreatment) {
     case 'taxable':
       return configuredRatePpm;
@@ -119,7 +107,7 @@ export function lines(
   priceOptions: readonly PricedOption[],
   ratePpm: number,
 ): PricingLines {
-  requireInt(ratePpm, 0, PPM, 'Tax rate (ppm)');
+  requireIntegerInRange(ratePpm, 0, PPM, 'Tax rate (ppm)');
   if (priceOptions.length > MAX_LINES) {
     throw new RangeError(
       `At most ${String(MAX_LINES)} price options, got ${String(priceOptions.length)}`,
@@ -134,7 +122,12 @@ export function lines(
   const optionsById = new Map<string, PricedOption>();
   const kinds = new Set<string>();
   for (const option of priceOptions) {
-    requireInt(option.priceMinor, 0, MAX_UNIT_PRICE_MINOR, 'Unit price');
+    requireIntegerInRange(
+      option.priceMinor,
+      0,
+      MAX_UNIT_PRICE_MINOR,
+      'Unit price',
+    );
     if (optionsById.has(option.id) || kinds.has(option.kind)) {
       throw new RangeError('Price options must have distinct ids and kinds');
     }
@@ -146,7 +139,7 @@ export function lines(
   const priced: PriceLine[] = [];
   let ticketSubtotalMinor = 0;
   for (const item of items) {
-    requireInt(item.quantity, 1, MAX_QUANTITY, 'Quantity');
+    requireIntegerInRange(item.quantity, 1, MAX_QUANTITY, 'Quantity');
     const option = optionsById.get(item.priceOptionId);
     if (!option) {
       throw new RangeError('A line names a price option that is not offered');

@@ -871,7 +871,9 @@ describe('blockRefusal', () => {
     const rows = [lapsed(1), lapsed(2), lapsed(3)];
     const until = new Date(later(12 * minuteMs));
 
-    expect(blockRefusal(rows, new Date(until.getTime() - 1))).not.toBeNull();
+    expect(blockRefusal(rows, new Date(until.getTime() - 1))).toEqual(
+      blockedUntil(3),
+    );
     expect(blockRefusal(rows, until)).toBeNull();
   });
 
@@ -882,12 +884,16 @@ describe('blockRefusal', () => {
   });
 
   it('counts a lapse 14 minutes ago and not one exactly 15 minutes ago', () => {
-    expect(blockRefusal([lapsed(1), lapsed(2), lapsed(14)], at)).not.toBeNull();
+    expect(blockRefusal([lapsed(1), lapsed(2), lapsed(14)], at)).toEqual(
+      blockedUntil(14),
+    );
     expect(blockRefusal([lapsed(1), lapsed(2), lapsed(15)], at)).toBeNull();
   });
 
   it('counts a deadline equal to `at` and not one after it', () => {
-    expect(blockRefusal([lapsed(0), lapsed(1), lapsed(2)], at)).not.toBeNull();
+    expect(blockRefusal([lapsed(0), lapsed(1), lapsed(2)], at)).toEqual(
+      blockedUntil(2),
+    );
     expect(blockRefusal([lapsed(-1), lapsed(1), lapsed(2)], at)).toBeNull();
   });
 

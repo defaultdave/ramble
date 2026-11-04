@@ -3,8 +3,9 @@ import { render, screen, within } from '@testing-library/react';
 import { notFound } from 'next/navigation';
 import type { ReactElement, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { LandingKind } from '@/lib/pages/landing';
+import { landingResultsId, type LandingKind } from '@/lib/pages/landing';
 import { LandingRoute, landingMetadata } from './LandingRoute';
+import { makeDriverError } from '../../../../../tests/support/driverError';
 
 // Behaviours under test, one per decision, branch or risk:
 // - an address the catalog has nothing for is a not-found
@@ -77,11 +78,7 @@ const notFoundDigest = expect.stringContaining(
   'NEXT_HTTP_ERROR_FALLBACK;404',
 ) as string;
 
-// What a database error carries: the query text and the values bound to it.
-const driverError = Object.assign(
-  new Error('Failed query: select ... where slug = $1\nparams: secret-slug'),
-  { cause: new Error('connection to secret-host refused') },
-);
+const driverError = makeDriverError('secret-slug', { withCause: true });
 
 type SuspendedResults = ReactElement<{
   children: ReactElement<unknown, (props: unknown) => Promise<ReactElement>>;
@@ -232,7 +229,7 @@ describe('the landing results', () => {
     { branch: 'read', fail: false, inside: () => screen.getByRole('heading') },
     { branch: 'failed', fail: true, inside: () => screen.getByRole('alert') },
   ])(
-    'marks the $branch branch to be shown with scripting off',
+    'marks the $branch branch to be shown with scripting off, and reachable by the skip link',
     async ({ fail, inside }) => {
       if (fail) server.browse.mockRejectedValue(driverError);
 
@@ -241,7 +238,7 @@ describe('the landing results', () => {
       );
 
       const shown = container.querySelector('[data-reveal-without-script]');
-      expect(shown).toBeInTheDocument();
+      expect(shown).toHaveAttribute('id', landingResultsId);
       expect(shown).toContainElement(inside());
     },
   );

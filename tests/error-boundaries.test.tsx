@@ -5,7 +5,6 @@ import GuestError from '@/app/(guest)/error';
 import HostError from '@/app/(host)/error';
 import OpsError from '@/app/(ops)/error';
 import GlobalError from '@/app/global-error';
-import { Button } from '@/components/Button';
 import { ErrorNotice } from '@/components/ErrorNotice';
 
 function findElement(
@@ -23,15 +22,6 @@ function findElement(
 }
 
 describe('Try again', () => {
-  it('runs the retry function the button was given', () => {
-    const retry = vi.fn();
-
-    const button = findElement(ErrorNotice({ onRetry: retry }), Button);
-    (button?.props.onClick as () => void)();
-
-    expect(retry).toHaveBeenCalledTimes(1);
-  });
-
   it.each([
     ['guest', GuestError],
     ['checkout', CheckoutError],

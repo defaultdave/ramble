@@ -4,7 +4,7 @@ import {
   cacheTagBudget,
   homePageTagCount,
 } from './cacheTagBudget';
-import { editorialLimits } from '../editorial';
+import { editorialLimits, picksCandidates } from '../editorial';
 import { cardLookupLimit, coverLookupLimit } from '../idLookup';
 import { homeLimits } from './home';
 import { photoLimits } from '../photos';
@@ -38,7 +38,7 @@ describe('cacheEntryTagCounts', () => {
   });
 
   it('keeps more Pick candidates than cards shown, so a module that cannot show its first cards is filled', () => {
-    expect(homeLimits.picksCandidates).toBeGreaterThan(homeLimits.picksShown);
+    expect(picksCandidates).toBeGreaterThan(homeLimits.picksShown);
   });
 });
 

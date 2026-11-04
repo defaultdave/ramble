@@ -7,6 +7,7 @@ import {
   withPriceOptions,
   type CardExperience,
 } from './experienceCards';
+import { id } from '../../tests/support/ids';
 
 // Behaviours under test, one per decision, branch or risk:
 // - prices are grouped under their experience, lowest first; a price of an unlisted experience is ignored
@@ -17,9 +18,6 @@ import {
 // - cards follow the order given, skip what is missing, and stop at the limit
 // - the row schema keeps what a card needs and refuses a negative or fractional price
 // - the lookup limit is the one bound the home read and the cover read share
-
-const id = (n: number) =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
 function experience(
   n: number,

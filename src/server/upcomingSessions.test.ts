@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { bookingRead, upcomingSessionLimits } from '@/lib/upcomingSessions';
 import { readUpcomingSessions } from './upcomingSessions';
+import { id } from '../../tests/support/ids';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the list uses the browse profile and tags the experience, in lower case
@@ -22,8 +23,6 @@ vi.mock('@/server/db/upcomingSessions', () => ({
 const spaces = vi.hoisted(() => ({ left: vi.fn() }));
 vi.mock('@/server/spacesLeft', () => ({ getSpacesLeft: spaces.left }));
 
-const id = (n: number) =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const asOf = '2026-11-02T15:00:00.000Z';
 const session = (n: number) => ({
   id: id(n),

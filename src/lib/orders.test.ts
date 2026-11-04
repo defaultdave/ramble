@@ -15,6 +15,7 @@ import {
   type OrderStatus,
 } from './orders';
 import { isTerminal } from './transitions';
+import { id } from '../../tests/support/ids';
 
 // Behaviours under test, one per decision, branch or risk.
 // - reference: RMB- plus six Crockford characters, nothing else, bounded before the pattern runs
@@ -24,8 +25,6 @@ import { isTerminal } from './transitions';
 // - OrderSchema: a valid booking and a valid gift purchase pass; each row rule refuses its bad row
 // - OrderItemSchema: bounds on quantity and price, and the line total
 
-const id = (n: number) =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const holdId = id(10);
 const created = new Date('2026-11-01T12:00:00Z');
 const later = new Date('2026-11-01T12:05:00Z');

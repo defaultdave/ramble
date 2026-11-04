@@ -26,6 +26,9 @@ type Named = { slug: string; name: string };
  */
 export const landingPlaceholderSlug = 'not_a_slug';
 
+/** The id of the streamed results, which the skip link shown with scripting off points at. */
+export const landingResultsId = 'landing-results';
+
 /** The title of a landing page that has no name to show because the address names nothing. */
 export const landingFallbackTitle = 'Things to do in New York';
 

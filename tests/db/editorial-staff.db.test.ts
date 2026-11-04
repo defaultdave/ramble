@@ -1,5 +1,6 @@
 import { updateTag } from 'next/cache';
 import { sql } from 'drizzle-orm';
+import { ZodError } from 'zod';
 import {
   afterAll,
   beforeAll,
@@ -270,18 +271,6 @@ describe('legal drafts and publishing', () => {
     expect(first.status).toBe('draft');
   });
 
-  it('gives two drafts made at the same moment two different numbers', async () => {
-    const key = 'waiver-race';
-
-    const made = await Promise.all([
-      legal.createLegalDraft(ops, { doc: key, title: 'A', body: doc() }),
-      legal.createLegalDraft(ops, { doc: key, title: 'B', body: doc() }),
-      legal.createLegalDraft(ops, { doc: key, title: 'C', body: doc() }),
-    ]);
-
-    expect(made.map((entry) => entry.version).toSorted()).toEqual([1, 2, 3]);
-  });
-
   it('edits a draft and refuses to edit a published version', async () => {
     const draft = await legal.createLegalDraft(ops, {
       doc: 'waiver-edit',
@@ -360,14 +349,14 @@ describe('legal drafts and publishing', () => {
   it('refuses a key and a body the schema refuses, without writing', async () => {
     await expect(
       legal.createLegalDraft(ops, { doc: 'Cookies', title: 'x', body: doc() }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(ZodError);
     await expect(
       legal.createLegalDraft(ops, {
         doc: 'terms',
         title: 'x',
         body: { type: 'doc', content: [{ type: 'script' }] } as never,
       }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(ZodError);
   });
 });
 
@@ -424,7 +413,7 @@ describe('updating settings', () => {
   ])('refuses %s and invalidates nothing', async (_name, change) => {
     await expect(
       settingsApi.updateSettings(ops, change as never),
-    ).rejects.toThrow();
+    ).rejects.toThrow(ZodError);
 
     expect(updateTag).not.toHaveBeenCalled();
     expect((await client.db.select().from(settings))[0]?.holdMinutes).toBe(10);

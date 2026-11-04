@@ -1,5 +1,6 @@
 import { count, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { ZodError } from 'zod';
 import { maxAllocation } from '@/lib/sessions';
 import { anonymousCaller, ForbiddenError, Role } from '@/server/auth/caller';
 import { testCaller } from '@/server/auth/test-caller';
@@ -191,6 +192,6 @@ describe('createSessionTemplate', () => {
         ...saturdayTenAm,
         ...override,
       } as never),
-    ).rejects.toThrow();
+    ).rejects.toThrow(ZodError);
   });
 });

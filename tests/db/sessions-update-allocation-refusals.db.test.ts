@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { ZodError } from 'zod';
 import { maxAllocation } from '@/lib/sessions';
 import {
   anonymousCaller,
@@ -247,7 +248,7 @@ describe('updateSessionAllocation', () => {
         expectedVersion: 1,
         ...override,
       }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(ZodError);
     expect(await stored(session.id)).toMatchObject({
       allocation: 8,
       version: 1,

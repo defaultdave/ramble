@@ -139,7 +139,9 @@ describe('saving the home page', () => {
     );
     const pick = await saved(editorial.saveCollection(ops, collectionInput()));
 
-    await expect(editorial.saveHomeModules(ops, tooMany)).rejects.toThrow();
+    await expect(editorial.saveHomeModules(ops, tooMany)).rejects.toThrow(
+      ZodError,
+    );
     await expect(
       editorial.saveHomeModules(ops, [
         {
@@ -391,7 +393,7 @@ describe('saving a help article', () => {
 
     await expect(
       editorial.saveHelpArticle(ops, helpInput({ body })),
-    ).rejects.toThrow();
+    ).rejects.toThrow(ZodError);
   });
 });
 

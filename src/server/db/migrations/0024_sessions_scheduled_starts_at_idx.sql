@@ -1,0 +1,1 @@
+CREATE INDEX "sessions_scheduled_starts_at_idx" ON "sessions" USING btree ("starts_at") WHERE "sessions"."status" = 'scheduled';

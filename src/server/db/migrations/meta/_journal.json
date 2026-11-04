@@ -169,6 +169,13 @@
       "when": 1793676867976,
       "tag": "0023_consents_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793771382912,
+      "tag": "0024_sessions_scheduled_starts_at_idx",
+      "breakpoints": true
     }
   ]
 }

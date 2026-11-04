@@ -65,7 +65,11 @@ afterAll(async () => {
   vi.unstubAllEnvs();
 });
 
+// One instant per test, so every time derived inside a test shares the same base.
+let at = Date.now();
+
 beforeEach(async () => {
+  at = Date.now();
   // The limits count a device's holds in every session, so a test starts with none.
   await clearHolds(client.db);
   cache.updateTag.mockClear();
@@ -318,8 +322,8 @@ describe('reserveSpaces refuses and writes nothing', () => {
   it('a session that has started is refused as past', async () => {
     const bookable = await seedBookable(client.db);
     const started = await insertSession(client.db, bookable.experience.id, {
-      startsAt: new Date(Date.now() - 60 * minute),
-      endsAt: new Date(Date.now() + 60 * minute),
+      startsAt: new Date(at - 60 * minute),
+      endsAt: new Date(at + 60 * minute),
     });
 
     const answer = await expectNothingWritten(

@@ -26,14 +26,21 @@ export type CheckoutHeaderProps = HeaderBaseProps & {
   holdTimer: ReactNode;
 };
 
-export type HeaderProps = DefaultHeaderProps | CheckoutHeaderProps;
+/** The home link alone, for a frame that cannot carry the site navigation. */
+export type PlainHeaderProps = HeaderBaseProps & { variant: 'plain' };
+
+export type HeaderProps =
+  DefaultHeaderProps | CheckoutHeaderProps | PlainHeaderProps;
 
 export function Header(props: HeaderProps) {
-  return props.variant === 'checkout' ? (
-    <CheckoutHeader {...props} />
-  ) : (
-    <DefaultHeader {...props} />
-  );
+  switch (props.variant) {
+    case 'checkout':
+      return <CheckoutHeader {...props} />;
+    case 'plain':
+      return <PlainHeader {...props} />;
+    default:
+      return <DefaultHeader {...props} />;
+  }
 }
 
 function HomeLink() {
@@ -101,6 +108,16 @@ function CheckoutHeader({ variant, holdTimer, ...rest }: CheckoutHeaderProps) {
           <p className={styles.secure}>Secure checkout</p>
         </div>
         {holdTimer}
+      </div>
+    </header>
+  );
+}
+
+function PlainHeader({ variant, ...rest }: PlainHeaderProps) {
+  return (
+    <header {...rest} className={styles.header} data-variant={variant}>
+      <div className={styles.inner}>
+        <HomeLink />
       </div>
     </header>
   );

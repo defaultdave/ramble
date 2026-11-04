@@ -467,6 +467,10 @@ export const sessions = pgTable(
       table.experienceId,
       table.startsAt,
     ),
+    // "On this week" reads the soonest scheduled sessions across every experience.
+    index('sessions_scheduled_starts_at_idx')
+      .on(table.startsAt)
+      .where(sql`${table.status} = 'scheduled'`),
     // Nulls never collide, so sessions without a template are not constrained.
     uniqueIndex('sessions_template_local_date_unique').on(
       table.templateId,

@@ -8,7 +8,7 @@ import { SiteMenu } from './SiteMenu';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the notice shows its text in a labelled region
-// - the menu is closed until opened, opens and closes from its button, and lists its links
+// - the menu is closed until opened, opens and closes from its button, closes when a link in it is clicked, and lists its links
 // - the shell puts the skip link first, then the notice, the header, the one main landmark, and the footer
 // - the shell shows no notice when it is given none
 // - the shell's header links search, picks, and gifts to pages, and its footer links only pages that exist
@@ -82,6 +82,29 @@ describe('SiteMenu', () => {
     expect(details).toHaveAttribute('open');
 
     await userEvent.click(screen.getByRole('button', { name: 'Elsewhere' }));
+    expect(details).not.toHaveAttribute('open');
+  });
+
+  it('closes when a link in it is clicked', async () => {
+    // The click is not followed: the test page has nowhere to go.
+    const { container } = render(
+      <div
+        onClick={(event) => {
+          event.preventDefault();
+        }}
+      >
+        <SiteMenu links={links} />
+      </div>,
+    );
+    const details = container.querySelector('details');
+    await userEvent.click(
+      screen.getByText('Menu', { selector: 'summary span' }),
+    );
+
+    await userEvent.click(
+      screen.getByRole('link', { name: 'Gift guide', hidden: true }),
+    );
+
     expect(details).not.toHaveAttribute('open');
   });
 

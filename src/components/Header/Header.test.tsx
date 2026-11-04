@@ -92,6 +92,19 @@ describe('Header checkout', () => {
   });
 });
 
+describe('Header plain', () => {
+  it('holds the home link and nothing else, as one banner', () => {
+    render(<Header variant="plain" />);
+    expect(screen.getByRole('link', { name: 'Ramble home' })).toHaveAttribute(
+      'href',
+      '/',
+    );
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+    expect(screen.getAllByRole('banner')).toHaveLength(1);
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+  });
+});
+
 describe('Header props', () => {
   it('rejects className and style', () => {
     expectTypeOf<ComponentProps<typeof Header>>().not.toHaveProperty(

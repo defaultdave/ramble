@@ -164,11 +164,6 @@ export function FakePaymentForm({
 
   return (
     <div className={styles.form}>
-      <Alert
-        tone="info"
-        title="Demo payment form"
-        body="No real payment is taken here, and no real card is accepted. Only the test cards listed below work."
-      />
       <p role="status" className={styles.visuallyHidden}>
         {locked ? 'Confirming payment' : ''}
       </p>
@@ -177,6 +172,11 @@ export function FakePaymentForm({
           <Alert tone={notice.tone} title={notice.title} body={notice.body} />
         </div>
       ) : null}
+      <Alert
+        tone="info"
+        title="Demo payment form"
+        body="No real payment is taken here, and no real card is accepted. Only the test cards listed below work."
+      />
 
       {view.step === 'entering' ? (
         <>

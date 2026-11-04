@@ -14,7 +14,7 @@ import {
   calendarLoadingMessage,
 } from '@/lib/filterBar';
 import { noFilters } from '@/lib/filters';
-import { dateChipLabel } from '@/lib/pages/browse';
+import { dateChipLabel } from '@/lib/time';
 import {
   bar,
   calendarCard,
@@ -33,7 +33,7 @@ import {
 } from './FilterBar.testkit';
 
 // Behaviours under test, one per decision, branch or risk:
-// - the date chip shows the chosen day or "Pick a date"; the calendar opens, picks, clears, and closes on Escape or a press outside
+// - the date chip shows the chosen day or "Pick a date"; the calendar opens, picks, clears, and closes on Escape, a press outside, or focus tabbing out
 // - a calendar card fixed over the chip scrolls the page by the overlap; one that clears it or sits against the chip does not
 // - a press on blank space forgets the focus a history change would then wrongly claim
 // - the calendar's code is not fetched before the date disclosure opens, is fetched on its first open (row and drawer), and a press of the chip's neighbour fetches nothing
@@ -66,18 +66,21 @@ describe('the date chip', () => {
     ).toBeVisible();
   });
 
-  it('closes the calendar on Escape and returns focus to the chip', async () => {
-    const { details } = setup();
-    await userEvent.click(dateChip());
-    await userEvent.keyboard('{Escape}');
-    expect(details.open).toBe(false);
-    expect(dateChip()).toHaveFocus();
-  });
-
   it('closes the calendar on a press outside it', async () => {
     const { details } = setup();
     await userEvent.click(dateChip());
     await userEvent.click(document.body);
+    expect(details.open).toBe(false);
+  });
+
+  it('closes the calendar when focus tabs on past Clear date', async () => {
+    const { details } = setup({ ...noFilters, date: chosenDay });
+    await userEvent.click(dateChip(chosenLabel));
+    row().getByRole('link', { name: 'Clear date' }).focus();
+    expect(details.open).toBe(true);
+
+    await userEvent.tab();
+
     expect(details.open).toBe(false);
   });
 
@@ -138,19 +141,6 @@ describe('the date chip', () => {
       vi.unstubAllGlobals();
     },
   );
-
-  it('closes the calendar and focuses the chip when the chosen day changes and focus was in the calendar', async () => {
-    const { rerender } = render(bar(noFilters));
-    const details = disclosure();
-    await userEvent.click(dateChip());
-    expect(details.open).toBe(true);
-
-    rerender(bar({ ...noFilters, date: chosenDay }));
-
-    expect(disclosure()).toBe(details);
-    expect(details.open).toBe(false);
-    expect(dateChip(chosenLabel)).toHaveFocus();
-  });
 
   it('leaves focus on the page when the day changes by Back or Forward', () => {
     const { rerender } = render(bar(noFilters));
@@ -222,7 +212,7 @@ describe('the date chip', () => {
 });
 
 describe('the calendar fetched when the date disclosure opens', () => {
-  const placeholder = () => screen.getByRole('status', { busy: true });
+  const placeholder = () => within(disclosure()).getByRole('status');
 
   it('is not fetched before the disclosure opens, nor by the other chips', async () => {
     setup();
@@ -241,13 +231,13 @@ describe('the calendar fetched when the date disclosure opens', () => {
     });
     expect(calendarFetch).toHaveBeenCalledOnce();
     expect(placeholder()).toHaveTextContent(calendarLoadingMessage());
+    // A busy live region is held back from a screen reader, so the loading text would never be said.
+    expect(placeholder()).not.toHaveAttribute('aria-busy');
     expect(screen.queryByRole('grid')).not.toBeInTheDocument();
 
     calendar.finish();
     expect(await screen.findByRole('grid')).toBeVisible();
-    expect(
-      screen.queryByRole('status', { busy: true }),
-    ).not.toBeInTheDocument();
+    expect(within(disclosure()).queryByRole('status')).not.toBeInTheDocument();
   });
 
   it.each([
@@ -310,9 +300,7 @@ describe('the calendar fetched when the date disclosure opens', () => {
     calendarHeld.mockReturnValue(await real.loadDatePicker());
     await userEvent.click(dateChip());
     expect(screen.getByRole('grid')).toBeVisible();
-    expect(
-      screen.queryByRole('status', { busy: true }),
-    ).not.toBeInTheDocument();
+    expect(within(disclosure()).queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('holds one fetch for a card closed and opened again while the code is on its way', async () => {
@@ -355,9 +343,7 @@ describe('the calendar fetched when the date disclosure opens', () => {
     setup();
     await userEvent.click(dateChip());
     expect(screen.getByRole('grid')).toBeVisible();
-    expect(
-      screen.queryByRole('status', { busy: true }),
-    ).not.toBeInTheDocument();
+    expect(within(disclosure()).queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('says the calendar could not load, and a later open tries again', async () => {
@@ -468,20 +454,28 @@ describe('the calendar fetched when the date disclosure opens', () => {
     vi.unstubAllGlobals();
   });
 
-  it('closes on a pick and gives focus back to the chip, without mounting the calendar again', async () => {
+  it('closes the calendar and gives focus back to the chip on Escape and on a pick, without mounting the disclosure or the calendar again', async () => {
     const { rerender } = render(bar(noFilters));
+    const details = disclosure();
     await userEvent.click(dateChip());
     const grid = await screen.findByRole('grid');
+    await userEvent.keyboard('{Escape}');
+    expect(details.open).toBe(false);
+    expect(dateChip()).toHaveFocus();
+
+    await userEvent.click(dateChip());
     const [next] = await screen.findAllByRole('button', { name: 'Next' });
     if (!next) throw new Error('No Next button');
     await userEvent.click(next);
     await userEvent.click(
       screen.getByRole('button', { name: /Saturday, November 7, 2026/ }),
     );
+    expect(details.open).toBe(true);
 
     rerender(bar({ ...noFilters, date: chosenDay }));
 
-    expect(disclosure().open).toBe(false);
+    expect(disclosure()).toBe(details);
+    expect(details.open).toBe(false);
     expect(dateChip(chosenLabel)).toHaveFocus();
     expect(screen.getByRole('grid', { hidden: true })).toBe(grid);
   });

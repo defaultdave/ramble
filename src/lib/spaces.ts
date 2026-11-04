@@ -2,6 +2,9 @@ export type SpacesStatus = 'open' | 'few-left' | 'sold-out';
 
 const FEW_LEFT_AT_MOST = 3;
 
+/** A session with this many spaces left, or fewer, is sold out. The database filter reads it too. */
+export const soldOutAtSpacesLeft = 0;
+
 type SessionSpace = { allocation: number; seatsSold: number };
 
 export function spacesLeft({ allocation, seatsSold }: SessionSpace): number {
@@ -22,7 +25,7 @@ export function hasSpaceForParty(
 }
 
 export function spacesStatus(spacesLeft: number): SpacesStatus {
-  if (spacesLeft <= 0) return 'sold-out';
+  if (spacesLeft <= soldOutAtSpacesLeft) return 'sold-out';
   return spacesLeft <= FEW_LEFT_AT_MOST ? 'few-left' : 'open';
 }
 

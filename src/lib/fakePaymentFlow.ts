@@ -102,7 +102,7 @@ export type FocusTarget = 'sheet' | 'notice' | 'pay';
 
 /**
  * Where keyboard focus goes after a step change, so it never falls to the page when a sheet
- * unmounts: into a sheet when it opens, and back to the notice (or Pay) when it closes.
+ * unmounts: into a sheet when it opens, and to the notice when one shows (a card declined from the form too), else back to Pay when a sheet closes.
  * `fromSheet` is whether the step before this one was on a sheet.
  */
 export function focusTarget(
@@ -110,8 +110,9 @@ export function focusTarget(
   state: FlowState,
 ): FocusTarget | null {
   if (state.step === 'challenge' || state.step === 'wallet') return 'sheet';
-  if (state.step === 'entering' && fromSheet) {
-    return state.notice ? 'notice' : 'pay';
+  if (state.step === 'entering') {
+    if (state.notice) return 'notice';
+    return fromSheet ? 'pay' : null;
   }
   return null;
 }

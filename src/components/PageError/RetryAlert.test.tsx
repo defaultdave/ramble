@@ -1,7 +1,9 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { moduleClass } from '../../../tests/support/moduleClass';
 import { RetryAlert } from './RetryAlert';
+import styles from './RetryAlert.module.css';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the alert says what happened with the title and body it was given
@@ -32,8 +34,8 @@ describe('RetryAlert', () => {
         <button type="submit">Try again</button>
       </RetryAlert>,
     );
-    expect(
-      (container.firstElementChild as HTMLElement).className.includes('fit'),
-    ).toBe(marked);
+    const wrapper = container.firstElementChild;
+    if (!wrapper) throw new Error('The alert did not render');
+    expect(wrapper.classList.contains(moduleClass(styles.fit))).toBe(marked);
   });
 });

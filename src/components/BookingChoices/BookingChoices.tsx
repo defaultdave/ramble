@@ -75,6 +75,9 @@ export function BookingChoices({
   const timesHeadingId = useId();
   return (
     <div className={styles.choices}>
+      <p role="status" className={styles.visuallyHidden}>
+        {view.status}
+      </p>
       {notice ? (
         <Alert
           data-booking-notice=""
@@ -198,15 +201,20 @@ export function BookingPausedNotice() {
 /** Under the choices in the sheet: the total, the cancellation line, Continue, and how long spaces are held. */
 export function BookingFooter({
   summary,
+  missing,
   canContinue,
   pending,
   onContinue,
 }: {
   summary: Summary | null;
+  /** What Continue is waiting for, said under the button while it is disabled. */
+  missing: string | null;
   canContinue: boolean;
   pending: boolean;
   onContinue: () => void;
 }) {
+  const disabled = !canContinue || summary === null;
+  const missingId = useId();
   return (
     <div className={styles.footer}>
       {summary ? (
@@ -225,13 +233,19 @@ export function BookingFooter({
       <div className={styles.footerAction}>
         <Button
           size="lg"
-          disabled={!canContinue || summary === null}
+          disabled={disabled}
+          {...(disabled && missing ? { 'aria-describedby': missingId } : {})}
           loading={pending}
           onClick={onContinue}
         >
           {summary ? continueLabel(summary.totalMinor) : 'Continue'}
         </Button>
       </div>
+      {disabled && missing ? (
+        <p id={missingId} className={styles.footerNote}>
+          {missing}
+        </p>
+      ) : null}
       <p className={styles.footerNote}>{holdNote}</p>
     </div>
   );

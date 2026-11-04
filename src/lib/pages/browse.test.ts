@@ -8,13 +8,11 @@ import {
   browsePageSize,
   browseView,
   browseWindowDays,
-  dateChipLabel,
   errorView,
   maxHandEnteredDayRows,
   maxStoredDayRows,
   resultsSummary,
   nextBrowseDay,
-  splitPage,
   toBrowsePage,
   type BrowsePage,
   type BrowseView,
@@ -26,7 +24,6 @@ import { id } from '../../../tests/support/ids';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the window runs from the cache time to the horizon
-// - a page is cut from page size plus one rows: the extra row makes the cursor and is not shown
 // - a read becomes a page, and a cursor with no visible row is an outdated page, not an empty one
 // - the calendar days: a generated session keeps its stored date, a hand-entered one is on the day its start falls on in its own zone
 //   (east of UTC, west of UTC, a clock-change day), days are merged, de-duplicated, and sorted, and an unknown zone refuses the read
@@ -57,29 +54,6 @@ function experience(
 describe('browseWindowDays', () => {
   it('covers the horizon and the whole last day', () => {
     expect(browseWindowDays).toBe(browseDateHorizonDays + 1);
-  });
-});
-
-describe('splitPage', () => {
-  const rows = (count: number) =>
-    Array.from({ length: count }, (_, i) => ({ id: id(i + 1) }));
-
-  it('has no next page when there are fewer rows than a page', () => {
-    expect(splitPage(rows(3), 5)).toEqual({ items: rows(3), nextCursor: null });
-  });
-
-  it('has no next page when the rows fill a page exactly', () => {
-    expect(splitPage(rows(5), 5).nextCursor).toBeNull();
-  });
-
-  it('shows a page and starts the next after its last row when one more is read', () => {
-    const page = splitPage(rows(6), 5);
-    expect(page.items).toEqual(rows(5));
-    expect(page.nextCursor).toBe(id(5));
-  });
-
-  it('handles no rows', () => {
-    expect(splitPage([], 5)).toEqual({ items: [], nextCursor: null });
   });
 });
 
@@ -141,16 +115,6 @@ describe('resultsSummary', () => {
     [0, false, '0 experiences'],
   ])('writes %i shown, more=%s', (shown, hasMore, text) => {
     expect(resultsSummary(shown, hasMore)).toBe(text);
-  });
-});
-
-describe('dateChipLabel', () => {
-  it.each([
-    ['2026-11-07', 'Sat, Nov 7'],
-    ['2026-12-31', 'Thu, Dec 31'],
-    ['2027-01-01', 'Fri, Jan 1'],
-  ])('writes %s as %s', (date, label) => {
-    expect(dateChipLabel(date)).toBe(label);
   });
 });
 

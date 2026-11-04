@@ -1,4 +1,10 @@
-import { useEffect, useRef, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  type FocusEvent,
+  type KeyboardEvent,
+  type MouseEvent,
+} from 'react';
 import { dismissAction } from '@/lib/disclosureDismiss';
 
 type Options = {
@@ -7,8 +13,8 @@ type Options = {
 };
 
 /**
- * Wires Escape and an outside press to a native `<details>`. Without script the browser still
- * opens and closes it; this only adds the dismissals it lacks. The rule is `dismissAction`.
+ * Wires Escape, an outside press, focus leaving, and a link click to a native `<details>`. Without script the browser still
+ * opens and closes it; this only adds the dismissals it lacks. Spread `onKeyDown`, `onBlur`, and `onClick` on the `<details>`. The rule is `dismissAction`.
  * The press is heard in the capture phase, so a control that stops the event inside the page
  * cannot hide an outside press from it.
  */
@@ -49,5 +55,29 @@ export function useDismissableDetails({
     element.open = false;
     if (action === 'close-and-refocus') summary.current?.focus();
   }
-  return { details, summary, onKeyDown, close };
+  function onBlur(event: FocusEvent<HTMLDetailsElement>) {
+    const element = details.current;
+    if (!element) return;
+    const next = event.relatedTarget;
+    const action = dismissAction({
+      kind: 'focus-out',
+      open: element.open,
+      inside: next instanceof Node ? element.contains(next) : null,
+    });
+    if (action !== 'none') element.open = false;
+  }
+  function onClick(event: MouseEvent<HTMLDetailsElement>) {
+    const element = details.current;
+    if (!element) return;
+    if (!(event.target instanceof Element) || !event.target.closest('a')) {
+      return;
+    }
+    const action = dismissAction({
+      kind: 'link-click',
+      open: element.open,
+      inside: true,
+    });
+    if (action !== 'none') element.open = false;
+  }
+  return { details, summary, onKeyDown, onBlur, onClick, close };
 }

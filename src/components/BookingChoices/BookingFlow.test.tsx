@@ -167,6 +167,25 @@ describe('the bar and the sheet', () => {
     ).toBeDisabled();
   });
 
+  it('says what Continue is waiting for, and announces each section as it appears', async () => {
+    render(<Page offer={kayakOffer} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Choose date' }));
+    const continueButton = within(sheet()).getByRole('button', {
+      name: 'Continue',
+    });
+    expect(continueButton).toHaveAccessibleDescription(
+      'Choose a date to continue.',
+    );
+
+    await userEvent.click(day('Saturday, October 24, 2026'));
+    expect(continueButton).toHaveAccessibleDescription(
+      'Choose a time to continue.',
+    );
+    expect(
+      within(sheet()).getByText('Times for Sat, Oct 24 are listed below.'),
+    ).toHaveAttribute('role', 'status');
+  });
+
   it('shows what is chosen on the bar once the sheet is closed, and holds from the bar', async () => {
     render(<Page offer={kayakOffer} />);
     await userEvent.click(screen.getByRole('button', { name: 'Choose date' }));
@@ -553,10 +572,13 @@ describe('gifts', () => {
       screen.getByRole('button', { name: 'Give as a gift' }),
     );
 
-    expect(screen.getByRole('status')).toHaveTextContent(
-      "Gifts aren't open yet",
-    );
+    expect(
+      screen.getByText("Gifts aren't open yet").closest('[role="status"]'),
+    ).not.toBeNull();
     expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Continue' }),
+    ).not.toHaveAccessibleDescription();
 
     await userEvent.click(screen.getByRole('button', { name: 'Book for me' }));
     expect(screen.queryByText("Gifts aren't open yet")).toBeNull();

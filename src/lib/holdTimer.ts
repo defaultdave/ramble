@@ -30,6 +30,12 @@ export function holdTimerText(now: Date, expiresAt: Date): string {
     : `Spaces held for ${formatHoldTime(seconds)}`;
 }
 
+// The visible words for the states that otherwise differ only by colour: "Ending soon" in the last two minutes.
+// Expired already reads "Hold expired" in `holdTimerText`.
+export function holdTimerNote(now: Date, expiresAt: Date): string | null {
+  return holdTimerState(now, expiresAt) === 'warning' ? 'Ending soon' : null;
+}
+
 // A live region speaks only when its text changes, so the text changes only at
 // 5 minutes, 2 minutes, and expiry; a countdown read every second is noise.
 export function holdAnnouncement(now: Date, expiresAt: Date): string {

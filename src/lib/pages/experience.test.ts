@@ -36,7 +36,7 @@ import type { GuestPhoto } from '../photos';
 // - the streamed dates are handed the experience and only the price fields they read
 // - gifts switched off leave the gift entry out; the private-session entry stays
 // - the gallery is in the order staff set; a blank text section is left out
-// - the gallery layout follows the photo count (none, one, two, three, many); only the first photo leads; each photo of a set says its place and a lone one says nothing; "See all" and the photos behind it appear only past the grid
+// - the gallery layout follows the photo count (none, one, two, three, many); only the first photo leads; each photo of a set says its place and a lone one says nothing; "See all" appears only past the grid and every photo stays in the one list
 // - the head: a plain title for a guide entry or a missing experience, the name and an opening otherwise; the opening is cut at a word
 
 const photo = (position: number): GuestPhoto => ({
@@ -592,24 +592,17 @@ describe('galleryView', () => {
   });
 
   it.each([0, 1, 2, galleryGridPhotos])(
-    'offers no "See all" and holds nothing back for %i photos',
+    'offers no "See all" for %i photos',
     (count) => {
-      const gallery = galleryView(views(count));
-      expect(gallery.seeAllLabel).toBeNull();
-      expect(gallery.more).toEqual([]);
+      expect(galleryView(views(count)).seeAllLabel).toBeNull();
     },
   );
 
   it.each([4, 5, 15, 20])(
-    'puts every photo after the grid behind "See all %i photos"',
+    'offers "See all %i photos" and keeps every photo in one list',
     (count) => {
       const gallery = galleryView(views(count));
       expect(gallery.seeAllLabel).toBe(`See all ${String(count)} photos`);
-      expect(gallery.more.map(({ alt }) => alt)).toEqual(
-        views(count)
-          .slice(galleryGridPhotos)
-          .map(({ alt }) => alt),
-      );
       expect(gallery.photos).toHaveLength(count);
     },
   );

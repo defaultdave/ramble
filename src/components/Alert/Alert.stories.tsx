@@ -33,6 +33,12 @@ export const WarningWithAction: Story = {
     action: <button type="button">Pay now</button>,
   },
 };
+export const Focused: Story = {
+  args: { tone: 'danger', title: 'Not sent', tabIndex: -1 },
+  play: ({ canvasElement }) => {
+    canvasElement.querySelector<HTMLElement>('[role="alert"]')?.focus();
+  },
+};
 export const TitleOnly: Story = {
   args: { tone: 'info', body: undefined },
 };

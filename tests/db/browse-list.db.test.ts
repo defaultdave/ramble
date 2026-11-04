@@ -30,7 +30,6 @@ import {
 // - the next page starts after the cursor and no row is shown twice or skipped, including two rows with one name
 // - a row added before the cursor, or hidden after it, between two pages moves nothing already shown
 // - a cursor for a hidden or unknown experience finds no row and reads no page; a visible one returns its row
-// - the cursor row is read once per request, as its own query, and the page query does not read it again
 // - category and neighborhood filters match any value of their list and both must hold; an unknown slug matches nothing
 
 let fresh: FreshDatabase;

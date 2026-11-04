@@ -7,6 +7,7 @@ import {
   type FailureOutcome,
   type JobClaim,
 } from '@/lib/jobs';
+import { systemClock, type Clock } from '@/server/ports/clock';
 import { db, type Transaction } from './client';
 import { jobs } from './schema';
 
@@ -26,7 +27,11 @@ function dueAt(now: Date) {
   );
 }
 
-/** Writes one job in the caller's transaction. A dedupe key already used writes nothing and returns null. */
+/**
+ * Writes one job in the caller's transaction. A dedupe key already used writes nothing and returns null.
+ * With no `runAfter` the job is due at the clock's now, the clock that `claimDueJobs` is later given;
+ * the column's database default is only a backstop and may run on another clock.
+ */
 export async function insertJob(
   tx: Transaction,
   values: {
@@ -36,10 +41,11 @@ export async function insertJob(
     maxAttempts: number;
     runAfter?: Date | undefined;
   },
+  clock: Clock = systemClock,
 ): Promise<{ id: string } | null> {
   const [row] = await tx
     .insert(jobs)
-    .values(values)
+    .values({ ...values, runAfter: values.runAfter ?? clock.now() })
     .onConflictDoNothing({
       target: jobs.dedupeKey,
       where: sql`${jobs.dedupeKey} IS NOT NULL`,

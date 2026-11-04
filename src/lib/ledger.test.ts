@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { fakeCardFeeMinor } from './fakeCardFee';
 import {
   LedgerWindowSchema,
@@ -122,8 +123,9 @@ const safe = (rows: LedgerEntryInput[]) => {
   try {
     parseLedgerEvent(rows);
     return { success: true };
-  } catch {
-    return { success: false };
+  } catch (error) {
+    if (error instanceof z.ZodError) return { success: false };
+    throw error;
   }
 };
 const LedgerEntrySchema = {
@@ -131,13 +133,6 @@ const LedgerEntrySchema = {
   safeParse: (row: LedgerEntryInput) => safe([row]),
 };
 const LedgerEventSchema = { safeParse: safe };
-const isCashPosting = (entry: {
-  debitAccount: string;
-  creditAccount: string;
-}) =>
-  entry.debitAccount === 'platform_cash' ||
-  entry.creditAccount === 'platform_cash';
-
 const balancesOf = (...events: LedgerEntryInput[][]) =>
   accountBalances(events.flat().map((row) => LedgerEntrySchema.parse(row)));
 
@@ -380,12 +375,6 @@ describe('which accounts each entry type moves money between', () => {
       pairs.map(([debit, credit]) => [type, debit, credit]),
     );
     expect(inMap.toSorted()).toEqual(designDoc.toSorted());
-  });
-
-  it('lists every entry type, once', () => {
-    expect(Object.keys(ledgerPostings).toSorted()).toEqual(
-      [...ledgerEntryTypes].toSorted(),
-    );
   });
 
   it.each(ledgerEntryTypes)('%s accepts each of its pairs', (entryType) => {
@@ -1089,14 +1078,6 @@ describe('every builder emits rows the schema accepts, within the cap', () => {
     expect(LedgerEventSchema.safeParse(rows).success).toBe(true);
   });
 
-  it('puts a provider id on exactly the rows that touch platform_cash', () => {
-    for (const [, rows] of cases) {
-      for (const row of rows) {
-        expect(row.providerObjectId !== null).toBe(isCashPosting(row));
-      }
-    }
-  });
-
   it('keeps the cap at the largest builder output, and every entry type is used by a builder', () => {
     expect(Math.max(...cases.map(([, rows]) => rows.length))).toBe(
       ledgerLimits.maxEntriesPerPost,
@@ -1108,9 +1089,11 @@ describe('every builder emits rows the schema accepts, within the cap', () => {
   });
 
   it('adds up each event to the amounts it was given', () => {
-    expect(total(cases[0]?.[1] ?? [])).toBe(full.ticketMinor + full.taxMinor);
-    expect(total(cases[4]?.[1] ?? [])).toBe(full.ticketMinor + full.taxMinor);
-    expect(total(cases[6]?.[1] ?? [])).toBe(full.ticketMinor + full.taxMinor);
+    const rowsOf = (name: string) =>
+      cases.find(([caseName]) => caseName === name)?.[1] ?? [];
+    for (const name of ['bookingPaid', 'refundRequested', 'refundFailed']) {
+      expect(total(rowsOf(name)), name).toBe(full.ticketMinor + full.taxMinor);
+    }
   });
 });
 

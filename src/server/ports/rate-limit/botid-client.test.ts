@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const initBotId = vi.hoisted(() => vi.fn());
 vi.mock('botid/client/core', () => ({ initBotId }));
@@ -10,10 +10,16 @@ import { startBotChallenge } from './botid-client';
 // Behaviours under test:
 // - a guest page starts the challenge for POSTs to experience pages
 // - checkout, gift, manage, orders, host, and ops paths start nothing
+// - off Vercel nothing starts, on any path
 // - the files the browser loads before hydration pull in no Zod
 
 beforeEach(() => {
   initBotId.mockReset();
+  vi.stubEnv('NEXT_PUBLIC_BOT_CHALLENGE', 'true');
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 describe('startBotChallenge', () => {
@@ -42,6 +48,19 @@ describe('startBotChallenge', () => {
 
     expect(initBotId).not.toHaveBeenCalled();
   });
+});
+
+describe('startBotChallenge off Vercel', () => {
+  it.each(['false', ''])(
+    'starts nothing when the build flag is %j',
+    async (flag) => {
+      vi.stubEnv('NEXT_PUBLIC_BOT_CHALLENGE', flag);
+
+      await startBotChallenge('/experiences/sunrise-kayak');
+
+      expect(initBotId).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('what the browser loads', () => {

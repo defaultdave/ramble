@@ -37,7 +37,12 @@ export async function UpcomingSessionsContent({
     sessions = await readUpcomingSessions(upcoming.experienceId, asOf);
   } catch (error) {
     rethrowOrLog('The upcoming dates could not be read', error);
-    return <UpcomingSessionsError retryHref={retryHref} />;
+    return (
+      <UpcomingSessionsError
+        retryHref={retryHref}
+        selectedDate={selectedDate}
+      />
+    );
   }
 
   return (

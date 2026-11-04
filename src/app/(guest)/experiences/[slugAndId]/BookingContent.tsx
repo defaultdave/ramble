@@ -47,7 +47,12 @@ export async function BookingContent({
     return (
       <BookingSlots
         bar={null}
-        panel={<UpcomingSessionsError retryHref={retryHref} />}
+        panel={
+          <UpcomingSessionsError
+            retryHref={retryHref}
+            selectedDate={selectedDate}
+          />
+        }
       />
     );
   }

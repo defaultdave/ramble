@@ -64,9 +64,10 @@
   list-style: none;
 }
 
-/* The block padding makes each row a 44px target; rows touch but never overlap. nowrap keeps a link on one line while the columns share a row. */
+/* The block padding makes each row 44px tall and the minimum inline size makes a short word 44px wide; rows touch but never overlap. nowrap keeps a link on one line while the columns share a row. */
 .link {
   display: inline-block;
+  min-inline-size: var(--size-touch-target);
   padding: var(--space-3) 0;
   white-space: nowrap;
   border-radius: var(--radius-sm);

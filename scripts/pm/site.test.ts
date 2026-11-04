@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test";
 import { gitAuthEnv, Refused, type RunResult } from "../merge-desk/agent-git.ts";
-import { publish, type SiteDeps } from "./site.ts";
+import { publish, STATUS_LIMIT_BYTES, type SiteDeps } from "./site.ts";
 
 const DIR = "/work/ramble-pm";
 
-function fakeDeps(options: { branch?: string; remote?: string; staged?: boolean } = {}) {
+function fakeDeps(options: { branch?: string; remote?: string; staged?: boolean; statusBytes?: number } = {}) {
   const calls: { command: string[]; env: Record<string, string> }[] = [];
   const deps: SiteDeps = {
     dir: DIR,
@@ -17,6 +17,7 @@ function fakeDeps(options: { branch?: string; remote?: string; staged?: boolean 
       if (sub === "diff") return { code: options.staged === false ? 0 : 1, stdout: "" };
       return { code: 0, stdout: "" };
     },
+    size: () => options.statusBytes ?? 10_000,
   };
   const subcommands = () => calls.map((c) => c.command[3]);
   return { deps, calls, subcommands };
@@ -30,6 +31,12 @@ test("publish commits the changes and pushes main with the token in the environm
   expect(push.command).toEqual(["git", "-C", DIR, "push", "origin", "refs/heads/main:refs/heads/main"]);
   expect(push.command.join(" ")).not.toContain("ghs_fake");
   expect(push.env.GIT_CONFIG_VALUE_1).toBe(gitAuthEnv("ghs_fake").GIT_CONFIG_VALUE_1);
+});
+
+test("publish accepts a STATUS.md at the limit", async () => {
+  const { deps, subcommands } = fakeDeps({ statusBytes: STATUS_LIMIT_BYTES });
+  await publish("Status", deps);
+  expect(subcommands()).toContain("push");
 });
 
 test("publish with nothing staged skips the commit and still pushes", async () => {
@@ -46,7 +53,8 @@ test.each([
   ["an SSH push URL", { remote: "git@github.com:defaultdave/ramble-pm.git\n" }],
   ["the code repo's URL", { remote: "https://github.com/defaultdave/ramble.git\n" }],
   ["a second push URL elsewhere", { remote: "https://github.com/defaultdave/ramble-pm.git\nhttps://example.com/x.git\n" }],
-])("publish refuses %s and pushes nothing", async (_, o: { message?: string; branch?: string; remote?: string }) => {
+  ["a STATUS.md over the limit", { statusBytes: STATUS_LIMIT_BYTES + 1 }],
+])("publish refuses %s and pushes nothing", async (_, o: { message?: string; branch?: string; remote?: string; statusBytes?: number }) => {
   const { deps, subcommands } = fakeDeps(o);
   await expect(publish(o.message ?? "Status", deps)).rejects.toBeInstanceOf(Refused);
   expect(subcommands()).not.toContain("push");

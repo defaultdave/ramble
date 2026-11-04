@@ -99,36 +99,29 @@
     0 0 0 4px var(--color-focus-ring);
 }
 
-.moreList {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-6);
-  margin: var(--space-3) 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.moreItem {
-  position: relative;
-  overflow: hidden;
-  border-radius: var(--radius-lg);
-  aspect-ratio: 4 / 3;
-  background: var(--color-bg-sunken);
-}
-
 @media (min-width: 768px) {
+  /* The list's width sets the row height below, so the photos hold their shape at any width. */
+  .gallery {
+    container-type: inline-size;
+  }
+
   .strip {
     overflow: visible;
     scroll-snap-type: none;
   }
 
-  /* The lead takes two thirds of the width and both rows; the next two stack beside it. */
+  /*
+   * Three equal columns. The lead takes two and both of the first two rows; the next two stack beside
+   * it, and any after them follow in rows of three, which is where "See all" brings them in.
+   */
   .list {
     display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-    grid-template-rows: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(
+      2,
+      calc((100cqw * 440 / 1200 - var(--space-6)) / 2)
+    );
     gap: var(--space-6);
-    aspect-ratio: 1200 / 440;
   }
 
   .list[data-layout='one'] {
@@ -136,12 +129,21 @@
   }
 
   .item {
-    aspect-ratio: auto;
+    aspect-ratio: 4 / 3;
     border-radius: var(--radius-lg);
   }
 
+  .item:nth-child(-n + 3) {
+    aspect-ratio: auto;
+  }
+
   .item:first-child {
+    grid-column: span 2;
     grid-row: 1 / span 2;
+  }
+
+  .list[data-layout='one'] .item:first-child {
+    grid-column: 1;
   }
 
   .list[data-layout='two'] .item:nth-child(2) {
@@ -150,6 +152,10 @@
 
   .item:nth-child(n + 4) {
     display: none;
+  }
+
+  .gallery:has(.more[open]) .item:nth-child(n + 4) {
+    display: block;
   }
 
   .counter {

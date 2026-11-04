@@ -20,7 +20,7 @@
     "start": "next start",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "next typegen && eslint . --max-warnings 0 --report-unused-disable-directives",
+    "lint": "next typegen && eslint . --max-warnings 0 --report-unused-disable-directives && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-size.ts",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run --project unit --project components",
     "test:db": "vitest run --project db",

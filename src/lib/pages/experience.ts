@@ -431,15 +431,18 @@ export function metaDescription(
 }
 
 export const fallbackTitle = 'Experience';
+export const notFoundTitle = 'Experience not found';
 
 /**
- * The title and description for the page's head. A guide entry or an experience that is not there
- * gets the plain title and no description: its page is not this one, and what it says is not ours to state.
+ * The title and description for the page's head. An experience that is not there is titled as not
+ * found, and a guide entry gets the plain title; neither gets a description: its page is not this
+ * one, and what it says is not ours to state.
  */
 export function experienceHead(
   data: Pick<ExperiencePageInput, 'experience' | 'place'> | null,
 ): { title: string; description: string | null } {
-  if (data === null || data.experience.status === 'guide_only') {
+  if (data === null) return { title: notFoundTitle, description: null };
+  if (data.experience.status === 'guide_only') {
     return { title: fallbackTitle, description: null };
   }
   return {

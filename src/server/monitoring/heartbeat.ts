@@ -1,4 +1,5 @@
 import 'server-only';
+import { errorKind } from '@/lib/errorKind';
 import { logger } from './logger';
 
 const heartbeatTimeoutMs = 5000;
@@ -26,7 +27,7 @@ export async function sendHeartbeat(
     return 'sent';
   } catch (error) {
     logger.warn('heartbeat failed', {
-      errorName: error instanceof Error ? error.name : 'NonError',
+      errorName: errorKind(error, 'NonError'),
     });
     return 'failed';
   }

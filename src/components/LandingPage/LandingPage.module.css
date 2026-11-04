@@ -1,27 +1,14 @@
 .page {
-  display: flex;
-  max-inline-size: var(--size-content-max);
-  flex-direction: column;
-  gap: var(--space-6);
-  margin-inline: auto;
-  padding: var(--space-6) var(--size-gutter) var(--space-12);
-  font-family: var(--font-family-body);
-  color: var(--color-text-primary);
+  composes: page from '../../styles/page-shell.module.css';
 }
 
 .intro {
-  display: flex;
-  max-inline-size: 48rem;
-  flex-direction: column;
+  composes: intro from '../../styles/page-shell.module.css';
   gap: var(--space-3);
 }
 
 .title {
-  margin: 0;
-  font-family: var(--font-family-display);
-  font-size: var(--font-size-display-m);
-  line-height: var(--font-line-height-display-m);
-  font-weight: var(--font-weight-semibold);
+  composes: title from '../../styles/page-shell.module.css';
 }
 
 /* The phone gets a full-width target; from tablet up the link keeps its own width. */
@@ -35,10 +22,6 @@
 }
 
 @media (min-width: 768px) {
-  .page {
-    padding-block-start: var(--space-12);
-  }
-
   .action {
     display: block;
   }

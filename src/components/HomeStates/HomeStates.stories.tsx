@@ -7,8 +7,12 @@ const meta = {
   parameters: {
     a11y: {
       config: {
-        // Every story renders the state twice, once per color scheme.
-        rules: [{ id: 'landmark-unique', enabled: false }],
+        // Every story renders the state twice, once per color scheme. PageHeading's header is the page's
+        // banner here because no main wraps it; on the site it sits inside main and is not one.
+        rules: [
+          { id: 'landmark-unique', enabled: false },
+          { id: 'landmark-no-duplicate-banner', enabled: false },
+        ],
       },
     },
   },

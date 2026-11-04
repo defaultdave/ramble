@@ -3,6 +3,9 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StartPaymentResult } from '@/lib/checkout';
+import { holdTimerText } from '@/lib/holdTimer';
+import { formatMoney, formatPrice } from '@/lib/money';
+import { guestsLabel } from '@/lib/orderSummary';
 import type { ReholdResult } from '@/lib/pages/checkoutFlow';
 import type { CheckoutView } from '@/lib/pages/checkoutPage';
 import { CheckoutPage, type CheckoutActions } from './CheckoutPage';
@@ -63,6 +66,9 @@ const uuid = (n: number) =>
 
 const future = new Date(Date.now() + 10 * 60_000).toISOString();
 
+const unitPriceMinor = 6500;
+const guests = 2;
+
 const view: CheckoutView = {
   holdId: uuid(1),
   sessionId: uuid(2),
@@ -79,12 +85,17 @@ const view: CheckoutView = {
   timeZone: 'America/New_York',
   dateLabel: 'Sat, Oct 24',
   timeLabel: '5:30 PM',
-  guests: 2,
+  guests,
   where: 'Pier 26 boathouse, Tribeca.',
-  lines: [{ label: '$65 × 2 guests', amountMinor: 13_000 }],
+  lines: [
+    {
+      label: `${formatPrice(unitPriceMinor)} × ${guestsLabel(guests)}`,
+      amountMinor: unitPriceMinor * guests,
+    },
+  ],
   taxTreatment: 'not_taxable',
   taxMinor: 0,
-  totalMinor: 13_000,
+  totalMinor: unitPriceMinor * guests,
   cancellationLine: 'Free cancellation until Fri, Oct 23, 5:30 PM.',
   ageSubject: { ageRule: 'minimum_age', minAge: 14, maxAge: null },
   children: 0,
@@ -92,6 +103,8 @@ const view: CheckoutView = {
   termsDocument: { id: uuid(5), href: '/legal/terms' },
   waiverDocument: { id: uuid(6), href: '/legal/waiver-club' },
 };
+
+const expiredText = holdTimerText(new Date(0), new Date(0));
 
 const secret = 'fake_pay_1_secret_0123456789abcdef';
 
@@ -160,7 +173,9 @@ describe('CheckoutPage', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: 'Checkout' }),
     ).toBeVisible();
-    expect(screen.getByRole('timer')).toHaveTextContent('Spaces held for');
+    expect(screen.getByRole('timer')).toHaveTextContent(
+      holdTimerText(new Date(view.serverNow), new Date(view.expiresAt)),
+    );
     expect(
       screen.getByLabelText('Send me the Ramble newsletter'),
     ).not.toBeChecked();
@@ -228,7 +243,11 @@ describe('CheckoutPage', () => {
     );
     await user.type(screen.getByLabelText('Security code'), '123');
     await user.type(screen.getByLabelText('ZIP code'), '10001');
-    await user.click(screen.getByRole('button', { name: 'Pay $130.00' }));
+    await user.click(
+      screen.getByRole('button', {
+        name: `Pay ${formatMoney(view.totalMinor)}`,
+      }),
+    );
 
     await waitFor(() => {
       expect(push).toHaveBeenCalledWith('/orders/RMB-ABC234?t=order-token');
@@ -532,7 +551,7 @@ describe('CheckoutPage', () => {
         actions={actions()}
       />,
     );
-    expect(screen.getByRole('timer')).toHaveTextContent('Hold expired');
+    expect(screen.getByRole('timer')).toHaveTextContent(expiredText);
     expect(screen.getByText('Your hold ended')).toBeVisible();
     expect(
       screen.getByRole('button', { name: 'Hold my spaces again' }),
@@ -574,7 +593,7 @@ describe('CheckoutPage', () => {
         vi.advanceTimersByTime(3000);
       });
       expect(screen.getByText('Your hold ended')).toBeVisible();
-      expect(screen.getByRole('timer')).toHaveTextContent('Hold expired');
+      expect(screen.getByRole('timer')).toHaveTextContent(expiredText);
     } finally {
       vi.useRealTimers();
     }

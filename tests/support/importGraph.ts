@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
+import ts from 'typescript';
 
 export const root = path.resolve(import.meta.dirname, '..', '..');
 export const src = path.join(root, 'src');
@@ -45,15 +46,53 @@ export function hasClientDirective(text: string): boolean {
   return /^\s*(?:\/\/[^\n]*\n\s*)*['"]use client['"]/.test(text);
 }
 
+function isStringLike(node: ts.Node | undefined): node is ts.StringLiteralLike {
+  return (
+    node !== undefined &&
+    (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))
+  );
+}
+
+/** `<T>x` is a type assertion in a `.ts` file and the start of an element in a `.tsx` file, so the extension decides how the text parses. */
+function scriptKindOf(fileName: string): ts.ScriptKind {
+  const extension = path.extname(fileName);
+  if (extension === '.tsx') return ts.ScriptKind.TSX;
+  if (extension === '.jsx') return ts.ScriptKind.JSX;
+  if (extension === '.js' || extension === '.mjs' || extension === '.cjs')
+    return ts.ScriptKind.JS;
+  return ts.ScriptKind.TS;
+}
+
 /** The specifiers a module loads at run time. A type-only import is erased by the compiler, so it is left out. */
-export function importsOf(text: string): string[] {
-  const runtime = text.replace(
-    /\b(?:import|export)\s+type\b[^;'"]*?from\s*['"][^'"]+['"]/g,
-    '',
+export function importsOf(text: string, fileName: string): string[] {
+  const file = ts.createSourceFile(
+    fileName,
+    text,
+    ts.ScriptTarget.Latest,
+    false,
+    scriptKindOf(fileName),
   );
-  return [...runtime.matchAll(/(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g)].map(
-    (match) => match[1] ?? '',
-  );
+  const specifiers: string[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isImportDeclaration(node)) {
+      const typeOnly =
+        node.importClause?.phaseModifier === ts.SyntaxKind.TypeKeyword;
+      if (!typeOnly && isStringLike(node.moduleSpecifier))
+        specifiers.push(node.moduleSpecifier.text);
+    } else if (ts.isExportDeclaration(node)) {
+      if (!node.isTypeOnly && isStringLike(node.moduleSpecifier))
+        specifiers.push(node.moduleSpecifier.text);
+    } else if (
+      ts.isCallExpression(node) &&
+      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+      isStringLike(node.arguments[0])
+    ) {
+      specifiers.push(node.arguments[0].text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return specifiers;
 }
 
 /** Every module the roots can load, and the specifiers that reached them. */
@@ -67,7 +106,7 @@ export function importClosure(roots: readonly string[]) {
     seen.add(file);
     const text = readFileSync(file, 'utf8');
     if (hasServerActionDirective(text)) continue;
-    for (const specifier of importsOf(text)) {
+    for (const specifier of importsOf(text, file)) {
       specifiers.add(specifier);
       const next = resolveImport(specifier, file);
       if (next) queue.push(next);

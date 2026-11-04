@@ -66,6 +66,6 @@ describe('the import walk', () => {
     ["import { type T, a } from './mixed';", ['./mixed']],
     ["const lazy = import('./lazy');", ['./lazy']],
   ])('reads %j as loading %j', (text, expected) => {
-    expect(importsOf(text)).toEqual(expected);
+    expect(importsOf(text, 'module.ts')).toEqual(expected);
   });
 });

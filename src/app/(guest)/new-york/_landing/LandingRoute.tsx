@@ -9,6 +9,7 @@ import { PageError } from '@/components/PageError';
 import { RichText } from '@/components/RichText';
 import {
   landingBrowseHref,
+  landingErrorTitle,
   landingErrorView,
   landingFallbackTitle,
   landingHead,
@@ -22,6 +23,7 @@ import { minuteAsOf } from '@/lib/time';
 import { getBrowseResults } from '@/server/browse';
 import { getLandingData } from '@/server/landing';
 import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
+import { systemClock } from '@/server/ports/clock';
 
 type LandingProps = { kind: LandingKind; slug: string };
 
@@ -36,8 +38,8 @@ export async function landingMetadata({
     return description === null ? { title } : { title, description };
   } catch (error) {
     rethrowOrLog('The landing page head could not be read', error);
-    // The page reads the same entry and shows the error state; the head only falls back to the plain title.
-    return { title: landingFallbackTitle };
+    // The page reads the same entry and shows the error state; the head names the page by its address, as that state's h1 does.
+    return { title: landingErrorTitle(kind, slug) };
   }
 }
 
@@ -47,8 +49,7 @@ export async function landingMetadata({
  */
 async function LandingResults({ kind, slug }: LandingProps) {
   await connection();
-  // TODO(U-005): read the time from the Clock port once it exists.
-  const asOf = minuteAsOf(new Date());
+  const asOf = minuteAsOf(systemClock.now());
   let page;
   try {
     page = await getBrowseResults(landingQuery(kind, slug), asOf);
@@ -75,7 +76,7 @@ export async function LandingRoute({ kind, slug }: LandingProps) {
     rethrowOrLog('The landing page could not be read', error);
     return (
       <PageError
-        title={landingFallbackTitle}
+        title={landingErrorTitle(kind, slug)}
         alertTitle="We couldn't load this page"
         alertBody="Something went wrong on our side. Try again in a moment."
         retryHref={landingPath(kind, slug)}

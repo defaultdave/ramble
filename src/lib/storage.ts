@@ -77,6 +77,42 @@ export const maxObjectBytes = 10 * 1024 * 1024;
 export const defaultSignedUrlSeconds = 300;
 export const maxSignedUrlSeconds = 900;
 
+/** Where a refusal belongs in the put input, and what to tell the caller. */
+export type PutRefusal = { path: 'contentType' | 'body'; message: string };
+
+/**
+ * What a write may hold under its key's prefix: the content types that prefix allows and the one
+ * size bound. A key that names no store has no rule here; the key schema refuses it.
+ */
+export function putRefusals(
+  key: string,
+  contentType: string,
+  byteLength: number,
+): PutRefusal[] {
+  const visibility = visibilityOfKey(key);
+  if (!visibility) return [];
+  const refusals: PutRefusal[] = [];
+  const allowed: readonly string[] = allowedContentTypes[visibility];
+  if (!allowed.includes(contentType)) {
+    refusals.push({
+      path: 'contentType',
+      message: `${contentType} is not allowed under ${visibility}/`,
+    });
+  }
+  if (byteLength === 0 || byteLength > maxObjectBytes) {
+    refusals.push({
+      path: 'body',
+      message: `An object is 1 to ${String(maxObjectBytes)} bytes`,
+    });
+  }
+  return refusals;
+}
+
+/** When a link issued at `now` stops working, to the millisecond, so no adapter lets it lapse early. */
+export function signedUrlDeadline(now: Date, seconds: number): Date {
+  return new Date(now.getTime() + seconds * 1000);
+}
+
 /**
  * The store id inside a read-write token, `vercel_blob_rw_<storeId>_<random>`, which is also the first
  * label of the store's public host. The SDK reads it the same way. Null when the token has another shape.

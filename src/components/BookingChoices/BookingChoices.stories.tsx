@@ -136,6 +136,7 @@ function Sheet({
       footer={
         <BookingFooter
           summary={view.summary}
+          missing={view.missing}
           canContinue={canContinue(offer, state)}
           pending={false}
           onContinue={fn()}

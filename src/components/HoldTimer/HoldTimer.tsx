@@ -3,6 +3,7 @@ import type { ComponentPropsWithoutRef } from 'react';
 import { classNames } from '@/lib/classNames';
 import {
   holdAnnouncement,
+  holdTimerNote,
   holdTimerState,
   holdTimerText,
   type HoldTimerState,
@@ -25,6 +26,7 @@ const stateClass = {
 
 export function HoldTimer({ now, expiresAt, ...rest }: HoldTimerProps) {
   const state = holdTimerState(now, expiresAt);
+  const note = holdTimerNote(now, expiresAt);
 
   return (
     <>
@@ -35,6 +37,7 @@ export function HoldTimer({ now, expiresAt, ...rest }: HoldTimerProps) {
       >
         <Timer className={styles.icon} aria-hidden="true" />
         {holdTimerText(now, expiresAt)}
+        {note ? <span className={styles.note}>{note}</span> : null}
       </div>
       <span role="status" className={styles.announcement}>
         {holdAnnouncement(now, expiresAt)}

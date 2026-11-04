@@ -410,6 +410,35 @@ describe('the total', () => {
   });
 });
 
+describe('choicesView status and missing', () => {
+  it.each<[string, BookingAction[], string, string | null]>([
+    ['nothing chosen', [], '', 'Choose a date to continue.'],
+    [
+      'a date chosen',
+      [pickDate('2026-10-24')],
+      'Times for Sat, Oct 24 are listed below.',
+      'Choose a time to continue.',
+    ],
+    [
+      'gift mode, where Continue is off for another reason',
+      [{ type: 'setMode', mode: 'gift' }],
+      '',
+      null,
+    ],
+    [
+      'a time chosen',
+      [pickDate('2026-10-24'), pickSession(3)],
+      "Who's coming is listed below.",
+      null,
+    ],
+  ])('with %s', (_name, actions, status, missing) => {
+    expect(choicesView(kayakOffer, run(kayakOffer, actions))).toMatchObject({
+      status,
+      missing,
+    });
+  });
+});
+
 describe('choicesView', () => {
   it('offers the dates with room, and the times on the chosen date', () => {
     const view = choicesView(

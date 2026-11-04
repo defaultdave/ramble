@@ -3,6 +3,7 @@ import {
   holdAnnouncement,
   holdSecondsRemaining,
   holdTimerState,
+  holdTimerNote,
   holdTimerText,
 } from './holdTimer';
 
@@ -55,6 +56,18 @@ describe('holdTimerText', () => {
     { ms: 0, expected: 'Hold expired' },
   ])('$ms ms left reads "$expected"', ({ ms, expected }) => {
     expect(holdTimerText(now, expiringIn(ms))).toBe(expected);
+  });
+});
+
+describe('holdTimerNote', () => {
+  it.each([
+    { ms: 582_000, expected: null },
+    { ms: 120_000, expected: null },
+    { ms: 119_000, expected: 'Ending soon' },
+    { ms: 400, expected: 'Ending soon' },
+    { ms: 0, expected: null },
+  ])('$ms ms left gives $expected', ({ ms, expected }) => {
+    expect(holdTimerNote(now, expiringIn(ms))).toBe(expected);
   });
 });
 

@@ -222,7 +222,7 @@ describe('the date chip', () => {
 });
 
 describe('the calendar fetched when the date disclosure opens', () => {
-  const placeholder = () => screen.getByRole('status', { busy: true });
+  const placeholder = () => within(disclosure()).getByRole('status');
 
   it('is not fetched before the disclosure opens, nor by the other chips', async () => {
     setup();
@@ -241,13 +241,13 @@ describe('the calendar fetched when the date disclosure opens', () => {
     });
     expect(calendarFetch).toHaveBeenCalledOnce();
     expect(placeholder()).toHaveTextContent(calendarLoadingMessage());
+    // A busy live region is held back from a screen reader, so the loading text would never be said.
+    expect(placeholder()).not.toHaveAttribute('aria-busy');
     expect(screen.queryByRole('grid')).not.toBeInTheDocument();
 
     calendar.finish();
     expect(await screen.findByRole('grid')).toBeVisible();
-    expect(
-      screen.queryByRole('status', { busy: true }),
-    ).not.toBeInTheDocument();
+    expect(within(disclosure()).queryByRole('status')).not.toBeInTheDocument();
   });
 
   it.each([
@@ -310,9 +310,7 @@ describe('the calendar fetched when the date disclosure opens', () => {
     calendarHeld.mockReturnValue(await real.loadDatePicker());
     await userEvent.click(dateChip());
     expect(screen.getByRole('grid')).toBeVisible();
-    expect(
-      screen.queryByRole('status', { busy: true }),
-    ).not.toBeInTheDocument();
+    expect(within(disclosure()).queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('holds one fetch for a card closed and opened again while the code is on its way', async () => {
@@ -355,9 +353,7 @@ describe('the calendar fetched when the date disclosure opens', () => {
     setup();
     await userEvent.click(dateChip());
     expect(screen.getByRole('grid')).toBeVisible();
-    expect(
-      screen.queryByRole('status', { busy: true }),
-    ).not.toBeInTheDocument();
+    expect(within(disclosure()).queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('says the calendar could not load, and a later open tries again', async () => {

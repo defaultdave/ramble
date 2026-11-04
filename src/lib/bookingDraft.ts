@@ -503,10 +503,7 @@ export type ChoicesView = {
 };
 
 /** The live-region text for what just appeared below the date or time the guest chose. */
-function choicesStatus(
-  dayLabel: string | null,
-  hasTime: boolean,
-): string {
+function choicesStatus(dayLabel: string | null, hasTime: boolean): string {
   if (hasTime) return "Who's coming is listed below.";
   return dayLabel ? `Times for ${dayLabel} are listed below.` : '';
 }

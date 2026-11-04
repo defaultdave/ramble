@@ -272,6 +272,18 @@ const mobile = { viewport: { value: 'mobile1', isRotated: false } };
 const light = { colorScheme: 'light' } as const;
 const dark = { colorScheme: 'dark' } as const;
 
+export const SheetNothingChosen: Story = {
+  render: () => <Sheet />,
+  globals: mobile,
+  parameters: light,
+};
+export const SheetDateChosen: Story = {
+  render: () => (
+    <Sheet actions={[{ type: 'chooseDate', date: '2026-10-24' }]} />
+  ),
+  globals: mobile,
+  parameters: light,
+};
 export const SheetTimeChosenLight: Story = {
   render: () => <Sheet actions={evening(3)} />,
   globals: mobile,

@@ -194,10 +194,8 @@ type GalleryPhoto = {
 
 export type GalleryView = {
   layout: GalleryLayout;
-  /** Every photo, in order; the grid draws the first few and the strip all of them. */
+  /** Every photo, in order; the strip shows all of them, the grid the first few until "See all". */
   photos: GalleryPhoto[];
-  /** The photos behind "See all". */
-  more: PhotoView[];
   /** "See all 15 photos", or null when the grid already shows every photo. */
   seeAllLabel: string | null;
 };
@@ -220,7 +218,7 @@ function layoutFor(count: number): GalleryLayout {
 /** How the photos are laid out and labelled: the lead, each photo's place in the set, and what sits behind "See all". */
 export function galleryView(photos: readonly PhotoView[]): GalleryView {
   const count = photos.length;
-  const more = photos.slice(galleryGridPhotos);
+  const behindSeeAll = count - galleryGridPhotos;
   return {
     layout: layoutFor(count),
     photos: photos.map((photo, index) => ({
@@ -228,8 +226,7 @@ export function galleryView(photos: readonly PhotoView[]): GalleryView {
       isLead: index === 0,
       counter: count > 1 ? `${String(index + 1)} of ${String(count)}` : null,
     })),
-    more,
-    seeAllLabel: more.length > 0 ? `See all ${String(count)} photos` : null,
+    seeAllLabel: behindSeeAll > 0 ? `See all ${String(count)} photos` : null,
   };
 }
 

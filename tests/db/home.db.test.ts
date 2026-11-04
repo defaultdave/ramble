@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ZodError } from 'zod';
 import { homeLimits } from '@/lib/pages/home';
 import { upcomingWindow } from '@/lib/sessionWindow';
+import { hasSpaceLeft } from '@/lib/spaces';
 import {
   categories,
   cancellationTiers,
@@ -30,7 +31,11 @@ import {
 // - the session read returns scheduled sessions that start after the window opens and up to its end, soonest first
 //   (the opening instant is inside, the closing instant outside)
 // - the session read leaves out cancelled and completed sessions and those of an experience a guest cannot see
-// - the session read never returns more than its limit
+// - the session read returns one row per experience, its soonest open session, and leaves out sold-out sessions
+//   by the threshold hasSpaceLeft uses
+// - the session read is not short when more sold-out sessions than its limit start before the open ones
+// - the session read never returns more than its limit, one row per experience
+// - the partial index on starts_at for scheduled sessions exists and the planner can use it
 
 let fresh: FreshDatabase;
 let stopHttp: () => Promise<void>;
@@ -306,16 +311,71 @@ describe('listHomeExperiences', () => {
 });
 
 describe('listThisWeekSessions', () => {
-  it('returns scheduled sessions inside the window, soonest first', async () => {
-    const experience = await insertExperience();
-    const later = await insertSession(
-      experience.id,
-      new Date(opens.getTime() + 5 * 3_600_000),
+  it('returns the soonest session of each experience, soonest first', async () => {
+    const first = await insertExperience();
+    const second = await insertExperience();
+    await insertSession(first.id, new Date(opens.getTime() + 5 * 3_600_000));
+    const soonerOfFirst = await insertSession(
+      first.id,
+      new Date(opens.getTime() + 2 * 3_600_000),
     );
-    const sooner = await insertSession(
-      experience.id,
+    const soonest = await insertSession(
+      second.id,
       new Date(opens.getTime() + 3_600_000),
       { allocation: 5, seatsSold: 2 },
+    );
+
+    const found = (await home.listThisWeekSessions(window)).filter((row) =>
+      [first.id, second.id].includes(row.experienceId),
+    );
+
+    expect(found.map((row) => row.startsAt.getTime())).toEqual([
+      soonest.startsAt.getTime(),
+      soonerOfFirst.startsAt.getTime(),
+    ]);
+    expect(found[0]).toEqual({
+      experienceId: second.id,
+      experienceStatus: 'live',
+      startsAt: soonest.startsAt,
+      allocation: 5,
+      seatsSold: 2,
+    });
+  });
+
+  it.each([
+    ['one space left', 8, 7],
+    ['no space left', 8, 8],
+    ['an allocation of none', 0, 0],
+  ])(
+    'treats a session with %s as hasSpaceLeft does',
+    async (_name, allocation, seatsSold) => {
+      const experience = await insertExperience();
+      await insertSession(
+        experience.id,
+        new Date(opens.getTime() + 3_600_000),
+        {
+          allocation,
+          seatsSold,
+        },
+      );
+
+      const found = (await home.listThisWeekSessions(window)).filter(
+        (row) => row.experienceId === experience.id,
+      );
+
+      expect(found.length === 1).toBe(hasSpaceLeft({ allocation, seatsSold }));
+    },
+  );
+
+  it('returns the later open session of an experience whose early one is sold out', async () => {
+    const experience = await insertExperience();
+    await insertSession(experience.id, new Date(opens.getTime() + 3_600_000), {
+      allocation: 4,
+      seatsSold: 4,
+    });
+    const open = await insertSession(
+      experience.id,
+      new Date(opens.getTime() + 2 * 3_600_000),
     );
 
     const found = (await home.listThisWeekSessions(window)).filter(
@@ -323,16 +383,8 @@ describe('listThisWeekSessions', () => {
     );
 
     expect(found.map((row) => row.startsAt.getTime())).toEqual([
-      sooner.startsAt.getTime(),
-      later.startsAt.getTime(),
+      open.startsAt.getTime(),
     ]);
-    expect(found[0]).toEqual({
-      experienceId: experience.id,
-      experienceStatus: 'live',
-      startsAt: sooner.startsAt,
-      allocation: 5,
-      seatsSold: 2,
-    });
   });
 
   it('keeps the opening instant and leaves out the closing one', async () => {
@@ -381,25 +433,94 @@ describe('listThisWeekSessions', () => {
       expect(found).toEqual([]);
     },
   );
+});
+
+describe('listThisWeekSessions at its limit', () => {
+  beforeAll(async () => {
+    await client.db.delete(sessions);
+  });
+
+  async function insertExperiences(count: number) {
+    const shared = await parents();
+    const rows = await client.db
+      .insert(experiences)
+      .values(
+        Array.from({ length: count }, () => ({
+          ...shared,
+          slug: unique('experience'),
+          name: unique('Experience'),
+          status: 'live' as const,
+        })),
+      )
+      .returning({ id: experiences.id });
+    return rows.map((row) => row.id);
+  }
+
+  function sessionAt(experienceId: string, n: number, seatsSold: number) {
+    const startsAt = new Date(opens.getTime() + (n + 1) * 60_000);
+    return {
+      experienceId,
+      startsAt,
+      endsAt: new Date(startsAt.getTime() + 3_600_000),
+      timeZone: 'America/New_York',
+      allocation: 8,
+      seatsSold,
+      source: 'ramble' as const,
+    };
+  }
+
+  it('is not short when more sold-out sessions than its limit start before the open ones', async () => {
+    const ids = await insertExperiences(homeLimits.thisWeekSessions + 1);
+    const [openId, ...soldOutIds] = ids.toReversed();
+    await client.db
+      .insert(sessions)
+      .values(soldOutIds.map((id, n) => sessionAt(id, n, 8)));
+    await client.db
+      .insert(sessions)
+      .values(sessionAt(openId ?? '', soldOutIds.length, 0));
+
+    const found = await home.listThisWeekSessions(window);
+
+    expect(found.map((row) => row.experienceId)).toEqual([openId]);
+  });
 
   it('never returns more than its limit', async () => {
-    const experience = await insertExperience();
-    await client.db.insert(sessions).values(
-      Array.from({ length: homeLimits.thisWeekSessions + 1 }, (_, n) => {
-        const startsAt = new Date(opens.getTime() + (n + 1) * 60_000);
-        return {
-          experienceId: experience.id,
-          startsAt,
-          endsAt: new Date(startsAt.getTime() + 3_600_000),
-          timeZone: 'America/New_York',
-          allocation: 8,
-          source: 'ramble' as const,
-        };
-      }),
-    );
+    await client.db.delete(sessions);
+    const ids = await insertExperiences(homeLimits.thisWeekSessions + 1);
+    await client.db
+      .insert(sessions)
+      .values(ids.map((id, n) => sessionAt(id, n, 0)));
 
     const found = await home.listThisWeekSessions(window);
 
     expect(found).toHaveLength(homeLimits.thisWeekSessions);
+  });
+});
+
+describe('the sessions starts_at index for scheduled sessions', () => {
+  it('is partial on scheduled sessions', async () => {
+    const { rows } = await client.db.execute<{ indexdef: string }>(
+      sql`SELECT indexdef FROM pg_indexes WHERE schemaname = ${fresh.schema} AND indexname = 'sessions_scheduled_starts_at_idx'`,
+    );
+    expect(rows[0]?.indexdef).toMatch(
+      /\(starts_at\).*WHERE.*status = 'scheduled'/,
+    );
+  });
+
+  it('is what the planner reads for the soonest scheduled sessions', async () => {
+    const connection = await client.db.$client.connect();
+    try {
+      await connection.query('BEGIN');
+      await connection.query('SET LOCAL enable_seqscan = off');
+      const { rows } = await connection.query<{ 'QUERY PLAN': string }>(
+        "EXPLAIN SELECT id FROM sessions WHERE status = 'scheduled' ORDER BY starts_at LIMIT 10",
+      );
+      expect(rows.map((row) => row['QUERY PLAN']).join('\n')).toContain(
+        'sessions_scheduled_starts_at_idx',
+      );
+    } finally {
+      await connection.query('ROLLBACK');
+      connection.release();
+    }
   });
 });

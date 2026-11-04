@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, asc, eq, gte, inArray, lt } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 import {
   CardExperienceSchema,
   type CardExperience,
@@ -11,6 +11,7 @@ import {
   type ThisWeekSession,
 } from '@/lib/pages/home';
 import type { SessionWindow } from '@/lib/sessionWindow';
+import { soldOutAtSpacesLeft } from '@/lib/spaces';
 import { guestVisible } from './catalog';
 import { dbRead } from './client';
 import { coverImage, coverWith } from './photos';
@@ -61,15 +62,17 @@ export async function listHomeExperiences(
 }
 
 /**
- * The scheduled sessions that start from the window's opening up to, not including, its end, of the
- * experiences a guest can see: soonest first, at most `thisWeekSessions`. Whether a session still
- * has space is decided by the caller, from the counts.
+ * For each experience a guest can see, its soonest scheduled session with a space left that starts
+ * from the window's opening up to, not including, its end; the soonest `thisWeekSessions` of those,
+ * soonest first. One row per experience, so a busy experience cannot crowd the others out, and a
+ * sold-out session is left out here by the same threshold `hasSpaceLeft` uses. The caller still
+ * decides what is open, from these rows.
  */
 export async function listThisWeekSessions(
   window: SessionWindow,
 ): Promise<ThisWeekSession[]> {
-  const rows = await dbRead
-    .select({
+  const soonestPerExperience = dbRead
+    .selectDistinctOn([sessions.experienceId], {
       experienceId: sessions.experienceId,
       experienceStatus: experiences.status,
       startsAt: sessions.startsAt,
@@ -84,9 +87,22 @@ export async function listThisWeekSessions(
         eq(sessions.status, 'scheduled'),
         gte(sessions.startsAt, window.from),
         lt(sessions.startsAt, window.to),
+        sql`${sessions.allocation} - ${sessions.seatsSold} > ${soldOutAtSpacesLeft}`,
       ),
     )
-    .orderBy(asc(sessions.startsAt), asc(sessions.id))
+    .orderBy(
+      asc(sessions.experienceId),
+      asc(sessions.startsAt),
+      asc(sessions.id),
+    )
+    .as('soonest_per_experience');
+  const rows = await dbRead
+    .select()
+    .from(soonestPerExperience)
+    .orderBy(
+      asc(soonestPerExperience.startsAt),
+      asc(soonestPerExperience.experienceId),
+    )
     .limit(homeLimits.thisWeekSessions);
   return ThisWeekSessionSchema.array().parse(rows);
 }

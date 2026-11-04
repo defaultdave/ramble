@@ -217,6 +217,7 @@ export async function getHomeGiftGuide(): Promise<HomeGiftGuide | null> {
   return guide ? HomeGiftGuideSchema.parse(guide.collection) : null;
 }
 
+// TODO(U-036): first caller
 export async function getPublishedGiftGuide(): Promise<Collection | null> {
   const [guide] = await readCollections(
     and(publishedCollection, eq(collections.kind, 'gift_guide')),

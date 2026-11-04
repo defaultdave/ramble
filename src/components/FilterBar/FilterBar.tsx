@@ -3,7 +3,6 @@ import { Button, ButtonLink } from '@/components/Button';
 import { ChipLink } from '@/components/Chip';
 import { HiddenFields } from '@/components/HiddenFields';
 import { Input } from '@/components/Input';
-import { dateChipLabel } from '@/lib/pages/browse';
 import {
   calendarLoadFailedMessage,
   calendarLoadingMessage,
@@ -23,6 +22,7 @@ import {
   type ChipView,
 } from '@/lib/filters';
 import { browsePath } from '@/lib/routes';
+import { dateChipLabel } from '@/lib/time';
 import styles from './FilterBar.module.css';
 import { DrawerButton, FilterRow } from './FilterDrawerHost';
 import { LazyDatePicker } from './LazyDatePicker';

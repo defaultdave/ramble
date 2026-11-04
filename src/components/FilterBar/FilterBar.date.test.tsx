@@ -14,7 +14,7 @@ import {
   calendarLoadingMessage,
 } from '@/lib/filterBar';
 import { noFilters } from '@/lib/filters';
-import { dateChipLabel } from '@/lib/pages/browse';
+import { dateChipLabel } from '@/lib/time';
 import {
   bar,
   calendarCard,

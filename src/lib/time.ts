@@ -21,6 +21,18 @@ export function calendarDateFormat(zone: string): Intl.DateTimeFormat {
   });
 }
 
+const chipDate = new Intl.DateTimeFormat('en-US', {
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+  timeZone: 'UTC',
+});
+
+/** "Sat, Nov 7", for a date chip. The date is a calendar date, so no time zone moves it. */
+export function dateChipLabel(date: string): string {
+  return chipDate.format(new Date(`${date}T00:00:00Z`));
+}
+
 /** The UTC calendar date of `date`, as YYYY-MM-DD. */
 export function isoDateOf(date: Date): string {
   return date.toISOString().slice(0, 10);

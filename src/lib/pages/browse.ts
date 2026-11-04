@@ -15,7 +15,7 @@ import {
 import { guestsLabel } from '../orderSummary';
 import { browsePath } from '../routes';
 import { IsoDateSchema, TimeZoneSchema, isKnownTimeZone } from '../sessions';
-import { calendarDateFormat } from '../time';
+import { calendarDateFormat, dateChipLabel } from '../time';
 
 /** The id of the streamed results, which the skip link shown with scripting off points at. */
 export const browseResultsId = 'browse-results';
@@ -71,22 +71,6 @@ export function browseDays(rows: BrowseDayRows): string[] {
   return [...days].sort();
 }
 
-/**
- * One page from a read that fetched `pageSize + 1` rows. The extra row is not shown; its
- * presence is what says there is more, and the last shown row is where the next page starts.
- */
-export function splitPage<T extends { id: string }>(
-  rows: readonly T[],
-  pageSize: number,
-): { items: T[]; nextCursor: string | null } {
-  const items = rows.slice(0, pageSize);
-  const last = items.at(-1);
-  return {
-    items,
-    nextCursor: rows.length > pageSize && last ? last.id : null,
-  };
-}
-
 export type BrowsePage =
   | { ok: true; items: CardExperience[]; nextCursor: string | null }
   | { ok: false; reason: 'cursor_not_found' };
@@ -123,18 +107,6 @@ export function toBrowsePage(
     return { ok: false, reason: 'cursor_not_found' };
   }
   return { ok: true, items: read.items, nextCursor: read.nextCursor };
-}
-
-const chipDate = new Intl.DateTimeFormat('en-US', {
-  weekday: 'short',
-  month: 'short',
-  day: 'numeric',
-  timeZone: 'UTC',
-});
-
-/** "Sat, Nov 7", for the date chip. The date is a calendar date, so no time zone moves it. */
-export function dateChipLabel(date: string): string {
-  return chipDate.format(new Date(`${date}T00:00:00Z`));
 }
 
 /**

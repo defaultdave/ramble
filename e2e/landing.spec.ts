@@ -6,7 +6,15 @@ import { landingPaths, notFoundHeading } from './routes';
 // error state of a well-formed one. The copy, the results, and the not-found of a slug the catalog
 // lacks are covered by the unit tests and the stories.
 
+// A failed read names the page by its address, so each well-formed path above has its own heading.
+const errorHeadings = {
+  category: 'Cooking experiences in New York',
+  neighborhood: 'Things to do in Dumbo',
+} as const;
+
 for (const { name, notASlug, wellFormed } of landingPaths) {
+  const errorHeading = errorHeadings[name];
+
   test.describe(`the ${name} page`, () => {
     test('an address that is not a slug is not found', async ({ page }) => {
       const response = await page.goto(notASlug);
@@ -29,7 +37,7 @@ for (const { name, notASlug, wellFormed } of landingPaths) {
       await expect(
         page.getByRole('heading', {
           level: 1,
-          name: 'Things to do in New York',
+          name: errorHeading,
         }),
       ).toBeVisible();
       await expect(
@@ -37,7 +45,7 @@ for (const { name, notASlug, wellFormed } of landingPaths) {
           .getByRole('alert')
           .filter({ hasText: "We couldn't load this page" }),
       ).toBeVisible();
-      await expect(page).toHaveTitle('Things to do in New York | Ramble');
+      await expect(page).toHaveTitle(`${errorHeading} | Ramble`);
       await expect(page.locator('meta[name="robots"]')).toHaveCount(0);
       expect(errors).toEqual([]);
     });
@@ -51,7 +59,7 @@ for (const { name, notASlug, wellFormed } of landingPaths) {
         await expect(
           page.getByRole('heading', {
             level: 1,
-            name: 'Things to do in New York',
+            name: errorHeading,
           }),
         ).toBeVisible();
         await expect(

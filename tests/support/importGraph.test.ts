@@ -35,6 +35,31 @@ describe('importsOf', () => {
       "const glob = 'src/**/*.ts';\nconst more = 'a/*';\nimport 'real';\nconst end = '*/';",
       ['real'],
     ],
+    [
+      'an import after a regex literal holding a quote',
+      "const r = /'/;\nimport 'a';",
+      ['a'],
+    ],
+    [
+      'a regex literal holding a backtick and a comment opener',
+      "const r = /`\\/*/;\nimport 'a';",
+      ['a'],
+    ],
+    [
+      'a dynamic import after JSX text with an apostrophe',
+      "const a = <p>Don't</p>;\nconst b = () => import('z');\nconst c = <p>it's</p>;",
+      ['z'],
+    ],
+    [
+      'a dynamic import inside a template expression',
+      "const t = `${await import('a')}`;",
+      ['a'],
+    ],
+    [
+      'an import with a type-named specifier',
+      "import { type A, b } from 'x';",
+      ['x'],
+    ],
   ])('finds %s', (_name, text, expected) => {
     expect(importsOf(text)).toEqual(expected);
   });
@@ -43,6 +68,12 @@ describe('importsOf', () => {
     expect(importsOf("import type { A } from 'a';\nimport 'b';")).toEqual([
       'b',
     ]);
+  });
+
+  it('leaves out a type-only re-export', () => {
+    expect(
+      importsOf("export type { A } from 'a';\nexport * from 'b';"),
+    ).toEqual(['b']);
   });
 
   it.each([

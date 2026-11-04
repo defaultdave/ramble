@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
+import ts from 'typescript';
 
 export const root = path.resolve(import.meta.dirname, '..', '..');
 export const src = path.join(root, 'src');
@@ -45,52 +46,43 @@ export function hasClientDirective(text: string): boolean {
   return /^\s*(?:\/\/[^\n]*\n\s*)*['"]use client['"]/.test(text);
 }
 
-const specifierPosition = /\b(?:from|import)\s*\(?\s*$/;
-
-/**
- * The source with comments removed and every string or template literal emptied, except a literal in the
- * position of a module specifier, so a keyword inside a comment or a string is never read as an import.
- */
-function withoutCommentsAndStrings(text: string): string {
-  let out = '';
-  let index = 0;
-  while (index < text.length) {
-    const char = text.charAt(index);
-    const next = text.charAt(index + 1);
-    if (char === '/' && next === '/') {
-      while (index < text.length && text.charAt(index) !== '\n') index += 1;
-    } else if (char === '/' && next === '*') {
-      const end = text.indexOf('*/', index + 2);
-      index = end === -1 ? text.length : end + 2;
-      out += ' ';
-    } else if (char === '"' || char === "'" || char === '`') {
-      let end = index + 1;
-      while (end < text.length && text.charAt(end) !== char) {
-        end += text.charAt(end) === '\\' ? 2 : 1;
-      }
-      const literal = text.slice(index, end + 1);
-      out +=
-        char !== '`' && specifierPosition.test(out)
-          ? literal
-          : `${char}${char}`;
-      index = end + 1;
-    } else {
-      out += char;
-      index += 1;
-    }
-  }
-  return out;
+function isStringLike(node: ts.Node | undefined): node is ts.StringLiteralLike {
+  return (
+    node !== undefined &&
+    (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))
+  );
 }
 
 /** The specifiers a module loads at run time. A type-only import is erased by the compiler, so it is left out. */
 export function importsOf(text: string): string[] {
-  const runtime = withoutCommentsAndStrings(text).replace(
-    /\b(?:import|export)\s+type\b[^;'"]*?from\s*['"][^'"]+['"]/g,
-    '',
+  const file = ts.createSourceFile(
+    'module.tsx',
+    text,
+    ts.ScriptTarget.Latest,
+    false,
+    ts.ScriptKind.TSX,
   );
-  return [
-    ...runtime.matchAll(/\b(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g),
-  ].map((match) => match[1] ?? '');
+  const specifiers: string[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isImportDeclaration(node)) {
+      const typeOnly =
+        node.importClause?.phaseModifier === ts.SyntaxKind.TypeKeyword;
+      if (!typeOnly && isStringLike(node.moduleSpecifier))
+        specifiers.push(node.moduleSpecifier.text);
+    } else if (ts.isExportDeclaration(node)) {
+      if (!node.isTypeOnly && isStringLike(node.moduleSpecifier))
+        specifiers.push(node.moduleSpecifier.text);
+    } else if (
+      ts.isCallExpression(node) &&
+      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+      isStringLike(node.arguments[0])
+    ) {
+      specifiers.push(node.arguments[0].text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return specifiers;
 }
 
 /** Every module the roots can load, and the specifiers that reached them. */

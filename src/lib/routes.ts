@@ -1,9 +1,18 @@
 import { EntityIdSchema, isSlug } from './catalog';
+import { contactPath } from './paths';
 
-// ---- Browse ----
+// ---- Fixed addresses, in `paths` so client modules can reach them without the catalog ----
 
-/** The browse page. The grammar of its query lives in `filters.ts`. */
-export const browsePath = '/new-york/browse';
+export {
+  accessibilityPath,
+  browsePath,
+  contactPath,
+  giftGuidePath,
+  helpPath,
+  homePicksHref,
+  legalPath,
+  picksAnchor,
+} from './paths';
 
 // ---- Experiences and the guide ----
 
@@ -55,14 +64,6 @@ export function parseExperienceAddress(
 
 export const picksPath = (slug: string) => `/picks/${slug}`;
 
-/** The id of the first Ramble Picks module, which the header and footer link to. */
-export const picksAnchor = 'picks';
-
-/** The home page at its Ramble Picks module. */
-export const homePicksHref = `/#${picksAnchor}`;
-
-export const giftGuidePath = '/gifts';
-
 export const categoryPath = (slug: string) => `/new-york/things-to-do/${slug}`;
 export const neighborhoodPath = (slug: string) =>
   `/new-york/neighborhoods/${slug}`;
@@ -97,12 +98,6 @@ export function orderConfirmationPath(
 }
 
 // ---- Help and legal ----
-
-export const contactPath = '/contact';
-export const helpPath = '/help';
-export const accessibilityPath = '/accessibility';
-
-export const legalPath = (doc: 'terms' | 'privacy') => `/legal/${doc}`;
 
 /** Any published document by its key, such as a host's waiver. */
 export const legalDocPath = (doc: string) => `/legal/${doc}`;

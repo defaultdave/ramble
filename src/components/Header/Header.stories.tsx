@@ -5,6 +5,7 @@ import {
   Header,
   type CheckoutHeaderProps,
   type DefaultHeaderProps,
+  type PlainHeaderProps,
 } from '@/components/Header';
 
 const meta = {
@@ -28,6 +29,7 @@ export default meta;
 // Header is a union on variant, which Storybook cannot infer args from, so each story names its props.
 type DefaultStory = StoryObj<DefaultHeaderProps>;
 type CheckoutStory = StoryObj<CheckoutHeaderProps>;
+type PlainStory = StoryObj<PlainHeaderProps>;
 
 const now = new Date('2026-11-02T15:00:00.000Z');
 
@@ -90,5 +92,13 @@ export const MobileCheckoutWarning: CheckoutStory = {
 };
 export const DesktopCheckout: CheckoutStory = {
   args: { variant: 'checkout', holdTimer: holdTimer(582) },
+  globals: desktop,
+};
+export const MobilePlain: PlainStory = {
+  args: { variant: 'plain' },
+  globals: mobile,
+};
+export const DesktopPlain: PlainStory = {
+  args: { variant: 'plain' },
   globals: desktop,
 };

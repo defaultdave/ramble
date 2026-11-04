@@ -1,3 +1,5 @@
+import '@testing-library/jest-dom/vitest';
+import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CheckoutRoute from './page';
 
@@ -5,7 +7,8 @@ import CheckoutRoute from './page';
 // - a successful read renders the page and logs nothing
 // - the framework ending a prerender inside a driver error is rethrown and not logged
 // - a real read failure logs only the kind and renders the retry view
-// - a malformed id and a browser with no device are not-found before anything is read
+// - a malformed id, a browser with no device, and a missing hold render the not-found notice as JSX, not a thrown notFound
+// - a malformed id and a browser with no device are refused before anything is read
 // - arriving from a re-hold asks the page to focus its heading
 
 const server = vi.hoisted(() => ({
@@ -89,10 +92,32 @@ describe('the checkout route', () => {
     expect(JSON.stringify(element)).toContain('We couldn');
   });
 
-  it('is not found for a browser with no device, reading nothing', async () => {
-    server.device.mockResolvedValue(null);
+  it.each([
+    ['a malformed id', 'not-a-uuid', null],
+    ['a browser with no device', holdId, 'no-device'],
+    ['a hold that is missing', holdId, 'no-hold'],
+  ])('renders the not-found notice for %s', async (_name, id, cause) => {
+    if (cause === 'no-device') server.device.mockResolvedValue(null);
+    if (cause === 'no-hold') server.view.mockResolvedValue(null);
 
-    await expect(CheckoutRoute(props(holdId))).rejects.toThrow();
+    const element = await CheckoutRoute(props(id));
+
+    // Returned, not thrown, so the first flush carries the heading and the stylesheet.
+    render(element);
+    expect(
+      within(screen.getByRole('main')).getByRole('heading', {
+        level: 1,
+        name: "We can't find that page",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('reads nothing for a malformed id or a browser with no device', async () => {
+    await CheckoutRoute(props('not-a-uuid'));
+    expect(server.device).not.toHaveBeenCalled();
+
+    server.device.mockResolvedValue(null);
+    await CheckoutRoute(props(holdId));
     expect(server.view).not.toHaveBeenCalled();
   });
 });

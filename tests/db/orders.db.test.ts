@@ -2,7 +2,11 @@ import { randomInt, randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { orderCurrency } from '@/lib/orders';
-import { createFreshDatabase, type FreshDatabase } from './harness';
+import {
+  createFreshDatabase,
+  expectConstraint,
+  type FreshDatabase,
+} from './harness';
 import { createOrderParents } from './orderParents';
 
 // Behaviours under test, one per decision, branch or risk. Each bad row is refused by the
@@ -91,7 +95,6 @@ async function insert(table: string, row: Row) {
   return insertAsGiven(table, row);
 }
 
-const constraint = (name: string) => ({ cause: { constraint: name } });
 const invalidText = { cause: { code: '22P02' } };
 const notNull = { cause: { code: '23502' } };
 
@@ -275,18 +278,20 @@ describe('orders', () => {
     ['a trailing newline', 'RMB-ABCDEF\n'],
     ['no prefix', 'ABCDEF'],
   ])('refuses a reference with %s', async (_name, value) => {
-    await expect(
+    await expectConstraint(
       insert('orders', orderRow({ reference: value })),
-    ).rejects.toMatchObject(constraint('orders_reference_shape'));
+      'orders_reference_shape',
+    );
   });
 
   it('refuses a second order with one reference', async () => {
     const ref = reference();
     await newOrder({ reference: ref });
 
-    await expect(
+    await expectConstraint(
       insert('orders', orderRow({ reference: ref })),
-    ).rejects.toMatchObject(constraint('orders_reference_unique'));
+      'orders_reference_unique',
+    );
   });
 
   it('refuses a second order with one idempotency key', async () => {
@@ -294,8 +299,9 @@ describe('orders', () => {
     const base = { hold_id: holdId, idempotency_key: `book:${holdId}` };
     await newOrder(base);
 
-    await expect(insert('orders', orderRow(base))).rejects.toMatchObject(
-      constraint('orders_idempotency_key_unique'),
+    await expectConstraint(
+      insert('orders', orderRow(base)),
+      'orders_idempotency_key_unique',
     );
   });
 
@@ -305,9 +311,10 @@ describe('orders', () => {
     await newOrder();
     await newOrder();
 
-    await expect(
+    await expectConstraint(
       insert('orders', orderRow({ manage_token_hash: hash })),
-    ).rejects.toMatchObject(constraint('orders_manage_token_hash_unique'));
+      'orders_manage_token_hash_unique',
+    );
   });
 
   describe('one live order per hold', () => {
@@ -408,9 +415,7 @@ describe('orders', () => {
           }),
       ],
     ])('refuses %s', async (_name, build) => {
-      await expect(insert('orders', build())).rejects.toMatchObject(
-        constraint('orders_kind_shape'),
-      );
+      await expectConstraint(insert('orders', build()), 'orders_kind_shape');
     });
   });
 
@@ -421,27 +426,30 @@ describe('orders', () => {
       ['a display name', 'Pat <pat@example.com>'],
       ['255 characters', `${'a'.repeat(243)}@example.com`],
     ])('refuses an email that is %s', async (_name, value) => {
-      await expect(
+      await expectConstraint(
         insert('orders', orderRow({ contact_email: value })),
-      ).rejects.toMatchObject(constraint('orders_contact_email_shape'));
+        'orders_contact_email_shape',
+      );
     });
 
     it.each([
       ['blank', ' '],
       ['41 characters', 'p'.repeat(41)],
     ])('refuses a phone that is %s', async (_name, value) => {
-      await expect(
+      await expectConstraint(
         insert('orders', orderRow({ contact_phone: value })),
-      ).rejects.toMatchObject(constraint('orders_contact_phone_text'));
+        'orders_contact_phone_text',
+      );
     });
 
     it.each([
       ['blank', ' '],
       ['121 characters', 'n'.repeat(121)],
     ])('refuses a lead guest name that is %s', async (_name, value) => {
-      await expect(
+      await expectConstraint(
         insert('orders', orderRow({ lead_guest_name: value })),
-      ).rejects.toMatchObject(constraint('orders_lead_guest_name_text'));
+        'orders_lead_guest_name_text',
+      );
     });
 
     it.each([
@@ -449,19 +457,21 @@ describe('orders', () => {
       ['attribution_campaign'],
       ['attribution_issue'],
     ])('refuses a blank and an over-long %s', async (column) => {
-      await expect(
+      await expectConstraint(
         insert('orders', orderRow({ [column]: '  ' })),
-      ).rejects.toMatchObject(constraint('orders_attribution_text'));
-      await expect(
+        'orders_attribution_text',
+      );
+      await expectConstraint(
         insert('orders', orderRow({ [column]: 'a'.repeat(101) })),
-      ).rejects.toMatchObject(constraint('orders_attribution_text'));
+        'orders_attribution_text',
+      );
     });
 
     it.each([
       ['guardian_name', 'g'.repeat(121)],
       ['guardian_contact', 'g'.repeat(255)],
     ])('refuses an over-long %s', async (column, value) => {
-      await expect(
+      await expectConstraint(
         insert(
           'orders',
           orderRow({
@@ -470,7 +480,8 @@ describe('orders', () => {
             [column]: value,
           }),
         ),
-      ).rejects.toMatchObject(constraint('orders_guardian_text'));
+        'orders_guardian_text',
+      );
     });
   });
 
@@ -487,23 +498,26 @@ describe('orders', () => {
       ['a missing age', [null]],
       ['more children than the cap', Array.from({ length: 101 }, () => 5)],
     ])('refuses children ages with %s', async (_name, ages) => {
-      await expect(
+      await expectConstraint(
         insert('orders', orderRow({ children_ages: ages, ...guardian })),
-      ).rejects.toMatchObject(constraint('orders_children_ages_valid'));
+        'orders_children_ages_valid',
+      );
     });
 
     it('refuses children with no guardian', async () => {
-      await expect(
+      await expectConstraint(
         insert('orders', orderRow({ children_ages: [4] })),
-      ).rejects.toMatchObject(constraint('orders_guardian_complete'));
+        'orders_guardian_complete',
+      );
     });
 
     it.each([
       ['a name with no contact', { guardian_name: 'Pat' }],
       ['a contact with no name', { guardian_contact: 'x@example.com' }],
     ])('refuses a guardian %s', async (_name, change) => {
-      await expect(insert('orders', orderRow(change))).rejects.toMatchObject(
-        constraint('orders_guardian_complete'),
+      await expectConstraint(
+        insert('orders', orderRow(change)),
+        'orders_guardian_complete',
       );
     });
   });
@@ -644,9 +658,7 @@ describe('orders', () => {
     ];
 
     it.each(refuses)('refuses %s', async (_name, change, name) => {
-      await expect(insert('orders', orderRow(change))).rejects.toMatchObject(
-        constraint(name),
-      );
+      await expectConstraint(insert('orders', orderRow(change)), name);
     });
 
     it.each([
@@ -751,9 +763,7 @@ describe('orders', () => {
     ];
 
     it.each(refuses)('refuses %s', async (_name, change, name) => {
-      await expect(insert('orders', orderRow(change))).rejects.toMatchObject(
-        constraint(name),
-      );
+      await expectConstraint(insert('orders', orderRow(change)), name);
     });
 
     it.each([
@@ -779,9 +789,10 @@ describe('orders', () => {
         'orders_cancellation_tier_id_cancellation_tiers_id_fk',
       ],
     ])('refuses an unknown %s', async (_name, column, name) => {
-      await expect(
+      await expectConstraint(
         insert('orders', orderRow({ [column]: randomUUID() })),
-      ).rejects.toMatchObject(constraint(name));
+        name,
+      );
     });
 
     it.each([
@@ -819,9 +830,7 @@ describe('orders', () => {
           idempotency_key: `book:${holdId}`,
           ...(column === 'hold_id' ? {} : { [column]: randomUUID() }),
         });
-        await expect(insertAsGiven('orders', row)).rejects.toMatchObject(
-          constraint(name),
-        );
+        await expectConstraint(insertAsGiven('orders', row), name);
       },
     );
 
@@ -835,9 +844,10 @@ describe('orders', () => {
     it('restricts deleting a hold, a session, or a document an order points at', async () => {
       const holdId = randomUUID();
       await newOrder({ hold_id: holdId, idempotency_key: `book:${holdId}` });
-      await expect(
+      await expectConstraint(
         client.db.execute(sql`DELETE FROM holds WHERE id = ${holdId}`),
-      ).rejects.toMatchObject(constraint('orders_hold_id_holds_id_fk'));
+        'orders_hold_id_holds_id_fk',
+      );
       await expect(
         client.db.execute(
           sql`DELETE FROM sessions WHERE id = ${parents.sessionId}`,
@@ -868,8 +878,9 @@ describe('order items', () => {
     const orderId = await newOrder();
     await insert('order_items', item(orderId));
 
-    await expect(insert('order_items', item(orderId))).rejects.toMatchObject(
-      constraint('order_items_order_id_price_option_id_pk'),
+    await expectConstraint(
+      insert('order_items', item(orderId)),
+      'order_items_order_id_price_option_id_pk',
     );
   });
 
@@ -908,9 +919,7 @@ describe('order items', () => {
   ])('refuses %s', async (_name, change, name) => {
     const orderId = await newOrder();
 
-    await expect(
-      insert('order_items', item(orderId, change)),
-    ).rejects.toMatchObject(constraint(name));
+    await expectConstraint(insert('order_items', item(orderId, change)), name);
   });
 
   it.each([
@@ -923,9 +932,10 @@ describe('order items', () => {
   ])('refuses an unknown %s', async (_name, column, name) => {
     const orderId = await newOrder();
 
-    await expect(
+    await expectConstraint(
       insert('order_items', item(orderId, { [column]: randomUUID() })),
-    ).rejects.toMatchObject(constraint(name));
+      name,
+    );
   });
 });
 
@@ -962,10 +972,9 @@ describe('payment attempts', () => {
     const orderId = await newOrder();
     await insert('payment_attempts', attempt(orderId, { status: 'canceled' }));
 
-    await expect(
+    await expectConstraint(
       insert('payment_attempts', attempt(orderId, { status: 'canceled' })),
-    ).rejects.toMatchObject(
-      constraint('payment_attempts_order_attempt_no_unique'),
+      'payment_attempts_order_attempt_no_unique',
     );
   });
 
@@ -978,10 +987,9 @@ describe('payment attempts', () => {
         attempt(orderId, { status, failed_tries: 1 }),
       );
 
-      await expect(
+      await expectConstraint(
         insert('payment_attempts', attempt(orderId, { attempt_no: 2 })),
-      ).rejects.toMatchObject(
-        constraint('payment_attempts_one_live_per_order'),
+        'payment_attempts_one_live_per_order',
       );
     },
   );
@@ -1007,13 +1015,12 @@ describe('payment attempts', () => {
       attempt(await newOrder(), { provider_payment_id: 'pi_dup' }),
     );
 
-    await expect(
+    await expectConstraint(
       insert(
         'payment_attempts',
         attempt(await newOrder(), { provider_payment_id: 'pi_dup' }),
       ),
-    ).rejects.toMatchObject(
-      constraint('payment_attempts_provider_payment_id_unique'),
+      'payment_attempts_provider_payment_id_unique',
     );
   });
 
@@ -1104,9 +1111,7 @@ describe('payment attempts', () => {
     const orderId = await newOrder();
     const row = attempt(orderId, change);
 
-    await expect(insert('payment_attempts', row)).rejects.toMatchObject(
-      constraint(name),
-    );
+    await expectConstraint(insert('payment_attempts', row), name);
   });
 
   it.each([
@@ -1125,10 +1130,9 @@ describe('payment attempts', () => {
   it('refuses an attempt for an unknown order', async () => {
     const orderId = randomUUID();
 
-    await expect(
+    await expectConstraint(
       insert('payment_attempts', attempt(orderId)),
-    ).rejects.toMatchObject(
-      constraint('payment_attempts_order_id_orders_id_fk'),
+      'payment_attempts_order_id_orders_id_fk',
     );
   });
 });
@@ -1168,10 +1172,9 @@ describe('provider events', () => {
       event({ provider_event_id: providerEventId }),
     );
 
-    await expect(
+    await expectConstraint(
       insert('provider_events', event({ provider_event_id: providerEventId })),
-    ).rejects.toMatchObject(
-      constraint('provider_events_provider_event_id_unique'),
+      'provider_events_provider_event_id_unique',
     );
     await insert(
       'provider_events',
@@ -1262,9 +1265,7 @@ describe('provider events', () => {
       'provider_events_occurred_at_in_range',
     ],
   ])('refuses %s', async (_name, change, name) => {
-    await expect(
-      insert('provider_events', event(change)),
-    ).rejects.toMatchObject(constraint(name));
+    await expectConstraint(insert('provider_events', event(change)), name);
   });
 
   it.each([
@@ -1384,9 +1385,10 @@ describe('refunds', () => {
       'refunds_created_at_in_range',
     ],
   ])('refuses %s', async (_name, change, name) => {
-    await expect(
+    await expectConstraint(
       insert('refunds', refund(await newOrder(), change)),
-    ).rejects.toMatchObject(constraint(name));
+      name,
+    );
   });
 
   it('refuses a reinstated gift that names a payment attempt', async () => {
@@ -1401,7 +1403,7 @@ describe('refunds', () => {
       amount_minor: 18509,
     });
 
-    await expect(
+    await expectConstraint(
       insert(
         'refunds',
         refund(orderId, {
@@ -1409,8 +1411,7 @@ describe('refunds', () => {
           payment_attempt_id: attemptId,
         }),
       ),
-    ).rejects.toMatchObject(
-      constraint('refunds_reinstated_gift_refunds_no_payment'),
+      'refunds_reinstated_gift_refunds_no_payment',
     );
   });
 
@@ -1420,12 +1421,13 @@ describe('refunds', () => {
       refund(await newOrder(), { provider_refund_id: 're_dup' }),
     );
 
-    await expect(
+    await expectConstraint(
       insert(
         'refunds',
         refund(await newOrder(), { provider_refund_id: 're_dup' }),
       ),
-    ).rejects.toMatchObject(constraint('refunds_provider_refund_id_unique'));
+      'refunds_provider_refund_id_unique',
+    );
   });
 
   it('refuses an unknown reason and status', async () => {
@@ -1447,9 +1449,7 @@ describe('refunds', () => {
   ])('refuses an unknown %s', async (_name, column, name) => {
     const row = refund(await newOrder(), { [column]: randomUUID() });
 
-    await expect(insert('refunds', row)).rejects.toMatchObject(
-      constraint(name),
-    );
+    await expectConstraint(insert('refunds', row), name);
   });
 });
 
@@ -1497,8 +1497,9 @@ describe('transfers', () => {
     const orderId = await newOrder();
     await insert('transfers', transfer(orderId));
 
-    await expect(insert('transfers', transfer(orderId))).rejects.toMatchObject(
-      constraint('transfers_order_id_unique'),
+    await expectConstraint(
+      insert('transfers', transfer(orderId)),
+      'transfers_order_id_unique',
     );
   });
 
@@ -1556,9 +1557,10 @@ describe('transfers', () => {
       'transfers_release_after_in_range',
     ],
   ])('refuses %s', async (_name, change, name) => {
-    await expect(
+    await expectConstraint(
       insert('transfers', transfer(await newOrder(), change)),
-    ).rejects.toMatchObject(constraint(name));
+      name,
+    );
   });
 
   it('refuses a provider transfer id used twice', async () => {
@@ -1567,13 +1569,12 @@ describe('transfers', () => {
       transfer(await newOrder(), { provider_transfer_id: 'tr_dup' }),
     );
 
-    await expect(
+    await expectConstraint(
       insert(
         'transfers',
         transfer(await newOrder(), { provider_transfer_id: 'tr_dup' }),
       ),
-    ).rejects.toMatchObject(
-      constraint('transfers_provider_transfer_id_unique'),
+      'transfers_provider_transfer_id_unique',
     );
   });
 
@@ -1582,12 +1583,14 @@ describe('transfers', () => {
     await expect(
       insert('transfers', transfer(orderId, { status: 'sent' })),
     ).rejects.toMatchObject(invalidText);
-    await expect(
+    await expectConstraint(
       insert('transfers', transfer(randomUUID())),
-    ).rejects.toMatchObject(constraint('transfers_order_id_orders_id_fk'));
-    await expect(
+      'transfers_order_id_orders_id_fk',
+    );
+    await expectConstraint(
       insert('transfers', transfer(orderId, { host_id: randomUUID() })),
-    ).rejects.toMatchObject(constraint('transfers_host_id_hosts_id_fk'));
+      'transfers_host_id_hosts_id_fk',
+    );
   });
 });
 
@@ -1599,16 +1602,17 @@ describe('text that only looks blank', () => {
     ['U+2028', ' '],
     ['a mix', '  ﻿\t'],
   ])('refuses a lead guest name of only %s', async (_name, value) => {
-    await expect(
+    await expectConstraint(
       insert('orders', orderRow({ lead_guest_name: value })),
-    ).rejects.toMatchObject(constraint('orders_lead_guest_name_text'));
+      'orders_lead_guest_name_text',
+    );
   });
 
   it.each([
     ['U+00A0', ' '],
     ['U+FEFF', '﻿'],
   ])('refuses a provider event id of only %s', async (_name, value) => {
-    await expect(
+    await expectConstraint(
       insert('provider_events', {
         provider: 'stripe',
         provider_event_id: value,
@@ -1618,7 +1622,8 @@ describe('text that only looks blank', () => {
         received_at: created,
         payload: {},
       }),
-    ).rejects.toMatchObject(constraint('provider_events_event_id_text'));
+      'provider_events_event_id_text',
+    );
   });
 });
 
@@ -1644,8 +1649,6 @@ describe('provider event bodies', () => {
       Array.from({ length: 1000 }, (_, i) => [`k${String(i)}`, 1e-300]),
     );
 
-    await expect(body(payload)).rejects.toMatchObject(
-      constraint('provider_events_payload_object'),
-    );
+    await expectConstraint(body(payload), 'provider_events_payload_object');
   });
 });

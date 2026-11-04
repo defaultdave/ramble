@@ -17,6 +17,7 @@ import { server } from '../msw/server';
 import { mailboxSecret, setEnv, webhookSecret } from '../email/testEnv';
 import {
   createFreshDatabase,
+  expectConstraint,
   serveNeonHttp,
   type FreshDatabase,
 } from './harness';
@@ -792,9 +793,7 @@ describe('database constraints', () => {
       { status: 'failed', failureReason: 'r'.repeat(501) },
     ],
   ])('refuses %s', async (_label, constraint, overrides) => {
-    await expect(insert(overrides)).rejects.toMatchObject({
-      cause: { constraint },
-    });
+    await expectConstraint(insert(overrides), constraint);
   });
 
   it('refuses a status that is not in the enum', async () => {
@@ -814,11 +813,10 @@ describe('database constraints', () => {
   it('refuses a repeated provider ID for one adapter and allows it across adapters', async () => {
     await insert({ ...captured, providerMessageId: 'same-id' });
 
-    await expect(
+    await expectConstraint(
       insert({ ...captured, providerMessageId: 'same-id' }),
-    ).rejects.toMatchObject({
-      cause: { constraint: 'messages_provider_message_id_unique' },
-    });
+      'messages_provider_message_id_unique',
+    );
     await insert({
       adapter: 'resend',
       status: 'sent',
@@ -832,13 +830,12 @@ describe('database constraints', () => {
     ['an address with no domain dot', 'gone@localhost'],
     ['an address over 254 characters', `${'a'.repeat(250)}@example.com`],
   ])('refuses a suppression for %s', async (_label, address) => {
-    await expect(
+    await expectConstraint(
       client.db
         .insert(emailSuppressions)
         .values({ address, reason: 'complaint' }),
-    ).rejects.toMatchObject({
-      cause: { constraint: 'email_suppressions_address_shape' },
-    });
+      'email_suppressions_address_shape',
+    );
   });
 
   it('refuses a suppression reason outside the enum, and a repeated address', async () => {

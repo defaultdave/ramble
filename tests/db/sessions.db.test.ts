@@ -1,4 +1,4 @@
-import { count, eq, sql, type SQL } from 'drizzle-orm';
+import { count, eq, sql } from 'drizzle-orm';
 import type { PoolClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { maxAllocation, type SessionTemplateInput } from '@/lib/sessions';
@@ -10,19 +10,21 @@ import {
 } from '@/server/auth/caller';
 import { testCaller } from '@/server/auth/test-caller';
 import {
-  categories,
-  cancellationTiers,
   experiences,
   hosts,
-  neighborhoods,
   sessions,
   sessionTemplates,
 } from '@/server/db/schema';
 import {
+  backendPid,
   createFreshDatabase,
+  expectConstraint,
   serveNeonHttp,
+  waitUntilBlocked,
   type FreshDatabase,
 } from './harness';
+import { catalogFixtures } from './catalogFixtures';
+import { insertSession as insertHeldSession } from './holdFixtures';
 
 vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 
@@ -70,12 +72,6 @@ afterAll(async () => {
   vi.unstubAllEnvs();
 });
 
-let counter = 0;
-function unique(prefix: string) {
-  counter += 1;
-  return `${prefix}-${String(counter)}`;
-}
-
 const ops = testCaller({ roles: [Role.Ops] });
 const admin = testCaller({ roles: [Role.Admin] });
 const guest = testCaller();
@@ -86,42 +82,13 @@ function ownerOf(hostId: string): Caller {
 
 const earlyNow = new Date('2026-01-01T00:00:00Z');
 
-async function insertHost(timeZone = 'America/New_York') {
-  const [row] = await client.db
-    .insert(hosts)
-    .values({ slug: unique('host'), name: unique('Host'), timeZone })
-    .returning();
-  if (!row) throw new Error('insert returned no host');
-  return row;
-}
+const fixtures = catalogFixtures(() => client.db);
+
+const insertHost = (timeZone?: string) =>
+  fixtures.insertHost(timeZone === undefined ? {} : { timeZone });
 
 async function insertExperience(hostId: string) {
-  const [category] = await client.db
-    .insert(categories)
-    .values({ slug: unique('category'), name: unique('Category') })
-    .returning();
-  const [neighborhood] = await client.db
-    .insert(neighborhoods)
-    .values({ slug: unique('neighborhood'), name: unique('Neighborhood') })
-    .returning();
-  const [tier] = await client.db
-    .select()
-    .from(cancellationTiers)
-    .where(eq(cancellationTiers.isDefault, true));
-  if (!category || !neighborhood || !tier) throw new Error('missing parents');
-  const [row] = await client.db
-    .insert(experiences)
-    .values({
-      hostId,
-      categoryId: category.id,
-      neighborhoodId: neighborhood.id,
-      cancellationTierId: tier.id,
-      slug: unique('experience'),
-      name: unique('Experience'),
-    })
-    .returning();
-  if (!row) throw new Error('insert returned no experience');
-  return row;
+  return fixtures.insertExperience(await fixtures.parents(hostId));
 }
 
 /** A host with one experience and the host owner who may act on it. */
@@ -171,27 +138,17 @@ async function countSessions(experienceId: string) {
   return row?.total ?? 0;
 }
 
-type SessionInsert = typeof sessions.$inferInsert;
-
-async function insertSession(
+/** A Saturday session in June 2026 for eight spaces, unless the overrides say otherwise. */
+const insertSession = (
   experienceId: string,
-  overrides: { [K in keyof SessionInsert]?: SessionInsert[K] | SQL } = {},
-) {
-  const [row] = await client.db
-    .insert(sessions)
-    .values({
-      experienceId,
-      startsAt: new Date('2026-06-06T14:00:00Z'),
-      endsAt: new Date('2026-06-06T16:00:00Z'),
-      timeZone: 'America/New_York',
-      allocation: 8,
-      source: 'ramble',
-      ...overrides,
-    })
-    .returning();
-  if (!row) throw new Error('insert returned no session');
-  return row;
-}
+  overrides: Parameters<typeof insertHeldSession>[2] = {},
+) =>
+  insertHeldSession(client.db, experienceId, {
+    startsAt: new Date('2026-06-06T14:00:00Z'),
+    endsAt: new Date('2026-06-06T16:00:00Z'),
+    allocation: 8,
+    ...overrides,
+  });
 
 describe('constraints', () => {
   it.each([
@@ -235,7 +192,7 @@ describe('constraints', () => {
   ])('refuse a template with %s', async (_name, constraint, override) => {
     const { experience } = await setup();
 
-    await expect(
+    await expectConstraint(
       client.db.insert(sessionTemplates).values({
         experienceId: experience.id,
         weekday: 6,
@@ -244,7 +201,8 @@ describe('constraints', () => {
         allocation: 4,
         ...override,
       }),
-    ).rejects.toMatchObject({ cause: { constraint } });
+      constraint,
+    );
   });
 
   it.each([
@@ -254,7 +212,7 @@ describe('constraints', () => {
   ])('refuses a template created %s', async (_name, createdAt) => {
     const { experience } = await setup();
 
-    await expect(
+    await expectConstraint(
       client.db.insert(sessionTemplates).values({
         experienceId: experience.id,
         weekday: 6,
@@ -263,16 +221,15 @@ describe('constraints', () => {
         allocation: 4,
         createdAt,
       }),
-    ).rejects.toMatchObject({
-      cause: { constraint: 'session_templates_created_at_in_range' },
-    });
+      'session_templates_created_at_in_range',
+    );
   });
 
   it('refuses a second template for the same weekday and start time', async () => {
     const { experience } = await setup();
     await createTemplate(experience.id);
 
-    await expect(
+    await expectConstraint(
       client.db.insert(sessionTemplates).values({
         experienceId: experience.id,
         weekday: 6,
@@ -280,19 +237,17 @@ describe('constraints', () => {
         durationMinutes: 30,
         allocation: 1,
       }),
-    ).rejects.toMatchObject({
-      cause: { constraint: 'session_templates_slot_unique' },
-    });
+      'session_templates_slot_unique',
+    );
   });
 
   it('refuses a session whose seats sold exceed its allocation', async () => {
     const { experience } = await setup();
 
-    await expect(
+    await expectConstraint(
       insertSession(experience.id, { allocation: 4, seatsSold: 5 }),
-    ).rejects.toMatchObject({
-      cause: { constraint: 'sessions_seats_sold_within_allocation' },
-    });
+      'sessions_seats_sold_within_allocation',
+    );
   });
 
   it('refuses to lower a stored allocation below the seats sold, and keeps the row', async () => {
@@ -302,22 +257,20 @@ describe('constraints', () => {
       seatsSold: 4,
     });
 
-    await expect(
+    await expectConstraint(
       client.db
         .update(sessions)
         .set({ allocation: 3 })
         .where(eq(sessions.id, session.id)),
-    ).rejects.toMatchObject({
-      cause: { constraint: 'sessions_seats_sold_within_allocation' },
-    });
-    await expect(
+      'sessions_seats_sold_within_allocation',
+    );
+    await expectConstraint(
       client.db
         .update(sessions)
         .set({ seatsSold: 7 })
         .where(eq(sessions.id, session.id)),
-    ).rejects.toMatchObject({
-      cause: { constraint: 'sessions_seats_sold_within_allocation' },
-    });
+      'sessions_seats_sold_within_allocation',
+    );
     const [stored] = await client.db
       .select()
       .from(sessions)
@@ -409,9 +362,10 @@ describe('constraints', () => {
   ])('refuse a session with %s', async (_name, constraint, override) => {
     const { experience } = await setup();
 
-    await expect(
+    await expectConstraint(
       insertSession(experience.id, override()),
-    ).rejects.toMatchObject({ cause: { constraint } });
+      constraint,
+    );
   });
 
   it('refuses a template without a local date, a date outside years 1000 to 9999, and an external generated session', async () => {
@@ -422,16 +376,14 @@ describe('constraints', () => {
       localDate: '2026-06-06',
     };
 
-    await expect(
+    await expectConstraint(
       insertSession(experience.id, { templateId: template.id }),
-    ).rejects.toMatchObject({
-      cause: { constraint: 'sessions_template_has_local_date' },
-    });
-    await expect(
+      'sessions_template_has_local_date',
+    );
+    await expectConstraint(
       insertSession(experience.id, { ...generated, source: 'external' }),
-    ).rejects.toMatchObject({
-      cause: { constraint: 'sessions_template_source_generated' },
-    });
+      'sessions_template_source_generated',
+    );
   });
 
   it.each([
@@ -441,11 +393,10 @@ describe('constraints', () => {
     const { experience } = await setup();
     const template = await createTemplate(experience.id);
 
-    await expect(
+    await expectConstraint(
       insertSession(experience.id, { templateId: template.id, localDate }),
-    ).rejects.toMatchObject({
-      cause: { constraint: 'sessions_local_date_in_range' },
-    });
+      'sessions_local_date_in_range',
+    );
   });
 
   it('accepts local dates at both ends of the range', async () => {
@@ -502,22 +453,20 @@ describe('constraints', () => {
       localDate: '2026-06-06',
     });
 
-    await expect(
+    await expectConstraint(
       insertSession(experience.id, {
         templateId: template.id,
         localDate: '2026-06-06',
       }),
-    ).rejects.toMatchObject({
-      cause: { constraint: 'sessions_template_local_date_unique' },
-    });
-    await expect(
+      'sessions_template_local_date_unique',
+    );
+    await expectConstraint(
       insertSession(other.experience.id, {
         templateId: template.id,
         localDate: '2026-06-13',
       }),
-    ).rejects.toMatchObject({
-      cause: { constraint: 'sessions_template_experience_fk' },
-    });
+      'sessions_template_experience_fk',
+    );
   });
 
   it('keeps sessions without a template unconstrained by the date key', async () => {
@@ -537,13 +486,12 @@ describe('constraints', () => {
       localDate: '2026-06-06',
     });
 
-    await expect(
+    await expectConstraint(
       client.db
         .delete(sessionTemplates)
         .where(eq(sessionTemplates.id, template.id)),
-    ).rejects.toMatchObject({
-      cause: { constraint: 'sessions_template_experience_fk' },
-    });
+      'sessions_template_experience_fk',
+    );
     await expect(
       client.db.delete(experiences).where(eq(experiences.id, experience.id)),
     ).rejects.toMatchObject({ cause: { code: '23503' } });
@@ -1329,7 +1277,9 @@ describe('updateSessionAllocation', () => {
         allocation: 2,
         expectedVersion: 1,
       });
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await waitUntilBlocked(client.db.$client, {
+        blockedBy: await backendPid(booking),
+      });
       await booking.query('UPDATE sessions SET seats_sold = 3 WHERE id = $1', [
         session.id,
       ]);
@@ -1350,18 +1300,6 @@ describe('updateSessionAllocation', () => {
     });
   });
 
-  async function waitUntilBlockedBy(pid: number) {
-    for (let attempt = 0; attempt < 500; attempt += 1) {
-      const { rows } = await client.db.$client.query<{ waiting: number }>(
-        'SELECT count(*)::int AS waiting FROM pg_stat_activity WHERE $1 = ANY(pg_blocking_pids(pid))',
-        [pid],
-      );
-      if ((rows[0]?.waiting ?? 0) > 0) return;
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    }
-    throw new Error('The edit never waited on the row lock');
-  }
-
   /** Holds the row lock, starts the edit, runs `change` once the edit waits, then commits. */
   async function editWhileLocked(
     caller: Caller,
@@ -1375,16 +1313,14 @@ describe('updateSessionAllocation', () => {
       await held.query('SELECT id FROM sessions WHERE id = $1 FOR UPDATE', [
         sessionId,
       ]);
-      const { rows } = await held.query<{ pid: number }>(
-        'SELECT pg_backend_pid() AS pid',
-      );
+      const holderPid = await backendPid(held);
       const pending = sessionData
         .updateSessionAllocation(caller, { sessionId, ...edit })
         .then(
           (value) => ({ value }) as const,
           (error: unknown) => ({ error }) as const,
         );
-      await waitUntilBlockedBy(rows[0]?.pid ?? 0);
+      await waitUntilBlocked(client.db.$client, { blockedBy: holderPid });
       await change(held);
       await held.query('COMMIT');
       return await pending;

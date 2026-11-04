@@ -6,8 +6,10 @@ import { holds } from '@/server/db/schema';
 import type { Device } from '@/server/device';
 import {
   createFreshDatabase,
+  raceAgainstOpenTransaction as race,
   serveNeonHttp,
   type FreshDatabase,
+  type RaceHooks,
 } from './harness';
 import { testDevice } from '../deviceFixture';
 import { hash, insertHold, insertSession, seedBookable } from './holdFixtures';
@@ -83,7 +85,6 @@ const describeFailure = (reason: unknown) => {
 };
 
 const ops = testCaller({ roles: [Role.Ops] });
-const aFewMoments = () => new Promise((resolve) => setTimeout(resolve, 300));
 
 const request = (sessionId: string, bookable: Bookable, quantity = 1) => ({
   sessionId,
@@ -94,49 +95,12 @@ const request = (sessionId: string, bookable: Bookable, quantity = 1) => ({
 const lockSession = (tx: Tx, sessionId: string) =>
   tx.execute(sql`SELECT id FROM sessions WHERE id = ${sessionId} FOR UPDATE`);
 
-/**
- * Runs `holder` in a transaction that stays open, starts `challenger` on another connection,
- * checks the challenger is still waiting, then commits the holder and returns what the challenger
- * answered. A challenger that does not wait was not serialized by the lock. `whileWaiting` runs
- * on a third connection during the wait, and `beforeCommit` runs in the holder just before it commits.
- */
-async function raceAgainstOpenTransaction<T>(
+const raceAgainstOpenTransaction = <T>(
   holder: (tx: Tx) => Promise<void>,
   challenger: () => Promise<T>,
-  hooks: {
-    whileWaiting?: () => Promise<void>;
-    beforeCommit?: (tx: Tx) => Promise<void>;
-  } = {},
-): Promise<T> {
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  let held!: () => void;
-  const holding = new Promise<void>((resolve) => {
-    held = resolve;
-  });
-  const holderDone = client.db.transaction(async (tx) => {
-    await holder(tx);
-    held();
-    await gate;
-    await hooks.beforeCommit?.(tx);
-  });
-  await holding;
-
-  let settled = false;
-  const answer = challenger().finally(() => {
-    settled = true;
-  });
-  answer.catch(() => undefined);
-  await aFewMoments();
-  const waited = !settled;
-  await hooks.whileWaiting?.();
-  release();
-  await holderDone;
-  expect(waited, 'the challenger waited for the holder').toBe(true);
-  return answer;
-}
+  hooks: RaceHooks<Tx> = {},
+) =>
+  race<Tx, T>((body) => client.db.transaction(body), holder, challenger, hooks);
 
 async function heldSeatsOf(sessionId: string): Promise<number> {
   const result = await client.db.execute(sql`

@@ -1,16 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { eq, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ZodError } from 'zod';
 import { homeLimits } from '@/lib/pages/home';
 import { upcomingWindow } from '@/lib/sessionWindow';
 import { hasSpaceLeft } from '@/lib/spaces';
 import {
-  categories,
-  cancellationTiers,
   experiences,
-  hosts,
-  neighborhoods,
   photos,
   priceOptions,
   sessions,
@@ -20,6 +16,7 @@ import {
   serveNeonHttp,
   type FreshDatabase,
 } from './harness';
+import { catalogFixtures, unique } from './catalogFixtures';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the experience read returns live and guide-only experiences with the card's fields, and never a draft, one in review, or a paused one
@@ -57,84 +54,20 @@ afterAll(async () => {
   vi.unstubAllEnvs();
 });
 
-let counter = 0;
-function unique(prefix: string) {
-  counter += 1;
-  return `${prefix}-${String(counter)}`;
-}
-
-async function parents(neighborhoodName = unique('Neighborhood')) {
-  const [host] = await client.db
-    .insert(hosts)
-    .values({
-      slug: unique('host'),
-      name: unique('Host'),
-      timeZone: 'America/New_York',
-    })
-    .returning();
-  const [category] = await client.db
-    .insert(categories)
-    .values({ slug: unique('category'), name: unique('Category') })
-    .returning();
-  const [neighborhood] = await client.db
-    .insert(neighborhoods)
-    .values({ slug: unique('neighborhood'), name: neighborhoodName })
-    .returning();
-  const [tier] = await client.db
-    .select()
-    .from(cancellationTiers)
-    .where(eq(cancellationTiers.isDefault, true));
-  if (!host || !category || !neighborhood || !tier) {
-    throw new Error('missing parents');
-  }
-  return {
-    hostId: host.id,
-    categoryId: category.id,
-    neighborhoodId: neighborhood.id,
-    cancellationTierId: tier.id,
-  };
-}
+const fixtures = catalogFixtures(() => client.db);
+const { parents, insertSession } = fixtures;
 
 async function insertExperience(
   overrides: Partial<typeof experiences.$inferInsert> = {},
 ) {
-  const [row] = await client.db
-    .insert(experiences)
-    .values({
-      ...(await parents()),
-      slug: unique('experience'),
-      name: unique('Experience'),
-      status: 'live',
-      ...overrides,
-    })
-    .returning();
-  if (!row) throw new Error('insert returned no experience');
-  return row;
+  return fixtures.insertExperience(await parents(), {
+    status: 'live',
+    ...overrides,
+  });
 }
 
 const opens = new Date('2026-11-02T15:00:00.000Z');
 const window = upcomingWindow(opens.toISOString(), homeLimits.thisWeekDays);
-
-async function insertSession(
-  experienceId: string,
-  startsAt: Date,
-  overrides: Partial<typeof sessions.$inferInsert> = {},
-) {
-  const [row] = await client.db
-    .insert(sessions)
-    .values({
-      experienceId,
-      startsAt,
-      endsAt: new Date(startsAt.getTime() + 2 * 3_600_000),
-      timeZone: 'America/New_York',
-      allocation: 8,
-      source: 'ramble',
-      ...overrides,
-    })
-    .returning();
-  if (!row) throw new Error('insert returned no session');
-  return row;
-}
 
 const noCovers = { covers: false };
 const withCovers = { covers: true };
@@ -163,7 +96,7 @@ describe('listHomeExperiences', () => {
       name: 'Pasta night',
       slug: 'pasta-night',
       durationMinutes: 150,
-      ...(await parents('Carroll Gardens')),
+      ...(await parents(undefined, { name: 'Carroll Gardens' })),
     });
     await client.db.insert(priceOptions).values([
       { experienceId: live.id, kind: 'child', priceMinor: 4000 },

@@ -5,6 +5,7 @@ import { ForbiddenError, Role } from '@/server/auth/caller';
 import { testCaller } from '@/server/auth/test-caller';
 import {
   createFreshDatabase,
+  expectConstraint,
   raceAgainstOpenTransaction as race,
   type FreshDatabase,
 } from './harness';
@@ -120,7 +121,6 @@ async function eraseDirectly(tx: Tx, guestId: string) {
   );
 }
 
-const constraint = (name: string) => ({ cause: { constraint: name } });
 const restricted = { cause: { code: '23001' } };
 
 describe('guests constraints', () => {
@@ -151,60 +151,61 @@ describe('guests constraints', () => {
     ['255 characters', `${'a'.repeat(243)}@example.com`],
     ['an unbounded address', `${'a'.repeat(100_000)}@example.com`],
   ])('refuses an email that is %s', async (_name, email) => {
-    await expect(insert(email)).rejects.toMatchObject(
-      constraint('guests_email_shape'),
-    );
+    await expectConstraint(insert(email), 'guests_email_shape');
   });
 
   it('refuses a second row for the same address', async () => {
     const email = newEmail();
     await insert(email);
 
-    await expect(insert(email)).rejects.toMatchObject(
-      constraint('guests_email_unique'),
-    );
+    await expectConstraint(insert(email), 'guests_email_unique');
   });
 
   it('refuses the reserved domain on a live guest', async () => {
-    await expect(insert('pat@anonymized.invalid')).rejects.toMatchObject(
-      constraint('guests_reserved_domain_iff_anonymized'),
+    await expectConstraint(
+      insert('pat@anonymized.invalid'),
+      'guests_reserved_domain_iff_anonymized',
     );
   });
 
   it('refuses an erased row that keeps an ordinary address', async () => {
-    await expect(
+    await expectConstraint(
       client.db.execute(
         sql`INSERT INTO guests (email, anonymized_at) VALUES (${newEmail()}, clock_timestamp())`,
       ),
-    ).rejects.toMatchObject(constraint('guests_anonymized_email_from_id'));
+      'guests_anonymized_email_from_id',
+    );
   });
 
   it('refuses an erased row whose address is not derived from its id', async () => {
-    await expect(
+    await expectConstraint(
       client.db.execute(
         sql`INSERT INTO guests (email, anonymized_at) VALUES ('erased-someone-else@anonymized.invalid', clock_timestamp())`,
       ),
-    ).rejects.toMatchObject(constraint('guests_anonymized_email_from_id'));
+      'guests_anonymized_email_from_id',
+    );
   });
 
   it('refuses an erased time before the created time', async () => {
     const id = '3e1c3a40-0000-4000-8000-000000000001';
-    await expect(
+    await expectConstraint(
       client.db.execute(
         sql`INSERT INTO guests (id, email, created_at, anonymized_at) VALUES (${id}, ${anonymizedEmail(id)}, now(), now() - interval '1 day')`,
       ),
-    ).rejects.toMatchObject(constraint('guests_anonymized_at_in_range'));
+      'guests_anonymized_at_in_range',
+    );
   });
 
   it.each([
     ['infinity', 'infinity'],
     ['a year past 9999', '10000-01-01 00:00:00+00'],
   ])('refuses a created time of %s', async (_name, value) => {
-    await expect(
+    await expectConstraint(
       client.db.execute(
         sql`INSERT INTO guests (email, created_at) VALUES (${newEmail()}, ${value}::timestamptz)`,
       ),
-    ).rejects.toMatchObject(constraint('guests_created_at_in_range'));
+      'guests_created_at_in_range',
+    );
   });
 
   it('refuses a null address', async () => {
@@ -246,9 +247,10 @@ describe('consents constraints', () => {
   ])('refuses %s with %s', async (source, status) => {
     const guest = await newGuest();
 
-    await expect(
+    await expectConstraint(
       insert(guest.id, 'newsletter', status, source),
-    ).rejects.toMatchObject(constraint('consents_source_allows_status'));
+      'consents_source_allows_status',
+    );
   });
 
   it.each([
@@ -305,11 +307,12 @@ describe('consents constraints', () => {
   it('refuses a recorded time of infinity', async () => {
     const guest = await newGuest();
 
-    await expect(
+    await expectConstraint(
       client.db.execute(
         sql`INSERT INTO consents (guest_id, kind, status, source, recorded_at) VALUES (${guest.id}, 'newsletter', 'granted', 'checkout', 'infinity')`,
       ),
-    ).rejects.toMatchObject(constraint('consents_recorded_at_in_range'));
+      'consents_recorded_at_in_range',
+    );
   });
 });
 
@@ -392,10 +395,9 @@ describe('privacy_requests constraints', () => {
   it('refuses an open request that has a resolved time', async () => {
     const guest = await newGuest();
 
-    await expect(
+    await expectConstraint(
       insert(guest.id, 'access', 'open', 'resolved'),
-    ).rejects.toMatchObject(
-      constraint('privacy_requests_resolved_iff_not_open'),
+      'privacy_requests_resolved_iff_not_open',
     );
   });
 
@@ -404,10 +406,9 @@ describe('privacy_requests constraints', () => {
     async (status) => {
       const guest = await newGuest();
 
-      await expect(
+      await expectConstraint(
         insert(guest.id, 'access', status, null),
-      ).rejects.toMatchObject(
-        constraint('privacy_requests_resolved_iff_not_open'),
+        'privacy_requests_resolved_iff_not_open',
       );
     },
   );
@@ -415,12 +416,11 @@ describe('privacy_requests constraints', () => {
   it('refuses a resolved time before the created time', async () => {
     const guest = await newGuest();
 
-    await expect(
+    await expectConstraint(
       client.db.execute(
         sql`INSERT INTO privacy_requests (guest_id, kind, status, created_at, resolved_at) VALUES (${guest.id}, 'access', 'completed', now(), now() - interval '1 day')`,
       ),
-    ).rejects.toMatchObject(
-      constraint('privacy_requests_resolved_at_in_range'),
+      'privacy_requests_resolved_at_in_range',
     );
   });
 
@@ -428,9 +428,10 @@ describe('privacy_requests constraints', () => {
     const guest = await newGuest();
     await insert(guest.id, 'deletion', 'open', null);
 
-    await expect(
+    await expectConstraint(
       insert(guest.id, 'deletion', 'open', null),
-    ).rejects.toMatchObject(constraint('privacy_requests_one_open_per_kind'));
+      'privacy_requests_one_open_per_kind',
+    );
     await insert(guest.id, 'access', 'open', null);
   });
 

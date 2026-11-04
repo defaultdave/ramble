@@ -19,6 +19,7 @@ import {
   serveNeonHttp,
   type FreshDatabase,
 } from './harness';
+import { dueClock } from '../support/dueClock';
 
 vi.mock('@/server/monitoring/heartbeat', () => ({ sendHeartbeat: vi.fn() }));
 const raiseAlert = vi.hoisted(() => vi.fn());
@@ -586,8 +587,7 @@ describe('the export', () => {
     );
 
     const { drainJobs } = await import('@/server/jobs/drain');
-    const { systemClock } = await import('@/server/ports/clock');
-    const report = await drainJobs(systemClock);
+    const report = await drainJobs(dueClock);
 
     expect(report).toMatchObject({ claimed: 7, succeeded: 7, dead: 0 });
     const { getStorage } = await import('@/server/ports/storage/config');
@@ -600,7 +600,6 @@ describe('the export', () => {
   it('dead-letters a day at the first attempt, with one job-dead alert, when the store has no locked storage', async () => {
     const { enqueue } = await import('@/server/jobs/enqueue');
     const { drainJobs } = await import('@/server/jobs/drain');
-    const { systemClock } = await import('@/server/ports/clock');
     raiseAlert.mockClear();
     await client.db.transaction((tx) =>
       enqueue(tx, {
@@ -613,7 +612,7 @@ describe('the export', () => {
     store.locked = false;
     let report: Awaited<ReturnType<typeof drainJobs>>;
     try {
-      report = await drainJobs(systemClock);
+      report = await drainJobs(dueClock);
     } finally {
       store.locked = true;
     }

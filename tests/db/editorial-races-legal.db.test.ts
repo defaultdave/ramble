@@ -368,7 +368,9 @@ describe('the publication time of a legal version', () => {
     const rows = await client.db
       .select({
         version: legalDocuments.version,
-        stampedAfterPrevious: sql<boolean | null>`${legalDocuments.publishedAt} > lag(${legalDocuments.publishedAt}) over (order by ${legalDocuments.version})`,
+        stampedAfterPrevious: sql<
+          boolean | null
+        >`${legalDocuments.publishedAt} > lag(${legalDocuments.publishedAt}) over (order by ${legalDocuments.version})`,
       })
       .from(legalDocuments)
       .where(eq(legalDocuments.doc, key))

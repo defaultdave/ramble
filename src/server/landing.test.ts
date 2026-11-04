@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cacheEntryTagCounts } from '@/lib/pages/cacheTagBudget';
 import { tagsForChanges } from '@/lib/cacheTags';
 import { getLandingData } from './landing';
+import { makeDriverError } from '../../tests/support/driverError';
 
 // Behaviours under test, one per decision, branch or risk:
 // - a known category or neighborhood is read with the editorial profile, tagged with its own tag and the names, and returns its name and published copy
@@ -29,9 +30,7 @@ vi.mock('@/server/db/catalog', () => ({
 }));
 
 const copy = { id: '1', kind: 'category', slug: 'cooking', heading: 'Cooking' };
-const driverError = new Error(
-  'Failed query: select ... where slug = $1\nparams: secret-slug',
-);
+const driverError = makeDriverError('secret-slug');
 
 beforeEach(() => {
   vi.clearAllMocks();

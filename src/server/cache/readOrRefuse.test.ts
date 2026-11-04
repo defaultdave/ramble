@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { describe, expect, it } from 'vitest';
 import { readOrRefuse } from './readOrRefuse';
+import { makeDriverError } from '../../../tests/support/driverError';
 
 // Behaviours under test, one per decision, branch or risk:
 // - a read that succeeds returns its answer
@@ -8,10 +9,7 @@ import { readOrRefuse } from './readOrRefuse';
 // - a thrown value that is not an Error is named unknown
 // - a framework control-flow error passes through unchanged
 
-// What a database error carries: the query text and the values bound to it.
-const driverError = new Error(
-  'Failed query: select ... where slug in ($1)\nparams: secret-slug,2026-11-07',
-);
+const driverError = makeDriverError('secret-slug,2026-11-07');
 
 describe('readOrRefuse', () => {
   it('returns the answer of a read that succeeds', async () => {

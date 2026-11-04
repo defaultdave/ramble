@@ -14,6 +14,7 @@ import {
   type AttemptStatus,
 } from './payments';
 import { isTerminal } from './transitions';
+import { id } from '../../tests/support/ids';
 
 // Behaviours under test, one per decision, branch or risk.
 // - attempt transitions: the design doc table; succeeded and canceled never change; a failed try can still succeed
@@ -22,8 +23,6 @@ import { isTerminal } from './transitions';
 // - PaymentAttemptSchema: valid rows pass; each row rule refuses its bad row
 // - ProviderEventSchema: valid rows pass; amount and currency come together; the body is bounded and storable
 
-const id = (n: number) =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const orderId = id(1);
 const created = new Date('2026-11-01T12:00:00Z');
 const later = new Date('2026-11-01T12:05:00Z');

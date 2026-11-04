@@ -46,6 +46,13 @@ export const editorialLimits = {
   listed: 200,
 } as const;
 
+/**
+ * Entries of one collection the home page looks at to find the cards it shows, in case some cannot
+ * be shown. The most the tag budget leaves room for (`cacheTagBudget.test.ts` fails if it grows): every
+ * candidate is one cache tag on the home entry.
+ */
+export const picksCandidates = 5;
+
 const textEncoder = new TextEncoder();
 
 function byteLength(doc: RichTextDoc): number {

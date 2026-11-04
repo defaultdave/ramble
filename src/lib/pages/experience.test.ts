@@ -16,7 +16,11 @@ import {
   weatherTerms,
   type ExperiencePageInput,
 } from './experience';
-import { experience, id, place } from './experience.fixtures';
+import {
+  experience,
+  id,
+  place,
+} from '../../../tests/support/fixtures/experience';
 import type { GuestPhoto } from '../photos';
 
 // Behaviours under test, one per decision, branch or risk:

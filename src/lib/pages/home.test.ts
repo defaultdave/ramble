@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { ZodError } from 'zod';
-import type { Collection, HomeModule } from '../editorial';
+import {
+  picksCandidates,
+  type Collection,
+  type HomeModule,
+} from '../editorial';
 import type { CardExperience } from '../experienceCards';
 import {
   buildHomePage,
@@ -21,6 +25,7 @@ import {
 } from './home';
 import { paragraphs } from '../richText/paragraphs';
 import { upcomingWindow } from '../sessionWindow';
+import { id } from '../../../tests/support/ids';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the browse address writes only the parameters that are set, escaped, in the grammar order
@@ -35,9 +40,6 @@ import { upcomingWindow } from '../sessionWindow';
 // - a card starts with no photo; the page's card IDs are those of its Picks and this-week cards, each once, and none for an empty page
 // - a cover read is set on the Picks cards only; a this-week card keeps the cover it arrived with, and a card with none keeps none
 // - the banner is its trimmed text, or nothing when there is none
-
-const id = (n: number) =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
 function experience(
   n: number,
@@ -274,9 +276,7 @@ describe('homeExperienceIds', () => {
     const many = Array.from({ length: 30 }, (_, i) => i + 1);
     const picks = [pick(1, many)];
     const modules = [module(1, 'picks', { collectionId: id(801) })];
-    expect(homeExperienceIds(modules, picks)).toHaveLength(
-      homeLimits.picksCandidates,
-    );
+    expect(homeExperienceIds(modules, picks)).toHaveLength(picksCandidates);
   });
 
   it('is bounded in all, whatever the modules and collections hold', () => {
@@ -346,12 +346,12 @@ describe('buildHomePage category rail', () => {
         {
           slug: 'cooking',
           name: 'Cooking',
-          href: '/new-york/browse?category=cooking',
+          href: '/new-york/things-to-do/cooking',
         },
         {
           slug: 'wine',
           name: 'Wine and cocktails',
-          href: '/new-york/browse?category=wine',
+          href: '/new-york/things-to-do/wine',
         },
       ],
     });

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { samplePhoto } from '@/components/Photo/Photo.fixtures';
 import { parseFilters } from '@/lib/filters';
 import { homeCopy, type HomeModuleView } from '@/lib/pages/home';
+import { categoryPath } from '@/lib/routes';
 import { HomeModules } from './HomeModules';
 import {
   categoryRail,
@@ -20,7 +21,7 @@ import {
 // - the hero is the page's one h1, with its copy, and its search is a GET form to the browse page
 // - the search offers every neighborhood after "Anywhere", a date no earlier than today, and a submit
 // - the When field starts on today, and the submitted address reads back as that day; cleared, it reads back as any day
-// - each category links to the browse page filtered by it
+// - every category links to its things-to-do page, and none is marked current
 // - Ramble Picks shows its cards under an h2 with an h3 each, links to the whole Pick, and carries the anchor
 // - a guide-only card links out and says it is not bookable
 // - the gift guide links to /gifts and carries the sponsor line; without copy it shows none
@@ -152,14 +153,19 @@ describe('hero search', () => {
 });
 
 describe('category rail', () => {
-  it('links each category to browse filtered by it', () => {
+  it('links every category to its page and marks none current', () => {
     render_([categoryRail]);
     const region = screen.getByRole('region', { name: 'Browse by category' });
     const links = within(region).getAllByRole('link');
-    expect(links).toHaveLength(8);
-    expect(
-      within(region).getByRole('link', { name: 'Cooking' }),
-    ).toHaveAttribute('href', '/new-york/browse?category=cooking');
+    expect(links.map((link) => link.textContent)).toEqual(
+      categoryRail.categories.map(({ name }) => name),
+    );
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(
+      categoryRail.categories.map(({ slug }) => categoryPath(slug)),
+    );
+    expect(links.map((link) => link.getAttribute('aria-current'))).toEqual(
+      links.map(() => null),
+    );
   });
 });
 

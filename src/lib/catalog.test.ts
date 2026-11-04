@@ -11,6 +11,7 @@ import {
   priceKindLabel,
   type PriceOption,
 } from './catalog';
+import { id } from '../../tests/support/ids';
 
 // Behaviours under test, one per decision:
 // - a valid row parses for a guest and for a host
@@ -19,9 +20,6 @@ import {
 // - an unknown enum value is refused
 // - each field tie the database CHECKs state is refused here too: age limits, weather policy, link-out
 // - a negative or fractional price, a malformed slug and a malformed ID are refused
-
-const id = (n: number) =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
 const tier = {
   id: id(1),

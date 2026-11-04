@@ -42,7 +42,25 @@ describe('ErrorNotice', () => {
   });
 });
 
+describe('ErrorNotice focus', () => {
+  it('moves focus to the heading when it appears, so the failure is announced', () => {
+    render(<ErrorNotice onRetry={vi.fn()} />);
+
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(heading).toHaveFocus();
+    expect(heading).toHaveAttribute('tabindex', '-1');
+  });
+});
+
 describe('PageHeading', () => {
+  it('stays out of the tab order unless a caller asks to move focus to it', () => {
+    render(<PageHeading title="Plan your day" />);
+
+    expect(screen.getByRole('heading', { level: 1 })).not.toHaveAttribute(
+      'tabindex',
+    );
+  });
+
   it('renders the title as the level-1 heading above its children, in the page container', () => {
     render(
       <PageHeading title="Plan your day">

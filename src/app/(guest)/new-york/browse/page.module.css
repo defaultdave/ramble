@@ -39,5 +39,5 @@
 
 /* The same off-screen link, with the same focus treatment, as the skip link at the top of every guest page. */
 .skipToResults {
-  composes: skip from '../../../../components/GuestShell/GuestShell.module.css';
+  composes: skip from '../../../../components/SkipLink/SkipLink.module.css';
 }

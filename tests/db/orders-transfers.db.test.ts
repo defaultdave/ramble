@@ -162,9 +162,10 @@ describe('transfers', () => {
 });
 
 describe('text that only looks blank', () => {
-  // Postgres [[:space:]] takes these as text; JavaScript \s does not. blank-text.db.test.ts checks
-  // the class over every code point, so each column here only has to show it uses that class.
+  // Postgres [[:space:]] takes these as text; JavaScript \s does not.
   it.each([
+    ['U+00A0', ' '],
+    ['U+FEFF', '﻿'],
     ['U+2028', ' '],
     ['a mix', '  ﻿\t'],
   ])('refuses a lead guest name of only %s', async (_name, value) => {
@@ -176,6 +177,7 @@ describe('text that only looks blank', () => {
 
   it.each([
     ['U+00A0', ' '],
+    ['U+FEFF', '﻿'],
   ])('refuses a provider event id of only %s', async (_name, value) => {
     await expectConstraint(
       insert('provider_events', {

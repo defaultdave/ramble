@@ -214,6 +214,8 @@ describe('generateSessions', () => {
     );
 
     const dates = result.ok ? result.created.map((row) => row.localDate) : [];
+    // 2028 is a leap year that starts on a Saturday: 53 Saturdays in a 366-day range.
+    expect(dates).toHaveLength(53);
     expect([dates.at(0), dates.at(-1)]).toEqual(['2028-01-01', '2028-12-30']);
   });
 });

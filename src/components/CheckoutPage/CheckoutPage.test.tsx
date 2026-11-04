@@ -467,6 +467,9 @@ describe('CheckoutPage', () => {
 
       expect(await screen.findByText(pattern)).toBeVisible();
       expect(
+        screen.getByText('Not held').closest('[role="alert"]'),
+      ).toHaveFocus();
+      expect(
         screen.queryByRole('button', { name: 'Hold my spaces again' }),
       ).toBeNull();
       expect(

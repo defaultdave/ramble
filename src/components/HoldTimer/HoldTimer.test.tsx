@@ -25,6 +25,19 @@ describe('HoldTimer', () => {
     expect(screen.getByRole('timer')).toHaveTextContent(text);
   });
 
+  it.each([
+    { secondsLeft: 582, shown: false },
+    { secondsLeft: 72, shown: true },
+    { secondsLeft: 0, shown: false },
+  ])(
+    'shows "Ending soon" only in the warning band ($secondsLeft s: $shown)',
+    ({ secondsLeft, shown }) => {
+      render(timer(secondsLeft));
+      const text = screen.getByRole('timer').textContent;
+      expect(text.includes('Ending soon')).toBe(shown);
+    },
+  );
+
   it('keeps its announcement empty while the hold is long', () => {
     render(timer(582));
     expect(screen.getByRole('status')).toBeEmptyDOMElement();

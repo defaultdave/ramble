@@ -7,6 +7,7 @@ import {
 import { browsePageSize, browseTitle } from '@/lib/pages/browse';
 import { noFilters } from '@/lib/filters';
 import { getBrowseDates, getBrowseResults, getBrowseTitle } from './browse';
+import { makeDriverError } from '../../tests/support/driverError';
 
 // Behaviours under test, one per decision, branch or risk:
 // - each cached read names its cache profile and tags itself, results with the catalog and every experience they list
@@ -42,10 +43,7 @@ const asOf = '2026-10-26T12:00:00.000Z';
 const query = { filters: noFilters, after: null };
 const cursorId = '00000000-0000-4000-8000-0000000000aa';
 
-// What a database error carries: the query text and the values bound to it.
-const driverError = new Error(
-  'Failed query: select ... where slug in ($1)\nparams: secret-slug,2026-11-07',
-);
+const driverError = makeDriverError('secret-slug,2026-11-07');
 
 beforeEach(() => {
   vi.clearAllMocks();

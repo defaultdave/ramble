@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomeContent } from './HomeContent';
 import { id } from '../../../tests/support/ids';
+import { makeDriverError } from '../../../tests/support/driverError';
 
 // Behaviours under test, one per decision, branch or risk:
 // - a read that throws an Error carrying query text and params logs only its digest and kind and renders the error state
@@ -61,11 +62,7 @@ function content(modules: ReturnType<typeof homeModule>[]) {
   };
 }
 
-// What a database error carries: the query text and the values bound to it.
-const driverError = Object.assign(
-  new Error('Failed query: select ... where slug in ($1)\nparams: secret-slug'),
-  { cause: new Error('connection to secret-host refused') },
-);
+const driverError = makeDriverError('secret-slug', { withCause: true });
 
 beforeEach(() => {
   vi.clearAllMocks();

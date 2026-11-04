@@ -9,6 +9,7 @@ import { homeLimits } from '@/lib/pages/home';
 import { upcomingWindow } from '@/lib/sessionWindow';
 import { getHomeContent, getThisWeek } from './home';
 import { id } from '../../tests/support/ids';
+import { makeDriverError } from '../../tests/support/driverError';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the home read uses the editorial profile and tags the home, the names of categories and neighborhoods, and each experience a Pick names, shown or not; it does not tag the catalog
@@ -52,9 +53,7 @@ vi.mock('@/server/db/home', () => ({
 
 const asOf = '2026-11-02T15:00:00.000Z';
 
-const driverError = new Error(
-  'Failed query: select ... where id in ($1)\nparams: secret-id',
-);
+const driverError = makeDriverError('secret-id');
 
 beforeEach(() => {
   vi.clearAllMocks();

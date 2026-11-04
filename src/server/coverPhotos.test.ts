@@ -4,6 +4,7 @@ import { photoLimits } from '@/lib/photos';
 import { idWithLetters } from '../../tests/support/fixtures/experience';
 import { getCoverPhotos } from './coverPhotos';
 import { id } from '../../tests/support/ids';
+import { makeDriverError } from '../../tests/support/driverError';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the cover read uses the catalog profile and tags the experience of every ID it was asked about
@@ -21,9 +22,7 @@ vi.mock('next/cache', () => ({
 const db = vi.hoisted(() => ({ covers: vi.fn() }));
 vi.mock('@/server/db/photos', () => ({ listGuestCoverPhotos: db.covers }));
 
-const driverError = new Error(
-  'Failed query: select ... where id in ($1)\nparams: secret-id',
-);
+const driverError = makeDriverError('secret-id');
 
 beforeEach(() => {
   vi.clearAllMocks();

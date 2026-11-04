@@ -6,6 +6,7 @@ import {
 import { idWithLetters } from '../../tests/support/fixtures/experience';
 import { getExperiencePage } from './experiencePage';
 import { id } from '../../tests/support/ids';
+import { makeDriverError } from '../../tests/support/driverError';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the page read uses the catalog profile and tags the experience only; the category and neighborhood names arrive with their own tag through getFilterOptions
@@ -34,9 +35,7 @@ vi.mock('@/server/db/catalog', () => ({
 }));
 vi.mock('@/server/db/photos', () => ({ listGuestPhotos: db.photos }));
 
-const driverError = new Error(
-  'Failed query: select ... where id = $1\nparams: secret-id',
-);
+const driverError = makeDriverError('secret-id');
 
 beforeEach(() => {
   vi.clearAllMocks();

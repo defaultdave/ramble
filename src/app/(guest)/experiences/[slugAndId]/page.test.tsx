@@ -12,6 +12,7 @@ import ExperienceRoute, {
   generateMetadata,
   generateStaticParams,
 } from './page';
+import { makeDriverError } from '../../../../../tests/support/driverError';
 
 // Behaviours under test, one per decision, branch or risk:
 // - an address that is not a slug and an ID is a not-found, before anything is read
@@ -62,11 +63,7 @@ const notFoundDigest = expect.stringContaining(
   'NEXT_HTTP_ERROR_FALLBACK;404',
 ) as string;
 
-// What a database error carries: the query text and the values bound to it.
-const driverError = Object.assign(
-  new Error('Failed query: select ... where id = $1\nparams: secret-id'),
-  { cause: new Error('connection to secret-host refused') },
-);
+const driverError = makeDriverError('secret-id', { withCause: true });
 
 beforeEach(() => {
   vi.clearAllMocks();

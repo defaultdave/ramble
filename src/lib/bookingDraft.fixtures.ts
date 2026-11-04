@@ -1,4 +1,11 @@
-import type { BookingOffer, OfferedSession } from './bookingDraft';
+import {
+  bookingReducer,
+  initialState,
+  type BookingAction,
+  type BookingOffer,
+  type BookingState,
+  type OfferedSession,
+} from './bookingDraft';
 import type { BookingBasics } from './pages/experience';
 
 export const optionId = (n: number) =>
@@ -131,3 +138,35 @@ export function basicsOf(
     fullRefundHoursBefore,
   };
 }
+
+export const start = (offer: BookingOffer = kayakOffer) => initialState(offer);
+export const run = (
+  offer: BookingOffer,
+  actions: BookingAction[],
+  from: BookingState = start(offer),
+) =>
+  actions.reduce((state, action) => bookingReducer(offer, state, action), from);
+
+export function effectNotice() {
+  return {
+    kind: 'notice' as const,
+    notice: {
+      tone: 'warning' as const,
+      title: 'Those spaces just sold out',
+      body: 'x',
+      similar: false,
+    },
+    closeSession: false,
+    alternatives: [],
+  };
+}
+
+export const sessionAt = (n: number) => optionId(100 + n);
+export const pickDate = (date: string): BookingAction => ({
+  type: 'chooseDate',
+  date,
+});
+export const pickSession = (n: number): BookingAction => ({
+  type: 'chooseSession',
+  sessionId: sessionAt(n),
+});

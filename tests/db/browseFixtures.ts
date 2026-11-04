@@ -1,3 +1,5 @@
+import { noFilters, type BrowseFilters } from '@/lib/filters';
+import { browseDays, toBrowsePage, type BrowsePage } from '@/lib/pages/browse';
 import { isoDateOf, msPerDay } from '@/lib/time';
 import type { db as Db } from '@/server/db/client';
 import {
@@ -16,6 +18,49 @@ export type Scope = {
   neighborhood: { id: string; slug: string; name: string };
   cancellationTierId: string;
 };
+
+export const asOf = '2026-10-26T12:00:00.000Z';
+
+export const filtersFor = (
+  where: Scope,
+  extra: Partial<BrowseFilters> = {},
+) => ({
+  ...noFilters,
+  categories: [where.category.slug],
+  ...extra,
+});
+
+export const names = (page: Extract<BrowsePage, { ok: true }>) =>
+  page.items.map(({ name }) => name);
+
+/** The browse and calendar reads as a test sees them: a page, and the days the calendar shows. */
+export function browseReads(
+  getBrowse: () => typeof import('@/server/db/browse'),
+) {
+  async function list(
+    filters: BrowseFilters,
+    after: string | null = null,
+  ): Promise<Extract<BrowsePage, { ok: true }>> {
+    const read = await getBrowse().listBrowseExperiences(
+      { filters, after },
+      asOf,
+    );
+    const page = toBrowsePage(after, read);
+    if (!page.ok) throw new Error('expected a page');
+    return page;
+  }
+
+  async function daysFor(
+    filters: Pick<BrowseFilters, 'categories' | 'neighborhoods'> &
+      Partial<Pick<BrowseFilters, 'guests'>>,
+  ) {
+    return browseDays(
+      await getBrowse().listBrowseDayRows({ guests: null, ...filters }, asOf),
+    );
+  }
+
+  return { list, daysFor };
+}
 
 export function shiftDay(date: string, days: number): string {
   return isoDateOf(new Date(Date.parse(`${date}T00:00:00Z`) + days * msPerDay));

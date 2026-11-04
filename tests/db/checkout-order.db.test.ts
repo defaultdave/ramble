@@ -61,7 +61,11 @@ afterAll(async () => {
   await endCheckoutSuite(suite);
 });
 
+// One instant per test, so every time derived inside a test shares the same base.
+let at = Date.now();
+
 beforeEach(async () => {
+  at = Date.now();
   await resetCheckoutSettings(client.db);
 });
 
@@ -205,8 +209,8 @@ describe('a hold becomes an order', () => {
   it('puts the grace after now when the hold is paid in its last moment', async () => {
     const hold = await holdFor(client.db, bookable, guestA, {
       status: 'paying',
-      createdAt: new Date(Date.now() - 12 * minute),
-      payingUntil: new Date(Date.now() + 3 * minute),
+      createdAt: new Date(at - 12 * minute),
+      payingUntil: new Date(at + 3 * minute),
     });
 
     const started = await start({}, hold.id);

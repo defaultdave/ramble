@@ -62,7 +62,11 @@ afterAll(async () => {
   await endCheckoutSuite(suite);
 });
 
+// One instant per test, so every time derived inside a test shares the same base.
+let at = Date.now();
+
 beforeEach(async () => {
+  at = Date.now();
   await resetCheckoutSettings(client.db);
 });
 
@@ -76,14 +80,14 @@ describe('a hold that is not open', () => {
     over: Parameters<typeof holdFor>[3] = {},
   ) =>
     holdFor(client.db, await seedBookable(client.db), device, {
-      createdAt: new Date(Date.now() - 20 * minute),
+      createdAt: new Date(at - 20 * minute),
       ...over,
     });
 
   it('answers hold_expired with the spaces left and that the party can hold again, writing nothing', async () => {
     const open = await seedBookable(client.db, { allocation: 5 });
     const hold = await holdFor(client.db, open, guestA, {
-      createdAt: new Date(Date.now() - 20 * minute),
+      createdAt: new Date(at - 20 * minute),
     });
     const before = await tally();
 
@@ -105,7 +109,7 @@ describe('a hold that is not open', () => {
     await holdFor(client.db, small, guestB, { adults: 3 });
     const hold = await holdFor(client.db, small, guestA, {
       adults: 2,
-      createdAt: new Date(Date.now() - 20 * minute),
+      createdAt: new Date(at - 20 * minute),
     });
 
     expect(refused(await start({}, hold.id))).toEqual({
@@ -118,7 +122,7 @@ describe('a hold that is not open', () => {
   it('judges a paying hold past its deadline lapsed', async () => {
     const hold = await lapsed(guestA, {
       status: 'paying',
-      payingUntil: new Date(Date.now() - minute),
+      payingUntil: new Date(at - minute),
     });
 
     expect(refused(await start({}, hold.id)).status).toBe('hold_expired');
@@ -128,15 +132,15 @@ describe('a hold that is not open', () => {
     const full = await seedBookable(client.db, { allocation: 2 });
     const hold = await holdFor(client.db, full, guestA, {
       adults: 2,
-      createdAt: new Date(Date.now() - 20 * minute),
+      createdAt: new Date(at - 20 * minute),
     });
     await client.db
       .update(sessions)
       .set({ seatsSold: 2 })
       .where(eq(sessions.id, full.session.id));
     const other = await insertSession(client.db, full.experience.id, {
-      startsAt: new Date(Date.now() + 9 * day),
-      endsAt: new Date(Date.now() + 9 * day + 2 * 60 * minute),
+      startsAt: new Date(at + 9 * day),
+      endsAt: new Date(at + 9 * day + 2 * 60 * minute),
       allocation: 4,
     });
     const before = await tally();
@@ -267,9 +271,9 @@ describe('two calls on one hold', () => {
       .update(holds)
       .set({
         status: 'paying',
-        createdAt: new Date(Date.now() - 30 * minute),
-        expiresAt: new Date(Date.now() - 20 * minute),
-        payingUntil: new Date(Date.now() - minute),
+        createdAt: new Date(at - 30 * minute),
+        expiresAt: new Date(at - 20 * minute),
+        payingUntil: new Date(at - minute),
       })
       .where(eq(holds.id, hold.id));
 

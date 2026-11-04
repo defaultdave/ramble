@@ -64,7 +64,11 @@ afterAll(async () => {
   vi.unstubAllEnvs();
 });
 
+// One instant per test, so every time derived inside a test shares the same base.
+let at = Date.now();
+
 beforeEach(async () => {
+  at = Date.now();
   // The limits count a device's holds in every session, so a test starts with none.
   await clearHolds(client.db);
   cache.updateTag.mockClear();
@@ -163,9 +167,9 @@ describe('releaseHold', () => {
     const bookable = await seedBookable(client.db);
     const lapsed = await insertHold(client.db, bookable.session.id, {
       deviceKey: guestA.deviceKey,
-      createdAt: new Date(Date.now() - 30 * minute),
-      updatedAt: new Date(Date.now() - 30 * minute),
-      expiresAt: new Date(Date.now() - 20 * minute),
+      createdAt: new Date(at - 30 * minute),
+      updatedAt: new Date(at - 30 * minute),
+      expiresAt: new Date(at - 20 * minute),
     });
 
     expect(await holdData.releaseHold(guestA, { holdId: lapsed.id })).toEqual({
@@ -182,8 +186,8 @@ describe('releaseHold', () => {
     const paying = await insertHold(client.db, bookable.session.id, {
       deviceKey: guestA.deviceKey,
       status: 'paying',
-      payingUntil: new Date(Date.now() + 10 * minute),
-      expiresAt: new Date(Date.now() + 10 * minute),
+      payingUntil: new Date(at + 10 * minute),
+      expiresAt: new Date(at + 10 * minute),
     });
     const before = await storedHold(paying.id);
 
@@ -203,8 +207,8 @@ describe('releaseHold', () => {
     const paying = await insertHold(client.db, bookable.session.id, {
       deviceKey: guestA.deviceKey,
       status: 'paying',
-      payingUntil: new Date(Date.now() + 10 * minute),
-      expiresAt: new Date(Date.now() + 10 * minute),
+      payingUntil: new Date(at + 10 * minute),
+      expiresAt: new Date(at + 10 * minute),
     });
     const before = [
       await storedHold(holdId),
@@ -281,10 +285,10 @@ describe('capacity edits count open holds', () => {
     await insertHold(client.db, bookable.session.id, {
       seats: 5,
       status: 'paying',
-      createdAt: new Date(Date.now() - 12 * minute),
-      updatedAt: new Date(Date.now() - 12 * minute),
-      expiresAt: new Date(Date.now() - 2 * minute),
-      payingUntil: new Date(Date.now() + 3 * minute),
+      createdAt: new Date(at - 12 * minute),
+      updatedAt: new Date(at - 12 * minute),
+      expiresAt: new Date(at - 2 * minute),
+      payingUntil: new Date(at + 3 * minute),
     });
 
     expect(await edit(bookable, 4)).toMatchObject({
@@ -298,9 +302,9 @@ describe('capacity edits count open holds', () => {
     const bookable = await seedBookable(client.db, { allocation: 8 });
     await insertHold(client.db, bookable.session.id, {
       seats: 5,
-      createdAt: new Date(Date.now() - 30 * minute),
-      updatedAt: new Date(Date.now() - 30 * minute),
-      expiresAt: new Date(Date.now() - 20 * minute),
+      createdAt: new Date(at - 30 * minute),
+      updatedAt: new Date(at - 30 * minute),
+      expiresAt: new Date(at - 20 * minute),
     });
     await insertHold(client.db, bookable.session.id, {
       seats: 3,

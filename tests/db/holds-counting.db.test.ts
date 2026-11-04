@@ -83,8 +83,13 @@ const {} = holdDbFixtures(
 );
 
 describe('which holds count', () => {
-  const past = (ms: number) => new Date(Date.now() - ms);
-  const ahead = (ms: number) => new Date(Date.now() + ms);
+  // One instant per test, so every time derived inside a test shares the same base.
+  let at = Date.now();
+  beforeEach(() => {
+    at = Date.now();
+  });
+  const past = (ms: number) => new Date(at - ms);
+  const ahead = (ms: number) => new Date(at + ms);
 
   it('counts an active hold before its deadline and not one past it', async () => {
     const bookable = await seedBookable(client.db, { allocation: 2 });

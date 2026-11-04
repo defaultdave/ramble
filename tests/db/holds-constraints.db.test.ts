@@ -82,8 +82,13 @@ describe('constraints on holds', () => {
     bookable = await seedBookable(client.db);
   });
 
-  const now = () => new Date();
-  const ago = (ms: number) => new Date(Date.now() - ms);
+  // One instant per test, so every time derived inside a test shares the same base.
+  let at = Date.now();
+  beforeEach(() => {
+    at = Date.now();
+  });
+  const now = () => new Date(at);
+  const ago = (ms: number) => new Date(at - ms);
 
   it.each([
     [
@@ -274,8 +279,8 @@ describe('constraints on holds', () => {
     });
     await insertHold(client.db, bookable.session.id, {
       status: 'paying',
-      payingUntil: new Date(Date.now() + 10 * minute),
-      expiresAt: new Date(Date.now() + 10 * minute),
+      payingUntil: new Date(at + 10 * minute),
+      expiresAt: new Date(at + 10 * minute),
     });
     await insertHold(client.db, bookable.session.id, {
       status: 'released',

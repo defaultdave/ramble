@@ -47,13 +47,18 @@ export function hasClientDirective(text: string): boolean {
 
 /** The specifiers a module loads at run time. A type-only import is erased by the compiler, so it is left out. */
 export function importsOf(text: string): string[] {
-  const runtime = text.replace(
+  const code = text
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+  const runtime = code.replace(
     /\b(?:import|export)\s+type\b[^;'"]*?from\s*['"][^'"]+['"]/g,
     '',
   );
-  return [...runtime.matchAll(/(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g)].map(
-    (match) => match[1] ?? '',
-  );
+  return [
+    ...runtime.matchAll(
+      /^\s*(?:[^'"\n]*?\b)?(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/gm,
+    ),
+  ].map((match) => match[1] ?? '');
 }
 
 /** Every module the roots can load, and the specifiers that reached them. */

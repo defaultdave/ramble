@@ -7,6 +7,7 @@ import {
   securityHeaders,
 } from '@/lib/securityHeaders';
 import nextConfig from '../next.config';
+import { listFiles } from './support/importGraph';
 
 const root = path.resolve(import.meta.dirname, '..');
 const appDir = path.join(root, 'src/app');
@@ -39,12 +40,11 @@ function segmentToUrl(segment: string): string {
   return segment;
 }
 
-function pagesUnder(dir: string, segments: string[]): string[][] {
-  return readdirSync(dir).flatMap((entry) => {
-    const full = path.join(dir, entry);
-    if (isDirectory(full)) return pagesUnder(full, [...segments, entry]);
-    return entry === 'page.tsx' ? [segments] : [];
-  });
+function pagesUnder(dir: string): string[][] {
+  return listFiles(dir)
+    .filter((file) => path.basename(file) === 'page.tsx')
+    .map((file) => path.relative(dir, path.dirname(file)))
+    .map((relative) => relative.split(path.sep).filter(Boolean));
 }
 
 function groupRendersPerRequest(group: string): boolean {
@@ -59,7 +59,7 @@ function pageRoutes(): PageRoute[] {
     .map((dir) => path.basename(dir))
     .flatMap((group) => {
       const dynamic = groupRendersPerRequest(group);
-      return pagesUnder(path.join(appDir, group), []).map((segments) => ({
+      return pagesUnder(path.join(appDir, group)).map((segments) => ({
         group,
         urlPath: `/${segments.map(segmentToUrl).filter(Boolean).join('/')}`,
         dynamic,

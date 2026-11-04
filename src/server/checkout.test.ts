@@ -5,6 +5,7 @@ import { PaymentsError, type Payment } from '@/server/ports/payments';
 import { testDevice } from '../../tests/deviceFixture';
 
 const mocks = vi.hoisted(() => ({
+  getGuestSettings: vi.fn(),
   consumeRateLimit: vi.fn(),
   readPaymentTryState: vi.fn(),
   startPaymentTx: vi.fn(),
@@ -21,6 +22,9 @@ vi.mock(
 );
 vi.mock('@/server/ports/rate-limit', () => ({
   consumeRateLimit: mocks.consumeRateLimit,
+}));
+vi.mock('@/server/db/settings', () => ({
+  getGuestSettings: mocks.getGuestSettings,
 }));
 vi.mock('@/server/db/checkout', () => ({
   readPaymentTryState: mocks.readPaymentTryState,
@@ -41,6 +45,8 @@ vi.mock('@/server/monitoring/logger', () => ({
 import { startCheckoutPayment } from './checkout';
 
 // Behaviours under test, one per decision, branch or risk:
+// - checkout in maintenance is refused first, with no try spent, no data layer, and no provider; a failed
+//   settings read rejects, so nothing is paid (fail closed)
 // - one try is spent on the payment_tries surface for the hold id; a try over the limit is too_many_tries and
 //   reaches no data layer or provider; a failed limit store rejects, so nothing is paid (fail closed)
 // - a re-read of a confirmed order or an existing payment spends no try and reaches the limiter never; a hold that
@@ -101,6 +107,7 @@ const noHold = {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  mocks.getGuestSettings.mockResolvedValue({ checkoutMaintenance: false });
   mocks.consumeRateLimit.mockResolvedValue({ allowed: true, remaining: 4 });
   mocks.readPaymentTryState.mockResolvedValue(noHold);
   mocks.startPaymentTx.mockResolvedValue(started());
@@ -173,6 +180,27 @@ describe('the tries limit', () => {
     await expect(startCheckoutPayment(device, input)).rejects.toThrow(
       'store down',
     );
+    expect(mocks.startPaymentTx).not.toHaveBeenCalled();
+  });
+});
+
+describe('checkout maintenance', () => {
+  it('refuses before any try is spent, any lock is taken, or any provider is asked', async () => {
+    mocks.getGuestSettings.mockResolvedValue({ checkoutMaintenance: true });
+
+    await expect(startCheckoutPayment(device, input)).resolves.toEqual({
+      status: 'maintenance',
+    });
+    expect(mocks.readPaymentTryState).not.toHaveBeenCalled();
+    expect(mocks.consumeRateLimit).not.toHaveBeenCalled();
+    expect(mocks.startPaymentTx).not.toHaveBeenCalled();
+    expect(mocks.createPayment).not.toHaveBeenCalled();
+  });
+
+  it('rejects when the setting cannot be read, so nothing is paid', async () => {
+    mocks.getGuestSettings.mockRejectedValue(new Error('down'));
+
+    await expect(startCheckoutPayment(device, input)).rejects.toThrow('down');
     expect(mocks.startPaymentTx).not.toHaveBeenCalled();
   });
 });

@@ -108,6 +108,7 @@ export type StartPaymentResult =
   | { status: 'hold_expired'; canRehold: boolean; spacesLeft: number }
   | { status: 'sold_out'; alternatives: SessionSummary[] }
   | { status: 'too_many_tries' }
+  | { status: 'maintenance' }
   | { status: 'invalid'; fieldErrors: FieldErrors };
 
 type Issue = { path: readonly PropertyKey[]; message: string };
@@ -498,6 +499,13 @@ export const unknownHold: StartPaymentResult = {
 };
 
 export const tooManyTries: StartPaymentResult = { status: 'too_many_tries' };
+
+/** The ops switch (ADR 0002): while checkout is in maintenance no payment starts, and nothing is written. */
+export function maintenanceRefusal(
+  checkoutMaintenance: boolean,
+): StartPaymentResult | null {
+  return checkoutMaintenance ? { status: 'maintenance' } : null;
+}
 
 /** The `payment_tries` limit, spent before any lock: a try over it is refused and writes nothing. */
 export function paymentTriesRefusal(

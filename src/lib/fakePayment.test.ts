@@ -8,6 +8,7 @@ import {
   isRefusalCode,
   planChallenge,
   planWallet,
+  recallsStoredSuccess,
   refusedNotice,
   walletCancelledNotice,
 } from './fakePayment';
@@ -109,5 +110,37 @@ describe('fakeDrainTime', () => {
     fakeDrainTime(now);
 
     expect(now.toISOString()).toBe('2026-10-30T12:00:00.000Z');
+  });
+});
+
+describe('recallsStoredSuccess', () => {
+  const succeeded = { outcome: 'succeeded', method: 'card' } as const;
+  const declined = {
+    outcome: 'declined',
+    failureCode: 'card_declined',
+  } as const;
+
+  it.each([
+    [
+      'a retry of a success after a stored success',
+      succeeded,
+      { type: 'payment.succeeded' },
+      true,
+    ],
+    [
+      'a decline, even after a stored success',
+      declined,
+      { type: 'payment.succeeded' },
+      false,
+    ],
+    ['a success with no stored event', succeeded, null, false],
+    [
+      'a success after a stored non-success event',
+      succeeded,
+      { type: 'payment.failed' },
+      false,
+    ],
+  ] as const)('is %s: %s', (_name, plan, last, expected) => {
+    expect(recallsStoredSuccess(plan, last)).toBe(expected);
   });
 });

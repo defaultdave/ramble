@@ -57,6 +57,16 @@ export function planWallet(wallet: FakeWallet): FakeConfirmPlan {
   return { outcome: 'succeeded', method: wallet };
 }
 
+/** A paid payment cannot be confirmed twice, so a retry of a success is answered with the event already stored for it. */
+export function recallsStoredSuccess(
+  plan: FakeConfirmPlan,
+  lastEvent: { type: string } | null | undefined,
+): boolean {
+  return (
+    plan.outcome === 'succeeded' && lastEvent?.type === 'payment.succeeded'
+  );
+}
+
 /** A payments error the guest can do nothing about; any other error is rethrown so the form treats the answer as lost. */
 export function isRefusalCode(code: string): boolean {
   return code === 'not_found' || code === 'invalid_state';

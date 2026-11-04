@@ -171,6 +171,13 @@ function afterAnswer(
       return { step: 'sold_out', alternatives: result.alternatives };
     case 'too_many_tries':
       return { step: 'too_many_tries' };
+    case 'maintenance':
+      return {
+        step: 'details',
+        errors: {},
+        sending: false,
+        notice: maintenanceCopy.body,
+      };
     case 'invalid':
       return {
         step: 'details',

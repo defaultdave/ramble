@@ -17,6 +17,7 @@ import {
   soldOutCopy,
   type CheckoutStep,
   type ReholdResult,
+  maintenanceCopy,
 } from './checkoutFlow';
 import type { CheckoutView } from './checkoutPage';
 
@@ -161,6 +162,10 @@ describe('checkoutReducer', () => {
       { step: 'sold_out', alternatives: [] },
     ],
     [{ status: 'too_many_tries' } as const, { step: 'too_many_tries' }],
+    [
+      { status: 'maintenance' } as const,
+      { step: 'details', sending: false, notice: maintenanceCopy.body },
+    ],
   ] as [StartPaymentResult, object][])(
     'moves to the step for %j',
     (result, expected) => {

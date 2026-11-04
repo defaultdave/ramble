@@ -3,7 +3,7 @@ import { render, screen, within } from '@testing-library/react';
 import { notFound } from 'next/navigation';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { basicsOf, kayakOffer } from '@/lib/bookingDraft.fixtures';
-import { id } from '@/lib/pages/experience.fixtures';
+import { id } from '../../../../../tests/support/fixtures/experience';
 import { BookingContent } from './BookingContent';
 
 // Behaviours under test, one per decision, branch or risk:

@@ -9,14 +9,13 @@ import {
   type RefundStatus,
 } from './refunds';
 import { isTerminal } from './transitions';
+import { id } from '../../tests/support/ids';
 
 // Behaviours under test, one per decision, branch or risk.
 // - refund transitions: pending resolves once; succeeded, failed, and gift_reinstated never change
 // - initial statuses and the provider key
 // - RefundSchema: valid rows pass; each row rule refuses its bad row
 
-const id = (n: number) =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const refundId = id(5);
 const created = new Date('2026-11-01T12:00:00Z');
 const later = new Date('2026-11-01T12:05:00Z');

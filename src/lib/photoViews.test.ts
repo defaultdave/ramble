@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { idWithLetters } from './pages/experience.fixtures';
+import { idWithLetters } from '../../tests/support/fixtures/experience';
 import type { GuestPhoto } from './photos';
 import { photoLimits } from './photos';
 import {
@@ -9,6 +9,7 @@ import {
   photoView,
   withCovers,
 } from './photoViews';
+import { id } from '../../tests/support/ids';
 
 // Behaviours under test, one per decision, branch or risk:
 // - a photo's view carries its address, size, and blur placeholder, and its alt text unless it is decorative, which gets an empty alt
@@ -16,9 +17,6 @@ import {
 // - the IDs of a lookup are lower-case, each once, and in one order, whatever order they came in
 // - the cover of an experience is its lowest position, whatever order the photos arrive in, and an experience with no photo has none
 // - a card gets its experience's cover, or no image when it has none, and keeps everything else
-
-const id = (n: number) =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
 const photo = (
   experienceId: string,

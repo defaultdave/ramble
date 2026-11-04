@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { id } from './pages/experience.fixtures';
+import { id } from '../../tests/support/fixtures/experience';
 import {
   UpcomingSessionSchema,
   bookingRead,

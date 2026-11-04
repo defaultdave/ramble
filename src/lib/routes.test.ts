@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { id, idWithLetters } from './pages/experience.fixtures';
+import { id, idWithLetters } from '../../tests/support/fixtures/experience';
 import {
   accessibilityPath,
   browsePath,

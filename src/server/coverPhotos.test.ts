@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cacheTagBudget } from '@/lib/pages/cacheTagBudget';
 import { photoLimits } from '@/lib/photos';
-import { idWithLetters } from '@/lib/pages/experience.fixtures';
+import { idWithLetters } from '../../tests/support/fixtures/experience';
 import { getCoverPhotos } from './coverPhotos';
+import { id } from '../../tests/support/ids';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the cover read uses the catalog profile and tags the experience of every ID it was asked about
@@ -19,9 +20,6 @@ vi.mock('next/cache', () => ({
 
 const db = vi.hoisted(() => ({ covers: vi.fn() }));
 vi.mock('@/server/db/photos', () => ({ listGuestCoverPhotos: db.covers }));
-
-const id = (n: number) =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
 const driverError = new Error(
   'Failed query: select ... where id in ($1)\nparams: secret-id',

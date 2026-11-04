@@ -3,6 +3,7 @@ import { after } from 'next/server';
 import {
   fakeDrainTime,
   fakeDrainWaitMs,
+  recallsStoredSuccess,
   type FakeConfirmPlan,
 } from '@/lib/fakePayment';
 import { drainJobs } from '@/server/jobs/drain';
@@ -27,16 +28,14 @@ async function settleWithin(work: Promise<unknown>, ms: number): Promise<void> {
   }
 }
 
-/** A paid payment cannot be confirmed twice, so a retry of a success is answered with the event the first one emitted. */
+/** Answers a retry of a success with the stored event, and anything else with a fresh confirmation. */
 async function confirmOrRecall(
   fake: ReturnType<typeof getFakePayments>,
   paymentId: string,
   plan: FakeConfirmPlan,
 ) {
-  if (plan.outcome === 'succeeded') {
-    const last = await fake.lastEventFor(paymentId);
-    if (last?.type === 'payment.succeeded') return { event: last };
-  }
+  const last = await fake.lastEventFor(paymentId);
+  if (last && recallsStoredSuccess(plan, last)) return { event: last };
   return fake.confirm(paymentId, plan);
 }
 

@@ -8,6 +8,7 @@ import {
   orderItemRows,
   orderSnapshot,
   orderTokenFor,
+  maintenanceRefusal,
   paymentTriesRefusal,
   priceHold,
   spendsPaymentTry,
@@ -309,6 +310,13 @@ describe('the tries limit', () => {
       tooManyTries,
     );
     expect(paymentTriesRefusal({ allowed: true, remaining: 0 })).toBeNull();
+  });
+});
+
+describe('the maintenance switch', () => {
+  it('refuses while it is on and passes while it is off', () => {
+    expect(maintenanceRefusal(true)).toEqual({ status: 'maintenance' });
+    expect(maintenanceRefusal(false)).toBeNull();
   });
 });
 

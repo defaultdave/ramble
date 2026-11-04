@@ -1,8 +1,10 @@
+import { isSafeIntegerInRange } from './integers';
+
 // Money is integer minor units (cents, USD) everywhere; these two functions are the only place it becomes text.
 const CENTS_PER_DOLLAR = 100;
 
 function splitMinor(minor: number): { dollars: string; cents: number } {
-  if (!Number.isSafeInteger(minor) || minor < 0) {
+  if (!isSafeIntegerInRange(minor, 0)) {
     throw new RangeError(
       `Money must be a non-negative integer of minor units, got ${String(minor)}`,
     );

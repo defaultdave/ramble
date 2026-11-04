@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { WriteIdSchema } from './catalog';
+import { isSafeIntegerInRange } from './integers';
 import { orderCurrency, orderLimits } from './orders';
 import { ProviderIdSchema } from './payments';
 import { addRuleIssues, type RuleIssue } from './rules';
@@ -355,7 +356,7 @@ type Draft = {
 };
 
 function requireMinor(value: number, what: string, minimum: 0 | 1): void {
-  if (!Number.isSafeInteger(value) || value < minimum) {
+  if (!isSafeIntegerInRange(value, minimum)) {
     throw new RangeError(
       `${what} must be a whole number of at least ${String(minimum)}, got ${String(value)}`,
     );

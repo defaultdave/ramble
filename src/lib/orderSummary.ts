@@ -1,4 +1,5 @@
 import type { taxTreatments } from './catalog';
+import { isSafeIntegerInRange } from './integers';
 import { formatMoney } from './money';
 import { MAX_LINES } from './pricing';
 
@@ -13,7 +14,7 @@ export type OrderSummaryAmounts = {
 };
 
 export function guestsLabel(count: number): string {
-  if (!Number.isSafeInteger(count) || count < 1) {
+  if (!isSafeIntegerInRange(count, 1)) {
     throw new RangeError(
       `Guests must be a positive integer, got ${String(count)}`,
     );

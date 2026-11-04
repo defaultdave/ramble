@@ -1,5 +1,3 @@
-import { flushSync } from 'react-dom';
-import { createRoot, type Root } from 'react-dom/client';
 import { page } from 'vitest/browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BookingChoices } from '@/components/BookingChoices';
@@ -14,6 +12,7 @@ import {
   type BookingAction,
 } from '@/lib/bookingDraft';
 import { kidsOffer, optionId } from '@/lib/bookingDraft.fixtures';
+import { registerMount } from '../../../tests/support/mount';
 
 // next/link, reached through the Button barrel, reads process.env when it loads, and a browser has no process.
 vi.hoisted(() => {
@@ -29,8 +28,7 @@ vi.hoisted(() => {
 // - nothing in the panel scrolls
 // - a control focused by keyboard, at either end, is brought into the window
 
-let container: HTMLDivElement;
-let root: Root;
+const { mount } = registerMount();
 
 const chooseDate: BookingAction = { type: 'chooseDate', date: '2026-10-24' };
 const chooseTime: BookingAction = {
@@ -49,44 +47,42 @@ const viewAfter = (actions: BookingAction[]) =>
 function mountPage(actions: BookingAction[]) {
   const view = viewAfter(actions);
   const { summary } = view;
-  flushSync(() => {
-    root.render(
-      <ExperiencePage
-        view={sunsetKayak}
-        dates={null}
-        booking={
-          <BookingSlots
-            bar={null}
-            panel={
-              <BookingPanel
-                priceMinor={6500}
-                holdNote={holdNote}
-                {...(summary
-                  ? {
-                      total: {
-                        label: summary.label,
-                        amountMinor: summary.totalMinor,
-                      },
-                    }
-                  : {})}
-                onContinue={vi.fn()}
-              >
-                <BookingChoices
-                  view={view}
-                  similarHref={kidsOffer.similarHref}
-                  onDate={vi.fn()}
-                  onSession={vi.fn()}
-                  onAdults={vi.fn()}
-                  onChildren={vi.fn()}
-                  onAlternative={vi.fn()}
-                />
-              </BookingPanel>
-            }
-          />
-        }
-      />,
-    );
-  });
+  mount(
+    <ExperiencePage
+      view={sunsetKayak}
+      dates={null}
+      booking={
+        <BookingSlots
+          bar={null}
+          panel={
+            <BookingPanel
+              priceMinor={6500}
+              holdNote={holdNote}
+              {...(summary
+                ? {
+                    total: {
+                      label: summary.label,
+                      amountMinor: summary.totalMinor,
+                    },
+                  }
+                : {})}
+              onContinue={vi.fn()}
+            >
+              <BookingChoices
+                view={view}
+                similarHref={kidsOffer.similarHref}
+                onDate={vi.fn()}
+                onSession={vi.fn()}
+                onAdults={vi.fn()}
+                onChildren={vi.fn()}
+                onAlternative={vi.fn()}
+              />
+            </BookingPanel>
+          }
+        />
+      }
+    />,
+  );
 }
 
 // A scroll frame is a rAF, and the panel moves in the one after the scroll.
@@ -143,15 +139,9 @@ async function stickAtTop() {
   }
 }
 
-beforeEach(() => {
-  container = document.createElement('div');
-  document.body.append(container);
-  root = createRoot(container);
-});
+beforeEach(() => {});
 
 afterEach(() => {
-  root.unmount();
-  container.remove();
   window.scrollTo(0, 0);
 });
 

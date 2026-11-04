@@ -7,9 +7,12 @@ import { botProtectedRoutes, shouldLoadBotId } from '@/lib/botChallenge';
 /**
  * Starts BotID's challenge for the guest pages that need it. The script loads wherever this runs,
  * so it does nothing on checkout, gift, manage, orders, host, and ops paths (ADR 0003, ADR 0007),
- * and the SDK itself is imported only after that check, so those pages never download it.
+ * and the SDK itself is imported only after that check, so those pages never download it. Off
+ * Vercel it does nothing, matching `checkBot`, which passes everyone there.
  */
 export async function startBotChallenge(pathname: string): Promise<void> {
+  // `next.config.ts` inlines this at build time from `VERCEL`, which the browser cannot read.
+  if (process.env.NEXT_PUBLIC_BOT_CHALLENGE !== 'true') return;
   if (!shouldLoadBotId(pathname)) return;
   const { initBotId } = await import('botid/client/core');
   initBotId({ protect: [...botProtectedRoutes] });

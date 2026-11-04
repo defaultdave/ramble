@@ -309,7 +309,13 @@ describe('legal documents and acceptances in the database', () => {
           subjectKind: 'host',
           subjectId: uuid(1),
         }),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({
+        cause: {
+          message: expect.stringContaining(
+            'Only a published version',
+          ) as string,
+        },
+      });
     });
 
     it('is written once per subject and version, and never changes', async () => {
@@ -349,7 +355,7 @@ describe('legal documents and acceptances in the database', () => {
         client.db
           .delete(legalDocuments)
           .where(eq(legalDocuments.id, publishedId)),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ cause: { code: '23001' } });
     });
   });
 

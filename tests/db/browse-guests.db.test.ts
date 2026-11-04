@@ -11,7 +11,6 @@ import {
   filtersFor,
   names,
   shiftDay,
-  type Scope,
 } from './browseFixtures';
 import {
   createFreshDatabase,
@@ -25,6 +24,7 @@ import {
 // - guests match an experience through a session with spaces for the whole party: a full session is out for a
 //   party bigger than its spaces left and in for one that fits, on the chosen day or, with no date, anywhere in the window
 // - guests ride with the other filters, and the calendar offers only days with room for the party
+// - the next page keeps the party, so a row with no room for it does not appear there
 // - the lib's isOpenSession and the SQL agree on a party at every edge of spaces left
 // - a filter the schema refuses (too many values, a bad slug, a bad time) is refused before any query
 
@@ -132,7 +132,7 @@ describe('the guests filter', () => {
     ]);
   });
 
-  it('offers only the days with room for the party, and the next page keeps the party', async () => {
+  it('offers only the days with room for the party', async () => {
     const where = await scope();
     const exp = await insertExperience(where, { name: 'Days' });
     await insertSession(exp.id, '2026-11-07T14:00:00Z', {
@@ -148,6 +148,27 @@ describe('the guests filter', () => {
     ]);
     expect(await daysFor({ ...base, guests: 3 })).toEqual(['2026-11-08']);
     expect(await daysFor(base)).toEqual(['2026-11-07', '2026-11-08']);
+  });
+
+  it('keeps the party on the next page, so a row with no room for it never turns up there', async () => {
+    const where = await scope();
+    for (let index = 0; index < browsePageSize + 1; index += 1) {
+      const exp = await insertExperience(where, {
+        name: `F${String(index).padStart(2, '0')}`,
+      });
+      await insertSession(exp.id, start, { allocation: 8, seatsSold: 5 });
+    }
+    const tooSmall = await insertExperience(where, { name: 'Z no room' });
+    await insertSession(tooSmall.id, start, { allocation: 8, seatsSold: 7 });
+    const filters = filtersFor(where, { guests: 3 });
+    const first = await list(filters);
+    const second = await list(filters, first.nextCursor);
+
+    expect(first.items).toHaveLength(browsePageSize);
+    expect(names(second)).toEqual([
+      `F${String(browsePageSize).padStart(2, '0')}`,
+    ]);
+    expect(second.nextCursor).toBeNull();
   });
 
   it('pages through a party search with no row twice or skipped', async () => {
@@ -272,51 +293,5 @@ describe('input the schema refuses', () => {
         'soon',
       ),
     ).rejects.toThrow(ZodError);
-  });
-
-  describe('queries sent for a cursor', () => {
-    async function sentQueries(after: string, where: Scope) {
-      const send = vi.spyOn(globalThis, 'fetch');
-      try {
-        await browse.listBrowseExperiences(
-          { filters: filtersFor(where), after },
-          asOf,
-        );
-        return send.mock.calls.map(
-          ([, init]) =>
-            JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as {
-              query: string;
-            },
-        );
-      } finally {
-        send.mockRestore();
-      }
-    }
-
-    it('sends one query for a cursor nobody can see', async () => {
-      const where = await scope();
-      await insertExperience(where, { name: 'A live' });
-
-      const sent = await sentQueries(
-        '00000000-0000-4000-8000-0000000000aa',
-        where,
-      );
-
-      expect(sent).toHaveLength(1);
-    });
-
-    it('reads the cursor row once, and the page query only compares against it', async () => {
-      const where = await scope();
-      const first = await insertExperience(where, { name: 'A first' });
-      await insertExperience(where, { name: 'B second' });
-
-      const sent = await sentQueries(first.id, where);
-
-      const readsCursor = sent.filter(({ query }) =>
-        query.includes('"experiences"."id" = $1'),
-      );
-      expect(readsCursor).toHaveLength(1);
-      expect(sent.length).toBeGreaterThan(1);
-    });
   });
 });

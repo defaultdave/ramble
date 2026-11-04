@@ -66,14 +66,6 @@ describe('the date chip', () => {
     ).toBeVisible();
   });
 
-  it('closes the calendar on Escape and returns focus to the chip', async () => {
-    const { details } = setup();
-    await userEvent.click(dateChip());
-    await userEvent.keyboard('{Escape}');
-    expect(details.open).toBe(false);
-    expect(dateChip()).toHaveFocus();
-  });
-
   it('closes the calendar on a press outside it', async () => {
     const { details } = setup();
     await userEvent.click(dateChip());
@@ -149,19 +141,6 @@ describe('the date chip', () => {
       vi.unstubAllGlobals();
     },
   );
-
-  it('closes the calendar and focuses the chip when the chosen day changes and focus was in the calendar', async () => {
-    const { rerender } = render(bar(noFilters));
-    const details = disclosure();
-    await userEvent.click(dateChip());
-    expect(details.open).toBe(true);
-
-    rerender(bar({ ...noFilters, date: chosenDay }));
-
-    expect(disclosure()).toBe(details);
-    expect(details.open).toBe(false);
-    expect(dateChip(chosenLabel)).toHaveFocus();
-  });
 
   it('leaves focus on the page when the day changes by Back or Forward', () => {
     const { rerender } = render(bar(noFilters));
@@ -475,20 +454,28 @@ describe('the calendar fetched when the date disclosure opens', () => {
     vi.unstubAllGlobals();
   });
 
-  it('closes on a pick and gives focus back to the chip, without mounting the calendar again', async () => {
+  it('closes the calendar and gives focus back to the chip on Escape and on a pick, without mounting the disclosure or the calendar again', async () => {
     const { rerender } = render(bar(noFilters));
+    const details = disclosure();
     await userEvent.click(dateChip());
     const grid = await screen.findByRole('grid');
+    await userEvent.keyboard('{Escape}');
+    expect(details.open).toBe(false);
+    expect(dateChip()).toHaveFocus();
+
+    await userEvent.click(dateChip());
     const [next] = await screen.findAllByRole('button', { name: 'Next' });
     if (!next) throw new Error('No Next button');
     await userEvent.click(next);
     await userEvent.click(
       screen.getByRole('button', { name: /Saturday, November 7, 2026/ }),
     );
+    expect(details.open).toBe(true);
 
     rerender(bar({ ...noFilters, date: chosenDay }));
 
-    expect(disclosure().open).toBe(false);
+    expect(disclosure()).toBe(details);
+    expect(details.open).toBe(false);
     expect(dateChip(chosenLabel)).toHaveFocus();
     expect(screen.getByRole('grid', { hidden: true })).toBe(grid);
   });

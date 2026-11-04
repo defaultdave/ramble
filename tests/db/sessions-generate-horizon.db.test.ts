@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { ZodError } from 'zod';
 import { ForbiddenError } from '@/server/auth/caller';
 import {
   createFreshDatabase,
@@ -198,11 +199,11 @@ describe('generateSessions', () => {
         { templateId: template.id, ...range, ...override },
         earlyNow,
       ),
-    ).rejects.toThrow();
+    ).rejects.toThrow(ZodError);
     expect(await countSessions(experience.id)).toBe(0);
   });
 
-  it('generates a full year in one call', async () => {
+  it('accepts a range of exactly 366 days, the longest one call covers', async () => {
     const { experience } = await setup();
     const template = await createTemplate(experience.id);
 
@@ -212,6 +213,9 @@ describe('generateSessions', () => {
       new Date('2027-12-31T00:00:00Z'),
     );
 
-    expect(result.ok && result.created).toHaveLength(53);
+    const dates = result.ok ? result.created.map((row) => row.localDate) : [];
+    // 2028 is a leap year that starts on a Saturday: 53 Saturdays in a 366-day range.
+    expect(dates).toHaveLength(53);
+    expect([dates.at(0), dates.at(-1)]).toEqual(['2028-01-01', '2028-12-30']);
   });
 });

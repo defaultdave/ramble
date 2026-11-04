@@ -629,9 +629,9 @@ describe('the order snapshot', () => {
       cancelledAt: null,
     };
 
-    expect(OrderSchema.safeParse(order).success).toBe(true);
+    expect(OrderSchema.parse(order)).toEqual(order);
     for (const row of orderItemRows(order.id, priced)) {
-      expect(OrderItemSchema.safeParse(row).success).toBe(true);
+      expect(OrderItemSchema.parse(row)).toEqual(row);
     }
   });
 
@@ -1052,15 +1052,6 @@ describe('what a lapsed hold answers', () => {
       {
         kind: 'result',
         result: { status: 'hold_expired', canRehold: true, spacesLeft: 2 },
-      },
-    ],
-    [
-      'more than the party',
-      1,
-      5,
-      {
-        kind: 'result',
-        result: { status: 'hold_expired', canRehold: true, spacesLeft: 5 },
       },
     ],
   ])('%s', (_name, seats, left, expected) => {

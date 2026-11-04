@@ -1,5 +1,6 @@
 import { updateTag } from 'next/cache';
 import { eq } from 'drizzle-orm';
+import { ZodError } from 'zod';
 import {
   afterAll,
   beforeAll,
@@ -216,10 +217,10 @@ describe('saving a collection', () => {
 
     await expect(
       editorial.saveCollection(ops, collectionInput({ slug, intro: unsafe })),
-    ).rejects.toThrow();
+    ).rejects.toThrow(ZodError);
     await expect(
       editorial.saveCollection(ops, collectionInput({ slug, title: ' ' })),
-    ).rejects.toThrow();
+    ).rejects.toThrow(ZodError);
     expect(
       await client.db
         .select()

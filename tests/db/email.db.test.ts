@@ -936,13 +936,21 @@ describe('webhook rate limiting with the real limiter', () => {
   it('refuses the 601st verified request in a minute and counts only verified ones against that cap', async () => {
     await client.db.execute(sql`DELETE FROM rate_limits`);
 
-    for (let n = 0; n < 600; n += 1) {
-      expect((await fakeEvent('fake-unknown', 'delivered')).status).toBe(200);
-    }
+    // One real request opens the window; 600 more sequential requests cost about two seconds, so
+    // the count is moved to 599 tries instead, which leaves the 600th to pass and the 601st to fail.
+    expect((await fakeEvent('fake-unknown', 'delivered')).status).toBe(200);
+    await client.db.execute(
+      sql`UPDATE rate_limits SET count = 599 WHERE key LIKE 'email_webhook:%'`,
+    );
+
+    const last = await fakeEvent('fake-unknown', 'delivered');
     const refused = await fakeEvent('fake-unknown', 'delivered');
 
+    expect(last.status).toBe(200);
     expect(refused.status).toBe(429);
-    expect(Number(refused.headers.get('retry-after'))).toBeLessThanOrEqual(60);
+    const retryAfter = Number(refused.headers.get('retry-after'));
+    expect(retryAfter).toBeGreaterThanOrEqual(50);
+    expect(retryAfter).toBeLessThanOrEqual(60);
     expect((await bad('198.51.100.1')).status).toBe(401);
   });
 });

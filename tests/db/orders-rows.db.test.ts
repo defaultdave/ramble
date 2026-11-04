@@ -7,7 +7,6 @@ import {
   client,
   count,
   ensureHold,
-  fresh,
   giftPurchaseRow,
   insert,
   later,
@@ -187,15 +186,22 @@ describe('orders', () => {
     // A booking's key must be book:<hold>, so a second order on a hold meets the key index before
     // this one. With the key rules lifted inside a transaction that is rolled back, this index is
     // what is left, and it is the one that frees a hold whose order went void.
-    it('refuses a second live order and frees the hold when the first is void', async () => {
+    const withKeyRulesLifted = async (
+      run: (
+        insertOrder: (
+          key: string,
+          overrides: Record<string, unknown>,
+        ) => Promise<unknown>,
+      ) => Promise<void>,
+    ) => {
       const holdId = randomUUID();
       await ensureHold(holdId);
       const connection = await client.db.$client.connect();
-      const insertOrder = (key: string, status: string) => {
+      const insertOrder = (key: string, overrides: Record<string, unknown>) => {
         const row = orderRow({
           hold_id: holdId,
           idempotency_key: key,
-          status,
+          ...overrides,
         });
         const columns = Object.keys(row);
         return connection.query(
@@ -209,25 +215,35 @@ describe('orders', () => {
           'ALTER TABLE orders DROP CONSTRAINT orders_kind_shape',
         );
         await connection.query('DROP INDEX orders_idempotency_key_unique');
-        await insertOrder('first', 'void');
-        await insertOrder('second', 'pending_payment');
-
-        await expect(
-          insertOrder('third', 'pending_payment'),
-        ).rejects.toMatchObject({ constraint: 'orders_one_live_per_hold' });
+        await run(insertOrder);
       } finally {
         await connection.query('ROLLBACK');
         connection.release();
       }
+    };
+
+    it('refuses a second live order and frees the hold when the first is void', async () => {
+      await withKeyRulesLifted(async (insertOrder) => {
+        await insertOrder('first', { status: 'void' });
+        await insertOrder('second', { status: 'pending_payment' });
+
+        await expect(
+          insertOrder('third', { status: 'pending_payment' }),
+        ).rejects.toMatchObject({ constraint: 'orders_one_live_per_hold' });
+      });
     });
 
-    it('is a partial index on hold_id that leaves void orders out', async () => {
-      const { rows } = await client.db.execute<{ indexdef: string }>(
-        sql`SELECT indexdef FROM pg_indexes WHERE schemaname = ${fresh.schema} AND indexname = 'orders_one_live_per_hold'`,
-      );
-      expect(rows[0]?.indexdef).toMatch(
-        /UNIQUE INDEX.*\(hold_id\).*WHERE.*status <> 'void'/,
-      );
+    it('refuses a second live order on a hold whose first order is confirmed', async () => {
+      await withKeyRulesLifted(async (insertOrder) => {
+        await insertOrder('first', {
+          status: 'confirmed',
+          confirmed_at: later,
+        });
+
+        await expect(
+          insertOrder('second', { status: 'pending_payment' }),
+        ).rejects.toMatchObject({ constraint: 'orders_one_live_per_hold' });
+      });
     });
   });
 

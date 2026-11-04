@@ -1,5 +1,6 @@
 import { withBotId } from 'botid/next/config';
 import type { NextConfig } from 'next';
+import { botChallengeEnvKey, botChallengeIsLive } from './src/lib/botChallenge';
 import { cacheProfiles } from './src/lib/cacheProfiles';
 import { imageConfigFor } from './src/lib/images';
 import { securityHeaders } from './src/lib/securityHeaders';
@@ -13,7 +14,10 @@ const publicToken =
     : undefined;
 const publicStoreId = publicToken ? publicStoreIdFromToken(publicToken) : null;
 
+const botChallengeLive = botChallengeIsLive(process.env.VERCEL);
+
 const nextConfig: NextConfig = {
+  env: { [botChallengeEnvKey]: String(botChallengeLive) },
   reactStrictMode: true,
   cacheComponents: true,
   // Next.js warns at build time when this is left unset beside cacheComponents.
@@ -27,5 +31,6 @@ const nextConfig: NextConfig = {
   },
 };
 
-// Adds the rewrites that carry BotID's challenge through the site's own origin (ADR 0007).
-export default withBotId(nextConfig);
+// Adds the rewrites that carry BotID's challenge through the site's own origin (ADR 0007). Off
+// Vercel they would proxy to api.vercel.com for a challenge nothing checks.
+export default botChallengeLive ? withBotId(nextConfig) : nextConfig;

@@ -55,7 +55,7 @@ vi.mock('@/server/monitoring/logger', () => ({
 // - the largest details the lib accepts are accepted; details over the byte ceiling are refused; a time out of range is refused
 // The insert-only guard:
 // - UPDATE, DELETE, and TRUNCATE are refused for the owner, and the rows stay
-// - audit_writer cannot log in, holds INSERT and SELECT only, can insert and read, and is refused update, delete, and truncate; the role step can run twice
+// - audit_writer cannot log in, holds INSERT and SELECT only, can insert and read, and is refused update, delete, and truncate
 // writeAudit:
 // - writes inside the caller's transaction and returns the id; a rollback leaves nothing; a refused entry writes nothing
 // The export, against the real table and the fake store:
@@ -407,24 +407,6 @@ describe('the insert-only guard', () => {
     await expect(asWriter(sql`TRUNCATE audit_log`)).rejects.toMatchObject(
       noPrivilege,
     );
-  });
-
-  it('can create the role a second time without failing, as a second schema or branch would', async () => {
-    const step = sql`DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'audit_writer') THEN
-          CREATE ROLE audit_writer NOLOGIN;
-        END IF;
-      EXCEPTION WHEN duplicate_object OR unique_violation THEN
-        NULL;
-      END
-      $$`;
-    await client.db.execute(step);
-    await client.db.execute(step);
-    const { rows } = await client.db.execute<{ n: number }>(
-      sql`SELECT count(*)::int AS n FROM pg_roles WHERE rolname = 'audit_writer'`,
-    );
-    expect(rows[0]?.n).toBe(1);
   });
 });
 

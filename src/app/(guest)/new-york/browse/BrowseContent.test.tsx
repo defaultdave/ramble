@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { browseResultsId } from '@/lib/pages/browse';
 import { BrowseContent } from './BrowseContent';
+import { id } from '../../../../../tests/support/ids';
 
 // Behaviours under test, one per decision, branch or risk:
 // - a card shows the cover its experience read carried, and none for one without
@@ -36,9 +37,6 @@ vi.mock('@/server/monitoring/logger', () => ({
 vi.mock('@/components/FilterBar', () => ({
   FilterBar: () => <div data-testid="filters" />,
 }));
-
-const id = (n: number) =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
 const item = (n: number) => ({
   id: id(n),

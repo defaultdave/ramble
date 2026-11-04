@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { coverLookupIds } from '@/lib/photoViews';
 import type { GuestPhoto } from '@/lib/photos';
 import { readGuestCovers } from './guestCovers';
+import { id } from '../../tests/support/ids';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the covers come back keyed by experience, lowest position first
@@ -15,9 +16,6 @@ vi.mock('@/server/coverPhotos', () => ({ getCoverPhotos: covers.read }));
 
 const monitoring = vi.hoisted(() => ({ rethrowOrLog: vi.fn() }));
 vi.mock('@/server/monitoring/rethrowOrLog', () => monitoring);
-
-const id = (n: number) =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
 const photo = (experienceId: string, position: number): GuestPhoto => ({
   id: id(100 + position),

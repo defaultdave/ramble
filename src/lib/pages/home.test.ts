@@ -25,6 +25,7 @@ import {
 } from './home';
 import { paragraphs } from '../richText/paragraphs';
 import { upcomingWindow } from '../sessionWindow';
+import { id } from '../../../tests/support/ids';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the browse address writes only the parameters that are set, escaped, in the grammar order
@@ -39,9 +40,6 @@ import { upcomingWindow } from '../sessionWindow';
 // - a card starts with no photo; the page's card IDs are those of its Picks and this-week cards, each once, and none for an empty page
 // - a cover read is set on the Picks cards only; a this-week card keeps the cover it arrived with, and a card with none keeps none
 // - the banner is its trimmed text, or nothing when there is none
-
-const id = (n: number) =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
 function experience(
   n: number,

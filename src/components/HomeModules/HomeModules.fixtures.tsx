@@ -5,6 +5,7 @@ import { categoryPath } from '@/lib/routes';
 import { paragraphs } from '@/lib/richText/paragraphs';
 import type { RichTextDoc } from '@/lib/richText/format';
 import styles from './HomeModules.stories.module.css';
+import { id } from '../../../tests/support/ids';
 
 /** Draws a document's text as paragraphs; the page's real renderer is server-only. */
 export function renderCopy(doc: RichTextDoc): ReactNode {
@@ -22,9 +23,6 @@ export function renderCopy(doc: RichTextDoc): ReactNode {
     </div>
   );
 }
-
-const id = (n: number) =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
 const bookable = (n: number, title: string, meta: string, price: string) =>
   ({

@@ -17,8 +17,10 @@ import {
   cancellationTiers,
   slugHistory,
 } from '@/server/db/schema';
+import { catalogFixtures, unique, type Parents } from './catalogFixtures';
 import {
   createFreshDatabase,
+  expectConstraint,
   serveNeonHttp,
   type FreshDatabase,
 } from './harness';
@@ -57,97 +59,13 @@ afterAll(async () => {
   vi.unstubAllEnvs();
 });
 
-let counter = 0;
-function unique(prefix: string) {
-  counter += 1;
-  return `${prefix}-${String(counter)}`;
-}
-
-async function defaultTierId() {
-  const [tier] = await client.db
-    .select()
-    .from(cancellationTiers)
-    .where(eq(cancellationTiers.isDefault, true));
-  if (!tier) throw new Error('The migration inserts a default tier');
-  return tier.id;
-}
-
-async function insertHost(overrides: Partial<typeof hosts.$inferInsert> = {}) {
-  const [row] = await client.db
-    .insert(hosts)
-    .values({
-      slug: unique('host'),
-      name: unique('Host'),
-      timeZone: 'America/New_York',
-      ...overrides,
-    })
-    .returning();
-  if (!row) throw new Error('insert returned no host');
-  return row;
-}
-
-async function insertCategory(
-  overrides: Partial<typeof categories.$inferInsert> = {},
-) {
-  const [row] = await client.db
-    .insert(categories)
-    .values({
-      slug: unique('category'),
-      name: unique('Category'),
-      ...overrides,
-    })
-    .returning();
-  if (!row) throw new Error('insert returned no category');
-  return row;
-}
-
-async function insertNeighborhood(
-  overrides: Partial<typeof neighborhoods.$inferInsert> = {},
-) {
-  const [row] = await client.db
-    .insert(neighborhoods)
-    .values({
-      slug: unique('neighborhood'),
-      name: unique('Neighborhood'),
-      ...overrides,
-    })
-    .returning();
-  if (!row) throw new Error('insert returned no neighborhood');
-  return row;
-}
-
-type Parents = {
-  hostId: string;
-  categoryId: string;
-  neighborhoodId: string;
-  cancellationTierId: string;
-};
-
-async function parents(hostId?: string): Promise<Parents> {
-  return {
-    hostId: hostId ?? (await insertHost()).id,
-    categoryId: (await insertCategory()).id,
-    neighborhoodId: (await insertNeighborhood()).id,
-    cancellationTierId: await defaultTierId(),
-  };
-}
-
-async function insertExperience(
-  parentIds: Parents,
-  overrides: Partial<typeof experiences.$inferInsert> = {},
-) {
-  const [row] = await client.db
-    .insert(experiences)
-    .values({
-      ...parentIds,
-      slug: unique('experience'),
-      name: unique('Experience'),
-      ...overrides,
-    })
-    .returning();
-  if (!row) throw new Error('insert returned no experience');
-  return row;
-}
+const {
+  insertHost,
+  insertCategory,
+  insertNeighborhood,
+  parents,
+  insertExperience,
+} = catalogFixtures(() => client.db);
 
 function ownerOf(hostId: string): Caller {
   return testCaller({ roles: [Role.HostOwner], hostIds: [hostId] });
@@ -723,9 +641,7 @@ describe('constraints', () => {
       (ids: Parents) => insertExperience(ids, { affiliateUrl: 'https://' }),
     ],
   ])('refuse %s', async (_name, constraint, attempt) => {
-    await expect(attempt(await parents())).rejects.toMatchObject({
-      cause: { constraint },
-    });
+    await expectConstraint(attempt(await parents()), constraint);
   });
 
   // The read schemas and the CHECKs share httpUrlPattern, and this pins that the database applies it
@@ -825,9 +741,7 @@ describe('constraints', () => {
       ],
     ] as const;
     for (const [constraint, attempt] of insertions) {
-      await expect(attempt()).rejects.toMatchObject({
-        cause: { constraint },
-      });
+      await expectConstraint(attempt(), constraint);
     }
   });
 

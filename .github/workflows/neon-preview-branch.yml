@@ -1,7 +1,7 @@
 name: neon-preview-branch
 # The Vercel and Neon integration creates and wires the preview branch (named preview/<git branch>).
 # This workflow does what the integration does not: it sets the 7-day expiry, and it deletes the
-# branch when the pull request merges or closes.
+# branch when the pull request merges or closes. Both pass when no branch exists.
 on:
   pull_request:
     types: [opened, reopened, synchronize, closed]
@@ -24,18 +24,20 @@ jobs:
         run: |
           set -euo pipefail
           expires_at=$(date -u -d '+7 days' +%Y-%m-%dT%H:%M:%SZ)
-          # The integration makes the branch when the preview deployment starts, so wait for it.
-          for _ in $(seq 1 30); do
+          # The integration makes the branch when the preview deployment starts, so wait briefly for it.
+          # Branches with deployments disabled (vercel.json) never get one, so absence is not a failure.
+          branch_id=""
+          for attempt in 1 2 3; do
             branch_id=$(curl -fsS -H "Authorization: Bearer $NEON_API_KEY" \
               --get --data-urlencode "search=$BRANCH_NAME" \
               "$NEON_API/projects/$NEON_PROJECT_ID/branches" \
               | jq -r --arg name "$BRANCH_NAME" '.branches[] | select(.name == $name) | .id' | head -n 1)
             [ -n "$branch_id" ] && break
-            sleep 10
+            [ "$attempt" -lt 3 ] && sleep 10
           done
           if [ -z "$branch_id" ]; then
-            echo "::error::No Neon branch named $BRANCH_NAME after 5 minutes. Is the Vercel integration's preview branching on?"
-            exit 1
+            echo "::notice::No Neon branch named $BRANCH_NAME was found, so the integration made none; no expiry was set."
+            exit 0
           fi
           curl -fsS -X PATCH -H "Authorization: Bearer $NEON_API_KEY" -H 'Content-Type: application/json' \
             -d "{\"branch\":{\"expires_at\":\"$expires_at\"}}" \

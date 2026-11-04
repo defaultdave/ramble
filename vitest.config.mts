@@ -45,6 +45,9 @@ export default defineConfig({
           name: 'db',
           include: ['src/**/*.db.test.ts', 'tests/**/*.db.test.ts'],
           environment: 'node',
+          // A file can hold a dozen connections (a pg pool of 10 and the HTTP shim's 2) and Postgres
+          // allows 100 in all, so the default of one worker per core but one can exhaust them.
+          maxWorkers: 4,
           // The harness refuses any host that is not local.
           env: {
             DATABASE_URL_UNPOOLED:

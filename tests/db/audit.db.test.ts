@@ -16,6 +16,7 @@ import {
 } from '@/lib/audit';
 import {
   createFreshDatabase,
+  expectConstraint,
   serveNeonHttp,
   type FreshDatabase,
 } from './harness';
@@ -95,7 +96,6 @@ beforeEach(async () => {
   await client.db.execute(sql`DELETE FROM jobs`);
 });
 
-const constraint = (name: string) => ({ cause: { constraint: name } });
 const code = (value: string) => ({ cause: { code: value } });
 const restricted = code('23001');
 const noPrivilege = code('42501');
@@ -178,9 +178,7 @@ describe('the table', () => {
       'audit_log_recorded_at_in_range',
     ],
   ])('refuses %s', async (_label, over, name) => {
-    await expect(insertRaw(userRow(over))).rejects.toMatchObject(
-      constraint(name),
-    );
+    await expectConstraint(insertRaw(userRow(over)), name);
   });
 
   it('refuses an unknown actor kind and a missing subject', async () => {
@@ -267,11 +265,12 @@ describe('the table', () => {
     ['the details are an array', '[]'],
     ['the details are a string', '"x"'],
   ])('refuses a row when %s', async (_label, json) => {
-    await expect(
+    await expectConstraint(
       client.db.execute(
         sql`INSERT INTO audit_log (actor_kind, action, subject_kind, subject_id, details) VALUES ('system', 'a.b', 'k', ${subject}, ${json}::jsonb)`,
       ),
-    ).rejects.toMatchObject(constraint('audit_log_details_shape'));
+      'audit_log_details_shape',
+    );
   });
 
   it('refuses details over the byte ceiling', async () => {
@@ -281,8 +280,9 @@ describe('the table', () => {
         'a'.repeat(100),
       ]),
     );
-    await expect(insertRaw(userRow({ details: wide }))).rejects.toMatchObject(
-      constraint('audit_log_details_shape'),
+    await expectConstraint(
+      insertRaw(userRow({ details: wide })),
+      'audit_log_details_shape',
     );
   });
 
@@ -293,8 +293,9 @@ describe('the table', () => {
     ['a trailing dot', 'order.'],
     ['65 characters', `${'a'.repeat(32)}.${'b'.repeat(32)}`],
   ])('refuses an action with %s', async (_label, action) => {
-    await expect(insertRaw(userRow({ action }))).rejects.toMatchObject(
-      constraint('audit_log_action_shape'),
+    await expectConstraint(
+      insertRaw(userRow({ action })),
+      'audit_log_action_shape',
     );
   });
 
@@ -304,9 +305,10 @@ describe('the table', () => {
     ['41 characters', 'a'.repeat(41)],
     ['nothing', ''],
   ])('refuses a subject kind with %s', async (_label, subjectKind) => {
-    await expect(
+    await expectConstraint(
       insertRaw(userRow({ subject_kind: subjectKind })),
-    ).rejects.toMatchObject(constraint('audit_log_subject_kind_shape'));
+      'audit_log_subject_kind_shape',
+    );
   });
 });
 

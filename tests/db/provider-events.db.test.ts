@@ -26,7 +26,12 @@ import {
   type SimulatedDelivery,
 } from '../support/paymentEvents';
 import { dueClock } from '../support/dueClock';
-import { createFreshDatabase, type FreshDatabase } from './harness';
+import {
+  backendPid,
+  createFreshDatabase,
+  waitUntilBlocked,
+  type FreshDatabase,
+} from './harness';
 import { insertHold, insertSession, minute } from './holdFixtures';
 import { createOrderParents } from './orderParents';
 
@@ -74,9 +79,7 @@ const parents = {
 
 beforeAll(async () => {
   fresh = await createFreshDatabase(process.env.DATABASE_URL_UNPOOLED ?? '');
-  const handlerUrl = new URL(fresh.url);
-  handlerUrl.searchParams.set('application_name', fresh.schema);
-  vi.stubEnv('DATABASE_URL', handlerUrl.toString());
+  vi.stubEnv('DATABASE_URL', fresh.url);
   client = await import('@/server/db/client');
   dbEvents = await import('@/server/db/providerEvents');
   jobModule = await import('@/server/jobs/providerEvents');
@@ -816,20 +819,6 @@ describe('events that match nothing', () => {
   });
 });
 
-async function waitUntilBlocked(count: number) {
-  const deadline = Date.now() + 5000;
-  for (;;) {
-    const { rows } = await side.query<{ n: number }>(
-      `SELECT count(*)::int AS n FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND application_name = $1`,
-      [fresh.schema],
-    );
-    if ((rows[0]?.n ?? 0) >= count) return;
-    if (Date.now() > deadline)
-      throw new Error('the handler never waited for a lock');
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
-}
-
 describe('one order at a time', () => {
   it('waits for the order events lock and judges the state its holder left', async () => {
     const world = await seedWorld({ attempt: { status: 'processing' } });
@@ -842,7 +831,9 @@ describe('one order at a time', () => {
 
     confirmed.mockClear();
     const handled = run(id);
-    await waitUntilBlocked(1);
+    await waitUntilBlocked(side, {
+      blockedBy: await backendPid(holder),
+    });
     expect(confirmed).not.toHaveBeenCalled();
     await holder.query(
       `UPDATE payment_attempts SET status = 'canceled' WHERE id = $1`,
@@ -872,7 +863,10 @@ describe('one order at a time', () => {
     ]);
 
     const both = Promise.all([run(id), run(id)]);
-    await waitUntilBlocked(2);
+    await waitUntilBlocked(side, {
+      blockedBy: await backendPid(holder),
+      count: 2,
+    });
     await holder.query('COMMIT');
     holder.release();
     await both;
@@ -894,7 +888,9 @@ describe('one order at a time', () => {
     ]);
 
     const handled = run(id);
-    await waitUntilBlocked(1);
+    await waitUntilBlocked(side, {
+      blockedBy: await backendPid(holder),
+    });
     const probe = await side.connect();
     await expect(
       probe.query(`SELECT id FROM sessions WHERE id = $1 FOR UPDATE NOWAIT`, [

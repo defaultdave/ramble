@@ -1,16 +1,8 @@
-import { eq, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import type { db as Db } from '@/server/db/client';
-import {
-  categories,
-  cancellationTiers,
-  experiences,
-  holds,
-  hosts,
-  neighborhoods,
-  priceOptions,
-  sessions,
-} from '@/server/db/schema';
+import { experiences, holds, priceOptions, sessions } from '@/server/db/schema';
+import { catalogFixtures } from './catalogFixtures';
 
 type Database = typeof Db;
 type ExperienceInsert = typeof experiences.$inferInsert;
@@ -33,12 +25,6 @@ export async function clearHolds(db: Pick<Database, 'execute'>) {
     END $$`);
 }
 
-let counter = 0;
-function unique(prefix: string) {
-  counter += 1;
-  return `${prefix}-${String(counter)}`;
-}
-
 export const day = 86_400_000;
 export const minute = 60_000;
 
@@ -55,43 +41,12 @@ export async function seedBookable(
     experience?: Partial<ExperienceInsert>;
   } = {},
 ) {
-  const [host] = await db
-    .insert(hosts)
-    .values({
-      slug: unique('host'),
-      name: unique('Host'),
-      timeZone: 'America/New_York',
-    })
-    .returning();
-  const [category] = await db
-    .insert(categories)
-    .values({ slug: unique('category'), name: unique('Category') })
-    .returning();
-  const [neighborhood] = await db
-    .insert(neighborhoods)
-    .values({ slug: unique('neighborhood'), name: unique('Neighborhood') })
-    .returning();
-  const [tier] = await db
-    .select()
-    .from(cancellationTiers)
-    .where(eq(cancellationTiers.isDefault, true));
-  if (!host || !category || !neighborhood || !tier)
-    throw new Error('missing parents');
-  const [experience] = await db
-    .insert(experiences)
-    .values({
-      hostId: host.id,
-      categoryId: category.id,
-      neighborhoodId: neighborhood.id,
-      cancellationTierId: tier.id,
-      slug: unique('experience'),
-      name: unique('Experience'),
-      status: 'live',
-      taxTreatment: 'taxable',
-      ...options.experience,
-    })
-    .returning();
-  if (!experience) throw new Error('insert returned no experience');
+  const catalog = catalogFixtures(() => db);
+  const host = await catalog.insertHost();
+  const experience = await catalog.insertExperience(
+    await catalog.parents(host.id),
+    { status: 'live', taxTreatment: 'taxable', ...options.experience },
+  );
   const [adult] = await db
     .insert(priceOptions)
     .values({

@@ -13,7 +13,12 @@ import {
 import { backoffSeconds, deadJobAlertKey, jobLimits } from '@/lib/jobs';
 import type { JobRegistry } from '@/server/jobs/registry';
 import { logger } from '@/server/monitoring/logger';
-import { createFreshDatabase, type FreshDatabase } from './harness';
+import {
+  backendPid,
+  createFreshDatabase,
+  waitUntilBlocked,
+  type FreshDatabase,
+} from './harness';
 
 const raise = vi.hoisted(() => vi.fn());
 vi.mock('@/server/monitoring/alerts', () => ({ alerts: { raise } }));
@@ -660,46 +665,6 @@ describe('claim', () => {
   });
 });
 
-/** Polls until `check` is true, so a loaded machine only makes a test slower, never reorders it. */
-async function waitUntil(
-  what: string,
-  check: () => Promise<boolean>,
-  timeoutMs = 15_000,
-) {
-  const deadline = performance.now() + timeoutMs;
-  while (!(await check())) {
-    if (performance.now() > deadline) {
-      throw new Error(`timed out waiting until ${what}`);
-    }
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
-}
-
-/** Whether a backend of this database, other than `exceptPid`, is queued behind a row lock. */
-async function someoneIsWaitingForALock(exceptPid: number) {
-  const { rows } = await side.query(
-    `SELECT 1 FROM pg_stat_activity
-     WHERE datname = current_database() AND wait_event_type = 'Lock' AND pid <> $1`,
-    [exceptPid],
-  );
-  return rows.length > 0;
-}
-
-async function isWaitingForALock(pid: number) {
-  const { rows } = await side.query(
-    `SELECT 1 FROM pg_stat_activity WHERE pid = $1 AND wait_event_type = 'Lock'`,
-    [pid],
-  );
-  return rows.length > 0;
-}
-
-async function backendPid(connection: PoolClient) {
-  const { rows } = await connection.query<{ pid: number }>(
-    'SELECT pg_backend_pid() AS pid',
-  );
-  return (rows[0] as { pid: number }).pid;
-}
-
 const t0 = new Date('2030-01-01T00:00:00Z');
 const finishedMeanwhile = `UPDATE jobs SET status = 'succeeded', locked_until = NULL, finished_at = clock_timestamp() WHERE id = $1`;
 const takenAgain = `UPDATE jobs SET attempts = attempts + 1, locked_until = locked_until + interval '10 minutes' WHERE id = $1`;
@@ -730,9 +695,7 @@ describe('the locked re-check before a job runs', () => {
         second,
       ]);
       gate.open();
-      await waitUntil('the drain is queued for the second row', () =>
-        someoneIsWaitingForALock(otherPid),
-      );
+      await waitUntilBlocked(side, { blockedBy: otherPid });
       await other.query(change, [second]);
       await other.query('COMMIT');
       return { report: await draining, second };
@@ -797,14 +760,10 @@ describe('the locked re-check when recording a failure', () => {
         'SELECT id FROM jobs WHERE id = $1 FOR UPDATE',
         [id],
       );
-      await waitUntil('the side connection is queued for the row', () =>
-        isWaitingForALock(otherPid),
-      );
+      await waitUntilBlocked(side, { pid: otherPid });
       gate.open();
       await queued;
-      await waitUntil('the failure recording is queued for the row', () =>
-        someoneIsWaitingForALock(otherPid),
-      );
+      await waitUntilBlocked(side, { blockedBy: otherPid });
       await other.query(change, [id]);
       await other.query('COMMIT');
       return { report: await draining, before };

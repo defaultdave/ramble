@@ -1,7 +1,11 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { notBlankPattern } from '@/lib/text';
-import { createFreshDatabase, type FreshDatabase } from './harness';
+import {
+  createFreshDatabase,
+  expectConstraint,
+  type FreshDatabase,
+} from './harness';
 
 // Behaviours under test, one per decision, branch or risk.
 // - the database CHECK class (notBlankPattern) calls blank exactly the code points JavaScript's \s does,
@@ -49,9 +53,7 @@ describe('blank text in the database', () => {
     ['U+00A0', ' ', 'blank-nbsp'],
     ['U+FEFF', '﻿', 'blank-bom'],
   ])('refuses a collection title of only %s', async (_name, value, slug) => {
-    await expect(insertTitle(slug, value)).rejects.toMatchObject({
-      cause: { constraint: 'collections_title' },
-    });
+    await expectConstraint(insertTitle(slug, value), 'collections_title');
   });
 
   it('keeps a title with real text between them', async () => {

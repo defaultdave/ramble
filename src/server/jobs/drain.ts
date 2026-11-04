@@ -13,6 +13,7 @@ import {
   type DrainReport,
   type RunOutcome,
 } from '@/lib/jobs';
+import { errorKind } from '@/lib/errorKind';
 import { db } from '@/server/db/client';
 import {
   claimDueJobs,
@@ -72,7 +73,7 @@ async function runJob(
       jobId: job.id,
       kind: job.kind,
       attempt: job.attempts,
-      errorName: error instanceof Error ? error.name : 'NonError',
+      errorName: errorKind(error, 'NonError'),
     });
     return recordFailure(job, error, clock);
   }
@@ -138,7 +139,7 @@ export async function drainJobs(
         logger.error('job failure could not be recorded', {
           jobId: job.id,
           kind: job.kind,
-          errorName: error instanceof Error ? error.name : 'NonError',
+          errorName: errorKind(error, 'NonError'),
         });
         report = tallyOutcome(report, 'unrecorded');
         continue;

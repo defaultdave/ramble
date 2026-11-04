@@ -9,7 +9,7 @@ import { afterEach, beforeEach } from 'vitest';
  * unmounted and removed afterwards. `mount` renders synchronously and can be called again to swap
  * the tree. `container` is read when called, because the element changes per test.
  */
-export function useMount() {
+export function registerMount() {
   let container: HTMLDivElement | undefined;
   let root: Root | undefined;
 
@@ -27,14 +27,14 @@ export function useMount() {
   });
 
   return {
-    mount(node: ReactNode) {
+    mount: (node: ReactNode) => {
       const current = root;
       if (!current) throw new Error('mount ran outside a test');
       flushSync(() => {
         current.render(node);
       });
     },
-    container() {
+    container: () => {
       if (!container) throw new Error('container read outside a test');
       return container;
     },

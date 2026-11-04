@@ -12,7 +12,7 @@ import {
   type BookingAction,
 } from '@/lib/bookingDraft';
 import { kidsOffer, optionId } from '@/lib/bookingDraft.fixtures';
-import { useMount } from '../../../tests/support/mount';
+import { registerMount } from '../../../tests/support/mount';
 
 // next/link, reached through the Button barrel, reads process.env when it loads, and a browser has no process.
 vi.hoisted(() => {
@@ -28,7 +28,7 @@ vi.hoisted(() => {
 // - nothing in the panel scrolls
 // - a control focused by keyboard, at either end, is brought into the window
 
-const { mount } = useMount();
+const { mount } = registerMount();
 
 const chooseDate: BookingAction = { type: 'chooseDate', date: '2026-10-24' };
 const chooseTime: BookingAction = {

@@ -2,7 +2,7 @@ import { commands, userEvent } from 'vitest/browser';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Chip } from '@/components/Chip/Chip';
 import { DatePicker } from '@/components/DatePicker/DatePicker';
-import { useMount } from '../../tests/support/mount';
+import { registerMount } from '../../tests/support/mount';
 
 declare module 'vitest/browser' {
   interface BrowserCommands {
@@ -36,7 +36,7 @@ function expectSelectedBorder(element: Element) {
   expect(style.borderTopColor).toBe(systemColor('Highlight'));
 }
 
-const { mount, container } = useMount();
+const { mount, container } = registerMount();
 
 async function tabTo(find: () => Element | null) {
   for (let presses = 0; presses < 20; presses += 1) {

@@ -5,7 +5,7 @@ import { RichText } from '@/components/RichText';
 import { homeCopy } from '@/lib/pages/home';
 import { paragraphs } from '@/lib/richText/paragraphs';
 import { HomeSkeleton } from './HomeSkeleton';
-import { useMount } from '../../../tests/support/mount';
+import { registerMount } from '../../../tests/support/mount';
 import styles from './HomeStates.module.css';
 
 // next/link, reached through the Button barrel, reads process.env when it loads, and a browser has no process.
@@ -27,7 +27,7 @@ const widths = [320, 390, 768, 1024, 1280, 1440];
 // A pixel of slack for sub-pixel line boxes.
 const slack = 1;
 
-const { mount, container } = useMount();
+const { mount, container } = registerMount();
 
 const heightOf = (element: Element) => element.getBoundingClientRect().height;
 const expectSame = (actual: number, expected: number | null) => {

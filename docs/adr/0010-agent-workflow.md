@@ -1,6 +1,6 @@
 # ADR 0010: Agent workflow wiring
 
-- **Status:** Accepted 2026-10-18 (Dave), with a change to gate 5: pushing unit branches, opening PRs, and starting PR reviews become automatic once Dave opts in. The first couple of units run with his approval on each action; the goal is fully automatic. Merges to `main`, deploys, issues, and repo creation stay Dave's. **Amended 2026-10-20 (Dave): tiered auto-merge for the P5 build, see "Merge rule" below; it takes effect when Dave switches it on at the walking skeleton.**
+- **Status:** Accepted 2026-10-18 (Dave), with a change to gate 5: pushing unit branches, opening PRs, and starting PR reviews become automatic once Dave opts in. The first couple of units run with his approval on each action; the goal is fully automatic. Merges to `main`, deploys, issues, and repo creation stay Dave's. **Amended 2026-10-20 (Dave): tiered auto-merge for the P5 build, see "Merge rule" below; it takes effect when Dave switches it on at the walking skeleton. Amended 2026-11-04 (Dave, after the process audit): one merge lane; see "One lane" under the merge rule.**
 - **Date:** 2026-10-18
 - **Question:** R10 in `docs/plan/BUILD-PLAN.md`
 - **Depends on:** ADR 0007 (repository and CI)
@@ -83,6 +83,14 @@ Dave's gate time (about 108 h at P50) is what pushes the demo into spring 2027 (
 - **Needed before it is switched on:** branch rules on `main` and `integration` requiring the CI checks and blocking direct pushes (a unit at the walking skeleton); a merge desk that checks the agent verdicts before merging (port from vig or write as a unit); a nightly smoke test; an automatic revert path (one command reverts a merge); and Dave relaxing the permission prompts for `git push`, `gh pr create`, and `gh pr merge` for this project.
 - **Known weakness:** agents reviewing agents share blind spots, which is why the money and hold paths go through the integration branch and Dave's batch read, not straight to `main`.
 - **Overnight runs** need somewhere to run: the PM's session on Dave's machine while it is awake, or cloud sessions; decide at the walking skeleton.
+
+### One lane (amended 2026-11-04, Dave)
+
+The two bullets on tiers above are replaced: every unit, standard or critical, merges to `main` once every required check passes. The tier now decides who reads a PR, not where it lands. A critical-tier PR also needs the `human-read` check (`scripts/merge-desk/human-read.ts`), which passes only when Dave's latest deciding review approves the PR's current head. `integration`, its ruleset, sync PRs, and promotions are retired (runbook E0).
+
+- **Why.** The second lane cost 64 PRs into `integration`, 17 sync PRs, 7 promotions merged with `--admin`, two deletions of the branch, and PRs opened against the wrong base, and the batch read it was for left no record. The known weakness above still holds; a review on each critical PR is where that read now happens, and an agent cannot give it because agents act as the App.
+- **What stays.** Production is gated by Dave's `vercel promote` (ADR 0007), so `main` is still not production. The nightly smoke and the race and access tests now run on `main`.
+- **Cost.** A critical PR waits for Dave instead of landing on `integration` and waiting for the weekly batch, so his reads come one PR at a time; the PM batches the review requests into his owner window.
 
 ## What would change the call
 

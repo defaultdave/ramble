@@ -1,0 +1,30 @@
+name: human-read
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+    branches: [main]
+  # Reruns the check when the owner approves, requests changes, or a review is dismissed.
+  pull_request_review:
+    types: [submitted, dismissed]
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  human-read:
+    name: human-read
+    if: github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      # The base commit, so a PR cannot change the units record or this script to pick its own tier.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+      - name: Critical tier waits for the owner's approval of this head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bun scripts/merge-desk/human-read.ts

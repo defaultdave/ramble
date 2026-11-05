@@ -2,7 +2,6 @@
 // code from the PR. Env: PR_TITLE, BASE_REF, HEAD_REF, PR_HEAD (a local ref for the PR head).
 import { readFileSync } from "node:fs";
 
-export const PROMOTION_MESSAGE = "Promotion: Dave merges with bypass after the nightly smoke (runbook E1).";
 export const PROTECTED = [".github/", ".claude/", "CLAUDE.md", "scripts/merge-desk/", "docs/adr/", "docs/plan/"];
 export const BOOKKEEPING_FILES = ["docs/plan/units.yaml", "docs/plan/STATUS.md", "docs/plan/delta-log.md"];
 
@@ -17,10 +16,6 @@ export interface ScopeInput {
   changedFiles: string[];
   /** Unit id -> review tier, from units.yaml. */
   units: Map<string, Tier>;
-  /** True when the head carries commits that are on integration and not on main. */
-  carriesIntegrationCommits: boolean;
-  /** True when the head has commits that are not already on main (used for sync PRs). */
-  aheadOfMain: boolean;
   /** units.yaml before (base) and after (PR head); needed only when a bookkeeping PR changes it. */
   unitsYaml?: { base: string; head: string };
 }
@@ -75,6 +70,16 @@ export function unitsYamlViolations(before: string, after: string): string[] {
   return problems;
 }
 
+/** What a PR title says it is: a unit's PR (or the revert of one), or PM bookkeeping. */
+export function readTitle(prTitle: string): { revert: boolean; bookkeeping: boolean; unitId?: string } {
+  const title = prTitle.replace(/^(Revert: )+/, "");
+  return {
+    revert: /^Revert: /.test(prTitle),
+    bookkeeping: title.startsWith("PM bookkeeping:"),
+    unitId: title.match(/^(U-[0-9]+[a-z]*)(?![0-9A-Za-z])/)?.[1],
+  };
+}
+
 const UNIT_BRANCH = /^unit\/(U-[0-9]+[a-z]*)(?:-|$)/;
 const REVERT_BRANCH = /^revert\/pr-[0-9]+$/;
 const lower = (path: string) => path.toLowerCase();
@@ -82,27 +87,17 @@ const lower = (path: string) => path.toLowerCase();
 export function checkScope(input: ScopeInput): Verdict {
   const { base, head, changedFiles, units } = input;
 
-  // 1. Promotion PRs always fail; Dave merges them with bypass.
-  if (head === "integration" && base === "main") return fail(PROMOTION_MESSAGE);
+  // 1. Every PR targets main; the review tier decides who reads it (the human-read check), not where it lands.
+  if (base !== "main") return fail(`Base must be main, not ${base}.`);
 
-  // 2. Sync PRs (main into integration) pass, provided the head adds nothing beyond main.
-  if (base === "integration" && (head === "main" || head.startsWith("sync/"))) {
-    return input.aheadOfMain
-      ? fail(`Sync PR: ${head} has commits that are not on main; a sync branch must be main itself.`)
-      : pass("Sync PR: brings main into integration.");
-  }
-
-  // 3. The title names a unit, or is PM bookkeeping. Branch and title must agree, so a title cannot pick the tier.
-  const revert = /^Revert: /.test(input.title);
-  const title = input.title.replace(/^(Revert: )+/, "");
-  const bookkeeping = title.startsWith("PM bookkeeping:");
-  const unitId = title.match(/^(U-[0-9]+[a-z]*)(?![0-9A-Za-z])/)?.[1];
+  // 2. The title names a unit, or is PM bookkeeping. Branch and title must agree, so a title cannot pick the tier.
+  const { revert, bookkeeping, unitId } = readTitle(input.title);
   if (!bookkeeping && (!unitId || !units.has(unitId))) {
     return fail(`Title must start with a unit ID from units.yaml (for example "U-118: …") or "PM bookkeeping:". Got: ${input.title}`);
   }
   if (revert) {
     // revert.sh names its branch revert/pr-N. The check cannot see the reverted PR, so the unit ID in the
-    // title (copied from that PR) sets the tier; rule 5 then keeps a critical unit's revert off main.
+    // title (copied from that PR) sets the tier, and a critical unit's revert waits for the human read too.
     if (!REVERT_BRANCH.test(head)) return fail(`A revert PR must come from a revert/pr-<number> branch, not ${head}.`);
   } else if (!bookkeeping) {
     const branchUnit = head.match(UNIT_BRANCH)?.[1];
@@ -111,14 +106,8 @@ export function checkScope(input: ScopeInput): Verdict {
     }
   }
 
-  // Integration's unpromoted commits must never reach main around the promotion, whatever the PR is.
-  if (base === "main" && input.carriesIntegrationCommits) {
-    return fail("The branch carries commits that are on integration and not on main; it must target integration so nothing reaches main around the promotion.");
-  }
-
-  // 4. Protected paths. Bookkeeping may touch three plan files, and only into main.
+  // 3. Protected paths. Bookkeeping may touch three plan files.
   if (bookkeeping) {
-    if (base !== "main") return fail("A bookkeeping PR must target main.");
     const stray = changedFiles.filter((file) => !BOOKKEEPING_FILES.includes(file));
     if (stray.length > 0) {
       return fail(`A bookkeeping PR may touch only ${BOOKKEEPING_FILES.join(", ")}. Also changed: ${stray.join(", ")}`);
@@ -136,15 +125,7 @@ export function checkScope(input: ScopeInput): Verdict {
   const touched = changedFiles.filter((file) => PROTECTED.some((path) => lower(file) === lower(path) || lower(file).startsWith(lower(path))));
   if (touched.length > 0) return fail(`Protected paths changed (Dave edits these): ${touched.join(", ")}`);
 
-  // 5. Tier.
-  const tier = units.get(unitId!)!;
-  if (tier === "critical" && base !== "integration") {
-    return fail(`${unitId} is critical tier and must target integration, not ${base}.`);
-  }
-  if (tier === "standard" && base !== "main" && base !== "integration") {
-    return fail(`Base must be main or integration, not ${base}.`);
-  }
-  return pass(`${unitId} (${tier}) into ${base}.`);
+  return pass(`${unitId} (${units.get(unitId!)}) into main.`);
 }
 
 function git(args: string[]): string {
@@ -160,13 +141,6 @@ if (import.meta.main) {
     const { PR_TITLE = "", BASE_REF = "", HEAD_REF = "", PR_HEAD = "pr-head" } = process.env;
     if (!BASE_REF || !HEAD_REF) throw new Error("BASE_REF and HEAD_REF are required");
     const base = `origin/${BASE_REF}`;
-    const onMain = new Set(lines(git(["rev-list", PR_HEAD, "^origin/main"])));
-    // Only a missing integration branch means "no integration commits"; any other git error fails the check.
-    const probe = Bun.spawnSync(["git", "rev-parse", "--verify", "--quiet", "origin/integration"], { stdout: "pipe", stderr: "pipe" });
-    if (probe.exitCode !== 0 && (probe.exitCode !== 1 || probe.stderr.toString().trim() !== "")) {
-      throw new Error(`git rev-parse origin/integration failed: ${probe.stderr.toString().trim()}`);
-    }
-    const onIntegration = probe.exitCode === 0 ? lines(git(["rev-list", "origin/integration", "^origin/main"])) : [];
     const changedFiles = git(["diff", "--name-only", "-z", "--no-renames", `${base}...${PR_HEAD}`]).split("\0").filter(Boolean);
     const unitsYaml = changedFiles.includes("docs/plan/units.yaml")
       ? { base: git(["show", `${base}:docs/plan/units.yaml`]), head: git(["show", `${PR_HEAD}:docs/plan/units.yaml`]) }
@@ -177,8 +151,6 @@ if (import.meta.main) {
       head: HEAD_REF,
       changedFiles,
       units: parseUnits(readFileSync("docs/plan/units.yaml", "utf8")),
-      carriesIntegrationCommits: onIntegration.some((sha) => onMain.has(sha)),
-      aheadOfMain: onMain.size > 0,
       unitsYaml,
     });
     console.log(verdict.reason);

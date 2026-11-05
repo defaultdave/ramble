@@ -51,7 +51,7 @@ git fetch origin && git push origin origin/main:refs/heads/production
 
 This pushes `origin/main` rather than the local `main`, which can be behind and would create or move `production` at an old commit.
 
-Agents cannot push `production` in practice: `scripts/merge-desk/agent-git.ts` only pushes `unit/`, `pm/`, `revert/`, and `sync/` branches. On 2026-10-29 the PM ran `gh api repos/defaultdave/ramble/rulesets` and found two active rulesets, "main: tiered auto-merge" (`refs/heads/main`) and "integration: tiered auto-merge" (`refs/heads/integration`), neither matching `production`; step 1 below re-checks it. So the restriction is a convention in the script, not a GitHub rule. The commit you push is the one you chose: check CI on `main` first.
+Agents cannot push `production` in practice: `scripts/merge-desk/agent-git.ts` only pushes `unit/`, `pm/`, and `revert/` branches. On 2026-10-29 the PM ran `gh api repos/defaultdave/ramble/rulesets` and found two active rulesets, "main: tiered auto-merge" (`refs/heads/main`) and "integration: tiered auto-merge" (`refs/heads/integration`), neither matching `production`; step 1 below re-checks it. So the restriction is a convention in the script, not a GitHub rule. The commit you push is the one you chose: check CI on `main` first.
 
 ## One-time setup (Dave, in Vercel)
 

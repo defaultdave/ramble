@@ -29,7 +29,11 @@ test("rejects a check name that is not one of the four agent checks", () => {
   expect(() => buildCheckRun({ ...input, name: "scope-manifest" })).toThrow("--name");
 });
 
-test("rejects a conclusion other than success or failure", () => {
+test("posts action_required for a check that could not run", () => {
+  expect(buildCheckRun({ ...input, conclusion: "action_required" }).conclusion).toBe("action_required");
+});
+
+test("rejects a conclusion other than success, failure or action_required", () => {
   expect(() => buildCheckRun({ ...input, conclusion: "neutral" })).toThrow("--conclusion");
 });
 

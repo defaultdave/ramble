@@ -3,6 +3,8 @@
 .env*
 !.env.example
 .claude/agent-memory-local/
+# The PM's public memory lives in the ramble-pm repo (memory/).
+.claude/agent-memory/
 node_modules/
 .next/
 next-env.d.ts

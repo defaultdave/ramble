@@ -109,7 +109,7 @@ bun scripts/merge-desk/post-check.ts --name review-agent --sha <head sha> --conc
 ```
 
 - `--name` is one of `review-agent`, `qa-agent`, `spec-compliance`, `architecture-audit` (added 2026-10-22; see the note under C3).
-- `--conclusion` is `success` or `failure`.
+- `--conclusion` is `success`, `failure`, or `action_required`. A check that could not run its evidence (no browser, no database; qa's BLOCKED) posts `action_required`, never `success`.
 - It calls `POST /repos/defaultdave/ramble/check-runs` with `status: completed`, the conclusion, and `output.title` plus `output.summary` (cut to 65,000 characters).
 
 **`scripts/merge-desk/agent-git.ts`** is the agents' only route to GitHub. It always uses the App token, never your login. Its subcommands:

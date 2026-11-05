@@ -8,6 +8,7 @@ import {
   boundaryConfigs,
   withTypeImportsAllowed,
 } from './eslint.config.boundaries.mjs';
+import { ticketCommentsConfig } from './eslint.config.ticket-comments.mjs';
 
 export default defineConfig([
   ...withTypeImportsAllowed([...nextVitals, ...nextTypescript]),
@@ -40,6 +41,7 @@ export default defineConfig([
     files: ['**/*.mjs'],
   },
   ...boundaryConfigs,
+  ticketCommentsConfig,
   {
     name: 'ramble/no-inline-disables-of-boundaries',
     plugins: { '@eslint-community/eslint-comments': commentsPlugin },

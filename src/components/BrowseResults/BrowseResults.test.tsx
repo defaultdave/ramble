@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { samplePhoto } from '@/components/Photo/Photo.fixtures';
 import type { ExperienceCard } from '@/lib/experienceCards';
 import { ExperienceCardItem } from '@/components/ExperienceCard';
+import type { BrowseView } from '@/lib/pages/browse';
 import { BrowseResults } from './BrowseResults';
 import { BrowseResultsList } from './BrowseResultsList';
 import { TargetButton } from './TargetButton';
@@ -33,6 +34,7 @@ function elementsOfType<Props>(
 // - Show more is a form that sends every field of the next address, and is absent on the last page
 // - the way back to the first results is there only on a later page
 // - empty says whether a filter is on and offers Clear all filters only then
+// - empty with ways forward lists each as "Remove <filter> (<count>)" under a heading, with the address that drops it; with none given there is no heading or list, and a chosen day keeps them beside its own links
 // - empty on a chosen day names the day and links to the next day with experiences and to any day, or only to any day when none follows; Clear all filters is offered only when another filter is on
 // - a page with no filters words its empty state without filters and offers browse, and its error without saying filters are saved
 // - an error is announced as an alert with a Try again form that carries the same address
@@ -248,6 +250,89 @@ describe('BrowseResults empty', () => {
     expect(
       screen.queryByRole('link', { name: 'Clear all filters' }),
     ).not.toBeInTheDocument();
+  });
+});
+
+type ViewOf<State extends BrowseView['state']> = Extract<
+  BrowseView,
+  { state: State }
+>;
+
+describe('BrowseResults empty with ways forward', () => {
+  const suggestions = [
+    {
+      param: 'categories' as const,
+      label: 'Kayaking',
+      count: 12,
+      href: '/new-york/browse?neighborhood=dumbo',
+    },
+    {
+      param: 'price' as const,
+      label: 'Under $50',
+      count: 1,
+      href: '/new-york/browse?category=kayaking',
+    },
+  ];
+
+  it('lists a link per filter under a heading, each worded as the removal with its count', () => {
+    render(
+      <BrowseResults
+        state="empty"
+        filtered
+        dated={null}
+        suggestions={suggestions}
+      />,
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Or take a filter off' }),
+    ).toBeVisible();
+    const list = screen.getByRole('list');
+    const links = within(list).getAllByRole('link');
+    expect(links.map((link) => link.textContent)).toEqual([
+      'Remove Kayaking (12)',
+      'Remove Under $50 (1)',
+    ]);
+    expect(links.map((link) => link.getAttribute('href'))).toEqual([
+      '/new-york/browse?neighborhood=dumbo',
+      '/new-york/browse?category=kayaking',
+    ]);
+    expect(
+      screen.getByRole('link', { name: 'Clear all filters' }),
+    ).toBeVisible();
+  });
+
+  it.each<[string, ViewOf<'empty'>]>([
+    ['none given', { state: 'empty', filtered: true, dated: null }],
+    [
+      'an empty list',
+      { state: 'empty', filtered: true, dated: null, suggestions: [] },
+    ],
+  ])('shows no heading or list when there are %s', (_, view) => {
+    render(<BrowseResults {...view} />);
+    expect(
+      screen.queryByRole('heading', { name: 'Or take a filter off' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
+  });
+
+  it('shows them on a chosen day too, beside its own ways out', () => {
+    render(
+      <BrowseResults
+        state="empty"
+        filtered
+        suggestions={suggestions}
+        dated={{
+          dateLabel: 'Sat, Nov 7',
+          nextDay: null,
+          anyDayHref: '/new-york/browse',
+          message: 'There are no experiences on later days.',
+        }}
+      />,
+    );
+    expect(
+      screen.getByRole('link', { name: 'Remove Kayaking (12)' }),
+    ).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Any day' })).toBeVisible();
   });
 });
 

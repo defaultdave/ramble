@@ -157,6 +157,35 @@ export const EmptyWithoutFilters: EmptyStory = {
   args: { state: 'empty', filtered: false, dated: null },
 };
 
+// A filtered page with nothing: up to three filters to take off, each with what it would bring back.
+export const EmptyWithWaysForward: EmptyStory = {
+  args: {
+    state: 'empty',
+    filtered: true,
+    dated: null,
+    suggestions: [
+      {
+        param: 'categories',
+        label: 'Kayaking',
+        count: 12,
+        href: '/new-york/browse?neighborhood=dumbo',
+      },
+      {
+        param: 'neighborhoods',
+        label: 'DUMBO',
+        count: 4,
+        href: '/new-york/browse?category=kayaking',
+      },
+      {
+        param: 'price',
+        label: 'Under $50',
+        count: 1,
+        href: '/new-york/browse?category=kayaking&neighborhood=dumbo',
+      },
+    ],
+  },
+};
+
 // A chosen day with nothing on it: the next day that has experiences, and the same filters with any day.
 export const EmptyOnADay: EmptyStory = {
   args: {

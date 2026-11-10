@@ -95,3 +95,10 @@ export function oneLineClipped(text: string, max: number): string {
     .join('')
     .trimEnd()}…`;
 }
+
+/** The first value of a query parameter, which Next gives as one string or a list when it repeats. */
+export function firstQueryValue(
+  raw: string | string[] | undefined,
+): string | undefined {
+  return Array.isArray(raw) ? raw[0] : raw;
+}

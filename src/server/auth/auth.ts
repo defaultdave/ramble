@@ -10,6 +10,7 @@ import {
   sessionMaxAgeSeconds,
   signInLinkTtlSeconds,
 } from '@/lib/auth';
+import { signInConfirmUrl } from '@/lib/signIn';
 import { db } from '@/server/db/client';
 import {
   authAccounts,
@@ -76,11 +77,22 @@ function createAuth() {
       magicLink({
         expiresIn: signInLinkTtlSeconds,
         storeToken: { type: 'custom-hasher', hash: hashSignInToken },
-        async sendMagicLink({ email, url }) {
+        async sendMagicLink({ email, url, token }) {
+          // The emailed address is a Ramble page that asks for a click, not Better Auth's verify
+          // address: a mail scanner that fetches every link would otherwise use the link up.
+          const verify = new URL(url);
+          const confirmUrl = signInConfirmUrl(
+            verify.origin,
+            token,
+            verify.searchParams.get('callbackURL'),
+          );
           await sendEmail({
             template: 'sign-in-link',
             to: email,
-            data: { url, expiresInMinutes: signInLinkTtlSeconds / 60 },
+            data: {
+              url: confirmUrl,
+              expiresInMinutes: signInLinkTtlSeconds / 60,
+            },
             idempotencyKey: `sign-in-link-${randomUUID()}`,
           });
         },

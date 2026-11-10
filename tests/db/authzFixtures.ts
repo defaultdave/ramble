@@ -64,11 +64,14 @@ async function linkFor(address: string) {
   const { rows } = await client.db.execute<{ html: string }>(
     sql`SELECT html FROM messages WHERE recipient = ${address} AND template = 'sign-in-link' ORDER BY created_at DESC, id DESC LIMIT 1`,
   );
-  const href = /href="([^"]*magic-link\/verify[^"]*)"/.exec(
+  const href = /href="([^"]*sign-in\/confirm[^"]*)"/.exec(
     rows[0]?.html ?? '',
   )?.[1];
   if (!href) throw new Error('no sign-in link in the email');
-  return href.replaceAll('&amp;', '&');
+  const token =
+    new URL(href.replaceAll('&amp;', '&')).searchParams.get('token') ?? '';
+  // The email opens the confirm page; these tests are about who the session is, so they use the verify address it posts to.
+  return `${origin}/api/auth/magic-link/verify?token=${token}&callbackURL=%2F`;
 }
 
 /** Follows the link and returns the session cookie it sets. */

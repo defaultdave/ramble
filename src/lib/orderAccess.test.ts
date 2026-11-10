@@ -114,6 +114,25 @@ describe('pickOrderToken', () => {
   });
 });
 
+describe('tokenRouteHeaders for the sign-in confirm page', () => {
+  it.each(['/sign-in/confirm', '/sign-in/confirm/'])(
+    'keeps %s out of indexes and caches',
+    (pathname) => {
+      expect(tokenRouteHeaders(pathname)).toEqual([
+        { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' },
+        { key: 'Cache-Control', value: 'no-store' },
+      ]);
+    },
+  );
+
+  it.each(['/sign-in', '/sign-in/confirm/x', '/sign-in/confirmed'])(
+    'adds nothing to %s',
+    (pathname) => {
+      expect(tokenRouteHeaders(pathname)).toEqual([]);
+    },
+  );
+});
+
 describe('tokenRouteHeaders', () => {
   it.each([`/orders/${reference}`, `/orders/${reference}/`])(
     'keeps %s out of indexes and caches',

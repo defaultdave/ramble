@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Menu } from 'lucide-react';
+import { AccountControl } from '@/components/Header/AccountControl';
 import { HoldTimer } from '@/components/HoldTimer';
 import {
   Header,
@@ -82,6 +83,22 @@ export const MobileMenuSlot: DefaultStory = {
   globals: mobile,
 };
 export const Desktop: DefaultStory = { args: defaults, globals: desktop };
+export const MobileSignedOut: DefaultStory = {
+  args: { ...defaults, account: <AccountControl signedIn={false} /> },
+  globals: mobile,
+};
+export const MobileSignedIn: DefaultStory = {
+  args: { ...defaults, account: <AccountControl signedIn /> },
+  globals: mobile,
+};
+export const DesktopSignedOut: DefaultStory = {
+  args: { ...defaults, account: <AccountControl signedIn={false} /> },
+  globals: desktop,
+};
+export const DesktopSignedIn: DefaultStory = {
+  args: { ...defaults, account: <AccountControl signedIn /> },
+  globals: desktop,
+};
 export const MobileCheckout: CheckoutStory = {
   args: { variant: 'checkout', holdTimer: holdTimer(582) },
   globals: mobile,

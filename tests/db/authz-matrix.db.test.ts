@@ -51,6 +51,7 @@ type Data = {
   catalog: typeof import('@/server/db/catalog');
   editorial: typeof import('@/server/db/editorial');
   guests: typeof import('@/server/db/guests');
+  hostDashboard: typeof import('@/server/db/hostDashboard');
   ledger: typeof import('@/server/db/ledger');
   legal: typeof import('@/server/db/legal');
   photos: typeof import('@/server/db/photos');
@@ -111,6 +112,7 @@ beforeAll(async () => {
     catalog: await import('@/server/db/catalog'),
     editorial: await import('@/server/db/editorial'),
     guests: await import('@/server/db/guests'),
+    hostDashboard: await import('@/server/db/hostDashboard'),
     ledger: await import('@/server/db/ledger'),
     legal: await import('@/server/db/legal'),
     photos: await import('@/server/db/photos'),
@@ -339,6 +341,12 @@ const rows: Row[] = [
   {
     fn: 'readHostStatement',
     invoke: (c, t) => data.ledger.readHostStatement(c, t.hostId, window),
+    allows: { hostA: ['ownerA'], hostB: ['ownerB'], missing: [] },
+  },
+  {
+    fn: 'readHostDashboard',
+    invoke: (c, t) =>
+      data.hostDashboard.readHostDashboard(c, t.hostId, new Date()),
     allows: { hostA: ['ownerA'], hostB: ['ownerB'], missing: [] },
   },
   // The owner of the host, or staff.

@@ -49,7 +49,6 @@ export const routes: readonly RouteRow[] = [
     heading: 'Redeem a gift',
     noindex: true,
   },
-  { path: '/host', group: 'host', heading: 'Host tools', noindex: true },
   { path: '/ops', group: 'ops', heading: 'Operations', noindex: true },
   { path: '/ops/mailbox', group: 'ops', heading: 'Dev mailbox', noindex: true },
 ];

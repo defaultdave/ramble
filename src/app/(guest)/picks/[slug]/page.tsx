@@ -1,16 +1,23 @@
 import type { Metadata } from 'next';
-import { use } from 'react';
-import { RoutePlaceholder } from '@/components/RoutePlaceholder';
+import { picksPlaceholderSlug } from '@/lib/pages/picks';
+import { CollectionRoute, collectionMetadata } from '../CollectionRoute';
 
-export const metadata: Metadata = { title: 'Ramble Picks' };
-
+// The build has no database to list Picks from, so it prerenders the placeholder; a real Pick
+// renders on its first request and is kept by the cached read under it.
 export function generateStaticParams() {
-  return [{ slug: 'sample' }];
+  return [{ slug: picksPlaceholderSlug }];
 }
 
-export default function RamblePicksPage({
+export async function generateMetadata({
+  params,
+}: PageProps<'/picks/[slug]'>): Promise<Metadata> {
+  const { slug } = await params;
+  return collectionMetadata({ kind: 'pick', slug });
+}
+
+export default async function RamblePicksPage({
   params,
 }: PageProps<'/picks/[slug]'>) {
-  const { slug } = use(params);
-  return <RoutePlaceholder name="Ramble Picks" covers="PRD-03" param={slug} />;
+  const { slug } = await params;
+  return <CollectionRoute kind="pick" slug={slug} />;
 }

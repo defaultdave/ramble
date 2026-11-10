@@ -1,8 +1,16 @@
 import type { Metadata } from 'next';
-import { RoutePlaceholder } from '@/components/RoutePlaceholder';
+import { Suspense } from 'react';
+import { BrowseSkeleton } from '@/components/BrowseSkeleton';
+import { giftGuideFallbackTitle } from '@/lib/pages/picks';
+import { GiftGuideContent } from './GiftGuideContent';
 
-export const metadata: Metadata = { title: 'Gift guide' };
+// The head is fixed: whether the page exists at all is a per-request switch, which the head cannot wait for.
+export const metadata: Metadata = { title: giftGuideFallbackTitle };
 
 export default function GiftGuidePage() {
-  return <RoutePlaceholder name="Gift guide" covers="PRD-04" />;
+  return (
+    <Suspense fallback={<BrowseSkeleton filters={false} />}>
+      <GiftGuideContent />
+    </Suspense>
+  );
 }

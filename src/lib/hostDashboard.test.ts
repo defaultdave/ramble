@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildHostDashboard,
   hostDashboardLimits,
+  soldFillStep,
   soldPercent,
   type HostDashboardBooking,
   type HostDashboardSession,
@@ -123,5 +124,17 @@ describe('soldPercent', () => {
     [0, 0, 100],
   ])('%i of %i is %i percent', (sold, allocation, expected) => {
     expect(soldPercent(sold, allocation)).toBe(expected);
+  });
+});
+
+describe('soldFillStep', () => {
+  it.each([
+    [0, 0],
+    [9, 0],
+    [10, 1],
+    [99, 9],
+    [100, 10],
+  ])('%i percent fills %i tenths', (percent, step) => {
+    expect(soldFillStep(percent)).toBe(step);
   });
 });

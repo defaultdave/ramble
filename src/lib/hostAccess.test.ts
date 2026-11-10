@@ -67,8 +67,11 @@ describe('hostAccessFor', () => {
 describe('hostDashboardResult', () => {
   const data = { hostName: 'Harbor Co', sessions: [], bookings: [] };
 
-  it('sends nobody signed in to sign in, with or without data', () => {
-    expect(hostDashboardResult({ kind: 'signed_out' }, null)).toEqual({
+  it.each([
+    ['without data', null],
+    ['with data', data],
+  ])('sends nobody signed in to sign in %s', (_name, given) => {
+    expect(hostDashboardResult({ kind: 'signed_out' }, given)).toEqual({
       status: 'signed_out',
     });
   });

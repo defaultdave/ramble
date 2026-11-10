@@ -90,6 +90,11 @@ export function soldPercent(seatsSold: number, allocation: number): number {
   return Math.min(99, Math.floor((seatsSold / allocation) * 100));
 }
 
+/** The bar's width in tenths, 0 to 10, rounded down so only a full session reaches 10. */
+export function soldFillStep(percent: number): number {
+  return Math.floor(percent / 10);
+}
+
 function sessionRow(session: HostDashboardSession): HostSessionRowView {
   return {
     id: session.id,

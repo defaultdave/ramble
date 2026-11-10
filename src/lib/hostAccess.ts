@@ -8,9 +8,9 @@ export type HostAccessInput = {
   hostGrants?: readonly { role: string; hostId: string }[] | undefined;
 };
 
+/** `not_a_host_owner` is signed in but owns no host: a guest, ops, admin, or host staff (who are granted nothing here yet). */
 export type HostAccess =
   | { kind: 'signed_out' }
-  /** Signed in, but owns no host: a guest, ops, admin, or host staff (who are granted nothing here yet). */
   | { kind: 'not_a_host_owner' }
   | { kind: 'owner'; hostId: string };
 

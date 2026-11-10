@@ -1,6 +1,7 @@
 import { AccountControl } from '@/components/Header/AccountControl';
 import { PageHeading } from '@/components/PageHeading';
 import { classNames } from '@/lib/classNames';
+import { soldFillStep } from '@/lib/hostDashboard';
 import type {
   HostBookingRowView,
   HostDashboardView,
@@ -26,7 +27,7 @@ function SessionRow({ row }: { row: HostSessionRowView }) {
       <span className={styles.track} aria-hidden="true">
         <span
           className={styles.fill}
-          data-fill={String(Math.floor(row.soldPercent / 10))}
+          data-fill={String(soldFillStep(row.soldPercent))}
         />
       </span>
     </li>

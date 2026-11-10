@@ -2,6 +2,7 @@ import 'server-only';
 import {
   and,
   asc,
+  count,
   eq,
   exists,
   gte,
@@ -225,6 +226,20 @@ function pastCursor(cursor: BrowseCursorRow | null): SQL | undefined {
   return sql`(${experiences.name}, ${experiences.id}) > (${cursor.name}, ${cursor.id})`;
 }
 
+/** Every condition the filters put on an experience a guest can see, with no cursor. */
+function matchingFilters(filters: BrowseFilters, window: SessionWindow) {
+  return and(
+    shownInBrowse(),
+    inChosenCategories(filters.categories),
+    inChosenNeighborhoods(filters.neighborhoods),
+    hasOpenSession(filters, window),
+    inPriceBand(filters.price),
+    suitsAge(filters.age),
+    inSetting(filters.setting),
+    matchesKeywords(filters.search),
+  );
+}
+
 /**
  * One page of the experiences a guest can see that match the filters, by name and then id, with the
  * row `after` names. A category or neighborhood list matches any of its values, and the date matches
@@ -266,19 +281,7 @@ export async function listBrowseExperiences(
     .from(experiences)
     .innerJoin(neighborhoods, eq(neighborhoods.id, experiences.neighborhoodId))
     .leftJoinLateral(cover, sql`true`)
-    .where(
-      and(
-        shownInBrowse(),
-        inChosenCategories(filters.categories),
-        inChosenNeighborhoods(filters.neighborhoods),
-        hasOpenSession(filters, window),
-        inPriceBand(filters.price),
-        suitsAge(filters.age),
-        inSetting(filters.setting),
-        matchesKeywords(filters.search),
-        pastCursor(cursor),
-      ),
-    )
+    .where(and(matchingFilters(filters, window), pastCursor(cursor)))
     .orderBy(asc(experiences.name), asc(experiences.id))
     .limit(browsePageSize + 1);
 
@@ -288,6 +291,19 @@ export async function listBrowseExperiences(
     image: coverImage(joined),
   }));
   return { cursor, items: await attachPriceOptions(withImages), nextCursor };
+}
+
+/** How many experiences the filters match, which is what `listBrowseExperiences` lists across every page. */
+export async function countBrowseExperiences(
+  filters: BrowseFilters,
+  asOf: string,
+): Promise<number> {
+  const parsed = BrowseFiltersSchema.parse(filters);
+  const [row] = await dbRead
+    .select({ total: count() })
+    .from(experiences)
+    .where(matchingFilters(parsed, upcomingWindow(asOf, browseWindowDays)));
+  return row?.total ?? 0;
 }
 
 /**

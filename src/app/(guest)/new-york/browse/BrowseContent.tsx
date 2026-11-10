@@ -8,6 +8,7 @@ import {
   browseWindowDays,
   emptyBrowsePage,
   errorView,
+  withSuggestions,
 } from '@/lib/pages/browse';
 import {
   knownFilters,
@@ -17,7 +18,11 @@ import {
 import { upcomingWindow } from '@/lib/sessionWindow';
 import { minuteAsOf } from '@/lib/time';
 import { venueToday } from '@/lib/venue';
-import { getBrowseDates, getBrowseResults } from '@/server/browse';
+import {
+  getBrowseDates,
+  getBrowseResults,
+  getZeroResultSuggestions,
+} from '@/server/browse';
 import { getFilterOptions } from '@/server/filterOptions';
 import { chooseBrowseDate } from '@/server/actions/browse';
 import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
@@ -66,7 +71,11 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
   }
 
   const { options, dates, page } = loaded;
-  const view = browseView(query, page, dates);
+  const found = browseView(query, page, dates);
+  const view =
+    found.state === 'empty' && found.filtered
+      ? withSuggestions(found, await getZeroResultSuggestions(filters, asOf))
+      : found;
   return (
     <div id={browseResultsId} data-reveal-without-script>
       {/* Always rendered, so a screen reader hears the text change when the filters do. */}

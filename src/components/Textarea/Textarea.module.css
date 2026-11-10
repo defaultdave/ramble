@@ -1,0 +1,35 @@
+/* The label, hint, error, and field look are the Input's, so the two cannot drift apart. */
+.field {
+  composes: field from '../Input/Input.module.css';
+}
+
+.label {
+  composes: label from '../Input/Input.module.css';
+}
+
+.optional {
+  composes: optional from '../Input/Input.module.css';
+}
+
+.hint {
+  composes: hint from '../Input/Input.module.css';
+}
+
+.error {
+  composes: error from '../Input/Input.module.css';
+}
+
+.errorIcon {
+  composes: errorIcon from '../Input/Input.module.css';
+}
+
+.textarea {
+  composes: input from '../Input/Input.module.css';
+}
+
+/* Two classes outrank the composed one whichever sheet loads last. */
+.field .textarea {
+  display: block;
+  min-block-size: calc(var(--space-16) * 2);
+  resize: vertical;
+}

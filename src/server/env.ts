@@ -75,6 +75,10 @@ const schema = z
     FORM_GUARD_SECRET: z.string().min(32).optional(),
     // Derives every capability link (manage, confirmation). Read when a link is made or checked, which throws if it is unset outside test: a token opens a booking, so there is no stand-in in development.
     CAPABILITY_TOKEN_SECRET: optional(sharedSecret),
+    // Signs Better Auth's session cookie. Read when sign-in or a session is first used, which throws if it is unset in production; elsewhere a fixed stand-in is used.
+    BETTER_AUTH_SECRET: optional(sharedSecret),
+    // Keys the hash a sign-in link's token is stored under. Same rule as above; rotating it voids the links waiting to be used, which last 5 minutes.
+    SIGN_IN_LINK_SECRET: optional(sharedSecret),
     // Bearer secret for POST /api/pulse. Unset, the route refuses everyone.
     PULSE_SECRET: optional(sharedSecret),
     // Lets the pulse take a manual time (`asOf`) so the demo can show tomorrow's jobs. Off unless set to "on".

@@ -1,4 +1,7 @@
 import 'server-only';
+import { isSessionLive, touchedSessionExpiry } from '@/lib/auth';
+import { isValidGrantScope, type RoleGrant } from '@/lib/roleGrants';
+import { systemClock } from '@/server/ports/clock';
 
 export const Role = {
   Guest: 'guest',
@@ -38,9 +41,49 @@ export const anonymousCaller: Caller = {
   hostIds: [],
 };
 
-// TODO(U-004a): read the Better Auth session and role grants.
-export function getCaller(): Promise<Caller> {
-  return Promise.resolve(anonymousCaller);
+/**
+ * Everyone signed in is a guest. Each grant adds its role, and a host role adds its host. A grant
+ * whose host does not match its role (the table's CHECK refuses one) is skipped, never half used.
+ */
+export function callerFromGrants(
+  userId: string,
+  grants: readonly RoleGrant[],
+): Caller {
+  const valid = grants.filter(isValidGrantScope);
+  return {
+    userId,
+    roles: [...new Set<Role>([Role.Guest, ...valid.map((g) => g.role)])],
+    hostIds: [
+      ...new Set(valid.flatMap((g) => (g.hostId === null ? [] : [g.hostId]))),
+    ],
+  };
+}
+
+/** The caller a request's cookies name: anonymous without a live session, otherwise the person with their grants. */
+export async function callerForHeaders(
+  requestHeaders: Headers,
+  now: Date = systemClock.now(),
+): Promise<Caller> {
+  // Loaded here, not at the top: nearly every data-layer file imports this one for `requireRole`,
+  // and none of them should load Better Auth and the database client with it.
+  const [{ readSession }, { readRoleGrants }, { extendSessionExpiry }] =
+    await Promise.all([
+      import('./session'),
+      import('@/server/db/roleGrants'),
+      import('@/server/db/authSessions'),
+    ]);
+  const session = await readSession(requestHeaders);
+  if (session === null || !isSessionLive(session, now)) return anonymousCaller;
+
+  const extended = touchedSessionExpiry(session, now);
+  if (extended !== null) await extendSessionExpiry(session.id, extended, now);
+
+  return callerFromGrants(session.userId, await readRoleGrants(session.userId));
+}
+
+export async function getCaller(): Promise<Caller> {
+  const { headers } = await import('next/headers');
+  return callerForHeaders(await headers());
 }
 
 /**

@@ -15,6 +15,7 @@ import { DevCheck } from './templates/DevCheck';
 import { GuestConfirmation } from './templates/GuestConfirmation';
 import { HostBookingNotice } from './templates/HostBookingNotice';
 import { PaidAfterLapse } from './templates/PaidAfterLapse';
+import { SignInLink } from './templates/SignInLink';
 
 type Markup = {
   [Name in EmailTemplateName]: (
@@ -39,6 +40,9 @@ const markup: Markup = {
   ),
   'paid-after-lapse': (data, helpUrl) => (
     <PaidAfterLapse data={data} helpUrl={helpUrl} />
+  ),
+  'sign-in-link': (data, helpUrl) => (
+    <SignInLink data={data} helpUrl={helpUrl} />
   ),
 };
 

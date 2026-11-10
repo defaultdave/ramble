@@ -8,6 +8,7 @@ import {
 import {
   afterConfirm,
   extendedPayingUntil,
+  isEventProcessed,
   isPaymentEventType,
   matchEventAttempt,
   needsMetadataLookup,
@@ -28,7 +29,11 @@ import {
   type ProviderEventRow,
   type RetryReason,
 } from '@/lib/providerEvents';
-import { isRefundEventType, type RefundEventType } from '@/lib/refunds';
+import {
+  isRefundEventType,
+  refundEventRoute,
+  type RefundEventType,
+} from '@/lib/refunds';
 import { enqueue } from '@/server/jobs/enqueue';
 import { db, type Transaction } from './client';
 import type { ConfirmOrder } from './confirmOrder';
@@ -266,19 +271,22 @@ async function processRefundEvent(
   first: NonNullable<Awaited<ReturnType<typeof readProviderEvent>>>,
   type: RefundEventType,
 ): Promise<ProviderEventResult> {
-  if (first.rambleOrderId === null) return recordRetry(tx, first, 'unmatched');
-  await lockOrderEvents(tx, first.rambleOrderId);
-  const event = await readProviderEvent(tx, first.id);
-  if (!event) throw new Error('The provider event does not exist');
-  if (event.processedAt !== null) return { status: 'already_processed' };
-  const outcome = await applyRefundEvent(tx, {
+  let event = first;
+  if (first.rambleOrderId !== null) {
+    await lockOrderEvents(tx, first.rambleOrderId);
+    const reread = await readProviderEvent(tx, first.id);
+    if (!reread) throw new Error('The provider event does not exist');
+    if (isEventProcessed(reread)) return { status: 'already_processed' };
+    event = reread;
+  }
+  const action = await applyRefundEvent(tx, {
     type,
     objectId: event.objectId,
     amountMinor: event.amountMinor,
     rambleOrderId: event.rambleOrderId,
     rambleRecordId: event.rambleRecordId,
   });
-  if (outcome === 'unmatched' || outcome === 'conflict') {
+  if (refundEventRoute(action) === 'retry') {
     return recordRetry(tx, event, 'unmatched');
   }
   await markProcessed(tx, event.id);
@@ -297,7 +305,7 @@ export async function processProviderEvent(
 ): Promise<ProviderEventResult> {
   const first = await readProviderEvent(tx, input.eventId);
   if (!first) throw new Error('The provider event does not exist');
-  if (first.processedAt !== null) return { status: 'already_processed' };
+  if (isEventProcessed(first)) return { status: 'already_processed' };
   const type = first.type;
   if (isRefundEventType(type)) return processRefundEvent(tx, first, type);
   if (!isPaymentEventType(type)) {
@@ -322,7 +330,7 @@ export async function processProviderEvent(
     await lockOrderEvents(tx, ids.orderId);
     const reread = await readProviderEvent(tx, input.eventId);
     if (!reread) throw new Error('The provider event does not exist');
-    if (reread.processedAt !== null) return { status: 'already_processed' };
+    if (isEventProcessed(reread)) return { status: 'already_processed' };
     event = reread;
     order = await lockOrderRows(tx, ids.orderId);
   }

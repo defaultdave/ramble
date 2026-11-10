@@ -49,6 +49,7 @@ function createGateway(webhookSecret: string): FakeGateway {
       write((adapter) => adapter.reverseTransfer(input)),
     confirm: (paymentId, input) =>
       write((adapter) => adapter.confirm(paymentId, input)),
+    // TODO(U-077): first caller, the way the ops refund-failed queue is demonstrated.
     setRefundOutcome: (paymentId, input) =>
       write((adapter) => adapter.setRefundOutcome(paymentId, input)),
     retrieve: (query) => read((adapter) => adapter.retrieve(query)),

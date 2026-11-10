@@ -79,6 +79,8 @@ type Seed = {
   amountDueMinor?: number;
   /** Also make the payment at the fake gateway, so the refund job has one to refund. */
   gatewayPayment?: boolean;
+  /** Smaller amounts than the two worked examples, to meet the rounding at its edges. */
+  money?: { subtotal: number; tax: number; commission: number };
 };
 
 /** A booking order paid in full: confirmed, a succeeded attempt, and the ledger rows the confirm step writes. */
@@ -96,6 +98,17 @@ export async function seedPaidOrder(seed: Seed = {}): Promise<PaidOrder> {
       status: seed.status ?? 'confirmed',
       confirmedAt:
         seed.status === 'pending_payment' ? null : sql`clock_timestamp()`,
+      ...(seed.money
+        ? {
+            taxTreatment: 'taxable' as const,
+            taxRatePpm: 500_000,
+            ticketSubtotalMinor: seed.money.subtotal,
+            taxMinor: seed.money.tax,
+            totalMinor: seed.money.subtotal + seed.money.tax,
+            amountDueMinor: seed.money.subtotal + seed.money.tax,
+            commissionMinor: seed.money.commission,
+          }
+        : {}),
       ...(seed.amountDueMinor === undefined
         ? {}
         : {

@@ -1,28 +1,32 @@
 import 'server-only';
-import { createHash } from 'node:crypto';
 import { asc, eq, sql } from 'drizzle-orm';
 import { isSimulatedPayment } from '@/lib/confirmOrder';
-import { paymentLimits } from '@/lib/payments';
 import {
   RefundRequestSchema,
   RefundSchema,
-  planRefund,
+  attemptReadLimit,
   processRefundDedupeKey,
   processRefundKind,
+  providerRefundIdAction,
+  refundCashPostIsFirst,
   refundEventAction,
+  refundIdFromDigest,
   refundProviderKey,
   refundRequestIdentity,
-  refundableAttempt,
-  repeatsRequest,
+  refundRequestVerdict,
+  refundToSend,
   requireRefundTransition,
   totalsAfterFailure,
   totalsAfterRequest,
+  type RefundEventAction,
   type RefundEventFacts,
   type RefundEventType,
+  type RefundToSend,
   type RefundRequestInput,
   type RefundRequestRefusal,
 } from '@/lib/refunds';
 import { refundFailed, refundRequested, refundSucceeded } from '@/lib/ledger';
+import { sha256Hex } from '@/server/hash';
 import { enqueue } from '@/server/jobs/enqueue';
 import { db, type Transaction } from './client';
 import { postEntries } from './ledger';
@@ -55,19 +59,6 @@ export type RequestRefundResult =
       /** What the order's ticket part still holds, or null when the order was not found. */
       remainingTicketMinor: number | null;
     };
-
-/** A UUID (version 5 layout) made from the request's identity, so the same request is the same refund row. */
-function refundIdFor(identity: string): string {
-  const hex = createHash('sha256').update(identity).digest('hex');
-  const variant = (Number.parseInt(hex.charAt(16), 16) % 4) + 8;
-  return [
-    hex.slice(0, 8),
-    hex.slice(8, 12),
-    `5${hex.slice(13, 16)}`,
-    `${variant.toString(16)}${hex.slice(17, 20)}`,
-    hex.slice(20, 32),
-  ].join('-');
-}
 
 const requestedRefund = (row: RefundRow): RequestedRefund => ({
   refundId: row.id,
@@ -104,57 +95,61 @@ export async function requestRefund(
   input: RefundRequestInput,
 ): Promise<RequestRefundResult> {
   const request = RefundRequestSchema.parse(input);
-  const refundId = refundIdFor(refundRequestIdentity(request));
+  const refundId = refundIdFromDigest(
+    sha256Hex(refundRequestIdentity(request)),
+  );
 
-  if (!(await lockOrderById(tx, request.orderId))) {
-    return refused('order_not_found');
-  }
-  const [existing] = await tx
-    .select()
-    .from(refunds)
-    .where(eq(refunds.id, refundId));
-  if (existing) {
-    return repeatsRequest(existing, request)
-      ? { status: 'already_requested', refund: requestedRefund(existing) }
-      : refused('request_changed');
-  }
+  const locked = await lockOrderById(tx, request.orderId);
+  const [existing] = locked
+    ? await tx.select().from(refunds).where(eq(refunds.id, refundId))
+    : [];
+  const [order] = locked
+    ? await tx
+        .select({
+          status: orders.status,
+          hostId: orders.hostId,
+          ticketSubtotalMinor: orders.ticketSubtotalMinor,
+          taxMinor: orders.taxMinor,
+          totalMinor: orders.totalMinor,
+          amountDueMinor: orders.amountDueMinor,
+          commissionMinor: orders.commissionMinor,
+          commissionRateBps: orders.commissionRateBps,
+          refundedTicketMinor: orders.refundedTicketMinor,
+          refundedTaxMinor: orders.refundedTaxMinor,
+          commissionReturnedMinor: orders.commissionReturnedMinor,
+        })
+        .from(orders)
+        .where(eq(orders.id, request.orderId))
+    : [];
+  const attempts = locked
+    ? await tx
+        .select({
+          id: paymentAttempts.id,
+          status: paymentAttempts.status,
+          provider: paymentAttempts.provider,
+          providerPaymentId: paymentAttempts.providerPaymentId,
+        })
+        .from(paymentAttempts)
+        .where(eq(paymentAttempts.orderId, request.orderId))
+        .orderBy(asc(paymentAttempts.attemptNo))
+        .limit(attemptReadLimit)
+    : [];
 
-  const [order] = await tx
-    .select({
-      status: orders.status,
-      hostId: orders.hostId,
-      ticketSubtotalMinor: orders.ticketSubtotalMinor,
-      taxMinor: orders.taxMinor,
-      totalMinor: orders.totalMinor,
-      amountDueMinor: orders.amountDueMinor,
-      commissionMinor: orders.commissionMinor,
-      commissionRateBps: orders.commissionRateBps,
-      refundedTicketMinor: orders.refundedTicketMinor,
-      refundedTaxMinor: orders.refundedTaxMinor,
-      commissionReturnedMinor: orders.commissionReturnedMinor,
-    })
-    .from(orders)
-    .where(eq(orders.id, request.orderId));
+  const verdict = refundRequestVerdict({
+    request,
+    order: order ?? null,
+    existing: existing ?? null,
+    attempts,
+  });
+  if (verdict.kind === 'refused') {
+    return refused(verdict.reason, verdict.remainingTicketMinor);
+  }
+  if (verdict.kind === 'already_requested') {
+    if (!existing) throw new Error('The repeated refund disappeared');
+    return { status: 'already_requested', refund: requestedRefund(existing) };
+  }
   if (!order) throw new Error('The locked order disappeared');
-  const attempts = await tx
-    .select({
-      id: paymentAttempts.id,
-      status: paymentAttempts.status,
-      provider: paymentAttempts.provider,
-      providerPaymentId: paymentAttempts.providerPaymentId,
-    })
-    .from(paymentAttempts)
-    .where(eq(paymentAttempts.orderId, request.orderId))
-    .orderBy(asc(paymentAttempts.attemptNo))
-    .limit(paymentLimits.maxAttemptNo + 1);
-  const attempt = refundableAttempt(attempts);
-  if (!attempt) return refused('no_payment');
-
-  const plan = planRefund(order, request.ticketMinor);
-  if (plan.status === 'refused') {
-    return refused(plan.reason, plan.remainingTicketMinor);
-  }
-  const { split } = plan;
+  const { split, attempt } = verdict;
 
   const at = await readDatabaseTime(tx);
   const [row] = await tx
@@ -202,13 +197,7 @@ export async function requestRefund(
   return { status: 'requested', refund: requestedRefund(row) };
 }
 
-export type RefundToSend = {
-  refundId: string;
-  orderId: string;
-  providerKey: string;
-  amountMinor: number;
-  providerPaymentId: string;
-};
+type RefundSend = Extract<RefundToSend, { kind: 'send' }>;
 
 /**
  * What the refund job sends to the provider, read outside any transaction so the provider call holds
@@ -217,7 +206,7 @@ export type RefundToSend = {
  */
 export async function readRefundToSend(
   refundId: string,
-): Promise<RefundToSend | null> {
+): Promise<RefundSend | null> {
   const [row] = await db
     .select({
       refund: refunds,
@@ -227,18 +216,15 @@ export async function readRefundToSend(
     .leftJoin(paymentAttempts, eq(paymentAttempts.id, refunds.paymentAttemptId))
     .where(eq(refunds.id, refundId));
   if (!row) throw new Error('The refund to send does not exist');
-  const refund = RefundSchema.parse(row.refund);
-  if (refund.status !== 'pending') return null;
-  if (row.providerPaymentId === null) {
+  const toSend = refundToSend(
+    RefundSchema.parse(row.refund),
+    row.providerPaymentId,
+  );
+  if (toSend.kind === 'skip') return null;
+  if (toSend.kind === 'invalid') {
     throw new Error('The refund has no provider payment to go back to');
   }
-  return {
-    refundId: refund.id,
-    orderId: refund.orderId,
-    providerKey: refund.providerKey,
-    amountMinor: refund.amountMinor,
-    providerPaymentId: row.providerPaymentId,
-  };
+  return toSend;
 }
 
 /**
@@ -256,8 +242,9 @@ export async function recordProviderRefundId(
     .where(eq(refunds.id, refundId))
     .for('update');
   if (!row) throw new Error('The refund does not exist');
-  if (row.providerRefundId === providerRefundId) return;
-  if (row.providerRefundId !== null) {
+  const action = providerRefundIdAction(row.providerRefundId, providerRefundId);
+  if (action === 'keep') return;
+  if (action === 'conflict') {
     throw new Error('The refund already has a different provider id');
   }
   await tx
@@ -265,14 +252,6 @@ export async function recordProviderRefundId(
     .set({ providerRefundId })
     .where(eq(refunds.id, refundId));
 }
-
-export type RefundEventOutcome =
-  /** The refund moved, and its postings were written. */
-  | 'applied'
-  /** A repeat of what the refund already is. */
-  | 'noop'
-  | 'unmatched'
-  | 'conflict';
 
 type RefundEventRow = {
   type: RefundEventType;
@@ -287,23 +266,25 @@ type RefundEventRow = {
  * lock. Takes the order lock, then the refund's, and decides from the rows read after both. On
  * `refund.succeeded` the refund is `succeeded` and the cash leaves `platform_cash` under the provider's
  * refund id (rule 5). On `refund.failed` the refund is `failed`, the pending postings are reversed,
- * the order's refund totals give the parts back, and `orders.refund_failed` is set for ops. `unmatched`
- * and `conflict` write nothing.
+ * the order's refund totals give the parts back, and `orders.refund_failed` is set for ops. Returns the
+ * action `refundEventAction` chose; `unmatched` and `conflict` write nothing.
  */
 export async function applyRefundEvent(
   tx: Transaction,
   event: RefundEventRow,
-): Promise<RefundEventOutcome> {
+): Promise<RefundEventAction> {
   const { rambleOrderId: orderId, rambleRecordId: refundId } = event;
-  if (orderId === null || refundId === null) return 'unmatched';
-  if (!(await lockOrderById(tx, orderId))) return 'unmatched';
-  const [locked] = await tx
-    .select()
-    .from(refunds)
-    .where(eq(refunds.id, refundId))
-    .for('update');
-  if (!locked) return 'unmatched';
-  const refund = RefundSchema.parse(locked);
+  const orderRow =
+    orderId === null ? undefined : await lockOrderById(tx, orderId);
+  const [locked] =
+    orderRow && refundId !== null
+      ? await tx
+          .select()
+          .from(refunds)
+          .where(eq(refunds.id, refundId))
+          .for('update')
+      : [];
+  const refund = locked ? RefundSchema.parse(locked) : null;
 
   const facts: RefundEventFacts = {
     type: event.type,
@@ -313,10 +294,13 @@ export async function applyRefundEvent(
     recordId: refundId,
   };
   const action = refundEventAction(facts, refund);
-  if (action.kind === 'unmatched' || action.kind === 'conflict') {
-    return action.kind;
+  if (
+    !refund ||
+    orderId === null ||
+    (action.kind !== 'succeed' && action.kind !== 'fail')
+  ) {
+    return action;
   }
-  if (action.kind === 'noop') return 'noop';
 
   const [order] = await tx
     .select({
@@ -354,6 +338,7 @@ export async function applyRefundEvent(
       .set({
         status: 'succeeded',
         providerRefundId: event.objectId,
+        // Not `at`: that is whole milliseconds, which can read earlier than the refund's microsecond `created_at`.
         succeededAt: sql`clock_timestamp()`,
       })
       .where(eq(refunds.id, refund.id));
@@ -370,11 +355,10 @@ export async function applyRefundEvent(
         amountMinor: refund.amountMinor,
       }),
     );
-    // The provider's refund id was posted before while the refund was still pending: a half-posted event is a bug.
-    if (posted.status === 'already_posted') {
+    if (!refundCashPostIsFirst(posted.status)) {
       throw new Error('The refund cash was posted before the refund succeeded');
     }
-    return 'applied';
+    return action;
   }
 
   requireRefundTransition(refund.status, 'failed');
@@ -402,5 +386,5 @@ export async function applyRefundEvent(
       },
     }),
   );
-  return 'applied';
+  return action;
 }

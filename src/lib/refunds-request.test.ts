@@ -8,7 +8,6 @@ import {
   processRefundDedupeKey,
   refundRequestIdentity,
   refundsReconcile,
-  repeatsRequest,
   splitRefund,
   totalsAfterFailure,
   totalsAfterRequest,
@@ -426,19 +425,6 @@ describe('the refund request', () => {
       refundRequestIdentity(base),
     );
   });
-
-  it.each([
-    ['the same ticket part', 6_500, true],
-    ['`remaining`', 'remaining', true],
-    ['a different ticket part', 6_501, false],
-  ] as const)(
-    '%s repeats a refund of 6500: %s',
-    (_name, ticketMinor, expected) => {
-      expect(repeatsRequest({ ticketMinor: 6_500 }, { ticketMinor })).toBe(
-        expected,
-      );
-    },
-  );
 
   it('keys the job by the refund, in lower case, and parses its payload strictly', () => {
     expect(processRefundDedupeKey(id(9).toUpperCase())).toBe(

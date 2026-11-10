@@ -86,6 +86,11 @@ export function isDeferredEventType(type: ProviderEventType): boolean {
   return !isPaymentEventType(type);
 }
 
+/** An event with a processing time is finished: a repeat of its job does nothing. */
+export function isEventProcessed(event: { processedAt: Date | null }): boolean {
+  return event.processedAt !== null;
+}
+
 /** The ids an event is handled under: its own, or the ones the provider reported when it carried none. */
 export function eventIds(
   stored: { rambleOrderId: string | null; rambleRecordId: string | null },

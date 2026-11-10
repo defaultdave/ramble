@@ -1,7 +1,9 @@
 import 'server-only';
 import { z } from 'zod';
-import { isSimulatedPayment } from '@/lib/confirmOrder';
-import type { ProcessRefundPayloadSchema } from '@/lib/refunds';
+import {
+  handsOverProviderEvents,
+  type ProcessRefundPayloadSchema,
+} from '@/lib/refunds';
 import { providerEventRow } from '@/lib/providerEvents';
 import { readRefundToSend, recordProviderRefundId } from '@/server/db/refunds';
 import { recordProviderEvent } from '@/server/db/providerEvents';
@@ -25,7 +27,6 @@ const SentRefundSchema = z.strictObject({
  * came from this process's fake and is stored with the same row and job as a signed delivery, once:
  * a repeat of it writes nothing. A provider that delivers its own events needs none of this.
  */
-// TODO(U-046): the Stripe adapter delivers its own events; this stays for the fake only.
 async function deliverFakeRefundEvent(providerRefundId: string): Promise<void> {
   const event = await getFakePayments().lastEventFor(providerRefundId);
   if (!event) throw new Error('The fake provider emitted no refund event');
@@ -55,7 +56,8 @@ export async function prepareRefund(payload: {
     amountMinor: toSend.amountMinor,
     metadata: { orderId: toSend.orderId, recordId: toSend.refundId },
   });
-  if (isSimulatedPayment(port.provider)) await deliverFakeRefundEvent(sent.id);
+  if (handsOverProviderEvents(port.provider))
+    await deliverFakeRefundEvent(sent.id);
   return { refundId: toSend.refundId, providerRefundId: sent.id };
 }
 

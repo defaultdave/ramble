@@ -207,6 +207,26 @@ describe('requesting a refund', () => {
     },
   );
 
+  it('takes no more tax than the order has when earlier roundings used it: ticket 6, tax 3, in parts of 1', async () => {
+    const world = await seedPaidOrder({
+      money: { subtotal: 6, tax: 3, commission: 1 },
+    });
+    const taxes: number[] = [];
+    for (const key of ['a', 'b', 'c', 'd', 'e', 'f']) {
+      const result = await ask(world, { key, ticketMinor: 1 });
+      if (result.status !== 'requested') throw new Error('not requested');
+      taxes.push(result.refund.taxMinor);
+    }
+
+    expect(taxes).toEqual([1, 1, 1, 0, 0, 0]);
+    const order = await orderOf(world);
+    expect(order).toMatchObject({
+      refundedTicketMinor: 6,
+      refundedTaxMinor: 3,
+    });
+    expect(refundsReconcile(order, await refundsOf(world))).toBe(true);
+  });
+
   it.each([
     [
       'an order that does not exist',

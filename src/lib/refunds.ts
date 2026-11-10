@@ -1,7 +1,11 @@
 import { z } from 'zod';
 import { EntityIdSchema, WriteIdSchema } from './catalog';
 import { orderLimits, type OrderStatus } from './orders';
-import { ProviderIdSchema } from './payments';
+import {
+  ProviderIdSchema,
+  paymentLimits,
+  type PaymentProvider,
+} from './payments';
 import { commissionMinor } from './pricing';
 import { addRuleIssues, type RuleIssue } from './rules';
 import { canTransition, type TransitionTable } from './transitions';
@@ -225,16 +229,20 @@ export function refundRequestIdentity(
   return `refund-request:v1:${request.orderId}:${request.reason}:${request.key}`;
 }
 
-/** A repeat of a request names the same refund; it may not ask for a different amount of it. */
-export function repeatsRequest(
-  existing: { ticketMinor: number },
-  request: Pick<RefundRequest, 'ticketMinor'>,
-): boolean {
-  return (
-    request.ticketMinor === 'remaining' ||
-    request.ticketMinor === existing.ticketMinor
-  );
+/** A UUID (version 5 layout) made from the hex SHA-256 of a request's identity, so the same request is the same refund row. */
+export function refundIdFromDigest(hex: string): string {
+  const variant = (Number.parseInt(hex.charAt(16), 16) % 4) + 8;
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    `5${hex.slice(13, 16)}`,
+    `${variant.toString(16)}${hex.slice(17, 20)}`,
+    hex.slice(20, 32),
+  ].join('-');
 }
+
+/** How many attempts of one order a read takes: every attempt it can have, and one more to see a breach. */
+export const attemptReadLimit = paymentLimits.maxAttemptNo + 1;
 
 /** What an order has taken and given back, as the refund arithmetic needs it. */
 export type RefundableOrder = {
@@ -381,6 +389,60 @@ export function planRefund(
   return { status: 'planned', split };
 }
 
+export type RefundRequestVerdict<A> =
+  /** The request names a refund that exists and asks for the same amount of it. */
+  | { kind: 'already_requested' }
+  | {
+      kind: 'refused';
+      reason: RefundRequestRefusal;
+      /** What the order's ticket part still holds, or null when it is not known. */
+      remainingTicketMinor: number | null;
+    }
+  | {
+      kind: 'planned';
+      split: RefundSplit;
+      attempt: A & { providerPaymentId: string };
+    };
+
+/**
+ * Everything a request is judged on, in one order: no order is a refusal; a refund already made for
+ * the request's key is answered again, or refused when the request now asks for another ticket part;
+ * then the one succeeded payment, then the split. The data layer reads the rows under the order's lock
+ * and acts on the verdict.
+ */
+export function refundRequestVerdict<
+  A extends { status: string; providerPaymentId: string | null },
+>(input: {
+  request: Pick<RefundRequest, 'ticketMinor'>;
+  order: RefundableOrder | null;
+  existing: { ticketMinor: number } | null;
+  attempts: readonly A[];
+}): RefundRequestVerdict<A> {
+  const { request, order, existing, attempts } = input;
+  const refuse = (
+    reason: RefundRequestRefusal,
+    remainingTicketMinor: number | null = null,
+  ): RefundRequestVerdict<A> => ({
+    kind: 'refused',
+    reason,
+    remainingTicketMinor,
+  });
+  if (order === null) return refuse('order_not_found');
+  if (existing) {
+    const same =
+      request.ticketMinor === 'remaining' ||
+      request.ticketMinor === existing.ticketMinor;
+    return same ? { kind: 'already_requested' } : refuse('request_changed');
+  }
+  const attempt = refundableAttempt(attempts);
+  if (!attempt) return refuse('no_payment');
+  const plan = planRefund(order, request.ticketMinor);
+  if (plan.status === 'refused') {
+    return refuse(plan.reason, plan.remainingTicketMinor);
+  }
+  return { kind: 'planned', split: plan.split, attempt };
+}
+
 type RefundedTotals = Pick<
   RefundableOrder,
   'refundedTicketMinor' | 'refundedTaxMinor' | 'commissionReturnedMinor'
@@ -465,6 +527,65 @@ export function refundableAttempt<
   return { ...only, providerPaymentId: only.providerPaymentId };
 }
 
+export type RefundToSend =
+  | {
+      kind: 'send';
+      refundId: string;
+      orderId: string;
+      providerKey: string;
+      amountMinor: number;
+      providerPaymentId: string;
+    }
+  /** The provider already answered; nothing to send. */
+  | { kind: 'skip' }
+  /** A pending refund with no payment to go back to: data that cannot be right. */
+  | { kind: 'invalid' };
+
+/** Whether the job sends a refund to the provider: only a `pending` one, and only with the payment it goes back to. */
+export function refundToSend(
+  refund: Pick<
+    RefundRuleFields,
+    'id' | 'status' | 'providerKey' | 'amountMinor'
+  > & { orderId: string },
+  providerPaymentId: string | null,
+): RefundToSend {
+  if (refund.status !== 'pending') return { kind: 'skip' };
+  if (providerPaymentId === null) return { kind: 'invalid' };
+  return {
+    kind: 'send',
+    refundId: refund.id,
+    orderId: refund.orderId,
+    providerKey: refund.providerKey,
+    amountMinor: refund.amountMinor,
+    providerPaymentId,
+  };
+}
+
+/** What to do with the provider's id for a refund: it is kept once, and a different one is a conflict. */
+export function providerRefundIdAction(
+  kept: string | null,
+  incoming: string,
+): 'keep' | 'record' | 'conflict' {
+  if (kept === incoming) return 'keep';
+  return kept === null ? 'record' : 'conflict';
+}
+
+/**
+ * Ramble hands a provider's events to its own intake only for a provider with no webhook to deliver
+ * them, which is the fake.
+ */
+// TODO(U-046): the Stripe adapter delivers its own events; only the fake needs Ramble to hand them over.
+export function handsOverProviderEvents(provider: PaymentProvider): boolean {
+  return provider === 'fake';
+}
+
+/** The cash row of a refund is the first posting under the provider's id; finding it posted already is a bug. */
+export function refundCashPostIsFirst(
+  posted: 'posted' | 'already_posted',
+): boolean {
+  return posted === 'posted';
+}
+
 // -- The provider's answer ---------------------------------------------------------------------
 
 const refundEventTypes = ['refund.succeeded', 'refund.failed'] as const;
@@ -501,12 +622,15 @@ export type RefundEventAction =
  */
 export function refundEventAction(
   event: RefundEventFacts,
-  refund: Pick<
-    RefundRuleFields,
-    'id' | 'status' | 'amountMinor' | 'providerRefundId'
-  > & { orderId: string },
+  refund:
+    | (Pick<
+        RefundRuleFields,
+        'id' | 'status' | 'amountMinor' | 'providerRefundId'
+      > & { orderId: string })
+    | null,
 ): RefundEventAction {
   if (
+    refund === null ||
     event.recordId !== refund.id ||
     event.orderId === null ||
     event.orderId !== refund.orderId
@@ -528,4 +652,16 @@ export function refundEventAction(
   if (refund.status === target) return { kind: 'noop' };
   if (!canRefundTransition(refund.status, target)) return { kind: 'conflict' };
   return { kind: succeeds ? 'succeed' : 'fail' };
+}
+
+/**
+ * What the event job does once the event's action is known: an event that matches nothing, or
+ * contradicts the refund, is retried with backoff (and alerts); everything else is finished.
+ */
+export function refundEventRoute(
+  action: RefundEventAction,
+): 'retry' | 'finish' {
+  return action.kind === 'unmatched' || action.kind === 'conflict'
+    ? 'retry'
+    : 'finish';
 }

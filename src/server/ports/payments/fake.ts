@@ -134,6 +134,7 @@ type ConfirmedPayment = { payment: Payment; event: ProviderEvent };
 export type FakePaymentsAdapter = PaymentsPort & {
   /** Plays the guest's confirmation: the provider records the outcome and emits its event, which is handed back. */
   confirm(paymentId: string, input: ConfirmInput): Promise<ConfirmedPayment>;
+  // TODO(U-077): first caller, the way the ops refund-failed queue is demonstrated.
   /**
    * Decides how the refunds of one payment end from now on: `succeeded` (the default) or `failed`
    * with a failure code. A failed refund returns no money and emits `refund.failed`; a refund

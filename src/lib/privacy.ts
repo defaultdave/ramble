@@ -117,6 +117,69 @@ export const piiColumns: readonly PiiColumn[] = [
       'No anonymize step: a row is dead at expires_at (windows are at most one hour) and the purge removes it, so nothing outlives its window',
   },
   {
+    table: 'auth_users',
+    column: 'email',
+    kind: 'identifier',
+    data: 'The address a person signed in with, folded to lower case',
+    location: databaseLocation,
+    deletionPath:
+      'Not yet anonymized: the privacy-requests work (U-085) adds a step to anonymizeGuest that deletes the sign-in user and its sessions',
+  },
+  {
+    table: 'auth_users',
+    column: 'name',
+    kind: 'identifier',
+    data: 'A display name, empty unless a sign-in request supplied one',
+    location: databaseLocation,
+    deletionPath:
+      'Not yet anonymized: deleted with the sign-in user by the privacy-requests work (U-085)',
+  },
+  {
+    table: 'auth_verifications',
+    column: 'value',
+    kind: 'identifier',
+    data: 'The address a sign-in link was sent to, until the link is used or lapses (5 minutes)',
+    location: databaseLocation,
+    deletionPath:
+      'The row is deleted when the link is used. A link that is never used lapses but its row stays until a purge is built; the expiry job (a suggestion in the U-004a report) removes them',
+  },
+  {
+    table: 'auth_sessions',
+    column: 'user_id',
+    kind: 'link',
+    data: 'Which signed-in person a session belongs to',
+    location: databaseLocation,
+    deletionPath:
+      'Deleted with the sign-in user (cascade) by the privacy-requests work (U-085)',
+  },
+  {
+    table: 'auth_accounts',
+    column: 'user_id',
+    kind: 'link',
+    data: 'Which signed-in person an account belongs to',
+    location: databaseLocation,
+    deletionPath:
+      'Deleted with the sign-in user (cascade) by the privacy-requests work (U-085)',
+  },
+  {
+    table: 'auth_accounts',
+    column: 'account_id',
+    kind: 'link',
+    data: "The person's id at the sign-in method; for email links, none is written",
+    location: databaseLocation,
+    deletionPath:
+      'Deleted with the sign-in user (cascade) by the privacy-requests work (U-085)',
+  },
+  {
+    table: 'role_grants',
+    column: 'user_id',
+    kind: 'link',
+    data: 'Which signed-in person holds a role',
+    location: databaseLocation,
+    deletionPath:
+      'Deleted with the sign-in user (cascade); a role grant is access, not a record to keep (the audit log keeps who changed it)',
+  },
+  {
     table: 'jobs',
     column: 'payload',
     kind: 'identifier',
@@ -298,6 +361,8 @@ const notPersonal = (
 ) => columns.map((column) => ({ table, column, reason }));
 
 const aRandomId = 'A random uuid';
+const neverWritten =
+  'Always empty: Better Auth needs the column, and a CHECK refuses any value, so sign-in keeps no browser address, user agent, picture, or credential';
 const aFixedList = 'A fixed list of values';
 const aTime = 'A time';
 const aCountOrTime = 'A count or a time';
@@ -352,6 +417,49 @@ export const nonPiiColumns: readonly {
   ...notPersonal('support_requests', aRandomId, ['id']),
   ...notPersonal('support_requests', aFixedList, ['topic']),
   ...notPersonal('support_requests', aTime, ['created_at']),
+  ...notPersonal('auth_users', aRandomId, ['id']),
+  ...notPersonal('auth_users', 'A flag', ['email_verified']),
+  ...notPersonal('auth_users', aTime, ['created_at', 'updated_at']),
+  ...notPersonal('auth_users', neverWritten, ['image']),
+  ...notPersonal('auth_sessions', neverWritten, ['ip_address', 'user_agent']),
+  ...notPersonal('auth_accounts', neverWritten, [
+    'access_token',
+    'refresh_token',
+    'id_token',
+    'access_token_expires_at',
+    'refresh_token_expires_at',
+    'scope',
+    'password',
+  ]),
+  ...notPersonal('auth_sessions', aRandomId, ['id']),
+  ...notPersonal(
+    'auth_sessions',
+    'A random secret held in the cookie; it names no one without the user_id beside it',
+    ['token'],
+  ),
+  ...notPersonal('auth_sessions', aTime, [
+    'expires_at',
+    'created_at',
+    'updated_at',
+  ]),
+  ...notPersonal('auth_accounts', aRandomId, ['id']),
+  ...notPersonal('auth_accounts', aFixedList, ['provider_id']),
+  ...notPersonal('auth_accounts', aTime, ['created_at', 'updated_at']),
+  ...notPersonal('auth_verifications', aRandomId, ['id']),
+  ...notPersonal(
+    'auth_verifications',
+    'A keyed hash of a random token, with no address in it',
+    ['identifier'],
+  ),
+  ...notPersonal('auth_verifications', aTime, [
+    'expires_at',
+    'created_at',
+    'updated_at',
+  ]),
+  ...notPersonal('role_grants', aRandomId, ['id']),
+  ...notPersonal('role_grants', aFixedList, ['role']),
+  ...notPersonal('role_grants', structure, ['host_id']),
+  ...notPersonal('role_grants', aTime, ['created_at']),
   ...notPersonal('jobs', aRandomId, ['id']),
   ...notPersonal('jobs', 'The job type, from a registry in code', ['kind']),
   ...notPersonal('jobs', aFixedList, ['status']),

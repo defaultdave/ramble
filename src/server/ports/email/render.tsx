@@ -16,6 +16,7 @@ import { GuestConfirmation } from './templates/GuestConfirmation';
 import { HostBookingNotice } from './templates/HostBookingNotice';
 import { OpsNotice } from './templates/OpsNotice';
 import { PaidAfterLapse } from './templates/PaidAfterLapse';
+import { SignInLink } from './templates/SignInLink';
 
 type Markup = {
   [Name in EmailTemplateName]: (
@@ -42,6 +43,9 @@ const markup: Markup = {
     <PaidAfterLapse data={data} helpUrl={helpUrl} />
   ),
   'ops-notice': (data, helpUrl) => <OpsNotice data={data} helpUrl={helpUrl} />,
+  'sign-in-link': (data, helpUrl) => (
+    <SignInLink data={data} helpUrl={helpUrl} />
+  ),
 };
 
 // Generic so each template's markup receives exactly that template's data.

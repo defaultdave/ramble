@@ -9,10 +9,13 @@ import {
 } from '@/lib/filterBar';
 import {
   activeFilterCount,
+  ageChips,
   browseParamNames,
   guestChips,
   hrefForFilters,
   listChips,
+  priceChips,
+  settingChips,
   toQuery,
   toQueryEntries,
   withDate,
@@ -47,7 +50,7 @@ type ChipGroupsOptions = Pick<FilterBarProps, 'filters'> & {
   neighborhoods: readonly FilterOption[];
 };
 
-/** The drawer's three chip groups, which the no-script bar shows again in the page. */
+/** The drawer's chip groups, which the no-script bar shows again in the page. */
 function chipGroups({
   filters,
   categories,
@@ -60,6 +63,9 @@ function chipGroups({
       chips: listChips(filters, 'neighborhoods', neighborhoods),
     },
     { legend: 'Category', chips: listChips(filters, 'categories', categories) },
+    { legend: 'Price', chips: priceChips(filters) },
+    { legend: 'Age', chips: ageChips(filters) },
+    { legend: 'Indoor or outdoor', chips: settingChips(filters) },
   ];
 }
 

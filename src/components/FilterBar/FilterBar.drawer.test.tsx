@@ -140,7 +140,15 @@ describe('the drawer', () => {
     async (name) => {
       setup();
       const dialog = await openDrawer(name);
-      for (const group of ['When', 'Guests', 'Neighborhood', 'Category']) {
+      for (const group of [
+        'When',
+        'Guests',
+        'Neighborhood',
+        'Category',
+        'Price',
+        'Age',
+        'Indoor or outdoor',
+      ]) {
         expect(
           within(dialog).getByRole('group', { name: group }),
         ).toBeVisible();

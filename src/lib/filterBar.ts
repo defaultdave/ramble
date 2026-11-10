@@ -1,6 +1,9 @@
 import {
+  ageChips,
   guestChips,
   listChips,
+  priceChips,
+  settingChips,
   type BrowseFilters,
   type ChipView,
 } from './filters';
@@ -44,6 +47,9 @@ export function selectedChips(
       listChips(filters, 'neighborhoods', options.neighborhoods),
     ],
     ['guests', guestChips(filters)],
+    ['price', priceChips(filters)],
+    ['age', ageChips(filters)],
+    ['setting', settingChips(filters)],
   ] as const;
   return groups.flatMap(([group, chips]) =>
     chips

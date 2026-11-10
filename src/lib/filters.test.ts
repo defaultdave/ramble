@@ -49,6 +49,9 @@ describe('browseParamNames', () => {
       neighborhoods: 'neighborhood',
       date: 'date',
       guests: 'guests',
+      price: 'price',
+      age: 'age',
+      setting: 'setting',
       after: 'after',
     });
   });
@@ -74,6 +77,9 @@ describe('parseFilters', () => {
         neighborhoods: ['bushwick', 'dumbo'],
         date: '2026-11-07',
         guests: 4,
+        price: null,
+        age: null,
+        setting: null,
       },
       after: cursor,
     });
@@ -256,6 +262,9 @@ describe('toQuery', () => {
       neighborhoods: ['dumbo'],
       date: '2026-11-07',
       guests: 4,
+      price: null,
+      age: null,
+      setting: null,
     },
     after: cursor,
   };
@@ -357,6 +366,9 @@ describe('changing filters', () => {
       neighborhoods: ['dumbo'],
       date: '2026-11-07',
       guests: null,
+      price: null,
+      age: null,
+      setting: null,
     });
   });
 
@@ -423,6 +435,7 @@ describe('changing filters', () => {
     [
       'two values and a date',
       {
+        ...noFilters,
         categories: ['cooking'],
         neighborhoods: ['dumbo'],
         date: '2026-11-07',

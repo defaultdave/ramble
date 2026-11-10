@@ -132,15 +132,22 @@ export function omittedFor(filters: BrowseFilters): FilterParam[] {
 }
 
 /**
- * The filters to count for a removal, or null when browse would list nothing for them without
- * asking: a slug the catalog has not got, or a date no session can be on, as the page itself treats
- * them.
+ * The removals worth a count: each filter that is on and named, bar the chosen day, whose filters
+ * as they would be without it still match something. A removal that leaves a slug the catalog has
+ * not got, or a date no session can be on, brings back nothing and is left out, as the page itself
+ * treats those.
  */
-export function countableFilters(
-  without: BrowseFilters,
+export function readsFor(
+  filters: BrowseFilters,
   options: NamedOptions,
   window: SessionWindow,
-): BrowseFilters | null {
-  const known = knownFilters(without, options, window);
-  return known.matchesNothing || known.dateOutsideWindow ? null : known.filters;
+): { param: FilterParam; filters: BrowseFilters }[] {
+  return removals(filters, options, omittedFor(filters)).flatMap(
+    ({ param, filters: without }) => {
+      const known = knownFilters(without, options, window);
+      return known.matchesNothing || known.dateOutsideWindow
+        ? []
+        : [{ param, filters: known.filters }];
+    },
+  );
 }

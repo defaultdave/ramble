@@ -11,9 +11,8 @@ import { tags } from '@/lib/cacheTags';
 import { type BrowseFilters, type BrowseQuery } from '@/lib/filters';
 import { upcomingWindow } from '@/lib/sessionWindow';
 import {
-  countableFilters,
   omittedFor,
-  removals,
+  readsFor,
   suggestions,
   type FilterParam,
   type ZeroResultSuggestion,
@@ -86,21 +85,16 @@ async function readZeroResultSuggestions(
   const options = await getFilterOptions();
   const window = upcomingWindow(asOf, browseWindowDays);
   const counts: Partial<Record<FilterParam, number>> = {};
-  const omit = omittedFor(filters);
   await readOrRefuse('Zero results', () =>
     Promise.all(
-      removals(filters, options, omit).map(
+      readsFor(filters, options, window).map(
         async ({ param, filters: without }) => {
-          const countable = countableFilters(without, options, window);
-          counts[param] =
-            countable === null
-              ? 0
-              : await countBrowseExperiences(countable, asOf);
+          counts[param] = await countBrowseExperiences(without, asOf);
         },
       ),
     ),
   );
-  return suggestions(filters, options, counts, omit);
+  return suggestions(filters, options, counts, omittedFor(filters));
 }
 
 /**

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { browseParamNames, noFilters, type BrowseFilters } from './filters';
 import { upcomingWindow } from './sessionWindow';
 import {
-  countableFilters,
+  readsFor,
   omittedFor,
   removals,
   suggestions,
@@ -159,23 +159,41 @@ describe('omittedFor', () => {
   });
 });
 
-describe('countableFilters', () => {
+describe('readsFor', () => {
   const window = upcomingWindow('2026-10-26T12:00:00.000Z', 30);
 
-  it('is the filters as they are when the catalog knows them and the day is in the window', () => {
+  it('is a read for each filter that is on, without it, and none for the chosen day', () => {
     const filters = {
       ...noFilters,
       categories: ['kayaking'],
+      neighborhoods: ['dumbo'],
       date: '2026-10-30',
     };
 
-    expect(countableFilters(filters, options, window)).toEqual(filters);
+    expect(readsFor(filters, options, window)).toEqual([
+      { param: 'categories', filters: { ...filters, categories: [] } },
+      { param: 'neighborhoods', filters: { ...filters, neighborhoods: [] } },
+    ]);
   });
 
   it.each([
-    ['a slug the catalog has not got', { ...noFilters, categories: ['gone'] }],
-    ['a date outside the window', { ...noFilters, date: '2027-06-01' }],
-  ])('is null for %s, since browse would list nothing', (_, filters) => {
-    expect(countableFilters(filters, options, window)).toBeNull();
-  });
+    [
+      'a slug the catalog has not got',
+      { ...noFilters, categories: ['gone'], neighborhoods: ['dumbo'] },
+    ],
+    [
+      'a date outside the window',
+      { ...noFilters, date: '2027-06-01', neighborhoods: ['dumbo'] },
+    ],
+  ])(
+    'has none for a removal that still leaves %s, since browse would list nothing',
+    (_, filters) => {
+      expect(readsFor(filters, options, window)).not.toContainEqual(
+        expect.objectContaining({ param: 'categories' }),
+      );
+      expect(
+        readsFor({ ...filters }, options, window).map(({ param }) => param),
+      ).not.toContain('date');
+    },
+  );
 });

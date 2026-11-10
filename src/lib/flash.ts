@@ -15,9 +15,21 @@ export type FlashReading =
   | { ok: true; flash: FlashMessage }
   | { ok: false; reason: 'missing' | 'too-long' | 'not-json' | 'wrong-shape' };
 
-/** TODO(U-073): first caller. The Server Action that sets the flash cookie writes this value. */
-export function serializeFlash({ tone, message }: FlashMessage): string {
-  return JSON.stringify({ tone, message: message.slice(0, FLASH_MAX_LENGTH) });
+export type FlashWriting =
+  { ok: true; value: string } | { ok: false; reason: 'invalid' | 'too-long' };
+
+/**
+ * TODO(U-073): first caller. The cookie value for a flash, which the Server Action that sets the
+ * cookie writes. A flash `readFlash` would refuse is refused here, never cut down to fit.
+ */
+export function serializeFlash(flash: FlashMessage): FlashWriting {
+  const checked = flashSchema.safeParse(flash);
+  if (!checked.success) return { ok: false, reason: 'invalid' };
+  const value = JSON.stringify(checked.data);
+  if (value.length > FLASH_RAW_MAX_LENGTH) {
+    return { ok: false, reason: 'too-long' };
+  }
+  return { ok: true, value };
 }
 
 function parseJson(raw: string): { ok: true; value: unknown } | { ok: false } {

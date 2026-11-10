@@ -4,6 +4,7 @@ import {
   ConfirmDestructive,
   type ConfirmDestructiveProps,
 } from '@/components/ConfirmDestructive';
+import styles from './ConfirmDestructive.stories.module.css';
 
 const settles: ConfirmDestructiveProps['action'] = () => undefined;
 
@@ -26,7 +27,7 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <div style={{ padding: 'var(--space-4)' }}>
+      <div className={styles.frame}>
         <Story />
       </div>
     ),

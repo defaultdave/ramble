@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { StatusFilterBar } from '@/components/StatusBadge';
+import styles from './StatusFilterBar.stories.module.css';
 
 const meta = {
   title: 'Ops/StatusFilterBar',
@@ -25,7 +26,7 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <div style={{ padding: 'var(--space-4)' }}>
+      <div className={styles.frame}>
         <Story />
       </div>
     ),

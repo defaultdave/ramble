@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { SearchField } from '@/components/SearchField';
+import styles from './SearchField.stories.module.css';
 
 const meta = {
   title: 'Ops/SearchField',
@@ -21,7 +22,7 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <div style={{ padding: 'var(--space-4)' }}>
+      <div className={styles.frame}>
         <Story />
       </div>
     ),

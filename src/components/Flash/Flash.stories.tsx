@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Flash } from '@/components/Flash';
+import styles from './Flash.stories.module.css';
 
 const meta = {
   title: 'Ops/Flash',
@@ -7,7 +8,7 @@ const meta = {
   args: { flash: { tone: 'success', message: 'Order refunded.' } },
   decorators: [
     (Story) => (
-      <div style={{ padding: 'var(--space-4)' }}>
+      <div className={styles.frame}>
         <Story />
       </div>
     ),

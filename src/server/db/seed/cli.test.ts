@@ -10,6 +10,7 @@ import { seedCaller } from './caller';
 // - a refusal (production, no declared target, a remote host declared local) prints why, exits 1, and
 //   never runs the seed, reads the database, or opens a connection
 // - production-demo seeds the curated set against production and refuses --scale before anything runs
+// - the personas are seeded on every target but production-demo, which gets none
 // - a good run seeds with the clock and scale it was given, checks coverage, prints the result, exits 0
 // - a coverage gap exits 1 and names the probe; a scale run holds the scale probe to account
 // - after the coverage matrix the photo step opens the store, writes the photos, and checks the cover and
@@ -22,12 +23,14 @@ import { seedCaller } from './caller';
 const end = vi.fn(() => Promise.resolve());
 const runSeed = vi.fn();
 const readSeedSnapshot = vi.fn();
+const seedPersonas = vi.fn();
 const seedTestPhotos = vi.fn();
 const readPhotoCoverageGaps = vi.fn();
 const openStorage = vi.fn();
 
 vi.mock('@/server/db/client', () => ({ db: { $client: { end } } }));
 vi.mock('./run', () => ({ runSeed }));
+vi.mock('./personas', () => ({ seedPersonas }));
 vi.mock('./read', () => ({ readSeedSnapshot }));
 vi.mock('./photos', () => ({ seedTestPhotos, readPhotoCoverageGaps }));
 
@@ -61,6 +64,7 @@ beforeEach(() => {
   openStorage.mockReset().mockReturnValue({ provider: 'vercel-blob' });
   seedTestPhotos.mockReset().mockResolvedValue({ created: 2, alreadyThere: 1 });
   readPhotoCoverageGaps.mockReset().mockResolvedValue([]);
+  seedPersonas.mockReset().mockResolvedValue(7);
   readSeedSnapshot
     .mockReset()
     .mockResolvedValue(snapshotFromFixtures(curated, undefined, now));
@@ -132,6 +136,12 @@ describe('runSeedCommand', () => {
       );
     });
 
+    it('leaves the personas out', async () => {
+      expect(await run({ target: demo() })).toBe(0);
+      expect(seedPersonas).not.toHaveBeenCalled();
+      expect(lines.join('\n')).not.toContain('Personas');
+    });
+
     it('refuses --scale before touching anything', async () => {
       expect(await run({ target: demo(), argv: ['--scale=5'] })).toBe(1);
       const output = lines.join('\n');
@@ -153,6 +163,29 @@ describe('runSeedCommand', () => {
     expect(lines.join('\n')).toContain('no gaps');
     expect(end).toHaveBeenCalledTimes(1);
   });
+
+  it.each(['local', 'staging', 'load-test'] as const)(
+    'seeds the personas on %s, as ops, before the coverage check',
+    async (seedTarget) => {
+      const target =
+        seedTarget === 'local'
+          ? {
+              ...command().target,
+              seedTarget,
+              databaseUrl: 'postgres://u:secret@localhost:5432/ramble',
+              seedHost: undefined,
+            }
+          : { ...command().target, seedTarget };
+      expect(
+        await run({ target, storage: { provider: 'fake', open: openStorage } }),
+      ).toBe(0);
+      expect(seedPersonas).toHaveBeenCalledWith(seedCaller);
+      expect(seedPersonas.mock.invocationCallOrder[0]).toBeLessThan(
+        readSeedSnapshot.mock.invocationCallOrder[0] ?? 0,
+      );
+      expect(lines.join('\n')).toContain('Personas: 7');
+    },
+  );
 
   describe('photos', () => {
     it('writes them after the matrix and reports the count and the coverage', async () => {

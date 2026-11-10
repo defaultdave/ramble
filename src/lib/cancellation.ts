@@ -1,5 +1,5 @@
 import { MAX_FULL_REFUND_HOURS, type CancellationTier } from './catalog';
-import { requireIntegerInRange } from './integers';
+import { isSafeIntegerInRange, requireIntegerInRange } from './integers';
 import { PPM } from './pricing';
 import { isKnownTimeZone, TimeZoneSchema } from './sessions';
 import { msPerHour } from './time';
@@ -104,5 +104,48 @@ export function cancellationWindow(
     freeCancelUntilLocal: localDeadline(freeCancelUntil, timeZone),
     isFree,
     refundPpm: isFree ? PPM : 0,
+  };
+}
+
+/** A count of hours in words: "1 hour", "24 hours". */
+export function hoursLabel(hours: number): string {
+  return `${String(hours)} ${hours === 1 ? 'hour' : 'hours'}`;
+}
+
+/**
+ * How long before the start a guest can still cancel, in the tier's own words: whole days from two
+ * up, hours otherwise ("24 hours" stays hours, as the design shows it).
+ */
+function windowLabel(hours: number): string {
+  const day = 24;
+  return hours >= 2 * day && hours % day === 0
+    ? `${String(hours / day)} days`
+    : hoursLabel(hours);
+}
+
+/**
+ * What the page says about cancelling, from the experience's tier (PRD-10, PRD-46). It is stated
+ * before any date is chosen, so it names the window; the deadline for one session comes from
+ * `cancellationWindow` when a session is picked. A tier outside 0 to a year is refused, as there.
+ */
+export function cancellationTerms(
+  tier: Pick<CancellationTier, 'fullRefundHoursBefore'>,
+): { fact: string; detail: string } {
+  const hours = tier.fullRefundHoursBefore;
+  if (!isSafeIntegerInRange(hours, 0, MAX_FULL_REFUND_HOURS)) {
+    throw new RangeError('The cancellation window is out of range');
+  }
+  const refunded =
+    'If the host or the weather cancels, you get everything back.';
+  if (hours === 0) {
+    return {
+      fact: 'Free cancellation until it starts',
+      detail: `Free cancellation until the experience starts. ${refunded}`,
+    };
+  }
+  const window = windowLabel(hours);
+  return {
+    fact: `Free cancellation up to ${window} before`,
+    detail: `Free cancellation up to ${window} before start. After that, no refund. ${refunded}`,
   };
 }

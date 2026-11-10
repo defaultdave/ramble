@@ -116,6 +116,16 @@ export const guidePaths = {
 } as const;
 
 /**
+ * The host page reads the host from the database, which the e2e server does not have. A path that
+ * is not a slug is a not-found (`sample` is a slug, so it would read), and a well-formed one shows
+ * the error state.
+ */
+export const hostPaths = {
+  notFound: '/hosts/not_a_host',
+  readFails: '/hosts/harbor-kayak-co',
+} as const;
+
+/**
  * The category and neighborhood pages read their names from the database, which the e2e server does
  * not have: an address that is not a slug is a not-found, and a well-formed one shows the error state.
  */

@@ -151,7 +151,11 @@ export function ExperiencePage({ view, dates, booking }: ExperiencePageProps) {
               {view.host.initial}
             </span>
             <div className={styles.hostText}>
-              <p className={styles.hostName}>{view.host.name}</p>
+              <p className={styles.hostName}>
+                <Link href={view.host.href} className={styles.hostLink}>
+                  {view.host.name}
+                </Link>
+              </p>
               {view.host.description ? (
                 <p className={styles.hostAbout}>{view.host.description}</p>
               ) : null}

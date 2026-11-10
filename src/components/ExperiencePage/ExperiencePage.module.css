@@ -215,6 +215,26 @@
   overflow-wrap: anywhere;
 }
 
+.hostLink {
+  display: inline-flex;
+  min-height: var(--size-touch-target);
+  align-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-link);
+  text-decoration: none;
+}
+
+.hostLink:hover {
+  text-decoration: underline;
+}
+
+.hostLink:focus-visible {
+  outline: 2px solid transparent;
+  box-shadow:
+    0 0 0 2px var(--color-bg-canvas),
+    0 0 0 4px var(--color-focus-ring);
+}
+
 .hostAbout {
   margin: 0;
   font-size: var(--font-size-body-s);

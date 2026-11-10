@@ -25,6 +25,9 @@ export function guidePath({ slug, id }: ExperienceAddress): string {
   return `/guide/${slug}-${id}`;
 }
 
+/** The host's profile page; the slug is unique, so it is the whole address. */
+export const hostPath = (slug: string) => `/hosts/${slug}`;
+
 /** A card links to the experience page, or to the guide entry when the experience is guide only. */
 export function experienceCardPath(
   experience: ExperienceAddress & { status: string },

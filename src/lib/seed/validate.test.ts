@@ -243,6 +243,42 @@ describe('fixtureIssues', () => {
       'Only a picks or gift_guide module points at a collection',
     ],
     [
+      'a help article the schema refuses',
+      {
+        ...curated,
+        helpArticles: [
+          ...curated.helpArticles,
+          {
+            ...(curated
+              .helpArticles[0] as CuratedFixtures['helpArticles'][number]),
+            slug: 'Bad Slug',
+          },
+        ],
+      },
+      'help article Bad Slug',
+    ],
+    [
+      'a help article slug used twice',
+      {
+        ...curated,
+        helpArticles: [
+          ...curated.helpArticles,
+          ...curated.helpArticles.slice(0, 1),
+        ],
+      },
+      'help article "is-my-session-still-on" appears twice',
+    ],
+    [
+      'a banned word in a help article',
+      {
+        ...curated,
+        helpArticles: curated.helpArticles.map((article, index) =>
+          index === 0 ? { ...article, summary: 'A seamless answer.' } : article,
+        ),
+      },
+      'help article is-my-session-still-on uses "seamless"',
+    ],
+    [
       'page copy for a category that does not exist',
       {
         ...curated,

@@ -7,6 +7,7 @@ import {
   collectionInput,
   experienceId,
   experienceRow,
+  helpArticleInput,
   homeModulesInput,
   hostId,
   hostNotificationEmail,
@@ -191,6 +192,24 @@ describe('collectionInput', () => {
         { id: 'stored', slug: pick.slug, kind: 'gift_guide' },
       ]),
     ).toThrow('already exists as another kind');
+  });
+});
+
+describe('helpArticleInput', () => {
+  const article = curated
+    .helpArticles[0] as (typeof curated.helpArticles)[number];
+
+  it('creates an article with no id when the slug is not stored', () => {
+    expect(helpArticleInput(article, [])).not.toHaveProperty('id');
+  });
+
+  it('replaces the stored article of the same slug', () => {
+    expect(
+      helpArticleInput(article, [
+        { id: 'other', slug: 'another-slug' },
+        { id: 'stored', slug: article.slug },
+      ]).id,
+    ).toBe('stored');
   });
 });
 

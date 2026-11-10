@@ -187,8 +187,15 @@
     {
       "idx": 26,
       "version": "7",
-      "when": 1794326131985,
-      "tag": "0026_experiences_search_vector",
+      "when": 1794325848460,
+      "tag": "0026_auth_and_role_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1794327829270,
+      "tag": "0027_experiences_search_vector",
       "breakpoints": true
     }
   ]

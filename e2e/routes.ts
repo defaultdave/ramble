@@ -23,7 +23,7 @@ export const routes: readonly RouteRow[] = [
   },
   { path: '/gifts', group: 'guest', heading: 'Gift guide', noindex: false },
   { path: '/help', group: 'guest', heading: 'Help', noindex: false },
-  { path: '/legal/sample', group: 'guest', heading: 'Legal', noindex: false },
+  { path: '/legal/terms', group: 'guest', heading: 'Legal', noindex: false },
   {
     path: '/accessibility',
     group: 'guest',

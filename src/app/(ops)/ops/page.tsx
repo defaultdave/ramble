@@ -1,13 +1,15 @@
 import type { Metadata } from 'next';
-import { RoutePlaceholder } from '@/components/RoutePlaceholder';
+import { OpsAccessDenied, OpsLanding } from '@/components/OpsShell';
+import { holdsOpsRole, opsLandingLinks } from '@/lib/opsNav';
+import { readOpsCaller } from '@/server/opsCaller';
+import { recordOpsAccess } from '@/server/db/audit';
 
 export const metadata: Metadata = { title: 'Operations' };
 
-export default function OperationsPage() {
-  return (
-    <RoutePlaceholder
-      name="Operations"
-      covers="PRD-39, PRD-40, PRD-50 to PRD-59"
-    />
-  );
+export default async function OperationsPage() {
+  const caller = await readOpsCaller();
+  if (!holdsOpsRole(caller.roles)) return <OpsAccessDenied next="/ops" />;
+
+  await recordOpsAccess(caller);
+  return <OpsLanding areas={opsLandingLinks()} />;
 }

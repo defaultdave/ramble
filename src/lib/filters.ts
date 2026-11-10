@@ -52,17 +52,17 @@ export type PriceBand = keyof typeof priceBands;
 /** An experience is for kids when its minimum age is no higher than this, or it has none. */
 export const kidsMinAgeCeiling = 12;
 
-export const ageChoices = {
+const ageChoices = {
   kids: 'Kids welcome',
   'twenty-one-plus': '21 and over',
 } as const;
-export type AgeChoice = keyof typeof ageChoices;
+type AgeChoice = keyof typeof ageChoices;
 
-export const settingChoices = {
+const settingChoices = {
   indoor: 'Indoor',
   outdoor: 'Outdoor',
 } as const;
-export type SettingChoice = keyof typeof settingChoices;
+type SettingChoice = keyof typeof settingChoices;
 
 // The keys are the values a parameter may take, so a value no one offers is dropped like any malformed one.
 function choiceSchema<T extends string>(choices: Record<T, unknown>) {

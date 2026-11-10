@@ -7,6 +7,7 @@ import {
   paymentAttempts,
   sessions,
 } from '@/server/db/schema';
+import { insertGift } from './giftFixtures';
 import { insertHold, insertSession } from './holdFixtures';
 import type { createOrderParents } from './orderParents';
 
@@ -98,6 +99,8 @@ export async function seedBooking(
         }),
   });
   const kind = seed.orderKind ?? 'booking';
+  const redeemedGift =
+    kind === 'zero_due' ? await insertGift(db, parents) : null;
   const [order] = await db
     .insert(orders)
     .values({
@@ -121,7 +124,7 @@ export async function seedBooking(
       totalMinor: money.total,
       ...(kind === 'zero_due'
         ? {
-            giftId: randomUUID(),
+            giftId: redeemedGift?.id ?? null,
             giftAppliedMinor: money.total,
             amountDueMinor: 0,
           }

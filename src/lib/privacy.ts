@@ -197,6 +197,36 @@ export const piiColumns: readonly PiiColumn[] = [
       'Not yet anonymized: the privacy-requests work (U-085) adds an orders step to anonymizeGuest that clears it and keeps the booking and tax record',
   })),
   {
+    table: 'gifts',
+    column: 'buyer_guest_id',
+    kind: 'link',
+    data: 'Which guest bought a gift',
+    location: databaseLocation,
+    deletionPath:
+      'The row stays as the gift and payment record (PRD-73); the guest it points at is anonymized',
+  },
+  ...(
+    [
+      [
+        'recipient_name',
+        'The name of the person a gift is for, as the buyer typed it',
+      ],
+      [
+        'recipient_email',
+        'The address a gift is sent to, as the buyer typed it',
+      ],
+      ['message', "The buyer's note to the recipient, which can name people"],
+    ] as const
+  ).map(([column, data]): PiiColumn => ({
+    table: 'gifts',
+    column,
+    kind: 'identifier',
+    data,
+    location: databaseLocation,
+    deletionPath:
+      'Not yet anonymized: the privacy-requests work (U-085) adds a gifts step that clears it once the gift is redeemed or out of date, and keeps the gift and payment record. The recipient is not a guest, so U-085 also decides how a request from a recipient reaches it',
+  })),
+  {
     table: 'provider_events',
     column: 'payload',
     kind: 'identifier',
@@ -576,6 +606,37 @@ export const nonPiiColumns: readonly {
     'line_total_minor',
   ]),
   ...notPersonal('order_items', publishedCopy, ['label']),
+  ...notPersonal('gifts', aRandomId, ['id']),
+  ...notPersonal('gifts', aFixedList, ['status']),
+  ...notPersonal('gifts', structure, [
+    'purchase_order_id',
+    'experience_id',
+    'redeemed_order_id',
+    'token_version',
+  ]),
+  ...notPersonal('gifts', 'An amount of money in minor units', ['value_minor']),
+  ...notPersonal(
+    'gifts',
+    'A one-way hash of a capability token, which is a credential and says nothing about a person',
+    ['token_hash'],
+  ),
+  ...notPersonal('gifts', aTime, [
+    'send_at',
+    'sent_at',
+    'valid_until',
+    'created_at',
+    'redeemed_at',
+  ]),
+  ...notPersonal('gift_items', structure, [
+    'gift_id',
+    'price_option_id',
+    'quantity',
+    'unit_price_minor',
+    'tax_rate_ppm',
+    'uses_space',
+    'line_total_minor',
+  ]),
+  ...notPersonal('gift_items', publishedCopy, ['label']),
   ...notPersonal('payment_attempts', aRandomId, ['id']),
   ...notPersonal('payment_attempts', structure, [
     'order_id',

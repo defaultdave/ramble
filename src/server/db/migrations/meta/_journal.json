@@ -176,6 +176,13 @@
       "when": 1793771382912,
       "tag": "0024_sessions_scheduled_starts_at_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794324346699,
+      "tag": "0025_gifts",
+      "breakpoints": true
     }
   ]
 }

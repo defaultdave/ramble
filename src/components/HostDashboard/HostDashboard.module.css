@@ -75,8 +75,50 @@
 
 .fill {
   display: block;
+  inline-size: 0;
   block-size: 100%;
   background: var(--color-action-primary-bg);
+}
+
+/* The bar moves in tenths, rounded down, so it fills only when the session does. */
+.fill[data-fill='1'] {
+  inline-size: 10%;
+}
+
+.fill[data-fill='2'] {
+  inline-size: 20%;
+}
+
+.fill[data-fill='3'] {
+  inline-size: 30%;
+}
+
+.fill[data-fill='4'] {
+  inline-size: 40%;
+}
+
+.fill[data-fill='5'] {
+  inline-size: 50%;
+}
+
+.fill[data-fill='6'] {
+  inline-size: 60%;
+}
+
+.fill[data-fill='7'] {
+  inline-size: 70%;
+}
+
+.fill[data-fill='8'] {
+  inline-size: 80%;
+}
+
+.fill[data-fill='9'] {
+  inline-size: 90%;
+}
+
+.fill[data-fill='10'] {
+  inline-size: 100%;
 }
 
 .empty {

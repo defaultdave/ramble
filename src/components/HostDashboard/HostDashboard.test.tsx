@@ -32,6 +32,15 @@ describe('HostDashboard', () => {
     expect(rows[0]).toHaveTextContent('Sat, Nov 14 · 4:00 PM EST');
     expect(rows[0]).toHaveTextContent('5 of 12 seats sold');
     expect(rows[2]).toHaveTextContent('8 of 8 seats sold');
+    // The bar steps in tenths, rounded down: 5 of 12 is 41 percent, a full session is the last step.
+    expect(rows[0]?.querySelector('[data-fill]')).toHaveAttribute(
+      'data-fill',
+      '4',
+    );
+    expect(rows[2]?.querySelector('[data-fill]')).toHaveAttribute(
+      'data-fill',
+      '10',
+    );
   });
 
   it('lists recent bookings with guest, seats, total, status, and reference', () => {

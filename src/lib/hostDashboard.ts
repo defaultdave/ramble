@@ -84,10 +84,10 @@ const bookingStatusLabels = {
 const whenLabel = (instant: Date, timeZone: string) =>
   `${zonedShortDayLabel(instant, timeZone)} · ${zonedTimeLabel(instant, timeZone)}`;
 
-/** How much of the allocation is sold, as a whole percent held between 0 and 100. An allocation of 0 reads as full. */
+/** How much of the allocation is sold, as a whole percent. 100 means full: a session one seat short never reads as full, and an allocation of 0 is full. */
 export function soldPercent(seatsSold: number, allocation: number): number {
-  if (allocation <= 0) return 100;
-  return Math.min(100, Math.round((seatsSold / allocation) * 100));
+  if (allocation <= 0 || seatsSold >= allocation) return 100;
+  return Math.min(99, Math.floor((seatsSold / allocation) * 100));
 }
 
 function sessionRow(session: HostDashboardSession): HostSessionRowView {

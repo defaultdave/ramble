@@ -7,6 +7,7 @@ import {
   type Caller,
 } from '@/server/auth/caller';
 import { testCaller } from '@/server/auth/test-caller';
+import { priceOptions } from '@/server/db/schema';
 import { insertSession } from './holdFixtures';
 import { createOrderParents } from './orderParents';
 import {
@@ -26,6 +27,8 @@ import {
 // - bookings are confirmed and cancelled orders of kind booking, latest first, with seats counted from the lines that use a space
 // - a host that does not exist reads as null for its owner grant
 // - an id that is no uuid is refused before the database is asked
+// - a line that takes no space is not counted as a seat
+// - the bookings stop at the limit and the newest comes first
 
 let reads: typeof import('@/server/db/hostDashboard');
 const other = { ...parents };
@@ -82,6 +85,25 @@ describe('readHostDashboard', () => {
       lead_guest_name: 'Ada Lovelace',
       total_minor: 18509,
     });
+    // A line that takes no space (a child who sits on a lap) is not a seat.
+    const [lap] = await client.db
+      .insert(priceOptions)
+      .values({
+        experienceId: parents.experienceId,
+        kind: 'child',
+        priceMinor: 0,
+        usesSpace: false,
+      })
+      .returning();
+    await insert('order_items', {
+      order_id: orderId,
+      price_option_id: lap?.id,
+      label: 'Child on lap',
+      quantity: 3,
+      unit_price_minor: 0,
+      uses_space: false,
+      line_total_minor: 0,
+    });
 
     const data = await reads.readHostDashboard(
       owner(parents.hostId),
@@ -97,7 +119,7 @@ describe('readHostDashboard', () => {
     });
     expect(data?.bookings.find((b) => b.id === orderId)).toMatchObject({
       leadGuestName: 'Ada Lovelace',
-      seats: 2,
+      seats: 2, // the two adults; the three lap lines are not seats
       totalMinor: 18509,
       status: 'confirmed',
     });
@@ -141,6 +163,10 @@ describe('readHostDashboard', () => {
   });
 
   it('lists scheduled sessions from now, soonest first, and leaves out past and cancelled ones', async () => {
+    const soonest = await insertSession(client.db, parents.experienceId, {
+      startsAt: new Date(now.getTime() + hour / 2),
+      endsAt: new Date(now.getTime() + hour),
+    });
     const past = await insertSession(client.db, parents.experienceId, {
       startsAt: new Date(now.getTime() - hour),
       endsAt: new Date(now.getTime() + hour),
@@ -160,6 +186,7 @@ describe('readHostDashboard', () => {
     const ids = data?.sessions.map((s) => s.id) ?? [];
     const starts = data?.sessions.map((s) => s.startsAt.getTime()) ?? [];
 
+    expect(ids[0]).toBe(soonest.id);
     expect(ids).not.toContain(past.id);
     expect(ids).not.toContain(cancelled.id);
     expect(starts).toEqual([...starts].sort((a, b) => a - b));
@@ -217,5 +244,34 @@ describe('readHostDashboard', () => {
     await expect(
       reads.readHostDashboard(owner('x'), 'x', now),
     ).rejects.toThrow();
+  });
+
+  it('keeps the bookings within the limit and puts the newest first', async () => {
+    // Run last: these are newer than every booking made above, so they fill the limit.
+    const made: string[] = [];
+    for (
+      let minute = 0;
+      minute < hostDashboardLimits.bookings + 2;
+      minute += 1
+    ) {
+      const at = `2026-11-05T10:${String(minute).padStart(2, '0')}:00Z`;
+      made.push(
+        await confirmedBooking(parents, {
+          created_at: at,
+          confirmed_at: at,
+        }),
+      );
+    }
+
+    const data = await reads.readHostDashboard(
+      owner(parents.hostId),
+      parents.hostId,
+      now,
+    );
+
+    expect(data?.bookings).toHaveLength(hostDashboardLimits.bookings);
+    expect(data?.bookings.map((b) => b.id)).toEqual(
+      made.slice(-hostDashboardLimits.bookings).reverse(),
+    );
   });
 });

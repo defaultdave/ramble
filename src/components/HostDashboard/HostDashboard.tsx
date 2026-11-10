@@ -26,7 +26,7 @@ function SessionRow({ row }: { row: HostSessionRowView }) {
       <span className={styles.track} aria-hidden="true">
         <span
           className={styles.fill}
-          style={{ inlineSize: `${String(row.soldPercent)}%` }}
+          data-fill={String(Math.floor(row.soldPercent / 10))}
         />
       </span>
     </li>

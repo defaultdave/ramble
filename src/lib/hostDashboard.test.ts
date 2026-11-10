@@ -10,7 +10,7 @@ import {
 // Behaviours under test, one per decision, branch or risk:
 // - a session row says how many seats are sold against the allocation, on the session's own clock
 // - the session's status follows the seats left (open, few left, sold out)
-// - the percent sold is rounded, held to 100, and reads an allocation of 0 as full
+// - the percent sold is floored and reads 100 only when the session is full (or has no allocation)
 // - a booking row shows the guest, the experience, the session time, the seats, the total, and the status in words
 // - one seat is singular, and a cancelled booking says so
 // - neither list is longer than its limit, whatever is handed over
@@ -116,6 +116,8 @@ describe('soldPercent', () => {
   it.each([
     [0, 10, 0],
     [1, 3, 33],
+    [2, 3, 66],
+    [999, 1000, 99],
     [10, 10, 100],
     [12, 10, 100],
     [0, 0, 100],

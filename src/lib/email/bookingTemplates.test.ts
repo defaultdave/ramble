@@ -5,6 +5,7 @@ import {
   guestConfirmationData,
   hostBookingNoticeData,
   paidAfterLapseData,
+  sessionReminderData,
 } from '../bookingEmails';
 import {
   appUrl,
@@ -57,6 +58,10 @@ const cancellation = {
 const requests = [
   ['guest-confirmation', confirmation],
   ['host-booking-notice', hostBookingNoticeData(orderA)],
+  [
+    'session-reminder',
+    sessionReminderData(orderA, { appUrl, manageToken: fakeManageToken }),
+  ],
   [
     'booking-cancellation',
     bookingCancellationData({
@@ -114,6 +119,23 @@ describe('booking template requests', () => {
     ).toThrow();
   });
 
+  it.each([
+    ['a manage link that is not http(s)', { manageUrl: 'javascript:alert(1)' }],
+    ['a reference that is not an order reference', { reference: 'ABC' }],
+    ['a host name over 120 characters', { hostName: 'x'.repeat(121) }],
+    ['no party', { partyLabel: '' }],
+  ])('session-reminder refuses %s', (_label, override) => {
+    expect(() =>
+      request('session-reminder', {
+        ...sessionReminderData(orderA, {
+          appUrl,
+          manageToken: fakeManageToken,
+        }),
+        ...override,
+      }),
+    ).toThrow();
+  });
+
   it('refuses a cancellation for a reader who is neither the guest nor the host', () => {
     expect(() =>
       request('booking-cancellation', {
@@ -140,7 +162,12 @@ describe('subjects', () => {
       hostBookingNoticeData(orderA),
       'New booking: Sunset sail on the Hudson, Saturday, November 7, 2026',
     ],
-    ['booking-refund', requests[3][1], 'Refund issued: $170.00'],
+    [
+      'session-reminder',
+      sessionReminderData(orderA, { appUrl, manageToken: fakeManageToken }),
+      'Coming up: Sunset sail on the Hudson, Saturday, November 7, 2026',
+    ],
+    ['booking-refund', requests[4][1], 'Refund issued: $170.00'],
     [
       'paid-after-lapse',
       paidAfterLapseData(lapse),

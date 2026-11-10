@@ -55,7 +55,7 @@ vi.mock(
 // Behaviours under test, one per decision, branch, or risk:
 // - a confirmed booking writes exactly one of each: the seat count, the hold converted, the order confirmed with a manage
 //   hash that matches capabilityToken, the booking and fee ledger rows (taxable too), one scheduled transfer released
-//   24 hours after the session ends, the two email jobs, and the session's spaces tag invalidated
+//   24 hours after the session ends, the three email jobs, and the session's spaces tag invalidated
 // - a replayed success answers already_confirmed and writes nothing more; a fee the provider did not report posts no fee row
 // - the worked example (two guests at $65, fee $4.07) leaves the balances the ledger tests expect
 // - a lapsed hold, still active or already released, confirms when the session has room (room and exactly enough)
@@ -287,6 +287,11 @@ describe('a confirmed booking', () => {
         payload: { orderId: world.orderId },
         dedupe_key: `host-booking-notice:${world.orderId}`,
       },
+      {
+        kind: 'session-reminder',
+        payload: { orderId: world.orderId },
+        dedupe_key: `session-reminder:${world.orderId}`,
+      },
     ]);
     const { revalidateTag } = await import('next/cache');
     for (const tag of tagsForChanges([
@@ -331,7 +336,7 @@ describe('a confirmed booking', () => {
     expect(twice.session.seatsSold).toBe(once.session.seatsSold);
     expect(twice.ledger).toHaveLength(once.ledger.length);
     expect(twice.transfers).toHaveLength(1);
-    expect(twice.jobs).toHaveLength(2);
+    expect(twice.jobs).toHaveLength(3);
     expect(twice.order.confirmedAt).toEqual(once.order.confirmedAt);
   });
 
@@ -555,7 +560,7 @@ describe('concurrency', () => {
     expect(after.session.seatsSold).toBe(2);
     expect(after.ledger).toHaveLength(3);
     expect(after.transfers).toHaveLength(1);
-    expect(after.jobs).toHaveLength(2);
+    expect(after.jobs).toHaveLength(3);
     const processed = await Promise.all(
       ids.map(async (id) => {
         const [event] = await client.db

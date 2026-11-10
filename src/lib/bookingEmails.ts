@@ -4,6 +4,7 @@ import type {
   GuestConfirmationData,
   HostBookingNoticeData,
   PaidAfterLapseData,
+  SessionReminderData,
 } from './email/bookingTemplates';
 import { durationLabel } from './duration';
 import { googleCalendarUrl, type CalendarEvent } from './ics';
@@ -63,7 +64,7 @@ export type BookingEmailSource = {
  * so the provider delivers each message once however often the job runs.
  */
 export function bookingEmailKey(
-  kind: 'guest-confirmation' | 'host-booking-notice',
+  kind: 'guest-confirmation' | 'host-booking-notice' | 'session-reminder',
   orderId: string,
 ): string {
   return `${kind}:${orderId}`;
@@ -83,6 +84,32 @@ export function confirmationDecision(source: {
   if (source.kind !== 'booking') return 'refuse';
   if (source.status === 'confirmed') return 'send';
   return source.status === 'cancelled' ? 'skip' : 'refuse';
+}
+
+/** How long before the session starts the reminder goes out. */
+export const reminderLeadMs = 24 * 60 * 60 * 1000;
+
+/**
+ * When the reminder job is due: 24 hours before the session, or `now` when the booking is made
+ * inside that window. Null for a session that has already started, which has nothing to remind.
+ */
+export function reminderRunAt(startsAt: Date, now: Date): Date | null {
+  if (startsAt.getTime() <= now.getTime()) return null;
+  return new Date(Math.max(startsAt.getTime() - reminderLeadMs, now.getTime()));
+}
+
+/**
+ * Whether the reminder goes out when its job runs. The confirmation rules apply (a cancelled
+ * booking is skipped, anything else that is not a confirmed booking is refused), and a session that
+ * has started is skipped, so a job that ran late sends nothing.
+ */
+export function reminderDecision(
+  source: Pick<BookingEmailSource, 'kind' | 'status' | 'startsAt'>,
+  now: Date,
+): ConfirmationDecision {
+  const decision = confirmationDecision(source);
+  if (decision !== 'send') return decision;
+  return source.startsAt.getTime() <= now.getTime() ? 'skip' : 'send';
 }
 
 const nameMax = 120;
@@ -239,6 +266,30 @@ export function hostBookingNoticeData(
     timeLabel: zonedTimeLabel(source.startsAt, source.timeZone),
     guestName: guestNameForHost(source.leadGuestName),
     partyLabel: partyLabel(source.items),
+  };
+}
+
+export function sessionReminderData(
+  source: BookingEmailSource,
+  input: { appUrl: string; manageToken: string },
+): SessionReminderData {
+  return {
+    recipientName: greetingName(source.leadGuestName),
+    reference: source.reference,
+    experienceName: oneLineClipped(source.experienceName, nameOfExperienceMax),
+    hostName: oneLineClipped(source.hostName, nameMax),
+    dayLabel: zonedDayLabel(source.startsAt, source.timeZone),
+    timeLabel: zonedTimeLabel(source.startsAt, source.timeZone),
+    durationLabel:
+      source.durationMinutes === null
+        ? null
+        : durationLabel(source.durationMinutes),
+    meetingPoint:
+      source.meetingPoint === null
+        ? null
+        : oneLineClipped(source.meetingPoint, meetingPointMax) || null,
+    partyLabel: partyLabel(source.items),
+    manageUrl: manageLink(input.manageToken, input.appUrl),
   };
 }
 

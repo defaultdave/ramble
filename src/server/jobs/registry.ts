@@ -14,6 +14,7 @@ import {
   BookingEmailPayloadSchema,
   sendGuestConfirmation,
   sendHostBookingNotice,
+  sendSessionReminder,
 } from './bookingEmails';
 import { sendOpsNotice } from './opsNotice';
 import { handleProviderEvent, prepareProviderEvent } from './providerEvents';
@@ -105,6 +106,11 @@ export const jobRegistry = {
     payload: BookingEmailPayloadSchema,
     maxAttempts: jobLimits.defaultMaxAttempts,
     handleIdempotent: sendHostBookingNotice,
+  }),
+  'session-reminder': defineJob({
+    payload: BookingEmailPayloadSchema,
+    maxAttempts: jobLimits.defaultMaxAttempts,
+    handleIdempotent: sendSessionReminder,
   }),
   [opsNoticeKind]: defineJob({
     payload: OpsNoticeDataSchema,

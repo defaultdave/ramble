@@ -38,6 +38,7 @@ export const sunsetKayak: ExperiencePageView = {
     initial: 'H',
     description:
       'Six guides, all trained in water rescue. On Ramble since 2026.',
+    href: '/hosts/hudson-paddle-club',
   },
   meeting: {
     text: 'Pier 26 boathouse, Tribeca. The exact door is in your confirmation.',
@@ -87,7 +88,12 @@ export const kidsClass: ExperiencePageView = {
     'The teacher keeps the group to eight, so every child gets hands-on help.',
   ],
   included: [],
-  host: { name: 'Wheelhouse Kids Studio', initial: 'W', description: null },
+  host: {
+    name: 'Wheelhouse Kids Studio',
+    initial: 'W',
+    description: null,
+    href: '/hosts/wheelhouse-kids-studio',
+  },
   meeting: {
     text: 'Wheelhouse Kids Studio, ground floor, Williamsburg.',
     mapsHref: null,
@@ -123,7 +129,12 @@ export const bareExperience: ExperiencePageView = {
   gallery: galleryView([]),
   about: [],
   included: [],
-  host: { name: 'Red Hook Walks', initial: 'R', description: null },
+  host: {
+    name: 'Red Hook Walks',
+    initial: 'R',
+    description: null,
+    href: '/hosts/red-hook-walks',
+  },
   meeting: null,
   accessibility: null,
   weather: null,

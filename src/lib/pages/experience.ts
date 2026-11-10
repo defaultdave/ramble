@@ -19,6 +19,7 @@ import {
   categoryPath,
   checkoutPath,
   giftCheckoutPath,
+  hostPath,
   neighborhoodPath,
   privateSessionPath,
 } from '../routes';
@@ -120,6 +121,11 @@ export function cancellationTerms(
     fact: `Free cancellation up to ${window} before`,
     detail: `Free cancellation up to ${window} before start. After that, no refund. ${refunded}`,
   };
+}
+
+/** The letter in the host's avatar. */
+export function hostInitial(name: string): string {
+  return Array.from(name)[0]?.toUpperCase() ?? '';
 }
 
 // ---- Prices ----
@@ -261,7 +267,12 @@ export type ExperiencePageView = {
   gallery: GalleryView;
   about: string[];
   included: string[];
-  host: { name: string; initial: string; description: string | null };
+  host: {
+    name: string;
+    initial: string;
+    description: string | null;
+    href: string;
+  };
   meeting: { text: string; mapsHref: string | null } | null;
   accessibility: string | null;
   weather: string | null;
@@ -359,8 +370,9 @@ export function buildExperiencePage(
     included: includedItems(experience.included),
     host: {
       name: experience.host.name,
-      initial: Array.from(experience.host.name)[0]?.toUpperCase() ?? '',
+      initial: hostInitial(experience.host.name),
       description: presentText(experience.host.description),
+      href: hostPath(experience.host.slug),
     },
     meeting:
       meetingText === null

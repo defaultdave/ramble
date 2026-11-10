@@ -1,0 +1,50 @@
+/* The section, heading, and text styles are the experience page's, so a host reads the same on both. */
+.page {
+  composes: page from '../../../../styles/page-shell.module.css';
+}
+
+.intro {
+  composes: intro from '../../../../styles/page-shell.module.css';
+  flex-direction: row;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.avatar {
+  composes: avatar from '../../../../components/ExperiencePage/ExperiencePage.module.css';
+}
+
+.title {
+  composes: title from '../../../../styles/page-shell.module.css';
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.section {
+  composes: section from '../../../../components/ExperiencePage/ExperiencePage.module.css';
+}
+
+.heading {
+  composes: heading from '../../../../components/ExperiencePage/ExperiencePage.module.css';
+}
+
+.prose {
+  composes: prose from '../../../../components/ExperiencePage/ExperiencePage.module.css';
+}
+
+.text {
+  composes: text from '../../../../components/ExperiencePage/ExperiencePage.module.css';
+}
+
+.terms {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.termsTitle {
+  font-weight: var(--font-weight-semibold);
+}

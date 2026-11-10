@@ -449,7 +449,7 @@ describe('buildExperiencePage', () => {
     });
   });
 
-  it('gives the meeting point a Maps link, and the host an initial and a trimmed description', () => {
+  it('gives the meeting point a Maps link, and the host an initial, a trimmed description, and the address of their page', () => {
     const view = build({
       experience: experience({
         host: {
@@ -466,6 +466,7 @@ describe('buildExperiencePage', () => {
       name: 'élan Studio',
       initial: 'É',
       description: null,
+      href: '/hosts/h',
     });
   });
 

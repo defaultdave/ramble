@@ -13,6 +13,7 @@ import {
   guidePath,
   helpPath,
   homePicksHref,
+  hostPath,
   legalPath,
   managePath,
   maxAddressLength,
@@ -99,6 +100,11 @@ describe('literal addresses', () => {
     ['the home page at Ramble Picks', homePicksHref, '/#picks'],
     ['the Ramble Picks anchor', picksAnchor, 'picks'],
     ['a picks page', picksPath('summer'), '/picks/summer'],
+    [
+      'a host page',
+      hostPath('hudson-paddle-club'),
+      '/hosts/hudson-paddle-club',
+    ],
     ['a category', categoryPath('outdoors'), '/new-york/things-to-do/outdoors'],
     [
       'a neighborhood',

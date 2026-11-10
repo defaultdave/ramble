@@ -145,12 +145,13 @@ export const PriceOptionSchema = z.object({
 export type PriceOption = z.infer<typeof PriceOptionSchema>;
 
 /** The part of a host a guest page shows. Time zone and creation time stay on the server. */
-const GuestHostSchema = z.object({
+export const GuestHostSchema = z.object({
   id: EntityIdSchema,
   slug: SlugSchema,
   name: z.string().min(1),
   description: z.string().nullable(),
 });
+export type GuestHost = z.infer<typeof GuestHostSchema>;
 
 const experienceFields = z.object({
   id: EntityIdSchema,

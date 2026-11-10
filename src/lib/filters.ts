@@ -56,13 +56,11 @@ const ageChoices = {
   kids: 'Kids welcome',
   'twenty-one-plus': '21 and over',
 } as const;
-type AgeChoice = keyof typeof ageChoices;
 
 const settingChoices = {
   indoor: 'Indoor',
   outdoor: 'Outdoor',
 } as const;
-type SettingChoice = keyof typeof settingChoices;
 
 // The keys are the values a parameter may take, so a value no one offers is dropped like any malformed one.
 function choiceSchema<T extends string>(choices: Record<T, unknown>) {

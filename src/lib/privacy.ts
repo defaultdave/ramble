@@ -216,6 +216,33 @@ export const piiColumns: readonly PiiColumn[] = [
       "Not yet anonymized: the support queue work adds a step keyed on the sender's address, because a sender need not be a guest",
   },
   {
+    table: 'private_requests',
+    column: 'name',
+    kind: 'identifier',
+    data: 'The name a guest typed into the private session form',
+    location: databaseLocation,
+    deletionPath:
+      "Not yet anonymized: the host queue work adds a step keyed on the sender's address, because a sender need not be a guest",
+  },
+  {
+    table: 'private_requests',
+    column: 'email',
+    kind: 'identifier',
+    data: 'The address a guest typed into the private session form, folded to lower case',
+    location: databaseLocation,
+    deletionPath:
+      "Not yet anonymized: the host queue work adds a step keyed on the sender's address, because a sender need not be a guest",
+  },
+  {
+    table: 'private_requests',
+    column: 'message',
+    kind: 'identifier',
+    data: 'Free text a guest typed into the private session form, which can name a person or anything else they chose to write',
+    location: databaseLocation,
+    deletionPath:
+      "Not yet anonymized: the host queue work adds a step keyed on the sender's address, because a sender need not be a guest",
+  },
+  {
     table: 'jobs',
     column: 'dedupe_key',
     kind: 'link',
@@ -417,6 +444,13 @@ export const nonPiiColumns: readonly {
   ...notPersonal('support_requests', aRandomId, ['id']),
   ...notPersonal('support_requests', aFixedList, ['topic']),
   ...notPersonal('support_requests', aTime, ['created_at']),
+  ...notPersonal('private_requests', aRandomId, ['id', 'experience_id']),
+  ...notPersonal(
+    'private_requests',
+    'A date or a number the guest chose, with no name in it',
+    ['requested_date', 'group_size', 'budget_minor'],
+  ),
+  ...notPersonal('private_requests', aTime, ['created_at']),
   ...notPersonal('auth_users', aRandomId, ['id']),
   ...notPersonal('auth_users', 'A flag', ['email_verified']),
   ...notPersonal('auth_users', aTime, ['created_at', 'updated_at']),

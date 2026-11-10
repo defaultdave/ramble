@@ -348,7 +348,7 @@ describe('buildExperiencePage', () => {
       paused: false,
       checkoutBase: '/checkout/',
       similarHref: '/new-york/things-to-do/outdoors',
-      privateSessionHref: '/contact',
+      privateSessionHref: `/experiences/sunset-kayak-${id(1)}/private-session`,
       fullRefundHoursBefore: 24,
     });
   });
@@ -418,7 +418,9 @@ describe('buildExperiencePage', () => {
     expect(build()?.giftHref).toBe(`/gifts/checkout/${id(1)}`);
     const off = build({ giftsEnabled: false });
     expect(off?.giftHref).toBeNull();
-    expect(off?.privateSessionHref).toBe('/contact');
+    expect(off?.privateSessionHref).toBe(
+      `/experiences/sunset-kayak-${id(1)}/private-session`,
+    );
   });
 
   it('orders the gallery by position, whatever order the photos arrive in', () => {

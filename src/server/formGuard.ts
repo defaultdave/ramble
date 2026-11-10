@@ -31,7 +31,6 @@ function signatureMatches(issuedAtMs: string, signature: string): boolean {
   return secureEqual(signature, sign(issuedAtMs));
 }
 
-// TODO(U-043): second caller, `requestPrivateSession`.
 /**
  * Judges a submitted guest form: honeypot empty, token genuine, filled in no faster than a person
  * could and not left open for hours. On any failure the caller returns the same reply a success

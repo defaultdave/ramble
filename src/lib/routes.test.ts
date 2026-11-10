@@ -124,7 +124,11 @@ describe('literal addresses', () => {
     ['accessibility', accessibilityPath, '/accessibility'],
     ['the terms', legalPath('terms'), '/legal/terms'],
     ['the privacy policy', legalPath('privacy'), '/legal/privacy'],
-    ['a private session', privateSessionPath, '/contact'],
+    [
+      'a private session request',
+      privateSessionPath({ slug: 'thing-1', id: id(1) }),
+      `/experiences/thing-1-${id(1)}/private-session`,
+    ],
     ['a manage page', managePath('abc'), '/manage/abc'],
   ])('writes %s', (_name, actual, expected) => {
     expect(actual).toBe(expected);

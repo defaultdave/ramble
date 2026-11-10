@@ -4,6 +4,7 @@ import {
   maxEmailAddressLength,
   normalizeEmailAddress,
 } from '@/lib/email/address';
+import { readTextFields } from '@/lib/formFields';
 import { requiredText } from '@/lib/text';
 
 export const supportTopics = [
@@ -38,7 +39,7 @@ export type SupportField = (typeof supportFields)[number];
 const trim = (value: string) => value.trim();
 
 /** Trimmed and folded to lower case first: the one spelling the stored address and its CHECK accept. */
-const EmailFieldSchema = z
+export const EmailFieldSchema = z
   .string()
   .max(maxEmailAddressLength * 2)
   .transform((raw) => normalizeEmailAddress(raw.trim()))
@@ -84,22 +85,11 @@ export type SupportFormState =
   | { status: 'expired'; values: SupportFormValues }
   | { status: 'failed'; values: SupportFormValues };
 
-const ValueSchema = z.string().max(supportLimits.messageMaxChars * 2);
-
-/** Reads the form's text fields; anything else (a file, a missing field) reads as empty. */
+/** Reads the form's text fields; see `readTextFields`. */
 export function readSupportValues(
   get: (field: SupportField) => unknown,
 ): SupportFormValues {
-  const read = (field: SupportField) => {
-    const value = ValueSchema.safeParse(get(field));
-    return value.success ? value.data : '';
-  };
-  return {
-    name: read('name'),
-    email: read('email'),
-    topic: read('topic'),
-    message: read('message'),
-  };
+  return readTextFields(supportFields, get, supportLimits.messageMaxChars * 2);
 }
 
 const isSupportField = (key: unknown): key is SupportField =>

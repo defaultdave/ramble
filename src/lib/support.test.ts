@@ -79,7 +79,6 @@ describe('readSupportValues', () => {
       name: 'Pat',
       email: new File(['x'], 'x.txt'),
       topic: null,
-      message: 'x'.repeat(supportLimits.messageMaxChars * 2 + 1),
     };
 
     expect(readSupportValues((field) => fields[field])).toEqual({
@@ -88,5 +87,21 @@ describe('readSupportValues', () => {
       topic: '',
       message: '',
     });
+  });
+
+  it('keeps an over-long message so the schema refuses it with the message error', () => {
+    const typed = 'x'.repeat(supportLimits.messageMaxChars * 5);
+    const values = readSupportValues((field) =>
+      field === 'message' ? typed : valid[field],
+    );
+
+    expect(values.message).not.toBe('');
+    const result = SupportRequestSchema.safeParse(values);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(supportFieldErrors(result.error)).toEqual({
+        message: supportFieldMessages.message,
+      });
+    }
   });
 });

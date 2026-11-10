@@ -233,6 +233,16 @@ describe('the photo pool manifest', () => {
     }
   });
 
+  it('claims no direction in any caption, since the art is mirrored for about half the slugs', () => {
+    const direction =
+      /\b(left|right|upper|lower|above|below|beside|higher|east|west|north|south|clockwise)\b/i;
+    for (const e of all) {
+      for (const caption of photoManifest[e.slug] ?? []) {
+        expect(caption.replace(e.name, '')).not.toMatch(direction);
+      }
+    }
+  });
+
   const plans = all.map((e) => ({ e, plan: planTestPhotos(e) }));
 
   it('describes the drawn illustration: its motif, and a name that is not cut off at the foot', () => {

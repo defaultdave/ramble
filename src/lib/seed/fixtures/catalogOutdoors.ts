@@ -149,10 +149,10 @@ export const outdoorExperiences: ExperienceFixture[] = [
       meetingPoint:
         'Pier 26 boathouse, Tribeca. The exact door is in your confirmation.',
       included:
-        'A kayak, paddle, life jacket, a wetsuit top if it is cool, and a dry bag.',
+        "A kayak, paddle, life jacket, a wetsuit top if it's cool, and a dry bag.",
       durationMinutes: 180,
       accessibilityNotes:
-        'There is a ramp down to the dock. Getting into a kayak takes some mobility, and guides can help.',
+        "There's a ramp down to the dock. Getting into a kayak takes some mobility, and guides can help.",
       outdoor: true,
       weatherPolicy: 'decided_before_start',
       weatherDecisionHours: 4,
@@ -279,7 +279,7 @@ export const outdoorExperiences: ExperienceFixture[] = [
         'Tandem kayaks, paddles, life jackets sized for kids, and a dry bag.',
       durationMinutes: 90,
       accessibilityNotes:
-        'There is a ramp down to the dock. Guides help children and adults in and out.',
+        "There's a ramp down to the dock. Guides help children and adults in and out.",
       outdoor: true,
       weatherPolicy: 'decided_before_start',
       weatherDecisionHours: 3,
@@ -315,7 +315,7 @@ export const outdoorExperiences: ExperienceFixture[] = [
         { kind: 'adult', priceMinor: 0, usesSpace: false },
         { kind: 'child', priceMinor: 3600, usesSpace: true },
       ],
-      slots: [slot(6, '10:00', 90, 8), slot(0, '10:30', 90, 8)],
+      slots: [slot(6, '10:00', 90, 8), slot(6, '13:00', 90, 8)],
     },
   ),
   experience(

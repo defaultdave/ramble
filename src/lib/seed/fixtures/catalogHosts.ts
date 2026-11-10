@@ -39,7 +39,7 @@ export const catalogHosts: HostFixture[] = [
     slug: 'quill-and-ink-press',
     name: 'Quill & Ink Press',
     description:
-      'A one-room letterpress shop on the Lower East Side that opens its presses for evening classes. Ramble lists them; the shop takes the bookings.',
+      'A one-room letterpress shop on the Lower East Side that opens its presses for weeknight and Sunday classes. Ramble lists them; the shop takes the bookings.',
   },
   {
     slug: 'old-pier-oyster-bar',

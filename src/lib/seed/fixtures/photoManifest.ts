@@ -71,11 +71,13 @@ const photoCounts: Readonly<Record<string, number>> = {
 const landscapePositions = 3;
 
 // What testPhotoArt.ts draws for each motif, by variant (the position in the set, modulo three).
+// Nothing here says left, right, upper or lower: testPhotoArt.ts mirrors the whole motif for about half the
+// slugs, so a direction would be false for those pictures. A test holds the line.
 const scenes: Readonly<Record<Motif, readonly [string, string, string]>> = {
   vessel: [
     'A flat, round-bellied vessel with a wide rim and a small foot, in one solid color.',
     'A flat, round-bellied vessel with a wide rim and a small foot, banded in two alternating colors.',
-    'A flat, round-bellied vessel with a wide rim and a small foot, in one solid color, in a second pose.',
+    'A flat, round-bellied vessel with a wide rim and a small foot, in one solid color again, as in the first view.',
   ],
   pot: [
     'A flat cooking pot with a dark lid bar and three wavy lines of steam rising from it.',
@@ -88,19 +90,19 @@ const scenes: Readonly<Record<Motif, readonly [string, string, string]>> = {
     'A skyline of eight flat buildings, tall and short in alternating colors, in a third arrangement of heights.',
   ],
   glass: [
-    'A flat stemmed glass with the bowl filled in one color and a small bubble floating at the upper right.',
-    'A flat stemmed glass with the bowl filled in one color and a small bubble floating higher at the right.',
-    'A flat stemmed glass with the top of the bowl in a second color and a small bubble floating at the far right.',
+    'A flat stemmed glass with the bowl filled in one color and a small bubble floating off the bowl.',
+    'A flat stemmed glass with the bowl filled in one color and a small bubble floating a little farther from the bowl.',
+    'A flat stemmed glass with the bowl in two colors and a small bubble floating farther still from the bowl.',
   ],
   cup: [
-    'A flat cup on a saucer line with a round handle at the right and two wisps of steam above it.',
-    'A flat cup on a saucer line with a round handle at the right and two wisps of steam curling another way.',
-    'A flat cup on a saucer line with a round handle at the right and two wisps of steam in a third curl.',
+    'A flat cup on a saucer line with a round handle on one side and two wisps of steam rising from it.',
+    'A flat cup on a saucer line with a round handle on one side and two wisps of steam curling another way.',
+    'A flat cup on a saucer line with a round handle on one side and two wisps of steam in a third curl.',
   ],
   'sun-water': [
-    'A round sun left of center above bands of wavy, striped water.',
-    'A round sun at the center above bands of wavy, striped water.',
-    'A round sun right of center above bands of wavy, striped water.',
+    'A round sun just off center, with bands of wavy, striped water.',
+    'A round sun at the center, with bands of wavy, striped water.',
+    'A round sun just off center on the opposite side from the first view, with bands of wavy, striped water.',
   ],
   rings: [
     'A round target of concentric rings in alternating colors.',
@@ -108,9 +110,9 @@ const scenes: Readonly<Record<Motif, readonly [string, string, string]>> = {
     'A round target of concentric rings in alternating colors, the color order moved along two steps.',
   ],
   blocks: [
-    'Three flat building blocks, one stacked on top, and a ball at the lower right, in three colors.',
-    'Three flat building blocks, one stacked on top, and a ball at the lower right, with the colors swapped round.',
-    'Three flat building blocks, one stacked on top, and a ball at the lower right, in a third color order.',
+    'Three flat building blocks, one stacked across the other two, and a ball, in three colors.',
+    'Three flat building blocks, one stacked across the other two, and a ball, with the colors swapped round.',
+    'Three flat building blocks, one stacked across the other two, and a ball, in a third color order.',
   ],
 };
 

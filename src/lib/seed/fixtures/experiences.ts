@@ -27,7 +27,7 @@ export const hosts: HostFixture[] = [
     slug: 'orchard-street-wine-room',
     name: 'Orchard Street Wine Room',
     description:
-      'A twelve-seat wine bar on the Lower East Side that pours small-batch bottles and answers every question.',
+      'A fourteen-seat wine bar on the Lower East Side that pours small-batch bottles and answers every question.',
   },
   {
     slug: 'salt-and-semolina',

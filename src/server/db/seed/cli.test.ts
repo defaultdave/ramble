@@ -180,6 +180,9 @@ describe('runSeedCommand', () => {
         await run({ target, storage: { provider: 'fake', open: openStorage } }),
       ).toBe(0);
       expect(seedPersonas).toHaveBeenCalledWith(seedCaller);
+      expect(seedPersonas.mock.invocationCallOrder[0]).toBeLessThan(
+        readSeedSnapshot.mock.invocationCallOrder[0] ?? 0,
+      );
       expect(lines.join('\n')).toContain('Personas: 7');
     },
   );

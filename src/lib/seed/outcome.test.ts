@@ -6,10 +6,12 @@ import {
   curatedLine,
   editorialLine,
   legalLine,
+  personasLine,
   photoCoverageLine,
   photosLine,
   refusalLine,
   scaleLine,
+  seedsPersonas,
   startLine,
   stepNames,
   taxonomyLine,
@@ -136,5 +138,20 @@ describe('progress lines and step names', () => {
     expect(stepNames.savePageCopy('category', 'kayaking')).toBe(
       'save category copy kayaking',
     );
+  });
+});
+
+describe('personas', () => {
+  it.each([
+    ['local', true],
+    ['staging', true],
+    ['load-test', true],
+    ['production-demo', false],
+  ] as const)('are seeded on %s: %s', (target, expected) => {
+    expect(seedsPersonas(target)).toBe(expected);
+  });
+
+  it('says how many were written', () => {
+    expect(personasLine(7)).toBe('Personas: 7 sign-in people, one per role');
   });
 });

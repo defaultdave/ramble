@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, expect, vi } from 'vitest';
 import type { Caller } from '@/server/auth/caller';
-import type { PersonaKey } from '@/server/db/seed/personas';
+import { personaKeys, personas, type PersonaKey } from '@/lib/seed/personas';
 import {
   createFreshDatabase,
   serveNeonHttp,
@@ -9,16 +9,6 @@ import {
 } from './harness';
 
 const origin = 'http://localhost:3000';
-
-export const personaKeys: readonly PersonaKey[] = [
-  'guest',
-  'ownerA',
-  'staffA',
-  'ownerB',
-  'staffB',
-  'ops',
-  'admin',
-];
 
 export const subjects = ['anonymous', ...personaKeys] as const;
 export type Subject = (typeof subjects)[number];
@@ -111,9 +101,7 @@ export async function signInEverySubject(): Promise<Record<Subject, Caller>> {
       async (key) =>
         [
           key,
-          await callerForCookie(
-            await signInCookie(personaSeed.personas[key].email),
-          ),
+          await callerForCookie(await signInCookie(personas[key].email)),
         ] as const,
     ),
   );

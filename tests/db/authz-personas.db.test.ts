@@ -1,12 +1,12 @@
 import { eq, inArray } from 'drizzle-orm';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { personaHostSlugs, personaKeys, personas } from '@/lib/seed/personas';
 import { hostId } from '@/lib/seed/rows';
 import { Role, type Caller } from '@/server/auth/caller';
 import { seedCaller } from '@/server/db/seed/caller';
 import { authUsers, hosts, roleGrants } from '@/server/db/schema';
 import {
   client,
-  personaKeys,
   personaSeed,
   setupAuthzDatabase,
   signInEverySubject,
@@ -31,8 +31,8 @@ let people: Record<Subject, Caller>;
 
 beforeAll(async () => {
   people = await signInEverySubject();
-  hostA = hostId(personaSeed.personaHostSlugs.a);
-  hostB = hostId(personaSeed.personaHostSlugs.b);
+  hostA = hostId(personaHostSlugs.a);
+  hostB = hostId(personaHostSlugs.b);
 });
 
 let hostA: string;
@@ -65,7 +65,7 @@ const expectedFor = (key: Subject) =>
 
 describe('the seeded personas', () => {
   it('are seven fixed addresses on the reserved .test domain', () => {
-    const emails = personaKeys.map((key) => personaSeed.personas[key].email);
+    const emails = personaKeys.map((key) => personas[key].email);
     expect(emails).toHaveLength(7);
     expect(new Set(emails).size).toBe(7);
     for (const email of emails) {
@@ -101,7 +101,7 @@ describe('the seeded personas', () => {
       .innerJoin(authUsers, eq(authUsers.id, roleGrants.userId));
     const granted = personaKeys
       .filter((key) => key !== 'guest')
-      .map((key) => personaSeed.personas[key].email)
+      .map((key) => personas[key].email)
       .sort();
     expect(holders.map((row) => row.email).sort()).toEqual(granted);
   });
@@ -131,7 +131,7 @@ describe('seeding the personas again', () => {
   });
 
   it('gives the grants to a person who signed in at the address first', async () => {
-    const email = personaSeed.personas.ownerA.email;
+    const email = personas.ownerA.email;
     await client.db.delete(authUsers).where(eq(authUsers.email, email));
     const [earlier] = await client.db
       .insert(authUsers)

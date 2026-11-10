@@ -85,6 +85,8 @@ Every target but `production-demo` also writes seven people who can sign in by l
 | `ops@ramble.test` | ops |
 | `admin@ramble.test` | admin |
 
+`staging` and `load-test` get the ops and admin personas too. With a non-live `EMAIL_MODE`, anyone holding the mailbox secret can request a link for `admin@ramble.test` and read it, so whoever holds the secret must be trusted with admin. With live email the link goes to a `.test` address nobody can register or receive mail at.
+
 `production-demo` writes none of them. A rerun changes nothing, and a person who already signed in at one of these addresses keeps their id and gains the grants. Do not point real people at these addresses.
 
 ## What it writes

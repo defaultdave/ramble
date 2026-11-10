@@ -5,9 +5,11 @@ import { describeFailure } from '@/lib/seed/decide';
 import {
   combineSeedExits,
   coverageExit,
+  personasLine,
   photoCoverageLine,
   photosLine,
   refusalLine,
+  seedsPersonas,
   startLine,
   type SeedExit,
 } from '@/lib/seed/outcome';
@@ -77,11 +79,8 @@ export async function runSeedCommand(command: SeedCommand): Promise<number> {
       scale: args.scale,
       log: write,
     });
-    // Sign-in people with every role must not exist on the production demo.
-    if (verdict.target !== 'production-demo') {
-      write(
-        `Personas: ${String(await seedPersonas(seedCaller))} sign-in people, one per role`,
-      );
+    if (seedsPersonas(verdict.target)) {
+      write(personasLine(await seedPersonas(seedCaller)));
     }
     const exit = coverageExit(
       await readSeedSnapshot(seedCaller, command.now),

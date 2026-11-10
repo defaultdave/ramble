@@ -14,6 +14,7 @@ import {
 } from '@/server/auth/caller';
 import { experiences } from '@/server/db/schema';
 import { createFakeStorageAdapter } from '@/server/ports/storage/fake';
+import { personaHostSlugs } from '@/lib/seed/personas';
 import { collectionInput, doc, helpInput } from './editorialFixtures';
 import {
   client,
@@ -142,8 +143,8 @@ beforeAll(async () => {
   legalDraftId = draft.id;
 
   const hostIds = {
-    hostA: seededHostId(personaSeed.personaHostSlugs.a),
-    hostB: seededHostId(personaSeed.personaHostSlugs.b),
+    hostA: seededHostId(personaHostSlugs.a),
+    hostB: seededHostId(personaHostSlugs.b),
   };
   const gone = randomUUID();
   const from = isoDateOf(new Date(Date.now() + msPerDay));
@@ -581,6 +582,16 @@ describe('requireRole on its own', () => {
 });
 
 describe('a host owner asking about an experience', () => {
+  // Pins today's behaviour, so the it.fails below fails for the reason it names and not for any reason.
+  it('gets null for a missing experience and a refusal for another host’s, today', async () => {
+    expect(
+      await data.catalog.getHostExperience(people.ownerA, randomUUID()),
+    ).toBeNull();
+    await expect(
+      data.catalog.getHostExperience(people.ownerA, target.hostB.experienceId),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
   // The photo path refuses a host owner the same way for a missing experience as for another host's, so
   // the answer never says which ids exist. getHostExperience says null for one and refuses the other.
   it.fails(

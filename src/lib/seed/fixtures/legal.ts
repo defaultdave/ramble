@@ -53,4 +53,15 @@ export const legal: LegalFixture[] = [
       'Guides are trained in water rescue and will help you back in. Tell your guide before you start if you cannot swim or have a condition they should know about.',
     ),
   },
+  {
+    doc: 'waiver-spoke-and-saddle',
+    title: 'Spoke & Saddle waiver',
+    body: blocks(
+      demoNotice,
+      { heading: 'Riding in the city' },
+      'Cycling carries real risks, including falls, traffic, and uneven paths. You wear a helmet for the whole ride and follow your guide.',
+      { heading: 'If something goes wrong' },
+      'Guides carry a first-aid kit and a spare tube. Tell your guide before you start if you have a condition they should know about.',
+    ),
+  },
 ];

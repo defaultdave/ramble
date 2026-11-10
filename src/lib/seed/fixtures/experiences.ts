@@ -83,7 +83,7 @@ type Required = Pick<
   | 'description'
 >;
 
-function experience(
+export function experience(
   required: Required,
   rest: Partial<ExperienceFixture>,
 ): ExperienceFixture {
@@ -282,6 +282,8 @@ export const experiences: ExperienceFixture[] = [
       included:
         'Ingredients, aprons, and the meal you make, with a glass of wine or soda.',
       durationMinutes: 150,
+      accessibilityNotes:
+        'Step-free entrance. Most of the work is at a standing-height counter, and stools are available.',
       ageRule: 'minimum_age',
       minAge: 14,
       taxTreatment: 'unknown',

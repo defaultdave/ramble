@@ -51,6 +51,21 @@ describe('a sign-in link request', () => {
     expect(await handed.json()).toEqual({ email: 'Sam@Example.COM' });
   });
 
+  it('hands on a rebuilt request with no stale content-length, for a body of multi-byte characters', async () => {
+    const body = JSON.stringify({
+      email: 'sam@example.com',
+      name: 'Zoë 日本語',
+    });
+    const request = post(body);
+    request.headers.set('content-length', '5');
+
+    await handleAuthRequest(request);
+
+    const handed = betterAuthHandler.mock.calls[0]?.[0] as Request;
+    expect(handed.headers.get('content-length')).toBeNull();
+    expect(await handed.text()).toBe(body);
+  });
+
   it('is refused with Retry-After when the count is spent, and reaches no one', async () => {
     consumeRateLimit.mockResolvedValue({
       allowed: false,

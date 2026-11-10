@@ -3,6 +3,7 @@ import {
   initialSessionExpiry,
   isSessionLive,
   isSignInLinkRequest,
+  appUrlIsRequired,
   pickAuthSecret,
   sessionIdleSeconds,
   sessionMaxAgeSeconds,
@@ -130,4 +131,16 @@ describe('pickAuthSecret', () => {
       expect(pickAuthSecret(kind, undefined, 'production')).toBeNull();
     },
   );
+});
+
+describe('appUrlIsRequired', () => {
+  it.each([
+    ['production', undefined, true],
+    ['preview', undefined, true],
+    ['production', 'https://ramble.example', false],
+    ['development', undefined, false],
+    [undefined, undefined, false],
+  ])('on %s with APP_URL %s is %s', (vercelEnv, configured, expected) => {
+    expect(appUrlIsRequired(vercelEnv, configured)).toBe(expected);
+  });
 });

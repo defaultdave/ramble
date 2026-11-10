@@ -340,6 +340,7 @@ describe('the caller from role grants', () => {
       userId,
       roles: [caller.Role.Guest],
       hostIds: [],
+      hostGrants: [],
     });
     expect(() => {
       caller.requireRole(found, caller.Role.Guest, { ownerId: userId });
@@ -376,6 +377,38 @@ describe('the caller from role grants', () => {
         hostId: '00000000-0000-4000-8000-000000000000',
       });
     }).toThrow(caller.ForbiddenError);
+  });
+
+  it('keeps each host role with its host: owner of A and staff of B is not owner of B', async () => {
+    const { address, cookie } = await signIn();
+    const { userId } = await sessionRow(address);
+    await grant(userId, 'host_owner', hostA);
+    await grant(userId, 'host_staff', hostB);
+
+    const found = await callerFor(cookie);
+    const allowed = (
+      role: Parameters<typeof caller.requireRole>[1],
+      hostId: string,
+    ) => {
+      try {
+        caller.requireRole(found, role, { hostId });
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    expect({
+      ownerOfA: allowed(caller.Role.HostOwner, hostA),
+      staffOfB: allowed(caller.Role.HostStaff, hostB),
+      ownerOfB: allowed(caller.Role.HostOwner, hostB),
+      staffOfA: allowed(caller.Role.HostStaff, hostA),
+    }).toEqual({
+      ownerOfA: true,
+      staffOfB: true,
+      ownerOfB: false,
+      staffOfA: false,
+    });
   });
 
   it('carries ops and admin with no host, for any resource', async () => {

@@ -6,10 +6,20 @@ export const TEST_HOST_ID = 'host-test';
 
 /** A signed-in guest on no host, for unit and database tests. */
 export function testCaller(overrides: Partial<Caller> = {}): Caller {
-  return {
+  const caller = {
     userId: TEST_USER_ID,
     roles: [Role.Guest],
     hostIds: [],
     ...overrides,
+  };
+  if (caller.hostGrants) return caller;
+  // Every host role on every host, the shape the tests have always meant by `roles` and `hostIds`.
+  return {
+    ...caller,
+    hostGrants: caller.roles.flatMap((role) =>
+      role === Role.HostOwner || role === Role.HostStaff
+        ? caller.hostIds.map((hostId) => ({ role, hostId }))
+        : [],
+    ),
   };
 }

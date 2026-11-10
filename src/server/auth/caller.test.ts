@@ -82,7 +82,10 @@ describe('callerFromGrants', () => {
       { roles: [Role.Guest], hostIds: [] },
     ],
   ])('gives %s', (_name, grants, expected) => {
-    expect(callerFromGrants(userId, grants)).toEqual({ userId, ...expected });
+    expect(callerFromGrants(userId, grants)).toMatchObject({
+      userId,
+      ...expected,
+    });
   });
 
   it('builds a caller requireRole accepts for its own host and refuses for another', () => {
@@ -99,6 +102,33 @@ describe('callerFromGrants', () => {
     expect(() => {
       requireRole(caller, Role.Ops, {});
     }).toThrow(ForbiddenError);
+  });
+
+  it('keeps each host role with its host: owner of A and staff of B is not owner of B', () => {
+    const caller = callerFromGrants(userId, [
+      { role: 'host_owner', hostId: host },
+      { role: 'host_staff', hostId: otherHostId },
+    ]);
+    const allowed = (role: Role, hostId: string) => {
+      try {
+        requireRole(caller, role, { hostId });
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    expect({
+      ownerOfA: allowed(Role.HostOwner, host),
+      staffOfB: allowed(Role.HostStaff, otherHostId),
+      ownerOfB: allowed(Role.HostOwner, otherHostId),
+      staffOfA: allowed(Role.HostStaff, host),
+    }).toEqual({
+      ownerOfA: true,
+      staffOfB: true,
+      ownerOfB: false,
+      staffOfA: false,
+    });
   });
 
   it('builds a guest who owns their own rows only', () => {
@@ -160,6 +190,7 @@ describe('callerForHeaders', () => {
       userId,
       roles: [Role.Guest, Role.Ops],
       hostIds: [],
+      hostGrants: [],
     });
     expect(readRoleGrants).toHaveBeenCalledWith(userId);
     expect(extendSessionExpiry).toHaveBeenCalledWith(
@@ -267,5 +298,25 @@ describe('requireRole', () => {
     expect(() => {
       requireRole(testCaller(overrides), role, resource);
     }).toThrow(ForbiddenError);
+  });
+});
+
+describe('testCaller', () => {
+  it('pairs every host role with every host, as roles and hostIds have always meant', () => {
+    const built = testCaller({
+      roles: [Role.HostOwner],
+      hostIds: [TEST_HOST_ID],
+    });
+
+    expect(built.hostGrants).toEqual([
+      { role: Role.HostOwner, hostId: TEST_HOST_ID },
+    ]);
+    expect(testCaller().hostGrants).toEqual([]);
+  });
+
+  it('keeps hostGrants a test passes', () => {
+    const grants = [{ role: Role.HostStaff, hostId: 'h' }] as const;
+
+    expect(testCaller({ hostGrants: grants }).hostGrants).toBe(grants);
   });
 });

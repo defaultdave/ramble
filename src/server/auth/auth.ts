@@ -4,6 +4,7 @@ import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { magicLink } from 'better-auth/plugins/magic-link';
 import {
+  appUrlIsRequired,
   initialSessionExpiry,
   pickAuthSecret,
   sessionMaxAgeSeconds,
@@ -28,6 +29,10 @@ function createAuth() {
     env.NODE_ENV,
   );
   if (secret === null) throw new Error('BETTER_AUTH_SECRET is not set');
+  // `env.APP_URL` defaults to localhost, so the raw variable is what says whether it was set.
+  if (appUrlIsRequired(env.VERCEL_ENV, process.env.APP_URL)) {
+    throw new Error('APP_URL is not set');
+  }
 
   return betterAuth({
     appName: 'Ramble',

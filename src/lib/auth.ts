@@ -83,3 +83,11 @@ export function pickAuthSecret(
   if (configured) return configured;
   return nodeEnv === 'production' ? null : developmentSecrets[kind];
 }
+
+/** A deployed environment must say its own address: a localhost default would put it in every sign-in link. */
+export function appUrlIsRequired(
+  vercelEnv: string | undefined,
+  configured: string | undefined,
+): boolean {
+  return (vercelEnv === 'production' || vercelEnv === 'preview') && !configured;
+}

@@ -19,6 +19,17 @@ export type Caller = {
   roles: readonly Role[];
   /** Hosts the caller acts for; read only for host owner and host staff. */
   hostIds: readonly string[];
+  /**
+   * Which host role is held on which host. When present, host roles are checked against these
+   * pairs, so owner of one host and staff of another is not owner of both. A caller built without
+   * it is checked against `hostIds` alone.
+   */
+  hostGrants?: readonly HostGrant[];
+};
+
+export type HostGrant = {
+  role: typeof Role.HostOwner | typeof Role.HostStaff;
+  hostId: string;
 };
 
 /** The row a data-layer function is about to read or write. */
@@ -50,7 +61,13 @@ export function callerFromGrants(
   grants: readonly RoleGrant[],
 ): Caller {
   const valid = grants.filter(isValidGrantScope);
+  const hostGrants = valid.flatMap((g) =>
+    g.hostId !== null && (g.role === 'host_owner' || g.role === 'host_staff')
+      ? [{ role: g.role, hostId: g.hostId }]
+      : [],
+  );
   return {
+    hostGrants,
     userId,
     roles: [...new Set<Role>([Role.Guest, ...valid.map((g) => g.role)])],
     hostIds: [
@@ -110,7 +127,11 @@ function ownsResource(caller: Caller, role: Role, resource: Resource) {
     case Role.HostStaff:
       return (
         resource.hostId !== undefined &&
-        caller.hostIds.includes(resource.hostId)
+        (caller.hostGrants
+          ? caller.hostGrants.some(
+              (g) => g.role === role && g.hostId === resource.hostId,
+            )
+          : caller.hostIds.includes(resource.hostId))
       );
     case Role.Guest:
       return (

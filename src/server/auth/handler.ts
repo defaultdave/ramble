@@ -20,6 +20,12 @@ function refusal(
   return new Response(null, { status, headers: { ...noStore, ...headers } });
 }
 
+function withoutContentLength(headers: Headers): Headers {
+  const copy = new Headers(headers);
+  copy.delete('content-length');
+  return copy;
+}
+
 /**
  * Counts a sign-in link request against its address before Better Auth sees it. Returns the request
  * to pass on (its body was read, so it is rebuilt from the text) or the refusal. A request that
@@ -66,7 +72,8 @@ async function guardSignInLink(
   return {
     request: new Request(request.url, {
       method: request.method,
-      headers: request.headers,
+      // The declared length was the original body's; the rebuilt one sets its own.
+      headers: withoutContentLength(request.headers),
       body: text,
     }),
   };

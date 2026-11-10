@@ -1,20 +1,25 @@
 import 'server-only';
 import { createHmac } from 'node:crypto';
 import {
+  canRehash,
   capabilityTokenMessage,
   isCapabilityTokenShape,
   manageHashAfterBump,
   nextTokenVersion,
   pickCapabilityTokenSecret,
   rehashLimits,
-  storesHash,
   type CapabilityTokenKind,
-  type HashStoredKind,
+  type RehashKind,
   type RehashOptions,
 } from '@/lib/capabilityTokens';
 import { WriteIdSchema } from '@/lib/catalog';
 import { isOrderReference } from '@/lib/orders';
 import { db, type Transaction } from '@/server/db/client';
+import {
+  lockGiftTokenVersion,
+  readGiftByTokenHash,
+  writeGiftTokenVersion,
+} from '@/server/db/giftTokens';
 import {
   lockOrderTokenState,
   readManageTokenPage,
@@ -29,8 +34,8 @@ import { secureEqual, sha256Hex } from '@/server/hash';
 
 // Capability links (design doc 4.2.3, the accepted amendment, option A): a token is derived from
 // the row, so any server code can rebuild a link, and the version bumps to void the earlier ones.
-// Both kinds so far live on `orders` and share its `manage_token_version`, so one bump voids the
-// manage link and the confirmation URL together.
+// The `manage` and `order` kinds live on `orders` and share its `manage_token_version`, so one bump
+// voids the manage link and the confirmation URL together. A `gift` token lives on `gifts`.
 
 function secret(): string {
   const configured = pickCapabilityTokenSecret(
@@ -61,8 +66,9 @@ export function hashToken(token: string): string {
 export type ResolvedToken = OrderTokenRow;
 
 // TODO(U-055): first caller, the manage page; U-054 and U-107 follow.
+// TODO(U-064a): first caller of the `gift` kind, redeemGift; U-064b follows.
 export async function resolveToken(
-  kind: 'manage',
+  kind: 'manage' | 'gift',
   token: string,
 ): Promise<ResolvedToken | null>;
 export async function resolveToken(
@@ -71,9 +77,9 @@ export async function resolveToken(
   reference: string,
 ): Promise<ResolvedToken | null>;
 /**
- * The order a token opens, or null. A `manage` token is found by its stored hash; an `order` token
- * stores none, so it is found by the order's reference. Either way the token is then compared, in
- * constant time, against the one recomputed for the row's current version, so a token from before a
+ * The row a token opens, or null. A `manage` token is found by its stored hash on an order, a
+ * `gift` token by its stored hash on a gift; an `order` token stores none, so it is found by the
+ * order's reference. Either way the token is then compared, in constant time, against the one recomputed for the row's current version, so a token from before a
  * bump, a token of another kind, and a token that merely hashes alike all resolve to nothing.
  */
 export async function resolveToken(
@@ -82,9 +88,11 @@ export async function resolveToken(
   reference?: string,
 ): Promise<ResolvedToken | null> {
   if (!isCapabilityTokenShape(token)) return null;
-  let row: OrderTokenRow | null;
+  let row: ResolvedToken | null;
   if (kind === 'manage') {
     row = await readOrderByManageHash(hashToken(token));
+  } else if (kind === 'gift') {
+    row = await readGiftByTokenHash(hashToken(token));
   } else {
     if (reference === undefined || !isOrderReference(reference)) return null;
     row = await readOrderByReference(reference);
@@ -95,12 +103,14 @@ export async function resolveToken(
     : null;
 }
 
-// TODO(U-077): first caller, "void earlier links".
+// TODO(U-077): first caller, "void earlier links"; U-113 follows for gifts.
 /**
- * Raises the order's token version by one and, in the same UPDATE, rewrites the stored hash to the
- * new manage token, which voids the earlier manage link and confirmation URL. An order that has no
- * manage hash yet (not confirmed) keeps none. Joins the caller's transaction and takes the order
- * row lock itself, so two bumps never read one version. Null when the order does not exist.
+ * Raises the row's token version by one and, in the same UPDATE, rewrites the stored hash to the
+ * new token. For `manage` and `order` the row is the order, and the new manage token voids the
+ * earlier manage link and confirmation URL; an order that has no manage hash yet (not confirmed)
+ * keeps none. For `gift` the row is the gift, which always holds a hash. Joins the caller's
+ * transaction and takes the row lock itself, so two bumps never read one version. Null when the
+ * row does not exist.
  */
 export async function bumpTokenVersion(
   tx: Transaction,
@@ -110,6 +120,7 @@ export async function bumpTokenVersion(
   switch (kind) {
     case 'manage':
     case 'order':
+    case 'gift':
       break;
     default:
       throw new RangeError(
@@ -118,6 +129,18 @@ export async function bumpTokenVersion(
   }
   const parsed = WriteIdSchema.safeParse(id);
   if (!parsed.success) return null;
+  if (kind === 'gift') {
+    const current = await lockGiftTokenVersion(tx, parsed.data);
+    if (current === null) return null;
+    const next = nextTokenVersion(current);
+    await writeGiftTokenVersion(
+      tx,
+      parsed.data,
+      next,
+      hashToken(capabilityToken('gift', parsed.data, next)),
+    );
+    return { version: next };
+  }
   const state = await lockOrderTokenState(tx, parsed.data);
   if (state === null) return null;
   const version = nextTokenVersion(state.version);
@@ -136,11 +159,11 @@ export async function bumpTokenVersion(
  * with an error rather than loop past the cap. Returns how many hashes it rewrote.
  */
 export async function rehashTokens(
-  kind: HashStoredKind,
+  kind: RehashKind,
   options: RehashOptions = {},
 ): Promise<number> {
   const { batchSize, maxBatches } = rehashLimits(options);
-  if (!storesHash(kind)) return 0;
+  if (!canRehash(kind)) return 0;
   let rewritten = 0;
   let afterId: string | null = null;
   // The cap counts pages that returned rows; the empty read that ends the run is free, so exactly

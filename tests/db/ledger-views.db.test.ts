@@ -11,6 +11,7 @@ import {
 } from '@/lib/ledger';
 import { ForbiddenError, Role } from '@/server/auth/caller';
 import { testCaller } from '@/server/auth/test-caller';
+import { insertGift } from './giftFixtures';
 import {
   client,
   common,
@@ -131,7 +132,7 @@ describe('the views', () => {
     await post(
       giftPurchased({
         ...when,
-        giftId: randomUUID(),
+        giftId: (await insertGift(client.db, parents)).id,
         providerObjectId: nextProviderId(),
         amountMinor: 5000,
       }),

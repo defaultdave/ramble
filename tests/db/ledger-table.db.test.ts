@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
+import { insertGift } from './giftFixtures';
 import {
   cashRow,
   client,
@@ -24,7 +25,7 @@ import {
 // - a provider id is present exactly on rows that touch platform_cash, and is not blank or over 255 characters
 // - a memo is not blank and at most 500 characters; times are in range
 // - simulated has no default; the id is generated; an unknown entry type or account is refused
-// - foreign keys to order, host, attempt, refund, and transfer; none on gift, dispute, or created_by; an order with entries cannot be deleted
+// - foreign keys to order, host, attempt, refund, and transfer; gift; none on dispute or created_by; an order with entries cannot be deleted
 // - the cash index: the same entry type and provider id twice is refused, the same id under another type is not, rows with no provider id repeat
 
 openLedgerDatabase();
@@ -192,8 +193,16 @@ describe('ledger_entries', () => {
     ).rejects.toMatchObject(constraint('ledger_entries_names_a_subject'));
   });
 
-  it('accepts a gift or an order alone as the subject, with no foreign key on the gift', async () => {
-    await insert(cashRow({ host_id: null, gift_id: randomUUID() }));
+  it('accepts a gift or an order alone as the subject, and refuses a gift that does not exist', async () => {
+    await insert(
+      cashRow({
+        host_id: null,
+        gift_id: (await insertGift(client.db, parents)).id,
+      }),
+    );
+    await expect(
+      insert(cashRow({ host_id: null, gift_id: randomUUID() })),
+    ).rejects.toMatchObject(constraint('ledger_entries_gift_id_gifts_id_fk'));
     await insert(
       cashRow({ host_id: null, order_id: await parents.newOrder() }),
     );

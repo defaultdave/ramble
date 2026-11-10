@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  canRehash,
   capabilityTokenKinds,
   capabilityTokenMessage,
   isCapabilityTokenShape,
@@ -11,12 +12,11 @@ import {
   pickCapabilityTokenSecret,
   rehashBatchSize,
   rehashLimits,
-  storesHash,
 } from './capabilityTokens';
 
 // Behaviours under test, one per decision, branch or risk.
 // - the message the HMAC covers: unique per kind, id, and version; refuses a bad id or version
-// - which kinds store a hash
+// - which kinds a secret rotation re-hashes (not gifts yet)
 // - token and hash shapes, checked before any lookup and bounded
 // - the next version: plus one, refused at the integer limit
 // - the secret: configured, fixed only in test, none elsewhere
@@ -51,12 +51,13 @@ describe('capabilityTokenMessage', () => {
   });
 });
 
-describe('storesHash', () => {
+describe('canRehash', () => {
   it.each([
     ['manage', true],
     ['order', false],
-  ] as const)('%s stores a hash: %s', (kind, expected) => {
-    expect(storesHash(kind)).toBe(expected);
+    ['gift', false],
+  ] as const)('a rotation re-hashes %s: %s', (kind, expected) => {
+    expect(canRehash(kind)).toBe(expected);
   });
 });
 

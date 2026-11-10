@@ -30,13 +30,21 @@ import {
 // - the longest form the schema accepts still queues, so the notice never refuses what the form let through
 // - a draft experience takes no request: nothing is written, and the guest is told it failed
 // - a refused guard (honeypot) answers sent and writes neither a request nor a job
-// - a form that fails validation writes nothing
+// - a form that fails validation writes nothing, including an optional message far over the limit, which is refused rather than dropped
+// - a failed notice enqueue rolls the request back: no request without its notice
 // - the sixth submit from one address within the window is rate limited and writes nothing
 
 vi.mock(
   'next/headers',
   async () => (await import('../deviceFixture')).nextHeadersMock,
 );
+
+// The real enqueue, spied on so one test can make it fail inside the request's transaction.
+vi.mock('@/server/jobs/enqueue', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('@/server/jobs/enqueue')>();
+  return { ...original, enqueue: vi.fn(original.enqueue) };
+});
 
 let fresh: FreshDatabase;
 let client: typeof import('@/server/db/client');
@@ -257,6 +265,27 @@ describe('submitting the private session form', () => {
 
     expect(await requests()).toHaveLength(0);
     expect(await noticeJobs()).toHaveLength(0);
+  });
+
+  it('writes no request when queuing its notice fails', async () => {
+    const queue = await import('@/server/jobs/enqueue');
+    vi.mocked(queue.enqueue).mockRejectedValueOnce(new Error('queue down'));
+
+    await expect(submit()).resolves.toMatchObject({ status: 'failed' });
+
+    expect(await requests()).toHaveLength(0);
+    expect(await noticeJobs()).toHaveLength(0);
+  });
+
+  it('answers invalid, not sent, for a message far over the limit', async () => {
+    await expect(
+      submit({ message: 'x'.repeat(privateSessionLimits.messageMaxChars * 3) }),
+    ).resolves.toMatchObject({
+      status: 'invalid',
+      errors: { message: expect.any(String) as string },
+    });
+
+    expect(await requests()).toHaveLength(0);
   });
 
   it('answers sent and writes nothing when the honeypot is filled', async () => {

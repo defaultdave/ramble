@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { opsNoticeLimits, type OpsNoticeData } from '@/lib/email/opsNotice';
+import { readTextFields } from '@/lib/formFields';
 import { formatMoney } from '@/lib/money';
 import { EmailFieldSchema, supportLimits } from '@/lib/support';
 import { oneLineClipped, requiredText } from '@/lib/text';
@@ -137,24 +138,15 @@ const fieldOfKey = {
   message: 'message',
 } as const satisfies Record<string, PrivateSessionField>;
 
-const ValueSchema = z.string().max(privateSessionLimits.messageMaxChars * 2);
-
-/** Reads the form's text fields; anything else (a file, a missing field) reads as empty. */
+/** Reads the form's text fields; see `readTextFields`. */
 export function readPrivateSessionValues(
   get: (field: PrivateSessionField) => unknown,
 ): PrivateSessionFormValues {
-  const read = (field: PrivateSessionField) => {
-    const value = ValueSchema.safeParse(get(field));
-    return value.success ? value.data : '';
-  };
-  return {
-    date: read('date'),
-    groupSize: read('groupSize'),
-    budget: read('budget'),
-    name: read('name'),
-    email: read('email'),
-    message: read('message'),
-  };
+  return readTextFields(
+    privateSessionFields,
+    get,
+    privateSessionLimits.messageMaxChars * 2,
+  );
 }
 
 const isSchemaKey = (key: unknown): key is keyof typeof fieldOfKey =>

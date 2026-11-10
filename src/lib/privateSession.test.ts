@@ -167,6 +167,24 @@ describe('readPrivateSessionValues', () => {
   });
 });
 
+describe('an over-long message end to end', () => {
+  it('is read whole enough to be refused, never emptied into a valid request', () => {
+    const typed = 'x'.repeat(privateSessionLimits.messageMaxChars * 5);
+    const values = readPrivateSessionValues((field) =>
+      field === 'message' ? typed : valid[field],
+    );
+
+    expect(values.message).not.toBe('');
+    const result = parse({ message: values.message });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(privateSessionFieldErrors(result.error)).toEqual({
+        message: privateSessionFieldMessages.message,
+      });
+    }
+  });
+});
+
 describe('privateRequestNotice', () => {
   const request = schema.parse({ ...valid, budgetMinor: valid.budget });
   const stored = {

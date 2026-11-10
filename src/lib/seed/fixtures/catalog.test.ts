@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { photoLimits } from '@/lib/photos';
 import { fixtureIssues } from '../validate';
-import { planTestPhotos } from '../testPhotos';
-import { renderTestPhoto } from '../testPhotoImage';
+import { planTestPhotos, wrapLabel } from '../testPhotos';
+import { labelColumns, renderTestPhoto } from '../testPhotoImage';
 import { curated } from './index';
 import { photoManifest } from './photoManifest';
 import type { ExperienceFixture } from '../types';
@@ -13,8 +13,8 @@ import type { ExperienceFixture } from '../types';
 // - guide entries link out and sell nothing; the hosts of guides are not the hosts of bookings
 // - the data varies on every browse filter, and keeps sold-out, nearly full, and sparse dates
 // - the copy keeps to the tone checklist's mechanics: lengths, no banned words, no prices in prose, no pressure
-// - the photo manifest names every experience once, with 3 to 5 distinct captions, and every planned photo
-//   has alt text and its own picture
+// - the photo manifest names every experience once, with 3 to 5 distinct captions that describe the drawn
+//   illustration, and every planned photo has alt text and its own picture
 
 const all = curated.experiences;
 const guides = all.filter((e) => e.status === 'guide_only');
@@ -180,7 +180,7 @@ describe('copy against the tone checklist', () => {
     (_slug, text) => {
       expect(text).not.toMatch(pressure);
       expect(text).not.toContain('!');
-      expect(text).not.toMatch(/[$€£]|\bUSD\b/);
+      expect(text).not.toMatch(/[$€£]|\bUSD\b|(?<![-\w])free\b/i);
     },
   );
 
@@ -234,6 +234,14 @@ describe('the photo pool manifest', () => {
   });
 
   const plans = all.map((e) => ({ e, plan: planTestPhotos(e) }));
+
+  it('describes the drawn illustration: its motif, and a name that is not cut off at the foot', () => {
+    for (const { e, plan } of plans) {
+      const drawn = wrapLabel(e.name, labelColumns, 3).join(' ');
+      expect(drawn).toBe(e.name.toUpperCase());
+      for (const photo of plan) expect(photo.altText).toContain(e.name);
+    }
+  });
 
   it('plans every photo with alt text that opens as an illustration and is unique', () => {
     const alts = plans.flatMap(({ plan }) => plan.map((p) => p.altText));

@@ -9,7 +9,7 @@ export const catalogHosts: HostFixture[] = [
     slug: 'spoke-and-saddle',
     name: 'Spoke & Saddle',
     description:
-      'Two cycling teachers who lead small, unhurried rides along the Brooklyn waterfront. Bikes and helmets included, and nobody gets dropped.',
+      'Two cycling teachers who lead small, unhurried rides along the New York waterfront. Bikes and helmets included, and nobody gets dropped.',
   },
   {
     slug: 'second-pour',
@@ -27,13 +27,13 @@ export const catalogHosts: HostFixture[] = [
     slug: 'stoop-garden-club',
     name: 'Stoop Garden Club',
     description:
-      'A volunteer-run garden in Park Slope. Saturday sessions stay small, and the vegetables go to neighbors.',
+      'A volunteer-run garden in Park Slope. Anyone can come and get their hands dirty, and the vegetables go to neighbors.',
   },
   {
     slug: 'corner-table-tours',
     name: 'Corner Table Tours',
     description:
-      'Neighbors who eat their way around Sunset Park and take a few guests along. Every stop is a family-run place they go to themselves.',
+      'Neighbors who eat their way around south and west Brooklyn and take a few guests along. They only visit counters and kitchens they go to themselves.',
   },
   {
     slug: 'quill-and-ink-press',
@@ -51,7 +51,7 @@ export const catalogHosts: HostFixture[] = [
     slug: 'fifth-avenue-run-club',
     name: 'Fifth Avenue Run Club',
     description:
-      'A free, friendly run group that meets in Sunset Park. Ramble lists the Saturday runs; the club keeps its own sign-up.',
+      'A friendly run group that meets in Sunset Park. Ramble lists the Saturday runs; the club keeps its own sign-up.',
   },
   {
     slug: 'sunday-supper-club',

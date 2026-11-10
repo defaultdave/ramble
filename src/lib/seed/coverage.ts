@@ -667,8 +667,7 @@ export const coverage: CoverageEntry[] = [
     title: 'Experience',
     probes: ['kayak-page', 'kayak-session-states', 'neighbors'],
     trigger: 'Open the kayak page.',
-    // TODO(U-021b): seed the photo pool, then drop this gap.
-    gap: 'The seed writes no photo rows yet; the gallery shows its placeholder.',
+    gap: 'The seed writes photo rows only when STORAGE_PROVIDER=vercel-blob; with the fake provider the gallery shows its placeholder.',
   },
   {
     id: '03b',

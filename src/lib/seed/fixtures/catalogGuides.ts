@@ -80,7 +80,7 @@ export const guideExperiences: ExperienceFixture[] = [
     neighborhoodSlug: 'tribeca',
     name: 'Martinis and a short history',
     description:
-      'A short history of the martini, told with three of them. The bar pours slowly and talks fast, and the bar snacks are better than they need to be.',
+      'A short history of the martini, told with three of them. The bar pours slowly and talks fast, and the snacks are a real plate, not a bowl of peanuts.',
     meetingPoint: 'Old Pier Oyster Bar, Tribeca.',
     durationMinutes: 75,
     linkOutUrl: 'https://old-pier-oyster-bar.example.com/lessons/martini',
@@ -92,7 +92,7 @@ export const guideExperiences: ExperienceFixture[] = [
     neighborhoodSlug: 'sunset-park',
     name: 'Saturday easy run in Sunset Park',
     description:
-      'A free, easy run up the hill to the park and back, at a pace where you can still talk. All speeds are welcome, and the group waits at every corner.',
+      'An easy run up the hill to the park and back, at a pace where you can still talk. All speeds are welcome, and the group waits at every corner.',
     meetingPoint: 'The corner of Fifth Avenue and 44th Street, Sunset Park.',
     durationMinutes: 60,
     linkOutUrl: 'https://fifth-avenue-run-club.example.com/saturday-run',
@@ -118,7 +118,7 @@ export const guideExperiences: ExperienceFixture[] = [
     description:
       'A home cook, a long table, and a menu that changes with the market. Bring a bottle if you like, and leave with the recipe for whatever you liked best.',
     meetingPoint:
-      "A home cook's apartment in Williamsburg. The address comes with your booking.",
+      "A home cook's apartment in Williamsburg. The host sends the address when you book.",
     durationMinutes: 180,
     linkOutUrl: 'https://sunday-supper-club.example.com/suppers',
     affiliate: true,
@@ -132,7 +132,7 @@ export const guideExperiences: ExperienceFixture[] = [
     description:
       'A flaky-crust morning with a home baker who has rolled out a thousand of them. You roll, crimp, and carry a small pie home still warm.',
     meetingPoint:
-      "A home baker's kitchen in Williamsburg. The address comes with your booking.",
+      "A home baker's kitchen in Williamsburg. The host sends the address when you book.",
     durationMinutes: 150,
     linkOutUrl: 'https://sunday-supper-club.example.com/pie',
   }),
@@ -143,9 +143,9 @@ export const guideExperiences: ExperienceFixture[] = [
     neighborhoodSlug: 'carroll-gardens',
     name: 'Kids pizza Saturday in Carroll Gardens',
     description:
-      "A relaxed Saturday where kids make personal pizzas at a home cook's counter. Grown-ups stay, and there is coffee.",
+      "A relaxed Saturday where kids make personal pizzas at a home cook's counter. Grown-ups stay, and there's coffee.",
     meetingPoint:
-      "A home cook's kitchen in Carroll Gardens. The address comes with your booking.",
+      "A home cook's kitchen in Carroll Gardens. The host sends the address when you book.",
     durationMinutes: 90,
     linkOutUrl: 'https://sunday-supper-club.example.com/kids-pizza',
   }),

@@ -15,7 +15,7 @@ export const makerExperiences: ExperienceFixture[] = [
       neighborhoodSlug: 'williamsburg',
       name: 'Hand-built planters for small windowsills',
       description:
-        'Pinch, coil, and slab your way to a planter sized for the herbs you keep forgetting to water. The teacher shows three hand-building methods, then lets you pick one and make it yours.',
+        'Pinch, coil, and slab your way to a planter sized for the herbs you keep forgetting to water. Three hand-building methods get demoed, then you pick one and make it yours.',
     },
     {
       tier: 'moderate',
@@ -64,7 +64,7 @@ export const makerExperiences: ExperienceFixture[] = [
       neighborhoodSlug: 'carroll-gardens',
       name: 'Visible mending afternoon',
       description:
-        'Bring a sweater with a hole in it and learn to fix it so the repair shows. You practice three stitches on a sample, then mend your own piece while the teacher goes around the table.',
+        'Bring a sweater with a hole in it and learn to fix it so the repair shows. Practice three stitches on a sample, then mend your own piece while the teacher goes around the table.',
     },
     {
       meetingPoint: 'Thimble & Thread, Carroll Gardens.',
@@ -116,7 +116,7 @@ export const makerExperiences: ExperienceFixture[] = [
       meetingPoint:
         'Salt & Semolina, Carroll Gardens. Ring the bell marked Kitchen.',
       included:
-        'Ingredients, aprons, lunch at the table, and a jar of sauce to take home.',
+        'Ingredients, aprons, a meal at the table, and a jar of sauce to take home.',
       durationMinutes: 180,
       accessibilityNotes:
         'Step-free entrance. Most of the work is at a standing-height counter, and stools are available.',
@@ -124,7 +124,7 @@ export const makerExperiences: ExperienceFixture[] = [
       minAge: 12,
       taxTreatment: 'unknown',
       prices: [{ kind: 'adult', priceMinor: 9500, usesSpace: true }],
-      slots: [slot(0, '11:00', 180, 10), slot(3, '18:00', 180, 10)],
+      slots: [slot(0, '11:00', 180, 10), slot(0, '16:00', 180, 10)],
     },
   ),
   experience(
@@ -156,7 +156,7 @@ export const makerExperiences: ExperienceFixture[] = [
       neighborhoodSlug: 'carroll-gardens',
       name: 'Pickles and ferments workshop',
       description:
-        'Salt a cabbage, brine a cucumber, and find out why the jar bubbles. You pack three small jars to take home, plus a plan for what to do when they get funky.',
+        'Salt a cabbage, brine a cucumber, and find out why the jar bubbles. Three small jars come home with you, plus a plan for when they get funky.',
     },
     {
       meetingPoint:
@@ -179,7 +179,7 @@ export const makerExperiences: ExperienceFixture[] = [
       neighborhoodSlug: 'lower-east-side',
       name: 'Stirred, not shaken: a cocktail class',
       description:
-        'Make three classic drinks behind a real bar and learn why the stir matters. The bartender walks you through ice, ratios, and the small habits that make a drink taste right.',
+        "Make three classic drinks behind a real bar and learn why the stir matters. You'll pick up ice, ratios, and the small habits that make a drink taste right from a working bartender.",
     },
     {
       tier: 'moderate',
@@ -203,7 +203,7 @@ export const makerExperiences: ExperienceFixture[] = [
       neighborhoodSlug: 'lower-east-side',
       name: 'Amaro and aperitivo hour',
       description:
-        'Taste six bitter, herbal, slightly strange bottles and find the one you will order next time. Small snacks and a short history lesson come with the pours.',
+        "Taste six bitter, herbal, slightly strange bottles and find the one you'll order next time. Small snacks and a short history lesson come with the pours.",
     },
     {
       meetingPoint: 'Second Pour, Lower East Side.',
@@ -225,7 +225,7 @@ export const makerExperiences: ExperienceFixture[] = [
       neighborhoodSlug: 'lower-east-side',
       name: 'Three grapes, one night',
       description:
-        'One grape, three producers, and a host who lines them up side by side. It is the quickest way to learn what a place and a pair of hands do to a wine.',
+        "One grape, three producers, and a host who lines them up side by side. It's the quickest way to learn what a place and a pair of hands do to a wine.",
     },
     {
       tier: 'moderate',
@@ -253,7 +253,7 @@ export const makerExperiences: ExperienceFixture[] = [
       neighborhoodSlug: 'sunset-park',
       name: 'Dumpling crawl on Eighth Avenue',
       description:
-        'Five stops, five kinds of dumpling, and a guide who knows who makes the best wrapper on the block. You walk about a mile between bites, and every stop is a family-run counter.',
+        'Five stops, five kinds of dumpling, and a guide who knows who makes the best wrapper on the block. You walk about a mile between bites, and every stop is a small counter with a short menu.',
     },
     {
       meetingPoint: 'The corner of Eighth Avenue and 55th Street, Sunset Park.',
@@ -280,7 +280,7 @@ export const makerExperiences: ExperienceFixture[] = [
       neighborhoodSlug: 'williamsburg',
       name: 'Latte art basics',
       description:
-        'Pull a shot, steam the milk, and pour until the heart shows up. The barista keeps it to six people, so everyone gets a turn at the machine and plenty of practice cups.',
+        'Pull a shot, steam the milk, and pour until the heart shows up. Class is capped at six, so everyone gets a turn at the machine and plenty of practice cups.',
     },
     {
       meetingPoint: 'Bean Counter Coffee Lab, Williamsburg.',
@@ -320,7 +320,7 @@ export const makerExperiences: ExperienceFixture[] = [
       neighborhoodSlug: 'carroll-gardens',
       name: 'Cheese counter tasting',
       description:
-        'Six cheeses, two breads, and a cheesemonger who will tell you what to buy for Friday night. You meet at a Carroll Gardens counter the block has trusted for years.',
+        'Six cheeses, two breads, and a cheesemonger who will tell you what to buy for Friday night. You meet at a cheese counter on Court Street in Carroll Gardens.',
     },
     {
       tier: 'moderate',

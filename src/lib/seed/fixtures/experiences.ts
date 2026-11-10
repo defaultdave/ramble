@@ -51,7 +51,7 @@ export const hosts: HostFixture[] = [
     slug: 'cast-iron-walks',
     name: 'Cast Iron Walks',
     description:
-      'Two architecture nerds who lead small walking groups below Canal Street.',
+      'Two architecture nerds who lead small walking groups through old Manhattan streets and Brooklyn brownstone blocks.',
   },
   {
     slug: 'low-tide-studio',

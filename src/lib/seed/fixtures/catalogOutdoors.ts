@@ -174,7 +174,7 @@ export const outdoorExperiences: ExperienceFixture[] = [
       neighborhoodSlug: 'park-slope',
       name: 'Saturday morning at the stoop garden',
       description:
-        "Weed, water, and harvest alongside the volunteers who keep this Park Slope garden going. You learn what is in season, take home a bag of what you picked, and the rest goes to a neighbor's table.",
+        "You'll weed, water, and harvest alongside the volunteers who keep this Park Slope garden going. You learn what's in season and take home a bag of what you picked, and the rest goes to a neighbor's table.",
     },
     {
       meetingPoint: 'The Stoop Garden gate on Seventh Avenue, Park Slope.',
@@ -222,7 +222,7 @@ export const outdoorExperiences: ExperienceFixture[] = [
       neighborhoodSlug: 'park-slope',
       name: 'Garden meditation morning',
       description:
-        'Sit among the raised beds with a teacher who keeps it short and kind. You get twenty minutes of quiet, a slow walk through the garden, and tea before you go.',
+        'A teacher who keeps it short and kind leads twenty minutes of quiet among the raised beds, then a slow walk through the garden and tea before you go.',
     },
     {
       meetingPoint: 'The Stoop Garden gate on Seventh Avenue, Park Slope.',
@@ -245,7 +245,7 @@ export const outdoorExperiences: ExperienceFixture[] = [
       neighborhoodSlug: 'park-slope',
       name: 'Little bakers: pizza night',
       description:
-        'Kids stretch dough, spread sauce, and top their own pizza, then eat it hot at the counter. Grown-ups can stay for a slice and a coffee while they wait.',
+        'Stretch the dough, spread the sauce, top it yourself: each kid makes a personal pizza and eats it hot at the counter. Grown-ups can stay for a slice and a coffee while they wait.',
     },
     {
       meetingPoint: 'Little Bakers Co. storefront, Park Slope.',
@@ -270,7 +270,7 @@ export const outdoorExperiences: ExperienceFixture[] = [
       neighborhoodSlug: 'tribeca',
       name: 'Family paddle Sunday',
       description:
-        'Kids and grown-ups share a tandem kayak on calm water near the pier, with a guide close by. It is the gentlest way to try paddling, and the kids steer more than they think.',
+        "Kids and grown-ups share a tandem kayak on calm water near the pier, with a guide close by. It's the gentlest way to try paddling, and the kids steer more than they think.",
     },
     {
       meetingPoint:
@@ -326,7 +326,7 @@ export const outdoorExperiences: ExperienceFixture[] = [
       neighborhoodSlug: 'carroll-gardens',
       name: 'Sew a hand puppet',
       description:
-        'Kids choose felt and buttons, sew a hand puppet, and give it a name and a voice. The needles are blunt, and every child gets help with their first stitches.',
+        'Felt, buttons, and blunt needles: kids sew a hand puppet, then give it a name and a voice. Every child gets help with their first stitches.',
     },
     {
       meetingPoint: 'Thimble & Thread, Carroll Gardens.',

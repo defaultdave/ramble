@@ -18,7 +18,10 @@ import { readBodyText } from '@/server/boundedBody';
 import { revalidateTagsForChanges } from '@/server/cache/invalidate';
 import { releaseLapsedHolds, scrubReleasedHolds } from '@/server/db/holds';
 import { PURGE_BATCH, purgeExpiredRateLimits } from '@/server/db/rateLimits';
-import { extendSessionHorizon } from '@/server/db/sessions';
+import {
+  extendSessionHorizon,
+  type ExtendHorizonResult,
+} from '@/server/db/sessions';
 import { env } from '@/server/env';
 import { scheduleAuditExports } from '@/server/jobs/auditSchedule';
 import { drainJobs } from '@/server/jobs/drain';
@@ -108,26 +111,50 @@ async function queueAuditExports(): Promise<void> {
 }
 
 /**
- * Keeps the rolling window of sessions generated, on the pulse's clock. A failure is logged by name
- * and not thrown, for the reason given on `queueAuditExports`: the next pulse tries the same range
+ * Keeps the rolling window of sessions generated, on the pulse's clock. The experiences that gained
+ * sessions are revalidated first, then each failure is logged and alerted by name. A failure is not thrown, for the reason given on `queueAuditExports`: the next pulse tries the same range
  * again, and a date already generated is left alone. Returns how many sessions were created.
  */
 async function extendSessions(now: Date): Promise<number> {
+  let result: ExtendHorizonResult;
   try {
-    const { created, experienceIds } = await extendSessionHorizon(now);
-    revalidateTagsForChanges(
-      experienceIds.map((experienceId) => ({
-        kind: 'schedule',
-        experienceId,
-      })),
-    );
-    return created;
+    result = await extendSessionHorizon(now);
   } catch (error) {
     const errorName = errorKind(error, 'NonError');
     logger.error('the session horizon could not be extended', { errorName });
     alerts.raise('session-horizon-failed', 'error', 'queue', { errorName });
     return 0;
   }
+  try {
+    if (result.experienceIds.length > 0) {
+      revalidateTagsForChanges(
+        result.experienceIds.map((experienceId) => ({
+          kind: 'schedule',
+          experienceId,
+        })),
+      );
+    }
+  } catch (error) {
+    const errorName = errorKind(error, 'NonError');
+    logger.error('the schedule caches could not be revalidated', {
+      errorName,
+    });
+    alerts.raise('session-horizon-revalidate-failed', 'error', 'queue', {
+      errorName,
+    });
+  }
+  if (result.failed > 0) {
+    const errorName = result.firstErrorName ?? 'NonError';
+    logger.error('some templates could not be extended', {
+      failed: result.failed,
+      errorName,
+    });
+    alerts.raise('session-horizon-failed', 'error', 'queue', {
+      errorName,
+      failed: result.failed,
+    });
+  }
+  return result.created;
 }
 
 /**

@@ -53,7 +53,9 @@ vi.mock('@/server/ports/rate-limit', () => ({ consumeRateLimit: vi.fn() }));
 // - the audit exports are queued before the drain, so the same pulse runs them
 // - a failure queueing the exports is logged by name and does not stop the drain, the purge, the hold cleanup, or the heartbeat
 // - the session horizon is extended after the drain on the pulse's clock (fixed at asOf when one is given), its created count is answered, and the experiences that gained sessions have their schedule tag revalidated
-// - a failure extending the horizon is logged and alerted by name, counts zero, and does not stop the rest of the pulse or the heartbeat
+// - a failure extending the horizon is logged and alerted by name, counts zero, revalidates nothing, and does not stop the rest of the pulse or the heartbeat
+// - templates that failed are alerted by first error name and count after the successes are revalidated, and the pulse still answers 200
+// - a revalidation that throws is logged and alerted as its own failure, not as the horizon failing
 // - a drain or purge failure is thrown and sends no heartbeat
 // - a drain that could not record a failure answers 200 with its counts but sends no heartbeat
 // - a heartbeat that fails does not fail the pulse
@@ -99,7 +101,13 @@ beforeEach(() => {
   vi.mocked(drainJobs).mockReset().mockResolvedValue(report);
   vi.mocked(extendSessionHorizon)
     .mockReset()
-    .mockResolvedValue({ created: 0, experienceIds: [], skipped: 0 });
+    .mockResolvedValue({
+      created: 0,
+      experienceIds: [],
+      skipped: 0,
+      failed: 0,
+      firstErrorName: null,
+    });
   vi.mocked(revalidateTagsForChanges).mockReset();
   vi.mocked(purgeExpiredRateLimits).mockReset().mockResolvedValue(0);
   vi.mocked(releaseLapsedHolds).mockReset().mockResolvedValue(0);
@@ -375,6 +383,8 @@ describe('a good pulse', () => {
       created: 7,
       experienceIds: ['exp-1', 'exp-2'],
       skipped: 0,
+      failed: 0,
+      firstErrorName: null,
     });
 
     const counts: unknown = await (await pulseResponse(post())).json();
@@ -386,6 +396,62 @@ describe('a good pulse', () => {
       { kind: 'schedule', experienceId: 'exp-1' },
       { kind: 'schedule', experienceId: 'exp-2' },
     ]);
+  });
+
+  it('revalidates the successes first, then alerts by name for the templates that failed, and still answers 200', async () => {
+    vi.mocked(extendSessionHorizon).mockResolvedValue({
+      created: 4,
+      experienceIds: ['exp-1'],
+      skipped: 0,
+      failed: 2,
+      firstErrorName: 'RangeError',
+    });
+
+    const response = await pulseResponse(post());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ sessionsCreated: 4 });
+    expect(revalidateTagsForChanges).toHaveBeenCalledExactlyOnceWith([
+      { kind: 'schedule', experienceId: 'exp-1' },
+    ]);
+    expect(raise).toHaveBeenCalledExactlyOnceWith(
+      'session-horizon-failed',
+      'error',
+      'queue',
+      { errorName: 'RangeError', failed: 2 },
+    );
+    expect(
+      vi.mocked(revalidateTagsForChanges).mock.invocationCallOrder[0],
+    ).toBeLessThan(raise.mock.invocationCallOrder[0] ?? 0);
+    expect(sendHeartbeat).toHaveBeenCalled();
+  });
+
+  it('logs a revalidation that throws as its own failure, not as the horizon failing', async () => {
+    vi.mocked(extendSessionHorizon).mockResolvedValue({
+      created: 1,
+      experienceIds: ['exp-1'],
+      skipped: 0,
+      failed: 0,
+      firstErrorName: null,
+    });
+    vi.mocked(revalidateTagsForChanges).mockImplementation(() => {
+      throw new TypeError('cache down');
+    });
+
+    const response = await pulseResponse(post());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ sessionsCreated: 1 });
+    expect(logger.error).toHaveBeenCalledExactlyOnceWith(
+      'the schedule caches could not be revalidated',
+      { errorName: 'TypeError' },
+    );
+    expect(raise).toHaveBeenCalledExactlyOnceWith(
+      'session-horizon-revalidate-failed',
+      'error',
+      'queue',
+      { errorName: 'TypeError' },
+    );
   });
 
   it('logs and alerts on a failure extending the horizon by name and carries on with the rest of the pulse', async () => {
@@ -407,6 +473,7 @@ describe('a good pulse', () => {
       'queue',
       { errorName: 'TypeError' },
     );
+    expect(revalidateTagsForChanges).not.toHaveBeenCalled();
     expect(purgeExpiredRateLimits).toHaveBeenCalled();
     expect(releaseLapsedHolds).toHaveBeenCalled();
     expect(sendHeartbeat).toHaveBeenCalled();

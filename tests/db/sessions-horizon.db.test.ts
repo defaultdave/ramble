@@ -16,6 +16,7 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 // - a later run adds only the dates that came into the window, and an edited session is not rebuilt
 // - a template that spans a daylight saving change keeps its local start time while the UTC start moves an hour
 // - a template with an unusable host zone is skipped and the rest carry on
+// - a template that throws is counted with the first error name only, and the templates before and after it are still extended and returned
 
 let fresh: FreshDatabase;
 let stopHttp: () => Promise<void>;
@@ -149,5 +150,34 @@ describe('extendSessionHorizon', () => {
     expect(result.skipped).toBeGreaterThanOrEqual(1);
     expect(result.experienceIds).toContain(healthy.experience.id);
     expect(await sessionsOf(template.id)).toHaveLength(12);
+  });
+
+  it('counts a template that throws and still extends the ones before and after it', async () => {
+    const before = await setup();
+    const beforeTemplate = await createTemplate(before.experience.id);
+    const bad = await setup();
+    const badTemplate = await createTemplate(bad.experience.id);
+    const after = await setup();
+    const afterTemplate = await createTemplate(after.experience.id);
+    const laterNow = new Date('2026-06-20T12:00:00Z');
+    const failing = badTemplate.id;
+
+    const result = await sessionData.extendSessionHorizon(
+      laterNow,
+      (templateId, range, at) => {
+        if (templateId === failing) throw new RangeError('boom');
+        return sessionData.generateSessions(ops, { templateId, ...range }, at);
+      },
+    );
+
+    expect(result.failed).toBe(1);
+    expect(result.firstErrorName).toBe('RangeError');
+    expect(result.experienceIds).toEqual(
+      expect.arrayContaining([before.experience.id, after.experience.id]),
+    );
+    expect(result.experienceIds).not.toContain(bad.experience.id);
+    expect(await sessionsOf(beforeTemplate.id)).toHaveLength(12);
+    expect(await sessionsOf(afterTemplate.id)).toHaveLength(12);
+    expect(await sessionsOf(badTemplate.id)).toHaveLength(0);
   });
 });

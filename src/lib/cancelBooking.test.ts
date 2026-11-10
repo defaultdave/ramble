@@ -1,17 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  CancelBookingInputSchema,
   CancelOrderInputSchema,
   GuestCancellationPayloadSchema,
   GuestRefundPayloadSchema,
   HostCancellationPayloadSchema,
-  ManageTokenSchema,
   cancelInputFromForm,
   cancelPlan,
   cancelQuote,
   cancelRefundKey,
   cancelRefundReason,
-  cancelVerdict,
   cancellationAuditEntry,
   giftReinstated,
   isBookingRow,
@@ -21,12 +18,13 @@ import {
   refundEtaLine,
   refundRequestOutcome,
   refundsReconcileWithin,
-  refusalResult,
+  missingOrderResult,
   returnsSpaces,
   type CancelBookingResult,
   type CancelFacts,
 } from './cancelBooking';
 import { refundArrivalLine } from './bookingEmails';
+import { CapabilityTokenSchema } from './capabilityTokens';
 import { parseAuditEntry } from './audit';
 
 // Behaviours under test, one per decision, branch, or risk:
@@ -69,11 +67,11 @@ const token = 'A'.repeat(43);
 describe('the input', () => {
   it('takes a token and a refund', () => {
     expect(
-      CancelBookingInputSchema.parse({
-        manageToken: token,
-        expectedRefundMinor: 0,
-      }),
-    ).toEqual({ manageToken: token, expectedRefundMinor: 0 });
+      parseCancelInput({ manageToken: token, expectedRefundMinor: 0 }),
+    ).toEqual({
+      kind: 'ok',
+      input: { manageToken: token, expectedRefundMinor: 0 },
+    });
   });
 
   it.each([
@@ -95,7 +93,10 @@ describe('the input', () => {
     ],
     ['no refund', { manageToken: token }],
   ])('refuses %s', (_name, input) => {
-    expect(CancelBookingInputSchema.safeParse(input).success).toBe(false);
+    expect(parseCancelInput(input)).toEqual({
+      kind: 'refused',
+      result: { status: 'not_found' },
+    });
   });
 });
 
@@ -236,9 +237,9 @@ describe('the quote', () => {
   });
 });
 
-describe('the verdict', () => {
-  const ask = (over: Partial<Parameters<typeof cancelVerdict>[0]> = {}) =>
-    cancelVerdict({
+describe('the verdict, through the plan', () => {
+  const ask = (over: Partial<Parameters<typeof cancelPlan>[0]> = {}) =>
+    cancelPlan({
       facts,
       openedTokenVersion: 1,
       expectedRefundMinor: 13_000,
@@ -258,8 +259,8 @@ describe('the verdict', () => {
     'reports changed terms for a shown refund of %i',
     (shown) => {
       expect(ask({ expectedRefundMinor: shown })).toEqual({
-        kind: 'terms_changed',
-        refundMinor: 13_000,
+        kind: 'stop',
+        result: { status: 'terms_changed', refundMinor: 13_000 },
       });
     },
   );
@@ -275,18 +276,18 @@ describe('the verdict', () => {
 
   it('reports changed terms when the window closed after a refund was shown', () => {
     expect(ask({ now: new Date(freeUntil.getTime() + 1) })).toEqual({
-      kind: 'terms_changed',
-      refundMinor: 0,
+      kind: 'stop',
+      result: { status: 'terms_changed', refundMinor: 0 },
     });
   });
 
-  it('reads a token from before a bump as stale, before anything else', () => {
+  it('reads a token from before a bump as not found, before anything else', () => {
     expect(
       ask({
         openedTokenVersion: 1,
         facts: { ...facts, manageTokenVersion: 2, status: 'cancelled' },
       }),
-    ).toEqual({ kind: 'token_stale' });
+    ).toEqual({ kind: 'stop', result: { status: 'not_found' } });
   });
 
   it('says a cancelled order is already cancelled, whatever refund was shown', () => {
@@ -295,37 +296,25 @@ describe('the verdict', () => {
         facts: { ...facts, status: 'cancelled' },
         expectedRefundMinor: 5,
       }),
-    ).toEqual({ kind: 'already_cancelled' });
-  });
-
-  it('says a booking that cannot be cancelled is not cancellable', () => {
-    expect(ask({ now: startsAt })).toEqual({ kind: 'not_cancellable' });
-  });
-});
-
-describe('the answer for a refusal', () => {
-  it.each([
-    [
-      { kind: 'terms_changed', refundMinor: 5 } as const,
-      { status: 'terms_changed', refundMinor: 5 },
-    ],
-    [{ kind: 'already_cancelled' } as const, { status: 'already_cancelled' }],
-    [{ kind: 'token_stale' } as const, { status: 'not_found' }],
-  ])('maps %o', (verdict, expected) => {
-    expect(refusalResult(verdict, freeUntil)).toEqual(expected);
+    ).toEqual({ kind: 'stop', result: { status: 'already_cancelled' } });
   });
 
   it('gives the deadline of a booking that cannot be cancelled', () => {
-    expect(refusalResult({ kind: 'not_cancellable' }, freeUntil)).toEqual({
-      status: 'not_refundable',
-      freeCancelUntil: freeUntil.toISOString(),
+    expect(ask({ now: startsAt })).toEqual({
+      kind: 'stop',
+      result: {
+        status: 'not_refundable',
+        freeCancelUntil: freeUntil.toISOString(),
+      },
     });
   });
 
   it('gives no deadline for an order with none', () => {
-    expect(refusalResult({ kind: 'not_cancellable' }, null)).toEqual({
-      status: 'not_refundable',
-      freeCancelUntil: null,
+    expect(
+      ask({ now: startsAt, facts: { ...facts, freeCancelUntil: null } }),
+    ).toEqual({
+      kind: 'stop',
+      result: { status: 'not_refundable', freeCancelUntil: null },
     });
   });
 });
@@ -428,11 +417,8 @@ describe('the plan for the locked order', () => {
       ...over,
     });
 
-  it('is not found when no booking stands behind the order', () => {
-    expect(plan({ facts: null })).toEqual({
-      kind: 'stop',
-      result: { status: 'not_found' },
-    });
+  it('answers not found for an order with no booking behind it', () => {
+    expect(missingOrderResult).toEqual({ status: 'not_found' });
   });
 
   it('goes on, asking for a refund, when one is due', () => {
@@ -689,8 +675,8 @@ describe('the action input', () => {
 
 describe('the schemas', () => {
   it('takes a manage token by shape alone', () => {
-    expect(ManageTokenSchema.safeParse(token).success).toBe(true);
-    expect(ManageTokenSchema.safeParse('A'.repeat(44)).success).toBe(false);
+    expect(CapabilityTokenSchema.safeParse(token).success).toBe(true);
+    expect(CapabilityTokenSchema.safeParse('A'.repeat(44)).success).toBe(false);
   });
 
   const orderId = '0f6c9a52-3b8e-4f43-9a55-1a2b3c4d5e01';

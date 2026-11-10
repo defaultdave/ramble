@@ -1,5 +1,6 @@
 import 'server-only';
 import { eq } from 'drizzle-orm';
+import { WriteIdSchema } from '@/lib/catalog';
 import type { Transaction } from './client';
 import { refunds } from './schema';
 
@@ -18,6 +19,7 @@ export async function readRefundForEmail(
   tx: Transaction,
   refundId: string,
 ): Promise<RefundForEmail | null> {
+  const id = WriteIdSchema.parse(refundId);
   const [row] = await tx
     .select({
       orderId: refunds.orderId,
@@ -26,6 +28,6 @@ export async function readRefundForEmail(
       amountMinor: refunds.amountMinor,
     })
     .from(refunds)
-    .where(eq(refunds.id, refundId));
+    .where(eq(refunds.id, id));
   return row ?? null;
 }

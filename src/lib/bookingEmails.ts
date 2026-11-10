@@ -96,8 +96,10 @@ export function refundEmailDecision(refund: {
 /** A host with no notification address cannot be told: the job is refused so it fails and alerts, not skipped. */
 export function hostNoticeDecision(order: {
   hostNotificationEmail: string | null;
-}): 'send' | 'refuse' {
-  return order.hostNotificationEmail === null ? 'refuse' : 'send';
+}): { kind: 'send'; to: string } | { kind: 'refuse' } {
+  return order.hostNotificationEmail === null
+    ? { kind: 'refuse' }
+    : { kind: 'send', to: order.hostNotificationEmail };
 }
 
 /**
@@ -436,9 +438,11 @@ export function bookingCancellationData(
   };
 }
 
+/** How long a refund takes to show up, said once for every email and page that says it. */
+export const refundArrivalWindow = '5 to 10 business days';
+
 /** When a refund shows up, said once for every refund email. */
-export const refundArrivalLine =
-  'Your bank usually shows it within 5 to 10 business days.';
+export const refundArrivalLine = `Your bank usually shows it within ${refundArrivalWindow}.`;
 
 export function bookingRefundData(input: {
   recipientName: string | null;

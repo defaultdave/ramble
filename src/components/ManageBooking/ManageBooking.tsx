@@ -116,14 +116,10 @@ function BookingCard({ booking }: { booking: ManageBookingDetails }) {
       <h2 id="booking-title" className={styles.title}>
         {booking.experienceName}
       </h2>
-      <p className={styles.meta}>
-        {booking.dayLabel} · {booking.timeLabel} · {booking.partyLabel}
-      </p>
-      <p className={styles.meta}>
-        Confirmation {booking.reference} · with {booking.hostName}
-      </p>
-      {booking.meetingPoint ? (
-        <p className={styles.where}>Meet at {booking.meetingPoint}</p>
+      <p className={styles.meta}>{booking.metaLine}</p>
+      <p className={styles.meta}>{booking.referenceLine}</p>
+      {booking.meetingLine ? (
+        <p className={styles.where}>{booking.meetingLine}</p>
       ) : null}
       <dl className={styles.lines}>
         {booking.lines.map((line, index) => (

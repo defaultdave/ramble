@@ -32,6 +32,7 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 // - a malformed token, an unknown one, and a token of another kind open nothing, and all answer alike
 // what the page shows
 // - the refund shown first is the refund `cancelBooking` accepts as expectedRefundMinor
+// - the window is judged by the database clock, not the app's
 // - a cancelled booking shows as cancelled, and one whose session has started as closed
 // - each view spends one try of the manage count, and a token over the count gets the too-many-tries page and no booking
 
@@ -229,6 +230,27 @@ describe('what the page shows', () => {
     ).toMatchObject({ status: 'cancelled', refundMinor: 13_000 });
     const after = await page.readManagePage(token);
     expect(after).toMatchObject({ kind: 'ok', view: { kind: 'cancelled' } });
+  });
+
+  it('judges the window by the database clock, whatever the app clock says', async () => {
+    const a = await confirmed();
+    const token = await emailedToken(a);
+    vi.useFakeTimers({
+      toFake: ['Date'],
+      now: Date.now() + 10 * 24 * 60 * 60_000,
+    });
+
+    let shown: Awaited<ReturnType<typeof page.readManagePage>>;
+    try {
+      shown = await page.readManagePage(token);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(shown).toMatchObject({
+      kind: 'ok',
+      view: { kind: 'active', prompt: { refundMinor: 13_000 } },
+    });
   });
 
   it('shows a booking whose session has started as closed', async () => {

@@ -24,3 +24,16 @@ describe('the cancellation jobs in the registry', () => {
     },
   );
 });
+
+describe('the payloads refuse what is not theirs', () => {
+  it.each([
+    ['guest-cancellation', { orderId, cancelledBy: 'someone', refundMinor: 5 }],
+    ['guest-cancellation', { orderId, cancelledBy: 'guest', refundMinor: -1 }],
+    ['host-cancellation-notice', { orderId, cancelledBy: 'someone' }],
+    ['host-cancellation-notice', { orderId: 'nope', cancelledBy: 'guest' }],
+    ['guest-refund', { refundId: 'nope' }],
+    ['guest-refund', { refundId: 7 }],
+  ] as const)('%s refuses %o', (kind, bad) => {
+    expect(jobRegistry[kind].payload.safeParse(bad).success).toBe(false);
+  });
+});

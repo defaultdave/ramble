@@ -125,6 +125,11 @@ export function normalizeSubject(
   );
 }
 
+/** "1 minute" or "3 minutes": how a wait is said wherever a limit tells a guest to try again. */
+export function waitMinutesLabel(minutes: number): string {
+  return minutes === 1 ? '1 minute' : `${String(minutes)} minutes`;
+}
+
 export type RateLimitDecision =
   | { allowed: true; remaining: number }
   | { allowed: false; retryAfterSeconds: number };

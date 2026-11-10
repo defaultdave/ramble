@@ -2,6 +2,7 @@ import type { AlertTone } from './alertTone';
 import {
   bookingSummaryData,
   refundArrivalLine,
+  refundArrivalWindow,
   type BookingEmailSource,
   type BookingSummaryData,
 } from './bookingEmails';
@@ -13,7 +14,7 @@ import {
   type RefundBasis,
 } from './cancelBooking';
 import { formatMoney } from './money';
-import { rateLimitPolicies } from './rateLimits';
+import { rateLimitPolicies, waitMinutesLabel } from './rateLimits';
 import { managePath } from './routes';
 import { zonedDeadlineLabel } from './zonedLabels';
 
@@ -21,7 +22,15 @@ import { zonedDeadlineLabel } from './zonedLabels';
 // the refund shown first is the refund `expectedRefundMinor` carries back. The page and its form
 // render what these functions return; none of this copy lives in a component.
 
-export type ManageBooking = BookingSummaryData & { totalLabel: string };
+export type ManageBooking = BookingSummaryData & {
+  totalLabel: string;
+  /** "Saturday, November 7, 2026 · 4:00 PM EST · 3 guests". */
+  metaLine: string;
+  /** "Confirmation RMB-A3K7MN · with Harbor Light Sailing". */
+  referenceLine: string;
+  /** "Meet at Pier 40"; null when the experience has no meeting point. */
+  meetingLine: string | null;
+};
 
 type CancelPrompt = {
   /** What cancelling refunds now, in minor units: the value the form posts as `expectedRefundMinor`. */
@@ -47,10 +56,18 @@ export type ManageView =
   /** Confirmed, but not cancellable now (the session has started). */
   | { kind: 'closed'; booking: ManageBooking };
 
-const refundFootnote = 'Refunds go back to your card in 5 to 10 business days.';
+const refundFootnote = `Refunds go back to your card in ${refundArrivalWindow}.`;
 
 function manageBooking(source: BookingEmailSource): ManageBooking {
-  return { ...bookingSummaryData(source), totalLabel: 'Total charged' };
+  const summary = bookingSummaryData(source);
+  return {
+    ...summary,
+    totalLabel: 'Total charged',
+    metaLine: `${summary.dayLabel} · ${summary.timeLabel} · ${summary.partyLabel}`,
+    referenceLine: `Confirmation ${summary.reference} · with ${summary.hostName}`,
+    meetingLine:
+      summary.meetingPoint === null ? null : `Meet at ${summary.meetingPoint}`,
+  };
 }
 
 /** The sentence above the cancel button: what cancelling refunds now, and why. */
@@ -128,7 +145,7 @@ export type CancelNotice = {
 };
 
 /** What a cancel answered, as the short code the redirect carries: the same words as the action's statuses. */
-export const cancelNoticeCodes = [
+const cancelNoticeCodes = [
   'cancelled',
   'terms_changed',
   'not_refundable',
@@ -144,7 +161,7 @@ const secondsPerMinute = 60;
 /** "Try again in 3 minutes", rounded up so a guest is never told to retry too early. */
 function retryAfterLine(retryAfterSeconds: number): string {
   const minutes = Math.max(1, Math.ceil(retryAfterSeconds / secondsPerMinute));
-  return `Try again in ${String(minutes)} ${minutes === 1 ? 'minute' : 'minutes'}.`;
+  return `Try again in ${waitMinutesLabel(minutes)}.`;
 }
 
 /**
@@ -225,7 +242,7 @@ export type ManageQuery = {
 };
 
 /** `?confirm=1` is the second step; `?result=` is a cancel's answer. Neither is trusted as data: a value that is not exactly one of these is nothing. */
-export function parseManageQuery(query: ManageQuery): {
+function parseManageQuery(query: ManageQuery): {
   confirming: boolean;
   code: CancelNoticeCode | null;
 } {
@@ -236,6 +253,20 @@ export function parseManageQuery(query: ManageQuery): {
   };
 }
 
+const everyView = ['active', 'cancelled', 'closed'] as const;
+
+/** The booking states each answer can be about: a changed refund only of one that can still be cancelled, "cancelled" only of one that is. */
+const answerFitsView: Record<CancelNoticeCode, readonly ManageView['kind'][]> =
+  {
+    cancelled: ['cancelled'],
+    already_cancelled: ['cancelled'],
+    terms_changed: ['active'],
+    refund_unavailable: ['active'],
+    not_refundable: ['closed'],
+    not_found: everyView,
+    rate_limited: everyView,
+  };
+
 /** What the page shows for a view and a query: the one notice, and whether the second step is open. */
 export function managePageState(
   view: ManageView,
@@ -243,8 +274,9 @@ export function managePageState(
 ): { notice: CancelNotice | null; confirming: boolean } {
   const { confirming, code } = parseManageQuery(query);
   const refundMinor = view.kind === 'cancelled' ? view.refundedMinor : 0;
-  // A query can say anything, so "cancelled" is only believed of a booking that is.
-  const shown = code === 'cancelled' && view.kind !== 'cancelled' ? null : code;
+  // A query can say anything, so an answer is shown only for a booking it could be the answer about.
+  const shown =
+    code !== null && answerFitsView[code].includes(view.kind) ? code : null;
   const standing =
     view.kind === 'cancelled'
       ? cancelNotice('already_cancelled')

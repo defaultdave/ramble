@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ZodError } from 'zod';
 import { dueClock } from '../support/dueClock';
 import { seedCancellable } from './cancelFixtures';
 import {
@@ -94,6 +95,7 @@ describe('the emails of a cancellation, end to end', () => {
       idempotencyKey: `guest-cancellation:${world.orderId}`,
       data: {
         audience: 'guest',
+        recipientName: 'Pat Smith',
         reasonLine: 'You cancelled this booking.',
         refundLine:
           'Your refund of $130.00 goes back to your original payment method.',
@@ -106,6 +108,7 @@ describe('the emails of a cancellation, end to end', () => {
       idempotencyKey: `host-cancellation-notice:${world.orderId}`,
       data: {
         audience: 'host',
+        recipientName: 'Host',
         reasonLine: 'The guest cancelled this booking.',
         refundLine: null,
       },
@@ -113,7 +116,7 @@ describe('the emails of a cancellation, end to end', () => {
     const refund = emails.find((email) => email.template === 'booking-refund');
     expect(refund).toMatchObject({
       to: 'pat@example.com',
-      data: { amount: '$130.00' },
+      data: { amount: '$130.00', recipientName: 'Pat Smith' },
     });
     expect(refund?.idempotencyKey).toMatch(/^guest-refund:[0-9a-f-]{36}$/);
     expect(await jobsOfKind('guest-refund')).toMatchObject([
@@ -179,21 +182,81 @@ describe('the emails of a cancellation, end to end', () => {
   });
 });
 
+async function runHandler(
+  kind: 'guest-cancellation' | 'host-cancellation-notice' | 'guest-refund',
+  payload: unknown,
+) {
+  const handlers = await import('@/server/jobs/cancellationEmails');
+  const handler = {
+    'guest-cancellation': handlers.sendGuestCancellation,
+    'host-cancellation-notice': handlers.sendHostCancellationNotice,
+    'guest-refund': handlers.sendGuestRefund,
+  }[kind];
+  return client.db.transaction((tx) =>
+    handler({ tx, payload: payload as never, jobId: randomUUID() }),
+  );
+}
+
+describe('what the handlers read from the job and the order', () => {
+  it.each([
+    ['host', 'The host cancelled this session.', 'You cancelled this session.'],
+    [
+      'weather',
+      'This session was cancelled because of the weather.',
+      'This session was cancelled because of the weather.',
+    ],
+    [
+      'ramble',
+      'Ramble cancelled this session.',
+      'Ramble cancelled this session.',
+    ],
+  ] as const)(
+    'says a cancellation by %s in the words of each reader, from the job and not the order',
+    async (cancelledBy, guestLine, hostLine) => {
+      const world = await cancelAndSettle({}, 13_000);
+      sendEmail.mockClear();
+
+      await runHandler('guest-cancellation', {
+        orderId: world.orderId,
+        cancelledBy,
+        refundMinor: 0,
+      });
+      await runHandler('host-cancellation-notice', {
+        orderId: world.orderId,
+        cancelledBy,
+      });
+
+      const [guest, host] = sent();
+      expect(guest?.data).toMatchObject({
+        reasonLine: guestLine,
+        refundLine: 'No refund is due under the cancellation terms.',
+      });
+      expect(host?.data).toMatchObject({ reasonLine: hostLine });
+    },
+  );
+
+  it('sends no refund email, and does not fail, for a succeeded refund that is not a guest cancellation', async () => {
+    await clearJobs();
+    const world = await seedCancellable({ gatewayPayment: true });
+    const requested = await ask(world, {
+      reason: 'goodwill',
+      key: 'goodwill',
+      ticketMinor: 1_000,
+    });
+    if (requested.status !== 'requested') throw new Error('not requested');
+    await settle();
+    sendEmail.mockClear();
+
+    await expect(
+      runHandler('guest-refund', { refundId: requested.refund.refundId }),
+    ).resolves.toBeUndefined();
+
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+});
+
 describe('a job that should not exist', () => {
-  const run = async (
-    kind: 'guest-cancellation' | 'host-cancellation-notice' | 'guest-refund',
-    payload: unknown,
-  ) => {
-    const handlers = await import('@/server/jobs/cancellationEmails');
-    const handler = {
-      'guest-cancellation': handlers.sendGuestCancellation,
-      'host-cancellation-notice': handlers.sendHostCancellationNotice,
-      'guest-refund': handlers.sendGuestRefund,
-    }[kind];
-    return client.db.transaction((tx) =>
-      handler({ tx, payload: payload as never, jobId: randomUUID() }),
-    );
-  };
+  const run = runHandler;
 
   it.each([
     ['guest-cancellation', { refundMinor: 0 }],
@@ -242,6 +305,15 @@ describe('a job that should not exist', () => {
       }),
     ).rejects.toThrow('no notification address');
     expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it('refuses a refund id that is not one before it reads', async () => {
+    const { readRefundForEmail } =
+      await import('@/server/db/cancellationEmails');
+
+    await expect(
+      client.db.transaction((tx) => readRefundForEmail(tx, 'nope')),
+    ).rejects.toBeInstanceOf(ZodError);
   });
 
   it('is refused for a refund that has not succeeded, or does not exist', async () => {

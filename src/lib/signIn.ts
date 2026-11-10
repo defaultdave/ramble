@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { waitMinutesLabel } from './rateLimits';
 
 // The sign-in pages' decisions: where a person may be sent afterwards, what the link in the email
 // points at, and which state a refused request or a failed link becomes.
@@ -189,10 +190,7 @@ export function signInSentBody(email: string): string {
 
 /** The rate-limited notice's text, naming the wait. */
 export function rateLimitBody(retryAfterMinutes: number): string {
-  const wait =
-    retryAfterMinutes === 1
-      ? '1 minute'
-      : `${String(retryAfterMinutes)} minutes`;
+  const wait = waitMinutesLabel(retryAfterMinutes);
   return `Try again in about ${wait}. A link you already have still works until it expires.`;
 }
 

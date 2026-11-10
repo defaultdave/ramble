@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { refundArrivalLine } from './bookingEmails';
-import { isCapabilityTokenShape } from './capabilityTokens';
+import { CapabilityTokenSchema, maxTokenVersion } from './capabilityTokens';
 import { WriteIdSchema } from './catalog';
 import { isWithinFreeWindow } from './cancellation';
 import { orderCancelledBys, orderLimits, type OrderKind } from './orders';
@@ -11,7 +11,6 @@ import {
   type RefundableOrder,
   type RefundRequestRefusal,
 } from './refunds';
-import { maxTokenVersion } from './capabilityTokens';
 
 // What cancelling a booking by its manage link decides (design doc 4.2.3, `cancelBooking`; PRD-10,
 // PRD-46). The cancellation tiers give all or nothing: a full refund of what the order still holds
@@ -22,11 +21,8 @@ import { maxTokenVersion } from './capabilityTokens';
 export const cancelRefundReason = 'guest_cancel';
 export const cancelRefundKey = 'guest-cancel';
 
-/** A manage token's shape: checked before any lookup, so a token of any other shape does no work and spends no try. */
-export const ManageTokenSchema = z.string().refine(isCapabilityTokenShape);
-
-export const CancelBookingInputSchema = z.strictObject({
-  manageToken: ManageTokenSchema,
+const CancelBookingInputSchema = z.strictObject({
+  manageToken: CapabilityTokenSchema,
   /** The refund the guest was shown, in minor units. */
   expectedRefundMinor: z.int().min(0).max(orderLimits.maxMinor),
 });
@@ -105,7 +101,7 @@ export function cancelQuote(facts: CancelFacts, now: Date): CancelQuote {
   return { kind: 'cancellable', ...refundOnCancel(facts, now) };
 }
 
-export type CancelVerdict =
+type CancelVerdict =
   | { kind: 'proceed'; refundMinor: number; requestsRefund: boolean }
   /** What the tier now gives is not what the guest was shown. */
   | { kind: 'terms_changed'; refundMinor: number }
@@ -119,7 +115,7 @@ export type CancelVerdict =
  * nothing; then the order's own state; then the refund the guest saw against the refund the tier
  * gives now, which must match to the minor unit.
  */
-export function cancelVerdict(input: {
+function cancelVerdict(input: {
   facts: CancelFacts;
   openedTokenVersion: number;
   expectedRefundMinor: number;
@@ -159,7 +155,7 @@ export type CancelBookingResult =
   | { status: 'rate_limited'; retryAfterSeconds: number };
 
 /** The answer for a verdict that cancels nothing. */
-export function refusalResult(
+function refusalResult(
   verdict: Exclude<CancelVerdict, { kind: 'proceed' }>,
   freeCancelUntil: Date | null,
 ): CancelBookingResult {
@@ -252,19 +248,20 @@ export type CancelPlan =
   /** Nothing is cancelled: this is the answer. */
   | { kind: 'stop'; result: CancelBookingResult };
 
+/** The answer when no booking stands behind the order: the same as every other refusal of a link. */
+export const missingOrderResult: CancelBookingResult = { status: 'not_found' };
+
 /**
- * What the data layer does with the locked order: no booking behind the order is `not_found`; a
- * refused verdict is its typed answer; otherwise the cancellation goes on, asking for a refund only
+ * What the data layer does with the locked order: a refused verdict is its typed answer; otherwise the cancellation goes on, asking for a refund only
  * when one is due. The data layer executes this and decides nothing.
  */
 export function cancelPlan(input: {
-  facts: CancelFacts | null;
+  facts: CancelFacts;
   openedTokenVersion: number;
   expectedRefundMinor: number;
   now: Date;
 }): CancelPlan {
   const { facts, ...rest } = input;
-  if (facts === null) return { kind: 'stop', result: { status: 'not_found' } };
   const verdict = cancelVerdict({ facts, ...rest });
   if (verdict.kind === 'proceed') return verdict;
   return {
@@ -320,7 +317,7 @@ export async function openManageGate<Row>(
     open: (token: string) => Promise<Row | null>;
   },
 ): Promise<ManageGate<Row>> {
-  const parsed = ManageTokenSchema.safeParse(token);
+  const parsed = CapabilityTokenSchema.safeParse(token);
   if (!parsed.success) {
     return { kind: 'refused', refusal: { status: 'not_found' } };
   }

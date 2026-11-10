@@ -80,13 +80,14 @@ export async function sendHostCancellationNotice({
   payload: z.output<typeof HostCancellationPayloadSchema>;
 }): Promise<void> {
   const order = await loadCancelledOrder(tx, payload.orderId);
-  if (hostNoticeDecision(order) === 'refuse') {
+  const notice = hostNoticeDecision(order);
+  if (notice.kind === 'refuse') {
     throw new CancellationEmailError('the host has no notification address');
   }
   const { source } = order;
   await sendEmail({
     template: 'booking-cancellation',
-    to: order.hostNotificationEmail ?? '',
+    to: notice.to,
     data: bookingCancellationData({
       audience: 'host',
       recipientName: source.hostName,

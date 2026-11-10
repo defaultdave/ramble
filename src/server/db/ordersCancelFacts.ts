@@ -5,8 +5,9 @@ import { WriteIdSchema } from '@/lib/catalog';
 import type { Transaction } from './client';
 import { holds, orders, sessions } from './schema';
 
-// Apart from ./orderCancel, which enqueues jobs: the manage page reads these facts too, and the
-// checkout route group must not reach the job registry (and the monitoring SDK its handlers use).
+// Apart from ./orderCancel, which enqueues jobs: the manage page reads these facts too. The page
+// reaches the cancel through its action, the accepted `'use server'` seam, and this read stays free
+// of jobs and the monitoring SDK so the page's own imports stay light.
 
 /** The booking as the cancel judges it, with the ids the locks and writes need. */
 export type BookingRows = {

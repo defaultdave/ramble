@@ -1,11 +1,11 @@
 import { z } from 'zod';
-import { isCapabilityTokenShape } from './capabilityTokens';
+import { CapabilityTokenSchema } from './capabilityTokens';
 import { isOrderReference, type OrderStatus } from './orders';
 
 /** What the S9 poller sends: the order's reference and the order token that opens it. */
 export const OrderStatusInputSchema = z.strictObject({
   reference: z.string().refine(isOrderReference),
-  token: z.string().refine(isCapabilityTokenShape),
+  token: CapabilityTokenSchema,
 });
 export type OrderStatusInput = z.input<typeof OrderStatusInputSchema>;
 

@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { orderA } from './bookingEmails.fixtures';
 import {
   bookingEmailKey,
+  bookingCancellationData,
   bookingSummaryData,
+  refundArrivalLine,
+  refundArrivalWindow,
   cancellationDecision,
   guestConfirmationData,
   hostNoticeDecision,
@@ -60,15 +63,19 @@ describe('the keys', () => {
 });
 
 describe('whether the host is told', () => {
-  it.each([
-    ['an address', 'bookings@harborlight.example', 'send'],
-    ['no address', null, 'refuse'],
-  ] as const)(
-    'for a host with %s',
-    (_name, hostNotificationEmail, expected) => {
-      expect(hostNoticeDecision({ hostNotificationEmail })).toBe(expected);
-    },
-  );
+  it('sends to the address the host gave', () => {
+    expect(
+      hostNoticeDecision({
+        hostNotificationEmail: 'bookings@harborlight.example',
+      }),
+    ).toEqual({ kind: 'send', to: 'bookings@harborlight.example' });
+  });
+
+  it('refuses a host with no address', () => {
+    expect(hostNoticeDecision({ hostNotificationEmail: null })).toEqual({
+      kind: 'refuse',
+    });
+  });
 });
 
 describe('the booking summary', () => {
@@ -108,5 +115,60 @@ describe('the booking summary', () => {
     expect(summary.experienceName).toHaveLength(200);
     expect(summary.hostName).toHaveLength(120);
     expect(summary.meetingPoint).toHaveLength(600);
+  });
+});
+
+describe('who a cancellation email greets', () => {
+  const input = {
+    recipientName: null as string | null,
+    reference: 'RMB-A3K7MN',
+    experienceName: 'Sunset sail',
+    startsAt: new Date('2026-11-07T21:00:00Z'),
+    timeZone: 'America/New_York',
+    items: orderA.items,
+    cancelledBy: 'guest' as const,
+    refundMinor: 0,
+    otherDatesPath: null,
+    appUrl: 'https://ramble.example',
+  };
+
+  it.each([
+    ['no name', null, 'there'],
+    ['a blank name', '   ', 'there'],
+    ['a name', 'Pat Rivera', 'Pat Rivera'],
+    ['a name with a line break', 'Pat\nRivera', 'Pat Rivera'],
+  ])('greets %s as %s', (_name, recipientName, greeting) => {
+    for (const audience of ['guest', 'host'] as const) {
+      expect(
+        bookingCancellationData({ ...input, audience, recipientName })
+          .recipientName,
+      ).toBe(greeting);
+    }
+  });
+
+  it('says who cancelled, in the words of the audience', () => {
+    expect(
+      bookingCancellationData({
+        ...input,
+        audience: 'host',
+        cancelledBy: 'weather',
+      }).reasonLine,
+    ).toBe('This session was cancelled because of the weather.');
+    expect(
+      bookingCancellationData({
+        ...input,
+        audience: 'host',
+        cancelledBy: 'guest',
+      }).reasonLine,
+    ).toBe('The guest cancelled this booking.');
+  });
+});
+
+describe('how long a refund takes', () => {
+  it('is said once, in the refund email and on the manage page alike', () => {
+    expect(refundArrivalWindow).toBe('5 to 10 business days');
+    expect(refundArrivalLine).toBe(
+      'Your bank usually shows it within 5 to 10 business days.',
+    );
   });
 });

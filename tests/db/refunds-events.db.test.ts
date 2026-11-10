@@ -9,6 +9,7 @@ import {
   client,
   eventRow,
   handleEvent,
+  jobsOfKind,
   ledgerOf,
   orderOf,
   refundEvent,
@@ -102,6 +103,11 @@ describe('refund.succeeded', () => {
       refundFailed: false,
     });
     expect((await eventRow(id)).processedAt).not.toBeNull();
+    expect(
+      (await jobsOfKind('guest-refund')).filter(
+        (job) => job.dedupe_key === `guest-refund:${refund.refundId}`,
+      ),
+    ).toMatchObject([{ payload: { refundId: refund.refundId } }]);
   });
 
   it('answers a processed event again without writing, and a second event for the refund changes nothing', async () => {
@@ -167,6 +173,11 @@ describe('refund.failed', () => {
     ).toBe(true);
     expect(await balancesOf(world)).toEqual(untouched);
     expect((await eventRow(id)).processedAt).not.toBeNull();
+    expect(
+      (await jobsOfKind('guest-refund')).filter(
+        (job) => job.dedupe_key === `guest-refund:${refund.refundId}`,
+      ),
+    ).toHaveLength(0);
   });
 
   it('gives back only the failed refund when another stands, and the order can be refunded again', async () => {

@@ -3,12 +3,12 @@ import { orderA, orderB } from './bookingEmails.fixtures';
 import { type CancelFacts } from './cancelBooking';
 import {
   cancelNotice,
-  cancelNoticeCodes,
   cancelResultPath,
   confirmPath,
   manageView,
   managePageState,
-  parseManageQuery,
+  type CancelNoticeCode,
+  type ManageQuery,
 } from './manageBooking';
 
 // Behaviours under test, one per decision, branch, or risk:
@@ -16,7 +16,7 @@ import {
 // - the same booking after its window, paid with a gift, or already refunded shows no refund, a button that says so, and no footnote
 // - a cancelled booking and one that cannot be cancelled have no cancel prompt; a cancelled one carries what it gave back
 // - the booking shows the date, the party, the itemized lines, the tax line when taxable, a gift split, and "Total charged"
-// - every cancel answer has a notice; a wait is rounded up to whole minutes and defaults to the whole window
+// - every cancel answer has its full notice (tone, title, body); a wait is rounded up to whole minutes and defaults to the whole window
 // - the query is never trusted: only `confirm=1` opens the second step, only a known code is a notice, "cancelled" is believed only of a cancelled booking
 // - the page shows the one notice: the answer's, or the standing one of a cancelled or closed booking
 // - the second step opens only for an active booking
@@ -89,6 +89,9 @@ describe('the manage view of a booking', () => {
       meetingPoint: 'Pier 40, West Side Highway at Houston Street',
       total: '$234.12',
       totalLabel: 'Total charged',
+      metaLine: 'Saturday, November 7, 2026 · 4:00 PM EST · 3 guests',
+      referenceLine: 'Confirmation RMB-A3K7MN · with Harbor Light Sailing',
+      meetingLine: 'Meet at Pier 40, West Side Highway at Houston Street',
       giftApplied: null,
       charged: null,
     });
@@ -149,6 +152,7 @@ describe('the manage view of a booking', () => {
       charged: '$55.00',
       taxLine: null,
       meetingPoint: null,
+      meetingLine: null,
       recipientName: 'there',
     });
   });
@@ -186,32 +190,45 @@ describe('the manage view of a booking', () => {
 
 describe('the notice for each answer', () => {
   it.each([
-    ['cancelled', 'success'],
-    ['terms_changed', 'warning'],
-    ['not_refundable', 'info'],
-    ['already_cancelled', 'info'],
-    ['refund_unavailable', 'danger'],
-    ['not_found', 'danger'],
-    ['rate_limited', 'warning'],
-  ] as const)('%s is a %s notice with words', (code, tone) => {
-    const notice = cancelNotice(code);
-    expect(notice.tone).toBe(tone);
-    expect(notice.title).not.toBe('');
-    expect(notice.body).not.toBe('');
-  });
-
-  it('has a notice for every code, and only the actions statuses are codes', () => {
-    expect([...cancelNoticeCodes].sort()).toEqual(
-      [
-        'already_cancelled',
-        'cancelled',
-        'not_found',
-        'not_refundable',
-        'rate_limited',
-        'refund_unavailable',
-        'terms_changed',
-      ].sort(),
-    );
+    [
+      'cancelled',
+      'success',
+      'Your booking is cancelled',
+      'No refund is due under the cancellation terms.',
+    ],
+    [
+      'terms_changed',
+      'warning',
+      'The refund has changed',
+      'Nothing was cancelled. Check the refund below, then cancel again if you still want to.',
+    ],
+    [
+      'not_refundable',
+      'info',
+      "This booking can't be cancelled here",
+      "It isn't an active booking, or its session has started. Contact us if you need help.",
+    ],
+    [
+      'already_cancelled',
+      'info',
+      'This booking is already cancelled',
+      'There is nothing more to do.',
+    ],
+    [
+      'refund_unavailable',
+      'danger',
+      "We couldn't start your refund",
+      'Nothing was cancelled. Try again in a moment, or contact us.',
+    ],
+    [
+      'not_found',
+      'danger',
+      'This link no longer works',
+      'Use the link in the latest email we sent you.',
+    ],
+    ['rate_limited', 'warning', 'Too many tries', 'Try again in 10 minutes.'],
+  ] as const)('%s is the whole notice', (code, tone, title, body) => {
+    expect(cancelNotice(code)).toEqual({ tone, title, body });
   });
 
   it('says what a cancelled booking gave back, and the arrival', () => {
@@ -229,6 +246,12 @@ describe('the notice for each answer', () => {
     },
   );
 
+  it('says the refund of one minor unit, the smallest there is', () => {
+    expect(cancelNotice('cancelled', { refundMinor: 1 }).body).toBe(
+      'Your refund of $0.01 goes back to your original payment method. Your bank usually shows it within 5 to 10 business days.',
+    );
+  });
+
   it.each([
     [1, 'Try again in 1 minute.'],
     [60, 'Try again in 1 minute.'],
@@ -243,22 +266,67 @@ describe('the notice for each answer', () => {
 });
 
 describe('the query is not trusted', () => {
-  it.each([
+  // Read through the page state of an active booking; `result` is shown only when it fits the booking.
+  it.each<[ManageQuery, boolean, CancelNoticeCode | null]>([
     [{}, false, null],
     [{ confirm: '1' }, true, null],
     [{ confirm: '0' }, false, null],
     [{ confirm: 'true' }, false, null],
     [{ confirm: ['1'] }, false, null],
     [{ confirm: ['1', '1'] }, false, null],
-    [{ result: 'cancelled' }, false, 'cancelled'],
+    [{ result: 'terms_changed' }, false, 'terms_changed'],
     [{ result: 'rate_limited' }, false, 'rate_limited'],
-    [{ result: 'Cancelled' }, false, null],
+    [{ result: 'Rate_limited' }, false, null],
     [{ result: '<script>' }, false, null],
-    [{ result: ['cancelled'] }, false, null],
+    [{ result: ['terms_changed'] }, false, null],
     [{ result: 'constructor' }, false, null],
-    [{ confirm: '1', result: 'terms_changed' }, true, 'terms_changed'],
-  ])('reads %o as confirming %s and code %s', (query, confirming, code) => {
-    expect(parseManageQuery(query)).toEqual({ confirming, code });
+    [{ result: '' }, false, null],
+    [
+      { confirm: '1', result: 'refund_unavailable' },
+      true,
+      'refund_unavailable',
+    ],
+  ] as const)(
+    'reads %o as confirming %s and notice %s',
+    (query, confirming, code) => {
+      const state = managePageState(active, query);
+
+      expect(state.confirming).toBe(confirming);
+      expect(state.notice).toEqual(code === null ? null : cancelNotice(code));
+    },
+  );
+});
+
+describe('which answer fits which booking', () => {
+  const views = { active, cancelled, closed };
+  const fits = {
+    cancelled: ['cancelled'],
+    already_cancelled: ['cancelled'],
+    terms_changed: ['active'],
+    refund_unavailable: ['active'],
+    not_refundable: ['closed'],
+    not_found: ['active', 'cancelled', 'closed'],
+    rate_limited: ['active', 'cancelled', 'closed'],
+  } as const;
+
+  it.each(
+    Object.entries(fits).flatMap(([code, kinds]) =>
+      (['active', 'cancelled', 'closed'] as const).map(
+        (kind) =>
+          [code, kind, (kinds as readonly string[]).includes(kind)] as const,
+      ),
+    ),
+  )('the answer %s on a %s booking is shown: %s', (code, kind, shown) => {
+    const { notice } = managePageState(views[kind], { result: code });
+    const standing = managePageState(views[kind], {}).notice;
+
+    expect(notice).toEqual(
+      shown
+        ? cancelNotice(code as keyof typeof fits, {
+            refundMinor: kind === 'cancelled' ? 23_412 : 0,
+          })
+        : standing,
+    );
   });
 });
 

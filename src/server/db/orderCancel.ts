@@ -9,6 +9,7 @@ import {
   cancellationAuditEntry,
   giftReinstated,
   isBookingRow,
+  missingOrderResult,
   reconcileReadLimit,
   refundEtaLine,
   refundRequestOutcome,
@@ -89,19 +90,15 @@ async function cancelInTransaction(
   await lockHoldRow(tx, input.holdId);
   await lockOrderById(tx, input.orderId);
   const found = await readCancelFacts(tx, input.orderId);
+  if (found === null) return { result: missingOrderResult, sessionId: null };
+  const { facts, sessionId } = found;
   const plan = cancelPlan({
-    facts: found?.facts ?? null,
+    facts,
     openedTokenVersion: input.openedTokenVersion,
     expectedRefundMinor: input.expectedRefundMinor,
     now: await readDatabaseTime(tx),
   });
-  if (plan.kind === 'stop' || found === null) {
-    return {
-      result: plan.kind === 'stop' ? plan.result : { status: 'not_found' },
-      sessionId: null,
-    };
-  }
-  const { facts, sessionId } = found;
+  if (plan.kind === 'stop') return { result: plan.result, sessionId: null };
 
   let refundId: string | null = null;
   if (plan.requestsRefund) {
@@ -185,7 +182,7 @@ export async function cancelBookingOrder(
 ): Promise<CancelBookingResult> {
   const parsed = CancelOrderInputSchema.parse(input);
   const ids = await readLockIds(parsed.orderId);
-  if (ids === null) return { status: 'not_found' };
+  if (ids === null) return missingOrderResult;
   const { result, sessionId } = await db.transaction((tx) =>
     cancelInTransaction(tx, { ...parsed, ...ids }),
   );

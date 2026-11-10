@@ -1,9 +1,10 @@
 import { Check, Info, TriangleAlert, type LucideIcon } from 'lucide-react';
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
+import type { AlertTone } from '@/lib/alertTone';
 import { classNames } from '@/lib/classNames';
 import styles from './Alert.module.css';
 
-export type AlertTone = 'info' | 'success' | 'warning' | 'danger';
+export type { AlertTone };
 
 export type AlertProps = Omit<
   ComponentPropsWithoutRef<'div'>,

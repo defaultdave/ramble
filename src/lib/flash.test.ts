@@ -3,7 +3,7 @@ import { parseFlash, readFlash, serializeFlash } from './flash';
 
 // Behaviours under test, one per decision, branch or risk:
 // - what serializeFlash writes, parseFlash reads back
-// - a long message is cut when written, so what is written is always readable
+// - a message the cookie cannot hold is refused when written, never cut, so what is written is always readable
 // - a missing, unparsable, oversized, wrongly shaped, or unknown-tone value shows nothing
 
 const written = (flash: Parameters<typeof serializeFlash>[0]) => {

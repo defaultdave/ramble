@@ -1,11 +1,12 @@
 import { z } from 'zod';
+import { AlertToneSchema } from './alertTone';
 
 const FLASH_MAX_LENGTH = 200;
 // The cookie carries one short message, so a larger value is not one of ours.
 const FLASH_RAW_MAX_LENGTH = 400;
 
 const flashSchema = z.strictObject({
-  tone: z.enum(['success', 'info', 'warning', 'danger']),
+  tone: AlertToneSchema,
   message: z.string().min(1).max(FLASH_MAX_LENGTH),
 });
 

@@ -281,7 +281,6 @@ export async function getPublishedPageCopy(
   return copy ?? null;
 }
 
-// TODO(U-038): first caller
 export async function listPublishedHelpArticles(): Promise<
   HelpArticleSummary[]
 > {
@@ -298,7 +297,6 @@ export async function listPublishedHelpArticles(): Promise<
   return HelpArticleSummarySchema.array().parse(rows);
 }
 
-// TODO(U-038): first caller
 export async function getPublishedHelpArticle(
   slug: string,
 ): Promise<HelpArticle | null> {

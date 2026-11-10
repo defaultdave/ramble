@@ -1,6 +1,7 @@
 import type { CuratedFixtures } from '../types';
 import { collections, homeModules, pageCopy } from './editorial';
 import { experiences, hosts } from './experiences';
+import { helpArticles } from './help';
 import { legal } from './legal';
 import { categories, neighborhoods } from './taxonomy';
 
@@ -13,4 +14,5 @@ export const curated: CuratedFixtures = {
   collections,
   homeModules,
   pageCopy,
+  helpArticles,
 };

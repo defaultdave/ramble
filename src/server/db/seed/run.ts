@@ -4,6 +4,7 @@ import { requireRole, Role, type Caller } from '@/server/auth/caller';
 import { db } from '@/server/db/client';
 import {
   saveCollection,
+  saveHelpArticle,
   saveHomeModules,
   savePageCopy,
 } from '@/server/db/editorial';
@@ -14,6 +15,7 @@ import {
   categories,
   collections,
   experiences,
+  helpArticles,
   hosts,
   legalDocuments,
   neighborhoods,
@@ -43,6 +45,7 @@ import {
   collectionInput,
   experienceId,
   experienceRow,
+  helpArticleInput,
   homeModulesInput,
   hostRow,
   pageCopyInput,
@@ -54,6 +57,7 @@ import {
 import {
   curatedLine,
   editorialLine,
+  helpLine,
   legalLine,
   scaleLine,
   stepNames,
@@ -347,6 +351,20 @@ async function writeCatalog(
   };
 }
 
+async function writeHelpArticles(caller: Caller) {
+  const stored = await db
+    .select({ id: helpArticles.id, slug: helpArticles.slug })
+    .from(helpArticles)
+    .limit(200);
+  for (const fixture of curated.helpArticles) {
+    expectStatus(
+      stepNames.saveHelpArticle(fixture.slug),
+      await saveHelpArticle(caller, helpArticleInput(fixture, stored)),
+      'saved',
+    );
+  }
+}
+
 async function writeEditorial(
   caller: Caller,
   refs: Pick<RefMaps, 'categories' | 'neighborhoods'>,
@@ -416,6 +434,8 @@ export async function runSeed(options: SeedOptions): Promise<SeedReport> {
       curated.pageCopy.length,
     ),
   );
+  await writeHelpArticles(caller);
+  log(helpLine(curated.helpArticles.length));
 
   let scaleCounts: CatalogCounts | undefined;
   if (scale) {

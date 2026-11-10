@@ -61,7 +61,6 @@ const markMapping = {
 
 export type RichTextProps = { content: RichTextDoc };
 
-// TODO(U-038): first caller, for help articles and versioned legal pages.
 export function RichText({ content }: RichTextProps) {
   const doc = sanitizeRichText(content);
   if (doc.content.length === 0) return null;

@@ -11,19 +11,15 @@ import {
 import { holds, orders, paymentAttempts } from '@/server/db/schema';
 import type { Device } from '@/server/device';
 import { PaymentsError } from '@/server/ports/payments';
-import { createFakePaymentsAdapter } from '@/server/ports/payments/fake';
 import {
   checkoutReaders,
   endCheckoutSuite,
-  formFor,
-  holdFor,
-  proceeded,
   resetCheckoutSettings,
   startCheckoutSuite,
-  type Bookable,
   type CheckoutSuite,
 } from './checkoutFixtures';
 import { raceAgainstOpenTransaction } from './harness';
+import { payingLapseFixtures } from './payingLapseFixtures';
 import { hash, insertHold, seedBookable } from './holdFixtures';
 
 // The holds sweep for a `paying` hold past `paying_until`, against a real database and the fake provider.
@@ -33,7 +29,7 @@ import { hash, insertHold, seedBookable } from './holdFixtures';
 //   one the provider has nothing for is released with no provider call that cancels anything
 // - a hold still inside paying_until, a payment that succeeded at the provider, an attempt that succeeded, and a payment the
 //   provider no longer has are all left as they were, and nothing is voided
-// - a provider that is unavailable makes the sweep throw, and nothing is voided or released
+// - a provider that is unavailable makes the sweep throw, and that hold, its order, and its attempt are left as they were
 // - a cancel made earlier (by the sweep's own key, or by anything else) does not stop the release; a second sweep does nothing
 //   and makes no second cancel
 // - the sweep's spaces tag is revalidated for a session whose paying hold it released, and not when it released nothing
@@ -55,17 +51,14 @@ vi.mock(
 
 let suite: CheckoutSuite;
 let client: CheckoutSuite['client'];
-let checkout: CheckoutSuite['checkout'];
 let holdData: typeof import('@/server/db/holds');
 let lapseData: typeof import('@/server/db/ordersLapse');
-let guestA: Device;
 let guestB: Device;
-let terms: CheckoutSuite['terms'];
 let read: ReturnType<typeof checkoutReaders>;
 
 beforeAll(async () => {
   suite = await startCheckoutSuite();
-  ({ client, checkout, guestA, guestB, terms } = suite);
+  ({ client, guestB } = suite);
   holdData = await import('@/server/db/holds');
   lapseData = await import('@/server/db/ordersLapse');
   read = checkoutReaders(() => suite);
@@ -83,97 +76,11 @@ beforeEach(async () => {
   cache.revalidateTag.mockClear();
 });
 
-const makePayments = () =>
-  createFakePaymentsAdapter({
-    webhookSecret: 'whsec_fake_lapse_0123456789abcdef',
-    now: () => new Date(),
-  });
+const { makePayments, lapsedPayingHold, state, use, submit } =
+  payingLapseFixtures(() => suite);
 type Payments = ReturnType<typeof makePayments>;
 
-/** The hold's whole payment window is over: it expired 20 minutes ago and `paying_until` passed a minute ago. */
-const lapse = (holdId: string) =>
-  client.db
-    .update(holds)
-    .set({
-      createdAt: sql`now() - interval '30 minutes'`,
-      updatedAt: sql`now() - interval '30 minutes'`,
-      expiresAt: sql`now() - interval '20 minutes'`,
-      payingUntil: sql`now() - interval '1 minute'`,
-    })
-    .where(eq(holds.id, holdId));
-
-/**
- * A booking hold of the device that started to pay, with the provider holding its payment, and
- * then lapsed. `storePayment: false` leaves the provider's payment unrecorded on the attempt (the
- * second transaction of `startPayment` failed); `createPayment: false` leaves none at the provider.
- */
-async function lapsedPayingHold(
-  bookable: Bookable,
-  payments: Payments,
-  options: {
-    device?: Device;
-    adults?: number;
-    storePayment?: boolean;
-    createPayment?: boolean;
-  } = {},
-) {
-  const device = options.device ?? guestA;
-  const hold = await holdFor(client.db, bookable, device, {
-    adults: options.adults ?? 2,
-  });
-  const started = proceeded(
-    await checkout.startPaymentTx(device, formFor(hold.id, terms.id), 'fake'),
-  );
-  const payment =
-    options.createPayment === false
-      ? null
-      : await payments.createPayment({
-          idempotencyKey: started.attempt.providerKey,
-          amountMinor: started.attempt.amountMinor,
-          currency: 'USD',
-          metadata: { orderId: started.order.id, recordId: started.attempt.id },
-        });
-  if (payment && options.storePayment !== false) {
-    await checkout.recordProviderPayment(
-      device,
-      started.attempt.id,
-      payment.id,
-    );
-  }
-  await lapse(hold.id);
-  return { hold, started, payment, device };
-}
-type Lapsed = Awaited<ReturnType<typeof lapsedPayingHold>>;
-
 const sweep = (payments: Payments) => holdData.releaseLapsedHolds(payments);
-
-async function state(lapsed: Lapsed) {
-  const [attempt] = await read.attemptsOf(lapsed.started.order.id);
-  return {
-    hold: await read.storedHold(lapsed.hold.id),
-    order: await read.orderOf(lapsed.hold.id),
-    attempts: await read.attemptsOf(lapsed.started.order.id),
-    attempt,
-    provider: lapsed.payment
-      ? ((await providerOf(lapsed.payment.id))?.status ?? null)
-      : null,
-  };
-}
-
-let providers: Payments | null = null;
-const providerOf = (id: string) =>
-  providers?.retrieve({ kind: 'payment', id }) ?? Promise.resolve(null);
-const use = (payments: Payments) => {
-  providers = payments;
-  return payments;
-};
-
-const submit = (lapsed: Lapsed) =>
-  checkout.startPaymentTx(
-    lapsed.device,
-    formFor(lapsed.hold.id, terms.id),
-    'fake',
-  );
 
 describe('the sweep of a lapsed paying hold', () => {
   it('cancels the attempt at the provider, voids the order, and releases the hold as payment_abandoned', async () => {
@@ -381,7 +288,7 @@ describe('what the sweep leaves alone', () => {
     expect((await state(lapsed)).hold.status).toBe('paying');
   });
 
-  it('everything, when the provider is unavailable: the sweep throws and writes nothing', async () => {
+  it('the hold, order, and attempt, when the provider is unavailable: the sweep throws and they stay as they were', async () => {
     const payments = use(makePayments());
     const lapsed = await lapsedPayingHold(
       await seedBookable(client.db),

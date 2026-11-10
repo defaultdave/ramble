@@ -1,7 +1,11 @@
 import 'server-only';
-import { desc, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
+import type { z } from 'zod';
 import {
-  isCancelRefusal,
+  LapseRefSchema,
+  afterAttemptWrite,
+  cancelErrorAction,
+  liveAttemptStatuses,
   payingLapse,
   providerSettled,
   type LapseTarget,
@@ -15,6 +19,7 @@ import {
 import { PaymentsError, type PaymentsPort } from '@/server/ports/payments';
 import { db, type Transaction } from './client';
 import { lockHoldRow, lockOrderRow, lockSessionRow } from './locks';
+import { readLatestAttempt } from './ordersAttempts';
 import { holds, orders, paymentAttempts } from './schema';
 import { readDatabaseTime } from './time';
 
@@ -27,26 +32,9 @@ type Look =
       target: LapseTarget;
     };
 
-/** The order's latest attempt, locked after the order (the lock order's last step). */
-async function lockLatestAttempt(tx: Transaction, orderId: string) {
-  const [row] = await tx
-    .select({
-      id: paymentAttempts.id,
-      providerKey: paymentAttempts.providerKey,
-      status: paymentAttempts.status,
-      providerPaymentId: paymentAttempts.providerPaymentId,
-    })
-    .from(paymentAttempts)
-    .where(eq(paymentAttempts.orderId, orderId))
-    .orderBy(desc(paymentAttempts.attemptNo))
-    .limit(1)
-    .for('update');
-  return row ?? null;
-}
-
 /**
- * One look at a lapsed `paying` hold under the locks of design doc 4.2.3 (session, hold, order,
- * attempt), at database time read after them. `payingLapse` decides; a release is written here in
+ * One look at a lapsed `paying` hold under the locks of design doc 4.2.3 (session, hold, order),
+ * at database time read after them; the latest attempt is read with no lock. `payingLapse` decides; a release is written here in
  * the one transaction: the attempt cancelled, the order voided, the hold released as
  * `payment_abandoned`. A cancel the provider has not made yet is handed back and nothing is written.
  */
@@ -60,7 +48,7 @@ async function lookAtHold(
   if (!hold) return { done: true, released: false };
   const order =
     (await lockOrderRow(tx, bookingIdempotencyKey(hold.id))) ?? null;
-  const attempt = order ? await lockLatestAttempt(tx, order.id) : null;
+  const attempt = order ? await readLatestAttempt(tx, order.id) : null;
   const at = await readDatabaseTime(tx);
 
   const lapse = payingLapse({ hold, order, attempt }, at, settledAttemptId);
@@ -76,10 +64,22 @@ async function lookAtHold(
 
   if (lapse.cancelAttempt) {
     requireAttemptTransition(lapse.cancelAttempt.from, 'canceled');
-    await tx
+    // The attempt row is not locked (design doc 4.2.3: only the payment's second transaction takes
+    // it), so the write only lands while the attempt is still live, and nothing else is written
+    // before it.
+    const moved = await tx
       .update(paymentAttempts)
-      .set({ status: 'canceled', updatedAt: sql`clock_timestamp()` })
-      .where(eq(paymentAttempts.id, lapse.cancelAttempt.id));
+      .set({ status: 'canceled', updatedAt: at })
+      .where(
+        and(
+          eq(paymentAttempts.id, lapse.cancelAttempt.id),
+          inArray(paymentAttempts.status, liveAttemptStatuses),
+        ),
+      )
+      .returning({ id: paymentAttempts.id });
+    if (afterAttemptWrite(moved.length) === 'skip') {
+      return { done: true, released: false };
+    }
   }
   if (lapse.voidOrderId !== null && order) {
     requireOrderTransition(order.status, 'void');
@@ -124,9 +124,8 @@ async function paymentStatusAfterCancel(
       })
     ).status;
   } catch (error) {
-    if (!(error instanceof PaymentsError) || !isCancelRefusal(error.code)) {
-      throw error;
-    }
+    const code = error instanceof PaymentsError ? error.code : null;
+    if (cancelErrorAction(code) === 'rethrow') throw error;
     const current = await payments.retrieve({ kind: 'payment', id: found.id });
     return current?.status ?? null;
   }
@@ -143,8 +142,9 @@ async function paymentStatusAfterCancel(
  */
 export async function abandonPayingHold(
   payments: PaymentsPort,
-  ref: { holdId: string; sessionId: string },
+  input: z.input<typeof LapseRefSchema>,
 ): Promise<boolean> {
+  const ref = LapseRefSchema.parse(input);
   const first = await db.transaction((tx) => lookAtHold(tx, ref, null));
   if (first.done) return first.released;
 

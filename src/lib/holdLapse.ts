@@ -1,6 +1,13 @@
+import { z } from 'zod';
+import { WriteIdSchema } from './catalog';
 import { isOpenHold, type HoldTimes } from './holds';
 import { type OrderStatus } from './orders';
-import { isLiveAttempt, type AttemptStatus } from './payments';
+import {
+  attemptStatuses,
+  isLiveAttempt,
+  type AttemptStatus,
+  type PaymentAttemptSchema,
+} from './payments';
 
 // What the holds sweep does with a `paying` hold that ran past `paying_until` (design doc 4.2.3,
 // Hold transitions): the live attempt is cancelled at the provider, the order is voided, and the
@@ -13,12 +20,28 @@ const lapsableOrderStatuses: readonly OrderStatus[] = [
   'void',
 ];
 
-type LapseAttempt = {
-  id: string;
-  providerKey: string;
-  status: AttemptStatus;
-  providerPaymentId: string | null;
-};
+type LapseAttempt = Pick<
+  z.output<typeof PaymentAttemptSchema>,
+  'id' | 'providerKey' | 'status' | 'providerPaymentId'
+>;
+
+/** The hold the sweep found: both ids are lower-cased uuids, as Postgres returns them. */
+export const LapseRefSchema = z.object({
+  holdId: WriteIdSchema,
+  sessionId: WriteIdSchema,
+});
+
+/** The statuses an attempt may still be moved from: the cancel is written only where the attempt is still in one. */
+export const liveAttemptStatuses = attemptStatuses.filter(isLiveAttempt);
+
+/**
+ * What the sweep does once it tried to cancel the attempt row `where status is live`: with a row
+ * updated the release goes on; with none, something else (a payment event) moved the attempt first,
+ * and the hold is left as it now stands.
+ */
+export function afterAttemptWrite(rowsUpdated: number): 'release' | 'skip' {
+  return rowsUpdated === 1 ? 'release' : 'skip';
+}
 
 export type LapseState = {
   hold: HoldTimes;
@@ -114,11 +137,12 @@ function cancelAttemptKey(attemptProviderKey: string): string {
 }
 
 /**
- * Whether a refused cancel only says what the payment's state is: the payment cannot be cancelled
- * from where it is (`invalid_state`), or the provider has no such payment (`not_found`). The sweep
- * reads the payment then and lets `providerSettled` decide. Any other refusal (the provider is
- * unavailable, the key clashed) is thrown, and the sweep stops and tries again on the next pulse.
+ * What the sweep does with an error from the cancel. `code` is the payments error's code, or null
+ * for any other error. A refusal that only says what the payment's state is (`invalid_state`, or
+ * `not_found` for a payment the provider does not have) is answered by reading the payment and
+ * letting `providerSettled` decide. Anything else (the provider is unavailable, the key clashed,
+ * an error that is not the port's) is rethrown, and the sweep stops and tries again next pulse.
  */
-export function isCancelRefusal(code: string): boolean {
-  return code === 'invalid_state' || code === 'not_found';
+export function cancelErrorAction(code: string | null): 'read' | 'rethrow' {
+  return code === 'invalid_state' || code === 'not_found' ? 'read' : 'rethrow';
 }

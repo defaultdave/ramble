@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { isCancelRefusal, payingLapse, providerSettled } from './holdLapse';
+import {
+  LapseRefSchema,
+  afterAttemptWrite,
+  cancelErrorAction,
+  liveAttemptStatuses,
+  payingLapse,
+  providerSettled,
+} from './holdLapse';
 import { at, later, otherUuid, uuid } from './holds.fixtures';
 import { orderStatuses, type OrderStatus } from './orders';
 import { attemptStatuses, type AttemptStatus } from './payments';
@@ -13,7 +20,9 @@ import { attemptStatuses, type AttemptStatus } from './payments';
 // - a live attempt is cancelled at the provider first, found by the stored id or by Ramble's ids when none was stored,
 //   and is released only once that same attempt is the one the provider settled
 // - the provider has settled when the payment is cancelled, or is missing for a lookup by Ramble's ids only
-// - a refused cancel is read for the payment's state only for `invalid_state` and `not_found`
+// - an error from the cancel is answered by reading the payment only for `invalid_state` and `not_found`; any other code, or an error with none, is rethrown
+// - the attempt is written only while live: the live statuses are exactly the non-terminal ones, and the release goes on only when one row was written
+// - the hold ref is two lower-cased uuids and nothing else
 
 const order = (status: OrderStatus) => ({ id: otherUuid, status });
 const attemptOf = (
@@ -177,14 +186,53 @@ describe('providerSettled', () => {
   );
 });
 
-describe('isCancelRefusal', () => {
+describe('cancelErrorAction', () => {
   it.each([
-    ['invalid_state', true],
-    ['not_found', true],
-    ['provider_unavailable', false],
-    ['idempotency_conflict', false],
-    ['invalid_input', false],
-  ])('%s: %s', (code, reads) => {
-    expect(isCancelRefusal(code)).toBe(reads);
+    ['invalid_state', 'read'],
+    ['not_found', 'read'],
+    ['provider_unavailable', 'rethrow'],
+    ['idempotency_conflict', 'rethrow'],
+    ['invalid_input', 'rethrow'],
+    [null, 'rethrow'],
+  ] as const)('%s: %s', (code, action) => {
+    expect(cancelErrorAction(code)).toBe(action);
+  });
+});
+
+describe('the attempt write', () => {
+  it('guards on exactly the live statuses', () => {
+    expect(liveAttemptStatuses).toEqual([
+      'created',
+      'requires_action',
+      'processing',
+      'failed_try',
+    ]);
+  });
+
+  it.each([
+    [1, 'release'],
+    [0, 'skip'],
+    [2, 'skip'],
+  ] as const)('%i rows written: %s', (rows, verdict) => {
+    expect(afterAttemptWrite(rows)).toBe(verdict);
+  });
+});
+
+describe('LapseRefSchema', () => {
+  it('lower-cases both ids', () => {
+    expect(
+      LapseRefSchema.parse({
+        holdId: uuid.toUpperCase(),
+        sessionId: otherUuid.toUpperCase(),
+      }),
+    ).toEqual({ holdId: uuid, sessionId: otherUuid });
+  });
+
+  it.each([
+    [{ holdId: 'nope', sessionId: otherUuid }],
+    [{ holdId: uuid, sessionId: '' }],
+    [{ holdId: uuid }],
+  ])('refuses %j', (ref) => {
+    expect(LapseRefSchema.safeParse(ref).success).toBe(false);
   });
 });

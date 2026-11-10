@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   boolean,
   char,
   check,
@@ -35,6 +36,7 @@ import {
   sessions,
   taxTreatmentEnum,
 } from './catalog';
+import { gifts } from './gifts';
 import { holds } from './holds';
 import { cancellationTiers, legalDocuments } from './policies';
 import { guests } from './people';
@@ -62,8 +64,8 @@ const childAges = sql.raw(
 
 /**
  * One order per booking or gift purchase (design doc 4.2.3, Orders). Time columns that order
- * records come from `clock_timestamp()`. `gift_id` is a uuid column with no foreign key yet: the
- * gifts table is built by a unit that depends on this one.
+ * records come from `clock_timestamp()`. `gift_id` names the gift a booking redeemed or a gift
+ * purchase created; the gift's `purchase_order_id` points back, so a purchase sets it after both exist.
  */
 export const orders = pgTable(
   'orders',
@@ -81,8 +83,9 @@ export const orders = pgTable(
     hostId: uuid()
       .notNull()
       .references(() => hosts.id, { onDelete: 'restrict' }),
-    // TODO(U-017): foreign key to gifts.
-    giftId: uuid(),
+    giftId: uuid().references((): AnyPgColumn => gifts.id, {
+      onDelete: 'restrict',
+    }),
     guestId: uuid()
       .notNull()
       .references(() => guests.id, { onDelete: 'restrict' }),

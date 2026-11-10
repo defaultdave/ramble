@@ -22,6 +22,7 @@ import {
 import { orderCurrency, orderLimits } from '@/lib/orders';
 import { paymentLimits } from '@/lib/payments';
 import { hosts } from './catalog';
+import { gifts } from './gifts';
 import { orders } from './orders';
 import { paymentAttempts, refunds, transfers } from './payments';
 import { isReadableDate, optionalText } from './shared';
@@ -50,7 +51,7 @@ const timestampTz = () => timestamp({ withTimezone: true });
 /**
  * One movement of money from a debit account to a credit account (design doc 4.2.3, Ledger).
  * `recorded_at` is when Ramble wrote the row, taken after any lock; `occurred_at` is provider time
- * and can arrive out of order. `gift_id`, `dispute_id`, and `created_by` are uuid columns with no
+ * and can arrive out of order. `dispute_id` and `created_by` are uuid columns with no
  * foreign key yet: the tables they point to are built by units that depend on this one.
  */
 export const ledgerEntries = pgTable(
@@ -67,8 +68,7 @@ export const ledgerEntries = pgTable(
     amountMinor: integer().notNull(),
     currency: char({ length: 3 }).notNull().default(orderCurrency),
     orderId: uuid().references(() => orders.id, { onDelete: 'restrict' }),
-    // TODO(U-017): foreign key to gifts.
-    giftId: uuid(),
+    giftId: uuid().references(() => gifts.id, { onDelete: 'restrict' }),
     hostId: uuid().references(() => hosts.id, { onDelete: 'restrict' }),
     paymentAttemptId: uuid().references(() => paymentAttempts.id, {
       onDelete: 'restrict',

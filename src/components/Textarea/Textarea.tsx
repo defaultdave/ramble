@@ -1,7 +1,7 @@
 import type { ComponentPropsWithoutRef } from 'react';
 import { useId } from 'react';
 import { Field } from '@/components/Field';
-import { fieldIds } from '@/lib/fieldIds';
+import { fieldControl } from '@/lib/fieldIds';
 import styles from './Textarea.module.css';
 
 export type TextareaProps = Omit<
@@ -26,12 +26,18 @@ export function Textarea({
   ...rest
 }: TextareaProps) {
   const generatedId = useId();
-  const textareaId = id ?? generatedId;
-  const ids = fieldIds(textareaId, { hint, errorText, describedBy });
+  const control = fieldControl({
+    id,
+    generatedId,
+    hint,
+    errorText,
+    describedBy,
+    ariaInvalid: rest['aria-invalid'],
+  });
 
   return (
     <Field
-      fieldId={textareaId}
+      fieldId={control.fieldId}
       label={label}
       hint={hint}
       errorText={errorText}
@@ -40,11 +46,11 @@ export function Textarea({
       <div className={styles.control}>
         <textarea
           {...rest}
-          id={textareaId}
+          id={control.fieldId}
           rows={rows}
           className={styles.textarea}
-          aria-invalid={errorText ? true : rest['aria-invalid']}
-          aria-describedby={ids.describedBy}
+          aria-invalid={control.ariaInvalid}
+          aria-describedby={control.describedBy}
         />
       </div>
     </Field>

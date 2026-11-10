@@ -1,6 +1,6 @@
 import { Check, Info, TriangleAlert, type LucideIcon } from 'lucide-react';
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
-import type { AlertTone } from '@/lib/alertTone';
+import { alertRole, type AlertTone } from '@/lib/alertTone';
 import { classNames } from '@/lib/classNames';
 import styles from './Alert.module.css';
 
@@ -30,21 +30,13 @@ const toneIcon = {
   danger: TriangleAlert,
 } satisfies Record<AlertTone, LucideIcon>;
 
-// Warnings and errors interrupt; confirmations and notes wait their turn.
-const toneRole = {
-  info: 'status',
-  success: 'status',
-  warning: 'alert',
-  danger: 'alert',
-} satisfies Record<AlertTone, 'status' | 'alert'>;
-
 export function Alert({ tone, title, body, action, ...rest }: AlertProps) {
   const Icon = toneIcon[tone];
 
   return (
     <div
       {...rest}
-      role={toneRole[tone]}
+      role={alertRole(tone)}
       className={classNames(styles.alert, toneClass[tone])}
     >
       <Icon className={styles.icon} aria-hidden="true" />

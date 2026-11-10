@@ -4,6 +4,7 @@ import {
   parseSingle,
   type RawSearchParams,
 } from './filters';
+import { pickKnown } from './pickKnown';
 import { hrefWithQuery } from './queryHref';
 
 export type SortDirection = 'asc' | 'desc';
@@ -39,8 +40,8 @@ export function parseSort(
   fallback: SortState,
 ): SortState {
   const named = parseSingle(query[SORT_PARAM], TextSchema);
-  const column = sortableColumns.find((known) => known === named);
-  if (column === undefined) return fallback;
+  const column = pickKnown(named, sortableColumns, null);
+  if (column === null) return fallback;
   return {
     column,
     direction:
@@ -149,4 +150,14 @@ export function carriedFields(
   return Object.entries(singleValues(query)).filter(
     ([name]) => name !== ownName && name !== CURSOR_PARAM,
   );
+}
+
+/** Names the box a wide table scrolls in, apart from the table's own caption. */
+export function tableScrollLabel(caption: string): string {
+  return `Scrollable ${caption}`;
+}
+
+/** Names the table's page links. */
+export function tablePagesLabel(caption: string): string {
+  return `${caption} pages`;
 }

@@ -11,6 +11,8 @@ import {
   parseSort,
   SEARCH_MAX_LENGTH,
   sortHref,
+  tablePagesLabel,
+  tableScrollLabel,
   tableHref,
   type SortState,
 } from './tableQuery';
@@ -179,5 +181,12 @@ describe('carriedFields', () => {
       ['tag', 'x'],
       ['sort', 'name'],
     ]);
+  });
+});
+
+describe('table labels', () => {
+  it('names the scroll box and the page links from the caption, apart from the caption', () => {
+    expect(tableScrollLabel('Orders')).toBe('Scrollable Orders');
+    expect(tablePagesLabel('Orders')).toBe('Orders pages');
   });
 });

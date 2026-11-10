@@ -3,7 +3,7 @@ import type { ComponentPropsWithoutRef } from 'react';
 import { useId } from 'react';
 import { Field } from '@/components/Field';
 import { classNames } from '@/lib/classNames';
-import { fieldIds } from '@/lib/fieldIds';
+import { fieldControl } from '@/lib/fieldIds';
 import styles from './Select.module.css';
 
 export type SelectOption = {
@@ -42,12 +42,18 @@ export function Select({
   ...rest
 }: SelectProps) {
   const generatedId = useId();
-  const selectId = id ?? generatedId;
-  const ids = fieldIds(selectId, { hint, errorText, describedBy });
+  const control = fieldControl({
+    id,
+    generatedId,
+    hint,
+    errorText,
+    describedBy,
+    ariaInvalid: rest['aria-invalid'],
+  });
 
   return (
     <Field
-      fieldId={selectId}
+      fieldId={control.fieldId}
       label={label}
       hint={hint}
       errorText={errorText}
@@ -61,10 +67,10 @@ export function Select({
       >
         <select
           {...rest}
-          id={selectId}
+          id={control.fieldId}
           className={styles.select}
-          aria-invalid={errorText ? true : rest['aria-invalid']}
-          aria-describedby={ids.describedBy}
+          aria-invalid={control.ariaInvalid}
+          aria-describedby={control.describedBy}
         >
           {placeholder === undefined ? null : (
             <option value="">{placeholder}</option>

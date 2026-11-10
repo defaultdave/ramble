@@ -1,6 +1,7 @@
 import type { BadgeTone } from './badge';
 import { z } from 'zod';
 import { parseSingle } from './filters';
+import { pickKnown } from './pickKnown';
 import { changedParamHref, type TableQuery } from './tableQuery';
 
 export type StatusTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
@@ -34,8 +35,11 @@ export function parseStatusFilter(
   raw: string | readonly string[] | undefined,
   options: readonly StatusFilterOption[],
 ): string | null {
-  const named = parseSingle(raw, z.string());
-  return options.find(({ value }) => value === named)?.value ?? null;
+  return pickKnown(
+    parseSingle(raw, z.string()),
+    options.map(({ value }) => value),
+    null,
+  );
 }
 
 function chipLabel({ label, count }: { label: string; count?: number }) {

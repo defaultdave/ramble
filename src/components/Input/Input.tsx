@@ -1,7 +1,7 @@
 import type { ComponentPropsWithoutRef } from 'react';
 import { useId } from 'react';
 import { Field } from '@/components/Field';
-import { fieldIds } from '@/lib/fieldIds';
+import { fieldControl } from '@/lib/fieldIds';
 import styles from './Input.module.css';
 
 export type InputProps = Omit<
@@ -24,12 +24,18 @@ export function Input({
   ...rest
 }: InputProps) {
   const generatedId = useId();
-  const inputId = id ?? generatedId;
-  const ids = fieldIds(inputId, { hint, errorText, describedBy });
+  const control = fieldControl({
+    id,
+    generatedId,
+    hint,
+    errorText,
+    describedBy,
+    ariaInvalid: rest['aria-invalid'],
+  });
 
   return (
     <Field
-      fieldId={inputId}
+      fieldId={control.fieldId}
       label={label}
       hint={hint}
       errorText={errorText}
@@ -37,10 +43,10 @@ export function Input({
     >
       <input
         {...rest}
-        id={inputId}
+        id={control.fieldId}
         className={styles.input}
-        aria-invalid={errorText ? true : rest['aria-invalid']}
-        aria-describedby={ids.describedBy}
+        aria-invalid={control.ariaInvalid}
+        aria-describedby={control.describedBy}
       />
     </Field>
   );

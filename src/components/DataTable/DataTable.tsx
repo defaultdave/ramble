@@ -9,6 +9,8 @@ import {
   firstPageHref,
   nextPageHref,
   sortHref,
+  tablePagesLabel,
+  tableScrollLabel,
   type SortState,
   type TableQuery,
 } from '@/lib/tableQuery';
@@ -111,7 +113,7 @@ export function DataTable<Row>({
       <div
         className={styles.scroll}
         role="region"
-        aria-label={`Scrollable ${caption}`}
+        aria-label={tableScrollLabel(caption)}
         tabIndex={0}
       >
         <table className={styles.table}>
@@ -171,7 +173,7 @@ export function DataTable<Row>({
         </table>
       </div>
       {cursor || nextCursor ? (
-        <nav className={styles.pages} aria-label={`${caption} pages`}>
+        <nav className={styles.pages} aria-label={tablePagesLabel(caption)}>
           {cursor ? (
             <ButtonLink href={firstPageHref(path, query)} variant="secondary">
               First page

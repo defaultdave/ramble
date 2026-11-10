@@ -43,3 +43,6 @@ export const WithError: Story = {
   },
 };
 export const Disabled: Story = { args: { hint, disabled: true } };
+
+/** The look the home hero search uses. */
+export const Hero: Story = { args: { variant: 'hero' } };

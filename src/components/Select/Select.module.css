@@ -33,3 +33,11 @@
 .control:has(.select:disabled) .chevron {
   color: var(--color-text-disabled);
 }
+
+.control.hero .select {
+  padding-inline-end: var(--space-10);
+}
+
+.control.hero .chevron {
+  color: var(--color-text-secondary);
+}

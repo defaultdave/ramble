@@ -2,6 +2,7 @@ import { ChevronDown } from 'lucide-react';
 import type { ComponentPropsWithoutRef } from 'react';
 import { useId } from 'react';
 import { Field } from '@/components/Field';
+import { classNames } from '@/lib/classNames';
 import { fieldIds } from '@/lib/fieldIds';
 import styles from './Select.module.css';
 
@@ -10,6 +11,8 @@ export type SelectOption = {
   label: string;
   disabled?: boolean;
 };
+
+export type SelectVariant = 'default' | 'hero';
 
 export type SelectProps = Omit<
   ComponentPropsWithoutRef<'select'>,
@@ -22,6 +25,8 @@ export type SelectProps = Omit<
   hint?: string;
   errorText?: string;
   optional?: boolean;
+  /** The hero search's look: a quieter chevron and a slimmer end padding. */
+  variant?: SelectVariant;
 };
 
 /** TODO(U-073): first caller. */
@@ -32,6 +37,7 @@ export function Select({
   hint,
   errorText,
   optional = false,
+  variant = 'default',
   id,
   'aria-describedby': describedBy,
   ...rest
@@ -48,7 +54,12 @@ export function Select({
       errorText={errorText}
       optional={optional}
     >
-      <div className={styles.control}>
+      <div
+        className={classNames(
+          styles.control,
+          variant === 'hero' && styles.hero,
+        )}
+      >
         <select
           {...rest}
           id={selectId}

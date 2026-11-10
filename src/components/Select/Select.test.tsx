@@ -55,6 +55,21 @@ describe('Select', () => {
     expect(screen.getByText('(optional)')).toBeVisible();
   });
 
+  it('keeps its label, options, and value in the hero variant', () => {
+    render(
+      <Select
+        label="Guests"
+        options={options}
+        variant="hero"
+        name="guests"
+        defaultValue="a"
+      />,
+    );
+    const select = screen.getByLabelText('Guests');
+    expect(select).toHaveValue('a');
+    expect(select).toHaveAttribute('name', 'guests');
+  });
+
   it('rejects className and style', () => {
     expectTypeOf<ComponentProps<typeof Select>>().not.toHaveProperty(
       'className',

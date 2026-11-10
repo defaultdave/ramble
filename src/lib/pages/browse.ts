@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { andList } from '../andList';
 import {
   toExperienceCard,
   type CardExperience,
@@ -143,11 +144,6 @@ export function browseHeading(view: BrowseView): string | null {
 
 type TitleOption = { slug: string; name: string };
 
-const titleList = new Intl.ListFormat('en-US', {
-  style: 'long',
-  type: 'conjunction',
-});
-
 /**
  * The page title for the filters, so the route announcer reads something new after each change:
  * "Browse Cooking experiences in DUMBO on Sat, Nov 7 for 4 guests". Names are the chosen categories and
@@ -169,9 +165,9 @@ export function browseTitle(
   const neighborhoods = named(filters.neighborhoods, options.neighborhoods);
   return [
     'Browse',
-    categories.length > 0 ? titleList.format(categories) : null,
+    categories.length > 0 ? andList.format(categories) : null,
     'experiences',
-    neighborhoods.length > 0 ? `in ${titleList.format(neighborhoods)}` : null,
+    neighborhoods.length > 0 ? `in ${andList.format(neighborhoods)}` : null,
     filters.date ? `on ${dateChipLabel(filters.date)}` : null,
     filters.guests === null ? null : `for ${guestsLabel(filters.guests)}`,
   ]

@@ -1,3 +1,4 @@
+import { andList } from './andList';
 import {
   ageChips,
   browseParamNames,
@@ -29,11 +30,6 @@ export type NamedOptions = {
   neighborhoods: readonly Option[];
 };
 
-const listFormat = new Intl.ListFormat('en-US', {
-  style: 'long',
-  type: 'conjunction',
-});
-
 function chosenName(chips: readonly { selected: boolean; label: string }[]) {
   return chips.find(({ selected }) => selected)?.label ?? null;
 }
@@ -41,7 +37,7 @@ function chosenName(chips: readonly { selected: boolean; label: string }[]) {
 function namesOf(slugs: readonly string[], options: readonly Option[]) {
   const lookup = new Map(options.map(({ slug, name }) => [slug, name]));
   const names = slugs.flatMap((slug) => lookup.get(slug) ?? []);
-  return names.length === 0 ? null : listFormat.format(names);
+  return names.length === 0 ? null : andList.format(names);
 }
 
 /** What the filter is called on a link: "Kayaking", "Under $50", "4 guests". Null when there is nothing to call it by. */

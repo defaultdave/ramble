@@ -143,7 +143,7 @@ export const experiences: ExperienceFixture[] = [
       slots: [
         {
           weekday: 6,
-          startTime: '14:00',
+          startTime: '15:30',
           durationMinutes: 120,
           allocation: 12,
         },
@@ -318,7 +318,7 @@ export const experiences: ExperienceFixture[] = [
       neighborhoodSlug: 'sunset-park',
       name: 'Dumpling folding in Sunset Park',
       description:
-        'Learn three folds from a family that has been making dumplings for three generations. You fill, pleat, and steam your own, and everything you fold you eat.',
+        'Learn three folds from a family that has been making dumplings for three generations. You fill, pleat, and steam your own, then eat a first batch at the table and take the rest home frozen.',
     },
     {
       meetingPoint: 'Steam & Fold, Eighth Avenue, Sunset Park.',
@@ -419,8 +419,8 @@ export const experiences: ExperienceFixture[] = [
           source: 'allocation',
         },
         {
-          weekday: 1,
-          startTime: '19:30',
+          weekday: 0,
+          startTime: '10:00',
           durationMinutes: 60,
           allocation: 20,
           source: 'allocation',

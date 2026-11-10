@@ -17,6 +17,7 @@ type Guide = {
   durationMinutes: number;
   linkOutUrl: string;
   affiliate?: boolean;
+  outdoor?: boolean;
 };
 
 function guide(input: Guide): ExperienceFixture {
@@ -30,6 +31,13 @@ function guide(input: Guide): ExperienceFixture {
       durationMinutes: input.durationMinutes,
       linkOutUrl: input.linkOutUrl,
       affiliateUrl: input.affiliate ? `${input.linkOutUrl}?ref=ramble` : null,
+      ...(input.outdoor
+        ? {
+            outdoor: true,
+            weatherPolicy: 'decided_before_start' as const,
+            weatherDecisionHours: 2,
+          }
+        : {}),
     },
   );
 }
@@ -96,6 +104,7 @@ export const guideExperiences: ExperienceFixture[] = [
     meetingPoint: 'The corner of Fifth Avenue and 44th Street, Sunset Park.',
     durationMinutes: 60,
     linkOutUrl: 'https://fifth-avenue-run-club.example.com/saturday-run',
+    outdoor: true,
   }),
   guide({
     slug: 'post-run-stretch-on-the-grass',
@@ -108,6 +117,7 @@ export const guideExperiences: ExperienceFixture[] = [
     meetingPoint: 'The lawn at the top of the hill, Sunset Park.',
     durationMinutes: 30,
     linkOutUrl: 'https://fifth-avenue-run-club.example.com/stretch',
+    outdoor: true,
   }),
   guide({
     slug: 'long-table-supper-in-williamsburg',

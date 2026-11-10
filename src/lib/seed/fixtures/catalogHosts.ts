@@ -33,7 +33,7 @@ export const catalogHosts: HostFixture[] = [
     slug: 'corner-table-tours',
     name: 'Corner Table Tours',
     description:
-      'Neighbors who eat their way around south and west Brooklyn and take a few guests along. They only visit counters and kitchens they go to themselves.',
+      'Neighbors who walk and eat their way around south and west Brooklyn and take a few guests along. They only visit counters and kitchens they go to themselves.',
   },
   {
     slug: 'quill-and-ink-press',
@@ -57,6 +57,6 @@ export const catalogHosts: HostFixture[] = [
     slug: 'sunday-supper-club',
     name: 'Sunday Supper Club',
     description:
-      'A rotating cast of home cooks who open their tables in Williamsburg and Carroll Gardens. Ramble lists the dinners; each cook takes their own bookings.',
+      'A rotating cast of home cooks who open their tables in Williamsburg and Carroll Gardens. Ramble lists their dinners and classes; each cook takes their own bookings.',
   },
 ];

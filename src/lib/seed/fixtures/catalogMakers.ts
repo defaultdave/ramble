@@ -53,7 +53,7 @@ export const makerExperiences: ExperienceFixture[] = [
       minAge: 12,
       taxTreatment: 'taxable',
       prices: [{ kind: 'adult', priceMinor: 5800, usesSpace: true }],
-      slots: [slot(4, '18:30', 150, 10), slot(0, '14:00', 150, 10)],
+      slots: [slot(4, '18:30', 150, 10), slot(0, '17:00', 150, 10)],
     },
   ),
   experience(
@@ -145,7 +145,7 @@ export const makerExperiences: ExperienceFixture[] = [
       ageRule: 'minimum_age',
       minAge: 10,
       prices: [{ kind: 'adult', priceMinor: 6400, usesSpace: true }],
-      slots: [slot(6, '11:00', 120, 8), slot(4, '18:30', 120, 8)],
+      slots: [slot(6, '15:00', 120, 8), slot(4, '18:30', 120, 8)],
     },
   ),
   experience(
@@ -168,7 +168,7 @@ export const makerExperiences: ExperienceFixture[] = [
       ageRule: 'minimum_age',
       minAge: 12,
       prices: [{ kind: 'adult', priceMinor: 5200, usesSpace: true }],
-      slots: [slot(2, '18:30', 90, 10), slot(6, '10:00', 90, 10)],
+      slots: [slot(3, '18:30', 90, 10), slot(6, '10:00', 90, 10)],
     },
   ),
   experience(
@@ -225,7 +225,7 @@ export const makerExperiences: ExperienceFixture[] = [
       neighborhoodSlug: 'lower-east-side',
       name: 'Three grapes, one night',
       description:
-        "One grape, three producers, and a host who lines them up side by side. It's the quickest way to learn what a place and a pair of hands do to a wine.",
+        "Three grapes, three producers of each, and a host who lines them up side by side. It's the quickest way to learn what a place and a pair of hands do to a wine.",
     },
     {
       tier: 'moderate',

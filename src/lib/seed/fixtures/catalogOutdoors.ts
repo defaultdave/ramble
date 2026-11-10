@@ -142,7 +142,7 @@ export const outdoorExperiences: ExperienceFixture[] = [
       neighborhoodSlug: 'tribeca',
       name: 'Learn to kayak in the cove',
       description:
-        'A three-hour first lesson in flat, sheltered water: how to sit, how to steer, and what to do if you tip. You finish with a lap on your own and a guide alongside.',
+        'A three-hour first lesson in flat, sheltered water: how to sit, how to steer, and what to do if you tip. You finish with a lap of the cove, with a guide paddling alongside.',
     },
     {
       tier: 'strict',
@@ -305,7 +305,7 @@ export const outdoorExperiences: ExperienceFixture[] = [
     },
     {
       meetingPoint: 'Steam & Fold, Eighth Avenue, Sunset Park.',
-      included: 'Dough, fillings, aprons, and a lunch of their own dumplings.',
+      included: 'Dough, fillings, aprons, and a meal of their own dumplings.',
       durationMinutes: 90,
       accessibilityNotes: 'Step-free entrance. Low stools for small cooks.',
       ageRule: 'age_range',

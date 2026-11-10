@@ -197,13 +197,14 @@ describe('after Pay', () => {
         .from(schema.transfers)
         .where(eq(schema.transfers.orderId, world.orderId)),
     ).toHaveLength(1);
-    const emailJobs = await client.db.execute<{ status: string }>(
-      sql`SELECT status FROM jobs WHERE payload->>'orderId' = ${world.orderId}`,
+    const emailJobs = await client.db.execute<{ kind: string; status: string }>(
+      sql`SELECT kind, status FROM jobs WHERE payload->>'orderId' = ${world.orderId} ORDER BY kind`,
     );
-    expect(emailJobs.rows).toHaveLength(2);
-    expect(emailJobs.rows.every((row) => row.status === 'succeeded')).toBe(
-      true,
-    );
+    expect(emailJobs.rows).toEqual([
+      { kind: 'guest-confirmation', status: 'succeeded' },
+      { kind: 'host-booking-notice', status: 'succeeded' },
+      { kind: 'session-reminder', status: 'pending' },
+    ]);
     const mail = await client.db.select().from(schema.messages);
     expect(mail.map((m) => m.recipient).toSorted()).toEqual([
       'bookings@harborlight.example',

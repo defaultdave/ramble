@@ -16,6 +16,10 @@ import {
   paidAfterLapseData,
   partyLabel,
   refundArrivalLine,
+  reminderDecision,
+  reminderLeadMs,
+  reminderRunAt,
+  sessionReminderData,
   type BookingEmailSource,
   type CancelledBy,
 } from './bookingEmails';
@@ -31,6 +35,7 @@ import {
   GuestConfirmationDataSchema,
   HostBookingNoticeDataSchema,
   PaidAfterLapseDataSchema,
+  SessionReminderDataSchema,
 } from './email/bookingTemplates';
 import { orderStatuses } from './orders';
 
@@ -277,6 +282,106 @@ describe('hostBookingNoticeData', () => {
   });
 });
 
+describe('reminderRunAt', () => {
+  const startsAt = new Date('2026-11-07T21:00:00Z');
+
+  it.each([
+    [
+      'days ahead: 24 hours before the session',
+      '2026-11-01T00:00:00Z',
+      '2026-11-06T21:00:00Z',
+    ],
+    [
+      'exactly 24 hours ahead: now',
+      '2026-11-06T21:00:00Z',
+      '2026-11-06T21:00:00Z',
+    ],
+    [
+      'under 24 hours ahead: now',
+      '2026-11-07T10:00:00Z',
+      '2026-11-07T10:00:00Z',
+    ],
+  ])('with the booking made %s', (_label, now, expected) => {
+    expect(reminderRunAt(startsAt, new Date(now))).toEqual(new Date(expected));
+  });
+
+  it.each([
+    ['at the start', '2026-11-07T21:00:00Z'],
+    ['after the start', '2026-11-08T00:00:00Z'],
+  ])('is null for a booking made %s', (_label, now) => {
+    expect(reminderRunAt(startsAt, new Date(now))).toBeNull();
+  });
+
+  it('leads by 24 hours', () => {
+    expect(reminderLeadMs).toBe(86_400_000);
+  });
+});
+
+describe('reminderDecision', () => {
+  const before = new Date('2026-11-06T21:00:00Z');
+
+  it.each(
+    orderStatuses.map((status) => [
+      status,
+      status === 'confirmed'
+        ? 'send'
+        : status === 'cancelled'
+          ? 'skip'
+          : 'refuse',
+    ]),
+  )('for a booking that is %s, before the session: %s', (status, expected) => {
+    expect(reminderDecision({ ...orderA, status }, before)).toBe(expected);
+  });
+
+  it('skips a confirmed booking whose session has started', () => {
+    expect(reminderDecision(orderA, orderA.startsAt)).toBe('skip');
+  });
+
+  it('refuses a gift purchase', () => {
+    expect(reminderDecision({ ...orderA, kind: 'gift_purchase' }, before)).toBe(
+      'refuse',
+    );
+  });
+});
+
+describe('sessionReminderData', () => {
+  const input = { appUrl, manageToken: fakeManageToken };
+
+  it('names the session, the place, the host, and the manage link, and passes its schema', () => {
+    const data = sessionReminderData(orderA, input);
+
+    expect(SessionReminderDataSchema.parse(data)).toEqual(data);
+    expect(data).toEqual({
+      recipientName: 'Pat Rivera',
+      reference: 'RMB-A3K7MN',
+      experienceName: 'Sunset sail on the Hudson',
+      hostName: 'Harbor Light Sailing',
+      dayLabel: 'Saturday, November 7, 2026',
+      timeLabel: '4:00 PM EST',
+      durationLabel: '2\u00a0hr',
+      meetingPoint: 'Pier 40, West Side Highway at Houston Street',
+      partyLabel: '3 guests',
+      manageUrl: `https://ramble.example/manage/${fakeManageToken}`,
+    });
+  });
+
+  it('has no length or place when the experience has none, and greets "there" without a name', () => {
+    const data = sessionReminderData(orderB, input);
+
+    expect(data).toMatchObject({
+      recipientName: 'there',
+      durationLabel: null,
+      meetingPoint: null,
+    });
+  });
+
+  it('refuses a link that is not a capability token', () => {
+    expect(() =>
+      sessionReminderData(orderA, { appUrl, manageToken: 'nope' }),
+    ).toThrow(RangeError);
+  });
+});
+
 describe('cancellation wording', () => {
   const cancellers: CancelledBy[] = ['guest', 'host', 'weather', 'ramble'];
 
@@ -423,13 +528,12 @@ describe('paidAfterLapseData', () => {
 });
 
 describe('bookingEmailKey', () => {
-  it.each(['guest-confirmation', 'host-booking-notice'] as const)(
-    'builds one key per order for %s',
-    (kind) => {
-      expect(bookingEmailKey(kind, 'abc')).toBe(`${kind}:abc`);
-      expect(bookingEmailKey(kind, 'abc')).not.toBe(
-        bookingEmailKey(kind, 'abd'),
-      );
-    },
-  );
+  it.each([
+    'guest-confirmation',
+    'host-booking-notice',
+    'session-reminder',
+  ] as const)('builds one key per order for %s', (kind) => {
+    expect(bookingEmailKey(kind, 'abc')).toBe(`${kind}:abc`);
+    expect(bookingEmailKey(kind, 'abc')).not.toBe(bookingEmailKey(kind, 'abd'));
+  });
 });

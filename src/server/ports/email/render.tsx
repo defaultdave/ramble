@@ -16,6 +16,7 @@ import { GuestConfirmation } from './templates/GuestConfirmation';
 import { HostBookingNotice } from './templates/HostBookingNotice';
 import { OpsNotice } from './templates/OpsNotice';
 import { PaidAfterLapse } from './templates/PaidAfterLapse';
+import { SessionReminder } from './templates/SessionReminder';
 import { SignInLink } from './templates/SignInLink';
 
 type Markup = {
@@ -32,6 +33,9 @@ const markup: Markup = {
   ),
   'host-booking-notice': (data, helpUrl) => (
     <HostBookingNotice data={data} helpUrl={helpUrl} />
+  ),
+  'session-reminder': (data, helpUrl) => (
+    <SessionReminder data={data} helpUrl={helpUrl} />
   ),
   'booking-cancellation': (data, helpUrl) => (
     <BookingCancellation data={data} helpUrl={helpUrl} />

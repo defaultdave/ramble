@@ -4,6 +4,7 @@ import type {
   GuestConfirmationData,
   HostBookingNoticeData,
   PaidAfterLapseData,
+  SessionReminderData,
 } from './bookingTemplates';
 
 // The words in each booking email, apart from the layout's footer: preview line, heading, opening
@@ -81,6 +82,31 @@ export function hostBookingNoticeBody(data: HostBookingNoticeData): Body {
       { label: 'Lead guest', value: data.guestName },
       { label: 'Reference', value: data.reference },
     ],
+  };
+}
+
+export type ReminderBody = Body & { manageLabel: string };
+
+export function sessionReminderBody(data: SessionReminderData): ReminderBody {
+  return {
+    preview: `${data.experienceName} is coming up, ${data.dayLabel}.`,
+    heading: 'Your session is coming up',
+    intro: `Hi ${data.recipientName}, ${data.hostName} is expecting you on ${data.dayLabel} at ${data.timeLabel}.`,
+    rows: [
+      { label: 'Experience', value: data.experienceName },
+      { label: 'Date', value: data.dayLabel },
+      { label: 'Time', value: data.timeLabel },
+      ...(data.durationLabel
+        ? [{ label: 'Length', value: data.durationLabel }]
+        : []),
+      ...(data.meetingPoint
+        ? [{ label: 'Meeting point', value: data.meetingPoint }]
+        : []),
+      { label: 'Guests', value: data.partyLabel },
+      { label: 'Host', value: data.hostName },
+      { label: 'Reference', value: data.reference },
+    ],
+    manageLabel: 'Manage your booking',
   };
 }
 

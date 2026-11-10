@@ -5,6 +5,7 @@ import {
   guestConfirmationData,
   hostBookingNoticeData,
   paidAfterLapseData,
+  sessionReminderData,
 } from '@/lib/bookingEmails';
 import {
   appUrl,
@@ -19,6 +20,7 @@ import { renderEmail } from './render';
 // - every booking email has the help link, absolute, in both parts, and no em dash
 // - the guest confirmation shows what, when, where, party, the itemized total, the terms, the manage link, the
 //   calendar link, and carries one calendar file; an order with a gift shows the gift and the charge
+// - the reminder shows what, when, where, the party, the host, and the manage link, and carries no file and no payment
 // - the host notice shows the guest and the party and no payment or link
 // - the cancellation shows the refund and other dates to a guest, and neither to a host
 // - the refund and S10 notices show the amount; S10 says the guest is not booked and links to browse
@@ -62,6 +64,10 @@ const all: [string, EmailRequest][] = [
   [
     'host-booking-notice',
     request('host-booking-notice', hostBookingNoticeData(orderA)),
+  ],
+  [
+    'session-reminder',
+    request('session-reminder', sessionReminderData(orderA, input)),
   ],
   [
     'booking-cancellation (guest)',
@@ -219,6 +225,33 @@ describe('host booking notice', () => {
     expect(text).toContain('Saturday, November 7, 2026');
     expect(text).not.toMatch(/\$\d/);
     expect(html).not.toContain('/manage/');
+    expect(attachments).toEqual([]);
+  });
+});
+
+describe('session reminder', () => {
+  it('shows the session, the place, the party, the host, and the manage link', async () => {
+    const { html, text, subject, attachments } = await render(
+      byName('session-reminder'),
+    );
+
+    expect(subject).toBe(
+      'Coming up: Sunset sail on the Hudson, Saturday, November 7, 2026',
+    );
+    for (const part of [
+      'Hi Pat Rivera, Harbor Light Sailing is expecting you on Saturday, November 7, 2026 at 4:00 PM EST.',
+      'Pier 40, West Side Highway at Houston Street',
+      '2\u00a0hr',
+      '3 guests',
+      'RMB-A3K7MN',
+    ]) {
+      expect(text).toContain(part);
+    }
+    expect(html).toContain(
+      `href="https://ramble.example/manage/${fakeManageToken}"`,
+    );
+    expect(text).toContain(`https://ramble.example/manage/${fakeManageToken}`);
+    expect(text).not.toMatch(/\$\d/);
     expect(attachments).toEqual([]);
   });
 });

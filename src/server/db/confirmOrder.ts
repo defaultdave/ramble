@@ -23,6 +23,7 @@ import type { Transaction } from './client';
 import { readOpenHeldSeats } from './holds';
 import { postEntries, postProviderFee } from './ledger';
 import { takeRefundPath } from './refundPath';
+import { enqueueSessionReminder } from './sessionReminder';
 import { holds, orders, paymentAttempts, sessions, transfers } from './schema';
 
 /** What the provider event job tells the confirm step about the success it is acting on. */
@@ -245,6 +246,7 @@ async function writeBookingConfirmed(
       dedupeKey: bookingEmailKey(kind, order.id),
     });
   }
+  await enqueueSessionReminder(tx, { orderId: order.id, now: at });
 }
 
 function refundPath(

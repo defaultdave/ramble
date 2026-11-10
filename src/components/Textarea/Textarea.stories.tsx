@@ -29,7 +29,7 @@ export const Focus: Story = {
   },
 };
 export const Optional: Story = { args: { optional: true, defaultValue: '' } };
-export const Error: Story = {
+export const WithError: Story = {
   args: { defaultValue: '', hint, errorText: 'Write a note before sending.' },
 };
 export const Disabled: Story = { args: { hint, disabled: true } };

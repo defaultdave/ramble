@@ -118,7 +118,7 @@ export const Empty: Story = { args: { rows: [] } };
 export const EmptyPastTheLastPage: Story = {
   args: { rows: [], cursor: 'o-40', empty: { title: 'No more orders' } },
 };
-export const Error: Story = {
+export const LoadFailed: Story = {
   args: {
     error: {
       title: 'Orders could not load',

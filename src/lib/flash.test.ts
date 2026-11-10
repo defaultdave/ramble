@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseFlash, serializeFlash } from './flash';
+import { parseFlash, readFlash, serializeFlash } from './flash';
 
 // Behaviours under test, one per decision, branch or risk:
 // - what serializeFlash writes, parseFlash reads back
@@ -33,5 +33,23 @@ describe('parseFlash', () => {
     ],
   ])('shows nothing for %s', (_case, raw) => {
     expect(parseFlash(raw)).toBeNull();
+  });
+});
+
+describe('readFlash reasons', () => {
+  it.each([
+    [undefined, 'missing'],
+    ['x'.repeat(401), 'too-long'],
+    ['{nope', 'not-json'],
+    ['{"tone":"loud","message":"Hi"}', 'wrong-shape'],
+  ])('reads %j as %s', (raw, reason) => {
+    expect(readFlash(raw)).toEqual({ ok: false, reason });
+  });
+
+  it('returns the flash when the value is ours', () => {
+    expect(readFlash('{"tone":"info","message":"Hi"}')).toEqual({
+      ok: true,
+      flash: { tone: 'info', message: 'Hi' },
+    });
   });
 });

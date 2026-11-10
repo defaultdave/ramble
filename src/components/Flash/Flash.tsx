@@ -6,7 +6,7 @@ export type FlashProps = {
   flash: FlashMessage | null;
 };
 
-/** The one-line result of a Server Action, shown on the page the action sent the user to. */
+/** TODO(U-073): first caller. The one-line result of a Server Action, shown on the page the action sent the user to. */
 export function Flash({ flash }: FlashProps) {
   if (flash === null) return null;
   return <Alert tone={flash.tone} title={flash.message} />;

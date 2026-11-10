@@ -63,6 +63,7 @@ function SortIcon({
 }
 
 /**
+ * TODO(U-073): first caller.
  * Sorting and paging are links to the same address with other params, so the server reads the
  * order and the page and the table works with no script.
  */
@@ -110,7 +111,7 @@ export function DataTable<Row>({
       <div
         className={styles.scroll}
         role="region"
-        aria-label={caption}
+        aria-label={`Scrollable ${caption}`}
         tabIndex={0}
       >
         <table className={styles.table}>

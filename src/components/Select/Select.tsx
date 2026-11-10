@@ -1,6 +1,7 @@
-import { ChevronDown, TriangleAlert } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import type { ComponentPropsWithoutRef } from 'react';
 import { useId } from 'react';
+import { Field } from '@/components/Field';
 import { fieldIds } from '@/lib/fieldIds';
 import styles from './Select.module.css';
 
@@ -23,6 +24,7 @@ export type SelectProps = Omit<
   optional?: boolean;
 };
 
+/** TODO(U-073): first caller. */
 export function Select({
   label,
   options,
@@ -39,11 +41,13 @@ export function Select({
   const ids = fieldIds(selectId, { hint, errorText, describedBy });
 
   return (
-    <div className={styles.field}>
-      <label className={styles.label} htmlFor={selectId}>
-        {label}
-        {optional ? <span className={styles.optional}> (optional)</span> : null}
-      </label>
+    <Field
+      fieldId={selectId}
+      label={label}
+      hint={hint}
+      errorText={errorText}
+      optional={optional}
+    >
       <div className={styles.control}>
         <select
           {...rest}
@@ -67,17 +71,6 @@ export function Select({
         </select>
         <ChevronDown className={styles.chevron} aria-hidden="true" />
       </div>
-      {hint ? (
-        <p className={styles.hint} id={ids.hintId}>
-          {hint}
-        </p>
-      ) : null}
-      {errorText ? (
-        <p className={styles.error} id={ids.errorId}>
-          <TriangleAlert className={styles.errorIcon} aria-hidden="true" />
-          {errorText}
-        </p>
-      ) : null}
-    </div>
+    </Field>
   );
 }

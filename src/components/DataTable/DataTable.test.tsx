@@ -89,10 +89,9 @@ describe('DataTable rows', () => {
 
   it('names the scrolling region and the table after the caption', () => {
     renderTable();
-    expect(screen.getByRole('region', { name: 'Orders' })).toHaveAttribute(
-      'tabindex',
-      '0',
-    );
+    expect(
+      screen.getByRole('region', { name: 'Scrollable Orders' }),
+    ).toHaveAttribute('tabindex', '0');
     expect(screen.getByRole('table', { name: 'Orders' })).toBeInTheDocument();
   });
 });

@@ -30,6 +30,8 @@ describe('parseStatusFilter', () => {
     ['refunded', null],
     ['', null],
     [undefined, null],
+    [['failed', 'paid'], null],
+    [['failed'], 'failed'],
   ])('reads %j as %j', (raw, expected) => {
     expect(parseStatusFilter(raw, options)).toBe(expected);
   });

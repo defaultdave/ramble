@@ -34,7 +34,7 @@ export const Focus: Story = {
   },
 };
 export const Optional: Story = { args: { optional: true } };
-export const Error: Story = {
+export const WithError: Story = {
   args: {
     placeholder: 'Choose a reason',
     defaultValue: '',

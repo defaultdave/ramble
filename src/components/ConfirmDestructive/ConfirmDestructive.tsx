@@ -29,7 +29,7 @@ function ConfirmButton({ label }: { label: string }) {
   );
 }
 
-/** Opens a dialog that must be answered before the action runs. Cancel has focus first, so Enter alone never destroys anything. */
+/** TODO(U-073): first caller. Opens a dialog that must be answered before the action runs. Cancel has focus first, so Enter alone never destroys anything. */
 export function ConfirmDestructive({
   triggerLabel,
   title,

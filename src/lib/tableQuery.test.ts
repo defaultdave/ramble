@@ -3,7 +3,6 @@ import {
   ariaSortFor,
   carriedFields,
   changedParamHref,
-  CURSOR_MAX_LENGTH,
   firstPageHref,
   nextPageHref,
   nextSortDirection,
@@ -42,6 +41,15 @@ describe('parseSort', () => {
       { column: 'name', direction: 'asc' },
     ],
     [{ sort: 'password' }, fallback],
+    [{ sort: ['name', 'created'] }, fallback],
+    [
+      { sort: 'name', dir: ['asc', 'desc'] },
+      { column: 'name', direction: 'asc' },
+    ],
+    [
+      { sort: ['name'], dir: ['desc'] },
+      { column: 'name', direction: 'desc' },
+    ],
     [{ dir: 'asc' }, fallback],
     [{}, fallback],
   ] as const)('reads %j as %j', (query, expected) => {
@@ -49,24 +57,38 @@ describe('parseSort', () => {
   });
 });
 
+const id = '3f2b8c1e-5d4a-4e6b-9c7d-0a1b2c3d4e5f';
+
 describe('parseCursor', () => {
   it.each([
-    [undefined, null],
-    ['', null],
-    ['abc', 'abc'],
-    ['x'.repeat(CURSOR_MAX_LENGTH), 'x'.repeat(CURSOR_MAX_LENGTH)],
-    ['x'.repeat(CURSOR_MAX_LENGTH + 1), null],
-  ])('reads %j as %j', (raw, expected) => {
+    ['absent', undefined, null],
+    ['empty', '', null],
+    ['a row id', id, id],
+    ['an upper-case row id, lowered', id.toUpperCase(), id],
+    ['not an id', 'abc', null],
+    ['quote and comment characters', "x'; select 1 --", null],
+    ['oversized', `${id}${id}`, null],
+    ['repeated', [id, id], null],
+    ['repeated with one bad', [id, 'abc'], null],
+    ['one in a list', [id], id],
+  ])('reads %s', (_case, raw, expected) => {
     expect(parseCursor(raw)).toBe(expected);
   });
 });
 
 describe('parseSearchTerm', () => {
   it.each([
-    [undefined, ''],
-    ['  gift  ', 'gift'],
-    ['x'.repeat(SEARCH_MAX_LENGTH + 20), 'x'.repeat(SEARCH_MAX_LENGTH)],
-  ])('reads %j as %j', (raw, expected) => {
+    ['absent', undefined, ''],
+    ['padded', '  gift  ', 'gift'],
+    [
+      'at the limit',
+      'x'.repeat(SEARCH_MAX_LENGTH),
+      'x'.repeat(SEARCH_MAX_LENGTH),
+    ],
+    ['over the limit, refused', 'x'.repeat(SEARCH_MAX_LENGTH + 1), ''],
+    ['repeated, refused', ['a', 'b'], ''],
+    ['one in a list', ['a'], 'a'],
+  ])('reads %s', (_case, raw, expected) => {
     expect(parseSearchTerm(raw)).toBe(expected);
   });
 });
@@ -128,6 +150,18 @@ describe('addresses', () => {
   });
 });
 
+describe('addresses from a repeated param', () => {
+  it('drops the repeated param rather than choosing one', () => {
+    const query = { status: ['a', 'b'], q: 'gift' };
+    expect(firstPageHref('/ops', query)).toBe('/ops?q=gift');
+    expect(nextPageHref('/ops', query, 'c9')).toBe('/ops?q=gift&cursor=c9');
+    expect(sortHref('/ops', query, fallback, 'name')).toBe(
+      '/ops?q=gift&sort=name&dir=asc',
+    );
+    expect(changedParamHref('/ops', query, 'x', 'y')).toBe('/ops?q=gift&x=y');
+  });
+});
+
 describe('carriedFields', () => {
   it('keeps the rest of the address and drops the own field, the cursor, and empty values', () => {
     expect(
@@ -136,5 +170,14 @@ describe('carriedFields', () => {
         'q',
       ),
     ).toEqual([['status', 'failed']]);
+  });
+
+  it('never carries a repeated param into a hidden input', () => {
+    expect(
+      carriedFields({ status: ['a', 'b'], tag: ['x'], sort: 'name' }, 'q'),
+    ).toEqual([
+      ['tag', 'x'],
+      ['sort', 'name'],
+    ]);
   });
 });

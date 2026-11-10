@@ -13,7 +13,7 @@ export type StatusFilterBarProps = {
   allLabel?: string;
 };
 
-/** Links, not a script: the status is in the address, so a filtered table can be shared and reloaded. */
+/** TODO(U-073): first caller. Links, not a script: the status is in the address, so a filtered table can be shared and reloaded. */
 export function StatusFilterBar({
   path,
   query,

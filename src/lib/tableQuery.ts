@@ -1,40 +1,67 @@
+import { z } from 'zod';
+import {
+  BrowseQuerySchema,
+  parseSingle,
+  type RawSearchParams,
+} from './filters';
+
 export type SortDirection = 'asc' | 'desc';
 export type SortState = { column: string; direction: SortDirection };
 
-/** Search params as a page reads them: one value per name, absent or empty when unset. */
-export type TableQuery = Readonly<Record<string, string | undefined>>;
+/** Search params as Next hands them to a page: a name may repeat, and a repeated one is read as absent. */
+export type TableQuery = RawSearchParams;
 
 export const SEARCH_MAX_LENGTH = 100;
-export const CURSOR_MAX_LENGTH = 128;
+
+// The browse cursor's schema (a lower-cased id), so a hand-edited cursor never reaches a uuid column.
+const CursorSchema = BrowseQuerySchema.shape.after.unwrap();
+const TextSchema = z.string();
 
 const SORT_PARAM = 'sort';
 const DIRECTION_PARAM = 'dir';
 const CURSOR_PARAM = 'cursor';
 
-/** The sort the address names, or the fallback when it names a column the table cannot sort by. */
+/** The params that carry exactly one value; a repeated name is dropped, never first-wins. */
+function singleValues(query: TableQuery): Record<string, string> {
+  const single: Record<string, string> = {};
+  for (const name of Object.keys(query)) {
+    const value = parseSingle(query[name], TextSchema);
+    if (value !== null && value !== '') single[name] = value;
+  }
+  return single;
+}
+
+/** TODO(U-073): first caller. The sort the address names, or the fallback when it names a column the table cannot sort by. */
 export function parseSort(
   query: TableQuery,
   sortableColumns: readonly string[],
   fallback: SortState,
 ): SortState {
-  const column = sortableColumns.find((known) => known === query[SORT_PARAM]);
+  const named = parseSingle(query[SORT_PARAM], TextSchema);
+  const column = sortableColumns.find((known) => known === named);
   if (column === undefined) return fallback;
   return {
     column,
-    direction: query[DIRECTION_PARAM] === 'desc' ? 'desc' : 'asc',
+    direction:
+      parseSingle(query[DIRECTION_PARAM], TextSchema) === 'desc'
+        ? 'desc'
+        : 'asc',
   };
 }
 
-/** The cursor the address names. An empty or oversized one is not a cursor, so the read starts at the first page. */
-export function parseCursor(raw: string | undefined): string | null {
-  if (raw === undefined || raw === '' || raw.length > CURSOR_MAX_LENGTH) {
-    return null;
-  }
-  return raw;
+/** TODO(U-073): first caller. The one cursor the address names; absent, repeated, or not a row id is null, so the read starts at the first page. */
+export function parseCursor(
+  raw: string | readonly string[] | undefined,
+): string | null {
+  return parseSingle(raw, CursorSchema);
 }
 
-export function parseSearchTerm(raw: string | undefined): string {
-  return (raw ?? '').trim().slice(0, SEARCH_MAX_LENGTH);
+/** TODO(U-073): first caller. The one search term the address names; absent, repeated, or over the limit is empty. */
+export function parseSearchTerm(
+  raw: string | readonly string[] | undefined,
+): string {
+  const term = (parseSingle(raw, TextSchema) ?? '').trim();
+  return term.length > SEARCH_MAX_LENGTH ? '' : term;
 }
 
 /** Choosing the column that is already sorted flips it; any other column starts ascending. */
@@ -78,7 +105,7 @@ export function sortHref(
   column: string,
 ): string {
   return tableHref(path, {
-    ...query,
+    ...singleValues(query),
     [SORT_PARAM]: column,
     [DIRECTION_PARAM]: nextSortDirection(current, column),
     [CURSOR_PARAM]: null,
@@ -90,11 +117,14 @@ export function nextPageHref(
   query: TableQuery,
   nextCursor: string,
 ): string {
-  return tableHref(path, { ...query, [CURSOR_PARAM]: nextCursor });
+  return tableHref(path, {
+    ...singleValues(query),
+    [CURSOR_PARAM]: nextCursor,
+  });
 }
 
 export function firstPageHref(path: string, query: TableQuery): string {
-  return tableHref(path, { ...query, [CURSOR_PARAM]: null });
+  return tableHref(path, { ...singleValues(query), [CURSOR_PARAM]: null });
 }
 
 /** A change to what the table lists (a filter, a search) starts from the first page. */
@@ -104,7 +134,11 @@ export function changedParamHref(
   name: string,
   value: string | null,
 ): string {
-  return tableHref(path, { ...query, [name]: value, [CURSOR_PARAM]: null });
+  return tableHref(path, {
+    ...singleValues(query),
+    [name]: value,
+    [CURSOR_PARAM]: null,
+  });
 }
 
 /** What a GET search form carries besides its own field: the rest of the address, from the first page. */
@@ -112,12 +146,7 @@ export function carriedFields(
   query: TableQuery,
   ownName: string,
 ): [name: string, value: string][] {
-  return Object.entries(query).flatMap(([name, value]) =>
-    value === undefined ||
-    value === '' ||
-    name === ownName ||
-    name === CURSOR_PARAM
-      ? []
-      : [[name, value] as [string, string]],
+  return Object.entries(singleValues(query)).filter(
+    ([name]) => name !== ownName && name !== CURSOR_PARAM,
   );
 }

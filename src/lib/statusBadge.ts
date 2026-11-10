@@ -1,4 +1,6 @@
 import type { BadgeTone } from './badge';
+import { z } from 'zod';
+import { parseSingle } from './filters';
 import { changedParamHref, type TableQuery } from './tableQuery';
 
 export type StatusTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
@@ -27,12 +29,13 @@ export type StatusFilterChip = {
 
 const STATUS_FILTER_PARAM = 'status';
 
-/** The option the address names, or null (all) when it names none the filter offers. */
+/** The one option the address names, or null (all) when it names none, or more than one, that the filter offers. */
 export function parseStatusFilter(
-  raw: string | undefined,
+  raw: string | readonly string[] | undefined,
   options: readonly StatusFilterOption[],
 ): string | null {
-  return options.find(({ value }) => value === raw)?.value ?? null;
+  const named = parseSingle(raw, z.string());
+  return options.find(({ value }) => value === named)?.value ?? null;
 }
 
 function chipLabel({ label, count }: { label: string; count?: number }) {

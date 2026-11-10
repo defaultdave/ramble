@@ -29,7 +29,6 @@ export type SelectProps = Omit<
   variant?: SelectVariant;
 };
 
-/** TODO(U-073): first caller. */
 export function Select({
   label,
   options,

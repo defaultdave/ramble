@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { EntityIdSchema, SlugSchema } from './catalog';
 import { holdLimits, PartySizeSchema } from './holds';
 import { guestsLabel } from './orderSummary';
+import { hrefWithQuery } from './queryHref';
 import { browsePath } from './routes';
 import { IsoDateSchema } from './sessions';
 import { isDateInWindow, type SessionWindow } from './sessionWindow';
@@ -244,8 +245,7 @@ export function toQuery(query: BrowseQuery): string {
 }
 
 export function browseHref(query: BrowseQuery): string {
-  const queryString = toQuery(query);
-  return queryString ? `${browsePath}?${queryString}` : browsePath;
+  return hrefWithQuery(browsePath, toQueryEntries(query));
 }
 
 /** A filter change starts again from the first results. */

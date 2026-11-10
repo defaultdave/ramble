@@ -41,3 +41,7 @@
 .control.hero .chevron {
   color: var(--color-text-secondary);
 }
+
+.control.hero .select:not(:disabled) {
+  cursor: default;
+}

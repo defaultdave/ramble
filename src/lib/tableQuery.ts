@@ -4,6 +4,7 @@ import {
   parseSingle,
   type RawSearchParams,
 } from './filters';
+import { hrefWithQuery } from './queryHref';
 
 export type SortDirection = 'asc' | 'desc';
 export type SortState = { column: string; direction: SortDirection };
@@ -87,14 +88,13 @@ export function tableHref(
   path: string,
   params: Readonly<Record<string, string | null | undefined>>,
 ): string {
-  const search = new URLSearchParams();
+  const entries: [string, string][] = [];
   for (const [name, value] of Object.entries(params)) {
     if (value !== undefined && value !== null && value !== '') {
-      search.set(name, value);
+      entries.push([name, value]);
     }
   }
-  const text = search.toString();
-  return text === '' ? path : `${path}?${text}`;
+  return hrefWithQuery(path, entries);
 }
 
 /** Another sort starts from the first page, because a cursor only means something in the order it came from. */

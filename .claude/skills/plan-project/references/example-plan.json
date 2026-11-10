@@ -1,0 +1,149 @@
+{
+  "project": "Team workspaces for a single-user product",
+  "recorded": "2026-10-07",
+  "appetite_weeks": 10,
+  "first_milestone": { "title": "A member can be invited to a workspace", "units": ["invite-emails"] },
+  "assumptions": {
+    "join_buffer": 1,
+    "round_days": 0.5,
+    "owner_hours_per_week": 40,
+    "focus_hours_per_day": 6,
+    "calibrated": null
+  },
+  "reference_class": [
+    { "name": "Previous feature epic", "units": 18, "days": 96 }
+  ],
+  "units": [
+    {
+      "id": "preflight",
+      "title": "Accounts, quotas, secrets and rulesets",
+      "capability": "Setup",
+      "kind": "preflight",
+      "complexity": 1,
+      "uncertainty": 2,
+      "estimate": { "o": 0.5, "m": 1, "p": 2 }
+    },
+    {
+      "id": "schema",
+      "title": "Data model",
+      "capability": "Workspaces",
+      "depends_on": ["preflight"],
+      "complexity": 2,
+      "uncertainty": 2,
+      "estimate": { "o": 3, "m": 4, "p": 7 }
+    },
+    {
+      "id": "authz",
+      "title": "Authorization rules",
+      "capability": "Workspaces",
+      "depends_on": ["schema"],
+      "complexity": 2,
+      "uncertainty": 2,
+      "human_only": true,
+      "estimate": { "o": 3, "m": 5, "p": 8 }
+    },
+    {
+      "id": "api-crud",
+      "title": "Workspace API",
+      "capability": "Workspaces",
+      "depends_on": ["schema"],
+      "complexity": 2,
+      "uncertainty": 1,
+      "rounds": { "o": 2, "m": 3, "p": 6 },
+      "owner_minutes": 60
+    },
+    {
+      "id": "api-members",
+      "title": "Members API",
+      "capability": "Workspaces",
+      "depends_on": ["authz", "api-crud"],
+      "complexity": 2,
+      "uncertainty": 1,
+      "estimate": { "o": 3, "m": 5, "p": 7 }
+    },
+    {
+      "id": "migration-spike",
+      "title": "Migration spike",
+      "capability": "Migration",
+      "kind": "spike",
+      "depends_on": ["schema"],
+      "complexity": 1,
+      "uncertainty": 3,
+      "estimate": { "o": 2, "m": 3, "p": 5 }
+    },
+    {
+      "id": "backfill",
+      "title": "Backfill",
+      "capability": "Migration",
+      "depends_on": ["migration-spike", "api-crud"],
+      "complexity": 3,
+      "uncertainty": 3,
+      "estimate": { "o": 4, "m": 5, "p": 10 }
+    },
+    {
+      "id": "cutover",
+      "title": "Cutover",
+      "capability": "Migration",
+      "depends_on": ["backfill", "api-members"],
+      "complexity": 3,
+      "uncertainty": 2,
+      "estimate": { "o": 3, "m": 5, "p": 9 }
+    },
+    {
+      "id": "settings-ui",
+      "title": "Settings UI",
+      "capability": "Workspaces",
+      "depends_on": ["api-members"],
+      "complexity": 2,
+      "uncertainty": 1,
+      "rounds": { "o": 2, "m": 4, "p": 8 },
+      "owner_minutes": 90
+    },
+    {
+      "id": "invite-emails",
+      "title": "Invite emails",
+      "capability": "Invitations",
+      "depends_on": ["api-members"],
+      "complexity": 1,
+      "uncertainty": 1,
+      "rounds": { "o": 1, "m": 2, "p": 4 },
+      "owner_minutes": 45
+    },
+    {
+      "id": "audit-log",
+      "title": "Audit log",
+      "capability": "Compliance",
+      "depends_on": ["schema"],
+      "complexity": 2,
+      "uncertainty": 2,
+      "estimate": { "o": 3, "m": 5, "p": 8 }
+    },
+    {
+      "id": "qa-pass",
+      "title": "QA pass",
+      "kind": "qa",
+      "depends_on": ["cutover", "settings-ui", "invite-emails", "audit-log"],
+      "complexity": 2,
+      "uncertainty": 2,
+      "estimate": { "o": 2, "m": 3, "p": 5 }
+    },
+    {
+      "id": "ramp",
+      "title": "Staged ramp",
+      "kind": "launch",
+      "depends_on": ["qa-pass"],
+      "complexity": 2,
+      "uncertainty": 2,
+      "estimate": { "o": 3, "m": 5, "p": 8 }
+    },
+    {
+      "id": "tail",
+      "title": "Flag and legacy-path removal",
+      "kind": "tail",
+      "depends_on": ["ramp"],
+      "complexity": 2,
+      "uncertainty": 1,
+      "estimate": { "o": 2, "m": 3, "p": 5 }
+    }
+  ]
+}

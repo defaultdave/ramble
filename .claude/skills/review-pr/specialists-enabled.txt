@@ -1,0 +1,4 @@
+# Stage 5 specialists to run when the target project has no .claude/office/specialists-enabled.txt.
+# One per line; lines starting with # are ignored. Valid: spec-compliance, a11y-audit, perf-check, architecture-audit
+# spec-compliance is off: review checks acceptance criteria itself (review.md step 3). It stays a review-swarm dimension.
+# spec-compliance

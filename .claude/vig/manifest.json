@@ -1,0 +1,63 @@
+{
+  "generator": "vig bin/cloud-kit.mjs",
+  "source": {
+    "repo": "defaultdave/vig",
+    "commit": "09373c91bb2519579b0db30df1672004e1c3310a"
+  },
+  "files": {
+    ".claude/agents/a11y-audit.md": "sha256:9fc6db0194aac5e83e5c9bf8fae780f7b383f885abf61e2a5e9bb994d218591b",
+    ".claude/agents/architecture-audit.md": "sha256:d070a74f4ea765426d3becff70695c61e4d9d89b805c6e5c7a1b3feb3ea6b622",
+    ".claude/agents/baseline.md": "sha256:0984609f22d327de2a12162241816a26db823319343c7bdb19c596deb1c310ef",
+    ".claude/agents/creative-peer.md": "sha256:9dae9d4039504e0e923cad476020f6ce497363d48e5306ef985e062db90c9dab",
+    ".claude/agents/critical-thinker.md": "sha256:3418170ef1978a8aa9d56ddea3b8e3a1466d1e14f865712af87fe54d9a0af70d",
+    ".claude/agents/know-it-all.md": "sha256:abf34b94796b9de912a4ebe3cb7760098bdcfbc743b52a7ba1e2592131930bb8",
+    ".claude/agents/perf-check.md": "sha256:ff6413bbc51485aa99123492603f71b489a13cb4f2cc5b3fbab139215bcc4faf",
+    ".claude/agents/qa.md": "sha256:3b8183403e8923dd7fe2cec530ef9b4da8a5836f88fc58b86d95e4a161ad4049",
+    ".claude/agents/review.md": "sha256:acc621256848bb5babe7bffd504a3bd824b58c670b0994e9ab74cfc961394bf6",
+    ".claude/agents/senior.md": "sha256:223c6a81d9283020bf7b82eff45d0e4c81417634bf30009b378af13ce18b626e",
+    ".claude/agents/snidely.md": "sha256:a83fc17dacb115216e95f34c1d4db5a09ecd8986523d6b16d3a71e294a4af4ca",
+    ".claude/agents/spec-compliance.md": "sha256:1d6075aa8f27a12bcef5d0bf006bd7dc234f664a4ce46f6eab90879ee2770423",
+    ".claude/agents/synthesizer.md": "sha256:aaab12de2279425f82de33edd132110299651ad27cdb19aa3dc6aa18cd117aab",
+    ".claude/agents/tech-pm.md": "sha256:3e2f4680ec1a9a581434e2ad23f4f1210407dd7a475e2fd6e989e9cfc5101cae",
+    ".claude/hooks/secret-guard.sh": "sha256:46e3a0acc90836f2792b0cc4fb4b15c2d8a2d6966ebc59e34557dce7a6a835c0",
+    ".claude/rules/cloud-github.md": "sha256:bc63ba7c21180a25d008f97f0cf7df88b2e802d7a97a7f05ed790795560c3bc8",
+    ".claude/rules/code-standards.md": "sha256:53c1d91fa97328bab7561d5fb4c95b7f418c34aec1ed30dd843ffc0f6d67e1d1",
+    ".claude/rules/quality-gates.md": "sha256:563f3c4a32a55c8456556caf6e9f1d3f0ea7c434820c9e2339ca8b1cf9a05833",
+    ".claude/rules/scope-discipline.md": "sha256:77ead214da594185645ff182078d29b72b8d00ecc2064adf43b7a1a2b369bcc0",
+    ".claude/rules/vig-conventions.md": "sha256:ca2a691e3b71d7eabbaeefbaef40f8bbee20a95bd99af2a8316fabbecab7c934",
+    ".claude/skills/decompose-ticket/SKILL.md": "sha256:80573840d44342fc92eaab36940a44c1801789218d33c4b6a1d5dc1cea4660d1",
+    ".claude/skills/decompose-ticket/references/example-cross-cutting-refactor.md": "sha256:2383ebd949df53ad7031fdde2cf19b491eb125cbd491ba852d02864b5bebfb74",
+    ".claude/skills/decompose-ticket/references/example-frontend-feature.md": "sha256:6775e5904321455afe6170f87c4e1cf023c90e2501c8a4b53a44ddabe47077d1",
+    ".claude/skills/decompose-ticket/references/example-walking-skeleton.md": "sha256:5c95b0a4d002a8be3e272d528b55f4345f1db35d28d14a00a4eb9f358eee803d",
+    ".claude/skills/design/SKILL.md": "sha256:d024f60ed01d2e33fba0e7e9a2b85fb8c3cfa8e594a2db6ef6ec103d485e14ef",
+    ".claude/skills/plan-project/SKILL.md": "sha256:b12064639986f8a1bf438092f237e6542661cb425cceb98340e87fb2f5ea2b63",
+    ".claude/skills/plan-project/bin/plan.mjs": "sha256:665613681c48486e965c703ffc85056b35ab7151714ef7517f657e956927942a",
+    ".claude/skills/plan-project/lib/plan.mjs": "sha256:d5946b8527feefdff922687cb16decb8c38f24c2f094193b705f2022fd7cae3c",
+    ".claude/skills/plan-project/lib/plan.test.mjs": "sha256:f9fe91853b70bfdf5023395d0e8497275e74d3e622375d5ec82b77d2881a77ec",
+    ".claude/skills/plan-project/references/example-plan-report.md": "sha256:f0362a0e27b99de5e655db2d4b7bdf15f6f9a94d17ff53fe0dad1e46bd35d268",
+    ".claude/skills/plan-project/references/example-plan.json": "sha256:ff77db71152f1280f61e1c583d314c600490b0140d39a0867bd5383425bca5e2",
+    ".claude/skills/plan-project/references/project-setup.md": "sha256:10e08bd6a38c8ef64edcd3ff244b531b3ac60007f23921263d115e0546633601",
+    ".claude/skills/plan-project/templates/brief.md": "sha256:82a90ef572e201c28f0b17319f51629ab5ac92fc8a7f03d3e21453bc81584d30",
+    ".claude/skills/plan-project/templates/delta-log.md": "sha256:4ab5fdf2b0256ea48e78d023bccf25c4143f3db963b550666d3df929822b76b4",
+    ".claude/skills/plan-project/templates/plan.json": "sha256:4f56cf6e40931c00483582e482da87270980c78108c97039645e6cabf6709170",
+    ".claude/skills/plan-project/templates/preflight.md": "sha256:d22997b71f8651fce712d8be1199f00ca840846413ae231f9f72c66325ac4ebb",
+    ".claude/skills/plan-project/templates/proposal.md": "sha256:75b09f6c64fedec4d70ab7bd4491213f7540a831ba367f51733b131608652973",
+    ".claude/skills/plan-project/templates/ticket.md": "sha256:ff56265ea403523e48518907e30b8d7fa369bf8a36797e2fd647c521720b4faa",
+    ".claude/skills/rebase-auditor/SKILL.md": "sha256:f23f3417c3e6bda0623e0209e17ef42f5948ddf11374d4ebb1b7fc851da08348",
+    ".claude/skills/rebase-auditor/bin/rebase-auditor.sh": "sha256:53056f6bfd7640f225793d69ec80ef3a118b769ed974208ebba0bc34b5f1b0e0",
+    ".claude/skills/review-pr/SKILL.md": "sha256:d9f5bc9c80c10cc91bf2a2523bf366a3680299190a9d6e2db46ec38f8f5b1b26",
+    ".claude/skills/review-pr/specialists-enabled.txt": "sha256:6af9976ee61c0673e3ab5e516c92d82b227f7c3d7f9bbfe537f74ed6cd20619b",
+    ".claude/skills/senior/SKILL.md": "sha256:de666cc48e144de499a526c1dda41c5a35856e29236af327530dade3f2d0cafe",
+    ".claude/vig/README.md": "sha256:4d9ea87d963db35299f5f9fa63a71d20ea44ed1ee5af226460289cfb294e3e31",
+    ".claude/vig/bin/playwright-mcp.sh": "sha256:d41ab98b6e4b10246bf49e67e6ae246fff486a5806c7adb9c2289454fd024fad",
+    ".claude/vig/standards/architecture.md": "sha256:c45fd7ebc6a5ad698ace5211b6c04ed8e0573c7610faa868fd3a54a89278d807",
+    ".claude/vig/standards/react-nextjs.md": "sha256:eb85d74c2d0030a283a8d137df49bfcec05550c0bf62531c9c6d9c9eaa3635b1",
+    ".claude/vig/standards/stack-decisions.md": "sha256:d7bb492e79adc5401a52677a4aa570067cdc513e68a03f370d7b545bb171c8db"
+  },
+  "settingsHooks": [
+    "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/secret-guard.sh\""
+  ],
+  "mcpServers": [
+    "playwright"
+  ]
+}

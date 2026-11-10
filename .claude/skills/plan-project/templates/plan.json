@@ -1,0 +1,87 @@
+{
+  "project": "<project name>",
+  "recorded": "<YYYY-MM-DD>",
+  "appetite_weeks": 6,
+  "first_milestone": { "title": "<the smallest thing the decision-maker can click through>", "units": ["<agent-built-id>"] },
+  "assumptions": {
+    "join_buffer": 1,
+    "round_days": 0.5,
+    "owner_hours_per_week": 15,
+    "focus_hours_per_day": 6,
+    "calibrated": null
+  },
+  "reference_class": [
+    { "name": "<finished project of the same kind>", "units": 0, "days": 0 }
+  ],
+  "units": [
+    {
+      "id": "preflight",
+      "title": "Accounts, quotas, secrets and rulesets, from templates/preflight.md",
+      "kind": "preflight",
+      "complexity": 1,
+      "uncertainty": 2,
+      "estimate": { "o": 0.5, "m": 1, "p": 2 }
+    },
+    {
+      "id": "design",
+      "title": "Design before code: tokens, components and page layouts (Figma via the MCP, a Claude Design artifact, or both compared)",
+      "capability": "Design",
+      "kind": "build",
+      "complexity": 2,
+      "uncertainty": 2,
+      "human_only": true,
+      "estimate": { "o": 0.75, "m": 1.5, "p": 2.5 },
+      "notes": "Remove when the client supplies designs. Every shell and page unit lists it in depends_on."
+    },
+    {
+      "id": "<short-id>",
+      "title": "<what a user or the system can do when this is done>",
+      "capability": "<capability this slice belongs to>",
+      "kind": "build",
+      "depends_on": ["preflight"],
+      "complexity": 2,
+      "uncertainty": 2,
+      "estimate": { "o": 1, "m": 2, "p": 4 },
+      "notes": ""
+    },
+    {
+      "id": "<agent-built-id>",
+      "title": "<a slice an agent builds: uncertainty 1, off the critical path>",
+      "capability": "<capability this slice belongs to>",
+      "kind": "build",
+      "depends_on": ["preflight"],
+      "complexity": 1,
+      "uncertainty": 1,
+      "rounds": { "o": 1, "m": 2, "p": 4 },
+      "owner_minutes": 45,
+      "notes": ""
+    },
+    {
+      "id": "qa-pass",
+      "title": "Cross-feature QA and fixes",
+      "kind": "qa",
+      "depends_on": ["<short-id>", "<agent-built-id>"],
+      "complexity": 1,
+      "uncertainty": 2,
+      "estimate": { "o": 1, "m": 2, "p": 4 }
+    },
+    {
+      "id": "ramp",
+      "title": "Staged ramp with exit criteria",
+      "kind": "launch",
+      "depends_on": ["qa-pass"],
+      "complexity": 1,
+      "uncertainty": 2,
+      "estimate": { "o": 1, "m": 2, "p": 4 }
+    },
+    {
+      "id": "tail",
+      "title": "<retire the old system, or remove flags, scaffolding, and deferred edge cases>",
+      "kind": "tail",
+      "depends_on": ["ramp"],
+      "complexity": 1,
+      "uncertainty": 1,
+      "estimate": { "o": 1, "m": 2, "p": 4 }
+    }
+  ]
+}

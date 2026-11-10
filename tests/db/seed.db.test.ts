@@ -28,6 +28,7 @@ import {
   collectionItems,
   collections,
   experiences,
+  helpArticles,
   homeModules,
   hosts,
   legalDocuments,
@@ -133,6 +134,7 @@ async function tableCounts() {
     items: await one(db.select({ n: count() }).from(collectionItems)),
     modules: await one(db.select({ n: count() }).from(homeModules)),
     pages: await one(db.select({ n: count() }).from(pages)),
+    help: await one(db.select({ n: count() }).from(helpArticles)),
   };
 }
 
@@ -237,6 +239,7 @@ const nothingWritten = {
   hosts: 0,
   experiences: 0,
   legal: 0,
+  help: 0,
 };
 
 describe('a caller who is not ops', () => {
@@ -279,6 +282,7 @@ describe('the curated seed', () => {
       collections: curated.collections.length,
       modules: curated.homeModules.length,
       pages: curated.pageCopy.length,
+      help: curated.helpArticles.length,
     });
     expect(counts.sessions).toBe(
       planSessions(curated.hosts, curated.experiences, now).length,

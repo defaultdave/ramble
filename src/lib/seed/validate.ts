@@ -2,6 +2,7 @@ import type { ZodError } from 'zod';
 import { HostExperienceSchema, isSlug } from '@/lib/catalog';
 import {
   CollectionInputSchema,
+  HelpArticleInputSchema,
   HomeModulesInputSchema,
   PageCopyInputSchema,
   hasCollectionKindMismatch,
@@ -214,6 +215,10 @@ function copyIssues(
       `home module ${module.kind}`,
       `${module.heading ?? ''} ${module.body ? textOf(module.body) : ''}`,
     ]),
+    ...curated.helpArticles.map((article): [string, string] => [
+      `help article ${article.slug}`,
+      `${article.title} ${article.summary ?? ''} ${textOf(article.body)}`,
+    ]),
     ...curated.pageCopy.map((copy): [string, string] => [
       `${copy.kind} copy ${copy.slug}`,
       `${copy.heading} ${copy.metaDescription} ${textOf(copy.intro)} ${textOf(copy.body)}`,
@@ -296,6 +301,12 @@ function editorialIssues(
       );
     }
   }
+  for (const article of curated.helpArticles) {
+    const parsed = HelpArticleInputSchema.safeParse(article);
+    if (!parsed.success) {
+      issues.push(`help article ${article.slug}: ${describe(parsed.error)}`);
+    }
+  }
   for (const doc of curated.legal) {
     const parsed = LegalDraftInputSchema.safeParse(doc);
     if (!parsed.success)
@@ -341,6 +352,10 @@ export function fixtureIssues(
     ...uniqueIssues(
       'collection',
       curated.collections.map((c) => c.slug),
+    ),
+    ...uniqueIssues(
+      'help article',
+      curated.helpArticles.map((a) => a.slug),
     ),
     ...uniqueIssues(
       'page copy',

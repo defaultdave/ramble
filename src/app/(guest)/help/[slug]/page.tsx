@@ -2,8 +2,11 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { HelpArticleView } from '@/components/HelpCenter';
 import { PageError } from '@/components/PageError';
-import { helpArticleFallbackTitle, helpArticleHead } from '@/lib/pages/help';
-import { helpArticlePath } from '@/lib/pages/help';
+import {
+  helpArticleFallbackTitle,
+  helpArticleHead,
+  helpArticlePath,
+} from '@/lib/pages/help';
 import { getHelpArticle } from '@/server/help';
 import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
 

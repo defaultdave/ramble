@@ -33,8 +33,8 @@ export function OpsNotice({ data, helpUrl }: Props) {
     <EmailLayout previewText={subject} helpUrl={helpUrl}>
       <EmailHeading>{subject}</EmailHeading>
       <Section>
-        {data.fields.map((field) => (
-          <div key={field.label}>
+        {data.fields.map((field, position) => (
+          <div key={`${String(position)}-${field.label}`}>
             <Text style={styles.label}>{field.label}</Text>
             <Text style={styles.value}>
               {field.value.split(/\r?\n/).map((line, index) => (

@@ -7,6 +7,7 @@ import { FilterBar } from './FilterBar';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the server markup carries a day form and every chip group inside <noscript>, so a browser with scripting off can use them
+// - the price, age, and indoor or outdoor groups are there too, and the day form keeps what is chosen in them
 // - the day form is a GET form to the browse address that carries the other filters and not the day
 // - the form offers the chosen day, and none when no day is chosen
 // - the chip groups link to the address with that chip turned on, and a chosen chip links to the address without it
@@ -45,7 +46,14 @@ describe('the filters shown with scripting off', () => {
     renderNoScript(noFilters);
 
     expect(screen.getByRole('form', { name: 'Choose a day' })).toBeVisible();
-    for (const name of ['Guests', 'Neighborhood', 'Category']) {
+    for (const name of [
+      'Guests',
+      'Neighborhood',
+      'Category',
+      'Price',
+      'Age',
+      'Indoor or outdoor',
+    ]) {
       expect(screen.getByRole('group', { name })).toBeVisible();
     }
   });
@@ -56,6 +64,9 @@ describe('the filters shown with scripting off', () => {
       categories: ['cooking'],
       neighborhoods: ['dumbo'],
       guests: 3,
+      price: 'under-50',
+      age: 'kids',
+      setting: 'indoor',
       date: '2026-11-07',
     });
 
@@ -70,6 +81,9 @@ describe('the filters shown with scripting off', () => {
       ['category', 'cooking'],
       ['neighborhood', 'dumbo'],
       ['guests', '3'],
+      ['price', 'under-50'],
+      ['age', 'kids'],
+      ['setting', 'indoor'],
       ['date', '2026-11-07'],
     ]);
   });

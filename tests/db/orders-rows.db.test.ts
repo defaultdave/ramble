@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { orderCurrency } from '@/lib/orders';
+import { insertGift } from './giftFixtures';
 import { expectConstraint } from './harness';
 import {
   client,
@@ -12,6 +13,7 @@ import {
   later,
   newOrder,
   orderRow,
+  parents,
   reference,
   type Row,
   setupOrdersDatabase,
@@ -72,9 +74,9 @@ describe('orders', () => {
     ],
     [
       'a booking paid partly by a gift',
-      () =>
+      async () =>
         orderRow({
-          gift_id: randomUUID(),
+          gift_id: (await insertGift(client.db, parents)).id,
           gift_applied_minor: 5000,
           amount_due_minor: 13509,
         }),
@@ -100,7 +102,7 @@ describe('orders', () => {
         }),
     ],
   ])('accepts %s', async (_name, build) => {
-    const row = build();
+    const row = await build();
     await insert('orders', row);
 
     expect(await count('orders', row.id)).toBe(1);

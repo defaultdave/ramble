@@ -4,16 +4,16 @@ import { EntityIdSchema } from './catalog';
 // random: an HMAC of its kind, the row id, and a version, so any server code can rebuild a link and
 // a bump of the version voids the earlier ones (design doc 4.2.3, the capability-token amendment).
 
-// TODO(U-017): `gift` joins these kinds when the gifts table exists.
-export const capabilityTokenKinds = ['manage', 'order'] as const;
+export const capabilityTokenKinds = ['manage', 'order', 'gift'] as const;
 export type CapabilityTokenKind = (typeof capabilityTokenKinds)[number];
 
-/** The kinds whose hash is stored on the row. An `order` token is checked by recomputing it. */
-const hashStoredKinds = ['manage'] as const;
-export type HashStoredKind = (typeof hashStoredKinds)[number];
+// TODO(U-099): `gift` joins these kinds when the rotation re-hash covers gifts.
+/** The kinds a secret rotation re-hashes. A `manage` and a `gift` token store a hash; an `order` token stores none. */
+const rehashKinds = ['manage'] as const;
+export type RehashKind = (typeof rehashKinds)[number];
 
-export function storesHash(kind: CapabilityTokenKind): kind is HashStoredKind {
-  return (hashStoredKinds as readonly string[]).includes(kind);
+export function canRehash(kind: CapabilityTokenKind): kind is RehashKind {
+  return (rehashKinds as readonly string[]).includes(kind);
 }
 
 /** A stored token hash: lower-case hex SHA-256. */

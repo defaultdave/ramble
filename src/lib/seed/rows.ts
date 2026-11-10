@@ -1,6 +1,7 @@
 import { EmailAddressSchema } from '@/lib/email/address';
 import type {
   CollectionInput,
+  HelpArticleInput,
   HomeModulesInput,
   PageCopyInput,
 } from '@/lib/editorial';
@@ -10,6 +11,7 @@ import { seedId } from './ids';
 import type {
   CollectionFixture,
   ExperienceFixture,
+  HelpArticleFixture,
   HomeModuleFixture,
   HostFixture,
   PageCopyFixture,
@@ -157,6 +159,15 @@ export function collectionInput(
       note: item.note,
     })),
   };
+}
+
+/** The input `saveHelpArticle` takes: a replacement when the slug is already stored, a new article otherwise. */
+export function helpArticleInput(
+  fixture: HelpArticleFixture,
+  stored: readonly { id: string; slug: string }[],
+): HelpArticleInput {
+  const existing = stored.find((row) => row.slug === fixture.slug);
+  return { ...(existing ? { id: existing.id } : {}), ...fixture };
 }
 
 /** The whole home page as `saveHomeModules` takes it. `collectionIds` maps a collection slug to the id the database gave it. */

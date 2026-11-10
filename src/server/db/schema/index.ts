@@ -10,5 +10,6 @@ export * from './operations';
 export { publishStatusEnum } from './shared';
 export * from './jobs';
 export * from './orders';
+export * from './gifts';
 export * from './payments';
 export * from './ledger';

@@ -1,4 +1,12 @@
 import 'server-only';
+import { isSessionLive, touchedSessionExpiry } from '@/lib/auth';
+import {
+  accessFromGrants,
+  ownsHostRole,
+  type HostGrant,
+  type RoleGrant,
+} from '@/lib/roleGrants';
+import { systemClock } from '@/server/ports/clock';
 
 export const Role = {
   Guest: 'guest',
@@ -16,6 +24,12 @@ export type Caller = {
   roles: readonly Role[];
   /** Hosts the caller acts for; read only for host owner and host staff. */
   hostIds: readonly string[];
+  /**
+   * Which host role is held on which host. When present, host roles are checked against these
+   * pairs, so owner of one host and staff of another is not owner of both. A caller built without
+   * it is checked against `hostIds` alone.
+   */
+  hostGrants?: readonly HostGrant[];
 };
 
 /** The row a data-layer function is about to read or write. */
@@ -38,9 +52,38 @@ export const anonymousCaller: Caller = {
   hostIds: [],
 };
 
-// TODO(U-004a): read the Better Auth session and role grants.
-export function getCaller(): Promise<Caller> {
-  return Promise.resolve(anonymousCaller);
+export function callerFromGrants(
+  userId: string,
+  grants: readonly RoleGrant[],
+): Caller {
+  return { userId, ...accessFromGrants(grants) };
+}
+
+/** The caller a request's cookies name: anonymous without a live session, otherwise the person with their grants. */
+export async function callerForHeaders(
+  requestHeaders: Headers,
+  now: Date = systemClock.now(),
+): Promise<Caller> {
+  // Loaded here, not at the top: nearly every data-layer file imports this one for `requireRole`,
+  // and none of them should load Better Auth and the database client with it.
+  const [{ readSession }, { readRoleGrants }, { extendSessionExpiry }] =
+    await Promise.all([
+      import('./session'),
+      import('@/server/db/roleGrants'),
+      import('@/server/db/authSessions'),
+    ]);
+  const session = await readSession(requestHeaders);
+  if (session === null || !isSessionLive(session, now)) return anonymousCaller;
+
+  const extended = touchedSessionExpiry(session, now);
+  if (extended !== null) await extendSessionExpiry(session.id, extended, now);
+
+  return callerFromGrants(session.userId, await readRoleGrants(session.userId));
+}
+
+export async function getCaller(): Promise<Caller> {
+  const { headers } = await import('next/headers');
+  return callerForHeaders(await headers());
 }
 
 /**
@@ -67,7 +110,7 @@ function ownsResource(caller: Caller, role: Role, resource: Resource) {
     case Role.HostStaff:
       return (
         resource.hostId !== undefined &&
-        caller.hostIds.includes(resource.hostId)
+        ownsHostRole(caller, role, resource.hostId)
       );
     case Role.Guest:
       return (

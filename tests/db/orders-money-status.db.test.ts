@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
+import { insertGift } from './giftFixtures';
 import { expectConstraint } from './harness';
 import {
   client,
@@ -22,7 +23,7 @@ import {
 // orders (money and status):
 // - money: ranges, tax rate zero unless taxable, tax and commission rounding, total, gift, amount due, refund caps
 // - status and time rules; times in range
-// - foreign keys to guests, experiences, hosts, cancellation tiers, holds, sessions, and the terms and waiver documents; none yet on gift ids
+// - foreign keys to guests, experiences, hosts, cancellation tiers, holds, sessions, and the terms and waiver documents; gifts
 
 setupOrdersDatabase();
 
@@ -339,10 +340,18 @@ describe('orders', () => {
       },
     );
 
-    it('accepts a waiver document that exists, and keeps no foreign key yet on the gift id', async () => {
+    it('accepts a waiver document and a gift that exist', async () => {
       await newOrder({ waiver_document_id: parents.termsDocumentId });
-      await expect(newOrder({ gift_id: randomUUID() })).resolves.toBeTypeOf(
+      const gift = await insertGift(client.db, parents);
+      await expect(newOrder({ gift_id: gift.id })).resolves.toBeTypeOf(
         'string',
+      );
+    });
+
+    it('refuses an order pointing at a missing gift', async () => {
+      await expectConstraint(
+        insert('orders', orderRow({ gift_id: randomUUID() })),
+        'orders_gift_id_gifts_id_fk',
       );
     });
 

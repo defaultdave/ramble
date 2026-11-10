@@ -23,6 +23,10 @@ const templateSchemas = {
   'booking-cancellation': BookingCancellationDataSchema,
   'booking-refund': BookingRefundDataSchema,
   'paid-after-lapse': PaidAfterLapseDataSchema,
+  'sign-in-link': z.object({
+    url: z.url({ protocol: /^https?$/ }).max(2048),
+    expiresInMinutes: z.int().min(1).max(60),
+  }),
 } as const;
 
 export type EmailTemplateName = keyof typeof templateSchemas;
@@ -42,6 +46,7 @@ const subjects: {
   'booking-cancellation': bookingSubjects.bookingCancellation,
   'booking-refund': bookingSubjects.bookingRefund,
   'paid-after-lapse': bookingSubjects.paidAfterLapse,
+  'sign-in-link': () => 'Your Ramble sign-in link',
 };
 
 const attachments: {
@@ -55,6 +60,7 @@ const attachments: {
   'booking-cancellation': () => [],
   'booking-refund': () => [],
   'paid-after-lapse': () => [],
+  'sign-in-link': () => [],
 };
 
 export type EmailRequest = {

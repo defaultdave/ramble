@@ -88,6 +88,9 @@ export const editorialLine = (
 ) =>
   `Editorial: ${String(collections)} collections, ${String(homeModules)} home modules, ${String(pageCopies)} page copies`;
 
+export const helpLine = (articles: number) =>
+  `Help articles ${String(articles)}`;
+
 export const scaleLine = (counts: CatalogCounts) =>
   `Scale: ${String(counts.hosts)} hosts, ${String(counts.experiences)} experiences, ${String(counts.sessionsCreated)} sessions created`;
 
@@ -97,5 +100,6 @@ export const stepNames = {
   saveHomeModules: 'save home modules',
   publishLegal: (doc: string) => `publish ${doc}`,
   saveCollection: (slug: string) => `save collection ${slug}`,
+  saveHelpArticle: (slug: string) => `save help article ${slug}`,
   savePageCopy: (kind: string, slug: string) => `save ${kind} copy ${slug}`,
 } as const;

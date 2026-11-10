@@ -27,6 +27,9 @@ describe('selectedChips', () => {
         neighborhoods: ['dumbo'],
         date: null,
         guests: 4,
+        price: null,
+        age: null,
+        setting: null,
       },
       options,
     );
@@ -40,6 +43,28 @@ describe('selectedChips', () => {
       ['DUMBO', '/new-york/browse?category=cooking&guests=4'],
       ['4 guests', '/new-york/browse?category=cooking&neighborhood=dumbo'],
     ]);
+  });
+
+  it('lists price, age, and setting after the party, keyed by their group', () => {
+    const chips = selectedChips(
+      {
+        ...noFilters,
+        guests: 2,
+        price: '100-plus',
+        age: 'kids',
+        setting: 'outdoor',
+      },
+      options,
+    );
+    expect(chips.map(({ key, label }) => [key, label])).toEqual([
+      ['guests:2', '2 guests'],
+      ['price:100-plus', '$100 and up'],
+      ['age:kids', 'Kids welcome'],
+      ['setting:outdoor', 'Outdoor'],
+    ]);
+    expect(chips[3]?.href).toBe(
+      '/new-york/browse?guests=2&price=100-plus&age=kids',
+    );
   });
 
   it('gives a category and a neighborhood with one slug different keys', () => {

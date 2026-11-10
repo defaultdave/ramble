@@ -153,6 +153,9 @@ describe('relatedQuery', () => {
         neighborhoods: [],
         date: null,
         guests: null,
+        price: null,
+        age: null,
+        setting: null,
       },
       after: null,
     });

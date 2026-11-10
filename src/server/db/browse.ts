@@ -9,6 +9,7 @@ import {
   isNotNull,
   isNull,
   lt,
+  lte,
   or,
   sql,
   type SQL,
@@ -34,6 +35,8 @@ import {
 import {
   BrowseFiltersSchema,
   BrowseQuerySchema,
+  kidsMinAgeCeiling,
+  priceBands,
   type BrowseFilters,
   type BrowseQuery,
 } from '@/lib/filters';
@@ -96,6 +99,38 @@ function inChosenNeighborhoods(slugs: readonly string[]): SQL | undefined {
       .from(neighborhoods)
       .where(inArray(neighborhoods.slug, [...slugs])),
   );
+}
+
+// The price a card leads with: the cheapest option that takes a space. An experience with none (guide only) is in no band.
+const cheapestSpacePrice = () =>
+  sql`(select min(${priceOptions.priceMinor}) from ${priceOptions} where ${priceOptions.experienceId} = ${experiences.id} and ${priceOptions.usesSpace})`;
+
+function inPriceBand(band: BrowseFilters['price']): SQL | undefined {
+  if (band === null) return undefined;
+  const { minMinor, maxMinor } = priceBands[band];
+  return and(
+    gte(cheapestSpacePrice(), minMinor),
+    maxMinor === null ? undefined : lt(cheapestSpacePrice(), maxMinor),
+  );
+}
+
+function suitsAge(age: BrowseFilters['age']): SQL | undefined {
+  if (age === null) return undefined;
+  if (age === 'twenty-one-plus') {
+    return eq(experiences.ageRule, 'twenty_one_plus');
+  }
+  return or(
+    eq(experiences.ageRule, 'all_ages'),
+    and(
+      inArray(experiences.ageRule, ['minimum_age', 'age_range']),
+      lte(experiences.minAge, kidsMinAgeCeiling),
+    ),
+  );
+}
+
+function inSetting(setting: BrowseFilters['setting']): SQL | undefined {
+  if (setting === null) return undefined;
+  return eq(experiences.outdoor, setting === 'outdoor');
 }
 
 function scheduledInWindow(window: SessionWindow): SQL | undefined {
@@ -189,7 +224,9 @@ function pastCursor(cursor: BrowseCursorRow | null): SQL | undefined {
  * row `after` names. A category or neighborhood list matches any of its values, and the date matches
  * an experience with a scheduled session that starts on that day in the window. Guests match an
  * experience with a scheduled session in the window that has spaces for the whole party, on that day
- * when a date is chosen too. `after` is the id
+ * when a date is chosen too. The price band matches the cheapest price option that takes a space, age
+ * matches the experience's age rule (kids: all ages or a minimum age within `kidsMinAgeCeiling`), and
+ * setting matches its outdoor flag. `after` is the id
  * of the last experience on the previous page: the next page is every row past it in the same order,
  * so a row that appears or goes between pages moves nothing that was already shown. When no visible
  * experience has the `after` id, the page is empty and `cursor` is null, and only the cursor is read;
@@ -229,6 +266,9 @@ export async function listBrowseExperiences(
         inChosenCategories(filters.categories),
         inChosenNeighborhoods(filters.neighborhoods),
         hasOpenSession(filters, window),
+        inPriceBand(filters.price),
+        suitsAge(filters.age),
+        inSetting(filters.setting),
         pastCursor(cursor),
       ),
     )

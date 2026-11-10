@@ -18,6 +18,7 @@ import type { StoragePort } from '@/server/ports/storage';
 import { db } from '@/server/db/client';
 import { seedCaller } from './caller';
 import { readPhotoCoverageGaps, seedTestPhotos } from './photos';
+import { seedPersonas } from './personas';
 import { readSeedSnapshot } from './read';
 import { runSeed } from './run';
 
@@ -76,6 +77,12 @@ export async function runSeedCommand(command: SeedCommand): Promise<number> {
       scale: args.scale,
       log: write,
     });
+    // Sign-in people with every role must not exist on the production demo.
+    if (verdict.target !== 'production-demo') {
+      write(
+        `Personas: ${String(await seedPersonas(seedCaller))} sign-in people, one per role`,
+      );
+    }
     const exit = coverageExit(
       await readSeedSnapshot(seedCaller, command.now),
       args.scale,

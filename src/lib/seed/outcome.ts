@@ -26,6 +26,13 @@ export const refusalLine = (verdict: Refused): string =>
 export const startLine = (verdict: Accepted): string =>
   `Seeding the ${verdict.target} database on ${verdict.host}`;
 
+/** Sign-in people with every role must not exist on the production demo. */
+export const seedsPersonas = (target: Accepted['target']): boolean =>
+  target !== 'production-demo';
+
+export const personasLine = (count: number): string =>
+  `Personas: ${String(count)} sign-in people, one per role`;
+
 /**
  * The exit of a seed that finished: 0 when every probe that applies holds, 1 with the gaps named
  * otherwise. A scale run holds the probes that need the scale fixture to account; a run without

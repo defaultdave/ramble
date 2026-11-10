@@ -10,6 +10,7 @@ import {
   confirmationAttachments,
 } from './bookingTemplates';
 import { IdempotencyKeySchema, type EmailAttachment } from './message';
+import { OpsNoticeDataSchema, opsNoticeSubject } from './opsNotice';
 
 /**
  * Every template's data shape, subject line, and attachments. The markup for each lives in
@@ -23,6 +24,7 @@ const templateSchemas = {
   'booking-cancellation': BookingCancellationDataSchema,
   'booking-refund': BookingRefundDataSchema,
   'paid-after-lapse': PaidAfterLapseDataSchema,
+  'ops-notice': OpsNoticeDataSchema,
   'sign-in-link': z.object({
     url: z.url({ protocol: /^https?$/ }).max(2048),
     expiresInMinutes: z.int().min(1).max(60),
@@ -46,6 +48,7 @@ const subjects: {
   'booking-cancellation': bookingSubjects.bookingCancellation,
   'booking-refund': bookingSubjects.bookingRefund,
   'paid-after-lapse': bookingSubjects.paidAfterLapse,
+  'ops-notice': opsNoticeSubject,
   'sign-in-link': () => 'Your Ramble sign-in link',
 };
 
@@ -60,6 +63,7 @@ const attachments: {
   'booking-cancellation': () => [],
   'booking-refund': () => [],
   'paid-after-lapse': () => [],
+  'ops-notice': () => [],
   'sign-in-link': () => [],
 };
 

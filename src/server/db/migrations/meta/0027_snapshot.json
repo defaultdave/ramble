@@ -1,5 +1,5 @@
 {
-  "id": "e98f4207-18e8-46f0-aa9d-5c6fd26d34d6",
+  "id": "ad234e5d-522d-4523-9f29-ef591aa77225",
   "prevId": "acc279a2-7553-4f00-a43c-b3d6d81ebc3e",
   "version": "7",
   "dialect": "postgresql",
@@ -217,34 +217,9 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "search_vector": {
-          "name": "search_vector",
-          "type": "tsvector",
-          "primaryKey": false,
-          "notNull": true,
-          "generated": {
-            "as": "to_tsvector('english', coalesce(name, '') || ' ' || coalesce(description, ''))",
-            "type": "stored"
-          }
         }
       },
       "indexes": {
-        "experiences_search_vector_idx": {
-          "name": "experiences_search_vector_idx",
-          "columns": [
-            {
-              "expression": "search_vector",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "gin",
-          "with": {}
-        },
         "experiences_host_id_idx": {
           "name": "experiences_host_id_idx",
           "columns": [
@@ -4126,6 +4101,91 @@
       },
       "isRLSEnabled": false
     },
+    "public.support_requests": {
+      "name": "support_requests",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "topic": {
+          "name": "topic",
+          "type": "support_topic",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "clock_timestamp()"
+        }
+      },
+      "indexes": {
+        "support_requests_created_at_idx": {
+          "name": "support_requests_created_at_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "support_requests_name_shape": {
+          "name": "support_requests_name_shape",
+          "value": "\"support_requests\".\"name\" ~ '[^\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]' AND char_length(\"support_requests\".\"name\") <= 120"
+        },
+        "support_requests_email_shape": {
+          "name": "support_requests_email_shape",
+          "value": "\"support_requests\".\"email\" ~ '^[a-z0-9._%+-]+@[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$' AND char_length(\"support_requests\".\"email\") <= 254"
+        },
+        "support_requests_message_shape": {
+          "name": "support_requests_message_shape",
+          "value": "\"support_requests\".\"message\" ~ '[^\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]' AND char_length(\"support_requests\".\"message\") <= 2000"
+        },
+        "support_requests_created_at_in_range": {
+          "name": "support_requests_created_at_in_range",
+          "value": "\"support_requests\".\"created_at\" >= '1000-01-01 00:00:00+00' AND \"support_requests\".\"created_at\" < '10000-01-01 00:00:00+00'"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.jobs": {
       "name": "jobs",
       "schema": "",
@@ -6886,6 +6946,18 @@
         "open",
         "completed",
         "declined"
+      ]
+    },
+    "public.support_topic": {
+      "name": "support_topic",
+      "schema": "public",
+      "values": [
+        "booking",
+        "change_or_cancel",
+        "refund",
+        "gift",
+        "accessibility",
+        "other"
       ]
     },
     "public.job_status": {

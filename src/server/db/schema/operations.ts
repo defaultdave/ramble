@@ -14,9 +14,14 @@ import {
 } from 'drizzle-orm/pg-core';
 import { auditActorKinds, auditLimits, auditPatterns } from '@/lib/audit';
 import { privacyRequestKinds, privacyRequestStatuses } from '@/lib/guests';
+import {
+  emailAddressPattern,
+  maxEmailAddressLength,
+} from '@/lib/email/address';
 import { rateLimitKeyPattern } from '@/lib/rateLimits';
+import { supportLimits, supportTopics } from '@/lib/support';
 import { guests } from './people';
-import { isReadableDate, maxChars } from './shared';
+import { isReadableDate, maxChars, requiredText } from './shared';
 
 // No `import 'server-only'` here: drizzle-kit loads the schema outside Next.js, where that import throws.
 
@@ -156,5 +161,44 @@ export const auditLog = pgTable(
     check('audit_log_recorded_at_in_range', isReadableDate(table.recordedAt)),
     index('audit_log_recorded_at_idx').on(table.recordedAt),
     index('audit_log_subject_idx').on(table.subjectKind, table.subjectId),
+  ],
+);
+
+export const supportTopicEnum = pgEnum('support_topic', supportTopics);
+
+/**
+ * A guest's message through the contact form. It holds exactly what the form collects and no guest
+ * id: the sender may not have an account or a booking. The support queue (a later unit) reads it.
+ */
+export const supportRequests = pgTable(
+  'support_requests',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    name: text().notNull(),
+    email: text().notNull(),
+    topic: supportTopicEnum().notNull(),
+    message: text().notNull(),
+    createdAt: timestamp({ withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+  },
+  (table) => [
+    check(
+      'support_requests_name_shape',
+      requiredText(table.name, supportLimits.nameMaxChars),
+    ),
+    check(
+      'support_requests_email_shape',
+      sql`${table.email} ~ ${sql.raw(`'${emailAddressPattern}'`)} AND ${maxChars(table.email, maxEmailAddressLength)}`,
+    ),
+    check(
+      'support_requests_message_shape',
+      requiredText(table.message, supportLimits.messageMaxChars),
+    ),
+    check(
+      'support_requests_created_at_in_range',
+      isReadableDate(table.createdAt),
+    ),
+    index('support_requests_created_at_idx').on(table.createdAt.desc()),
   ],
 );

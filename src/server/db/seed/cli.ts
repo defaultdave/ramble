@@ -5,9 +5,11 @@ import { describeFailure } from '@/lib/seed/decide';
 import {
   combineSeedExits,
   coverageExit,
+  personasLine,
   photoCoverageLine,
   photosLine,
   refusalLine,
+  seedsPersonas,
   startLine,
   type SeedExit,
 } from '@/lib/seed/outcome';
@@ -18,6 +20,7 @@ import type { StoragePort } from '@/server/ports/storage';
 import { db } from '@/server/db/client';
 import { seedCaller } from './caller';
 import { readPhotoCoverageGaps, seedTestPhotos } from './photos';
+import { seedPersonas } from './personas';
 import { readSeedSnapshot } from './read';
 import { runSeed } from './run';
 
@@ -76,6 +79,9 @@ export async function runSeedCommand(command: SeedCommand): Promise<number> {
       scale: args.scale,
       log: write,
     });
+    if (seedsPersonas(verdict.target)) {
+      write(personasLine(await seedPersonas(seedCaller)));
+    }
     const exit = coverageExit(
       await readSeedSnapshot(seedCaller, command.now),
       args.scale,

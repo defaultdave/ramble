@@ -73,6 +73,22 @@ Type `SEED_HOST` by hand from the Neon console (Project, the production branch, 
 
 The seed still refuses `NODE_ENV=production`, an unreadable `DATABASE_URL`, and one with a `host`, `hostaddr`, `dbname`, or `database` query parameter or a percent escape in the host or database name. Pages cached by the running deployment serve the old data until they expire (see Caches), so redeploy production after seeding.
 
+## Personas
+
+Every target but `production-demo` also writes seven people who can sign in by link, one per role, so the authorization matrix (`tests/db/authz-matrix.db.test.ts`) and a person trying the app by hand use the same cast. They are Better Auth users with `role_grants` rows; there is no password, so a sign-in link is the only way in. The addresses are on `.test`, a domain RFC 2606 reserves, so no link sent to one reaches a real inbox (on `local`, read the link in the mailbox).
+
+| Address | Holds |
+|---|---|
+| `guest@ramble.test` | nothing beyond being signed in |
+| `owner.a@ramble.test`, `staff.a@ramble.test` | host owner, host staff of Hudson Paddle Club (host A) |
+| `owner.b@ramble.test`, `staff.b@ramble.test` | host owner, host staff of Kiln and Clay (host B) |
+| `ops@ramble.test` | ops |
+| `admin@ramble.test` | admin |
+
+`staging` and `load-test` get the ops and admin personas too. With a non-live `EMAIL_MODE`, anyone holding the mailbox secret can request a link for `admin@ramble.test` and read it, so whoever holds the secret must be trusted with admin. With live email the link goes to a `.test` address nobody can register or receive mail at.
+
+`production-demo` writes none of them. A rerun changes nothing, and a person who already signed in at one of these addresses keeps their id and gains the grants. Do not point real people at these addresses.
+
 ## What it writes
 
 | Group | How it is written |

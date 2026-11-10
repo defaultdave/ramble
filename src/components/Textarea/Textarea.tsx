@@ -14,7 +14,6 @@ export type TextareaProps = Omit<
   optional?: boolean;
 };
 
-/** TODO(U-073): first caller. */
 export function Textarea({
   label,
   hint,

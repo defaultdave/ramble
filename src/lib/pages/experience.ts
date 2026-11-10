@@ -392,10 +392,10 @@ export function buildExperiencePage(
       paused: bookingsPaused,
       checkoutBase: checkoutPath(''),
       similarHref: categoryPath(place.category.slug),
-      privateSessionHref: privateSessionPath,
+      privateSessionHref: privateSessionPath(experience),
       fullRefundHoursBefore: experience.cancellationTier.fullRefundHoursBefore,
     },
-    privateSessionHref: privateSessionPath,
+    privateSessionHref: privateSessionPath(experience),
   };
 }
 

@@ -1,5 +1,4 @@
 import { EntityIdSchema, isSlug } from './catalog';
-import { contactPath } from './paths';
 
 // ---- Fixed addresses, in `paths` so client modules can reach them without the catalog ----
 
@@ -107,8 +106,6 @@ export const legalDocPath = (doc: string) => `/legal/${doc}`;
 /** The manage page a booking email links to. The token is a capability: it is never logged or stored. */
 export const managePath = (token: string) => `/manage/${token}`;
 
-/**
- * Where a guest asks about a private session until the private-request form exists.
- * @alias
- */
-export const privateSessionPath = contactPath;
+/** The private session request form for one experience. */
+export const privateSessionPath = (address: ExperienceAddress): string =>
+  `${experiencePath(address)}/private-session`;

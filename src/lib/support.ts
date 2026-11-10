@@ -38,7 +38,7 @@ export type SupportField = (typeof supportFields)[number];
 const trim = (value: string) => value.trim();
 
 /** Trimmed and folded to lower case first: the one spelling the stored address and its CHECK accept. */
-const EmailFieldSchema = z
+export const EmailFieldSchema = z
   .string()
   .max(maxEmailAddressLength * 2)
   .transform((raw) => normalizeEmailAddress(raw.trim()))

@@ -7,6 +7,7 @@ import {
   planRefund,
   providerRefundIdAction,
   refundCashPostIsFirst,
+  refundAttemptId,
   refundEventAction,
   refundEventRoute,
   refundIdFromDigest,
@@ -279,9 +280,18 @@ describe('what the refund job and its events do', () => {
     [{ kind: 'unmatched' }, 'retry'],
     [{ kind: 'conflict' }, 'retry'],
     [{ kind: 'noop' }, 'finish'],
-    [{ kind: 'succeed' }, 'finish'],
-    [{ kind: 'fail' }, 'finish'],
+    [{ kind: 'succeed' }, 'write'],
+    [{ kind: 'fail' }, 'write'],
   ] as [RefundEventAction, string][])('routes %j to %s', (action, route) => {
     expect(refundEventRoute(action)).toBe(route);
+  });
+});
+
+describe('refundAttemptId', () => {
+  it('is the attempt the refund goes back to, and a refund with none is an error', () => {
+    expect(refundAttemptId({ paymentAttemptId: id(4) })).toBe(id(4));
+    expect(() => refundAttemptId({ paymentAttemptId: null })).toThrow(
+      'no payment attempt',
+    );
   });
 });

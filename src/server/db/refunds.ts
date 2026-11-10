@@ -9,7 +9,9 @@ import {
   processRefundKind,
   providerRefundIdAction,
   refundCashPostIsFirst,
+  refundAttemptId,
   refundEventAction,
+  refundEventRoute,
   refundIdFromDigest,
   refundProviderKey,
   refundRequestIdentity,
@@ -294,12 +296,9 @@ export async function applyRefundEvent(
     recordId: refundId,
   };
   const action = refundEventAction(facts, refund);
-  if (
-    !refund ||
-    orderId === null ||
-    (action.kind !== 'succeed' && action.kind !== 'fail')
-  ) {
-    return action;
+  if (refundEventRoute(action) !== 'write') return action;
+  if (!refund || orderId === null) {
+    throw new Error('A refund event to write names no refund');
   }
 
   const [order] = await tx
@@ -319,13 +318,11 @@ export async function applyRefundEvent(
     .from(orders)
     .where(eq(orders.id, orderId));
   if (!order) throw new Error('The locked order disappeared');
-  if (refund.paymentAttemptId === null) {
-    throw new Error('A pending refund has no payment attempt');
-  }
+  const paymentAttemptId = refundAttemptId(refund);
   const [attempt] = await tx
     .select({ provider: paymentAttempts.provider })
     .from(paymentAttempts)
-    .where(eq(paymentAttempts.id, refund.paymentAttemptId));
+    .where(eq(paymentAttempts.id, paymentAttemptId));
   if (!attempt)
     throw new Error('The refund names a payment attempt that is gone');
   const simulated = isSimulatedPayment(attempt.provider);
@@ -350,7 +347,7 @@ export async function applyRefundEvent(
         orderId,
         hostId: order.hostId,
         refundId: refund.id,
-        paymentAttemptId: refund.paymentAttemptId,
+        paymentAttemptId,
         providerObjectId: event.objectId,
         amountMinor: refund.amountMinor,
       }),
@@ -378,7 +375,7 @@ export async function applyRefundEvent(
       orderId,
       hostId: order.hostId,
       refundId: refund.id,
-      paymentAttemptId: refund.paymentAttemptId,
+      paymentAttemptId,
       split: {
         ticketMinor: refund.ticketMinor,
         commissionMinor: refund.commissionReturnedMinor,

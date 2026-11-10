@@ -49,6 +49,7 @@ export const refundTransitions = {
   gift_reinstated: [],
 } as const satisfies TransitionTable<RefundStatus>;
 
+// TODO(U-055): first caller, the refund row's first status.
 export const refundInitialStatuses = [
   'pending',
   'gift_reinstated',
@@ -173,6 +174,7 @@ export function processRefundDedupeKey(refundId: string): string {
  * order's own, and the gift reasons name a gift, so each belongs to the unit that builds that path.
  */
 // TODO(U-109): add `duplicate_payment`, which refunds a payment that is not the order's live attempt.
+// TODO(U-055): first caller, the cancel action's reason.
 export const orderRefundReasons = [
   'guest_cancel',
   'host_cancel',
@@ -497,6 +499,7 @@ type RefundLine = Pick<
  * sum to the order's `refunded_ticket_minor + refunded_tax_minor` and its returned commission,
  * and together never exceed `total_minor`.
  */
+// TODO(U-055): first caller, the per-order check after a cancellation.
 export function refundsReconcile(
   order: Pick<RefundableOrder, 'totalMinor'> & RefundedTotals,
   refunds: readonly RefundLine[],
@@ -655,13 +658,31 @@ export function refundEventAction(
 }
 
 /**
- * What the event job does once the event's action is known: an event that matches nothing, or
- * contradicts the refund, is retried with backoff (and alerts); everything else is finished.
+ * What the event job does once the event's action is known: a success or a failure writes the
+ * refund, order, and ledger rows; an event that matches nothing, or contradicts the refund, is retried
+ * with backoff (and alerts); a repeat is finished with nothing written.
  */
 export function refundEventRoute(
   action: RefundEventAction,
-): 'retry' | 'finish' {
-  return action.kind === 'unmatched' || action.kind === 'conflict'
-    ? 'retry'
-    : 'finish';
+): 'write' | 'retry' | 'finish' {
+  switch (action.kind) {
+    case 'succeed':
+    case 'fail':
+      return 'write';
+    case 'unmatched':
+    case 'conflict':
+      return 'retry';
+    case 'noop':
+      return 'finish';
+  }
+}
+
+/** The attempt a pending refund goes back to; a refund written without one is data that cannot be right. */
+export function refundAttemptId(refund: {
+  paymentAttemptId: string | null;
+}): string {
+  if (refund.paymentAttemptId === null) {
+    throw new Error('A pending refund has no payment attempt');
+  }
+  return refund.paymentAttemptId;
 }

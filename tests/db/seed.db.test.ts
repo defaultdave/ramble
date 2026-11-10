@@ -239,7 +239,6 @@ const nothingWritten = {
   hosts: 0,
   experiences: 0,
   legal: 0,
-  help: 0,
 };
 
 describe('a caller who is not ops', () => {
@@ -318,6 +317,9 @@ describe('the curated seed', () => {
               neighborhoods: ['williamsburg'],
               date,
               guests: null,
+              price: null,
+              age: null,
+              setting: null,
             },
             after: null,
           },

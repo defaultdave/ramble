@@ -11,12 +11,15 @@ export const maxFilterValues = 8;
 const maxSlugLength = 64;
 const maxCursorLength = 36;
 
-/** The one place the browse URL grammar lives: `category`, `neighborhood`, `date`, `guests`, and `after`. */
+/** The one place the browse URL grammar lives: `category`, `neighborhood`, `date`, `guests`, `price`, `age`, `setting`, and `after`. */
 export const browseParamNames = {
   categories: 'category',
   neighborhoods: 'neighborhood',
   date: 'date',
   guests: 'guests',
+  price: 'price',
+  age: 'age',
+  setting: 'setting',
   after: 'after',
 } as const;
 
@@ -38,6 +41,35 @@ export const guestCounts: readonly number[] = Array.from(
   (_, index) => holdLimits.minSeats + index,
 );
 
+/** The price bands, by the cheapest price option that takes a space. A band is from `minMinor` up to, but not including, `maxMinor`. */
+export const priceBands = {
+  'under-50': { label: 'Under $50', minMinor: 0, maxMinor: 5000 },
+  '50-to-100': { label: '$50 to $100', minMinor: 5000, maxMinor: 10000 },
+  '100-plus': { label: '$100 and up', minMinor: 10000, maxMinor: null },
+} as const;
+export type PriceBand = keyof typeof priceBands;
+
+/** An experience is for kids when its minimum age is no higher than this, or it has none. */
+export const kidsMinAgeCeiling = 12;
+
+const ageChoices = {
+  kids: 'Kids welcome',
+  'twenty-one-plus': '21 and over',
+} as const;
+
+const settingChoices = {
+  indoor: 'Indoor',
+  outdoor: 'Outdoor',
+} as const;
+
+// The keys are the values a parameter may take, so a value no one offers is dropped like any malformed one.
+function choiceSchema<T extends string>(choices: Record<T, unknown>) {
+  return z.enum(Object.keys(choices) as [T, ...T[]]);
+}
+const PriceBandSchema = choiceSchema(priceBands);
+const AgeChoiceSchema = choiceSchema(ageChoices);
+const SettingChoiceSchema = choiceSchema(settingChoices);
+
 const FilterSlugSchema = z.string().max(maxSlugLength).pipe(SlugSchema);
 // Postgres returns uuids in lower case, and the cursor is compared against stored ids.
 const CursorSchema = z
@@ -52,6 +84,9 @@ export const BrowseFiltersSchema = z.object({
   neighborhoods: z.array(FilterSlugSchema).max(maxFilterValues),
   date: IsoDateSchema.nullable(),
   guests: PartySizeSchema.nullable(),
+  price: PriceBandSchema.nullable(),
+  age: AgeChoiceSchema.nullable(),
+  setting: SettingChoiceSchema.nullable(),
 });
 export type BrowseFilters = z.infer<typeof BrowseFiltersSchema>;
 
@@ -70,6 +105,9 @@ export const noFilters: BrowseFilters = {
   neighborhoods: [],
   date: null,
   guests: null,
+  price: null,
+  age: null,
+  setting: null,
 };
 
 function valuesOf(raw: string | readonly string[] | undefined) {
@@ -116,6 +154,12 @@ export function parseFilters(searchParams: RawSearchParams): BrowseQuery {
       guests: parseSingle(
         searchParams[browseParamNames.guests],
         GuestsParamSchema,
+      ),
+      price: parseSingle(searchParams[browseParamNames.price], PriceBandSchema),
+      age: parseSingle(searchParams[browseParamNames.age], AgeChoiceSchema),
+      setting: parseSingle(
+        searchParams[browseParamNames.setting],
+        SettingChoiceSchema,
       ),
     },
     after: parseSingle(searchParams[browseParamNames.after], CursorSchema),
@@ -186,6 +230,10 @@ export function toQueryEntries({
   if (filters.guests !== null) {
     entries.push([browseParamNames.guests, String(filters.guests)]);
   }
+  if (filters.price) entries.push([browseParamNames.price, filters.price]);
+  if (filters.age) entries.push([browseParamNames.age, filters.age]);
+  if (filters.setting)
+    entries.push([browseParamNames.setting, filters.setting]);
   if (after) entries.push([browseParamNames.after, after]);
   return entries;
 }
@@ -210,7 +258,10 @@ export function activeFilterCount(filters: BrowseFilters): number {
     filters.categories.length +
     filters.neighborhoods.length +
     (filters.date ? 1 : 0) +
-    (filters.guests === null ? 0 : 1)
+    (filters.guests === null ? 0 : 1) +
+    (filters.price === null ? 0 : 1) +
+    (filters.age === null ? 0 : 1) +
+    (filters.setting === null ? 0 : 1)
   );
 }
 
@@ -268,6 +319,42 @@ export function guestChips(filters: BrowseFilters): ChipView[] {
       href: hrefForFilters(withGuests(filters, selected ? null : count)),
     };
   });
+}
+
+type ChoiceKey = 'price' | 'age' | 'setting';
+
+/** One chip per choice of a single-choice filter; the chosen one links to the address without it, so choosing it again clears it. */
+function choiceChips<K extends ChoiceKey>(
+  filters: BrowseFilters,
+  key: K,
+  labels: Readonly<Record<NonNullable<BrowseFilters[K]>, string>>,
+): ChipView[] {
+  return Object.entries(labels).map(([value, label]) => {
+    const selected = filters[key] === value;
+    return {
+      key: value,
+      label: String(label),
+      selected,
+      disabled: false,
+      href: hrefForFilters({ ...filters, [key]: selected ? null : value }),
+    };
+  });
+}
+
+const priceLabels = Object.fromEntries(
+  Object.entries(priceBands).map(([band, { label }]) => [band, label]),
+) as Record<PriceBand, string>;
+
+export function priceChips(filters: BrowseFilters): ChipView[] {
+  return choiceChips(filters, 'price', priceLabels);
+}
+
+export function ageChips(filters: BrowseFilters): ChipView[] {
+  return choiceChips(filters, 'age', ageChoices);
+}
+
+export function settingChips(filters: BrowseFilters): ChipView[] {
+  return choiceChips(filters, 'setting', settingChoices);
 }
 
 /** What a search select offers: the value it submits and the words it shows. */

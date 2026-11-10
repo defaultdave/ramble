@@ -32,6 +32,7 @@ import {
 import {
   isRefundEventType,
   refundEventRoute,
+  refundRetryReason,
   type RefundEventType,
 } from '@/lib/refunds';
 import { enqueue } from '@/server/jobs/enqueue';
@@ -287,7 +288,7 @@ async function processRefundEvent(
     rambleRecordId: event.rambleRecordId,
   });
   if (refundEventRoute(action) === 'retry') {
-    return recordRetry(tx, event, 'unmatched');
+    return recordRetry(tx, event, refundRetryReason(action));
   }
   await markProcessed(tx, event.id);
   return { status: 'processed' };

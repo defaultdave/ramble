@@ -270,9 +270,8 @@ export type RefundSplit = {
 };
 
 /** `round_half_up(n / d)` on integers; BigInt because the ticket times the tax can pass 2^53. */
-function roundHalfUpDivision(n: number, d: number): number {
-  const bigD = BigInt(d);
-  return Number((2n * BigInt(n) + bigD) / (2n * bigD));
+function roundHalfUpDivision(n: bigint, d: bigint): number {
+  return Number((2n * n + d) / (2n * d));
 }
 
 function requireSaneOrder(order: RefundableOrder): void {
@@ -316,8 +315,8 @@ export function splitRefund(
       : Math.min(
           remainingTax,
           roundHalfUpDivision(
-            ticketMinor * order.taxMinor,
-            order.ticketSubtotalMinor,
+            BigInt(ticketMinor) * BigInt(order.taxMinor),
+            BigInt(order.ticketSubtotalMinor),
           ),
         );
   const kept = remainingTicket - ticketMinor;
@@ -662,6 +661,13 @@ export function refundEventAction(
  * refund, order, and ledger rows; an event that matches nothing, or contradicts the refund, is retried
  * with backoff (and alerts); a repeat is finished with nothing written.
  */
+/** Why an event that cannot be applied is retried: nothing matches it, or it contradicts the refund it names. */
+export function refundRetryReason(
+  action: RefundEventAction,
+): 'unmatched' | 'refund_conflict' {
+  return action.kind === 'conflict' ? 'refund_conflict' : 'unmatched';
+}
+
 export function refundEventRoute(
   action: RefundEventAction,
 ): 'write' | 'retry' | 'finish' {

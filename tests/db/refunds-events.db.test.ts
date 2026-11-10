@@ -231,6 +231,7 @@ describe('an event that cannot be applied', () => {
       expect(await eventRow(id)).toMatchObject({
         processedAt: null,
         attempts: 1,
+        lastError: 'The event contradicts the refund it names',
       });
     },
   );
@@ -269,6 +270,7 @@ describe('an event that cannot be applied', () => {
       expect(await eventRow(id)).toMatchObject({
         processedAt: null,
         attempts: 1,
+        lastError: 'No matching payment attempt',
       });
     },
   );
@@ -293,6 +295,7 @@ describe('an event that cannot be applied', () => {
     expect(await eventRow(id)).toMatchObject({
       processedAt: null,
       attempts: 1,
+      lastError: 'No matching payment attempt',
     });
   });
 
@@ -315,9 +318,32 @@ describe('an event that cannot be applied', () => {
       expect(await eventRow(id)).toMatchObject({
         processedAt: null,
         attempts: 1,
+        lastError: 'The event contradicts the refund it names',
       });
     },
   );
+
+  it('alerts with its own kind when the 5th try of a contradicting event is spent', async () => {
+    const world = await seedPaidOrder();
+    const refund = await requested(world);
+    const id = await storeEvent(
+      refundEvent(
+        world,
+        { id: refund.refundId, amountMinor: refund.amountMinor },
+        'refund.succeeded',
+        { amountMinor: 1 },
+      ),
+    );
+
+    for (let tries = 0; tries < 5; tries += 1) await handleEvent(id);
+
+    expect(raise).toHaveBeenCalledWith(
+      'refund-event-conflict',
+      'error',
+      expect.any(String),
+      expect.objectContaining({ eventId: id, tries: 5 }),
+    );
+  });
 
   it('alerts when the 5th try is spent', async () => {
     const world = await seedPaidOrder();

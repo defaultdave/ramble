@@ -10,6 +10,7 @@ import {
   refundAttemptId,
   refundEventAction,
   refundEventRoute,
+  refundRetryReason,
   refundIdFromDigest,
   refundRequestVerdict,
   refundToSend,
@@ -293,5 +294,25 @@ describe('refundAttemptId', () => {
     expect(() => refundAttemptId({ paymentAttemptId: null })).toThrow(
       'no payment attempt',
     );
+  });
+});
+
+describe('refundRetryReason', () => {
+  it.each([
+    [{ kind: 'unmatched' }, 'unmatched'],
+    [{ kind: 'conflict' }, 'refund_conflict'],
+  ] as [RefundEventAction, string][])('retries %j as %s', (action, reason) => {
+    expect(refundRetryReason(action)).toBe(reason);
+  });
+});
+
+describe('the tax share on the largest orders', () => {
+  it('does the product in integers: 431236389 of 999999997 with a tax of 1978595693 takes 853242464', () => {
+    // The product is past 2^53, so a float product rounds it and the half-up division then lands on 853242465.
+    const order = orderOf(999_999_997, 1_978_595_693, {
+      commissionMinor: 0,
+      commissionRateBps: 0,
+    });
+    expect(splitRefund(order, 431_236_389).taxMinor).toBe(853_242_464);
   });
 });

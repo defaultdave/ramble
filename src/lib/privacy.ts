@@ -540,6 +540,7 @@ export const nonPiiColumns: readonly {
     'slug',
     'name',
     'description',
+    'search_vector',
     'meeting_point',
     'included',
     'accessibility_notes',

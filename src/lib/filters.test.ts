@@ -52,6 +52,7 @@ describe('browseParamNames', () => {
       price: 'price',
       age: 'age',
       setting: 'setting',
+      search: 'q',
       after: 'after',
     });
   });
@@ -80,6 +81,7 @@ describe('parseFilters', () => {
         price: null,
         age: null,
         setting: null,
+        search: null,
       },
       after: cursor,
     });
@@ -265,6 +267,7 @@ describe('toQuery', () => {
       price: null,
       age: null,
       setting: null,
+      search: null,
     },
     after: cursor,
   };
@@ -369,6 +372,7 @@ describe('changing filters', () => {
       price: null,
       age: null,
       setting: null,
+      search: null,
     });
   });
 

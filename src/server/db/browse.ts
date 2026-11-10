@@ -133,6 +133,12 @@ function inSetting(setting: BrowseFilters['setting']): SQL | undefined {
   return eq(experiences.outdoor, setting === 'outdoor');
 }
 
+// `websearch_to_tsquery` reads quotes, `or`, and a leading minus, and never raises on stray punctuation, so the text is bound as it came. Words the english config drops (stopwords) leave nothing to match.
+function matchesKeywords(search: BrowseFilters['search']): SQL | undefined {
+  if (search === null) return undefined;
+  return sql`${experiences.searchVector} @@ websearch_to_tsquery('english', ${search})`;
+}
+
 function scheduledInWindow(window: SessionWindow): SQL | undefined {
   return and(
     eq(sessions.status, 'scheduled'),
@@ -226,7 +232,7 @@ function pastCursor(cursor: BrowseCursorRow | null): SQL | undefined {
  * experience with a scheduled session in the window that has spaces for the whole party, on that day
  * when a date is chosen too. The price band matches the cheapest price option that takes a space, age
  * matches the experience's age rule (kids: all ages or a minimum age within `kidsMinAgeCeiling`), and
- * setting matches its outdoor flag. `after` is the id
+ * setting matches its outdoor flag, and the search matches the name and description by their words in any order (`websearch_to_tsquery` syntax). `after` is the id
  * of the last experience on the previous page: the next page is every row past it in the same order,
  * so a row that appears or goes between pages moves nothing that was already shown. When no visible
  * experience has the `after` id, the page is empty and `cursor` is null, and only the cursor is read;
@@ -269,6 +275,7 @@ export async function listBrowseExperiences(
         inPriceBand(filters.price),
         suitsAge(filters.age),
         inSetting(filters.setting),
+        matchesKeywords(filters.search),
         pastCursor(cursor),
       ),
     )

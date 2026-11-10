@@ -150,6 +150,7 @@ describe('hero search', () => {
         price: null,
         age: null,
         setting: null,
+        search: null,
       });
     },
   );

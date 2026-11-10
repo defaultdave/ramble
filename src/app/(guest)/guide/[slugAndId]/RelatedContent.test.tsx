@@ -60,6 +60,7 @@ describe('RelatedContent', () => {
           price: null,
           age: null,
           setting: null,
+          search: null,
         },
         after: null,
       },

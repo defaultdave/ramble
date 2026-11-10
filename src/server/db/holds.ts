@@ -43,6 +43,8 @@ import {
   updateTagsForChanges,
 } from '@/server/cache/invalidate';
 import type { Device } from '@/server/device';
+import type { PaymentsPort } from '@/server/ports/payments';
+import { getPaymentsPort } from '@/server/ports/payments/gateway';
 import { db, dbRead, type Transaction } from './client';
 import {
   lockClientAddress,
@@ -50,6 +52,7 @@ import {
   lockHoldRow,
   lockSessionRow,
 } from './locks';
+import { abandonPayingHold } from './ordersLapse';
 import {
   experiences,
   holdItems,
@@ -504,11 +507,12 @@ function isLapsedAt(at: Date) {
  * depends on this running (design doc 4.2.3). The candidates are found with no lock, then each
  * session is locked in turn, as every path that starts from a hold does, and each hold is judged
  * again at database time under the lock. A hold that was converted, released, or extended in the
- * meantime is left alone, so a second run finds nothing to do.
- * TODO(U-106): a lapsed `paying` hold's live attempt is cancelled and its order voided in U-106's
- * step, which must run before this one in the pulse.
+ * meantime is left alone, so a second run finds nothing to do. A lapsed `paying` hold is not
+ * released here: `abandonPayingHold` cancels its live attempt, voids its order, and releases it.
  */
-export async function releaseLapsedHolds(): Promise<number> {
+export async function releaseLapsedHolds(
+  payments: PaymentsPort = getPaymentsPort(),
+): Promise<number> {
   const candidates = await db
     .select({ id: holds.id, sessionId: holds.sessionId })
     .from(holds)
@@ -519,7 +523,7 @@ export async function releaseLapsedHolds(): Promise<number> {
 
   let released = 0;
   for (const [sessionId, rows] of bySession) {
-    const done = await db.transaction(async (tx) => {
+    const lapsed = await db.transaction(async (tx) => {
       await lockSessionRow(tx, sessionId);
       const at = await readDatabaseTime(tx);
       const locked = await tx
@@ -542,18 +546,18 @@ export async function releaseLapsedHolds(): Promise<number> {
         .orderBy(asc(holds.id))
         .for('update');
       const release = holdsToRelease(locked, at);
-      let count = 0;
-      for (const reason of ['expired', 'payment_abandoned'] as const) {
-        const ids = release[reason];
-        if (ids.length === 0) continue;
+      if (release.expired.length > 0) {
         await tx
           .update(holds)
-          .set({ status: 'released', releasedReason: reason, updatedAt: at })
-          .where(inArray(holds.id, ids));
-        count += ids.length;
+          .set({ status: 'released', releasedReason: 'expired', updatedAt: at })
+          .where(inArray(holds.id, release.expired));
       }
-      return count;
+      return release;
     });
+    let done = lapsed.expired.length;
+    for (const holdId of lapsed.payment_abandoned) {
+      if (await abandonPayingHold(payments, { holdId, sessionId })) done += 1;
+    }
     if (done > 0) {
       revalidateTagsForChanges([{ kind: 'spaces', sessionId }]);
       released += done;

@@ -16,12 +16,6 @@ export const routes: readonly RouteRow[] = [
     noindex: false,
   },
   {
-    path: '/guide/sample',
-    group: 'guest',
-    heading: 'Guide entry',
-    noindex: false,
-  },
-  {
     path: '/picks/sample',
     group: 'guest',
     heading: 'Ramble Picks',
@@ -113,6 +107,12 @@ export const unprerenderedParamPath = '/picks/not-prerendered';
 export const experiencePaths = {
   notFound: '/experiences/sample',
   readFails: '/experiences/sunset-kayak-00000000-0000-4000-8000-000000000001',
+} as const;
+
+/** The guide entry page answers as the experience page does: no placeholder, a not-found, or the error state. */
+export const guidePaths = {
+  notFound: '/guide/sample',
+  readFails: '/guide/sourdough-mornings-00000000-0000-4000-8000-000000000001',
 } as const;
 
 /**

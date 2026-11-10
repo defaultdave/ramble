@@ -1,0 +1,47 @@
+.control {
+  position: relative;
+  display: flex;
+}
+
+.select {
+  composes: input from '../Input/Input.module.css';
+}
+
+/* Two classes outrank the composed one whichever sheet loads last. */
+.control .select {
+  appearance: none;
+  padding-inline-end: var(--space-12);
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.control .select:disabled {
+  cursor: not-allowed;
+}
+
+.chevron {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: var(--space-4);
+  inline-size: var(--space-5);
+  block-size: var(--space-5);
+  color: var(--color-text-primary);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.control:has(.select:disabled) .chevron {
+  color: var(--color-text-disabled);
+}
+
+.control.hero .select {
+  padding-inline-end: var(--space-10);
+}
+
+.control.hero .chevron {
+  color: var(--color-text-secondary);
+}
+
+.control.hero .select:not(:disabled) {
+  cursor: default;
+}

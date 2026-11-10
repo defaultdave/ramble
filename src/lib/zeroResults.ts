@@ -73,14 +73,15 @@ export type FilterRemoval = {
 
 /**
  * Each filter that is on, in the order of `browseParamNames`. A list filter comes off whole. A
- * filter with no name to show has no removal.
+ * filter with no name to show has no removal, and neither has one in `omit`.
  */
 export function removals(
   filters: BrowseFilters,
   options: NamedOptions,
+  omit: readonly FilterParam[] = [],
 ): FilterRemoval[] {
   return filterParams.flatMap((param) => {
-    if (!isActive(filters, param)) return [];
+    if (omit.includes(param) || !isActive(filters, param)) return [];
     const label = labelOf[param](filters, options);
     if (label === null) return [];
     return [
@@ -107,8 +108,9 @@ export function suggestions(
   filters: BrowseFilters,
   options: NamedOptions,
   counts: Partial<Record<FilterParam, number>>,
+  omit: readonly FilterParam[] = [],
 ): ZeroResultSuggestion[] {
-  return removals(filters, options)
+  return removals(filters, options, omit)
     .flatMap(({ param, label, filters: without }) => {
       const count = counts[param] ?? 0;
       return count > 0

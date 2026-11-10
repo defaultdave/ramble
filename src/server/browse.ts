@@ -93,16 +93,20 @@ export async function getZeroResultSuggestions(
   const options = await getFilterOptions();
   const window = upcomingWindow(asOf, browseWindowDays);
   const counts: Partial<Record<FilterParam, number>> = {};
+  // A chosen day has its own way out, "Any day", so it takes no slot among the three.
+  const omit: FilterParam[] = filters.date === null ? [] : ['date'];
   await readOrRefuse('Zero results', () =>
     Promise.all(
-      removals(filters, options).map(async ({ param, filters: without }) => {
-        const known = knownFilters(without, options, window);
-        counts[param] =
-          known.matchesNothing || known.dateOutsideWindow
-            ? 0
-            : await countBrowseExperiences(known.filters, asOf);
-      }),
+      removals(filters, options, omit).map(
+        async ({ param, filters: without }) => {
+          const known = knownFilters(without, options, window);
+          counts[param] =
+            known.matchesNothing || known.dateOutsideWindow
+              ? 0
+              : await countBrowseExperiences(known.filters, asOf);
+        },
+      ),
     ),
   );
-  return suggestions(filters, options, counts);
+  return suggestions(filters, options, counts, omit);
 }

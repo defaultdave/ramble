@@ -107,6 +107,21 @@ describe('suggestions', () => {
     expect(maxSuggestions).toBe(3);
   });
 
+  it('fills the three from the other filters when one is left out, however many it would bring back', () => {
+    const counts = { date: 99, categories: 5, price: 4, search: 3, guests: 2 };
+
+    const offered = suggestions(everything, options, counts, ['date']);
+
+    expect(offered.map(({ param }) => param)).toEqual([
+      'categories',
+      'price',
+      'search',
+    ]);
+    expect(removals(everything, options, ['date'])).not.toContainEqual(
+      expect.objectContaining({ param: 'date' }),
+    );
+  });
+
   it('never offers a removal that brings back nothing, or one with no count', () => {
     const offered = suggestions(everything, options, {
       categories: 0,

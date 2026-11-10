@@ -49,7 +49,7 @@ export const refundTransitions = {
   gift_reinstated: [],
 } as const satisfies TransitionTable<RefundStatus>;
 
-// TODO(U-055): first caller, the refund row's first status.
+// TODO(U-066b): first caller, the refund row's first status (a reinstated gift writes `gift_reinstated`).
 export const refundInitialStatuses = [
   'pending',
   'gift_reinstated',
@@ -174,7 +174,6 @@ export function processRefundDedupeKey(refundId: string): string {
  * order's own, and the gift reasons name a gift, so each belongs to the unit that builds that path.
  */
 // TODO(U-109): add `duplicate_payment`, which refunds a payment that is not the order's live attempt.
-// TODO(U-055): first caller, the cancel action's reason.
 export const orderRefundReasons = [
   'guest_cancel',
   'host_cancel',
@@ -498,7 +497,6 @@ type RefundLine = Pick<
  * sum to the order's `refunded_ticket_minor + refunded_tax_minor` and its returned commission,
  * and together never exceed `total_minor`.
  */
-// TODO(U-055): first caller, the per-order check after a cancellation.
 export function refundsReconcile(
   order: Pick<RefundableOrder, 'totalMinor'> & RefundedTotals,
   refunds: readonly RefundLine[],

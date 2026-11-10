@@ -65,7 +65,6 @@ export function hashToken(token: string): string {
 
 export type ResolvedToken = OrderTokenRow;
 
-// TODO(U-055): first caller, the manage page; U-054 and U-107 follow.
 // TODO(U-064a): first caller of the `gift` kind, redeemGift; U-064b follows.
 export async function resolveToken(
   kind: 'manage' | 'gift',

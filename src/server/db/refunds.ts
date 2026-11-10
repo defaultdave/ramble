@@ -1,5 +1,6 @@
 import 'server-only';
 import { asc, eq, sql } from 'drizzle-orm';
+import { refundEmailKey } from '@/lib/bookingEmails';
 import { isSimulatedPayment } from '@/lib/confirmOrder';
 import {
   RefundRequestSchema,
@@ -91,7 +92,6 @@ const refused = (
  * refusal writes nothing and is a typed answer, never a throw; a database or order data that does not
  * add up throws and the caller's transaction rolls back.
  */
-// TODO(U-055): first caller, cancelBooking.
 export async function requestRefund(
   tx: Transaction,
   input: RefundRequestInput,
@@ -355,6 +355,11 @@ export async function applyRefundEvent(
     if (!refundCashPostIsFirst(posted.status)) {
       throw new Error('The refund cash was posted before the refund succeeded');
     }
+    await enqueue(tx, {
+      kind: 'guest-refund',
+      payload: { refundId: refund.id },
+      dedupeKey: refundEmailKey(refund.id),
+    });
     return action;
   }
 

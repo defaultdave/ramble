@@ -64,10 +64,46 @@ export type BookingEmailSource = {
  * so the provider delivers each message once however often the job runs.
  */
 export function bookingEmailKey(
-  kind: 'guest-confirmation' | 'host-booking-notice' | 'session-reminder',
+  kind:
+    | 'guest-confirmation'
+    | 'host-booking-notice'
+    | 'session-reminder'
+    | 'guest-cancellation'
+    | 'host-cancellation-notice',
   orderId: string,
 ): string {
   return `${kind}:${orderId}`;
+}
+
+/** One refund email per refund, whichever order it belongs to. */
+export function refundEmailKey(refundId: string): string {
+  return `guest-refund:${refundId.toLowerCase()}`;
+}
+
+/**
+ * Whether the refund email goes out for a refund. It is queued when the provider confirms a refund,
+ * so any other status is a bug in the caller. Only a guest's own cancellation sends it: the other
+ * reasons have their own emails (a session cancelled, a payment that arrived late).
+ */
+export function refundEmailDecision(refund: {
+  status: string;
+  reason: string;
+}): 'send' | 'skip' | 'refuse' {
+  if (refund.status !== 'succeeded') return 'refuse';
+  return refund.reason === 'guest_cancel' ? 'send' : 'skip';
+}
+
+/**
+ * Whether the cancellation emails go out for an order. Only a cancelled booking gets them; a
+ * booking still confirmed means the job was queued for a cancellation that did not happen.
+ */
+export function cancellationDecision(source: {
+  kind: BookingEmailSource['kind'];
+  status: OrderStatus;
+}): 'send' | 'refuse' {
+  return source.kind === 'booking' && source.status === 'cancelled'
+    ? 'send'
+    : 'refuse';
 }
 
 export type ConfirmationDecision = 'send' | 'skip' | 'refuse';
@@ -341,7 +377,6 @@ type CancellationInput = {
   appUrl: string;
 };
 
-// TODO(U-055): first caller, the cancellation email job.
 export function bookingCancellationData(
   input: CancellationInput,
 ): BookingCancellationData {
@@ -370,7 +405,6 @@ export function bookingCancellationData(
 export const refundArrivalLine =
   'Your bank usually shows it within 5 to 10 business days.';
 
-// TODO(U-055): first caller, the refund email job.
 export function bookingRefundData(input: {
   recipientName: string | null;
   reference: string;

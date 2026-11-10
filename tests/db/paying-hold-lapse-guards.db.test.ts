@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import { eq, inArray, sql } from 'drizzle-orm';
+import { ZodError } from 'zod';
 import {
   afterAll,
   beforeAll,
@@ -30,6 +32,10 @@ import { payingLapseFixtures } from './payingLapseFixtures';
 // - the sweep hands each hold's own id and its own session id to the lapse step
 // - the attempt row is not locked, so its cancel is written only while the attempt is live: one that succeeded after it
 //   was read is not overwritten, and the hold, order, and attempt stay as the payment event left them
+// - a hold that is not there is not released, and asks the provider nothing; a ref that is not two uuids is refused by the parse
+// - an error from the cancel that is not the port's is rethrown, and leaves the hold, order, and attempt as they were
+// - the sweep waits for the hold row and for the order row, and judges what the other transaction committed
+// - a refused cancel is logged with its code and the hold and attempt ids (and nothing else), a cancel that succeeded is not
 // - a pulse run, with the real sweep and the fake gateway, voids and releases a lapsed paying hold end to end
 
 const cache = vi.hoisted(() => ({
@@ -37,6 +43,12 @@ const cache = vi.hoisted(() => ({
   revalidateTag: vi.fn<(tag: string, profile: string) => void>(),
 }));
 const sendHeartbeat = vi.hoisted(() => vi.fn());
+const log = vi.hoisted(() => ({
+  warn: vi.fn(),
+  info: vi.fn(),
+  error: vi.fn(),
+}));
+vi.mock('@/server/monitoring/logger', () => ({ logger: log }));
 vi.mock('next/cache', () => cache);
 vi.mock('@/server/monitoring/heartbeat', () => ({ sendHeartbeat }));
 vi.mock(
@@ -78,6 +90,7 @@ beforeEach(async () => {
     .where(inArray(holds.status, ['active', 'paying']));
   sendHeartbeat.mockReset().mockResolvedValue('sent');
   vi.mocked(lapseData.abandonPayingHold).mockClear();
+  log.warn.mockClear();
 });
 
 const payments = () => fixtures.use(fixtures.makePayments());
@@ -262,6 +275,147 @@ describe('the attempt write', () => {
     expect(after.attempt).toMatchObject({ status: 'succeeded' });
     expect(after.hold.status).toBe('paying');
     expect(after.order.status).toBe('pending_payment');
+  });
+});
+
+describe('what the sweep refuses to act on', () => {
+  it('releases nothing for a hold that is not there, and asks the provider nothing', async () => {
+    const port = payments();
+    const cancel = vi.spyOn(port, 'cancelPayment');
+    const bookable = await seedBookable(client.db);
+
+    expect(
+      await lapseData.abandonPayingHold(port, {
+        holdId: randomUUID(),
+        sessionId: bookable.session.id,
+      }),
+    ).toBe(false);
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
+  it('refuses a ref that is not two uuids, before any provider call', async () => {
+    const port = payments();
+    const cancel = vi.spyOn(port, 'cancelPayment');
+    const bookable = await seedBookable(client.db);
+
+    await expect(
+      lapseData.abandonPayingHold(port, {
+        holdId: 'x',
+        sessionId: bookable.session.id,
+      }),
+    ).rejects.toBeInstanceOf(ZodError);
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
+  it("rethrows an error from the cancel that is not the port's, and leaves the hold, order, and attempt as they were", async () => {
+    const port = payments();
+    const lapsed = await fixtures.lapsedPayingHold(
+      await seedBookable(client.db),
+      port,
+    );
+    vi.spyOn(port, 'cancelPayment').mockRejectedValue(new Error('boom'));
+
+    await expect(sweep(port)).rejects.toThrow('boom');
+
+    const after = await fixtures.state(lapsed);
+    expect(after.hold.status).toBe('paying');
+    expect(after.order.status).toBe('pending_payment');
+    expect(after.attempt).toMatchObject({ status: 'created' });
+  });
+});
+
+describe('the locks that make the unlocked attempt read safe', () => {
+  const inTransaction = (
+    body: (
+      tx: Parameters<Parameters<typeof client.db.transaction>[0]>[0],
+    ) => Promise<void>,
+  ) => client.db.transaction(body);
+
+  it('waits for the hold row, then judges the hold as the other transaction left it', async () => {
+    const port = payments();
+    const cancel = vi.spyOn(port, 'cancelPayment');
+    const bookable = await seedBookable(client.db);
+    const lapsed = await fixtures.lapsedPayingHold(bookable, port);
+    const locks = await import('@/server/db/locks');
+
+    const released = await raceAgainstOpenTransaction(
+      inTransaction,
+      async (tx) => {
+        await locks.lockHoldRow(tx, lapsed.hold.id);
+        await tx
+          .update(holds)
+          .set({ payingUntil: sql`now() + interval '5 minutes'` })
+          .where(eq(holds.id, lapsed.hold.id));
+      },
+      () =>
+        lapseData.abandonPayingHold(port, {
+          holdId: lapsed.hold.id,
+          sessionId: bookable.session.id,
+        }),
+    );
+
+    expect(released).toBe(false);
+    expect(cancel).not.toHaveBeenCalled();
+    expect((await fixtures.state(lapsed)).hold.status).toBe('paying');
+  });
+
+  it('waits for the order row, then judges the order as the other transaction left it', async () => {
+    const port = payments();
+    const cancel = vi.spyOn(port, 'cancelPayment');
+    const bookable = await seedBookable(client.db);
+    const lapsed = await fixtures.lapsedPayingHold(bookable, port);
+    const locks = await import('@/server/db/locks');
+
+    const released = await raceAgainstOpenTransaction(
+      inTransaction,
+      async (tx) => {
+        await locks.lockOrderRow(tx, `book:${lapsed.hold.id}`);
+        await tx
+          .update(orders)
+          .set({ status: 'confirmed', confirmedAt: new Date() })
+          .where(eq(orders.id, lapsed.started.order.id));
+      },
+      () =>
+        lapseData.abandonPayingHold(port, {
+          holdId: lapsed.hold.id,
+          sessionId: bookable.session.id,
+        }),
+    );
+
+    expect(released).toBe(false);
+    expect(cancel).not.toHaveBeenCalled();
+    expect((await fixtures.state(lapsed)).order.status).toBe('confirmed');
+  });
+});
+
+describe('the log of a refused cancel', () => {
+  it('names the code and the hold and attempt ids, and nothing else', async () => {
+    const port = payments();
+    const lapsed = await fixtures.lapsedPayingHold(
+      await seedBookable(client.db),
+      port,
+    );
+    await port.cancelPayment({
+      idempotencyKey: 'cancel:elsewhere',
+      paymentId: lapsed.payment?.id ?? '',
+    });
+
+    expect(await sweep(port)).toBe(1);
+
+    expect(log.warn).toHaveBeenCalledExactlyOnceWith(expect.any(String), {
+      code: 'invalid_state',
+      holdId: lapsed.hold.id,
+      attemptId: lapsed.started.attempt.id,
+    });
+  });
+
+  it('is silent when the cancel succeeds', async () => {
+    const port = payments();
+    await fixtures.lapsedPayingHold(await seedBookable(client.db), port);
+
+    expect(await sweep(port)).toBe(1);
+
+    expect(log.warn).not.toHaveBeenCalled();
   });
 });
 

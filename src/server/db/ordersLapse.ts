@@ -16,6 +16,7 @@ import {
   requireAttemptTransition,
   requireOrderTransition,
 } from '@/lib/providerEvents';
+import { logger } from '@/server/monitoring/logger';
 import { PaymentsError, type PaymentsPort } from '@/server/ports/payments';
 import { db, type Transaction } from './client';
 import { lockHoldRow, lockOrderRow, lockSessionRow } from './locks';
@@ -34,9 +35,10 @@ type Look =
 
 /**
  * One look at a lapsed `paying` hold under the locks of design doc 4.2.3 (session, hold, order),
- * at database time read after them; the latest attempt is read with no lock. `payingLapse` decides; a release is written here in
- * the one transaction: the attempt cancelled, the order voided, the hold released as
- * `payment_abandoned`. A cancel the provider has not made yet is handed back and nothing is written.
+ * at database time read after them; the latest attempt is read with no lock. `payingLapse`
+ * decides; a release is written here in the one transaction: the attempt cancelled, the order
+ * voided, the hold released as `payment_abandoned`. A cancel the provider has not made yet is
+ * handed back and nothing is written.
  */
 async function lookAtHold(
   tx: Transaction,
@@ -103,6 +105,7 @@ async function lookAtHold(
 /** The payment's status once a cancel was tried: the cancel's answer, or the payment as it stands when the provider refused. */
 async function paymentStatusAfterCancel(
   payments: PaymentsPort,
+  holdId: string,
   look: Extract<Look, { done: false }>,
 ) {
   const found =
@@ -126,6 +129,11 @@ async function paymentStatusAfterCancel(
   } catch (error) {
     const code = error instanceof PaymentsError ? error.code : null;
     if (cancelErrorAction(code) === 'rethrow') throw error;
+    logger.warn('Payment cancel refused, payment read instead', {
+      code,
+      holdId,
+      attemptId: look.attemptId,
+    });
     const current = await payments.retrieve({ kind: 'payment', id: found.id });
     return current?.status ?? null;
   }
@@ -148,7 +156,7 @@ export async function abandonPayingHold(
   const first = await db.transaction((tx) => lookAtHold(tx, ref, null));
   if (first.done) return first.released;
 
-  const status = await paymentStatusAfterCancel(payments, first);
+  const status = await paymentStatusAfterCancel(payments, ref.holdId, first);
   if (!providerSettled(first.target, status)) return false;
   const second = await db.transaction((tx) =>
     lookAtHold(tx, ref, first.attemptId),

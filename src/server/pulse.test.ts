@@ -99,15 +99,13 @@ beforeEach(() => {
   vi.mocked(consumeRateLimit).mockReset().mockResolvedValue(allowed);
   vi.mocked(scheduleAuditExports).mockReset().mockResolvedValue(0);
   vi.mocked(drainJobs).mockReset().mockResolvedValue(report);
-  vi.mocked(extendSessionHorizon)
-    .mockReset()
-    .mockResolvedValue({
-      created: 0,
-      experienceIds: [],
-      skipped: 0,
-      failed: 0,
-      firstErrorName: null,
-    });
+  vi.mocked(extendSessionHorizon).mockReset().mockResolvedValue({
+    created: 0,
+    experienceIds: [],
+    skipped: 0,
+    failed: 0,
+    firstErrorName: null,
+  });
   vi.mocked(revalidateTagsForChanges).mockReset();
   vi.mocked(purgeExpiredRateLimits).mockReset().mockResolvedValue(0);
   vi.mocked(releaseLapsedHolds).mockReset().mockResolvedValue(0);

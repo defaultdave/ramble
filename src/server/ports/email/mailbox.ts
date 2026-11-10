@@ -3,6 +3,7 @@ import { createHmac } from 'node:crypto';
 import { z } from 'zod';
 import {
   mailboxAccess,
+  mailboxUnlockAllowed,
   type MailboxAccess,
   type MailboxMessage,
   type MailboxSummary,
@@ -36,17 +37,22 @@ function sessionToken(secret: string): string {
     .digest('hex');
 }
 
-// Production is the Vercel production deployment: the shared secret is never accepted there.
+function deployment(secret: string | null) {
+  return {
+    vercelEnv: env.VERCEL_ENV,
+    emailMode: env.EMAIL_MODE,
+    secretConfigured: secret !== null,
+  };
+}
+
 function access(
   caller: Caller,
   cookie: string | undefined,
   secret: string | null,
 ): MailboxAccess {
   return mailboxAccess({
+    ...deployment(secret),
     ops: holdsOpsRole(caller.roles),
-    production: env.VERCEL_ENV === 'production',
-    liveMode: env.EMAIL_MODE === 'live',
-    secretConfigured: secret !== null,
     hasCookie: cookie !== undefined,
     cookieMatches:
       secret !== null &&
@@ -56,21 +62,19 @@ function access(
 }
 
 /**
- * The cookie value for a submitted secret, or null when the secret path is closed (production,
- * live mode, no secret set) or the secret is wrong. A right secret is recorded before the cookie is
- * issued, so a failed audit write issues none.
+ * The cookie value for a submitted secret, or null when the lib refuses it. A right secret is
+ * recorded before the cookie is issued, so a failed audit write issues none.
  */
 export async function unlockMailbox(
   caller: Caller,
   submitted: string,
 ): Promise<string | null> {
   const secret = configuredSecret();
-  // The ops role is left out so the answer is about the secret path alone.
-  const pathOpen =
-    access({ ...caller, roles: [] }, undefined, secret).status !== 'disabled';
-  if (secret === null || !pathOpen || !secureEqual(submitted, secret)) {
-    return null;
-  }
+  const allowed = mailboxUnlockAllowed({
+    ...deployment(secret),
+    secretMatches: secret !== null && secureEqual(submitted, secret),
+  });
+  if (!allowed || secret === null) return null;
   await recordAudit(mailboxUnlockEntry(caller.userId));
   return sessionToken(secret);
 }

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mailboxSecret, setEnv } from '../../../tests/email/testEnv';
-import { anonymousCaller, getCaller } from '@/server/auth/caller';
+import { anonymousCaller } from '@/server/auth/caller';
+import { readOpsCaller } from '@/server/opsCaller';
 import { recordAudit } from '@/server/db/audit';
 import { consumeRateLimit } from '@/server/ports/rate-limit';
 import { unlockDevMailbox } from './mailbox';
@@ -9,10 +10,7 @@ const testEnv = vi.hoisted((): Record<string, unknown> => ({}));
 vi.mock('@/server/env', () => ({ env: testEnv }));
 vi.mock('@/server/db/messages', () => ({}));
 vi.mock('@/server/db/audit', () => ({ recordAudit: vi.fn() }));
-vi.mock('@/server/auth/caller', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/server/auth/caller')>()),
-  getCaller: vi.fn(),
-}));
+vi.mock('@/server/opsCaller', () => ({ readOpsCaller: vi.fn() }));
 vi.mock('@/server/ports/rate-limit', () => ({ consumeRateLimit: vi.fn() }));
 
 const cookieSet = vi.hoisted(() => vi.fn());
@@ -52,7 +50,7 @@ function form(secret?: string) {
 beforeEach(() => {
   setEnv(testEnv, { DEV_MAILBOX_SECRET: mailboxSecret });
   cookieSet.mockReset();
-  vi.mocked(getCaller).mockReset().mockResolvedValue(anonymousCaller);
+  vi.mocked(readOpsCaller).mockReset().mockResolvedValue(anonymousCaller);
   vi.mocked(recordAudit).mockReset().mockResolvedValue();
   forwardedFor.value = null;
   vi.mocked(consumeRateLimit)
@@ -167,7 +165,7 @@ describe('unlockDevMailbox', () => {
   });
 
   it('records the right secret once, as the signed-in caller', async () => {
-    vi.mocked(getCaller).mockResolvedValue({
+    vi.mocked(readOpsCaller).mockResolvedValue({
       ...anonymousCaller,
       userId: '5b3d7ad4-6f3c-4c2f-9d58-3a0a2f0e8a10',
     });

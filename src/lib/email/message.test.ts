@@ -7,6 +7,7 @@ import {
   isPermanentBounce,
   isRetryableStatus,
   mailboxAccess,
+  mailboxUnlockAllowed,
   outcomeForAdapter,
   planExistingMessage,
   sendAttemptsExhausted,
@@ -361,8 +362,8 @@ describe('isFreshTimestamp', () => {
 describe('mailboxAccess', () => {
   const guest = {
     ops: false,
-    production: false,
-    liveMode: false,
+    vercelEnv: undefined as string | undefined,
+    emailMode: 'sink',
     secretConfigured: true,
     hasCookie: true,
     cookieMatches: true,
@@ -381,12 +382,12 @@ describe('mailboxAccess', () => {
     ],
     [
       'open by the ops role in production',
-      { ops: true, production: true },
+      { ops: true, vercelEnv: 'production' },
       { status: 'open', via: 'ops_role' },
     ],
     [
       'open by the ops role in live mode',
-      { ops: true, liveMode: true },
+      { ops: true, emailMode: 'live' },
       { status: 'open', via: 'ops_role' },
     ],
     [
@@ -406,12 +407,12 @@ describe('mailboxAccess', () => {
     ],
     [
       'disabled in production, even with the right cookie',
-      { production: true },
+      { vercelEnv: 'production' },
       { status: 'disabled' },
     ],
     [
       'disabled in live mode, whatever the cookie',
-      { liveMode: true },
+      { emailMode: 'live' },
       { status: 'disabled' },
     ],
     [
@@ -421,5 +422,43 @@ describe('mailboxAccess', () => {
     ],
   ])('is %s', (_label, override, expected) => {
     expect(mailboxAccess({ ...guest, ...override })).toEqual(expected);
+  });
+});
+
+describe('mailboxAccess deployments', () => {
+  it.each(['preview', 'development', undefined])(
+    'lets the secret in on %s',
+    (vercelEnv) => {
+      expect(
+        mailboxAccess({
+          ops: false,
+          vercelEnv,
+          emailMode: 'allowlist',
+          secretConfigured: true,
+          hasCookie: true,
+          cookieMatches: true,
+        }),
+      ).toEqual({ status: 'open', via: 'secret' });
+    },
+  );
+});
+
+describe('mailboxUnlockAllowed', () => {
+  const base = {
+    vercelEnv: undefined as string | undefined,
+    emailMode: 'sink',
+    secretConfigured: true,
+    secretMatches: true,
+  };
+
+  it.each([
+    ['a matching secret off production', {}, true],
+    ['a preview deployment', { vercelEnv: 'preview' }, true],
+    ['a wrong secret', { secretMatches: false }, false],
+    ['production', { vercelEnv: 'production' }, false],
+    ['live mode', { emailMode: 'live' }, false],
+    ['no secret set', { secretConfigured: false }, false],
+  ])('for %s is %s', (_label, override, expected) => {
+    expect(mailboxUnlockAllowed({ ...base, ...override })).toBe(expected);
   });
 });

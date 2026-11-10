@@ -159,6 +159,7 @@ describe('extendSessionHorizon', () => {
     const badTemplate = await createTemplate(bad.experience.id);
     const after = await setup();
     const afterTemplate = await createTemplate(after.experience.id);
+    // 2026-06-20 is a Saturday: the range runs 06-19 to 09-12, which holds 13 Saturdays (06-20 to 09-12).
     const laterNow = new Date('2026-06-20T12:00:00Z');
     const failing = badTemplate.id;
 
@@ -176,8 +177,8 @@ describe('extendSessionHorizon', () => {
       expect.arrayContaining([before.experience.id, after.experience.id]),
     );
     expect(result.experienceIds).not.toContain(bad.experience.id);
-    expect(await sessionsOf(beforeTemplate.id)).toHaveLength(12);
-    expect(await sessionsOf(afterTemplate.id)).toHaveLength(12);
+    expect(await sessionsOf(beforeTemplate.id)).toHaveLength(13);
+    expect(await sessionsOf(afterTemplate.id)).toHaveLength(13);
     expect(await sessionsOf(badTemplate.id)).toHaveLength(0);
   });
 });

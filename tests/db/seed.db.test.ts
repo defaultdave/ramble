@@ -313,14 +313,10 @@ describe('the curated seed', () => {
         await browseReads.listBrowseExperiences(
           {
             filters: {
+              ...noFilters,
               categories: ['kids'],
               neighborhoods: ['williamsburg'],
               date,
-              guests: null,
-              price: null,
-              age: null,
-              setting: null,
-              search: null,
             },
             after: null,
           },

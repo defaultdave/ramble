@@ -11,7 +11,8 @@ import {
   it,
   vi,
 } from 'vitest';
-import { attemptProviderKey } from '@/lib/payments';
+import { liveAttemptStatuses } from '@/lib/holdLapse';
+import { attemptProviderKey, type AttemptStatus } from '@/lib/payments';
 import { holds, orders, paymentAttempts } from '@/server/db/schema';
 import { PaymentsError } from '@/server/ports/payments';
 import {
@@ -38,6 +39,7 @@ import { payingLapseFixtures } from './payingLapseFixtures';
 // - the sweep waits for the hold row and for the order row, and judges what the other transaction committed
 // - a cancel that fails, for any reason, rejects with nothing written, and the next sweep reads the payment again: succeeded is left alone, cancelled is settled with no second cancel
 // - a cancel whose answer is not `canceled` (processing, succeeded, created) settles nothing: nothing is released and no spaces tag is revalidated; `canceled` releases and revalidates
+// - an attempt in every live status (created, requires_action, processing, failed_try) is cancelled, its order voided, and its hold released
 // - the attempt's updated time is the time the hold is released at, and every judgement and write takes the database clock, never the app clock
 // - a pulse run, with the real sweep and the fake gateway, voids and releases a lapsed paying hold end to end
 
@@ -438,6 +440,12 @@ describe('a cancel that fails', () => {
   });
 });
 
+const setAttemptStatus = (orderId: string, status: AttemptStatus) =>
+  client.db
+    .update(paymentAttempts)
+    .set({ status, failedTries: status === 'failed_try' ? 1 : 0 })
+    .where(eq(paymentAttempts.orderId, orderId));
+
 describe('a cancel whose answer is not cancelled', () => {
   it.each(['processing', 'succeeded', 'created'] as const)(
     'settles nothing when the provider answers %s: nothing is released, and no spaces tag is revalidated',
@@ -447,6 +455,7 @@ describe('a cancel whose answer is not cancelled', () => {
       const lapsed = await fixtures.lapsedPayingHold(bookable, port);
       const payment = lapsed.payment;
       if (!payment) throw new Error('expected a provider payment');
+      await setAttemptStatus(lapsed.started.order.id, 'requires_action');
       vi.spyOn(port, 'retrieve').mockResolvedValue({
         ...payment,
         status: 'requires_action',
@@ -461,7 +470,7 @@ describe('a cancel whose answer is not cancelled', () => {
       const after = await fixtures.state(lapsed);
       expect(after.hold.status).toBe('paying');
       expect(after.order.status).toBe('pending_payment');
-      expect(after.attempt).toMatchObject({ status: 'created' });
+      expect(after.attempt).toMatchObject({ status: 'requires_action' });
       expect(cache.revalidateTag).not.toHaveBeenCalled();
       expect(cache.updateTag).not.toHaveBeenCalled();
     },
@@ -473,6 +482,7 @@ describe('a cancel whose answer is not cancelled', () => {
     const lapsed = await fixtures.lapsedPayingHold(bookable, port);
     const payment = lapsed.payment;
     if (!payment) throw new Error('expected a provider payment');
+    await setAttemptStatus(lapsed.started.order.id, 'requires_action');
     vi.spyOn(port, 'retrieve').mockResolvedValue({
       ...payment,
       status: 'requires_action',
@@ -490,6 +500,42 @@ describe('a cancel whose answer is not cancelled', () => {
       'max',
     );
   });
+});
+
+describe('an attempt in any live status', () => {
+  it.each(liveAttemptStatuses)(
+    'is cancelled, its order voided and its hold released when the database attempt is %s',
+    async (status) => {
+      const port = payments();
+      const lapsed = await fixtures.lapsedPayingHold(
+        await seedBookable(client.db),
+        port,
+      );
+      const payment = lapsed.payment;
+      if (!payment) throw new Error('expected a provider payment');
+      await setAttemptStatus(lapsed.started.order.id, status);
+      // The provider read answers a cancellable status whatever the row says: the fake cannot
+      // cancel a payment in `processing`, so this isolates the guarded write on the row.
+      vi.spyOn(port, 'retrieve').mockResolvedValue({
+        ...payment,
+        status: 'requires_action',
+      });
+      vi.spyOn(port, 'cancelPayment').mockResolvedValue({
+        ...payment,
+        status: 'canceled',
+      });
+
+      expect(await sweep(port)).toBe(1);
+
+      const after = await fixtures.state(lapsed);
+      expect(after.attempt).toMatchObject({ status: 'canceled' });
+      expect(after.order.status).toBe('void');
+      expect(after.hold).toMatchObject({
+        status: 'released',
+        releasedReason: 'payment_abandoned',
+      });
+    },
+  );
 });
 
 describe('the clock of the sweep', () => {

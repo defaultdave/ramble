@@ -1,6 +1,7 @@
 import 'server-only';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import {
+  bookableStatuses,
   CancellationTierSchema,
   GuestHostSchema,
   SlugSchema,
@@ -8,6 +9,7 @@ import {
   type GuestHost,
 } from '@/lib/catalog';
 import { cardLookupLimit } from '@/lib/idLookup';
+import { guestVisible } from './catalog';
 import { dbRead } from './client';
 import { cancellationTiers, experiences, hosts } from './schema';
 
@@ -40,7 +42,13 @@ export async function getHostListing(
       cancellationTiers,
       eq(cancellationTiers.id, experiences.cancellationTierId),
     )
-    .where(and(eq(experiences.hostId, host.id), eq(experiences.status, 'live')))
+    .where(
+      and(
+        eq(experiences.hostId, host.id),
+        guestVisible,
+        inArray(experiences.status, bookableStatuses),
+      ),
+    )
     .orderBy(asc(experiences.name), asc(experiences.id))
     .limit(cardLookupLimit);
   return {

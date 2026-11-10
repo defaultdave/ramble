@@ -1,9 +1,9 @@
 import { isSlug, type CancellationTier, type GuestHost } from '../catalog';
-import { textLines } from '../displayText';
+import { cancellationTerms } from '../cancellation';
+import { initialOf, textLines } from '../displayText';
 import type { CardExperience } from '../experienceCards';
 import { maxAddressLength } from '../routes';
 import type { BrowseView } from './browse';
-import { cancellationTerms, hostInitial } from './experience';
 import { collectionView } from './picks';
 
 /** What the host page is built from: the host, their live experiences as cards, and each one's tier. */
@@ -91,7 +91,7 @@ export function hostPageView({
           };
   return {
     name: host.name,
-    initial: hostInitial(host.name),
+    initial: initialOf(host.name),
     about: textLines(host.description),
     results,
     cancellation,

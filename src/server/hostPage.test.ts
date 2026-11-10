@@ -1,4 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cardLookupLimit } from '@/lib/idLookup';
+import {
+  cacheEntryTagCounts,
+  cacheTagBudget,
+} from '@/lib/pages/cacheTagBudget';
 import { id } from '../../tests/support/ids';
 import { makeDriverError } from '../../tests/support/driverError';
 import { getHostPage } from './hostPage';
@@ -80,6 +85,19 @@ describe('getHostPage', () => {
     expect(cache.tag.mock.calls.flat().toSorted()).toEqual(
       ['catalog', `experience:${id(1)}`, `experience:${id(7)}`].toSorted(),
     );
+  });
+
+  it('carries no more tags than the budget counts for a host with the most experiences it lists', async () => {
+    const live = Array.from({ length: cardLookupLimit }, (_, n) => ({
+      id: id(n + 1),
+      cancellationTier: tier,
+    }));
+    db.listing.mockResolvedValue({ host, live });
+
+    await getHostPage('hudson-paddle-club');
+
+    expect(cache.tag.mock.calls.flat()).toHaveLength(cacheEntryTagCounts.host);
+    expect(cacheEntryTagCounts.host).toBeLessThanOrEqual(cacheTagBudget);
   });
 
   it('keeps nothing for an unknown host, and reads no cards', async () => {

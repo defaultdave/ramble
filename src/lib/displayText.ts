@@ -11,3 +11,8 @@ export function textLines(value: string | null): string[] {
     .map((line) => line.trim())
     .filter((line) => line !== '');
 }
+
+/** The first letter of a name in capitals, for an avatar; empty for an empty name. */
+export function initialOf(name: string): string {
+  return Array.from(name)[0]?.toUpperCase() ?? '';
+}

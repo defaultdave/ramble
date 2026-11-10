@@ -30,6 +30,7 @@ describe('selectedChips', () => {
         price: null,
         age: null,
         setting: null,
+        search: null,
       },
       options,
     );

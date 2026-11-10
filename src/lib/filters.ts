@@ -10,8 +10,10 @@ import { isDateInWindow, type SessionWindow } from './sessionWindow';
 export const maxFilterValues = 8;
 const maxSlugLength = 64;
 const maxCursorLength = 36;
+/** A search longer than this is dropped, not cut, like any other malformed value. */
+export const maxSearchLength = 100;
 
-/** The one place the browse URL grammar lives: `category`, `neighborhood`, `date`, `guests`, `price`, `age`, `setting`, and `after`. */
+/** The one place the browse URL grammar lives: `category`, `neighborhood`, `date`, `guests`, `price`, `age`, `setting`, `q`, and `after`. */
 export const browseParamNames = {
   categories: 'category',
   neighborhoods: 'neighborhood',
@@ -20,6 +22,7 @@ export const browseParamNames = {
   price: 'price',
   age: 'age',
   setting: 'setting',
+  search: 'q',
   after: 'after',
 } as const;
 
@@ -70,6 +73,9 @@ const PriceBandSchema = choiceSchema(priceBands);
 const AgeChoiceSchema = choiceSchema(ageChoices);
 const SettingChoiceSchema = choiceSchema(settingChoices);
 
+// Trimmed first, so a blank search is an absent one.
+const SearchSchema = z.string().trim().min(1).max(maxSearchLength);
+
 const FilterSlugSchema = z.string().max(maxSlugLength).pipe(SlugSchema);
 // Postgres returns uuids in lower case, and the cursor is compared against stored ids.
 const CursorSchema = z
@@ -87,6 +93,7 @@ export const BrowseFiltersSchema = z.object({
   price: PriceBandSchema.nullable(),
   age: AgeChoiceSchema.nullable(),
   setting: SettingChoiceSchema.nullable(),
+  search: SearchSchema.nullable(),
 });
 export type BrowseFilters = z.infer<typeof BrowseFiltersSchema>;
 
@@ -108,6 +115,7 @@ export const noFilters: BrowseFilters = {
   price: null,
   age: null,
   setting: null,
+  search: null,
 };
 
 function valuesOf(raw: string | readonly string[] | undefined) {
@@ -161,6 +169,7 @@ export function parseFilters(searchParams: RawSearchParams): BrowseQuery {
         searchParams[browseParamNames.setting],
         SettingChoiceSchema,
       ),
+      search: parseSingle(searchParams[browseParamNames.search], SearchSchema),
     },
     after: parseSingle(searchParams[browseParamNames.after], CursorSchema),
   };
@@ -234,6 +243,7 @@ export function toQueryEntries({
   if (filters.age) entries.push([browseParamNames.age, filters.age]);
   if (filters.setting)
     entries.push([browseParamNames.setting, filters.setting]);
+  if (filters.search) entries.push([browseParamNames.search, filters.search]);
   if (after) entries.push([browseParamNames.after, after]);
   return entries;
 }
@@ -261,7 +271,8 @@ export function activeFilterCount(filters: BrowseFilters): number {
     (filters.guests === null ? 0 : 1) +
     (filters.price === null ? 0 : 1) +
     (filters.age === null ? 0 : 1) +
-    (filters.setting === null ? 0 : 1)
+    (filters.setting === null ? 0 : 1) +
+    (filters.search === null ? 0 : 1)
   );
 }
 

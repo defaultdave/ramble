@@ -317,6 +317,7 @@ describe('the curated seed', () => {
               price: null,
               age: null,
               setting: null,
+              search: null,
             },
             after: null,
           },

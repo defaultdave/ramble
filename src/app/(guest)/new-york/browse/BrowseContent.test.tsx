@@ -244,6 +244,7 @@ describe('BrowseContent', () => {
             price: null,
             age: null,
             setting: null,
+            search: null,
           },
           after: null,
         },

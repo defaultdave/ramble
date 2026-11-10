@@ -3,6 +3,7 @@ import {
   type AnyPgColumn,
   boolean,
   check,
+  customType,
   date,
   foreignKey,
   index,
@@ -70,6 +71,10 @@ export const sessionCancelReasonEnum = pgEnum(
 );
 
 const timestampTz = () => timestamp({ withTimezone: true });
+
+const tsvector = customType<{ data: string }>({
+  dataType: () => 'tsvector',
+});
 
 // The read schemas test stored links with this same pattern, so the two cannot disagree.
 const isHttpUrlOrNull = (column: AnyPgColumn) =>
@@ -175,8 +180,15 @@ export const experiences = pgTable(
     linkOutUrl: text(),
     affiliateUrl: text(),
     createdAt: timestampTz().notNull().defaultNow(),
+    // 'english' stems both sides, so "kayaking" finds "kayak"; its stopwords are dropped from the query too.
+    searchVector: tsvector()
+      .notNull()
+      .generatedAlwaysAs(
+        sql`to_tsvector('english', coalesce(name, '') || ' ' || coalesce(description, ''))`,
+      ),
   },
   (table) => [
+    index('experiences_search_vector_idx').using('gin', table.searchVector),
     index('experiences_host_id_idx').on(table.hostId),
     index('experiences_category_id_idx').on(table.categoryId),
     index('experiences_neighborhood_id_idx').on(table.neighborhoodId),

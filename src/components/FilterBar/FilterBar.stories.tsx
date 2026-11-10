@@ -73,6 +73,7 @@ export const WithFilters: Story = {
       price: null,
       age: null,
       setting: null,
+      search: null,
     },
   },
 };
@@ -85,6 +86,7 @@ const manyChosen: BrowseFilters = {
   price: '50-to-100',
   age: 'kids',
   setting: 'outdoor',
+  search: 'kayak',
 };
 
 /** Every group chosen: the row grows past the screen and scrolls sideways inside its own box. */

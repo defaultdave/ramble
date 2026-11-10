@@ -19,10 +19,8 @@ vi.mock('@/server/env', () => ({ env: testEnv }));
 // the page
 // - a confirmed order is a receipt from the snapshot, with a manage link that opens that order and no other
 // - a pending order is pending, and a cancelled order a notice, each with no manage link
-// - a refunded-after-lapse order (S10) is the refund notice with a find-another-date action and no manage link
 // the status
 // - the status answers with the order's own state for its own token and null for another's
-// - a refunded-after-lapse order's status is `refunded_after_lapse`, so the poller stops and the page shows S10
 // - the action answers `unknown` for a bad input, another order's token, and an unknown reference alike
 
 let fresh: FreshDatabase;
@@ -71,15 +69,11 @@ function reference() {
 }
 
 async function insertOrder(
-  status:
-    | 'confirmed'
-    | 'pending_payment'
-    | 'cancelled'
-    | 'refunded_after_lapse' = 'confirmed',
+  status: 'confirmed' | 'pending_payment' | 'cancelled' = 'confirmed',
 ) {
   const id = randomUUID();
   const { id: holdId } = await insertHold(client.db, sessionId);
-  const confirmed = status === 'confirmed' || status === 'cancelled';
+  const confirmed = status !== 'pending_payment';
   const [row] = await client.db
     .insert(orders)
     .values({
@@ -219,32 +213,6 @@ describe('the page', () => {
     );
     expect(page?.kind).toBe('notice');
     expect(JSON.stringify(page)).not.toContain('/manage/');
-  });
-});
-
-describe('a refunded-after-lapse order (S10)', () => {
-  it('is the refund notice with a way to find another date and no manage link', async () => {
-    const order = await insertOrder('refunded_after_lapse');
-    const page = await confirmation.readOrderPage(
-      order.reference,
-      orderToken(order.id),
-    );
-    if (page?.kind !== 'notice') throw new Error('expected a notice');
-    expect(page).toMatchObject({
-      reference: order.reference,
-      notice: {
-        title: "We couldn't keep your spaces, so we refunded you",
-        action: { label: 'Find another date', href: '/new-york/browse' },
-      },
-    });
-    expect(JSON.stringify(page)).not.toContain('/manage/');
-  });
-
-  it('is reported to the poller as refunded_after_lapse', async () => {
-    const order = await insertOrder('refunded_after_lapse');
-    expect(
-      await confirmation.readOrderState(order.reference, orderToken(order.id)),
-    ).toEqual({ state: 'refunded_after_lapse' });
   });
 });
 

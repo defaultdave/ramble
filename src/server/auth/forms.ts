@@ -2,11 +2,15 @@ import 'server-only';
 import {
   ConfirmSignInSchema,
   isOwnOrigin,
+  endSessionStatus,
   safeNextPath,
-  signInPath,
+  signInFailureUrl,
+  verifyErrorCallbackPath,
+  verifyOutcome,
 } from '@/lib/signIn';
 import { readBodyText } from '@/server/boundedBody';
 import { env } from '@/server/env';
+import { logger } from '@/server/monitoring/logger';
 import { handleAuthRequest } from './handler';
 
 // The two plain form posts the sign-in pages make. Each turns a form into the Better Auth request
@@ -19,7 +23,11 @@ const appOrigin = () => new URL(env.APP_URL).origin;
 
 /** A cross-site post is refused, so another site cannot sign a visitor in to its own account or out of theirs. */
 function refuseForeignOrigin(request: Request): Response | null {
-  return isOwnOrigin(request.headers.get('origin'), appOrigin())
+  return isOwnOrigin(
+    request.headers.get('origin'),
+    appOrigin(),
+    request.headers.get('sec-fetch-site'),
+  )
     ? null
     : new Response(null, { status: 403, headers: noStore });
 }
@@ -32,10 +40,7 @@ function redirectTo(location: string, from?: Headers): Response {
 }
 
 function signInFailure(next: string): Response {
-  const retry = new URL(signInPath, appOrigin());
-  retry.searchParams.set('next', next);
-  retry.searchParams.set('error', 'INVALID_TOKEN');
-  return redirectTo(retry.toString());
+  return redirectTo(signInFailureUrl(appOrigin(), next));
 }
 
 /**
@@ -59,23 +64,26 @@ export async function handleConfirmSignIn(request: Request): Promise<Response> {
   const verify = new URL('/api/auth/magic-link/verify', appOrigin());
   verify.searchParams.set('token', parsed.data.token);
   verify.searchParams.set('callbackURL', next);
-  const failed = new URL(signInPath, appOrigin());
-  failed.searchParams.set('next', next);
-  verify.searchParams.set(
-    'errorCallbackURL',
-    `${failed.pathname}${failed.search}`,
-  );
+  verify.searchParams.set('errorCallbackURL', verifyErrorCallbackPath(next));
 
   const response = await handleAuthRequest(
     new Request(verify, {
       headers: { 'user-agent': request.headers.get('user-agent') ?? '' },
     }),
   );
-  const location = response.headers.get('location');
-  if (response.status < 300 || response.status >= 400 || location === null) {
+  const outcome = verifyOutcome(
+    response.status,
+    response.headers.get('location'),
+  );
+  if (outcome.kind === 'refused') {
+    if (outcome.unexpectedStatus !== null) {
+      logger.error('Better Auth answered a sign-in link unexpectedly', {
+        status: outcome.unexpectedStatus,
+      });
+    }
     return signInFailure(next);
   }
-  return redirectTo(location, response.headers);
+  return redirectTo(outcome.location, response.headers);
 }
 
 /** The header's Sign out button: ends the session Better Auth finds from the cookie and goes home. */
@@ -95,7 +103,8 @@ export async function handleEndSession(request: Request): Promise<Response> {
       body: '{}',
     }),
   );
-  if (!response.ok)
+  if (endSessionStatus(response.ok) === 502) {
     return new Response(null, { status: 502, headers: noStore });
+  }
   return redirectTo('/', response.headers);
 }

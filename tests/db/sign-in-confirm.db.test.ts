@@ -108,6 +108,9 @@ describe('the emailed link', () => {
     ['a protocol-relative address', '//evil.com'],
     ['an absolute address', 'https://evil.com/account'],
     ['a backslash address', '/\\evil.com'],
+    ['a dot segment before a second slash', '/.//evil.com'],
+    ['an encoded dot segment before a second slash', '/%2e//evil.com'],
+    ['a dot-dot segment before a second slash', '/a/..//evil.com'],
   ])('carries home when the destination is %s', async (_label, next) => {
     const { url } = await emailedLink(newEmail(), next);
 

@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleConfirmSignIn, handleEndSession } from './forms';
 
 const handleAuthRequest = vi.hoisted(() => vi.fn());
+const logError = vi.hoisted(() => vi.fn());
 vi.mock('./handler', () => ({ handleAuthRequest }));
+vi.mock('@/server/monitoring/logger', () => ({
+  logger: { error: logError, warn: vi.fn(), info: vi.fn() },
+}));
 
 // Behaviours under test, one per decision, branch, or risk:
 // - a post whose Origin is missing or another site's is refused with 403 and reaches Better Auth with nothing
@@ -37,6 +41,50 @@ function redirectFromBetterAuth(location: string, cookie?: string) {
 
 beforeEach(() => {
   vi.resetAllMocks();
+});
+
+describe('the confirm post origin', () => {
+  it.each([
+    [
+      'null Origin with same-origin Sec-Fetch-Site',
+      { origin: 'null', 'sec-fetch-site': 'same-origin' },
+      true,
+    ],
+    [
+      'no Origin with same-origin Sec-Fetch-Site',
+      { 'sec-fetch-site': 'same-origin' },
+      true,
+    ],
+    ['null Origin with no Sec-Fetch-Site', { origin: 'null' }, false],
+    [
+      'null Origin with cross-site Sec-Fetch-Site',
+      { origin: 'null', 'sec-fetch-site': 'cross-site' },
+      false,
+    ],
+  ])('%s is allowed: %s', async (_label, headers, allowed) => {
+    handleAuthRequest.mockResolvedValue(redirectFromBetterAuth(`${origin}/`));
+
+    const response = await handleConfirmSignIn(
+      confirm('token=abc123&next=%2F', headers),
+    );
+
+    expect(response.status).toBe(allowed ? 303 : 403);
+    expect(handleAuthRequest).toHaveBeenCalledTimes(allowed ? 1 : 0);
+  });
+
+  it.each([
+    ['a dot-segment path', '%2F.%2F%2Fevil.com'],
+    ['an encoded dot-segment path', '%2F%252e%2F%2Fevil.com'],
+    ['a dot-dot path', '%2Fa%2F..%2F%2Fevil.com'],
+  ])('turns %s into home before Better Auth sees it', async (_label, next) => {
+    handleAuthRequest.mockResolvedValue(redirectFromBetterAuth(`${origin}/`));
+
+    await handleConfirmSignIn(confirm(`token=abc123&next=${next}`));
+
+    expect(new URL(verifyRequest().url).searchParams.get('callbackURL')).toBe(
+      '/',
+    );
+  });
 });
 
 describe('the confirm post', () => {
@@ -143,6 +191,33 @@ describe('the confirm post', () => {
     expect(new URL(verifyRequest().url).searchParams.get('callbackURL')).toBe(
       '/',
     );
+  });
+
+  it.each([
+    ['a 200 with a body', new Response('{}', { status: 200 }), 200],
+    ['a server error', new Response(null, { status: 500 }), 500],
+    [
+      'a redirect with no place to go',
+      new Response(null, { status: 302 }),
+      302,
+    ],
+  ])(
+    'logs the status of %s and nothing else',
+    async (_label, answer, status) => {
+      handleAuthRequest.mockResolvedValue(answer);
+
+      await handleConfirmSignIn(confirm('token=abc123&next=%2F'));
+
+      expect(logError).toHaveBeenCalledWith(expect.any(String), { status });
+    },
+  );
+
+  it('does not log an ordinary refusal', async () => {
+    handleAuthRequest.mockResolvedValue(new Response(null, { status: 400 }));
+
+    await handleConfirmSignIn(confirm('token=abc123&next=%2F'));
+
+    expect(logError).not.toHaveBeenCalled();
   });
 
   it.each([

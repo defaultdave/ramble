@@ -4,7 +4,12 @@ import { useActionState, useEffect, useRef } from 'react';
 import { Alert } from '@/components/Alert';
 import { Button, ButtonLink } from '@/components/Button';
 import { Input } from '@/components/Input';
-import { signInHref, type SignInFormState } from '@/lib/signIn';
+import {
+  rateLimitBody,
+  signInHref,
+  signInSentBody,
+  type SignInFormState,
+} from '@/lib/signIn';
 import styles from './SignIn.module.css';
 
 export type SignInFormProps = {
@@ -19,10 +24,6 @@ export type SignInFormProps = {
 };
 
 const idle: SignInFormState = { status: 'idle' };
-
-function minutes(count: number) {
-  return count === 1 ? '1 minute' : `${String(count)} minutes`;
-}
 
 export function SignInForm({
   action,
@@ -50,7 +51,7 @@ export function SignInForm({
         <Alert
           tone="success"
           title="Check your email"
-          body={`If ${state.email} can sign in, a link is on its way. It works once and lasts 5 minutes.`}
+          body={signInSentBody(state.email)}
           action={
             <ButtonLink href={signInHref(next)} variant="secondary">
               Use a different email
@@ -69,7 +70,7 @@ export function SignInForm({
           <Alert
             tone="warning"
             title="Too many sign-in links requested"
-            body={`Try again in about ${minutes(state.retryAfterMinutes)}. A link you already have still works until it expires.`}
+            body={rateLimitBody(state.retryAfterMinutes)}
           />
         </div>
       ) : null}

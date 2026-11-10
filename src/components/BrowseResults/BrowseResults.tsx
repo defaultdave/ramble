@@ -12,10 +12,8 @@ type Suggestions = Extract<BrowseView, { state: 'empty' }>['suggestions'];
 function RemoveFilterLinks({ suggestions }: { suggestions: Suggestions }) {
   if (!suggestions || suggestions.length === 0) return null;
   return (
-    <section className={styles.suggestions} aria-labelledby="remove-filter">
-      <h3 id="remove-filter" className={styles.suggestionsTitle}>
-        Or take a filter off
-      </h3>
+    <div className={styles.suggestions}>
+      <h3 className={styles.suggestionsTitle}>Or take a filter off</h3>
       <ul className={styles.suggestionList}>
         {suggestions.map(({ param, label, count, href }) => (
           <li key={param}>
@@ -25,7 +23,7 @@ function RemoveFilterLinks({ suggestions }: { suggestions: Suggestions }) {
           </li>
         ))}
       </ul>
-    </section>
+    </div>
   );
 }
 

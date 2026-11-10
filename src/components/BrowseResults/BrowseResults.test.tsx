@@ -283,9 +283,10 @@ describe('BrowseResults empty with ways forward', () => {
         suggestions={suggestions}
       />,
     );
-    const list = within(
-      screen.getByRole('region', { name: 'Or take a filter off' }),
-    ).getByRole('list');
+    expect(
+      screen.getByRole('heading', { name: 'Or take a filter off' }),
+    ).toBeVisible();
+    const list = screen.getByRole('list');
     const links = within(list).getAllByRole('link');
     expect(links.map((link) => link.textContent)).toEqual([
       'Remove Kayaking (12)',
@@ -308,7 +309,9 @@ describe('BrowseResults empty with ways forward', () => {
     ],
   ])('shows no heading or list when there are %s', (_, view) => {
     render(<BrowseResults {...view} />);
-    expect(screen.queryByRole('region')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Or take a filter off' }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole('list')).not.toBeInTheDocument();
   });
 

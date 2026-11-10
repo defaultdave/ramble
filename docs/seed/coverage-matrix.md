@@ -13,7 +13,7 @@ A state that needs a hold, a payment, or an order cannot be reached from seed ro
 | 01 | 44:10 | Home | `home-modules`, `picks-published`, `gift-guide`, `this-week`, `categories-eight` | Open the home page. **Gap:** The sponsor line on the gift module has no data model yet (Q-13). |
 | 02 | 45:190 | Browse | `categories-eight`, `neighborhoods-six`, `cooking-page`, `page-copy`, `guide-only`, `many-results` | Open a category, neighborhood, Pick, gift guide, or search page. |
 | 02b | 45:413 | Browse, filters open | `filter-variety` | Open All filters on a browse page. |
-| 03 | 46:678 | Experience | `kayak-page`, `kayak-session-states`, `neighbors` | Open the kayak page. **Gap:** The seed writes no photo rows yet; the gallery shows its placeholder. |
+| 03 | 46:678 | Experience | `kayak-page`, `kayak-session-states`, `neighbors` | Open the kayak page. **Gap:** The seed writes photo rows only when STORAGE_PROVIDER=vercel-blob; with the fake provider the gallery shows its placeholder. |
 | 03b | 46:897 | Guide-only page | `guide-only` | Open the sourdough entry. |
 | 04 | 47:890 | Choose date and party | `kayak-session-states`, `kayak-full-day`, `bookable-party` | Tap the booking bar on the kayak page. |
 | 04b | 47:1132 | Choose date, kids | `kids-booking` | Tap the booking bar on the kids wheel class. |
@@ -53,7 +53,7 @@ A state that needs a hold, a payment, or an order cannot be reached from seed ro
 | `categories-eight` | The 8 categories each have at least one live experience. |
 | `neighborhoods-six` | The 6 neighborhoods (Williamsburg, Carroll Gardens, Park Slope, Sunset Park, Tribeca, Lower East Side) each have at least one live experience. |
 | `cooking-page` | Cooking has live experiences in Carroll Gardens and Sunset Park with upcoming sessions, and one guide-only entry (the category page in Figma 02, S1, and S3). |
-| `many-results` | At least 24 live experiences, so a listing has a second page behind "Show more". The curated set is smaller; the scale fixture supplies the rest. *Needs the scale fixture (`--scale`).* |
+| `many-results` | At least 40 live experiences, so a listing runs to several pages behind "Show more". The curated catalog holds about 35; the scale fixture supplies the rest. *Needs the scale fixture (`--scale`).* |
 | `filter-variety` | Live experiences differ on every filter: three or more price points, indoor and outdoor, all four age rules, and some with access notes. |
 | `home-modules` | The home page has six enabled modules in order: hero_search, category_rail, picks, gift_guide, this_week, reassurance. The picks module shows the published Pick "rainy-day-sorted" and the gift_guide module the published gift guide; the hero and reassurance modules carry text. |
 | `this-week` | At least four live experiences have a session in the next seven days (the "On this week" module). |

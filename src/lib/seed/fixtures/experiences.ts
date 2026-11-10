@@ -27,7 +27,7 @@ export const hosts: HostFixture[] = [
     slug: 'orchard-street-wine-room',
     name: 'Orchard Street Wine Room',
     description:
-      'A twelve-seat wine bar on the Lower East Side that pours small-batch bottles and answers every question.',
+      'A fourteen-seat wine bar on the Lower East Side that pours small-batch bottles and answers every question.',
   },
   {
     slug: 'salt-and-semolina',
@@ -51,7 +51,7 @@ export const hosts: HostFixture[] = [
     slug: 'cast-iron-walks',
     name: 'Cast Iron Walks',
     description:
-      'Two architecture nerds who lead small walking groups below Canal Street.',
+      'Two architecture nerds who lead small walking groups through old Manhattan streets and Brooklyn brownstone blocks.',
   },
   {
     slug: 'low-tide-studio',
@@ -83,7 +83,7 @@ type Required = Pick<
   | 'description'
 >;
 
-function experience(
+export function experience(
   required: Required,
   rest: Partial<ExperienceFixture>,
 ): ExperienceFixture {
@@ -143,7 +143,7 @@ export const experiences: ExperienceFixture[] = [
       slots: [
         {
           weekday: 6,
-          startTime: '14:00',
+          startTime: '15:30',
           durationMinutes: 120,
           allocation: 12,
         },
@@ -282,6 +282,8 @@ export const experiences: ExperienceFixture[] = [
       included:
         'Ingredients, aprons, and the meal you make, with a glass of wine or soda.',
       durationMinutes: 150,
+      accessibilityNotes:
+        'Step-free entrance. Most of the work is at a standing-height counter, and stools are available.',
       ageRule: 'minimum_age',
       minAge: 14,
       taxTreatment: 'unknown',
@@ -316,7 +318,7 @@ export const experiences: ExperienceFixture[] = [
       neighborhoodSlug: 'sunset-park',
       name: 'Dumpling folding in Sunset Park',
       description:
-        'Learn three folds from a family that has been making dumplings for three generations. You fill, pleat, and steam your own, and everything you fold you eat.',
+        'Learn three folds from a family that has been making dumplings for three generations. You fill, pleat, and steam your own, then eat a first batch at the table and take the rest home frozen.',
     },
     {
       meetingPoint: 'Steam & Fold, Eighth Avenue, Sunset Park.',
@@ -417,8 +419,8 @@ export const experiences: ExperienceFixture[] = [
           source: 'allocation',
         },
         {
-          weekday: 1,
-          startTime: '19:30',
+          weekday: 0,
+          startTime: '10:00',
           durationMinutes: 60,
           allocation: 20,
           source: 'allocation',

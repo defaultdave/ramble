@@ -195,7 +195,9 @@ describe('runSeedCommand', () => {
       });
       const output = lines.join('\n');
       expect(output).toContain('Photos: 2 written, 1 already there');
-      expect(output).toContain('Photo coverage: 14 experiences');
+      expect(output).toContain(
+        `Photo coverage: ${String(curated.experiences.length)} experiences`,
+      );
     });
 
     it('exits 1 and names the experience when one lacks its photos', async () => {

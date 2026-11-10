@@ -1,6 +1,8 @@
 import { photoLimits, photoStorageKey } from '@/lib/photos';
 import type { StorageProviderName } from '@/lib/storage';
 import { seedId } from './ids';
+import { photoManifest } from './fixtures/photoManifest';
+import { artFor, type PhotoArt } from './testPhotoArt';
 import { experienceId } from './rows';
 import { labelColumns } from './testPhotoImage';
 
@@ -27,6 +29,8 @@ export type TestPhotoPlan = {
   storageKey: string;
   altText: string;
   hue: number;
+  /** The flat illustration behind the label, for an experience whose category has a motif. */
+  art?: PhotoArt | undefined;
   /** The text drawn on the image, one entry per line. */
   label: string[];
 };
@@ -35,11 +39,12 @@ function numberFrom(namespace: string, key: string): number {
   return parseInt(seedId(namespace, key).slice(0, 8), 16);
 }
 
-/** How many test photos an experience gets, from 3 to 5, fixed by its slug. */
+/** How many test photos an experience gets, from 3 to 5: the lines of its manifest entry, else fixed by its slug. */
 export function testPhotoCount(slug: string): number {
   return (
+    photoManifest[slug]?.length ??
     minTestPhotos +
-    (numberFrom('test-photo-count', slug) % (maxPhotos - minTestPhotos + 1))
+      (numberFrom('test-photo-count', slug) % (maxPhotos - minTestPhotos + 1))
   );
 }
 
@@ -64,6 +69,18 @@ export function wrapLabel(
   return lines.slice(0, maxLines);
 }
 
+/** The manifest's description of the scene, marked as an illustration; an experience with no entry gets the plain generated-image line. */
+function altTextFor(
+  name: string,
+  position: number,
+  total: number,
+  caption: string | undefined,
+): string {
+  return caption
+    ? `Illustration: ${caption}`
+    : `Generated test image ${String(position + 1)} of ${String(total)} for ${name}: a colour gradient labelled with the experience name.`;
+}
+
 /**
  * The photos one experience gets. Any three consecutive positions hold all three long edges, so every
  * experience has a small, a medium, and a ceiling-sized source; the fourth and fifth are portrait.
@@ -71,13 +88,16 @@ export function wrapLabel(
 export function planTestPhotos(experience: {
   slug: string;
   name: string;
+  categorySlug?: string;
 }): TestPhotoPlan[] {
   const total = testPhotoCount(experience.slug);
   const offset =
     numberFrom('test-photo-size', experience.slug) % testPhotoLongEdges.length;
   const baseHue = numberFrom('test-photo-hue', experience.slug) % 360;
   const id = experienceId(experience.slug);
+  const captions = photoManifest[experience.slug];
   return Array.from({ length: total }, (_, position) => {
+    const caption = captions?.[position];
     const long =
       testPhotoLongEdges[(position + offset) % testPhotoLongEdges.length] ??
       photoLimits.minLongEdge;
@@ -90,12 +110,16 @@ export function planTestPhotos(experience: {
       height: portrait ? long : short,
       photoId,
       storageKey: photoStorageKey(id, photoId),
-      altText:
-        `Generated test image ${String(position + 1)} of ${String(total)} for ${experience.name}: a colour gradient labelled with the experience name.`.slice(
-          0,
-          photoLimits.maxAltLength,
-        ),
+      altText: altTextFor(experience.name, position, total, caption).slice(
+        0,
+        photoLimits.maxAltLength,
+      ),
       hue: (baseHue + position * 37) % 360,
+      art: artFor(
+        experience.categorySlug,
+        baseHue + numberFrom('test-photo-art', experience.slug),
+        position,
+      ),
       label: [
         ...wrapLabel(experience.name, labelColumns, 3),
         `PHOTO ${String(position + 1)}/${String(total)} ${String(long)}PX`,

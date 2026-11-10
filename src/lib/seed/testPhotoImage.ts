@@ -1,3 +1,4 @@
+import { artColorAt } from './testPhotoArt';
 import type { TestPhotoPlan } from './testPhotos';
 
 export const labelColumns = 18;
@@ -79,6 +80,47 @@ function hslToRgb(
   ];
 }
 
+type ArtSpec = {
+  width: number;
+  height: number;
+  art: NonNullable<TestPhotoPlan['art']>;
+  /** The height of the open space above the label panel. */
+  areaHeight: number;
+};
+
+/** The motif, painted over the ground in the space above the label. */
+function drawArt(
+  out: Uint8Array,
+  { width, height, art, areaHeight }: ArtSpec,
+): void {
+  const radius = Math.min(width, areaHeight) * 0.4;
+  const centerX = width / 2;
+  const centerY = areaHeight / 2;
+  const reach = Math.ceil(radius * 1.3);
+  for (
+    let y = Math.max(0, Math.floor(centerY - reach));
+    y < Math.min(height, areaHeight, centerY + reach);
+    y++
+  ) {
+    for (
+      let x = Math.max(0, Math.floor(centerX - reach));
+      x < Math.min(width, centerX + reach);
+      x++
+    ) {
+      const color = artColorAt(
+        art,
+        (x - centerX) / radius,
+        (y - centerY) / radius,
+      );
+      if (!color) continue;
+      const at = (y * width + x) * 3;
+      out[at] = color[0];
+      out[at + 1] = color[1];
+      out[at + 2] = color[2];
+    }
+  }
+}
+
 /** The text scale that fits `labelColumns` characters in 80% of the width. */
 export function labelScale(width: number): number {
   return Math.max(
@@ -92,12 +134,15 @@ export function labelScale(width: number): number {
  * small file at any size), under a dark panel carrying the label in white.
  */
 export function renderTestPhoto(
-  spec: Pick<TestPhotoPlan, 'width' | 'height' | 'hue' | 'label'>,
+  spec: Pick<TestPhotoPlan, 'width' | 'height' | 'hue' | 'label'> &
+    Partial<Pick<TestPhotoPlan, 'art'>>,
 ): Uint8Array {
-  const { width, height, label } = spec;
+  const { width, height, label, art } = spec;
   const out = new Uint8Array(width * height * 3);
-  const from = hslToRgb(spec.hue, 0.65, 0.45);
-  const to = hslToRgb(spec.hue + 50, 0.7, 0.62);
+  const from = art ? [...art.palette.ground] : hslToRgb(spec.hue, 0.65, 0.45);
+  const to = art
+    ? [...art.palette.ground2]
+    : hslToRgb(spec.hue + 50, 0.7, 0.62);
   const span = width + height;
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -115,7 +160,14 @@ export function renderTestPhoto(
   const panelWidth = Math.floor(width * 0.88);
   const panelHeight = label.length * lineHeight + scale * 2;
   const left = Math.floor((width - panelWidth) / 2);
-  const top = Math.max(0, Math.floor((height - panelHeight) / 2));
+  // With art the label sits at the foot of the picture, so the motif has the open space above it.
+  const top = Math.max(
+    0,
+    art
+      ? height - panelHeight - Math.floor(height * 0.05)
+      : Math.floor((height - panelHeight) / 2),
+  );
+  if (art) drawArt(out, { width, height, art, areaHeight: top });
   const panelRows = label.length === 0 ? 0 : panelHeight;
   for (let y = top; y < Math.min(height, top + panelRows); y++) {
     for (let x = left; x < left + panelWidth; x++) {

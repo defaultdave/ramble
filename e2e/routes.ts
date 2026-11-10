@@ -49,10 +49,12 @@ export const routes: readonly RouteRow[] = [
     heading: 'Redeem a gift',
     noindex: true,
   },
-  { path: '/host', group: 'host', heading: 'Host tools', noindex: true },
   { path: '/ops', group: 'ops', heading: 'Operations', noindex: true },
   { path: '/ops/mailbox', group: 'ops', heading: 'Dev mailbox', noindex: true },
 ];
+
+/** The host dashboard reads the caller, so it is no placeholder: nobody signed in is sent to sign in, then back here. See `host.spec.ts`. */
+export const hostDashboardPath = '/host';
 
 export const unknownPaths: Record<RouteGroup, string> = {
   guest: '/this/page/does/not/exist',

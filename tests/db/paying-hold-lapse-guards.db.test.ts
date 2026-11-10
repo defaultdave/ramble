@@ -3,6 +3,7 @@ import { eq, inArray, sql } from 'drizzle-orm';
 import { ZodError } from 'zod';
 import {
   afterAll,
+  afterEach,
   beforeAll,
   beforeEach,
   describe,
@@ -36,6 +37,8 @@ import { payingLapseFixtures } from './payingLapseFixtures';
 // - an error from the cancel that is not the port's is rethrown, and leaves the hold, order, and attempt as they were
 // - the sweep waits for the hold row and for the order row, and judges what the other transaction committed
 // - a cancel that fails, for any reason, rejects with nothing written, and the next sweep reads the payment again: succeeded is left alone, cancelled is settled with no second cancel
+// - a cancel whose answer is not `canceled` (processing, succeeded, created) settles nothing: nothing is released and no spaces tag is revalidated; `canceled` releases and revalidates
+// - the attempt's updated time is the time the hold is released at, and every judgement and write takes the database clock, never the app clock
 // - a pulse run, with the real sweep and the fake gateway, voids and releases a lapsed paying hold end to end
 
 const cache = vi.hoisted(() => ({
@@ -89,6 +92,8 @@ beforeEach(async () => {
     .set({ status: 'released', releasedReason: 'guest_left' })
     .where(inArray(holds.status, ['active', 'paying']));
   sendHeartbeat.mockReset().mockResolvedValue('sent');
+  cache.revalidateTag.mockClear();
+  cache.updateTag.mockClear();
   vi.mocked(lapseData.abandonPayingHold).mockClear();
 });
 
@@ -430,6 +435,141 @@ describe('a cancel that fails', () => {
 
     expect(cancel).not.toHaveBeenCalled();
     expect((await fixtures.state(lapsed)).hold.status).toBe('released');
+  });
+});
+
+describe('a cancel whose answer is not cancelled', () => {
+  it.each(['processing', 'succeeded', 'created'] as const)(
+    'settles nothing when the provider answers %s: nothing is released, and no spaces tag is revalidated',
+    async (answer) => {
+      const port = payments();
+      const bookable = await seedBookable(client.db);
+      const lapsed = await fixtures.lapsedPayingHold(bookable, port);
+      const payment = lapsed.payment;
+      if (!payment) throw new Error('expected a provider payment');
+      vi.spyOn(port, 'retrieve').mockResolvedValue({
+        ...payment,
+        status: 'requires_action',
+      });
+      vi.spyOn(port, 'cancelPayment').mockResolvedValue({
+        ...payment,
+        status: answer,
+      });
+
+      expect(await sweep(port)).toBe(0);
+
+      const after = await fixtures.state(lapsed);
+      expect(after.hold.status).toBe('paying');
+      expect(after.order.status).toBe('pending_payment');
+      expect(after.attempt).toMatchObject({ status: 'created' });
+      expect(cache.revalidateTag).not.toHaveBeenCalled();
+      expect(cache.updateTag).not.toHaveBeenCalled();
+    },
+  );
+
+  it('releases and revalidates the session tag when the provider answers canceled', async () => {
+    const port = payments();
+    const bookable = await seedBookable(client.db);
+    const lapsed = await fixtures.lapsedPayingHold(bookable, port);
+    const payment = lapsed.payment;
+    if (!payment) throw new Error('expected a provider payment');
+    vi.spyOn(port, 'retrieve').mockResolvedValue({
+      ...payment,
+      status: 'requires_action',
+    });
+    vi.spyOn(port, 'cancelPayment').mockResolvedValue({
+      ...payment,
+      status: 'canceled',
+    });
+
+    expect(await sweep(port)).toBe(1);
+
+    expect((await fixtures.state(lapsed)).hold.status).toBe('released');
+    expect(cache.revalidateTag).toHaveBeenCalledWith(
+      `session:${bookable.session.id}`,
+      'max',
+    );
+  });
+});
+
+describe('the clock of the sweep', () => {
+  const hour = 3_600_000;
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function databaseNowMs() {
+    const { rows } = await client.db.execute<{ ms: string }>(
+      sql`SELECT (extract(epoch FROM now()) * 1000)::bigint AS ms`,
+    );
+    return Number(rows[0]?.ms);
+  }
+
+  it('stamps the hold and the attempt with the same database time', async () => {
+    const port = payments();
+    const lapsed = await fixtures.lapsedPayingHold(
+      await seedBookable(client.db),
+      port,
+    );
+
+    await sweep(port);
+
+    const after = await fixtures.state(lapsed);
+    expect(after.attempt?.updatedAt).toEqual(after.hold.updatedAt);
+  });
+
+  it('releases a hold lapsed at database time even when the app clock says it is still open', async () => {
+    const port = payments();
+    const lapsed = await fixtures.lapsedPayingHold(
+      await seedBookable(client.db),
+      port,
+    );
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() - hour });
+
+    expect(await sweep(port)).toBe(1);
+
+    expect((await fixtures.state(lapsed)).hold.status).toBe('released');
+  });
+
+  it('leaves a hold open at database time alone even when the app clock says it lapsed', async () => {
+    const port = payments();
+    const cancel = vi.spyOn(port, 'cancelPayment');
+    const bookable = await seedBookable(client.db);
+    const lapsed = await fixtures.lapsedPayingHold(bookable, port);
+    await client.db
+      .update(holds)
+      .set({ payingUntil: sql`now() + interval '5 minutes'` })
+      .where(eq(holds.id, lapsed.hold.id));
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + hour });
+
+    expect(
+      await lapseData.abandonPayingHold(port, {
+        holdId: lapsed.hold.id,
+        sessionId: bookable.session.id,
+      }),
+    ).toBe(false);
+
+    expect(cancel).not.toHaveBeenCalled();
+    expect((await fixtures.state(lapsed)).hold.status).toBe('paying');
+  });
+
+  it('stamps the hold and the attempt within seconds of the database clock when the app clock is an hour ahead', async () => {
+    const port = payments();
+    const lapsed = await fixtures.lapsedPayingHold(
+      await seedBookable(client.db),
+      port,
+    );
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + hour });
+
+    expect(await sweep(port)).toBe(1);
+    vi.useRealTimers();
+
+    const after = await fixtures.state(lapsed);
+    const now = await databaseNowMs();
+    expect(Math.abs(now - after.hold.updatedAt.getTime())).toBeLessThan(5000);
+    expect(
+      Math.abs(now - (after.attempt?.updatedAt.getTime() ?? 0)),
+    ).toBeLessThan(5000);
   });
 });
 

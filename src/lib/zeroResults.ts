@@ -2,16 +2,18 @@ import {
   ageChips,
   browseParamNames,
   hrefForFilters,
+  knownFilters,
   noFilters,
   priceBands,
   settingChips,
   type BrowseFilters,
 } from './filters';
 import { guestsLabel } from './orderSummary';
+import type { SessionWindow } from './sessionWindow';
 import { dateChipLabel } from './time';
 
 /** Browse never offers more than this many ways out of an empty page. */
-export const maxSuggestions = 3;
+const maxSuggestions = 3;
 
 /** A filter, by the name its parameter and its place in `BrowseFilters` share. `after` is a position, not a filter. */
 export type FilterParam = Exclude<keyof typeof browseParamNames, 'after'>;
@@ -119,4 +121,26 @@ export function suggestions(
     })
     .sort((a, b) => b.count - a.count)
     .slice(0, maxSuggestions);
+}
+
+/**
+ * What a chosen day already has its own way out of ("Any day"), so it takes no slot among the
+ * three. Left out of the removals before the counts are read.
+ */
+export function omittedFor(filters: BrowseFilters): FilterParam[] {
+  return filters.date === null ? [] : ['date'];
+}
+
+/**
+ * The filters to count for a removal, or null when browse would list nothing for them without
+ * asking: a slug the catalog has not got, or a date no session can be on, as the page itself treats
+ * them.
+ */
+export function countableFilters(
+  without: BrowseFilters,
+  options: NamedOptions,
+  window: SessionWindow,
+): BrowseFilters | null {
+  const known = knownFilters(without, options, window);
+  return known.matchesNothing || known.dateOutsideWindow ? null : known.filters;
 }

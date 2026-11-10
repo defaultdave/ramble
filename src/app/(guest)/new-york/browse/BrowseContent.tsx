@@ -13,7 +13,6 @@ import {
 import {
   knownFilters,
   parseFilters,
-  type BrowseFilters,
   type RawSearchParams,
 } from '@/lib/filters';
 import { upcomingWindow } from '@/lib/sessionWindow';
@@ -75,7 +74,7 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
   const found = browseView(query, page, dates);
   const view =
     found.state === 'empty' && found.filtered
-      ? withSuggestions(found, await zeroResultSuggestions(filters, asOf))
+      ? withSuggestions(found, await getZeroResultSuggestions(filters, asOf))
       : found;
   return (
     <div id={browseResultsId} data-reveal-without-script>
@@ -102,14 +101,4 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
       </div>
     </div>
   );
-}
-
-/** A way forward is a courtesy: when its reads fail, the empty state shows without it. */
-async function zeroResultSuggestions(filters: BrowseFilters, asOf: string) {
-  try {
-    return await getZeroResultSuggestions(filters, asOf);
-  } catch (error) {
-    rethrowOrLog('Browse suggestions could not be read', error);
-    return [];
-  }
 }

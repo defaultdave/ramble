@@ -295,18 +295,19 @@ describe('getZeroResultSuggestions', () => {
     },
   );
 
-  it('throws only the kind of a failed count', async () => {
+  it('offers nothing, and logs only the kind of the failure, when a count fails', async () => {
     db.count.mockRejectedValue(driverError);
 
-    const failure = await getZeroResultSuggestions(
+    const offered = await getZeroResultSuggestions(
       { ...noFilters, neighborhoods: ['dumbo'] },
       asOf,
-    ).catch((error: unknown) => error);
+    );
 
-    expect(failure).toMatchObject({
-      name: 'CachedReadError',
-      message: 'Zero results read failed: Error',
-    });
-    expect(JSON.stringify(failure)).not.toContain('secret-slug');
+    expect(offered).toEqual([]);
+    expect(log.error).toHaveBeenCalledWith(
+      'Browse suggestions could not be read',
+      expect.objectContaining({ kind: 'CachedReadError' }),
+    );
+    expect(JSON.stringify(log.error.mock.calls)).not.toContain('secret-slug');
   });
 });

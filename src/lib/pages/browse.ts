@@ -289,19 +289,13 @@ export function browseView(
   };
 }
 
-/**
- * The filters to take off, on an empty view. A chosen day already has its own way out ("Any day"), so
- * the date is not offered a second time. Any other view comes back as it was.
- */
+/** The filters to take off, on an empty view. Any other view comes back as it was. */
 export function withSuggestions(
   view: BrowseView,
   offered: readonly ZeroResultSuggestion[],
 ): BrowseView {
-  if (view.state !== 'empty') return view;
-  const shown = offered.filter(
-    ({ param }) => !(view.dated !== null && param === 'date'),
-  );
-  return shown.length === 0 ? view : { ...view, suggestions: shown };
+  if (view.state !== 'empty' || offered.length === 0) return view;
+  return { ...view, suggestions: [...offered] };
 }
 
 /** The same address again: a retry reloads exactly what failed. */

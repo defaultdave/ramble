@@ -8,13 +8,11 @@ import {
   type BrowsePage,
 } from '@/lib/pages/browse';
 import { tags } from '@/lib/cacheTags';
-import {
-  knownFilters,
-  type BrowseFilters,
-  type BrowseQuery,
-} from '@/lib/filters';
+import { type BrowseFilters, type BrowseQuery } from '@/lib/filters';
 import { upcomingWindow } from '@/lib/sessionWindow';
 import {
+  countableFilters,
+  omittedFor,
   removals,
   suggestions,
   type FilterParam,
@@ -77,13 +75,8 @@ export async function getBrowseTitle(filters: BrowseFilters): Promise<string> {
   }
 }
 
-/**
- * The filters worth taking off a page with no results, with what browse would list without each. A
- * count is one cheap read per filter that is on, so this is asked for only when the page is empty.
- * Counts go through `knownFilters`, so a removal that leaves a slug nobody has, or a date no session
- * can be on, counts as none, as the page itself would.
- */
-export async function getZeroResultSuggestions(
+// Cached, so a failed read throws and nothing is remembered; `getZeroResultSuggestions` is the one that forgives it.
+async function readZeroResultSuggestions(
   filters: BrowseFilters,
   asOf: string,
 ): Promise<ZeroResultSuggestion[]> {
@@ -93,20 +86,36 @@ export async function getZeroResultSuggestions(
   const options = await getFilterOptions();
   const window = upcomingWindow(asOf, browseWindowDays);
   const counts: Partial<Record<FilterParam, number>> = {};
-  // A chosen day has its own way out, "Any day", so it takes no slot among the three.
-  const omit: FilterParam[] = filters.date === null ? [] : ['date'];
+  const omit = omittedFor(filters);
   await readOrRefuse('Zero results', () =>
     Promise.all(
       removals(filters, options, omit).map(
         async ({ param, filters: without }) => {
-          const known = knownFilters(without, options, window);
+          const countable = countableFilters(without, options, window);
           counts[param] =
-            known.matchesNothing || known.dateOutsideWindow
+            countable === null
               ? 0
-              : await countBrowseExperiences(known.filters, asOf);
+              : await countBrowseExperiences(countable, asOf);
         },
       ),
     ),
   );
   return suggestions(filters, options, counts, omit);
+}
+
+/**
+ * The filters worth taking off a page with no results, with what browse would list without each. A
+ * count is one cheap read per filter that is on, so this is asked for only when the page is empty.
+ * A way forward is a courtesy: when its reads fail the empty state shows without it.
+ */
+export async function getZeroResultSuggestions(
+  filters: BrowseFilters,
+  asOf: string,
+): Promise<ZeroResultSuggestion[]> {
+  try {
+    return await readZeroResultSuggestions(filters, asOf);
+  } catch (error) {
+    rethrowOrLog('Browse suggestions could not be read', error);
+    return [];
+  }
 }

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { browseParamNames, noFilters, type BrowseFilters } from './filters';
+import { upcomingWindow } from './sessionWindow';
 import {
-  maxSuggestions,
+  countableFilters,
+  omittedFor,
   removals,
   suggestions,
   type FilterParam,
@@ -103,8 +105,7 @@ describe('suggestions', () => {
   it('offers no more than three', () => {
     const many = Object.fromEntries(params.map((param) => [param, 5]));
 
-    expect(suggestions(everything, options, many)).toHaveLength(maxSuggestions);
-    expect(maxSuggestions).toBe(3);
+    expect(suggestions(everything, options, many)).toHaveLength(3);
   });
 
   it('fills the three from the other filters when one is left out, however many it would bring back', () => {
@@ -148,5 +149,33 @@ describe('suggestions', () => {
       count: 3,
       href: '/new-york/browse?category=kayaking',
     });
+  });
+});
+
+describe('omittedFor', () => {
+  it('leaves the chosen day out, since "Any day" is its way out, and nothing when no day is chosen', () => {
+    expect(omittedFor({ ...noFilters, date: '2026-11-07' })).toEqual(['date']);
+    expect(omittedFor(noFilters)).toEqual([]);
+  });
+});
+
+describe('countableFilters', () => {
+  const window = upcomingWindow('2026-10-26T12:00:00.000Z', 30);
+
+  it('is the filters as they are when the catalog knows them and the day is in the window', () => {
+    const filters = {
+      ...noFilters,
+      categories: ['kayaking'],
+      date: '2026-10-30',
+    };
+
+    expect(countableFilters(filters, options, window)).toEqual(filters);
+  });
+
+  it.each([
+    ['a slug the catalog has not got', { ...noFilters, categories: ['gone'] }],
+    ['a date outside the window', { ...noFilters, date: '2027-06-01' }],
+  ])('is null for %s, since browse would list nothing', (_, filters) => {
+    expect(countableFilters(filters, options, window)).toBeNull();
   });
 });

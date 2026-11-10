@@ -1,10 +1,13 @@
 'use server';
 
+import { notFound, redirect } from 'next/navigation';
 import {
-  CancelBookingInputSchema,
+  cancelInputFromForm,
+  parseCancelInput,
   type CancelBookingInput,
   type CancelBookingResult,
 } from '@/lib/cancelBooking';
+import { cancelResultPath } from '@/lib/manageBooking';
 import {
   OrderStatusInputSchema,
   orderStatusResult,
@@ -12,9 +15,8 @@ import {
   type OrderStatusResult,
 } from '@/lib/orderStatus';
 import { cancelBookingOrder } from '@/server/db/orderCancel';
+import { openManageToken } from '@/server/manageBooking';
 import { readOrderState } from '@/server/orderConfirmation';
-import { consumeRateLimit } from '@/server/ports/rate-limit';
-import { resolveToken } from '@/server/tokens';
 
 /**
  * Where an order stands, for the "checking your payment" state (S9). The order token is the
@@ -39,21 +41,30 @@ export async function getOrderStatus(
 export async function cancelBooking(
   input: CancelBookingInput,
 ): Promise<CancelBookingResult> {
-  const parsed = CancelBookingInputSchema.safeParse(input);
-  if (!parsed.success) return { status: 'not_found' };
-  const { manageToken, expectedRefundMinor } = parsed.data;
-  const spent = await consumeRateLimit('manage', manageToken);
-  if (!spent.allowed) {
-    return {
-      status: 'rate_limited',
-      retryAfterSeconds: spent.retryAfterSeconds,
-    };
-  }
-  const opened = await resolveToken('manage', manageToken);
-  if (opened === null) return { status: 'not_found' };
+  const parsed = parseCancelInput(input);
+  if (parsed.kind === 'refused') return parsed.result;
+  const gate = await openManageToken(parsed.input.manageToken);
+  if (gate.kind === 'refused') return gate.refusal;
   return cancelBookingOrder({
-    orderId: opened.id,
-    openedTokenVersion: opened.version,
-    expectedRefundMinor,
+    orderId: gate.row.id,
+    openedTokenVersion: gate.row.version,
+    expectedRefundMinor: parsed.input.expectedRefundMinor,
   });
+}
+
+/**
+ * The manage page's cancel form: it posts the token and the refund the guest was shown, runs
+ * `cancelBooking`, and sends the guest back to the same page with the answer in the address. It
+ * works with scripting off. A form with no usable token is the not-found page.
+ */
+export async function cancelBookingForm(formData: FormData): Promise<void> {
+  const parsed = parseCancelInput(
+    cancelInputFromForm({
+      manageToken: formData.get('manageToken'),
+      expectedRefundMinor: formData.get('expectedRefundMinor'),
+    }),
+  );
+  if (parsed.kind === 'refused') notFound();
+  const result = await cancelBooking(parsed.input);
+  redirect(cancelResultPath(parsed.input.manageToken, result));
 }

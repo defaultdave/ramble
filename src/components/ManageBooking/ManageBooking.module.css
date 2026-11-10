@@ -31,15 +31,6 @@
   font-weight: var(--font-weight-semibold);
 }
 
-/* Holds the focus a result moves to; empty until there is one, and then it takes no room. */
-.notice:empty {
-  display: none;
-}
-
-.notice:focus {
-  outline: none;
-}
-
 .card {
   display: grid;
   gap: var(--space-2);

@@ -136,7 +136,7 @@ describe('the emails of a cancellation, end to end', () => {
     expect(await jobsOfKind('guest-refund')).toHaveLength(0);
   });
 
-  it('sends no refund email for a refund that is not a guest cancellation', async () => {
+  it('queues no refund email, and sends none, for a refund that is not a guest cancellation', async () => {
     await clearJobs();
     const world = await seedCancellable({ gatewayPayment: true });
     await ask(world, {
@@ -147,10 +147,35 @@ describe('the emails of a cancellation, end to end', () => {
 
     await settle();
 
-    expect(await jobsOfKind('guest-refund')).toMatchObject([
-      { status: 'succeeded' },
-    ]);
+    expect(await jobsOfKind('guest-refund')).toHaveLength(0);
     expect(sent()).toHaveLength(0);
+  });
+
+  it('emails the refund amount, ticket and tax, for a taxed order', async () => {
+    await cancelAndSettle({ taxable: true }, 18_509);
+
+    const refund = sent().find((email) => email.template === 'booking-refund');
+    expect(refund?.data).toMatchObject({ amount: '$185.09' });
+  });
+
+  it('queues and sends one refund email for each refund, each under its own key', async () => {
+    await clearJobs();
+    const world = await seedCancellable({ gatewayPayment: true });
+    await ask(world, { key: 'first', ticketMinor: 5_000 });
+    await ask(world, { key: 'second', ticketMinor: 8_000 });
+
+    await settle();
+
+    const jobs = await jobsOfKind('guest-refund');
+    expect(jobs).toHaveLength(2);
+    expect(new Set(jobs.map((job) => job.dedupe_key)).size).toBe(2);
+    const refunds = sent().filter(
+      (email) => email.template === 'booking-refund',
+    );
+    expect(refunds.map((email) => email.data.amount).sort()).toEqual(
+      ['$50.00', '$80.00'].sort(),
+    );
+    expect(new Set(refunds.map((email) => email.idempotencyKey)).size).toBe(2);
   });
 });
 

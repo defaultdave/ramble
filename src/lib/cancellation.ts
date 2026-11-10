@@ -72,6 +72,11 @@ function localDeadline(instant: Date, timeZone: string): LocalDeadline {
   };
 }
 
+/** Free up to and including the deadline: the one place that says where "up to 24 hours before" ends. */
+export function isWithinFreeWindow(freeCancelUntil: Date, now: Date): boolean {
+  return now.getTime() <= freeCancelUntil.getTime();
+}
+
 /**
  * When a booking stops being free to cancel, and what cancelling at `now` refunds (PRD-10, PRD-46).
  * The deadline is `fullRefundHoursBefore` elapsed hours before `startsAt`, so across a daylight
@@ -98,7 +103,7 @@ export function cancellationWindow(
 
   const freeCancelUntil = new Date(startsAt.getTime() - hours * msPerHour);
   requireInstant(freeCancelUntil, 'Free cancel deadline');
-  const isFree = now.getTime() <= freeCancelUntil.getTime();
+  const isFree = isWithinFreeWindow(freeCancelUntil, now);
   return {
     freeCancelUntil,
     freeCancelUntilLocal: localDeadline(freeCancelUntil, timeZone),

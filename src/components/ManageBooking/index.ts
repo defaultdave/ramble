@@ -1,6 +1,6 @@
 export { ManageBooking, ManageTooManyTries } from './ManageBooking';
 export type {
-  CancelBookingAction,
+  CancelBookingFormAction,
   ManageBookingProps,
   ManageTooManyTriesProps,
 } from './ManageBooking';

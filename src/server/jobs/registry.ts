@@ -1,5 +1,10 @@
 import 'server-only';
 import { z } from 'zod';
+import {
+  GuestCancellationPayloadSchema,
+  GuestRefundPayloadSchema,
+  HostCancellationPayloadSchema,
+} from '@/lib/cancelBooking';
 import { AuditExportPayloadSchema, auditExportKind } from '@/lib/audit';
 import { OpsNoticeDataSchema, opsNoticeKind } from '@/lib/email/opsNotice';
 import { MaxAttemptsSchema, jobLimits } from '@/lib/jobs';
@@ -18,9 +23,6 @@ import {
   sendSessionReminder,
 } from './bookingEmails';
 import {
-  GuestCancellationPayloadSchema,
-  GuestRefundPayloadSchema,
-  HostCancellationPayloadSchema,
   sendGuestCancellation,
   sendGuestRefund,
   sendHostCancellationNotice,

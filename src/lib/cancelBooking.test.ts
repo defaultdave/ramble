@@ -1,16 +1,29 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   CancelBookingInputSchema,
+  CancelOrderInputSchema,
+  GuestCancellationPayloadSchema,
+  GuestRefundPayloadSchema,
+  HostCancellationPayloadSchema,
+  ManageTokenSchema,
+  cancelInputFromForm,
+  cancelPlan,
   cancelQuote,
   cancelRefundKey,
   cancelRefundReason,
   cancelVerdict,
   cancellationAuditEntry,
   giftReinstated,
+  isBookingRow,
+  openManageGate,
+  parseCancelInput,
+  reconcileReadLimit,
   refundEtaLine,
   refundRequestOutcome,
+  refundsReconcileWithin,
   refusalResult,
-  tierRefundsInFull,
+  returnsSpaces,
+  type CancelBookingResult,
   type CancelFacts,
 } from './cancelBooking';
 import { refundArrivalLine } from './bookingEmails';
@@ -86,25 +99,27 @@ describe('the input', () => {
   });
 });
 
-describe('the tier', () => {
+describe('the tier, through the quote', () => {
   it.each([
     [
       'a minute before the deadline',
       new Date(freeUntil.getTime() - 60_000),
-      true,
+      'full',
     ],
-    ['the deadline to the millisecond', freeUntil, true],
+    ['the deadline to the millisecond', freeUntil, 'full'],
     [
       'one millisecond after the deadline',
       new Date(freeUntil.getTime() + 1),
-      false,
+      'window_closed',
     ],
-  ])('at %s', (_name, now, expected) => {
-    expect(tierRefundsInFull(freeUntil, now)).toBe(expected);
+  ])('at %s the basis is %s', (_name, now, basis) => {
+    expect(cancelQuote(facts, now)).toMatchObject({ basis });
   });
 
   it('is never free for an order with no deadline snapshot', () => {
-    expect(tierRefundsInFull(null, new Date(0))).toBe(false);
+    expect(
+      cancelQuote({ ...facts, freeCancelUntil: null }, new Date(0)),
+    ).toMatchObject({ refundMinor: 0, basis: 'window_closed' });
   });
 });
 
@@ -232,7 +247,11 @@ describe('the verdict', () => {
     });
 
   it('goes on when the refund shown is the refund now', () => {
-    expect(ask()).toEqual({ kind: 'proceed', refundMinor: 13_000 });
+    expect(ask()).toEqual({
+      kind: 'proceed',
+      refundMinor: 13_000,
+      requestsRefund: true,
+    });
   });
 
   it.each([12_999, 13_001, 0])(
@@ -251,7 +270,7 @@ describe('the verdict', () => {
         now: new Date(freeUntil.getTime() + 1),
         expectedRefundMinor: 0,
       }),
-    ).toEqual({ kind: 'proceed', refundMinor: 0 });
+    ).toEqual({ kind: 'proceed', refundMinor: 0, requestsRefund: false });
   });
 
   it('reports changed terms when the window closed after a refund was shown', () => {
@@ -327,7 +346,10 @@ describe('the refund request answer', () => {
   it('passes a refusal on', () => {
     expect(
       refundRequestOutcome({ status: 'refused', reason: 'no_payment' }, 13_000),
-    ).toEqual({ kind: 'refused', reason: 'no_payment' });
+    ).toEqual({
+      kind: 'refused',
+      result: { status: 'refund_unavailable', reason: 'no_payment' },
+    });
   });
 
   it.each([12_999, 13_001])(
@@ -393,5 +415,349 @@ describe('the rest of the cancellation', () => {
       giftReinstated: false,
     });
     expect(parseAuditEntry(entry).details).toMatchObject({ refund_id: null });
+  });
+});
+
+describe('the plan for the locked order', () => {
+  const plan = (over: Partial<Parameters<typeof cancelPlan>[0]> = {}) =>
+    cancelPlan({
+      facts,
+      openedTokenVersion: 1,
+      expectedRefundMinor: 13_000,
+      now: inside,
+      ...over,
+    });
+
+  it('is not found when no booking stands behind the order', () => {
+    expect(plan({ facts: null })).toEqual({
+      kind: 'stop',
+      result: { status: 'not_found' },
+    });
+  });
+
+  it('goes on, asking for a refund, when one is due', () => {
+    expect(plan()).toEqual({
+      kind: 'proceed',
+      refundMinor: 13_000,
+      requestsRefund: true,
+    });
+  });
+
+  it('goes on, asking for no refund, when none is due', () => {
+    expect(
+      plan({ now: new Date(freeUntil.getTime() + 1), expectedRefundMinor: 0 }),
+    ).toEqual({ kind: 'proceed', refundMinor: 0, requestsRefund: false });
+  });
+
+  it.each([
+    [
+      'changed terms',
+      { expectedRefundMinor: 1 },
+      { status: 'terms_changed', refundMinor: 13_000 },
+    ],
+    ['a stale token', { openedTokenVersion: 2 }, { status: 'not_found' }],
+    [
+      'a cancelled order',
+      { facts: { ...facts, status: 'cancelled' as const } },
+      { status: 'already_cancelled' },
+    ],
+    [
+      'a started session',
+      { now: startsAt },
+      { status: 'not_refundable', freeCancelUntil: freeUntil.toISOString() },
+    ],
+  ])('stops with the typed answer for %s', (_name, over, result) => {
+    expect(plan(over)).toEqual({ kind: 'stop', result });
+  });
+});
+
+describe('what is a booking row', () => {
+  it.each([
+    ['a session and a hold', 's', 'h', true],
+    ['no session', null, 'h', false],
+    ['no hold', 's', null, false],
+    ['neither', null, null, false],
+  ])('%s', (_name, sessionId, holdId, expected) => {
+    expect(isBookingRow({ sessionId, holdId })).toBe(expected);
+  });
+});
+
+describe('the reconcile check after a cancellation', () => {
+  const order = {
+    totalMinor: 13_000,
+    refundedTicketMinor: 13_000,
+    refundedTaxMinor: 0,
+    commissionReturnedMinor: 1_950,
+  };
+  const line = {
+    status: 'pending' as const,
+    ticketMinor: 13_000,
+    taxMinor: 0,
+    commissionReturnedMinor: 1_950,
+  };
+
+  it('reads 101 rows at most', () => {
+    expect(reconcileReadLimit).toBe(101);
+  });
+
+  it('passes refunds that add up to the order, read short of the limit', () => {
+    expect(refundsReconcileWithin(order, [line], reconcileReadLimit)).toBe(
+      true,
+    );
+  });
+
+  it('fails refunds that do not add up', () => {
+    expect(
+      refundsReconcileWithin(
+        order,
+        [{ ...line, ticketMinor: 12_999 }],
+        reconcileReadLimit,
+      ),
+    ).toBe(false);
+  });
+
+  it.each([
+    ['one short of the limit', 100, true],
+    ['at the limit: a read cut off there cannot say', 101, false],
+  ])('a read of %s', (_name, count, expected) => {
+    // Rows of nothing add up to the order whatever their number, so only the cut-off can fail it.
+    const rows = Array.from({ length: count }, () => ({
+      status: 'failed' as const,
+      ticketMinor: 0,
+      taxMinor: 0,
+      commissionReturnedMinor: 0,
+    }));
+    expect(
+      refundsReconcileWithin(
+        { ...order, refundedTicketMinor: 0, commissionReturnedMinor: 0 },
+        rows,
+        reconcileReadLimit,
+      ),
+    ).toBe(expected);
+  });
+});
+
+describe('whether spaces return', () => {
+  it.each([
+    [
+      {
+        status: 'cancelled',
+        refundMinor: 0,
+        giftReinstated: false,
+        refundEta: null,
+      },
+      true,
+    ],
+    [{ status: 'already_cancelled' }, false],
+    [{ status: 'terms_changed', refundMinor: 0 }, false],
+    [{ status: 'not_found' }, false],
+  ] as [CancelBookingResult, boolean][])('for %o', (result, expected) => {
+    expect(returnsSpaces(result)).toBe(expected);
+  });
+});
+
+describe('the gate in front of a manage link', () => {
+  const steps = (over: { spendTry?: unknown; open?: unknown } = {}) => ({
+    spendTry: vi.fn(() =>
+      Promise.resolve({ allowed: true as const, remaining: 5 }),
+    ),
+    open: vi.fn(() =>
+      Promise.resolve<{ id: string } | null>({ id: 'order-1' }),
+    ),
+    ...(over as object),
+  });
+
+  it.each([
+    ['a short token', 'short'],
+    ['a long token', 'A'.repeat(44)],
+    ['an empty token', ''],
+    ['a token with a bad character', `${'A'.repeat(42)}!`],
+    ['not a string', 7],
+  ])(
+    'answers not found for %s without spending a try or looking it up',
+    async (_name, bad) => {
+      const gate = steps();
+
+      expect(await openManageGate(bad, gate)).toEqual({
+        kind: 'refused',
+        refusal: { status: 'not_found' },
+      });
+      expect(gate.spendTry).not.toHaveBeenCalled();
+      expect(gate.open).not.toHaveBeenCalled();
+    },
+  );
+
+  it('tells a token over the count how long to wait, and looks nothing up', async () => {
+    const gate = steps({
+      spendTry: vi.fn(() =>
+        Promise.resolve({ allowed: false as const, retryAfterSeconds: 90 }),
+      ),
+    });
+
+    expect(await openManageGate(token, gate)).toEqual({
+      kind: 'refused',
+      refusal: { status: 'rate_limited', retryAfterSeconds: 90 },
+    });
+    expect(gate.open).not.toHaveBeenCalled();
+  });
+
+  it('answers not found for a token that opens nothing', async () => {
+    const gate = steps({ open: vi.fn(() => Promise.resolve(null)) });
+
+    expect(await openManageGate(token, gate)).toEqual({
+      kind: 'refused',
+      refusal: { status: 'not_found' },
+    });
+  });
+
+  it('opens what the lookup found, after counting the try, with the checked token', async () => {
+    const gate = steps();
+
+    expect(await openManageGate(token, gate)).toEqual({
+      kind: 'opened',
+      row: { id: 'order-1' },
+    });
+    expect(gate.spendTry).toHaveBeenCalledExactlyOnceWith(token);
+    expect(gate.open).toHaveBeenCalledExactlyOnceWith(token);
+    expect(gate.spendTry.mock.invocationCallOrder[0]).toBeLessThan(
+      gate.open.mock.invocationCallOrder[0] ?? 0,
+    );
+  });
+
+  it('lets a failed count or lookup propagate, so it fails closed', async () => {
+    await expect(
+      openManageGate(
+        token,
+        steps({
+          spendTry: vi.fn(() => Promise.reject(new Error('store down'))),
+        }),
+      ),
+    ).rejects.toThrow('store down');
+    await expect(
+      openManageGate(
+        token,
+        steps({ open: vi.fn(() => Promise.reject(new Error('lookup down'))) }),
+      ),
+    ).rejects.toThrow('lookup down');
+  });
+});
+
+describe('the action input', () => {
+  it('parses a good input', () => {
+    expect(
+      parseCancelInput({ manageToken: token, expectedRefundMinor: 5 }),
+    ).toEqual({
+      kind: 'ok',
+      input: { manageToken: token, expectedRefundMinor: 5 },
+    });
+  });
+
+  it.each([undefined, null, {}, { manageToken: 'x', expectedRefundMinor: 5 }])(
+    'is not found for %o',
+    (bad) => {
+      expect(parseCancelInput(bad)).toEqual({
+        kind: 'refused',
+        result: { status: 'not_found' },
+      });
+    },
+  );
+
+  it.each([
+    ['digits', '13000', 13_000],
+    ['zero', '0', 0],
+    ['ten digits', '2000000000', 2_000_000_000],
+    ['eleven digits', '12345678901', -1],
+    ['letters', '12a', -1],
+    ['a sign', '-5', -1],
+    ['a fraction', '1.5', -1],
+    ['nothing', '', -1],
+    ['not a string', null, -1],
+  ])('reads a form refund of %s', (_name, value, expected) => {
+    expect(
+      cancelInputFromForm({ manageToken: token, expectedRefundMinor: value })
+        .expectedRefundMinor,
+    ).toBe(expected);
+  });
+
+  it('reads a form token that is not a string as no token', () => {
+    expect(
+      cancelInputFromForm({ manageToken: null, expectedRefundMinor: '1' })
+        .manageToken,
+    ).toBe('');
+  });
+});
+
+describe('the schemas', () => {
+  it('takes a manage token by shape alone', () => {
+    expect(ManageTokenSchema.safeParse(token).success).toBe(true);
+    expect(ManageTokenSchema.safeParse('A'.repeat(44)).success).toBe(false);
+  });
+
+  const orderId = '0f6c9a52-3b8e-4f43-9a55-1a2b3c4d5e01';
+  it.each([
+    ['good', {}, true],
+    ['upper-case id', { orderId: orderId.toUpperCase() }, true],
+    ['not an id', { orderId: 'nope' }, false],
+    ['version 0', { openedTokenVersion: 0 }, false],
+    ['version past Postgres', { openedTokenVersion: 2_147_483_648 }, false],
+    ['a negative refund', { expectedRefundMinor: -1 }, false],
+    ['a refund over the limit', { expectedRefundMinor: 2_000_000_001 }, false],
+    ['an extra key', { extra: 1 }, false],
+  ])('what the data layer cancels: %s', (_name, over, ok) => {
+    expect(
+      CancelOrderInputSchema.safeParse({
+        orderId,
+        openedTokenVersion: 1,
+        expectedRefundMinor: 0,
+        ...over,
+      }).success,
+    ).toBe(ok);
+  });
+
+  const schemas = {
+    guest: [
+      GuestCancellationPayloadSchema,
+      { orderId, cancelledBy: 'guest', refundMinor: 100 },
+    ],
+    host: [HostCancellationPayloadSchema, { orderId, cancelledBy: 'guest' }],
+    refund: [GuestRefundPayloadSchema, { refundId: orderId }],
+  } as const;
+
+  it.each(Object.keys(schemas))(
+    'the %s job payload takes its own shape',
+    (name) => {
+      const [schema, good] = schemas[name as keyof typeof schemas];
+      expect(schema.safeParse(good).success).toBe(true);
+      expect(schema.safeParse({ ...good, extra: 1 }).success).toBe(false);
+    },
+  );
+
+  it.each([
+    ['a negative amount', { refundMinor: -1 }],
+    ['a fractional amount', { refundMinor: 1.5 }],
+    ['an amount over the limit', { refundMinor: 2_000_000_001 }],
+    ['an unknown canceller', { cancelledBy: 'someone' }],
+    ['a bad order id', { orderId: 'nope' }],
+  ])('the guest cancellation payload refuses %s', (_name, over) => {
+    expect(
+      GuestCancellationPayloadSchema.safeParse({
+        orderId,
+        cancelledBy: 'guest',
+        refundMinor: 100,
+        ...over,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('the guest cancellation payload takes the limit itself and zero', () => {
+    for (const refundMinor of [0, 2_000_000_000]) {
+      expect(
+        GuestCancellationPayloadSchema.safeParse({
+          orderId,
+          cancelledBy: 'ramble',
+          refundMinor,
+        }).success,
+      ).toBe(true);
+    }
   });
 });

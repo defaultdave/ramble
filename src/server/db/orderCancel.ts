@@ -2,18 +2,22 @@ import 'server-only';
 import { asc, eq, sql } from 'drizzle-orm';
 import { bookingEmailKey } from '@/lib/bookingEmails';
 import {
+  CancelOrderInputSchema,
+  cancelPlan,
   cancelRefundKey,
   cancelRefundReason,
-  cancelVerdict,
   cancellationAuditEntry,
   giftReinstated,
+  isBookingRow,
+  reconcileReadLimit,
   refundEtaLine,
   refundRequestOutcome,
-  refusalResult,
+  refundsReconcileWithin,
+  returnsSpaces,
   type CancelBookingResult,
+  type CancelOrderInput,
 } from '@/lib/cancelBooking';
 import { requireOrderTransition } from '@/lib/providerEvents';
-import { refundsReconcile } from '@/lib/refunds';
 import { revalidateTagsForChanges } from '@/server/cache/invalidate';
 import { enqueue } from '@/server/jobs/enqueue';
 import { db, type Transaction } from './client';
@@ -25,11 +29,9 @@ import { requestRefund } from './refunds';
 import { readDatabaseTime } from './time';
 
 // Cancelling a booking by its manage link (design doc 5.4). Every decision (the refund the tier
-// gives, whether it is what the guest saw, what a refusal answers) is a function in
-// `src/lib/cancelBooking.ts`; this file locks, reads, writes, and acts on what those say.
-
-/** The most refund rows one order is read with: more than an order can have, and one more to see a breach. */
-const reconcileReadLimit = 101;
+// gives, whether it is what the guest saw, what a refusal answers, whether the refunds reconcile)
+// is a function in `src/lib/cancelBooking.ts`; this file locks, reads, writes, and executes what
+// those say.
 
 /** The ids the locks are taken from, read without a lock: the order's session and hold. */
 async function readLockIds(
@@ -39,8 +41,9 @@ async function readLockIds(
     .select({ sessionId: orders.sessionId, holdId: orders.holdId })
     .from(orders)
     .where(eq(orders.id, orderId));
-  if (!row || row.sessionId === null || row.holdId === null) return null;
-  return { sessionId: row.sessionId, holdId: row.holdId };
+  return row && isBookingRow(row)
+    ? { sessionId: row.sessionId, holdId: row.holdId }
+    : null;
 }
 
 /** The standing refunds reconcile with the order's totals (design doc 4.2.3), or the cancellation rolls back. */
@@ -68,53 +71,40 @@ async function requireRefundsReconcile(
     .where(eq(refunds.orderId, orderId))
     .orderBy(asc(refunds.createdAt))
     .limit(reconcileReadLimit);
-  if (
-    !order ||
-    lines.length === reconcileReadLimit ||
-    !refundsReconcile(order, lines)
-  ) {
+  if (!order || !refundsReconcileWithin(order, lines, reconcileReadLimit)) {
     throw new Error(
       'The order refunds do not reconcile after the cancellation',
     );
   }
 }
 
-type Cancelled = { result: CancelBookingResult; spacesOf: string | null };
+type Cancelled = { result: CancelBookingResult; sessionId: string | null };
 
 async function cancelInTransaction(
   tx: Transaction,
-  input: {
-    orderId: string;
-    sessionId: string;
-    holdId: string;
-    openedTokenVersion: number;
-    expectedRefundMinor: number;
-  },
+  input: CancelOrderInput & { sessionId: string; holdId: string },
 ): Promise<Cancelled> {
   // Lock order: session, hold, order (db/locks.ts); `requestRefund` takes the order's lock again.
   await lockSessionRow(tx, input.sessionId);
   await lockHoldRow(tx, input.holdId);
   await lockOrderById(tx, input.orderId);
   const found = await readCancelFacts(tx, input.orderId);
-  if (found === null)
-    return { result: { status: 'not_found' }, spacesOf: null };
-  const { facts, sessionId } = found;
-  const at = await readDatabaseTime(tx);
-  const verdict = cancelVerdict({
-    facts,
+  const plan = cancelPlan({
+    facts: found?.facts ?? null,
     openedTokenVersion: input.openedTokenVersion,
     expectedRefundMinor: input.expectedRefundMinor,
-    now: at,
+    now: await readDatabaseTime(tx),
   });
-  if (verdict.kind !== 'proceed') {
+  if (plan.kind === 'stop' || found === null) {
     return {
-      result: refusalResult(verdict, facts.freeCancelUntil),
-      spacesOf: null,
+      result: plan.kind === 'stop' ? plan.result : { status: 'not_found' },
+      sessionId: null,
     };
   }
+  const { facts, sessionId } = found;
 
   let refundId: string | null = null;
-  if (verdict.refundMinor > 0) {
+  if (plan.requestsRefund) {
     const outcome = refundRequestOutcome(
       await requestRefund(tx, {
         orderId: input.orderId,
@@ -122,13 +112,10 @@ async function cancelInTransaction(
         key: cancelRefundKey,
         ticketMinor: 'remaining',
       }),
-      verdict.refundMinor,
+      plan.refundMinor,
     );
     if (outcome.kind === 'refused') {
-      return {
-        result: { status: 'refund_unavailable', reason: outcome.reason },
-        spacesOf: null,
-      };
+      return { result: outcome.result, sessionId: null };
     }
     refundId = outcome.refundId;
   }
@@ -139,7 +126,7 @@ async function cancelInTransaction(
     .set({
       status: 'cancelled',
       cancelledBy: 'guest',
-      // Not `at`: that is whole milliseconds, which can read earlier than the order's microsecond `confirmed_at`.
+      // Not the decision time: that is whole milliseconds, which can read earlier than the order's microsecond `confirmed_at`.
       cancelledAt: sql`clock_timestamp()`,
     })
     .where(eq(orders.id, input.orderId));
@@ -155,7 +142,7 @@ async function cancelInTransaction(
     cancellationAuditEntry({
       orderId: input.orderId,
       sessionId,
-      refundMinor: verdict.refundMinor,
+      refundMinor: plan.refundMinor,
       refundId,
       seatsReturned: facts.seats,
       giftReinstated: reinstated,
@@ -166,7 +153,7 @@ async function cancelInTransaction(
     payload: {
       orderId: input.orderId,
       cancelledBy: 'guest',
-      refundMinor: verdict.refundMinor,
+      refundMinor: plan.refundMinor,
     },
     dedupeKey: bookingEmailKey('guest-cancellation', input.orderId),
   });
@@ -178,11 +165,11 @@ async function cancelInTransaction(
   return {
     result: {
       status: 'cancelled',
-      refundMinor: verdict.refundMinor,
+      refundMinor: plan.refundMinor,
       giftReinstated: reinstated,
-      refundEta: refundEtaLine(verdict.refundMinor),
+      refundEta: refundEtaLine(plan.refundMinor),
     },
-    spacesOf: sessionId,
+    sessionId,
   };
 }
 
@@ -193,18 +180,17 @@ async function cancelInTransaction(
  * nothing. A refusal writes nothing at all. The refund request, the order, the spaces, the audit
  * row, and the email jobs commit together or not at all.
  */
-export async function cancelBookingOrder(input: {
-  orderId: string;
-  openedTokenVersion: number;
-  expectedRefundMinor: number;
-}): Promise<CancelBookingResult> {
-  const ids = await readLockIds(input.orderId);
+export async function cancelBookingOrder(
+  input: CancelOrderInput,
+): Promise<CancelBookingResult> {
+  const parsed = CancelOrderInputSchema.parse(input);
+  const ids = await readLockIds(parsed.orderId);
   if (ids === null) return { status: 'not_found' };
-  const { result, spacesOf } = await db.transaction((tx) =>
-    cancelInTransaction(tx, { ...input, ...ids }),
+  const { result, sessionId } = await db.transaction((tx) =>
+    cancelInTransaction(tx, { ...parsed, ...ids }),
   );
-  if (spacesOf !== null) {
-    revalidateTagsForChanges([{ kind: 'spaces', sessionId: spacesOf }]);
+  if (sessionId !== null && returnsSpaces(result)) {
+    revalidateTagsForChanges([{ kind: 'spaces', sessionId }]);
   }
   return result;
 }

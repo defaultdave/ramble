@@ -2,22 +2,27 @@ import '@testing-library/jest-dom/vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { orderA, orderB } from '@/lib/bookingEmails.fixtures';
-import type { CancelBookingResult, CancelFacts } from '@/lib/cancelBooking';
-import { manageView } from '@/lib/manageBooking';
-import { ManageBooking, ManageTooManyTries } from './ManageBooking';
+import type { CancelFacts } from '@/lib/cancelBooking';
+import {
+  managePageState,
+  manageView,
+  type ManageQuery,
+} from '@/lib/manageBooking';
+import {
+  ManageBooking,
+  ManageTooManyTries,
+  type ManageBookingProps,
+} from './ManageBooking';
 
-// Behaviours under test, one per decision, branch, or risk.
-// - the refund is shown before anything is asked: the booking, the sentence about the refund, and a button naming the amount
-// - nothing is sent on the first press: it asks again with the amount, and "Keep my booking" goes back without sending
-// - confirming sends the token and the refund that was shown, once, and a second press while it is working sends nothing
-// - a cancelled answer shows its notice, takes the cancel controls away, and moves focus to the notice
-// - a changed refund shows its notice, asks the page to render again for the new amount, and keeps the controls
-// - a refusal that can be retried keeps the controls; a refusal that cannot be (a dead link, already cancelled) removes them
-// - a booking that is cancelled, or has started, shows no cancel controls
+// Behaviours under test, one per decision, branch, or risk (the page is a server component and needs no script):
+// - the first step shows the booking, the refund sentence, a link (not a form) to the second step, and the footnote
+// - the second step is a form that says the refund again and posts the token and the refund that was shown, and offers to keep the booking
+// - submitting the form calls the action with exactly those two fields, once
+// - the page shows the notice it is given, with its tone, and none when it has none
+// - a booking after its window, or paid with a gift, offers a cancel with no refund and no footnote
+// - a cancelled booking and one that has started show no cancel controls; a cancelled one offers other experiences
+// - the help center and contact links are always there
 // - the too-many-tries page says how long to wait and shows no booking
-
-const refresh = vi.hoisted(() => vi.fn());
-vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }));
 
 const token = 'A'.repeat(43);
 const facts: CancelFacts = {
@@ -40,43 +45,30 @@ const facts: CancelFacts = {
 };
 const before = new Date('2026-11-05T12:00:00Z');
 
-const active = manageView(orderA, facts, before);
-const cancelled = manageView(
-  { ...orderA, status: 'cancelled' },
-  { ...facts, status: 'cancelled' },
-  before,
-);
-const closed = manageView(orderA, facts, orderA.startsAt);
-
-let cancel: ReturnType<
-  typeof vi.fn<(input: unknown) => Promise<CancelBookingResult>>
+let cancelAction: ReturnType<
+  typeof vi.fn<(formData: FormData) => Promise<void>>
 >;
 
 beforeEach(() => {
-  refresh.mockReset();
-  cancel = vi.fn(() =>
-    Promise.resolve<CancelBookingResult>({
-      status: 'cancelled',
-      refundMinor: 23_412,
-      giftReinstated: false,
-      refundEta: 'Your bank usually shows it within 5 to 10 business days.',
-    }),
-  );
+  cancelAction = vi.fn(() => Promise.resolve());
 });
 
-const renderManage = (view = active) =>
-  render(<ManageBooking view={view} token={token} cancel={cancel} />);
+function renderPage(
+  view = manageView(orderA, facts, before),
+  query: ManageQuery = {},
+) {
+  const props: ManageBookingProps = {
+    view,
+    token,
+    cancelAction,
+    ...managePageState(view, query),
+  };
+  return render(<ManageBooking {...props} />);
+}
 
-const press = async (name: string | RegExp) => {
-  await act(async () => {
-    fireEvent.click(screen.getByRole('button', { name }));
-    await Promise.resolve();
-  });
-};
-
-describe('the refund shown first', () => {
-  it('shows the booking, the refund sentence, and a button that names the amount', () => {
-    renderManage();
+describe('the first step', () => {
+  it('shows the booking, the refund sentence, and the footnote', () => {
+    renderPage();
 
     expect(
       screen.getByRole('heading', { level: 1, name: 'Your booking' }),
@@ -85,24 +77,28 @@ describe('the refund shown first', () => {
       screen.getByRole('heading', { name: 'Sunset sail on the Hudson' }),
     ).toBeVisible();
     expect(screen.getByText(/Saturday, November 7, 2026/)).toBeVisible();
+    expect(screen.getByText('Total charged')).toBeVisible();
     expect(screen.getByText(/full refund of \$234\.12/)).toBeVisible();
     expect(
-      screen.getByRole('button', { name: 'Cancel and refund $234.12' }),
+      screen.getByText(
+        'Refunds go back to your card in 5 to 10 business days.',
+      ),
     ).toBeVisible();
-    expect(cancel).not.toHaveBeenCalled();
   });
 
-  it('shows a button that says no refund after the window', () => {
-    renderManage(manageView(orderA, facts, new Date('2026-11-06T22:00:00Z')));
+  it('links to the second step instead of cancelling', () => {
+    renderPage();
 
-    expect(
-      screen.getByRole('button', { name: 'Cancel without a refund' }),
-    ).toBeVisible();
-    expect(screen.queryByText(/goes back to your card/)).toBeNull();
+    const link = screen.getByRole('link', {
+      name: 'Cancel and refund $234.12',
+    });
+    expect(link).toHaveAttribute('href', `/manage/${token}?confirm=1`);
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(cancelAction).not.toHaveBeenCalled();
   });
 
   it('shows a gift split for a booking paid with a gift', () => {
-    renderManage(
+    renderPage(
       manageView(
         orderB,
         {
@@ -118,157 +114,155 @@ describe('the refund shown first', () => {
 
     expect(screen.getByText('Paid with your gift')).toBeVisible();
     expect(screen.getByText('Charged to your card')).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: 'Cancel without a refund' }),
+    ).toBeVisible();
+    expect(screen.queryByText(/5 to 10 business days/)).toBeNull();
+  });
+
+  it('offers a cancel with no refund after the window', () => {
+    renderPage(manageView(orderA, facts, new Date('2026-11-06T22:00:00Z')));
+
+    expect(
+      screen.getByRole('link', { name: 'Cancel without a refund' }),
+    ).toBeVisible();
+    expect(screen.queryByText(/5 to 10 business days/)).toBeNull();
   });
 });
 
-describe('asking twice before it cancels', () => {
-  it('asks again with the amount on the first press and sends nothing', async () => {
-    renderManage();
+describe('the second step', () => {
+  it('says the refund again, and posts the token and the refund that was shown', () => {
+    const { container } = renderPage(undefined, { confirm: '1' });
 
-    await press('Cancel and refund $234.12');
-
-    const group = screen.getByRole('group', { name: 'Cancel this booking?' });
+    const form = screen.getByRole('form', { name: 'Cancel this booking?' });
     expect(
-      within(group).getByText(/\$234\.12 goes back to your card/),
+      within(form).getByText(/\$234\.12 goes back to your card/),
     ).toBeVisible();
-    expect(cancel).not.toHaveBeenCalled();
-  });
-
-  it('goes back without sending when the guest keeps the booking', async () => {
-    renderManage();
-    await press('Cancel and refund $234.12');
-
-    await press('Keep my booking');
-
-    expect(screen.queryByRole('group')).toBeNull();
-    expect(cancel).not.toHaveBeenCalled();
-  });
-
-  it('sends the token and the refund that was shown, once', async () => {
-    renderManage();
-    await press('Cancel and refund $234.12');
-
-    await press('Cancel and refund $234.12');
-
-    expect(cancel).toHaveBeenCalledExactlyOnceWith({
-      manageToken: token,
-      expectedRefundMinor: 23_412,
-    });
-  });
-
-  it('sends nothing more while the cancel is working', async () => {
-    let finish: (result: CancelBookingResult) => void = () => undefined;
-    cancel.mockReturnValue(
-      new Promise<CancelBookingResult>((resolve) => {
-        finish = resolve;
-      }),
+    expect(container.querySelector('input[name="manageToken"]')).toHaveValue(
+      token,
     );
-    renderManage();
-    await press('Cancel and refund $234.12');
+    expect(
+      container.querySelector('input[name="expectedRefundMinor"]'),
+    ).toHaveValue('23412');
+    expect(
+      within(form).getByRole('button', { name: 'Cancel and refund $234.12' }),
+    ).toHaveAttribute('type', 'submit');
+    expect(
+      within(form).getByRole('link', { name: 'Keep my booking' }),
+    ).toHaveAttribute('href', `/manage/${token}`);
+  });
 
-    await press('Cancel and refund $234.12');
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Cancel and refund $234.12' }),
-    );
+  it('calls the action once with exactly the two fields when submitted', async () => {
+    renderPage(undefined, { confirm: '1' });
 
-    expect(cancel).toHaveBeenCalledTimes(1);
     await act(async () => {
-      finish({ status: 'already_cancelled' });
+      fireEvent.submit(
+        screen.getByRole('form', { name: 'Cancel this booking?' }),
+      );
       await Promise.resolve();
     });
+
+    expect(cancelAction).toHaveBeenCalledTimes(1);
+    const data = cancelAction.mock.calls[0]?.[0];
+    expect([...(data?.entries() ?? [])]).toEqual([
+      ['manageToken', token],
+      ['expectedRefundMinor', '23412'],
+    ]);
+  });
+
+  it('posts a refund of 0 for a cancel with no refund', () => {
+    const { container } = renderPage(
+      manageView(orderA, facts, new Date('2026-11-06T22:00:00Z')),
+      { confirm: '1' },
+    );
+
+    expect(
+      container.querySelector('input[name="expectedRefundMinor"]'),
+    ).toHaveValue('0');
+    expect(screen.getByText(/nothing will be refunded/)).toBeVisible();
   });
 });
 
-describe('what the page says after', () => {
-  const confirmCancel = async () => {
-    renderManage();
-    await press('Cancel and refund $234.12');
-    await press('Cancel and refund $234.12');
-  };
+describe('the notice', () => {
+  it.each([
+    ['cancelled', 'status'],
+    ['refund_unavailable', 'alert'],
+  ] as const)('shows the answer %s with its role', (code, role) => {
+    const cancelled = manageView(
+      { ...orderA, status: 'cancelled' },
+      {
+        ...facts,
+        status: 'cancelled',
+        refundedTicketMinor: 21_500,
+        refundedTaxMinor: 1_912,
+        commissionReturnedMinor: 3_225,
+      },
+      before,
+    );
+    renderPage(code === 'cancelled' ? cancelled : undefined, { result: code });
 
-  it('shows the refund, takes the controls away, and moves focus to the notice', async () => {
-    await confirmCancel();
-
-    const notice = screen.getByRole('status');
-    expect(within(notice).getByText('Your booking is cancelled')).toBeVisible();
-    expect(
-      within(notice).getByText(/Your refund of \$234\.12 goes back/),
-    ).toBeVisible();
-    expect(screen.queryByRole('button')).toBeNull();
-    expect(notice.parentElement).toHaveFocus();
+    expect(screen.getByRole(role)).toBeVisible();
   });
 
-  it('shows the new refund, asks the page to render again, and keeps the controls, when the terms changed', async () => {
-    cancel.mockResolvedValue({ status: 'terms_changed', refundMinor: 0 });
-    await confirmCancel();
+  it('shows the refund a cancelled booking gave back', () => {
+    renderPage(
+      manageView(
+        { ...orderA, status: 'cancelled' },
+        {
+          ...facts,
+          status: 'cancelled',
+          refundedTicketMinor: 21_500,
+          refundedTaxMinor: 1_912,
+          commissionReturnedMinor: 3_225,
+        },
+        before,
+      ),
+      { result: 'cancelled' },
+    );
 
-    expect(screen.getByText('The refund has changed')).toBeVisible();
-    expect(refresh).toHaveBeenCalledTimes(1);
     expect(
-      screen.getByRole('button', { name: 'Cancel and refund $234.12' }),
+      screen.getByText(/Your refund of \$234\.12 goes back/),
     ).toBeVisible();
   });
 
-  it.each([
-    [
-      'refund_unavailable',
-      { status: 'refund_unavailable', reason: 'no_payment' },
-    ],
-    ['rate_limited', { status: 'rate_limited', retryAfterSeconds: 30 }],
-  ] as const)(
-    'keeps the controls for a retryable answer (%s)',
-    async (_name, result) => {
-      cancel.mockResolvedValue(result);
-      await confirmCancel();
+  it('shows none for an active booking with no answer', () => {
+    renderPage();
 
-      expect(refresh).not.toHaveBeenCalled();
-      expect(
-        screen.getByRole('button', { name: 'Cancel and refund $234.12' }),
-      ).toBeVisible();
-    },
-  );
-
-  it.each([
-    [{ status: 'already_cancelled' }, 'This booking is already cancelled'],
-    [{ status: 'not_found' }, 'This link no longer works'],
-    [
-      { status: 'not_refundable', freeCancelUntil: null },
-      "This booking can't be cancelled here",
-    ],
-  ] as const)(
-    'removes the controls for an answer that cannot be retried (%o)',
-    async (result, title) => {
-      cancel.mockResolvedValue(result);
-      await confirmCancel();
-
-      expect(screen.getByText(title)).toBeVisible();
-      expect(screen.queryByRole('button')).toBeNull();
-    },
-  );
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
 });
 
 describe('a booking that cannot be cancelled', () => {
-  it('shows a cancelled booking with nothing to press', () => {
-    renderManage(cancelled);
+  it('shows a cancelled booking with nothing to press and other experiences to explore', () => {
+    renderPage(
+      manageView(
+        { ...orderA, status: 'cancelled' },
+        { ...facts, status: 'cancelled' },
+        before,
+      ),
+    );
 
-    expect(screen.getByText('This booking is cancelled')).toBeVisible();
+    expect(screen.getByText('This booking is already cancelled')).toBeVisible();
     expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.queryByRole('link', { name: /Cancel/ })).toBeNull();
     expect(
       screen.getByRole('link', { name: 'Explore more experiences' }),
     ).toHaveAttribute('href', '/new-york/browse');
   });
 
   it('shows a booking that has started with nothing to press', () => {
-    renderManage(closed);
+    renderPage(manageView(orderA, facts, orderA.startsAt));
 
     expect(
       screen.getByText("This booking can't be cancelled here"),
     ).toBeVisible();
     expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.queryByRole('link', { name: /Cancel/ })).toBeNull();
   });
 
   it('always offers the help center and contact page', () => {
-    renderManage(closed);
+    renderPage(manageView(orderA, facts, orderA.startsAt));
 
     expect(screen.getByRole('link', { name: 'help center' })).toHaveAttribute(
       'href',

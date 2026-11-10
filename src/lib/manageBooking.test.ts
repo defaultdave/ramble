@@ -1,15 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import { orderA, orderB } from './bookingEmails.fixtures';
-import { refundArrivalLine } from './bookingEmails';
-import type { CancelBookingResult, CancelFacts } from './cancelBooking';
-import { cancelNotice, manageView, retryAfterLine } from './manageBooking';
+import { type CancelFacts } from './cancelBooking';
+import {
+  cancelNotice,
+  cancelNoticeCodes,
+  cancelResultPath,
+  confirmPath,
+  manageView,
+  managePageState,
+  parseManageQuery,
+} from './manageBooking';
 
 // Behaviours under test, one per decision, branch, or risk:
-// - an active booking shows the refund first, in the guest's words, with a button that names the amount
-// - the same booking after its window, paid with a gift, or already refunded shows no refund and a button that says so
-// - a cancelled booking and one that cannot be cancelled show the booking and no cancel prompt
-// - the booking shows the date, the party, the itemized lines, the tax line when taxable, and a gift split when there is one
-// - every answer of the action has a notice; only some settle the page; the wording rounds a wait up to whole minutes
+// - an active booking shows the refund first, in the guest's words, with a button that names the amount and the 5 to 10 day footnote
+// - the same booking after its window, paid with a gift, or already refunded shows no refund, a button that says so, and no footnote
+// - a cancelled booking and one that cannot be cancelled have no cancel prompt; a cancelled one carries what it gave back
+// - the booking shows the date, the party, the itemized lines, the tax line when taxable, a gift split, and "Total charged"
+// - every cancel answer has a notice; a wait is rounded up to whole minutes and defaults to the whole window
+// - the query is never trusted: only `confirm=1` opens the second step, only a known code is a notice, "cancelled" is believed only of a cancelled booking
+// - the page shows the one notice: the answer's, or the standing one of a cancelled or closed booking
+// - the second step opens only for an active booking
+// - the redirect paths carry the token, and the answer as its status word
 
 const facts: CancelFacts = {
   status: 'confirmed',
@@ -32,13 +43,28 @@ const facts: CancelFacts = {
 
 const before = new Date('2026-11-05T12:00:00Z');
 const afterWindow = new Date('2026-11-06T21:00:01Z');
+const token = 'A'.repeat(43);
+
+const cancelledFacts: CancelFacts = {
+  ...facts,
+  status: 'cancelled',
+  refundedTicketMinor: 21_500,
+  refundedTaxMinor: 1_912,
+  commissionReturnedMinor: 3_225,
+};
+const cancelled = manageView(
+  { ...orderA, status: 'cancelled' },
+  cancelledFacts,
+  before,
+);
+const active = manageView(orderA, facts, before);
+const closed = manageView(orderA, facts, orderA.startsAt);
 
 describe('the manage view of a booking', () => {
   it('shows the refund first, with a button that names the amount', () => {
-    const view = manageView(orderA, facts, before);
-    expect(view.kind).toBe('active');
-    if (view.kind !== 'active') return;
-    expect(view.prompt).toEqual({
+    expect(active.kind).toBe('active');
+    if (active.kind !== 'active') return;
+    expect(active.prompt).toEqual({
       refundMinor: 23_412,
       heading: 'Change of plans',
       body: "Cancel by Fri, Nov 6, 4:00 PM EST for a full refund of $234.12. After that, the booking can't be refunded.",
@@ -46,15 +72,15 @@ describe('the manage view of a booking', () => {
       confirmTitle: 'Cancel this booking?',
       confirmBody:
         'Your booking will be cancelled and $234.12 goes back to your card. This cannot be undone.',
-      arrivalLine: refundArrivalLine,
+      keepLabel: 'Keep my booking',
+      footnote: 'Refunds go back to your card in 5 to 10 business days.',
     });
   });
 
   it('shows the booking itself', () => {
-    const view = manageView(orderA, facts, before);
-    expect(view.booking).toMatchObject({
+    expect(active.booking).toMatchObject({
       reference: 'RMB-A3K7MN',
-      greeting: 'Pat Rivera',
+      recipientName: 'Pat Rivera',
       experienceName: 'Sunset sail on the Hudson',
       hostName: 'Harbor Light Sailing',
       dayLabel: 'Saturday, November 7, 2026',
@@ -62,17 +88,18 @@ describe('the manage view of a booking', () => {
       partyLabel: '3 guests',
       meetingPoint: 'Pier 40, West Side Highway at Houston Street',
       total: '$234.12',
+      totalLabel: 'Total charged',
       giftApplied: null,
       charged: null,
     });
-    expect(view.booking.lines).toEqual([
+    expect(active.booking.lines).toEqual([
       { label: 'Adult x 2', amount: '$170.00' },
       { label: 'Child x 1', amount: '$45.00' },
     ]);
-    expect(view.booking.taxLine?.amount).toBe('$19.12');
+    expect(active.booking.taxLine?.amount).toBe('$19.12');
   });
 
-  it('says the window closed, and offers a cancel with no refund, after the deadline', () => {
+  it('says the window closed, offers a cancel with no refund, and no footnote, after the deadline', () => {
     const view = manageView(orderA, facts, afterWindow);
     if (view.kind !== 'active') throw new Error('not active');
     expect(view.prompt).toMatchObject({
@@ -81,7 +108,7 @@ describe('the manage view of a booking', () => {
       buttonLabel: 'Cancel without a refund',
       confirmBody:
         'Your booking will be cancelled and nothing will be refunded. This cannot be undone.',
-      arrivalLine: null,
+      footnote: null,
     });
   });
 
@@ -122,7 +149,7 @@ describe('the manage view of a booking', () => {
       charged: '$55.00',
       taxLine: null,
       meetingPoint: null,
-      greeting: 'there',
+      recipientName: 'there',
     });
   });
 
@@ -143,98 +170,62 @@ describe('the manage view of a booking', () => {
     );
   });
 
-  it('shows a cancelled booking with no cancel prompt', () => {
-    expect(
-      manageView(
-        { ...orderA, status: 'cancelled' },
-        { ...facts, status: 'cancelled' },
-        before,
-      ).kind,
-    ).toBe('cancelled');
+  it('shows a cancelled booking with what it gave back and no cancel prompt', () => {
+    expect(cancelled).toMatchObject({
+      kind: 'cancelled',
+      refundedMinor: 23_412,
+    });
+    expect('prompt' in cancelled).toBe(false);
   });
 
   it('shows a booking that has started with no cancel prompt', () => {
-    expect(manageView(orderA, facts, orderA.startsAt).kind).toBe('closed');
+    expect(closed.kind).toBe('closed');
+    expect('prompt' in closed).toBe(false);
   });
 });
 
-describe('what the page says after a cancel', () => {
-  const cases: [CancelBookingResult, string, string, boolean][] = [
-    [
-      {
-        status: 'cancelled',
-        refundMinor: 13_000,
-        giftReinstated: false,
-        refundEta: refundArrivalLine,
-      },
-      'success',
-      `Your refund of $130.00 goes back to your original payment method. ${refundArrivalLine}`,
-      true,
-    ],
-    [
-      {
-        status: 'cancelled',
-        refundMinor: 0,
-        giftReinstated: false,
-        refundEta: null,
-      },
-      'success',
-      'No refund is due under the cancellation terms.',
-      true,
-    ],
-    [
-      {
-        status: 'cancelled',
-        refundMinor: 0,
-        giftReinstated: true,
-        refundEta: null,
-      },
-      'success',
-      'Your gift is back, so you can use it again.',
-      true,
-    ],
-    [
-      { status: 'terms_changed', refundMinor: 0 },
-      'warning',
-      'Cancelling now refunds $0.00. Nothing was cancelled. Check the amount below, then cancel again if you still want to.',
-      false,
-    ],
-    [
-      { status: 'not_refundable', freeCancelUntil: null },
-      'info',
-      "It isn't an active booking, or its session has started. Contact us if you need help.",
-      true,
-    ],
-    [
-      { status: 'already_cancelled' },
-      'info',
-      'There is nothing more to do.',
-      true,
-    ],
-    [
-      { status: 'refund_unavailable', reason: 'no_payment' },
-      'danger',
-      'Nothing was cancelled. Try again in a moment, or contact us.',
-      false,
-    ],
-    [
-      { status: 'not_found' },
-      'danger',
-      'Use the link in the latest email we sent you.',
-      true,
-    ],
-    [
-      { status: 'rate_limited', retryAfterSeconds: 61 },
-      'warning',
-      'Try again in 2 minutes.',
-      false,
-    ],
-  ];
+describe('the notice for each answer', () => {
+  it.each([
+    ['cancelled', 'success'],
+    ['terms_changed', 'warning'],
+    ['not_refundable', 'info'],
+    ['already_cancelled', 'info'],
+    ['refund_unavailable', 'danger'],
+    ['not_found', 'danger'],
+    ['rate_limited', 'warning'],
+  ] as const)('%s is a %s notice with words', (code, tone) => {
+    const notice = cancelNotice(code);
+    expect(notice.tone).toBe(tone);
+    expect(notice.title).not.toBe('');
+    expect(notice.body).not.toBe('');
+  });
 
-  it.each(cases)(
-    'says the right thing for %o',
-    (result, tone, body, settled) => {
-      expect(cancelNotice(result)).toMatchObject({ tone, body, settled });
+  it('has a notice for every code, and only the actions statuses are codes', () => {
+    expect([...cancelNoticeCodes].sort()).toEqual(
+      [
+        'already_cancelled',
+        'cancelled',
+        'not_found',
+        'not_refundable',
+        'rate_limited',
+        'refund_unavailable',
+        'terms_changed',
+      ].sort(),
+    );
+  });
+
+  it('says what a cancelled booking gave back, and the arrival', () => {
+    expect(cancelNotice('cancelled', { refundMinor: 13_000 }).body).toBe(
+      'Your refund of $130.00 goes back to your original payment method. Your bank usually shows it within 5 to 10 business days.',
+    );
+  });
+
+  it.each([[undefined], [0]])(
+    'says no refund is due when a cancelled booking gave back %s',
+    (refundMinor) => {
+      expect(cancelNotice('cancelled', { refundMinor }).body).toBe(
+        'No refund is due under the cancellation terms.',
+      );
     },
   );
 
@@ -243,7 +234,94 @@ describe('what the page says after a cancel', () => {
     [60, 'Try again in 1 minute.'],
     [61, 'Try again in 2 minutes.'],
     [0, 'Try again in 1 minute.'],
-  ])('rounds a wait of %i seconds up', (seconds, line) => {
-    expect(retryAfterLine(seconds)).toBe(line);
+    [undefined, 'Try again in 10 minutes.'],
+  ])('rounds a wait of %s seconds to "%s"', (seconds, line) => {
+    expect(
+      cancelNotice('rate_limited', { retryAfterSeconds: seconds }).body,
+    ).toBe(line);
+  });
+});
+
+describe('the query is not trusted', () => {
+  it.each([
+    [{}, false, null],
+    [{ confirm: '1' }, true, null],
+    [{ confirm: '0' }, false, null],
+    [{ confirm: 'true' }, false, null],
+    [{ confirm: ['1'] }, false, null],
+    [{ confirm: ['1', '1'] }, false, null],
+    [{ result: 'cancelled' }, false, 'cancelled'],
+    [{ result: 'rate_limited' }, false, 'rate_limited'],
+    [{ result: 'Cancelled' }, false, null],
+    [{ result: '<script>' }, false, null],
+    [{ result: ['cancelled'] }, false, null],
+    [{ result: 'constructor' }, false, null],
+    [{ confirm: '1', result: 'terms_changed' }, true, 'terms_changed'],
+  ])('reads %o as confirming %s and code %s', (query, confirming, code) => {
+    expect(parseManageQuery(query)).toEqual({ confirming, code });
+  });
+});
+
+describe('what the page shows', () => {
+  it('shows the answer of a cancel as the one notice, with what a cancelled booking gave back', () => {
+    expect(managePageState(cancelled, { result: 'cancelled' })).toEqual({
+      notice: cancelNotice('cancelled', { refundMinor: 23_412 }),
+      confirming: false,
+    });
+  });
+
+  it('shows the standing notice of a cancelled booking when there is no answer', () => {
+    expect(managePageState(cancelled, {}).notice).toEqual(
+      cancelNotice('already_cancelled'),
+    );
+  });
+
+  it('shows the standing notice of a booking that cannot be cancelled', () => {
+    expect(managePageState(closed, {}).notice).toEqual(
+      cancelNotice('not_refundable'),
+    );
+  });
+
+  it('shows no notice for an active booking with no answer', () => {
+    expect(managePageState(active, {}).notice).toBeNull();
+  });
+
+  it('shows the answer over the standing notice', () => {
+    expect(
+      managePageState(closed, { result: 'not_refundable' }).notice,
+    ).toEqual(cancelNotice('not_refundable'));
+    expect(managePageState(active, { result: 'terms_changed' }).notice).toEqual(
+      cancelNotice('terms_changed'),
+    );
+  });
+
+  it('does not believe "cancelled" of a booking that is not', () => {
+    expect(managePageState(active, { result: 'cancelled' }).notice).toBeNull();
+    expect(managePageState(closed, { result: 'cancelled' }).notice).toEqual(
+      cancelNotice('not_refundable'),
+    );
+  });
+
+  it('opens the second step only for an active booking', () => {
+    expect(managePageState(active, { confirm: '1' }).confirming).toBe(true);
+    expect(managePageState(cancelled, { confirm: '1' }).confirming).toBe(false);
+    expect(managePageState(closed, { confirm: '1' }).confirming).toBe(false);
+    expect(managePageState(active, {}).confirming).toBe(false);
+  });
+});
+
+describe('the paths', () => {
+  it('puts the second step in the query of the same page', () => {
+    expect(confirmPath(token)).toBe(`/manage/${token}?confirm=1`);
+  });
+
+  it.each([
+    [{ status: 'already_cancelled' }, 'already_cancelled'],
+    [{ status: 'terms_changed', refundMinor: 1 }, 'terms_changed'],
+    [{ status: 'rate_limited', retryAfterSeconds: 5 }, 'rate_limited'],
+  ] as const)('sends the guest back with the answer %o', (result, word) => {
+    expect(cancelResultPath(token, result)).toBe(
+      `/manage/${token}?result=${word}`,
+    );
   });
 });

@@ -1,60 +1,43 @@
-'use client';
-
 import { Info } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useRef, useState, useTransition } from 'react';
 import { Alert } from '@/components/Alert';
 import { Button, ButtonLink } from '@/components/Button';
-import type {
-  CancelBookingInput,
-  CancelBookingResult,
-} from '@/lib/cancelBooking';
 import {
   cancelNotice,
-  retryAfterLine,
+  confirmPath,
   type CancelNotice,
-  type CancelPrompt,
   type ManageBooking as ManageBookingDetails,
   type ManageView,
 } from '@/lib/manageBooking';
 import { browsePath, contactPath, helpPath } from '@/lib/paths';
+import { managePath } from '@/lib/routes';
 import styles from './ManageBooking.module.css';
 
-export type CancelBookingAction = (
-  input: CancelBookingInput,
-) => Promise<CancelBookingResult>;
+/** `cancelBookingForm`: posts the form's token and shown refund, then sends the guest back to the page. */
+export type CancelBookingFormAction = (formData: FormData) => Promise<void>;
 
 export type ManageBookingProps = {
   view: ManageView;
   /** The manage token the page was opened with: the caller's right to cancel. */
   token: string;
-  /** `cancelBooking`. */
-  cancel: CancelBookingAction;
+  /** The one notice the page shows, from `managePageState`. */
+  notice: CancelNotice | null;
+  /** The second step: the cancel form, with the refund said again. */
+  confirming: boolean;
+  cancelAction: CancelBookingFormAction;
 };
 
-export function ManageBooking({ view, token, cancel }: ManageBookingProps) {
-  const router = useRouter();
-  const [confirming, setConfirming] = useState(false);
-  const [notice, setNotice] = useState<CancelNotice | null>(null);
-  const [pending, startTransition] = useTransition();
-  const noticeRef = useRef<HTMLDivElement>(null);
-
-  const settled = notice?.settled ?? false;
-
-  const submit = (prompt: CancelPrompt) => {
-    startTransition(async () => {
-      const result = await cancel({
-        manageToken: token,
-        expectedRefundMinor: prompt.refundMinor,
-      });
-      setNotice(cancelNotice(result));
-      setConfirming(false);
-      // A changed refund is shown from the server's own quote, so the next confirm carries the new amount.
-      if (result.status === 'terms_changed') router.refresh();
-      noticeRef.current?.focus();
-    });
-  };
-
+/**
+ * The manage page. It is a server component and works with scripting off: the first step is the
+ * page with the refund shown, a link to the second step is `?confirm=1`, and the second step is a
+ * form that posts the cancel action.
+ */
+export function ManageBooking({
+  view,
+  token,
+  notice,
+  confirming,
+  cancelAction,
+}: ManageBookingProps) {
   return (
     <div className={styles.page}>
       <div className={styles.head}>
@@ -64,86 +47,56 @@ export function ManageBooking({ view, token, cancel }: ManageBookingProps) {
         <h1 className={styles.heading}>Your booking</h1>
       </div>
 
-      <div ref={noticeRef} tabIndex={-1} className={styles.notice}>
-        {notice ? (
-          <Alert tone={notice.tone} title={notice.title} body={notice.body} />
-        ) : null}
-      </div>
+      {notice ? (
+        <Alert tone={notice.tone} title={notice.title} body={notice.body} />
+      ) : null}
 
       <BookingCard booking={view.booking} />
 
-      {view.kind === 'active' && !settled ? (
+      {view.kind === 'active' ? (
         <section className={styles.cancel} aria-labelledby="cancel-title">
           <h2 id="cancel-title" className={styles.subheading}>
             {view.prompt.heading}
           </h2>
           <p className={styles.body}>{view.prompt.body}</p>
           {confirming ? (
-            <div
+            <form
+              action={cancelAction}
               className={styles.confirm}
-              role="group"
               aria-labelledby="confirm-title"
             >
               <p id="confirm-title" className={styles.confirmTitle}>
                 {view.prompt.confirmTitle}
               </p>
               <p className={styles.body}>{view.prompt.confirmBody}</p>
-              <Button
-                variant="primary"
-                loading={pending}
-                onClick={() => {
-                  submit(view.prompt);
-                }}
-              >
+              <input type="hidden" name="manageToken" value={token} />
+              <input
+                type="hidden"
+                name="expectedRefundMinor"
+                value={String(view.prompt.refundMinor)}
+              />
+              <Button type="submit" variant="primary">
                 {view.prompt.buttonLabel}
               </Button>
-              <Button
-                variant="secondary"
-                disabled={pending}
-                onClick={() => {
-                  setConfirming(false);
-                }}
-              >
-                Keep my booking
-              </Button>
-            </div>
+              <ButtonLink href={managePath(token)} variant="secondary">
+                {view.prompt.keepLabel}
+              </ButtonLink>
+            </form>
           ) : (
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setConfirming(true);
-              }}
-            >
+            <ButtonLink href={confirmPath(token)} variant="secondary">
               {view.prompt.buttonLabel}
-            </Button>
+            </ButtonLink>
           )}
-          {view.prompt.arrivalLine ? (
-            <p className={styles.fine}>
-              Refunds go back to your card. {view.prompt.arrivalLine}
-            </p>
+          {view.prompt.footnote ? (
+            <p className={styles.fine}>{view.prompt.footnote}</p>
           ) : null}
         </section>
       ) : null}
 
       {view.kind === 'cancelled' ? (
-        <Alert
-          tone="info"
-          title="This booking is cancelled"
-          body="Any refund that was due goes back to your original payment method."
-          action={
-            <ButtonLink href={browsePath} variant="secondary">
-              Explore more experiences
-            </ButtonLink>
-          }
-        />
-      ) : null}
-
-      {view.kind === 'closed' ? (
-        <Alert
-          tone="info"
-          title="This booking can't be cancelled here"
-          body="It isn't an active booking, or its session has started."
-        />
+        <ButtonLink href={browsePath} variant="secondary">
+          Explore more experiences
+        </ButtonLink>
       ) : null}
 
       <p className={styles.help}>
@@ -186,7 +139,7 @@ function BookingCard({ booking }: { booking: ManageBookingDetails }) {
           </div>
         ) : null}
         <div className={styles.totalLine}>
-          <dt>Total</dt>
+          <dt>{booking.totalLabel}</dt>
           <dd>{booking.total}</dd>
         </div>
         {booking.giftApplied ? (
@@ -212,14 +165,11 @@ export type ManageTooManyTriesProps = { retryAfterSeconds: number };
 export function ManageTooManyTries({
   retryAfterSeconds,
 }: ManageTooManyTriesProps) {
+  const notice = cancelNotice('rate_limited', { retryAfterSeconds });
   return (
     <div className={styles.page}>
       <h1 className={styles.heading}>Your booking</h1>
-      <Alert
-        tone="warning"
-        title="Too many tries"
-        body={retryAfterLine(retryAfterSeconds)}
-      />
+      <Alert tone={notice.tone} title={notice.title} body={notice.body} />
     </div>
   );
 }

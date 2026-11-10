@@ -93,6 +93,13 @@ export function refundEmailDecision(refund: {
   return refund.reason === 'guest_cancel' ? 'send' : 'skip';
 }
 
+/** A host with no notification address cannot be told: the job is refused so it fails and alerts, not skipped. */
+export function hostNoticeDecision(order: {
+  hostNotificationEmail: string | null;
+}): 'send' | 'refuse' {
+  return order.hostNotificationEmail === null ? 'refuse' : 'send';
+}
+
 /**
  * Whether the cancellation emails go out for an order. Only a cancelled booking gets them; a
  * booking still confirmed means the job was queued for a cancellation that did not happen.
@@ -235,11 +242,29 @@ export function manageLink(token: string, appUrl: string): string {
   return absolute(managePath(token), appUrl);
 }
 
-export function guestConfirmationData(
+/** What a booking page or email says about the booking itself: who, what, when, and the itemized money. */
+export type BookingSummaryData = Pick<
+  GuestConfirmationData,
+  | 'recipientName'
+  | 'reference'
+  | 'experienceName'
+  | 'hostName'
+  | 'dayLabel'
+  | 'timeLabel'
+  | 'durationLabel'
+  | 'meetingPoint'
+  | 'partyLabel'
+  | 'lines'
+  | 'taxLine'
+  | 'total'
+  | 'giftApplied'
+  | 'charged'
+>;
+
+/** The booking's own facts as finished text, for any order state: the confirmation email and the manage page both start here. */
+export function bookingSummaryData(
   source: BookingEmailSource,
-  input: { appUrl: string; manageToken: string },
-): GuestConfirmationData {
-  const confirmedAt = requireConfirmedAt(source);
+): BookingSummaryData {
   const amounts = orderSummaryAmounts({
     lines: source.items.map((item) => ({
       label: `${item.label} x ${String(item.quantity)}`,
@@ -249,7 +274,6 @@ export function guestConfirmationData(
     taxMinor: source.taxMinor,
     totalMinor: source.totalMinor,
   });
-  const event = bookingCalendarEvent(source, input.appUrl);
   const paidWithGift = source.giftAppliedMinor > 0;
   return {
     recipientName: greetingName(source.leadGuestName),
@@ -272,6 +296,17 @@ export function guestConfirmationData(
     total: amounts.total,
     giftApplied: paidWithGift ? formatMoney(source.giftAppliedMinor) : null,
     charged: paidWithGift ? formatMoney(source.amountDueMinor) : null,
+  };
+}
+
+export function guestConfirmationData(
+  source: BookingEmailSource,
+  input: { appUrl: string; manageToken: string },
+): GuestConfirmationData {
+  const confirmedAt = requireConfirmedAt(source);
+  const event = bookingCalendarEvent(source, input.appUrl);
+  return {
+    ...bookingSummaryData(source),
     cancellationTerms: cancellationTermsLabel(
       source.freeCancelUntil,
       confirmedAt,

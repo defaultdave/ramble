@@ -1,6 +1,6 @@
 import 'server-only';
 import { asc, eq, sql } from 'drizzle-orm';
-import { refundEmailKey } from '@/lib/bookingEmails';
+import { refundEmailDecision, refundEmailKey } from '@/lib/bookingEmails';
 import { isSimulatedPayment } from '@/lib/confirmOrder';
 import {
   RefundRequestSchema,
@@ -355,11 +355,16 @@ export async function applyRefundEvent(
     if (!refundCashPostIsFirst(posted.status)) {
       throw new Error('The refund cash was posted before the refund succeeded');
     }
-    await enqueue(tx, {
-      kind: 'guest-refund',
-      payload: { refundId: refund.id },
-      dedupeKey: refundEmailKey(refund.id),
-    });
+    if (
+      refundEmailDecision({ status: 'succeeded', reason: refund.reason }) ===
+      'send'
+    ) {
+      await enqueue(tx, {
+        kind: 'guest-refund',
+        payload: { refundId: refund.id },
+        dedupeKey: refundEmailKey(refund.id),
+      });
+    }
     return action;
   }
 

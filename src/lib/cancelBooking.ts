@@ -1,12 +1,17 @@
 import { z } from 'zod';
 import { refundArrivalLine } from './bookingEmails';
 import { isCapabilityTokenShape } from './capabilityTokens';
-import { orderLimits, type OrderKind } from './orders';
+import { WriteIdSchema } from './catalog';
+import { isWithinFreeWindow } from './cancellation';
+import { orderCancelledBys, orderLimits, type OrderKind } from './orders';
+import type { RateLimitDecision } from './rateLimits';
 import {
   planRefund,
+  refundsReconcile,
   type RefundableOrder,
   type RefundRequestRefusal,
 } from './refunds';
+import { maxTokenVersion } from './capabilityTokens';
 
 // What cancelling a booking by its manage link decides (design doc 4.2.3, `cancelBooking`; PRD-10,
 // PRD-46). The cancellation tiers give all or nothing: a full refund of what the order still holds
@@ -17,12 +22,23 @@ import {
 export const cancelRefundReason = 'guest_cancel';
 export const cancelRefundKey = 'guest-cancel';
 
+/** A manage token's shape: checked before any lookup, so a token of any other shape does no work and spends no try. */
+export const ManageTokenSchema = z.string().refine(isCapabilityTokenShape);
+
 export const CancelBookingInputSchema = z.strictObject({
-  manageToken: z.string().refine(isCapabilityTokenShape),
+  manageToken: ManageTokenSchema,
   /** The refund the guest was shown, in minor units. */
   expectedRefundMinor: z.int().min(0).max(orderLimits.maxMinor),
 });
 export type CancelBookingInput = z.input<typeof CancelBookingInputSchema>;
+
+/** What the data layer cancels: the order the token opened, at the version it opened, with the refund shown. */
+export const CancelOrderInputSchema = z.strictObject({
+  orderId: WriteIdSchema,
+  openedTokenVersion: z.int().min(1).max(maxTokenVersion),
+  expectedRefundMinor: z.int().min(0).max(orderLimits.maxMinor),
+});
+export type CancelOrderInput = z.input<typeof CancelOrderInputSchema>;
 
 /** What the order holds and what the cancellation is judged on. */
 export type CancelFacts = RefundableOrder & {
@@ -44,14 +60,6 @@ export type CancelQuote =
   | { kind: 'already_cancelled' }
   | { kind: 'not_cancellable' };
 
-/** Free up to and including the deadline, like `cancellationWindow`; an order with no deadline snapshot is never free. */
-export function tierRefundsInFull(
-  freeCancelUntil: Date | null,
-  now: Date,
-): boolean {
-  return freeCancelUntil !== null && now.getTime() <= freeCancelUntil.getTime();
-}
-
 /**
  * What cancelling at `now` refunds, and why. A gift paid for any part of the order refunds nothing
  * (the gift is not reinstated in this build). Past the deadline nothing is refunded. Otherwise it
@@ -63,7 +71,10 @@ function refundOnCancel(
   now: Date,
 ): { refundMinor: number; basis: RefundBasis } {
   if (facts.giftAppliedMinor > 0) return { refundMinor: 0, basis: 'gift_paid' };
-  if (!tierRefundsInFull(facts.freeCancelUntil, now)) {
+  if (
+    facts.freeCancelUntil === null ||
+    !isWithinFreeWindow(facts.freeCancelUntil, now)
+  ) {
     return { refundMinor: 0, basis: 'window_closed' };
   }
   const plan = planRefund(facts, 'remaining');
@@ -95,7 +106,7 @@ export function cancelQuote(facts: CancelFacts, now: Date): CancelQuote {
 }
 
 export type CancelVerdict =
-  | { kind: 'proceed'; refundMinor: number }
+  | { kind: 'proceed'; refundMinor: number; requestsRefund: boolean }
   /** What the tier now gives is not what the guest was shown. */
   | { kind: 'terms_changed'; refundMinor: number }
   | { kind: 'already_cancelled' }
@@ -121,7 +132,11 @@ export function cancelVerdict(input: {
   const quote = cancelQuote(facts, now);
   if (quote.kind !== 'cancellable') return { kind: quote.kind };
   return quote.refundMinor === expectedRefundMinor
-    ? { kind: 'proceed', refundMinor: quote.refundMinor }
+    ? {
+        kind: 'proceed',
+        refundMinor: quote.refundMinor,
+        requestsRefund: quote.refundMinor > 0,
+      }
     : { kind: 'terms_changed', refundMinor: quote.refundMinor };
 }
 
@@ -174,7 +189,7 @@ export function giftReinstated(): boolean {
 
 export type RefundRequestOutcome =
   | { kind: 'go'; refundId: string }
-  | { kind: 'refused'; reason: RefundRequestRefusal };
+  | { kind: 'refused'; result: CancelBookingResult };
 
 /**
  * What `requestRefund` answered, as the cancel acts on it. A refund made for this cancellation (now
@@ -191,7 +206,10 @@ export function refundRequestOutcome(
   refundMinor: number,
 ): RefundRequestOutcome {
   if (result.status === 'refused') {
-    return { kind: 'refused', reason: result.reason };
+    return {
+      kind: 'refused',
+      result: { status: 'refund_unavailable', reason: result.reason },
+    };
   }
   if (result.refund.amountMinor !== refundMinor) {
     throw new RangeError('The refund is not the amount the guest was shown');
@@ -228,3 +246,142 @@ export function cancellationAuditEntry(input: {
     },
   } as const;
 }
+
+export type CancelPlan =
+  | { kind: 'proceed'; refundMinor: number; requestsRefund: boolean }
+  /** Nothing is cancelled: this is the answer. */
+  | { kind: 'stop'; result: CancelBookingResult };
+
+/**
+ * What the data layer does with the locked order: no booking behind the order is `not_found`; a
+ * refused verdict is its typed answer; otherwise the cancellation goes on, asking for a refund only
+ * when one is due. The data layer executes this and decides nothing.
+ */
+export function cancelPlan(input: {
+  facts: CancelFacts | null;
+  openedTokenVersion: number;
+  expectedRefundMinor: number;
+  now: Date;
+}): CancelPlan {
+  const { facts, ...rest } = input;
+  if (facts === null) return { kind: 'stop', result: { status: 'not_found' } };
+  const verdict = cancelVerdict({ facts, ...rest });
+  if (verdict.kind === 'proceed') return verdict;
+  return {
+    kind: 'stop',
+    result: refusalResult(verdict, facts.freeCancelUntil),
+  };
+}
+
+/** An order row is a booking only with both a session and a hold behind it. */
+export function isBookingRow<
+  Row extends { sessionId: string | null; holdId: string | null },
+>(row: Row): row is Row & { sessionId: string; holdId: string } {
+  return row.sessionId !== null && row.holdId !== null;
+}
+
+/** The most refund rows one order is read with: more than an order can have, and one more to see a breach. */
+export const reconcileReadLimit = 101;
+
+/**
+ * The per-order check after a cancellation: the standing refunds reconcile with the order's totals,
+ * and the read was not cut off at its limit (a cut-off read cannot say they reconcile).
+ */
+export function refundsReconcileWithin(
+  order: Parameters<typeof refundsReconcile>[0],
+  lines: Parameters<typeof refundsReconcile>[1],
+  readLimit: number,
+): boolean {
+  return lines.length < readLimit && refundsReconcile(order, lines);
+}
+
+/** Only a cancellation that went through returns spaces to sale, so only it invalidates the spaces cache. */
+export function returnsSpaces(result: CancelBookingResult): boolean {
+  return result.status === 'cancelled';
+}
+
+/** Why a try at a manage link was refused before it reached the order. */
+export type GateRefusal =
+  | { status: 'not_found' }
+  | { status: 'rate_limited'; retryAfterSeconds: number };
+
+export type ManageGate<Row> =
+  { kind: 'opened'; row: Row } | { kind: 'refused'; refusal: GateRefusal };
+
+/**
+ * The one gate in front of every manage link, for the page and the action alike: a token of the
+ * wrong shape does no work and spends no try; a token over the count is told to wait; a token that
+ * opens nothing is not found. `steps` does the counting and the lookup, in that order.
+ */
+export async function openManageGate<Row>(
+  token: unknown,
+  steps: {
+    spendTry: (token: string) => Promise<RateLimitDecision>;
+    open: (token: string) => Promise<Row | null>;
+  },
+): Promise<ManageGate<Row>> {
+  const parsed = ManageTokenSchema.safeParse(token);
+  if (!parsed.success) {
+    return { kind: 'refused', refusal: { status: 'not_found' } };
+  }
+  const spent = await steps.spendTry(parsed.data);
+  if (!spent.allowed) {
+    return {
+      kind: 'refused',
+      refusal: {
+        status: 'rate_limited',
+        retryAfterSeconds: spent.retryAfterSeconds,
+      },
+    };
+  }
+  const row = await steps.open(parsed.data);
+  return row === null
+    ? { kind: 'refused', refusal: { status: 'not_found' } }
+    : { kind: 'opened', row };
+}
+
+/** The action's input, or the answer for input that cannot be one (it is not found: nothing says why). */
+export function parseCancelInput(
+  input: unknown,
+):
+  | { kind: 'ok'; input: z.output<typeof CancelBookingInputSchema> }
+  | { kind: 'refused'; result: CancelBookingResult } {
+  const parsed = CancelBookingInputSchema.safeParse(input);
+  return parsed.success
+    ? { kind: 'ok', input: parsed.data }
+    : { kind: 'refused', result: { status: 'not_found' } };
+}
+
+/** The form's two fields as the action's input; the refund travels as digits and is parsed strictly. */
+export function cancelInputFromForm(fields: {
+  manageToken: unknown;
+  expectedRefundMinor: unknown;
+}): CancelBookingInput {
+  const { manageToken, expectedRefundMinor } = fields;
+  return {
+    manageToken: typeof manageToken === 'string' ? manageToken : '',
+    expectedRefundMinor:
+      typeof expectedRefundMinor === 'string' &&
+      /^\d{1,10}$/.test(expectedRefundMinor)
+        ? Number(expectedRefundMinor)
+        : -1,
+  };
+}
+
+// The jobs a cancellation queues (ids and amounts only, so a job row holds no address or name).
+
+export const GuestCancellationPayloadSchema = z.strictObject({
+  orderId: WriteIdSchema,
+  cancelledBy: z.enum(orderCancelledBys),
+  /** What the guest gets back, as the cancellation decided it. */
+  refundMinor: z.int().min(0).max(orderLimits.maxMinor),
+});
+
+export const HostCancellationPayloadSchema = z.strictObject({
+  orderId: WriteIdSchema,
+  cancelledBy: z.enum(orderCancelledBys),
+});
+
+export const GuestRefundPayloadSchema = z.strictObject({
+  refundId: WriteIdSchema,
+});

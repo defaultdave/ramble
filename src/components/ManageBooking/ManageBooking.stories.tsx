@@ -1,9 +1,18 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, fn, userEvent, within } from 'storybook/test';
+import { fn } from 'storybook/test';
 import { orderA, orderB } from '@/lib/bookingEmails.fixtures';
-import type { CancelBookingResult, CancelFacts } from '@/lib/cancelBooking';
-import { manageView } from '@/lib/manageBooking';
-import { ManageBooking, ManageTooManyTries } from './ManageBooking';
+import type { CancelFacts } from '@/lib/cancelBooking';
+import {
+  manageView,
+  managePageState,
+  type ManageQuery,
+  type ManageView,
+} from '@/lib/manageBooking';
+import {
+  ManageBooking,
+  ManageTooManyTries,
+  type ManageBookingProps,
+} from './ManageBooking';
 
 const token = 'A'.repeat(43);
 
@@ -29,20 +38,34 @@ const facts: CancelFacts = {
 const inWindow = new Date('2026-11-05T12:00:00Z');
 const afterWindow = new Date('2026-11-06T22:00:00Z');
 
-const answer = (result: CancelBookingResult) =>
-  fn(() => Promise.resolve(result));
+const cancelledFacts: CancelFacts = {
+  ...facts,
+  status: 'cancelled',
+  refundedTicketMinor: 21_500,
+  refundedTaxMinor: 1_912,
+  commissionReturnedMinor: 3_225,
+};
+const cancelledView = manageView(
+  { ...orderA, status: 'cancelled' },
+  cancelledFacts,
+  inWindow,
+);
+
+/** The page as the route builds it: the view, and what the query says about it. */
+function page(view: ManageView, query: ManageQuery = {}): ManageBookingProps {
+  return {
+    view,
+    token,
+    cancelAction: fn(() => Promise.resolve()),
+    ...managePageState(view, query),
+  };
+}
 
 const meta = {
   title: 'Pages/ManageBooking',
   component: ManageBooking,
-  args: {
-    view: manageView(orderA, facts, inWindow),
-    token,
-    cancel: answer({ status: 'already_cancelled' }),
-  },
+  args: page(manageView(orderA, facts, inWindow)),
   parameters: {
-    // The component asks the app router to render again after a changed refund.
-    nextjs: { appDirectory: true },
     a11y: {
       config: {
         // Every story renders the state twice, once per color scheme, and outside the page's main.
@@ -61,48 +84,22 @@ type Story = StoryObj<typeof meta>;
 const mobile = { viewport: { value: 'mobile1', isRotated: false } };
 const desktop = { viewport: { value: 'desktop', isRotated: false } };
 
-/** The story renders once per color scheme; the first copy is enough. */
-function firstCopy(canvasElement: HTMLElement) {
-  const copy = canvasElement.querySelector<HTMLElement>('[data-scheme]');
-  if (!copy) throw new Error('No color scheme copy rendered');
-  return within(copy);
-}
-
-async function confirmCancel(canvasElement: HTMLElement) {
-  const canvas = firstCopy(canvasElement);
-  await userEvent.click(
-    await canvas.findByRole('button', { name: 'Cancel and refund $234.12' }),
-  );
-  await userEvent.click(
-    await canvas.findByRole('button', { name: 'Cancel and refund $234.12' }),
-  );
-  return canvas;
-}
-
 export const RefundShownFirstMobile: Story = { parameters: mobile };
 export const RefundShownFirstDesktop: Story = { parameters: desktop };
 
-export const AskingAgain: Story = {
+export const ConfirmStep: Story = {
+  args: page(manageView(orderA, facts, inWindow), { confirm: '1' }),
   parameters: mobile,
-  play: async ({ canvasElement }) => {
-    const canvas = firstCopy(canvasElement);
-    await userEvent.click(
-      await canvas.findByRole('button', { name: 'Cancel and refund $234.12' }),
-    );
-    await expect(
-      await canvas.findByRole('group', { name: 'Cancel this booking?' }),
-    ).toBeVisible();
-  },
 };
 
 export const NoRefundAfterTheWindow: Story = {
-  args: { view: manageView(orderA, facts, afterWindow) },
+  args: page(manageView(orderA, facts, afterWindow)),
   parameters: mobile,
 };
 
 export const PaidWithAGift: Story = {
-  args: {
-    view: manageView(
+  args: page(
+    manageView(
       orderB,
       {
         ...facts,
@@ -116,75 +113,40 @@ export const PaidWithAGift: Story = {
       },
       inWindow,
     ),
-  },
+  ),
   parameters: mobile,
 };
 
 export const Cancelled: Story = {
-  args: {
-    view: manageView(
-      { ...orderA, status: 'cancelled' },
-      { ...facts, status: 'cancelled' },
-      inWindow,
-    ),
-  },
+  args: page(cancelledView),
   parameters: mobile,
 };
 
 export const SessionStarted: Story = {
-  args: { view: manageView(orderA, facts, orderA.startsAt) },
+  args: page(manageView(orderA, facts, orderA.startsAt)),
   parameters: mobile,
 };
 
 export const JustCancelled: Story = {
-  args: {
-    cancel: answer({
-      status: 'cancelled',
-      refundMinor: 23_412,
-      giftReinstated: false,
-      refundEta: 'Your bank usually shows it within 5 to 10 business days.',
-    }),
-  },
+  args: page(cancelledView, { result: 'cancelled' }),
   parameters: mobile,
-  play: async ({ canvasElement }) => {
-    const canvas = await confirmCancel(canvasElement);
-    await expect(
-      await canvas.findByText('Your booking is cancelled'),
-    ).toBeVisible();
-  },
 };
 
 export const RefundChanged: Story = {
-  args: { cancel: answer({ status: 'terms_changed', refundMinor: 0 }) },
+  args: page(manageView(orderA, facts, inWindow), { result: 'terms_changed' }),
   parameters: mobile,
-  play: async ({ canvasElement }) => {
-    const canvas = await confirmCancel(canvasElement);
-    await expect(
-      await canvas.findByText('The refund has changed'),
-    ).toBeVisible();
-  },
 };
 
 export const RefundCouldNotStart: Story = {
-  args: {
-    cancel: answer({ status: 'refund_unavailable', reason: 'no_payment' }),
-  },
+  args: page(manageView(orderA, facts, inWindow), {
+    result: 'refund_unavailable',
+  }),
   parameters: mobile,
-  play: async ({ canvasElement }) => {
-    const canvas = await confirmCancel(canvasElement);
-    await expect(
-      await canvas.findByText("We couldn't start your refund"),
-    ).toBeVisible();
-  },
 };
 
 export const TooManyTriesWhileCancelling: Story = {
-  args: { cancel: answer({ status: 'rate_limited', retryAfterSeconds: 240 }) },
+  args: page(manageView(orderA, facts, inWindow), { result: 'rate_limited' }),
   parameters: mobile,
-  play: async ({ canvasElement }) => {
-    const canvas = await confirmCancel(canvasElement);
-    await expect(await canvas.findByText('Too many tries')).toBeVisible();
-  },
 };
 
 export const TooManyTriesPage: Story = {

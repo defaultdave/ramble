@@ -128,6 +128,18 @@ async function emailedToken(world: BookingWorld): Promise<string> {
   return token ?? '';
 }
 
+const notFound = {
+  kind: 'refused',
+  refusal: { status: 'not_found' },
+} as const;
+
+const manageTries = async () => {
+  const { rows } = await client.db.execute<{ n: string }>(
+    sql`SELECT count(*)::text AS n FROM rate_limits WHERE key LIKE 'manage:%'`,
+  );
+  return Number(rows[0]?.n);
+};
+
 const referenceOf = (
   result: Awaited<ReturnType<typeof page.readManagePage>>,
 ) => (result.kind === 'ok' ? result.view.booking.reference : result.kind);
@@ -158,7 +170,7 @@ describe('what a manage link opens', () => {
       tokens.bumpTokenVersion(tx, 'manage', a.orderId),
     );
 
-    expect(await page.readManagePage(earlier)).toEqual({ kind: 'not_found' });
+    expect(await page.readManagePage(earlier)).toEqual(notFound);
     const rebuilt = await emailedToken(a);
     expect(rebuilt).not.toBe(earlier);
     expect(referenceOf(await page.readManagePage(rebuilt))).toBe(a.reference);
@@ -174,8 +186,27 @@ describe('what a manage link opens', () => {
       tokens.capabilityToken('order', a.orderId, 1),
       tokens.capabilityToken('gift', a.orderId, 1),
     ]) {
-      expect(await page.readManagePage(token)).toEqual({ kind: 'not_found' });
+      expect(await page.readManagePage(token)).toEqual(notFound);
     }
+  });
+});
+
+describe('a token that cannot be one', () => {
+  it.each(['short', 'A'.repeat(44), `${'A'.repeat(42)}!`, ''])(
+    'is not found and spends no try of the manage count (%s)',
+    async (bad) => {
+      const tries = await manageTries();
+
+      expect(await page.readManagePage(bad)).toEqual(notFound);
+      expect(await manageTries()).toBe(tries);
+    },
+  );
+
+  it('spends a try for a well-formed token that opens nothing', async () => {
+    const tries = await manageTries();
+
+    expect(await page.readManagePage('C'.repeat(43))).toEqual(notFound);
+    expect(await manageTries()).toBe(tries + 1);
   });
 });
 
@@ -228,7 +259,16 @@ describe('what the page shows', () => {
     }
 
     const blocked = await page.readManagePage(token);
-    expect(blocked).toMatchObject({ kind: 'rate_limited' });
+    expect(blocked).toMatchObject({
+      kind: 'refused',
+      refusal: { status: 'rate_limited' },
+    });
+    const wait =
+      blocked.kind === 'refused' && blocked.refusal.status === 'rate_limited'
+        ? blocked.refusal.retryAfterSeconds
+        : 0;
+    expect(wait).toBeGreaterThan(0);
+    expect(wait).toBeLessThanOrEqual(600);
     expect(JSON.stringify(blocked)).not.toContain(a.reference);
   });
 });

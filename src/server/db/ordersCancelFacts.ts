@@ -1,6 +1,7 @@
 import 'server-only';
 import { eq } from 'drizzle-orm';
-import type { CancelFacts } from '@/lib/cancelBooking';
+import { isBookingRow, type CancelFacts } from '@/lib/cancelBooking';
+import { WriteIdSchema } from '@/lib/catalog';
 import type { Transaction } from './client';
 import { holds, orders, sessions } from './schema';
 
@@ -11,7 +12,6 @@ import { holds, orders, sessions } from './schema';
 export type BookingRows = {
   facts: CancelFacts;
   sessionId: string;
-  hostId: string;
 };
 
 /** Null when the order has no session and hold (it is not a booking) or does not exist. */
@@ -19,12 +19,13 @@ export async function readCancelFacts(
   tx: Transaction,
   orderId: string,
 ): Promise<BookingRows | null> {
+  const id = WriteIdSchema.parse(orderId);
   const [row] = await tx
     .select({
       kind: orders.kind,
       status: orders.status,
-      hostId: orders.hostId,
       sessionId: orders.sessionId,
+      holdId: orders.holdId,
       giftAppliedMinor: orders.giftAppliedMinor,
       freeCancelUntil: orders.freeCancelUntil,
       manageTokenVersion: orders.manageTokenVersion,
@@ -43,8 +44,8 @@ export async function readCancelFacts(
     .from(orders)
     .innerJoin(sessions, eq(sessions.id, orders.sessionId))
     .innerJoin(holds, eq(holds.id, orders.holdId))
-    .where(eq(orders.id, orderId));
-  if (!row || row.sessionId === null) return null;
-  const { sessionId, hostId, ...facts } = row;
-  return { facts, sessionId, hostId };
+    .where(eq(orders.id, id));
+  if (!row || !isBookingRow(row)) return null;
+  const { sessionId, ...facts } = row;
+  return { facts, sessionId };
 }

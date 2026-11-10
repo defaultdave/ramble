@@ -1,15 +1,19 @@
 import 'server-only';
-import { z } from 'zod';
+import type { z } from 'zod';
 import {
   bookingCancellationData,
   bookingEmailKey,
   bookingRefundData,
   cancellationDecision,
+  hostNoticeDecision,
   refundEmailDecision,
   refundEmailKey,
 } from '@/lib/bookingEmails';
-import { WriteIdSchema } from '@/lib/catalog';
-import { orderCancelledBys, orderLimits } from '@/lib/orders';
+import type {
+  GuestCancellationPayloadSchema,
+  GuestRefundPayloadSchema,
+  HostCancellationPayloadSchema,
+} from '@/lib/cancelBooking';
 import type { Transaction } from '@/server/db/client';
 import { readBookingEmailOrder } from '@/server/db/bookingEmails';
 import { readRefundForEmail } from '@/server/db/cancellationEmails';
@@ -21,22 +25,6 @@ import { sendEmail } from '@/server/ports/email';
 // cancelled, and the refund email when the provider confirms the money is on its way back. Payloads
 // are ids and amounts, so a job row holds no address or name. Each handler is safe to run twice: the
 // email's idempotency key is built from the order or the refund.
-
-export const GuestCancellationPayloadSchema = z.strictObject({
-  orderId: WriteIdSchema,
-  cancelledBy: z.enum(orderCancelledBys),
-  /** What the guest gets back, as the cancellation decided it. */
-  refundMinor: z.int().min(0).max(orderLimits.maxMinor),
-});
-
-export const HostCancellationPayloadSchema = z.strictObject({
-  orderId: WriteIdSchema,
-  cancelledBy: z.enum(orderCancelledBys),
-});
-
-export const GuestRefundPayloadSchema = z.strictObject({
-  refundId: WriteIdSchema,
-});
 
 /** Thrown for a job that should not exist. The message names no address, name, or token. */
 class CancellationEmailError extends Error {
@@ -92,13 +80,13 @@ export async function sendHostCancellationNotice({
   payload: z.output<typeof HostCancellationPayloadSchema>;
 }): Promise<void> {
   const order = await loadCancelledOrder(tx, payload.orderId);
-  if (order.hostNotificationEmail === null) {
+  if (hostNoticeDecision(order) === 'refuse') {
     throw new CancellationEmailError('the host has no notification address');
   }
   const { source } = order;
   await sendEmail({
     template: 'booking-cancellation',
-    to: order.hostNotificationEmail,
+    to: order.hostNotificationEmail ?? '',
     data: bookingCancellationData({
       audience: 'host',
       recipientName: source.hostName,

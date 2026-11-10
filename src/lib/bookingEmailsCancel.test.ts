@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { orderA } from './bookingEmails.fixtures';
 import {
   bookingEmailKey,
+  bookingSummaryData,
   cancellationDecision,
+  guestConfirmationData,
+  hostNoticeDecision,
   refundEmailDecision,
   refundEmailKey,
 } from './bookingEmails';
@@ -52,5 +56,57 @@ describe('the keys', () => {
 
   it('names the refund email by the refund, in lower case', () => {
     expect(refundEmailKey(id)).toBe(`guest-refund:${id.toLowerCase()}`);
+  });
+});
+
+describe('whether the host is told', () => {
+  it.each([
+    ['an address', 'bookings@harborlight.example', 'send'],
+    ['no address', null, 'refuse'],
+  ] as const)(
+    'for a host with %s',
+    (_name, hostNotificationEmail, expected) => {
+      expect(hostNoticeDecision({ hostNotificationEmail })).toBe(expected);
+    },
+  );
+});
+
+describe('the booking summary', () => {
+  it('is the same for a cancelled order with no confirmation time, which the confirmation email would refuse', () => {
+    const cancelled = {
+      ...orderA,
+      status: 'cancelled' as const,
+      confirmedAt: null,
+    };
+
+    expect(bookingSummaryData(cancelled)).toEqual(bookingSummaryData(orderA));
+    expect(() =>
+      guestConfirmationData(cancelled, {
+        appUrl: 'https://ramble.example',
+        manageToken: 'A'.repeat(43),
+      }),
+    ).toThrow('confirmed order');
+  });
+
+  it('is what the confirmation email starts from', () => {
+    const data = guestConfirmationData(orderA, {
+      appUrl: 'https://ramble.example',
+      manageToken: 'A'.repeat(43),
+    });
+
+    expect(data).toMatchObject(bookingSummaryData(orderA));
+  });
+
+  it('cuts a long name, host, and meeting point to the limits the emails hold', () => {
+    const summary = bookingSummaryData({
+      ...orderA,
+      experienceName: 'E'.repeat(500),
+      hostName: 'H'.repeat(500),
+      meetingPoint: 'M'.repeat(2_000),
+    });
+
+    expect(summary.experienceName).toHaveLength(200);
+    expect(summary.hostName).toHaveLength(120);
+    expect(summary.meetingPoint).toHaveLength(600);
   });
 });

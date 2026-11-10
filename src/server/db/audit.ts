@@ -5,10 +5,11 @@ import {
   type AuditEntryInput,
   type AuditRow,
 } from '@/lib/audit';
+import { opsAccessEntry } from '@/lib/opsAudit';
+import { requireRole, Role, type Caller } from '@/server/auth/caller';
 import { db, type Transaction } from './client';
 import { auditLog } from './schema';
 
-// TODO(U-055): first caller
 /**
  * Writes one audit row in the caller's transaction, so it exists exactly when the change it
  * records does. The parameter type accepts a transaction only; the plain `db` handle does not
@@ -25,6 +26,22 @@ export async function writeAudit(
     .returning({ id: auditLog.id });
   if (!row) throw new Error('The audit row was not written');
   return row;
+}
+
+/**
+ * Writes one audit row in a transaction of its own, for an action that changes nothing else: a
+ * read of something sensitive. It throws if the row is not written, so the caller returns nothing
+ * it has not recorded. Like `writeAudit` it takes no caller; the path that calls it has already
+ * authorized the action.
+ */
+export async function recordAudit(entry: AuditEntryInput): Promise<void> {
+  await db.transaction((tx) => writeAudit(tx, entry));
+}
+
+/** Records the ops user opening the ops area. Throws ForbiddenError, and writes nothing, for anyone else. */
+export async function recordOpsAccess(caller: Caller): Promise<void> {
+  requireRole(caller, Role.Ops, {});
+  await recordAudit(opsAccessEntry(caller.userId));
 }
 
 /** The time of the earliest audit row (an index read), or null for an empty log: where the export schedule starts. */

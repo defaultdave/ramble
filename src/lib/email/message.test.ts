@@ -359,7 +359,9 @@ describe('isFreshTimestamp', () => {
 });
 
 describe('mailboxAccess', () => {
-  const on = {
+  const guest = {
+    ops: false,
+    production: false,
     liveMode: false,
     secretConfigured: true,
     hasCookie: true,
@@ -367,20 +369,57 @@ describe('mailboxAccess', () => {
   };
 
   it.each([
-    ['open with a matching cookie', {}, 'open'],
+    [
+      'open by the ops role, with no cookie and no secret',
+      {
+        ops: true,
+        hasCookie: false,
+        cookieMatches: false,
+        secretConfigured: false,
+      },
+      { status: 'open', via: 'ops_role' },
+    ],
+    [
+      'open by the ops role in production',
+      { ops: true, production: true },
+      { status: 'open', via: 'ops_role' },
+    ],
+    [
+      'open by the ops role in live mode',
+      { ops: true, liveMode: true },
+      { status: 'open', via: 'ops_role' },
+    ],
+    [
+      'open by the secret with a matching cookie',
+      {},
+      { status: 'open', via: 'secret' },
+    ],
     [
       'locked with no cookie',
       { hasCookie: false, cookieMatches: false },
-      'locked',
+      { status: 'locked' },
     ],
-    ['locked with a wrong cookie', { cookieMatches: false }, 'locked'],
+    [
+      'locked with a wrong cookie',
+      { cookieMatches: false },
+      { status: 'locked' },
+    ],
+    [
+      'disabled in production, even with the right cookie',
+      { production: true },
+      { status: 'disabled' },
+    ],
     [
       'disabled in live mode, whatever the cookie',
       { liveMode: true },
-      'disabled',
+      { status: 'disabled' },
     ],
-    ['disabled without a secret', { secretConfigured: false }, 'disabled'],
+    [
+      'disabled without a secret',
+      { secretConfigured: false },
+      { status: 'disabled' },
+    ],
   ])('is %s', (_label, override, expected) => {
-    expect(mailboxAccess({ ...on, ...override })).toBe(expected);
+    expect(mailboxAccess({ ...guest, ...override })).toEqual(expected);
   });
 });

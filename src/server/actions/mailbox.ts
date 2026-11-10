@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { consumeRateLimit } from '@/server/ports/rate-limit';
 import { clientAddress } from '@/lib/clientAddress';
+import { getCaller } from '@/server/auth/caller';
 import { env } from '@/server/env';
 import {
   mailboxCookieMaxAgeSeconds,
@@ -17,7 +18,9 @@ const UnlockFormSchema = z.object({ secret: z.string().max(256) });
 
 export async function unlockDevMailbox(formData: FormData): Promise<void> {
   const form = UnlockFormSchema.safeParse({ secret: formData.get('secret') });
-  const token = form.success ? unlockMailbox(form.data.secret) : null;
+  const token = form.success
+    ? await unlockMailbox(await getCaller(), form.data.secret)
+    : null;
 
   if (token === null) {
     // Only a wrong secret is counted, and against the caller's own address, so nobody else's

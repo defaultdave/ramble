@@ -258,17 +258,29 @@ export function isFreshTimestamp(
   return Math.abs(nowSeconds - timestamp) <= toleranceSeconds;
 }
 
+export type MailboxAccess =
+  | { status: 'disabled' | 'locked' }
+  | { status: 'open'; via: 'ops_role' | 'secret' };
+
 /**
- * Whether the dev mailbox may be used and who is let in. It exists only where mail does not really
- * leave: it is off in live mode and until a secret is set. `cookieMatches` is the constant-time
- * comparison of the presented cookie with the one the secret yields.
+ * Who may read the mailbox. A caller with the ops role always may, in every deployment. The shared
+ * secret is the way in for a tester on a deployment that is not production, so it is refused in
+ * production, in live mode (real mail flows), and until a secret is set. `cookieMatches` is the
+ * constant-time comparison of the presented cookie with the one the secret yields.
  */
 export function mailboxAccess(input: {
+  ops: boolean;
+  production: boolean;
   liveMode: boolean;
   secretConfigured: boolean;
   hasCookie: boolean;
   cookieMatches: boolean;
-}): 'disabled' | 'locked' | 'open' {
-  if (input.liveMode || !input.secretConfigured) return 'disabled';
-  return input.hasCookie && input.cookieMatches ? 'open' : 'locked';
+}): MailboxAccess {
+  if (input.ops) return { status: 'open', via: 'ops_role' };
+  if (input.production || input.liveMode || !input.secretConfigured) {
+    return { status: 'disabled' };
+  }
+  return input.hasCookie && input.cookieMatches
+    ? { status: 'open', via: 'secret' }
+    : { status: 'locked' };
 }

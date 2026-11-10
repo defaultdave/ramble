@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { describe, expect, it, vi } from 'vitest';
+import { anonymousCaller, Role } from '@/server/auth/caller';
 import { mailboxSecret } from '../email/testEnv';
 import {
   client,
@@ -20,7 +21,8 @@ vi.mock('@/server/env', async () => ({
 // Behaviours under test, one per decision, branch, or risk:
 // - the dev mailbox lists only captured messages, newest first, capped at 100, and the detail returns the bodies
 // - a message sent through a real provider is not in the mailbox
-// - the mailbox gate shows a captured message to the secret holder and nobody else
+// - the mailbox gate shows a captured message to the secret holder and the ops role and nobody else, and each read writes an audit row
+// - production refuses the secret and writes no audit row
 
 setupEmailDatabase();
 
@@ -62,16 +64,64 @@ describe('dev mailbox reads', () => {
 });
 
 describe('the dev mailbox gate over the real log', () => {
-  it('shows a captured message to the secret holder and nobody else', async () => {
+  const opsUser = randomUUID();
+  const auditRows = async (subject: string) =>
+    (
+      await client.db.execute<{ action: string; actor_kind: string }>(
+        sql`SELECT action, actor_kind::text FROM audit_log WHERE subject_id = ${subject}`,
+      )
+    ).rows;
+
+  it('shows a captured message to the secret holder and the ops role, and nobody else, recording each read', async () => {
     setMode({ DEV_MAILBOX_SECRET: mailboxSecret });
     const mailbox = await import('@/server/ports/email/mailbox');
     const { messageId } = await email.sendEmail(request());
-    const cookie = mailbox.unlockMailbox(mailboxSecret) ?? '';
+    const cookie =
+      (await mailbox.unlockMailbox(anonymousCaller, mailboxSecret)) ?? '';
+    const ops = { userId: opsUser, roles: [Role.Ops], hostIds: [] };
 
-    const open = await mailbox.loadMailboxMessage(cookie, messageId);
-    const locked = await mailbox.loadMailboxMessage(undefined, messageId);
+    const byCookie = await mailbox.loadMailboxMessage(
+      anonymousCaller,
+      cookie,
+      messageId,
+    );
+    const byRole = await mailbox.loadMailboxMessage(ops, undefined, messageId);
+    const locked = await mailbox.loadMailboxMessage(
+      anonymousCaller,
+      undefined,
+      messageId,
+    );
 
-    expect(open).toMatchObject({ status: 'open', message: { id: messageId } });
+    expect(byCookie).toMatchObject({
+      status: 'open',
+      message: { id: messageId },
+    });
+    expect(byRole).toMatchObject({
+      status: 'open',
+      message: { id: messageId },
+    });
     expect(locked).toEqual({ status: 'locked' });
+    expect(await auditRows(messageId)).toEqual([
+      { action: 'mailbox.message_read', actor_kind: 'guest' },
+      { action: 'mailbox.message_read', actor_kind: 'user' },
+    ]);
+  });
+
+  it('refuses the secret on production and records nothing for the refused read', async () => {
+    setMode({ DEV_MAILBOX_SECRET: mailboxSecret });
+    const mailbox = await import('@/server/ports/email/mailbox');
+    const { messageId } = await email.sendEmail(request());
+    const cookie =
+      (await mailbox.unlockMailbox(anonymousCaller, mailboxSecret)) ?? '';
+    setMode({ DEV_MAILBOX_SECRET: mailboxSecret, VERCEL_ENV: 'production' });
+
+    const refused = await mailbox.loadMailboxMessage(
+      anonymousCaller,
+      cookie,
+      messageId,
+    );
+
+    expect(refused).toEqual({ status: 'disabled' });
+    expect(await auditRows(messageId)).toEqual([]);
   });
 });

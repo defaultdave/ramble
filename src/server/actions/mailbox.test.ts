@@ -1,11 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mailboxSecret, setEnv } from '../../../tests/email/testEnv';
+import { anonymousCaller, getCaller } from '@/server/auth/caller';
+import { recordAudit } from '@/server/db/audit';
 import { consumeRateLimit } from '@/server/ports/rate-limit';
 import { unlockDevMailbox } from './mailbox';
 
 const testEnv = vi.hoisted((): Record<string, unknown> => ({}));
 vi.mock('@/server/env', () => ({ env: testEnv }));
 vi.mock('@/server/db/messages', () => ({}));
+vi.mock('@/server/db/audit', () => ({ recordAudit: vi.fn() }));
+vi.mock('@/server/auth/caller', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/server/auth/caller')>()),
+  getCaller: vi.fn(),
+}));
 vi.mock('@/server/ports/rate-limit', () => ({ consumeRateLimit: vi.fn() }));
 
 const cookieSet = vi.hoisted(() => vi.fn());
@@ -32,6 +39,9 @@ vi.mock('next/navigation', () => ({
 // - a wrong attempt is counted against the caller's own address; one over the limit redirects to the limited page
 // - a right secret is never counted and never refused, even when the failure counter refuses everyone
 // - when the mailbox is disabled even the right secret is denied
+// - on production the right secret is denied and writes no audit row
+// - a right secret writes one audit row naming the signed-in caller, or a guest with none; a wrong secret writes none
+// - a failed audit write refuses the unlock and sets no cookie
 
 function form(secret?: string) {
   const data = new FormData();
@@ -42,6 +52,8 @@ function form(secret?: string) {
 beforeEach(() => {
   setEnv(testEnv, { DEV_MAILBOX_SECRET: mailboxSecret });
   cookieSet.mockReset();
+  vi.mocked(getCaller).mockReset().mockResolvedValue(anonymousCaller);
+  vi.mocked(recordAudit).mockReset().mockResolvedValue();
   forwardedFor.value = null;
   vi.mocked(consumeRateLimit)
     .mockReset()
@@ -137,6 +149,64 @@ describe('unlockDevMailbox', () => {
 
     await expect(unlockDevMailbox(form(mailboxSecret))).rejects.toThrow(
       'redirect:/ops/mailbox?denied=1',
+    );
+    expect(cookieSet).not.toHaveBeenCalled();
+  });
+
+  it('denies the right secret on production and records nothing', async () => {
+    setEnv(testEnv, {
+      DEV_MAILBOX_SECRET: mailboxSecret,
+      VERCEL_ENV: 'production',
+    });
+
+    await expect(unlockDevMailbox(form(mailboxSecret))).rejects.toThrow(
+      'redirect:/ops/mailbox?denied=1',
+    );
+    expect(cookieSet).not.toHaveBeenCalled();
+    expect(recordAudit).not.toHaveBeenCalled();
+  });
+
+  it('records the right secret once, as the signed-in caller', async () => {
+    vi.mocked(getCaller).mockResolvedValue({
+      ...anonymousCaller,
+      userId: '5b3d7ad4-6f3c-4c2f-9d58-3a0a2f0e8a10',
+    });
+
+    await expect(unlockDevMailbox(form(mailboxSecret))).rejects.toThrow(
+      'redirect:/ops/mailbox',
+    );
+
+    expect(recordAudit).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        actorKind: 'user',
+        actorId: '5b3d7ad4-6f3c-4c2f-9d58-3a0a2f0e8a10',
+        action: 'mailbox.unlocked',
+      }),
+    );
+  });
+
+  it('records a tester with no session as a guest', async () => {
+    await expect(unlockDevMailbox(form(mailboxSecret))).rejects.toThrow();
+
+    expect(recordAudit).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        actorKind: 'guest',
+        action: 'mailbox.unlocked',
+      }),
+    );
+  });
+
+  it('records nothing for a wrong secret', async () => {
+    await expect(unlockDevMailbox(form('wrong'))).rejects.toThrow();
+
+    expect(recordAudit).not.toHaveBeenCalled();
+  });
+
+  it('sets no cookie when the audit write fails', async () => {
+    vi.mocked(recordAudit).mockRejectedValue(new Error('audit down'));
+
+    await expect(unlockDevMailbox(form(mailboxSecret))).rejects.toThrow(
+      'audit down',
     );
     expect(cookieSet).not.toHaveBeenCalled();
   });

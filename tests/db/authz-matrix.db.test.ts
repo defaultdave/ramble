@@ -47,6 +47,7 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 setupAuthzDatabase();
 
 type Data = {
+  audit: typeof import('@/server/db/audit');
   anonymize: typeof import('@/server/db/anonymize');
   catalog: typeof import('@/server/db/catalog');
   editorial: typeof import('@/server/db/editorial');
@@ -107,6 +108,7 @@ const platform = (...who: readonly Subject[]) => ({ platform: who });
 
 beforeAll(async () => {
   data = {
+    audit: await import('@/server/db/audit'),
     anonymize: await import('@/server/db/anonymize'),
     catalog: await import('@/server/db/catalog'),
     editorial: await import('@/server/db/editorial'),
@@ -398,6 +400,12 @@ const rows: Row[] = [
       missing: staff,
     },
   },
+  // The ops area: ops alone, and the audit row is written only for ops.
+  {
+    fn: 'recordOpsAccess',
+    invoke: (c) => data.audit.recordOpsAccess(c),
+    allows: platform(...opsOnly),
+  },
   // Seed and persona writes: ops alone. These write the most, so they come last.
   {
     fn: 'seedPersonas',
@@ -618,6 +626,8 @@ describe('a host owner asking about an experience', () => {
 describe('the matrix is complete', () => {
   /** Functions that take a Caller and are the guard or its parts, not guarded functions. */
   const guards = new Set(['requireRole', 'requireStaff']);
+  /** The mailbox opens to the ops role or, off production, to the shared secret, so its access rule is not a role row; src/server/ports/email/mailbox.test.ts and tests/db/email-mailbox.db.test.ts cover every combination. */
+  const mailboxGate = ['unlockMailbox', 'loadMailbox', 'loadMailboxMessage'];
 
   const serverRoot = path.resolve(import.meta.dirname, '../../src/server');
 
@@ -651,7 +661,8 @@ describe('the matrix is complete', () => {
   it('lists every exported function in src/server that takes a Caller', () => {
     const inMatrix = new Set(rows.map((row) => row.fn));
     const missing = exportedCallerFunctions().filter(
-      (name) => !inMatrix.has(name) && !guards.has(name),
+      (name) =>
+        !inMatrix.has(name) && !guards.has(name) && !mailboxGate.includes(name),
     );
     expect(missing).toEqual([]);
   });

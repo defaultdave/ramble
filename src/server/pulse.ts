@@ -15,8 +15,10 @@ import {
 } from '@/lib/jobs';
 import { alerts } from '@/server/monitoring/alerts';
 import { readBodyText } from '@/server/boundedBody';
+import { revalidateTagsForChanges } from '@/server/cache/invalidate';
 import { releaseLapsedHolds, scrubReleasedHolds } from '@/server/db/holds';
 import { PURGE_BATCH, purgeExpiredRateLimits } from '@/server/db/rateLimits';
+import { extendSessionHorizon } from '@/server/db/sessions';
 import { env } from '@/server/env';
 import { scheduleAuditExports } from '@/server/jobs/auditSchedule';
 import { drainJobs } from '@/server/jobs/drain';
@@ -30,6 +32,7 @@ type PulseCounts = DrainReport & {
   purged: number;
   holdsReleased: number;
   holdsScrubbed: number;
+  sessionsCreated: number;
 };
 
 type PulseResult =
@@ -105,6 +108,29 @@ async function queueAuditExports(): Promise<void> {
 }
 
 /**
+ * Keeps the rolling window of sessions generated, on the pulse's clock. A failure is logged by name
+ * and not thrown, for the reason given on `queueAuditExports`: the next pulse tries the same range
+ * again, and a date already generated is left alone. Returns how many sessions were created.
+ */
+async function extendSessions(now: Date): Promise<number> {
+  try {
+    const { created, experienceIds } = await extendSessionHorizon(now);
+    revalidateTagsForChanges(
+      experienceIds.map((experienceId) => ({
+        kind: 'schedule',
+        experienceId,
+      })),
+    );
+    return created;
+  } catch (error) {
+    const errorName = errorKind(error, 'NonError');
+    logger.error('the session horizon could not be extended', { errorName });
+    alerts.raise('session-horizon-failed', 'error', 'queue', { errorName });
+    return 0;
+  }
+}
+
+/**
  * Every entry the pulse runs, in order. The later units' entries join this list:
  * TODO(U-097): synthetic booking and timing checks; TODO(U-098): hourly dump trigger.
  */
@@ -114,7 +140,9 @@ async function runPulse(
 ): Promise<PulseCounts> {
   const startedAt = performance.now();
   await queueAuditExports();
-  const report = await drainJobs(asOf ? fixedClock(asOf) : systemClock);
+  const clock = asOf ? fixedClock(asOf) : systemClock;
+  const report = await drainJobs(clock);
+  const sessionsCreated = await extendSessions(clock.now());
   const purged = await purgeRateLimits(startedAt);
   const { holdsReleased, holdsScrubbed } = await cleanUpHolds(startedAt);
   if (
@@ -122,7 +150,7 @@ async function runPulse(
   ) {
     await sendHeartbeat(env.BETTERSTACK_HEARTBEAT_URL);
   }
-  return { ...report, purged, holdsReleased, holdsScrubbed };
+  return { ...report, purged, holdsReleased, holdsScrubbed, sessionsCreated };
 }
 
 async function handlePulse(request: Request): Promise<PulseResult> {

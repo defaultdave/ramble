@@ -16,6 +16,7 @@ import {
   occurrencesBetween,
   requiresStaff,
   resolveHostZone,
+  rollingRange,
   splitUpcoming,
 } from './sessions';
 
@@ -658,5 +659,72 @@ describe('requiresStaff', () => {
     ['external', true],
   ] as const)('%s: %s', (source, expected) => {
     expect(requiresStaff(source)).toBe(expected);
+  });
+});
+
+// Behaviours under test for the rolling window, one per decision, branch or risk:
+// - the range runs from the day before now's UTC date to 12 weeks (84 days) ahead
+// - near the end of year 9999 it stops at the generation horizon, and a bad clock throws
+// - the range is the same all day, so a second run of the same day asks for the same dates
+// - a weekly template walked over the range across a daylight saving change keeps its local start
+describe('rollingRange', () => {
+  it.each([
+    ['midday', '2026-10-26T12:00:00Z', '2026-10-25', '2027-01-18'],
+    ['just after midnight', '2026-10-26T00:00:01Z', '2026-10-25', '2027-01-18'],
+    ['a leap year', '2028-01-10T12:00:00Z', '2028-01-09', '2028-04-03'],
+    ['year end', '2026-12-31T23:59:59Z', '2026-12-30', '2027-03-25'],
+  ])(
+    'at %s runs from the day before to 84 days ahead',
+    (_name, now, fromDate, toDate) => {
+      expect(rollingRange(new Date(now))).toEqual({ fromDate, toDate });
+    },
+  );
+
+  it('keeps the same dates for every instant of a UTC day', () => {
+    const morning = rollingRange(new Date('2026-10-26T00:00:00Z'));
+    const night = rollingRange(new Date('2026-10-26T23:59:59Z'));
+
+    expect(night).toEqual(morning);
+  });
+
+  it('fits what generateSessions accepts at every clock it may run on', () => {
+    const now = new Date('2026-10-26T12:00:00Z');
+    const { toDate } = rollingRange(now);
+
+    expect(isBeyondHorizon(toDate, now)).toBe(false);
+    expect(
+      GenerateSessionsInputSchema.safeParse({
+        templateId: '00000000-0000-4000-8000-000000000000',
+        ...rollingRange(now),
+      }).success,
+    ).toBe(true);
+  });
+
+  it('stops at the generation horizon at the end of year 9999', () => {
+    const now = new Date('9999-12-20T00:00:00Z');
+
+    expect(rollingRange(now)).toEqual({
+      fromDate: '9999-12-19',
+      toDate: '9999-12-29',
+    });
+  });
+
+  it('throws for a clock it cannot trust', () => {
+    expect(() => rollingRange(new Date('1000-12-31T23:59:59Z'))).toThrow(
+      RangeError,
+    );
+  });
+
+  it('keeps a Saturday 10:00 local start across the spring-forward change', () => {
+    const now = new Date('2026-02-20T12:00:00Z');
+    const { fromDate, toDate } = rollingRange(now);
+
+    const starts = occurrencesBetween(template, newYork, fromDate, toDate).map(
+      (occurrence) => occurrence.startsAt.toISOString(),
+    );
+
+    expect(starts).toHaveLength(12);
+    expect(starts).toContain('2026-03-07T15:00:00.000Z');
+    expect(starts).toContain('2026-03-14T14:00:00.000Z');
   });
 });

@@ -45,6 +45,6 @@ describe('hashSignInToken', () => {
   it('throws in production when no secret is set', async () => {
     const { hashSignInToken } = await load({ NODE_ENV: 'production' });
 
-    expect(() => hashSignInToken(token)).toThrow('SIGN_IN_LINK_SECRET');
+    await expect(hashSignInToken(token)).rejects.toThrow('SIGN_IN_LINK_SECRET');
   });
 });

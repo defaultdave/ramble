@@ -87,7 +87,7 @@ export function pickAuthSecret(
 /** A deployed environment must say its own address: a localhost default would put it in every sign-in link. */
 export function appUrlIsRequired(
   vercelEnv: string | undefined,
-  configured: string | undefined,
+  configured: boolean,
 ): boolean {
   return (vercelEnv === 'production' || vercelEnv === 'preview') && !configured;
 }

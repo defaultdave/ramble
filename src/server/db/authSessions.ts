@@ -3,6 +3,7 @@ import { and, eq, gt, sql } from 'drizzle-orm';
 import { db } from './client';
 import { authSessions } from './schema';
 
+// Called only from callerForHeaders (src/server/auth/caller.ts), which is where a caller is made.
 /**
  * Moves a session's idle deadline forward to `expiresAt`, never back, and never on a session that
  * has already lapsed: a request that raced the deadline cannot bring the session back.

@@ -1,6 +1,11 @@
 import 'server-only';
 import { isSessionLive, touchedSessionExpiry } from '@/lib/auth';
-import { isValidGrantScope, type RoleGrant } from '@/lib/roleGrants';
+import {
+  accessFromGrants,
+  ownsHostRole,
+  type HostGrant,
+  type RoleGrant,
+} from '@/lib/roleGrants';
 import { systemClock } from '@/server/ports/clock';
 
 export const Role = {
@@ -27,11 +32,6 @@ export type Caller = {
   hostGrants?: readonly HostGrant[];
 };
 
-export type HostGrant = {
-  role: typeof Role.HostOwner | typeof Role.HostStaff;
-  hostId: string;
-};
-
 /** The row a data-layer function is about to read or write. */
 export type Resource = {
   hostId?: string;
@@ -52,28 +52,11 @@ export const anonymousCaller: Caller = {
   hostIds: [],
 };
 
-/**
- * Everyone signed in is a guest. Each grant adds its role, and a host role adds its host. A grant
- * whose host does not match its role (the table's CHECK refuses one) is skipped, never half used.
- */
 export function callerFromGrants(
   userId: string,
   grants: readonly RoleGrant[],
 ): Caller {
-  const valid = grants.filter(isValidGrantScope);
-  const hostGrants = valid.flatMap((g) =>
-    g.hostId !== null && (g.role === 'host_owner' || g.role === 'host_staff')
-      ? [{ role: g.role, hostId: g.hostId }]
-      : [],
-  );
-  return {
-    hostGrants,
-    userId,
-    roles: [...new Set<Role>([Role.Guest, ...valid.map((g) => g.role)])],
-    hostIds: [
-      ...new Set(valid.flatMap((g) => (g.hostId === null ? [] : [g.hostId]))),
-    ],
-  };
+  return { userId, ...accessFromGrants(grants) };
 }
 
 /** The caller a request's cookies name: anonymous without a live session, otherwise the person with their grants. */
@@ -127,11 +110,7 @@ function ownsResource(caller: Caller, role: Role, resource: Resource) {
     case Role.HostStaff:
       return (
         resource.hostId !== undefined &&
-        (caller.hostGrants
-          ? caller.hostGrants.some(
-              (g) => g.role === role && g.hostId === resource.hostId,
-            )
-          : caller.hostIds.includes(resource.hostId))
+        ownsHostRole(caller, role, resource.hostId)
       );
     case Role.Guest:
       return (

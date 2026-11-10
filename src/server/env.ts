@@ -147,3 +147,6 @@ function readEnv() {
 }
 
 export const env = readEnv();
+
+/** `env.APP_URL` has a default, so this is what says whether the variable was set. */
+export const appUrlConfigured = (process.env.APP_URL ?? '') !== '';

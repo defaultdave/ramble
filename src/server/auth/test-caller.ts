@@ -1,4 +1,5 @@
 import 'server-only';
+import { pairEveryHostRole } from '@/lib/roleGrants';
 import { Role, type Caller } from './caller';
 
 export const TEST_USER_ID = 'user-test';
@@ -16,10 +17,6 @@ export function testCaller(overrides: Partial<Caller> = {}): Caller {
   // Every host role on every host, the shape the tests have always meant by `roles` and `hostIds`.
   return {
     ...caller,
-    hostGrants: caller.roles.flatMap((role) =>
-      role === Role.HostOwner || role === Role.HostStaff
-        ? caller.hostIds.map((hostId) => ({ role, hostId }))
-        : [],
-    ),
+    hostGrants: pairEveryHostRole(caller.roles, caller.hostIds),
   };
 }

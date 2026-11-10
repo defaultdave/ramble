@@ -135,12 +135,12 @@ describe('pickAuthSecret', () => {
 
 describe('appUrlIsRequired', () => {
   it.each([
-    ['production', undefined, true],
-    ['preview', undefined, true],
-    ['production', 'https://ramble.example', false],
-    ['development', undefined, false],
-    [undefined, undefined, false],
-  ])('on %s with APP_URL %s is %s', (vercelEnv, configured, expected) => {
+    ['production', false, true],
+    ['preview', false, true],
+    ['production', true, false],
+    ['development', false, false],
+    [undefined, false, false],
+  ])('on %s with APP_URL set %s is %s', (vercelEnv, configured, expected) => {
     expect(appUrlIsRequired(vercelEnv, configured)).toBe(expected);
   });
 });

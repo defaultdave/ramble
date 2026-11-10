@@ -17,7 +17,7 @@ import {
   authUsers,
   authVerifications,
 } from '@/server/db/schema';
-import { env } from '@/server/env';
+import { appUrlConfigured, env } from '@/server/env';
 import { systemClock } from '@/server/ports/clock';
 import { sendEmail } from '@/server/ports/email';
 import { hashSignInToken } from './signInToken';
@@ -29,8 +29,7 @@ function createAuth() {
     env.NODE_ENV,
   );
   if (secret === null) throw new Error('BETTER_AUTH_SECRET is not set');
-  // `env.APP_URL` defaults to localhost, so the raw variable is what says whether it was set.
-  if (appUrlIsRequired(env.VERCEL_ENV, process.env.APP_URL)) {
+  if (appUrlIsRequired(env.VERCEL_ENV, appUrlConfigured)) {
     throw new Error('APP_URL is not set');
   }
 

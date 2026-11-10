@@ -1,0 +1,4 @@
+/* A grid item stretches; the label keeps the width of its text. */
+.demo {
+  justify-self: start;
+}

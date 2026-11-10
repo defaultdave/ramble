@@ -539,7 +539,6 @@ export function transferReversed(
   );
 }
 
-// TODO(U-056): first caller, the refund path.
 /** A refund requested: no cash moves yet (rule 5). The legs are the refund row's split, `T - c`, `c`, and `X`. */
 export function refundRequested(
   input: Common &
@@ -573,7 +572,6 @@ export function refundRequested(
   );
 }
 
-// TODO(U-056): first caller, the refund.succeeded handler.
 /** The provider paid the refund out: `T + X` leaves cash, under the provider's refund id. A gift refund names the gift instead of an order. */
 export function refundSucceeded(
   input: Common &
@@ -597,7 +595,6 @@ export function refundSucceeded(
   );
 }
 
-// TODO(U-056): first caller, the refund.failed handler.
 /** A refund failed: one row per requested leg puts each back where it came from. */
 export function refundFailed(
   input: Common &

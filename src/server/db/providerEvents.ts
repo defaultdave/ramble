@@ -28,6 +28,7 @@ import {
   type ProviderEventRow,
   type RetryReason,
 } from '@/lib/providerEvents';
+import { isRefundEventType, type RefundEventType } from '@/lib/refunds';
 import { enqueue } from '@/server/jobs/enqueue';
 import { db, type Transaction } from './client';
 import type { ConfirmOrder } from './confirmOrder';
@@ -37,6 +38,7 @@ import {
   lockOrderById,
   lockSessionRow,
 } from './locks';
+import { applyRefundEvent } from './refunds';
 import { holds, orders, paymentAttempts, providerEvents } from './schema';
 import { readHoldSettings } from './settings';
 import { readDatabaseTime } from './time';
@@ -253,6 +255,37 @@ async function applyFailedTry(
 }
 
 /**
+ * A refund event: the order's events lock first (rule 8), then the order and refund locks inside
+ * `applyRefundEvent`, and the event read again after them. An event that names no refund of Ramble's, or
+ * contradicts the refund it names, writes nothing and is retried with backoff, which alerts on the
+ * 5th try and again when the last is spent; the retry reasons are the payment path's, so the alert
+ * names an unmatched event.
+ */
+async function processRefundEvent(
+  tx: Transaction,
+  first: NonNullable<Awaited<ReturnType<typeof readProviderEvent>>>,
+  type: RefundEventType,
+): Promise<ProviderEventResult> {
+  if (first.rambleOrderId === null) return recordRetry(tx, first, 'unmatched');
+  await lockOrderEvents(tx, first.rambleOrderId);
+  const event = await readProviderEvent(tx, first.id);
+  if (!event) throw new Error('The provider event does not exist');
+  if (event.processedAt !== null) return { status: 'already_processed' };
+  const outcome = await applyRefundEvent(tx, {
+    type,
+    objectId: event.objectId,
+    amountMinor: event.amountMinor,
+    rambleOrderId: event.rambleOrderId,
+    rambleRecordId: event.rambleRecordId,
+  });
+  if (outcome === 'unmatched' || outcome === 'conflict') {
+    return recordRetry(tx, event, 'unmatched');
+  }
+  await markProcessed(tx, event.id);
+  return { status: 'processed' };
+}
+
+/**
  * Handles one stored event, inside the job's transaction. The order's events lock comes first
  * (rule 8), then the session, hold, and order locks in their one order (rule 1), and everything the
  * decision rests on is read after them, the event row included. Time for the decision is read after
@@ -266,6 +299,7 @@ export async function processProviderEvent(
   if (!first) throw new Error('The provider event does not exist');
   if (first.processedAt !== null) return { status: 'already_processed' };
   const type = first.type;
+  if (isRefundEventType(type)) return processRefundEvent(tx, first, type);
   if (!isPaymentEventType(type)) {
     return {
       status: 'left',

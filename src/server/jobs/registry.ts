@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { AuditExportPayloadSchema, auditExportKind } from '@/lib/audit';
 import { OpsNoticeDataSchema, opsNoticeKind } from '@/lib/email/opsNotice';
 import { MaxAttemptsSchema, jobLimits } from '@/lib/jobs';
+import { ProcessRefundPayloadSchema, processRefundKind } from '@/lib/refunds';
 import {
   ProcessProviderEventPayloadSchema,
   processProviderEventKind,
@@ -17,6 +18,7 @@ import {
   sendSessionReminder,
 } from './bookingEmails';
 import { sendOpsNotice } from './opsNotice';
+import { handleRefund, prepareRefund } from './refund';
 import { handleProviderEvent, prepareProviderEvent } from './providerEvents';
 
 type JobContext<Payload> = {
@@ -116,5 +118,11 @@ export const jobRegistry = {
     payload: OpsNoticeDataSchema,
     maxAttempts: jobLimits.defaultMaxAttempts,
     handleIdempotent: sendOpsNotice,
+  }),
+  [processRefundKind]: defineJob({
+    payload: ProcessRefundPayloadSchema,
+    maxAttempts: jobLimits.defaultMaxAttempts,
+    prepare: (payload) => prepareRefund(payload),
+    handleIdempotent: (context) => handleRefund(context),
   }),
 } satisfies JobRegistry;

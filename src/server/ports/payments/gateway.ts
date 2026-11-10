@@ -49,6 +49,8 @@ function createGateway(webhookSecret: string): FakeGateway {
       write((adapter) => adapter.reverseTransfer(input)),
     confirm: (paymentId, input) =>
       write((adapter) => adapter.confirm(paymentId, input)),
+    setRefundOutcome: (paymentId, input) =>
+      write((adapter) => adapter.setRefundOutcome(paymentId, input)),
     retrieve: (query) => read((adapter) => adapter.retrieve(query)),
     getBalance: () => read((adapter) => adapter.getBalance()),
     lastEventFor: (paymentId) =>

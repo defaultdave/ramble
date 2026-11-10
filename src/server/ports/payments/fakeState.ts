@@ -112,6 +112,8 @@ const StoredStateSchema = z.strictObject({
     .max(maxIdempotencyKeys),
   byMetadata: entries(ProviderIdSchema, maxObjects),
   actionRounds: entries(z.int().min(0).max(maxActionRounds), maxObjects),
+  // Added after the first rows were written, so a row without it is a gateway with no failing refunds.
+  refundFailures: entries(FailureCodeSchema.unwrap(), maxObjects).default([]),
   events: z.array(StrictEventSchema).max(maxEvents),
   balanceMinor: z.int(),
 });
@@ -128,6 +130,7 @@ export const emptyFakeStateDocument = {
   idempotency: [],
   byMetadata: [],
   actionRounds: [],
+  refundFailures: [],
   events: [],
   balanceMinor: 0,
 } satisfies StoredState;
@@ -148,6 +151,7 @@ export function serializeFakeState(state: FakePaymentsState): StoredState {
     ]),
     byMetadata: [...state.byMetadata],
     actionRounds: [...state.actionRounds],
+    refundFailures: [...state.refundFailures],
     events: state.events.map(storedEvent),
     balanceMinor: state.balanceMinor,
   };
@@ -168,6 +172,7 @@ export function parseFakeState(stored: unknown): FakePaymentsState {
     idempotency: new Map(parsed.idempotency),
     byMetadata: new Map(parsed.byMetadata),
     actionRounds: new Map(parsed.actionRounds),
+    refundFailures: new Map(parsed.refundFailures),
     events: parsed.events,
     balanceMinor: parsed.balanceMinor,
   };

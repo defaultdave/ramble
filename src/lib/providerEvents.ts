@@ -36,6 +36,7 @@ export const alertAfterEventAttempts = 5;
 const providerEventAlerts = {
   unmatched: 'payment-event-unmatched',
   confirmUnavailable: 'payment-confirm-unavailable',
+  refundConflict: 'refund-event-conflict',
   duplicatePayment: 'payment-duplicate',
 } as const;
 
@@ -75,7 +76,7 @@ export function eventAlertKey(eventId: string): string {
 
 export type PaymentEventType = Extract<ProviderEventType, `payment.${string}`>;
 
-/** Refund, transfer, and dispute events belong to later units: stored, then left alone. */
+/** Transfer and dispute events belong to later units: stored, then left alone. Refund events are handled with the refunds. */
 export function isPaymentEventType(
   type: ProviderEventType,
 ): type is PaymentEventType {
@@ -84,6 +85,11 @@ export function isPaymentEventType(
 
 export function isDeferredEventType(type: ProviderEventType): boolean {
   return !isPaymentEventType(type);
+}
+
+/** An event with a processing time is finished: a repeat of its job does nothing. */
+export function isEventProcessed(event: { processedAt: Date | null }): boolean {
+  return event.processedAt !== null;
 }
 
 /** The ids an event is handled under: its own, or the ones the provider reported when it carried none. */
@@ -484,11 +490,13 @@ export function requireOrderTransition(
   }
 }
 
-export type RetryReason = 'unmatched' | 'confirm_unavailable';
+export type RetryReason =
+  'unmatched' | 'confirm_unavailable' | 'refund_conflict';
 
 export const retryErrors = {
   unmatched: 'No matching payment attempt',
   confirm_unavailable: 'Order confirmation is not available yet',
+  refund_conflict: 'The event contradicts the refund it names',
 } as const satisfies Record<RetryReason, string>;
 
 export type EventRetry = {
@@ -514,7 +522,8 @@ export function eventRetry(
   const tries = Math.min(attempts + 1, paymentLimits.maxEventAttempts);
   const last = tries >= paymentLimits.maxEventAttempts;
   const alertsOnFifth =
-    reason === 'unmatched' && tries === alertAfterEventAttempts;
+    (reason === 'unmatched' || reason === 'refund_conflict') &&
+    tries === alertAfterEventAttempts;
   return {
     tries,
     runAfter: last
@@ -554,6 +563,12 @@ export type EventAlert = {
   context: Record<string, unknown>;
 };
 
+const retryAlertKinds = {
+  unmatched: providerEventAlerts.unmatched,
+  confirm_unavailable: providerEventAlerts.confirmUnavailable,
+  refund_conflict: providerEventAlerts.refundConflict,
+} as const satisfies Record<RetryReason, string>;
+
 /** The alert a result calls for, if any. Context carries ids only, never the event body. */
 export function alertFor(
   result: ProviderEventResult,
@@ -569,10 +584,7 @@ export function alertFor(
   }
   if (result.status === 'retry' && result.alert !== null) {
     return {
-      kind:
-        result.reason === 'unmatched'
-          ? providerEventAlerts.unmatched
-          : providerEventAlerts.confirmUnavailable,
+      kind: retryAlertKinds[result.reason],
       key: result.alert === 'gave_up' ? `${key}:gave-up` : key,
       context: { eventId, tries: result.tries },
     };

@@ -29,13 +29,11 @@ describe('the keyword search in the filter bar', () => {
   it('is a GET form to the browse address with a search field', () => {
     renderBar(noFilters);
 
-    const form = screen.getByRole('search', { name: 'Search experiences' });
+    const field = screen.getByRole('searchbox', { name: 'Search' });
+    expect(field).toHaveAttribute('name', 'q');
+    const form = field.closest('form');
     expect(form).toHaveAttribute('method', 'get');
     expect(form).toHaveAttribute('action', '/new-york/browse');
-    expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveAttribute(
-      'name',
-      'q',
-    );
   });
 
   it('is not inside the noscript, so it needs no script either way', () => {
@@ -65,7 +63,7 @@ describe('the keyword search in the filter bar', () => {
   });
 
   it('keeps the other filters and leaves out the search', () => {
-    const { container } = renderBar({
+    renderBar({
       ...noFilters,
       categories: ['cooking'],
       guests: 3,
@@ -73,8 +71,9 @@ describe('the keyword search in the filter bar', () => {
     });
 
     const hidden = Array.from(
-      container
-        .querySelector('form[role="search"]')
+      screen
+        .getByRole('searchbox', { name: 'Search' })
+        .closest('form')
         ?.querySelectorAll<HTMLInputElement>('input[type="hidden"]') ?? [],
     ).map((input) => [input.name, input.value]);
     expect(hidden).toEqual([

@@ -18,7 +18,11 @@ type KeywordSearchProps = {
   value: string | null;
 };
 
-/** A plain GET form, so it works with scripting off and needs nothing beside the bar to submit. */
+/**
+ * A plain GET form, so it works with scripting off and needs nothing beside the bar to submit. It is
+ * not a search landmark: the stories render the bar once per colour scheme, and axe refuses two
+ * landmarks of one name on a page.
+ */
 export function KeywordSearch({
   action,
   name,
@@ -26,13 +30,7 @@ export function KeywordSearch({
   value,
 }: KeywordSearchProps) {
   return (
-    <form
-      className={styles.searchForm}
-      action={action}
-      method="get"
-      role="search"
-      aria-label="Search experiences"
-    >
+    <form className={styles.searchForm} action={action} method="get">
       <HiddenFields fields={kept} />
       <div className={styles.searchField}>
         <Input

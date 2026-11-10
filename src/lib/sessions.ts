@@ -312,6 +312,27 @@ export function generationHorizon(now: Date): string {
   return isoDateOf(new Date(reach));
 }
 
+/** How far ahead of now the rolling job keeps every template's sessions generated. */
+const rollingHorizonWeeks = 12;
+
+const lastRollingInstant = Date.UTC(9999, 11, 29);
+
+/**
+ * The dates the rolling job asks `generateSessions` for at `now`: from the day before the UTC date
+ * of `now` (a host west of UTC can still be on yesterday's date, and a date whose start has passed
+ * is skipped anyway) to `rollingHorizonWeeks` ahead, never past `generationHorizon`. The range is
+ * the same on every pulse of a day, so a second run finds every date already there.
+ */
+export function rollingRange(now: Date): { fromDate: string; toDate: string } {
+  const horizon = generationHorizon(now);
+  const wanted = now.getTime() + rollingHorizonWeeks * 7 * msPerDay;
+  return {
+    fromDate: isoDateOf(new Date(now.getTime() - msPerDay)),
+    toDate:
+      wanted >= lastRollingInstant ? horizon : isoDateOf(new Date(wanted)),
+  };
+}
+
 /** Whether `toDate` reaches past what a call made at `now` may generate for. */
 export function isBeyondHorizon(toDate: string, now: Date): boolean {
   return toDate > generationHorizon(now);

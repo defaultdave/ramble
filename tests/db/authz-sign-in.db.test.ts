@@ -78,10 +78,15 @@ async function linkFor(address: string) {
   const response = await askForLink({ email: address, callbackURL: '/' });
   expect(response.status).toBe(200);
   const html = (await emailsTo(address.toLowerCase())).at(-1) ?? '';
-  const href = /href="([^"]*magic-link\/verify[^"]*)"/.exec(html)?.[1];
+  const href = /href="([^"]*sign-in\/confirm[^"]*)"/.exec(html)?.[1];
   if (!href) throw new Error('no sign-in link in the email');
-  const url = href.replaceAll('&amp;', '&');
-  return { url, token: new URL(url).searchParams.get('token') ?? '' };
+  const token =
+    new URL(href.replaceAll('&amp;', '&')).searchParams.get('token') ?? '';
+  // The email opens the confirm page; these tests are about the session, so they go to the verify address it posts to.
+  return {
+    url: `${origin}/api/auth/magic-link/verify?token=${token}&callbackURL=%2F`,
+    token,
+  };
 }
 
 const followLink = (url: string, cookie?: string) =>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   everyJsonNode,
+  firstQueryValue,
   isStorableJson,
   notBlankPattern,
   oneLineClipped,
@@ -95,5 +96,16 @@ describe('oneLineClipped', () => {
     ['only whitespace', ' \n ', 5, ''],
   ])('gives %s', (_label, input, max, expected) => {
     expect(oneLineClipped(input, max)).toBe(expected);
+  });
+});
+
+describe('firstQueryValue', () => {
+  it.each([
+    ['one value', 'a', 'a'],
+    ['a repeated parameter', ['a', 'b'], 'a'],
+    ['an empty list', [], undefined],
+    ['an absent parameter', undefined, undefined],
+  ])('gives the first of %s', (_label, input, expected) => {
+    expect(firstQueryValue(input)).toBe(expected);
   });
 });

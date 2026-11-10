@@ -7,7 +7,7 @@ import { renderEmail } from './render';
 // - the plain-text part holds the link and no tags, and neither part has an em dash
 
 const url =
-  'https://ramble.example/api/auth/magic-link/verify?token=AbCdEfGhIjKlMnOpQrStUvWxYzAbCdEf&callbackURL=%2Faccount';
+  'https://ramble.example/sign-in/confirm?token=AbCdEfGhIjKlMnOpQrStUvWxYzAbCdEf&next=%2Faccount';
 
 async function rendered() {
   return renderEmail(

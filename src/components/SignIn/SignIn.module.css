@@ -1,0 +1,31 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 28rem;
+}
+
+.notice {
+  max-width: 28rem;
+}
+
+.notice:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: calc(var(--space-1) / 2);
+  border-radius: var(--radius-md);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 28rem;
+}
+
+/* The button fills the phone width and keeps its own from tablet up. */
+@media (min-width: 768px) {
+  .form > button,
+  .stack > form > button {
+    align-self: flex-start;
+  }
+}

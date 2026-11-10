@@ -8,16 +8,22 @@ import {
   browseWindowDays,
   emptyBrowsePage,
   errorView,
+  withSuggestions,
 } from '@/lib/pages/browse';
 import {
   knownFilters,
   parseFilters,
+  type BrowseFilters,
   type RawSearchParams,
 } from '@/lib/filters';
 import { upcomingWindow } from '@/lib/sessionWindow';
 import { minuteAsOf } from '@/lib/time';
 import { venueToday } from '@/lib/venue';
-import { getBrowseDates, getBrowseResults } from '@/server/browse';
+import {
+  getBrowseDates,
+  getBrowseResults,
+  getZeroResultSuggestions,
+} from '@/server/browse';
 import { getFilterOptions } from '@/server/filterOptions';
 import { chooseBrowseDate } from '@/server/actions/browse';
 import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
@@ -66,7 +72,11 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
   }
 
   const { options, dates, page } = loaded;
-  const view = browseView(query, page, dates);
+  const found = browseView(query, page, dates);
+  const view =
+    found.state === 'empty' && found.filtered
+      ? withSuggestions(found, await zeroResultSuggestions(filters, asOf))
+      : found;
   return (
     <div id={browseResultsId} data-reveal-without-script>
       {/* Always rendered, so a screen reader hears the text change when the filters do. */}
@@ -92,4 +102,14 @@ export async function BrowseContent({ searchParams }: BrowseContentProps) {
       </div>
     </div>
   );
+}
+
+/** A way forward is a courtesy: when its reads fail, the empty state shows without it. */
+async function zeroResultSuggestions(filters: BrowseFilters, asOf: string) {
+  try {
+    return await getZeroResultSuggestions(filters, asOf);
+  } catch (error) {
+    rethrowOrLog('Browse suggestions could not be read', error);
+    return [];
+  }
 }

@@ -3,14 +3,30 @@ import { cacheLife, cacheTag } from 'next/cache';
 import {
   browseDays,
   browseTitle,
+  browseWindowDays,
   toBrowsePage,
   type BrowsePage,
 } from '@/lib/pages/browse';
 import { tags } from '@/lib/cacheTags';
-import type { BrowseFilters, BrowseQuery } from '@/lib/filters';
+import {
+  knownFilters,
+  type BrowseFilters,
+  type BrowseQuery,
+} from '@/lib/filters';
+import { upcomingWindow } from '@/lib/sessionWindow';
+import {
+  removals,
+  suggestions,
+  type FilterParam,
+  type ZeroResultSuggestion,
+} from '@/lib/zeroResults';
 import { readOrRefuse } from '@/server/cache/readOrRefuse';
 import { tagExperiences } from '@/server/cache/tagExperiences';
-import { listBrowseDayRows, listBrowseExperiences } from '@/server/db/browse';
+import {
+  countBrowseExperiences,
+  listBrowseDayRows,
+  listBrowseExperiences,
+} from '@/server/db/browse';
 import { getFilterOptions } from '@/server/filterOptions';
 import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
 
@@ -59,4 +75,34 @@ export async function getBrowseTitle(filters: BrowseFilters): Promise<string> {
     rethrowOrLog('Browse title could not be read', error);
     return browseTitle(filters, { categories: [], neighborhoods: [] });
   }
+}
+
+/**
+ * The filters worth taking off a page with no results, with what browse would list without each. A
+ * count is one cheap read per filter that is on, so this is asked for only when the page is empty.
+ * Counts go through `knownFilters`, so a removal that leaves a slug nobody has, or a date no session
+ * can be on, counts as none, as the page itself would.
+ */
+export async function getZeroResultSuggestions(
+  filters: BrowseFilters,
+  asOf: string,
+): Promise<ZeroResultSuggestion[]> {
+  'use cache';
+  cacheLife('browse');
+  cacheTag(tags.catalog);
+  const options = await getFilterOptions();
+  const window = upcomingWindow(asOf, browseWindowDays);
+  const counts: Partial<Record<FilterParam, number>> = {};
+  await readOrRefuse('Zero results', () =>
+    Promise.all(
+      removals(filters, options).map(async ({ param, filters: without }) => {
+        const known = knownFilters(without, options, window);
+        counts[param] =
+          known.matchesNothing || known.dateOutsideWindow
+            ? 0
+            : await countBrowseExperiences(known.filters, asOf);
+      }),
+    ),
+  );
+  return suggestions(filters, options, counts);
 }

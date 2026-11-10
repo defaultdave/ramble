@@ -16,6 +16,7 @@ import { guestsLabel } from '../orderSummary';
 import { browsePath } from '../routes';
 import { IsoDateSchema, TimeZoneSchema, isKnownTimeZone } from '../sessions';
 import { calendarDateFormat, dateChipLabel } from '../time';
+import type { ZeroResultSuggestion } from '../zeroResults';
 
 /** The id of the streamed results, which the skip link shown with scripting off points at. */
 export const browseResultsId = 'browse-results';
@@ -223,6 +224,8 @@ export type BrowseView =
       filtered: boolean;
       /** Set when the browse has a date: a way out of a day with nothing on it. */
       dated: DatedEmpty | null;
+      /** Filters to take off, with what each would bring back. Set by `withSuggestions`, after the page is known to be empty. */
+      suggestions?: ZeroResultSuggestion[];
       /** A page that has no filters to take off words its empty state for itself. */
       wording?: 'landing';
     }
@@ -284,6 +287,21 @@ export function browseView(
         : targetFor({ filters, after: page.nextCursor }),
     startHref: after === null ? null : hrefForFilters(filters),
   };
+}
+
+/**
+ * The filters to take off, on an empty view. A chosen day already has its own way out ("Any day"), so
+ * the date is not offered a second time. Any other view comes back as it was.
+ */
+export function withSuggestions(
+  view: BrowseView,
+  offered: readonly ZeroResultSuggestion[],
+): BrowseView {
+  if (view.state !== 'empty') return view;
+  const shown = offered.filter(
+    ({ param }) => !(view.dated !== null && param === 'date'),
+  );
+  return shown.length === 0 ? view : { ...view, suggestions: shown };
 }
 
 /** The same address again: a retry reloads exactly what failed. */

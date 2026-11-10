@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { ButtonLink } from '@/components/Button';
 import { RetryAlert } from '@/components/PageError';
 import type { BrowseView } from '@/lib/pages/browse';
@@ -5,6 +6,28 @@ import { browsePath } from '@/lib/routes';
 import styles from './BrowseResults.module.css';
 import { BrowseResultsList } from './BrowseResultsList';
 import { TargetButton } from './TargetButton';
+
+type Suggestions = Extract<BrowseView, { state: 'empty' }>['suggestions'];
+
+function RemoveFilterLinks({ suggestions }: { suggestions: Suggestions }) {
+  if (!suggestions || suggestions.length === 0) return null;
+  return (
+    <section className={styles.suggestions} aria-labelledby="remove-filter">
+      <h3 id="remove-filter" className={styles.suggestionsTitle}>
+        Or take a filter off
+      </h3>
+      <ul className={styles.suggestionList}>
+        {suggestions.map(({ param, label, count, href }) => (
+          <li key={param}>
+            <Link href={href} className={styles.suggestionLink}>
+              Remove {label} ({count})
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 export type BrowseResultsProps = BrowseView;
 
@@ -38,6 +61,7 @@ export function BrowseResults(props: BrowseResultsProps) {
                 Any day
               </ButtonLink>
             </div>
+            <RemoveFilterLinks suggestions={props.suggestions} />
           </div>
         );
       }
@@ -64,6 +88,7 @@ export function BrowseResults(props: BrowseResultsProps) {
               ? 'Try another day, or take a filter off.'
               : 'New experiences are on their way.'}
           </p>
+          <RemoveFilterLinks suggestions={props.suggestions} />
           {props.filtered ? (
             <ButtonLink href={browsePath}>Clear all filters</ButtonLink>
           ) : null}

@@ -4,10 +4,9 @@ import type { z } from 'zod';
 import {
   LapseRefSchema,
   afterAttemptWrite,
-  cancelErrorAction,
+  cancelStep,
   liveAttemptStatuses,
   payingLapse,
-  providerSettled,
   type LapseTarget,
 } from '@/lib/holdLapse';
 import { requireHoldTransition } from '@/lib/holds';
@@ -16,8 +15,7 @@ import {
   requireAttemptTransition,
   requireOrderTransition,
 } from '@/lib/providerEvents';
-import { logger } from '@/server/monitoring/logger';
-import { PaymentsError, type PaymentsPort } from '@/server/ports/payments';
+import type { PaymentsPort } from '@/server/ports/payments';
 import { db, type Transaction } from './client';
 import { lockHoldRow, lockOrderRow, lockSessionRow } from './locks';
 import { readLatestAttempt } from './ordersAttempts';
@@ -102,41 +100,35 @@ async function lookAtHold(
   return { done: true, released: true };
 }
 
-/** The payment's status once a cancel was tried: the cancel's answer, or the payment as it stands when the provider refused. */
-async function paymentStatusAfterCancel(
+/**
+ * Whether the provider holds the attempt's payment cancelled once the sweep is done with it. The
+ * payment is read first and `cancelStep` decides; a cancel that then fails, for any reason, is not
+ * caught: the sweep stops with nothing written and the next pulse reads the payment again.
+ */
+async function settleAtProvider(
   payments: PaymentsPort,
-  holdId: string,
   look: Extract<Look, { done: false }>,
-) {
-  const found =
+): Promise<boolean> {
+  const payment = await payments.retrieve(
     look.target.kind === 'payment'
-      ? { id: look.target.paymentId }
-      : await payments.retrieve({
+      ? { kind: 'payment', id: look.target.paymentId }
+      : {
           kind: 'payment',
           metadata: {
             orderId: look.target.orderId,
             recordId: look.attemptId,
           },
-        });
-  if (found === null) return null;
-  try {
-    return (
-      await payments.cancelPayment({
-        idempotencyKey: look.idempotencyKey,
-        paymentId: found.id,
-      })
-    ).status;
-  } catch (error) {
-    const code = error instanceof PaymentsError ? error.code : null;
-    if (cancelErrorAction(code) === 'rethrow') throw error;
-    logger.warn('Payment cancel refused, payment read instead', {
-      code,
-      holdId,
-      attemptId: look.attemptId,
+        },
+  );
+  const step = cancelStep(look.target, payment?.status ?? null);
+  if (step === 'cancel' && payment) {
+    const cancelled = await payments.cancelPayment({
+      idempotencyKey: look.idempotencyKey,
+      paymentId: payment.id,
     });
-    const current = await payments.retrieve({ kind: 'payment', id: found.id });
-    return current?.status ?? null;
+    return cancelStep(look.target, cancelled.status) === 'already_settled';
   }
+  return step === 'already_settled';
 }
 
 /**
@@ -156,8 +148,7 @@ export async function abandonPayingHold(
   const first = await db.transaction((tx) => lookAtHold(tx, ref, null));
   if (first.done) return first.released;
 
-  const status = await paymentStatusAfterCancel(payments, ref.holdId, first);
-  if (!providerSettled(first.target, status)) return false;
+  if (!(await settleAtProvider(payments, first))) return false;
   const second = await db.transaction((tx) =>
     lookAtHold(tx, ref, first.attemptId),
   );

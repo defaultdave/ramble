@@ -31,7 +31,7 @@ import { hash, insertHold, seedBookable } from './holdFixtures';
 //   provider no longer has are all left as they were, and nothing is voided
 // - a provider that is unavailable makes the sweep throw, and that hold, its order, and its attempt are left as they were
 // - a cancel made earlier (by the sweep's own key, or by anything else) does not stop the release; a second sweep does nothing
-//   and makes no second cancel
+//   and makes no second cancel; the sweep reads the payment first and never cancels one that is already cancelled or succeeded
 // - the sweep's spaces tag is revalidated for a session whose paying hold it released, and not when it released nothing
 // - a submit after the sweep is refused as hold_expired (the guest may hold again) or sold_out, writes nothing, and never
 //   hands back the cancelled payment; before the sweep the same submit is handed the live payment (why the cancel matters)
@@ -219,8 +219,11 @@ describe('what the sweep leaves alone', () => {
       payments,
     );
     await payments.confirm(lapsed.payment?.id ?? '', { outcome: 'succeeded' });
+    const cancel = vi.spyOn(payments, 'cancelPayment');
 
     expect(await sweep(payments)).toBe(0);
+
+    expect(cancel).not.toHaveBeenCalled();
 
     const after = await state(lapsed);
     expect(after.provider).toBe('succeeded');
@@ -310,7 +313,7 @@ describe('what the sweep leaves alone', () => {
 });
 
 describe('a cancel that was made before the sweep got to it', () => {
-  it("under the sweep's own key (a crash after the provider answered): the repeat is idempotent and the hold is released", async () => {
+  it("under the sweep's own key (a crash after the provider answered): the payment is read as cancelled, no second cancel is made, and the hold is released", async () => {
     const payments = use(makePayments());
     const lapsed = await lapsedPayingHold(
       await seedBookable(client.db),
@@ -320,15 +323,18 @@ describe('a cancel that was made before the sweep got to it', () => {
       idempotencyKey: `cancel:${lapsed.started.attempt.providerKey}`,
       paymentId: lapsed.payment?.id ?? '',
     });
+    const cancel = vi.spyOn(payments, 'cancelPayment');
 
     expect(await sweep(payments)).toBe(1);
+
+    expect(cancel).not.toHaveBeenCalled();
 
     const after = await state(lapsed);
     expect(after.order.status).toBe('void');
     expect(after.hold.releasedReason).toBe('payment_abandoned');
   });
 
-  it('by anything else: the provider refuses the second cancel, the payment is read as cancelled, and the hold is released', async () => {
+  it('by anything else: the payment is read as cancelled, no second cancel is made, and the hold is released', async () => {
     const payments = use(makePayments());
     const lapsed = await lapsedPayingHold(
       await seedBookable(client.db),
@@ -338,8 +344,11 @@ describe('a cancel that was made before the sweep got to it', () => {
       idempotencyKey: 'cancel:elsewhere',
       paymentId: lapsed.payment?.id ?? '',
     });
+    const cancel = vi.spyOn(payments, 'cancelPayment');
 
     expect(await sweep(payments)).toBe(1);
+
+    expect(cancel).not.toHaveBeenCalled();
 
     const after = await state(lapsed);
     expect(after.order.status).toBe('void');

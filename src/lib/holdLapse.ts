@@ -117,32 +117,35 @@ export function payingLapse(
 }
 
 /**
- * Whether the provider no longer holds a live payment for the attempt, from the payment's status
- * after the cancel was tried (null: the provider has none). A payment found only by Ramble's ids may
- * be missing, because the attempt never stored one. A payment Ramble stored an id for that is gone
- * is not settled, because Ramble cannot say what became of it. Any other status, a payment in
- * `processing` or one that `succeeded`, is not cancelled and the hold is left for the next run.
+ * What the sweep does about the payment at the provider, from the status it reads before any
+ * cancel (null: the provider has none). A live payment is cancelled. One already cancelled is
+ * settled, and so is none when the attempt never stored a payment id (the payment is looked up by
+ * Ramble's ids and may never have been made). A stored payment id the provider no longer has is
+ * left alone, because Ramble cannot say what became of it, and so is a payment that `succeeded`
+ * (its event is on the way to `confirmOrder`) or is `processing`. The same function judges the
+ * answer of the cancel: `already_settled` means the provider now holds it cancelled.
  */
-export function providerSettled(
+export function cancelStep(
   target: LapseTarget,
   status: AttemptStatus | null,
-): boolean {
-  if (status === null) return target.kind === 'metadata';
-  return status === 'canceled';
+): 'cancel' | 'already_settled' | 'leave_alone' {
+  if (status === null) {
+    return target.kind === 'metadata' ? 'already_settled' : 'leave_alone';
+  }
+  switch (status) {
+    case 'canceled':
+      return 'already_settled';
+    case 'created':
+    case 'requires_action':
+    case 'failed_try':
+      return 'cancel';
+    case 'processing':
+    case 'succeeded':
+      return 'leave_alone';
+  }
 }
 
 /** The idempotency key of the cancel, derived from the attempt's own key so a repeated sweep repeats one call (FORM-8). */
 function cancelAttemptKey(attemptProviderKey: string): string {
   return `cancel:${attemptProviderKey}`;
-}
-
-/**
- * What the sweep does with an error from the cancel. `code` is the payments error's code, or null
- * for any other error. A refusal that only says what the payment's state is (`invalid_state`, or
- * `not_found` for a payment the provider does not have) is answered by reading the payment and
- * letting `providerSettled` decide. Anything else (the provider is unavailable, the key clashed,
- * an error that is not the port's) is rethrown, and the sweep stops and tries again next pulse.
- */
-export function cancelErrorAction(code: string | null): 'read' | 'rethrow' {
-  return code === 'invalid_state' || code === 'not_found' ? 'read' : 'rethrow';
 }

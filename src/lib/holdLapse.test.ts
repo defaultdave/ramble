@@ -2,10 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   LapseRefSchema,
   afterAttemptWrite,
-  cancelErrorAction,
+  cancelStep,
   liveAttemptStatuses,
   payingLapse,
-  providerSettled,
 } from './holdLapse';
 import { at, later, otherUuid, uuid } from './holds.fixtures';
 import { orderStatuses, type OrderStatus } from './orders';
@@ -19,8 +18,7 @@ import { attemptStatuses, type AttemptStatus } from './payments';
 // - an attempt that succeeded is left alone; none, or a cancelled one, needs no provider call
 // - a live attempt is cancelled at the provider first, found by the stored id or by Ramble's ids when none was stored,
 //   and is released only once that same attempt is the one the provider settled
-// - the provider has settled when the payment is cancelled, or is missing for a lookup by Ramble's ids only
-// - an error from the cancel is answered by reading the payment only for `invalid_state` and `not_found`; any other code, or an error with none, is rethrown
+// - the provider payment is read before any cancel: live is cancelled, cancelled is settled, succeeded or processing is left alone, and none is settled for a lookup by Ramble's ids only
 // - the attempt is written only while live: the live statuses are exactly the non-terminal ones, and the release goes on only when one row was written
 // - the hold ref is two lower-cased uuids and nothing else
 
@@ -163,39 +161,26 @@ describe('payingLapse: the attempt', () => {
   });
 });
 
-describe('providerSettled', () => {
+describe('cancelStep', () => {
   it.each([
-    ['payment', 'canceled', true],
-    ['payment', null, false],
-    ['payment', 'processing', false],
-    ['payment', 'succeeded', false],
-    ['payment', 'created', false],
-    ['metadata', 'canceled', true],
-    ['metadata', null, true],
-    ['metadata', 'succeeded', false],
-    ['metadata', 'processing', false],
-  ] as const)(
-    'a lookup by %s that finds %s is settled: %s',
-    (kind, status, settled) => {
-      const target =
-        kind === 'payment'
-          ? ({ kind, paymentId: 'pay_1' } as const)
-          : ({ kind, orderId: otherUuid, recordId: uuid } as const);
-      expect(providerSettled(target, status)).toBe(settled);
-    },
-  );
-});
-
-describe('cancelErrorAction', () => {
-  it.each([
-    ['invalid_state', 'read'],
-    ['not_found', 'read'],
-    ['provider_unavailable', 'rethrow'],
-    ['idempotency_conflict', 'rethrow'],
-    ['invalid_input', 'rethrow'],
-    [null, 'rethrow'],
-  ] as const)('%s: %s', (code, action) => {
-    expect(cancelErrorAction(code)).toBe(action);
+    ['payment', 'created', 'cancel'],
+    ['payment', 'requires_action', 'cancel'],
+    ['payment', 'failed_try', 'cancel'],
+    ['payment', 'canceled', 'already_settled'],
+    ['payment', 'processing', 'leave_alone'],
+    ['payment', 'succeeded', 'leave_alone'],
+    ['payment', null, 'leave_alone'],
+    ['metadata', 'created', 'cancel'],
+    ['metadata', 'canceled', 'already_settled'],
+    ['metadata', 'succeeded', 'leave_alone'],
+    ['metadata', 'processing', 'leave_alone'],
+    ['metadata', null, 'already_settled'],
+  ] as const)('a lookup by %s that finds %s: %s', (kind, status, step) => {
+    const target =
+      kind === 'payment'
+        ? ({ kind, paymentId: 'pay_1' } as const)
+        : ({ kind, orderId: otherUuid, recordId: uuid } as const);
+    expect(cancelStep(target, status)).toBe(step);
   });
 });
 

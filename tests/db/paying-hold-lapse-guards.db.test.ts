@@ -35,7 +35,7 @@ import { payingLapseFixtures } from './payingLapseFixtures';
 // - a hold that is not there is not released, and asks the provider nothing; a ref that is not two uuids is refused by the parse
 // - an error from the cancel that is not the port's is rethrown, and leaves the hold, order, and attempt as they were
 // - the sweep waits for the hold row and for the order row, and judges what the other transaction committed
-// - a refused cancel is logged with its code and the hold and attempt ids (and nothing else), a cancel that succeeded is not
+// - a cancel that fails, for any reason, rejects with nothing written, and the next sweep reads the payment again: succeeded is left alone, cancelled is settled with no second cancel
 // - a pulse run, with the real sweep and the fake gateway, voids and releases a lapsed paying hold end to end
 
 const cache = vi.hoisted(() => ({
@@ -90,7 +90,6 @@ beforeEach(async () => {
     .where(inArray(holds.status, ['active', 'paying']));
   sendHeartbeat.mockReset().mockResolvedValue('sent');
   vi.mocked(lapseData.abandonPayingHold).mockClear();
-  log.warn.mockClear();
 });
 
 const payments = () => fixtures.use(fixtures.makePayments());
@@ -388,34 +387,49 @@ describe('the locks that make the unlocked attempt read safe', () => {
   });
 });
 
-describe('the log of a refused cancel', () => {
-  it('names the code and the hold and attempt ids, and nothing else', async () => {
+describe('a cancel that fails', () => {
+  it('rejects with nothing written, whatever the reason, and the next sweep decides on what the provider now holds', async () => {
     const port = payments();
     const lapsed = await fixtures.lapsedPayingHold(
       await seedBookable(client.db),
       port,
     );
+    const paymentId = lapsed.payment?.id ?? '';
+    const cancel = vi.spyOn(port, 'cancelPayment');
+    cancel.mockRejectedValueOnce(new PaymentsError('invalid_state'));
+
+    await expect(sweep(port)).rejects.toMatchObject({ code: 'invalid_state' });
+    const stuck = await fixtures.state(lapsed);
+    expect(stuck.hold.status).toBe('paying');
+    expect(stuck.order.status).toBe('pending_payment');
+    expect(stuck.attempt).toMatchObject({ status: 'created' });
+
+    await port.confirm(paymentId, { outcome: 'succeeded' });
+    cancel.mockClear();
+    expect(await sweep(port)).toBe(0);
+    expect(cancel).not.toHaveBeenCalled();
+    expect((await fixtures.state(lapsed)).hold.status).toBe('paying');
+  });
+
+  it('is settled by the next sweep when the provider now holds the payment cancelled, without a second cancel', async () => {
+    const port = payments();
+    const lapsed = await fixtures.lapsedPayingHold(
+      await seedBookable(client.db),
+      port,
+    );
+    const cancel = vi.spyOn(port, 'cancelPayment');
+    cancel.mockRejectedValueOnce(new PaymentsError('not_found'));
+    await expect(sweep(port)).rejects.toMatchObject({ code: 'not_found' });
     await port.cancelPayment({
       idempotencyKey: 'cancel:elsewhere',
       paymentId: lapsed.payment?.id ?? '',
     });
+    cancel.mockClear();
 
     expect(await sweep(port)).toBe(1);
 
-    expect(log.warn).toHaveBeenCalledExactlyOnceWith(expect.any(String), {
-      code: 'invalid_state',
-      holdId: lapsed.hold.id,
-      attemptId: lapsed.started.attempt.id,
-    });
-  });
-
-  it('is silent when the cancel succeeds', async () => {
-    const port = payments();
-    await fixtures.lapsedPayingHold(await seedBookable(client.db), port);
-
-    expect(await sweep(port)).toBe(1);
-
-    expect(log.warn).not.toHaveBeenCalled();
+    expect(cancel).not.toHaveBeenCalled();
+    expect((await fixtures.state(lapsed)).hold.status).toBe('released');
   });
 });
 

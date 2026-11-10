@@ -1,6 +1,7 @@
 import 'server-only';
 import { z } from 'zod';
 import { AuditExportPayloadSchema, auditExportKind } from '@/lib/audit';
+import { OpsNoticeDataSchema, opsNoticeKind } from '@/lib/email/opsNotice';
 import { MaxAttemptsSchema, jobLimits } from '@/lib/jobs';
 import {
   ProcessProviderEventPayloadSchema,
@@ -14,6 +15,7 @@ import {
   sendGuestConfirmation,
   sendHostBookingNotice,
 } from './bookingEmails';
+import { sendOpsNotice } from './opsNotice';
 import { handleProviderEvent, prepareProviderEvent } from './providerEvents';
 
 type JobContext<Payload> = {
@@ -103,5 +105,10 @@ export const jobRegistry = {
     payload: BookingEmailPayloadSchema,
     maxAttempts: jobLimits.defaultMaxAttempts,
     handleIdempotent: sendHostBookingNotice,
+  }),
+  [opsNoticeKind]: defineJob({
+    payload: OpsNoticeDataSchema,
+    maxAttempts: jobLimits.defaultMaxAttempts,
+    handleIdempotent: sendOpsNotice,
   }),
 } satisfies JobRegistry;

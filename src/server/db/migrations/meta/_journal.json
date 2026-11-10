@@ -183,6 +183,13 @@
       "when": 1794324346699,
       "tag": "0025_gifts",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794326907865,
+      "tag": "0026_support_requests",
+      "breakpoints": true
     }
   ]
 }

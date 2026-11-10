@@ -119,11 +119,38 @@ export const piiColumns: readonly PiiColumn[] = [
   {
     table: 'jobs',
     column: 'payload',
-    kind: 'link',
-    data: 'The ids of the rows a job works on (an order id for the guest and host emails); a handler reads any address from the row',
+    kind: 'identifier',
+    data: "The ids of the rows a job works on (an order id for the guest and host emails); a handler reads any address from the row. The one exception is the ops notice, whose payload is the finished text of the email to Ramble: for a contact message that is the sender's name, address, and message",
     location: databaseLocation,
     deletionPath:
-      'Finished jobs are purged on a schedule; a job kind that puts an address or a name in its payload must be added here with its own step',
+      'Finished jobs are purged on a schedule, which bounds how long an ops notice keeps its text; a job kind that puts an address or a name in its payload must be added here with its own step',
+  },
+  {
+    table: 'support_requests',
+    column: 'name',
+    kind: 'identifier',
+    data: 'The name a guest typed into the contact form',
+    location: databaseLocation,
+    deletionPath:
+      "Not yet anonymized: the support queue work adds a step keyed on the sender's address, because a sender need not be a guest",
+  },
+  {
+    table: 'support_requests',
+    column: 'email',
+    kind: 'identifier',
+    data: 'The address a guest typed into the contact form, folded to lower case',
+    location: databaseLocation,
+    deletionPath:
+      "Not yet anonymized: the support queue work adds a step keyed on the sender's address, because a sender need not be a guest",
+  },
+  {
+    table: 'support_requests',
+    column: 'message',
+    kind: 'identifier',
+    data: 'Free text a guest typed into the contact form, which can name a booking, a person, or anything else they chose to write',
+    location: databaseLocation,
+    deletionPath:
+      "Not yet anonymized: the support queue work adds a step keyed on the sender's address, because a sender need not be a guest",
   },
   {
     table: 'jobs',
@@ -322,6 +349,9 @@ export const nonPiiColumns: readonly {
     'window_started_at',
     'expires_at',
   ]),
+  ...notPersonal('support_requests', aRandomId, ['id']),
+  ...notPersonal('support_requests', aFixedList, ['topic']),
+  ...notPersonal('support_requests', aTime, ['created_at']),
   ...notPersonal('jobs', aRandomId, ['id']),
   ...notPersonal('jobs', 'The job type, from a registry in code', ['kind']),
   ...notPersonal('jobs', aFixedList, ['status']),
@@ -907,6 +937,12 @@ export const retentionSchedule: readonly RetentionRow[] = [
     startsAt: 'The time the request was resolved',
     period: pendingCounsel,
     note: 'Kept as the record that a request was made and how it ended',
+  },
+  {
+    dataset: 'support_requests',
+    startsAt: "The row's creation",
+    period: pendingCounsel,
+    note: 'A contact message is kept until the support queue resolves it; the queue work adds the removal once the period is set',
   },
   {
     dataset: 'audit_log',

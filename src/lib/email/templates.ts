@@ -10,6 +10,7 @@ import {
   confirmationAttachments,
 } from './bookingTemplates';
 import { IdempotencyKeySchema, type EmailAttachment } from './message';
+import { OpsNoticeDataSchema, opsNoticeSubject } from './opsNotice';
 
 /**
  * Every template's data shape, subject line, and attachments. The markup for each lives in
@@ -23,6 +24,7 @@ const templateSchemas = {
   'booking-cancellation': BookingCancellationDataSchema,
   'booking-refund': BookingRefundDataSchema,
   'paid-after-lapse': PaidAfterLapseDataSchema,
+  'ops-notice': OpsNoticeDataSchema,
 } as const;
 
 export type EmailTemplateName = keyof typeof templateSchemas;
@@ -42,6 +44,7 @@ const subjects: {
   'booking-cancellation': bookingSubjects.bookingCancellation,
   'booking-refund': bookingSubjects.bookingRefund,
   'paid-after-lapse': bookingSubjects.paidAfterLapse,
+  'ops-notice': opsNoticeSubject,
 };
 
 const attachments: {
@@ -55,6 +58,7 @@ const attachments: {
   'booking-cancellation': () => [],
   'booking-refund': () => [],
   'paid-after-lapse': () => [],
+  'ops-notice': () => [],
 };
 
 export type EmailRequest = {

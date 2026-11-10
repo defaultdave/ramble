@@ -14,6 +14,7 @@ import { BookingRefund } from './templates/BookingRefund';
 import { DevCheck } from './templates/DevCheck';
 import { GuestConfirmation } from './templates/GuestConfirmation';
 import { HostBookingNotice } from './templates/HostBookingNotice';
+import { OpsNotice } from './templates/OpsNotice';
 import { PaidAfterLapse } from './templates/PaidAfterLapse';
 
 type Markup = {
@@ -40,6 +41,7 @@ const markup: Markup = {
   'paid-after-lapse': (data, helpUrl) => (
     <PaidAfterLapse data={data} helpUrl={helpUrl} />
   ),
+  'ops-notice': (data, helpUrl) => <OpsNotice data={data} helpUrl={helpUrl} />,
 };
 
 // Generic so each template's markup receives exactly that template's data.

@@ -1,7 +1,6 @@
 import 'server-only';
 import { randomInt } from 'node:crypto';
 import { signInLinkTtlSeconds } from '@/lib/auth';
-import { env } from '@/server/env';
 import { systemClock } from '@/server/ports/clock';
 import { getAuth } from './auth';
 import { hashSignInToken } from './signInToken';
@@ -9,9 +8,6 @@ import { hashSignInToken } from './signInToken';
 // Letters only, 32 of them, the shape Better Auth gives its own tokens; the confirm page accepts letters and digits.
 const tokenAlphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const tokenLength = 32;
-
-/** The site's own origin, for an address that goes in an email. */
-export const appOrigin = () => new URL(env.APP_URL).origin;
 
 /**
  * Makes a sign-in link's token for an address and stores it the way the magic-link plugin does:

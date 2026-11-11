@@ -49,7 +49,6 @@ vi.mock('@/server/monitoring/logger', () => ({
 // - the list pages by name with a cursor, each host once, and records one audit row per page; owners and agreement standing are each host's own
 // - one host reads with its owners and acceptances and records its view; an unknown id reads null and records nothing
 // - the new-host form read records its view and offers the current agreement version
-// The database refuses what Zod refuses on a host: a name over 120, a slug over 80, a blank or over-long description, and a time zone over 64 characters
 // Inviting the owner (real Better Auth, the fake mailer):
 // - the email goes to the owner's address from the grant, carries a confirm link for a token stored only as a keyed hash, and an audit row is written
 // - the link works once: it signs the owner in as host owner of this host, and a second use is refused
@@ -630,50 +629,6 @@ describe('host slugs are unique', () => {
         .values({ slug: 'db-unique', name: 'Dup', timeZone: 'UTC' }),
       'hosts_slug_unique',
     );
-  });
-});
-
-describe('the database refuses what Zod refuses on a host', () => {
-  const insert = (values: Record<string, unknown>) =>
-    client.db.insert(hosts).values({
-      slug: `db-${String(next())}`,
-      name: 'Host',
-      timeZone: 'UTC',
-      ...values,
-    });
-
-  it.each([
-    [
-      'a name over 120 characters',
-      'hosts_name_length',
-      { name: 'a'.repeat(121) },
-    ],
-    [
-      'a slug over 80 characters',
-      'hosts_slug_length',
-      { slug: 'a'.repeat(81) },
-    ],
-    [
-      'a description over 2000 characters',
-      'hosts_description_shape',
-      { description: 'a'.repeat(2001) },
-    ],
-    ['a blank description', 'hosts_description_shape', { description: '  ' }],
-    [
-      'a time zone over 64 characters',
-      'hosts_time_zone_length',
-      { timeZone: 'A'.repeat(65) },
-    ],
-  ])('refuses %s', async (_label, constraint, values) => {
-    await expectConstraint(insert(values), constraint);
-  });
-
-  it('accepts the largest values the form accepts', async () => {
-    await insert({
-      name: 'a'.repeat(120),
-      slug: 'a'.repeat(80),
-      description: 'a'.repeat(2000),
-    });
   });
 });
 

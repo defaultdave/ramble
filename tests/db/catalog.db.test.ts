@@ -185,8 +185,7 @@ describe('categories and neighborhoods', () => {
 });
 
 describe('slug history', () => {
-  // Category, neighborhood, and host slugs are unique while live; experience slugs repeat. The two
-  // repeating-slug cases below need two live entities with one slug, so they skip hosts.
+  // Category and neighborhood slugs are unique while live; experience slugs repeat. Hosts are unique too but listed here.
   const uniqueKinds = [
     {
       kind: 'category',
@@ -275,6 +274,7 @@ describe('slug history', () => {
   });
 
   describe.each(repeatingKinds)('$kind', ({ kind, insert, rename }) => {
+    const sharing = kind === 'host' ? it.skip : it; // host slugs are unique, so none are shared
     it('resolves a retired slug to its entity', async () => {
       const old = unique('old');
       const id = await insert(old);
@@ -287,29 +287,26 @@ describe('slug history', () => {
       });
     });
 
-    it.skipIf(kind === 'host')(
-      'keeps each entity’s own history when two retire the same slug',
-      async () => {
-        const shared = unique('shared');
-        const first = await insert(shared);
-        const second = await insert(shared);
-        await rename(first, unique('first-new'));
-        await rename(second, unique('second-new'));
+    sharing('keeps each entity’s own history for a shared slug', async () => {
+      const shared = unique('shared');
+      const first = await insert(shared);
+      const second = await insert(shared);
+      await rename(first, unique('first-new'));
+      await rename(second, unique('second-new'));
 
-        const rows = await client.db
-          .select()
-          .from(slugHistory)
-          .where(eq(slugHistory.slug, shared));
+      const rows = await client.db
+        .select()
+        .from(slugHistory)
+        .where(eq(slugHistory.slug, shared));
 
-        expect(rows.map((row) => row.entityId).sort()).toEqual(
-          [first, second].sort(),
-        );
-        expect(rows.every((row) => row.entityKind === kind)).toBe(true);
-        expect(await catalog.findRetiredSlug(kind, shared)).toMatchObject({
-          entityId: second,
-        });
-      },
-    );
+      expect(rows.map((row) => row.entityId).sort()).toEqual(
+        [first, second].sort(),
+      );
+      expect(rows.every((row) => row.entityKind === kind)).toBe(true);
+      expect(await catalog.findRetiredSlug(kind, shared)).toMatchObject({
+        entityId: second,
+      });
+    });
 
     it('leaves another entity’s history alone when a new entity is inserted with the slug', async () => {
       const old = unique('old');
@@ -333,21 +330,18 @@ describe('slug history', () => {
       });
     });
 
-    it.skipIf(kind === 'host')(
-      'drops a retired slug only when the same entity takes it back',
-      async () => {
-        const shared = unique('shared');
-        const first = await insert(shared);
-        const second = await insert(shared);
-        await rename(first, unique('first-new'));
-        await rename(second, unique('second-new'));
-        await rename(first, shared);
+    sharing('keeps another’s retired slug on a take-back', async () => {
+      const shared = unique('shared');
+      const first = await insert(shared);
+      const second = await insert(shared);
+      await rename(first, unique('first-new'));
+      await rename(second, unique('second-new'));
+      await rename(first, shared);
 
-        expect(await catalog.findRetiredSlug(kind, shared)).toMatchObject({
-          entityId: second,
-        });
-      },
-    );
+      expect(await catalog.findRetiredSlug(kind, shared)).toMatchObject({
+        entityId: second,
+      });
+    });
   });
 
   it('keeps the kinds apart', async () => {

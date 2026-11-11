@@ -4,7 +4,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 // - the token is 32 letters, and two tokens differ
 // - what is stored is the plugin's prefix and the keyed hash of the token, never the token, with the record the verify step parses
 // - the stored link lapses after the sign-in link lifetime, by the clock
-// - appOrigin is the origin of APP_URL, without its path
 
 const create = vi.fn();
 const now = new Date('2026-11-11T12:00:00Z');
@@ -13,9 +12,6 @@ async function load() {
   vi.resetModules();
   create.mockReset();
   vi.doMock('server-only', () => ({}));
-  vi.doMock('@/server/env', () => ({
-    env: { APP_URL: 'https://ramble.example/some/path' },
-  }));
   vi.doMock('@/server/ports/clock', () => ({
     systemClock: { now: () => now },
   }));
@@ -36,7 +32,6 @@ async function load() {
 }
 
 afterEach(() => {
-  vi.doUnmock('@/server/env');
   vi.doUnmock('@/server/ports/clock');
   vi.doUnmock('./auth');
   vi.doUnmock('./signInToken');
@@ -68,13 +63,5 @@ describe('createSignInLinkToken', () => {
       email: 'a@example.com',
     });
     expect(stored.expiresAt).toEqual(new Date('2026-11-11T12:05:00Z'));
-  });
-});
-
-describe('appOrigin', () => {
-  it('is the origin of APP_URL', async () => {
-    const { appOrigin } = await load();
-
-    expect(appOrigin()).toBe('https://ramble.example');
   });
 });

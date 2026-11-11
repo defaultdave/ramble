@@ -3,6 +3,7 @@ import { manageViewOf } from '@/lib/manageBooking.fixtures';
 import { fn } from 'storybook/test';
 import { orderA, orderB } from '@/lib/bookingEmails.fixtures';
 import type { CancelFacts } from '@/lib/cancelBooking';
+import type { MoveSubject } from '@/lib/moveBooking';
 import {
   managePageState,
   type ManageQuery,
@@ -36,6 +37,22 @@ const facts: CancelFacts = {
 };
 
 const inWindow = new Date('2026-11-05T12:00:00Z');
+
+const moveSubject: MoveSubject = {
+  facts,
+  sessionId: 'a0000000-0000-4000-8000-000000000001',
+  experienceId: 'e0000000-0000-4000-8000-000000000001',
+  experienceStatus: 'live',
+  fullRefundHoursBefore: 24,
+};
+const otherDate = (id: string, startsAt: string, spacesLeft: number) => ({
+  id,
+  experienceId: moveSubject.experienceId,
+  status: 'scheduled' as const,
+  startsAt: new Date(startsAt),
+  timeZone: orderA.timeZone,
+  spacesLeft,
+});
 const afterWindow = new Date('2026-11-06T22:00:00Z');
 
 const cancelledFacts: CancelFacts = {
@@ -57,6 +74,7 @@ function page(view: ManageView, query: ManageQuery = {}): ManageBookingProps {
     view,
     token,
     cancelAction: fn(() => Promise.resolve()),
+    moveAction: fn(() => Promise.resolve()),
     ...managePageState(view, query),
   };
 }
@@ -153,5 +171,48 @@ export const TooManyTriesWhileCancelling: Story = {
 
 export const TooManyTriesPage: Story = {
   render: () => <ManageTooManyTries retryAfterSeconds={240} />,
+  parameters: mobile,
+};
+
+export const MovePickerMobile: Story = {
+  args: page(
+    manageViewOf(orderA, facts, inWindow, {
+      subject: moveSubject,
+      candidates: [
+        otherDate(
+          'a0000000-0000-4000-8000-000000000002',
+          '2026-11-14T21:00:00Z',
+          8,
+        ),
+        otherDate(
+          'a0000000-0000-4000-8000-000000000003',
+          '2026-11-21T21:00:00Z',
+          3,
+        ),
+      ],
+    }),
+    { move: '1' },
+  ),
+  parameters: mobile,
+};
+
+export const MovePickerNoRoom: Story = {
+  args: page(
+    manageViewOf(orderA, facts, inWindow, {
+      subject: moveSubject,
+      candidates: [],
+    }),
+    { move: '1' },
+  ),
+  parameters: mobile,
+};
+
+export const JustMoved: Story = {
+  args: page(manageViewOf(orderA, facts, inWindow), { moved: 'moved' }),
+  parameters: mobile,
+};
+
+export const DateWasFull: Story = {
+  args: page(manageViewOf(orderA, facts, inWindow), { moved: 'sold_out' }),
   parameters: mobile,
 };

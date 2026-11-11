@@ -8,12 +8,16 @@ import {
   type ManageBooking as ManageBookingDetails,
   type ManageView,
 } from '@/lib/manageBooking';
+import { movePickerPath, type MovePrompt } from '@/lib/moveBooking';
 import { browsePath, contactPath, helpPath } from '@/lib/paths';
 import { managePath } from '@/lib/routes';
 import styles from './ManageBooking.module.css';
 
 /** `cancelBookingForm`: posts the form's token and shown refund, then sends the guest back to the page. */
 export type CancelBookingFormAction = (formData: FormData) => Promise<void>;
+
+/** `moveBookingForm`: posts the form's token and the date chosen, then sends the guest back to the page. */
+export type MoveBookingFormAction = (formData: FormData) => Promise<void>;
 
 export type ManageBookingProps = {
   view: ManageView;
@@ -24,12 +28,15 @@ export type ManageBookingProps = {
   /** The second step: the cancel form, with the refund said again. */
   confirming: boolean;
   cancelAction: CancelBookingFormAction;
+  /** The move's second step: the picker of other dates. */
+  moving: boolean;
+  moveAction: MoveBookingFormAction;
 };
 
 /**
  * The manage page. It is a server component and works with scripting off: the first step is the
  * page with the refund shown, a link to the second step is `?confirm=1`, and the second step is a
- * form that posts the cancel action.
+ * form that posts the cancel action. Moving to another date works the same way, with `?move=1`.
  */
 export function ManageBooking({
   view,
@@ -37,6 +44,8 @@ export function ManageBooking({
   notice,
   confirming,
   cancelAction,
+  moving,
+  moveAction,
 }: ManageBookingProps) {
   return (
     <div className={styles.page}>
@@ -52,6 +61,15 @@ export function ManageBooking({
       ) : null}
 
       <BookingCard booking={view.booking} />
+
+      {view.kind === 'active' && view.move ? (
+        <MoveSection
+          prompt={view.move}
+          token={token}
+          moving={moving}
+          moveAction={moveAction}
+        />
+      ) : null}
 
       {view.kind === 'active' ? (
         <section className={styles.cancel} aria-labelledby="cancel-title">
@@ -107,6 +125,69 @@ export function ManageBooking({
         </span>
       </p>
     </div>
+  );
+}
+
+function MoveSection({
+  prompt,
+  token,
+  moving,
+  moveAction,
+}: {
+  prompt: MovePrompt;
+  token: string;
+  moving: boolean;
+  moveAction: MoveBookingFormAction;
+}) {
+  const { picker } = prompt;
+  return (
+    <section className={styles.cancel} aria-labelledby="move-title">
+      <h2 id="move-title" className={styles.subheading}>
+        {prompt.heading}
+      </h2>
+      <p className={styles.body}>{prompt.body}</p>
+      {moving && picker ? (
+        picker.choices.length > 0 ? (
+          <form action={moveAction} className={styles.confirm}>
+            <fieldset className={styles.choices}>
+              <legend className={styles.confirmTitle}>{picker.legend}</legend>
+              {picker.choices.map((choice, index) => (
+                <label key={choice.sessionId} className={styles.choice}>
+                  <input
+                    type="radio"
+                    name="targetSessionId"
+                    value={choice.sessionId}
+                    required
+                    defaultChecked={index === 0}
+                  />
+                  <span>{choice.label}</span>
+                  <span className={styles.fine}>{choice.spacesLabel}</span>
+                </label>
+              ))}
+            </fieldset>
+            <p className={styles.fine}>{picker.note}</p>
+            <input type="hidden" name="manageToken" value={token} />
+            <Button type="submit" variant="primary">
+              {picker.submitLabel}
+            </Button>
+            <ButtonLink href={managePath(token)} variant="secondary">
+              {picker.keepLabel}
+            </ButtonLink>
+          </form>
+        ) : (
+          <>
+            <p className={styles.body}>{picker.emptyLine}</p>
+            <ButtonLink href={managePath(token)} variant="secondary">
+              {picker.keepLabel}
+            </ButtonLink>
+          </>
+        )
+      ) : (
+        <ButtonLink href={movePickerPath(token)} variant="secondary">
+          {prompt.linkLabel}
+        </ButtonLink>
+      )}
+    </section>
   );
 }
 

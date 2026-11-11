@@ -9,12 +9,20 @@ import {
 } from '@/lib/cancelBooking';
 import { cancelResultPath } from '@/lib/manageBooking';
 import {
+  moveInputFromForm,
+  moveResultPath,
+  parseMoveInput,
+  type MoveBookingInput,
+  type MoveBookingResult,
+} from '@/lib/moveBooking';
+import {
   OrderStatusInputSchema,
   orderStatusResult,
   type OrderStatusInput,
   type OrderStatusResult,
 } from '@/lib/orderStatus';
 import { cancelBookingOrder } from '@/server/db/orderCancel';
+import { moveBookingOrder } from '@/server/db/orderMove';
 import { openManageToken } from '@/server/manageBooking';
 import { readOrderState } from '@/server/orderConfirmation';
 
@@ -66,4 +74,40 @@ export async function cancelBookingForm(formData: FormData): Promise<void> {
   if (parsed.kind === 'refused') notFound();
   const result = await cancelBooking(parsed.input);
   redirect(cancelResultPath(parsed.input.manageToken, result));
+}
+
+/**
+ * Moves the booking a manage link opens onto another date of the same experience, at the same
+ * price. The token is the caller's right, so it is parsed and counted against the `manage` limit
+ * first, and a malformed, unknown, or stale token is answered alike (`not_found`). A failed
+ * rate-limit store or lookup throws, so the action fails closed.
+ */
+export async function moveBooking(
+  input: MoveBookingInput,
+): Promise<MoveBookingResult> {
+  const parsed = parseMoveInput(input);
+  if (parsed.kind === 'refused') return parsed.result;
+  const gate = await openManageToken(parsed.input.manageToken);
+  if (gate.kind === 'refused') return gate.refusal;
+  return moveBookingOrder({
+    token: gate.row,
+    targetSessionId: parsed.input.targetSessionId,
+  });
+}
+
+/**
+ * The manage page's move form: it posts the token and the date chosen, runs `moveBooking`, and
+ * sends the guest back to the same page with the answer in the address. It works with scripting
+ * off. A form with no usable token is the not-found page.
+ */
+export async function moveBookingForm(formData: FormData): Promise<void> {
+  const parsed = parseMoveInput(
+    moveInputFromForm({
+      manageToken: formData.get('manageToken'),
+      targetSessionId: formData.get('targetSessionId'),
+    }),
+  );
+  if (parsed.kind === 'refused') notFound();
+  const result = await moveBooking(parsed.input);
+  redirect(moveResultPath(parsed.input.manageToken, result));
 }

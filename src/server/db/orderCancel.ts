@@ -18,9 +18,11 @@ import {
   type CancelOrderInput,
 } from '@/lib/cancelBooking';
 import type { CapabilityTokenKind } from '@/lib/capabilityTokens';
+import { locksCoverOrder, type LockedAttempt } from '@/lib/orderLocks';
 import { requireOrderTransition } from '@/lib/providerEvents';
 import { revalidateTagsForChanges } from '@/server/cache/invalidate';
 import { enqueue } from '@/server/jobs/enqueue';
+import { untilLocksCoverOrder } from './lockRetry';
 import { db, type Transaction } from './client';
 import { writeAudit } from './audit';
 import {
@@ -77,17 +79,23 @@ type Cancelled = { result: CancelBookingResult; sessionId: string | null };
 async function cancelInTransaction(
   tx: Transaction,
   input: CancelOrderInput & { tokenKind: CapabilityTokenKind },
-): Promise<Cancelled> {
+): Promise<LockedAttempt<Cancelled>> {
   const start = cancelStart({
     tokenKind: input.tokenKind,
     ids: await readOrderLockIds(tx, input.orderId),
   });
-  if (start.kind === 'stop') return { result: start.result, sessionId: null };
+  if (start.kind === 'stop') {
+    return { kind: 'done', value: { result: start.result, sessionId: null } };
+  }
   const { sessionId } = start;
   // Lock order: session, hold, order (db/locks.ts); `requestRefund` takes the order's lock again.
   await lockSessionRow(tx, sessionId);
   await lockHoldRow(tx, start.holdId);
-  await lockOrderById(tx, input.orderId);
+  const locked = await lockOrderById(tx, input.orderId);
+  // A move can change the order's session between the read and the lock; these locks are then the old session's.
+  if (!locksCoverOrder({ sessionId, holdId: start.holdId }, locked)) {
+    return { kind: 'stale' };
+  }
   const found = await readCancelFacts(tx, input.orderId);
   const plan = cancelPlan({
     facts: found?.facts ?? null,
@@ -95,7 +103,9 @@ async function cancelInTransaction(
     expectedRefundMinor: input.expectedRefundMinor,
     now: await readDatabaseTime(tx),
   });
-  if (plan.kind === 'stop') return { result: plan.result, sessionId: null };
+  if (plan.kind === 'stop') {
+    return { kind: 'done', value: { result: plan.result, sessionId: null } };
+  }
   const { facts } = plan;
 
   let refundId: string | null = null;
@@ -110,7 +120,10 @@ async function cancelInTransaction(
       plan.refundMinor,
     );
     if (outcome.kind === 'refused') {
-      return { result: outcome.result, sessionId: null };
+      return {
+        kind: 'done',
+        value: { result: outcome.result, sessionId: null },
+      };
     }
     refundId = outcome.refundId;
   }
@@ -158,13 +171,16 @@ async function cancelInTransaction(
     dedupeKey: bookingEmailKey('host-cancellation-notice', input.orderId),
   });
   return {
-    result: {
-      status: 'cancelled',
-      refundMinor: plan.refundMinor,
-      giftReinstated: reinstated,
-      refundEta: refundEtaLine(plan.refundMinor),
+    kind: 'done',
+    value: {
+      result: {
+        status: 'cancelled',
+        refundMinor: plan.refundMinor,
+        giftReinstated: reinstated,
+        refundEta: refundEtaLine(plan.refundMinor),
+      },
+      sessionId,
     },
-    sessionId,
   };
 }
 
@@ -185,8 +201,10 @@ export async function cancelBookingOrder(input: {
     openedTokenVersion: input.token.version,
     expectedRefundMinor: input.expectedRefundMinor,
   });
-  const { result, sessionId } = await db.transaction((tx) =>
-    cancelInTransaction(tx, { ...parsed, tokenKind: input.token.kind }),
+  const { result, sessionId } = await untilLocksCoverOrder(() =>
+    db.transaction((tx) =>
+      cancelInTransaction(tx, { ...parsed, tokenKind: input.token.kind }),
+    ),
   );
   revalidateTagsForChanges(cancelCacheChanges(result, sessionId));
   return result;

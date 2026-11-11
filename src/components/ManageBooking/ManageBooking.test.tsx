@@ -58,6 +58,7 @@ function renderPage(
     view,
     token,
     cancelAction,
+    moveAction: vi.fn(() => Promise.resolve()),
     ...managePageState(view, query),
   };
   return render(<ManageBooking {...props} />);

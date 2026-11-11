@@ -120,6 +120,8 @@ const named = (name: string) => oneLineClipped(name, subjectNameMax);
 export const bookingSubjects = {
   guestConfirmation: (data: GuestConfirmationData) =>
     `You're booked: ${named(data.experienceName)}`,
+  bookingMoved: (data: GuestConfirmationData) =>
+    `Your booking has moved: ${named(data.experienceName)}, ${data.dayLabel}`,
   hostBookingNotice: (data: HostBookingNoticeData) =>
     `New booking: ${named(data.experienceName)}, ${data.dayLabel}`,
   sessionReminder: (data: SessionReminderData) =>

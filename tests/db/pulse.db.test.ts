@@ -131,6 +131,7 @@ describe('POST /api/pulse against a database', () => {
       purged: 1,
       holdsReleased: 0,
       holdsScrubbed: 0,
+      sessionsCreated: 0,
     });
     expect(await statuses()).toEqual(['succeeded']);
     expect(sendHeartbeat).toHaveBeenCalledOnce();

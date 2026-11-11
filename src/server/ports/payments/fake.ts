@@ -82,6 +82,17 @@ const ConfirmInputSchema = z.object({
 });
 type ConfirmInput = z.input<typeof ConfirmInputSchema>;
 
+const refundOutcomes = ['succeeded', 'failed'] as const;
+
+const RefundOutcomeInputSchema = z.object({
+  outcome: z.enum(refundOutcomes),
+  failureCode: z
+    .string()
+    .regex(/^[a-z0-9_]{1,64}$/)
+    .default('refund_declined'),
+});
+type RefundOutcomeInput = z.input<typeof RefundOutcomeInputSchema>;
+
 type Keyed = { id: string; metadata: RambleMetadata };
 
 export type FakePaymentsState = {
@@ -95,6 +106,8 @@ export type FakePaymentsState = {
   byMetadata: Map<string, string>;
   /** Authentication challenges raised per payment id. */
   actionRounds: Map<string, number>;
+  /** Payment id to the failure code its refunds fail with; a payment not listed refunds successfully. */
+  refundFailures: Map<string, string>;
   events: ProviderEvent[];
   balanceMinor: number;
 };
@@ -108,6 +121,7 @@ export function createFakePaymentsState(): FakePaymentsState {
     idempotency: new Map(),
     byMetadata: new Map(),
     actionRounds: new Map(),
+    refundFailures: new Map(),
     events: [],
     balanceMinor: 0,
   };
@@ -120,6 +134,13 @@ type ConfirmedPayment = { payment: Payment; event: ProviderEvent };
 export type FakePaymentsAdapter = PaymentsPort & {
   /** Plays the guest's confirmation: the provider records the outcome and emits its event, which is handed back. */
   confirm(paymentId: string, input: ConfirmInput): Promise<ConfirmedPayment>;
+  // TODO(U-077): first caller, the way the ops refund-failed queue is demonstrated.
+  /**
+   * Decides how the refunds of one payment end from now on: `succeeded` (the default) or `failed`
+   * with a failure code. A failed refund returns no money and emits `refund.failed`; a refund
+   * already made keeps the outcome it had.
+   */
+  setRefundOutcome(paymentId: string, input: RefundOutcomeInput): Promise<void>;
   /** Every event emitted so far, oldest first. */
   emittedEvents(): ProviderEvent[];
   /** The newest event emitted for a payment, as a copy, or null when it has emitted none: what a provider sends again when its delivery was not taken. */
@@ -469,27 +490,41 @@ export function createFakePaymentsAdapter(
           );
         }
         ensureCapacity(true);
+        const failureCode = state.refundFailures.get(payment.id) ?? null;
         const created: Refund = {
           id: fakeId('re', input.idempotencyKey),
           paymentId: payment.id,
-          status: 'succeeded',
+          status: failureCode === null ? 'succeeded' : 'failed',
           amountMinor: input.amountMinor,
           currency,
-          failureCode: null,
+          failureCode,
           metadata: input.metadata,
         };
-        payment.refundedMinor += input.amountMinor;
-        state.balanceMinor -= input.amountMinor;
+        if (failureCode === null) {
+          payment.refundedMinor += input.amountMinor;
+          state.balanceMinor -= input.amountMinor;
+        }
         store('refund', created);
         emit({
-          type: 'refund.succeeded',
+          type: failureCode === null ? 'refund.succeeded' : 'refund.failed',
           objectId: created.id,
           metadata: created.metadata,
           amountMinor: created.amountMinor,
+          ...(failureCode === null ? {} : { failureCode }),
         });
         return created;
       },
     );
+  }
+
+  function setRefundOutcome(paymentId: string, rawInput: unknown): void {
+    const input = parseOrThrow(RefundOutcomeInputSchema, rawInput);
+    const payment = mustFind('payment', paymentId);
+    if (input.outcome === 'succeeded') {
+      state.refundFailures.delete(payment.id);
+    } else {
+      state.refundFailures.set(payment.id, input.failureCode);
+    }
   }
 
   function transfer(rawInput: unknown): Transfer {
@@ -632,6 +667,10 @@ export function createFakePaymentsAdapter(
     getBalance: () =>
       Promise.resolve({ availableMinor: state.balanceMinor, currency }),
     confirm: (paymentId, input) => settled(() => confirm(paymentId, input)),
+    setRefundOutcome: (paymentId, input) =>
+      settled(() => {
+        setRefundOutcome(paymentId, input);
+      }),
     emittedEvents: () => state.events.map(copy),
     lastEventFor: (paymentId) => settled(() => lastEventFor(paymentId)),
     signWebhook: (event, signedAt) => signBody(JSON.stringify(event), signedAt),

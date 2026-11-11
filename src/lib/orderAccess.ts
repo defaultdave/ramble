@@ -13,6 +13,8 @@ export const orderAccessCookieName = 'ramble_order_access';
 export const orderAccessCookieMaxAgeSeconds = 2 * 60 * 60;
 
 const confirmationPathPattern = /^\/orders\/([^/]+)\/?$/;
+const signInConfirmPathPattern = /^\/sign-in\/confirm\/?$/;
+const managePathPattern = /^\/manage\/[^/]+\/?$/;
 
 export type OrderAccessHandoff = {
   reference: string;
@@ -77,14 +79,16 @@ export function pickOrderToken(input: {
 }
 
 /**
- * Headers for a page whose address is a capability: nothing indexes it and nothing caches it.
+ * Headers for a page whose address is a capability (an order's, a manage link's, or an emailed sign-in link's): nothing indexes it and nothing caches it.
  * Referrer-Policy stays the site's own, which the security header suite pins for every path; the
  * order address holds no token once the handoff has run, and the page's metadata asks for no Referer.
  */
 export function tokenRouteHeaders(
   pathname: string,
 ): readonly { key: string; value: string }[] {
-  return confirmationPathPattern.test(pathname)
+  return confirmationPathPattern.test(pathname) ||
+    signInConfirmPathPattern.test(pathname) ||
+    managePathPattern.test(pathname)
     ? [
         { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' },
         { key: 'Cache-Control', value: 'no-store' },

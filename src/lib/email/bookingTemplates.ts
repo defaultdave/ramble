@@ -61,6 +61,19 @@ export const HostBookingNoticeDataSchema = z.object({
   partyLabel: line(40),
 });
 
+export const SessionReminderDataSchema = z.object({
+  recipientName: line(120),
+  reference: Reference,
+  experienceName: line(200),
+  hostName: line(120),
+  dayLabel: line(60),
+  timeLabel: line(40),
+  durationLabel: line(40).nullable(),
+  meetingPoint: line(600).nullable(),
+  partyLabel: line(40),
+  manageUrl: link,
+});
+
 export const BookingCancellationDataSchema = z.object({
   audience: z.enum(cancellationAudiences),
   recipientName: line(120),
@@ -95,6 +108,7 @@ export const PaidAfterLapseDataSchema = z.object({
 
 export type GuestConfirmationData = z.infer<typeof GuestConfirmationDataSchema>;
 export type HostBookingNoticeData = z.infer<typeof HostBookingNoticeDataSchema>;
+export type SessionReminderData = z.infer<typeof SessionReminderDataSchema>;
 export type BookingCancellationData = z.infer<
   typeof BookingCancellationDataSchema
 >;
@@ -108,6 +122,8 @@ export const bookingSubjects = {
     `You're booked: ${named(data.experienceName)}`,
   hostBookingNotice: (data: HostBookingNoticeData) =>
     `New booking: ${named(data.experienceName)}, ${data.dayLabel}`,
+  sessionReminder: (data: SessionReminderData) =>
+    `Coming up: ${named(data.experienceName)}, ${data.dayLabel}`,
   bookingCancellation: (data: BookingCancellationData) =>
     data.audience === 'guest'
       ? `Your booking is cancelled: ${named(data.experienceName)}`

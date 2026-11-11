@@ -8,6 +8,13 @@ import { orders } from './schema';
 
 export type OrderTokenRow = { id: string; version: number };
 
+declare const manageTokenBrand: unique symbol;
+
+/** An order a `manage` token opened: only `resolveManageToken` makes one, so what writes a guest's order cannot be handed a bare id. */
+export type ResolvedManageToken = Readonly<
+  OrderTokenRow & { kind: 'manage'; [manageTokenBrand]: true }
+>;
+
 export async function readOrderByManageHash(
   hash: string,
 ): Promise<OrderTokenRow | null> {

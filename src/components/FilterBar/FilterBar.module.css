@@ -229,3 +229,16 @@
   gap: var(--space-3);
   margin-block-end: var(--space-6);
 }
+
+.searchForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin-block-end: var(--space-3);
+}
+
+.searchField {
+  flex: 1 1 14rem;
+  min-inline-size: 0;
+}

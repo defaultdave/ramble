@@ -1,0 +1,42 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 40rem;
+}
+
+/* Group size and budget are short answers: they share a row from the tablet width. */
+.pair {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.notice {
+  max-width: 40rem;
+}
+
+.notice:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: calc(var(--space-1) / 2);
+  border-radius: var(--radius-md);
+}
+
+.summaryList {
+  margin: 0;
+  padding-left: var(--space-5);
+}
+
+@media (min-width: 768px) {
+  .pair {
+    flex-direction: row;
+  }
+
+  .pair > * {
+    flex: 1;
+  }
+
+  .form > button {
+    align-self: flex-start;
+  }
+}

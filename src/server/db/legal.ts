@@ -27,7 +27,6 @@ import { requireStaff } from './staff';
 
 // TODO(U-074a): record the host agreement acceptance at onboarding.
 
-// TODO(U-038): first caller
 /** The highest published version of a document. Null when the key is malformed or nothing is published. */
 export async function getCurrentLegalDocument(
   doc: string,

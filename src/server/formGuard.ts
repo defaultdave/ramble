@@ -18,9 +18,10 @@ function sign(issuedAtMs: string): string {
   return createHmac('sha256', secret).update(issuedAtMs).digest('base64url');
 }
 
-// TODO(U-038): first caller, the contact form page; U-043 follows. Render it into
-// `FormGuardFields` as `token`, so the time starts when the form is rendered.
-/** `<issued at, ms>.<HMAC-SHA-256, base64url>`: a bot cannot back-date it to skip the minimum fill time. */
+/**
+ * `<issued at, ms>.<HMAC-SHA-256, base64url>`: a bot cannot back-date it to skip the minimum fill time.
+ * Render it into `FormGuardFields` as `token`, so the time starts when the form is rendered.
+ */
 export function issueFormGuardToken(now: Date): string {
   const issuedAtMs = String(now.getTime());
   return `${issuedAtMs}.${sign(issuedAtMs)}`;
@@ -30,7 +31,6 @@ function signatureMatches(issuedAtMs: string, signature: string): boolean {
   return secureEqual(signature, sign(issuedAtMs));
 }
 
-// TODO(U-038): first caller, `submitSupportRequest`; U-043 (`requestPrivateSession`) follows.
 /**
  * Judges a submitted guest form: honeypot empty, token genuine, filled in no faster than a person
  * could and not left open for hours. On any failure the caller returns the same reply a success

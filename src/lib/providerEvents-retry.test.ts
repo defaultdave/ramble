@@ -64,7 +64,16 @@ describe('eventRetry', () => {
     });
   });
 
-  it.each(['unmatched', 'confirm_unavailable'] as const)(
+  it('alerts on the fifth try of a refund event that contradicts its refund, with its own copy', () => {
+    expect(
+      eventRetry('refund_conflict', alertAfterEventAttempts - 1, id, now),
+    ).toMatchObject({
+      alert: 'unmatched',
+      lastError: retryErrors.refund_conflict,
+    });
+  });
+
+  it.each(['unmatched', 'confirm_unavailable', 'refund_conflict'] as const)(
     'gives up with one alert on the last try the table allows (%s)',
     (reason) => {
       expect(
@@ -134,6 +143,20 @@ describe('alertFor', () => {
         kind: 'payment-event-unmatched',
         key: `event:${id}:gave-up`,
         context: { eventId: id, tries: 25 },
+      },
+    ],
+    [
+      'the fifth try of a refund event that contradicts its refund',
+      {
+        status: 'retry',
+        reason: 'refund_conflict',
+        tries: 5,
+        alert: 'unmatched',
+      },
+      {
+        kind: 'refund-event-conflict',
+        key: `event:${id}`,
+        context: { eventId: id, tries: 5 },
       },
     ],
     [

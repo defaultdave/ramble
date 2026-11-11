@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { EntityIdSchema } from './catalog';
 
 // How a capability link (a manage link, a confirmation URL) is made. A token is derived, never
@@ -33,6 +34,9 @@ const tokenShapeRegex = /^[A-Za-z0-9_-]+$/;
 export function isCapabilityTokenShape(token: string): boolean {
   return token.length === capabilityTokenLength && tokenShapeRegex.test(token);
 }
+
+/** A capability token by shape alone: every form and action that takes one checks it with this before any lookup. */
+export const CapabilityTokenSchema = z.string().refine(isCapabilityTokenShape);
 
 /** A version is a Postgres integer, so a bump past the largest is refused rather than wrapped. */
 export const maxTokenVersion = 2_147_483_647;

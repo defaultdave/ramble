@@ -14,6 +14,7 @@ import {
   occurrencesBetween,
   requiresStaff,
   resolveHostZone,
+  rollingRange,
   splitUpcoming,
   type GenerateSessionsInput,
   type Session,
@@ -21,6 +22,7 @@ import {
   type SessionTemplateInput,
   type UpdateSessionAllocationInput,
 } from '@/lib/sessions';
+import { errorKind } from '@/lib/errorKind';
 import {
   ForbiddenError,
   Role,
@@ -114,7 +116,6 @@ export type GenerateSessionsResult =
       reason: 'template_not_found' | 'invalid_time_zone' | 'beyond_horizon';
     };
 
-// TODO(U-068): first caller
 /**
  * Creates the template's sessions for the dates from `fromDate` to `toDate` in the host's time zone,
  * and is safe to run again over the same or an overlapping range: a date that already has a session
@@ -274,4 +275,73 @@ export async function updateSessionAllocation(
     updateTagsForChanges([{ kind: 'spaces', sessionId: result.session.id }]);
   }
   return result;
+}
+
+/** The pulse acts for no one in particular and for every host's templates, so it carries ops. */
+const pulseCaller: Caller = { userId: null, roles: [Role.Ops], hostIds: [] };
+
+export type ExtendHorizonResult = {
+  created: number;
+  /** Experiences that gained a session, for `revalidateTagsForChanges` in the job. */
+  experienceIds: string[];
+  /** Templates whose host zone is unusable; they are left alone and the rest carry on. */
+  skipped: number;
+  /** Templates whose generation threw; the rest were still done. */
+  failed: number;
+  /** The error name of the first failure, never its message, or null when none failed. */
+  firstErrorName: string | null;
+};
+
+type GenerateForTemplate = (
+  templateId: string,
+  range: { fromDate: string; toDate: string },
+  now: Date,
+) => Promise<GenerateSessionsResult>;
+
+const generateAsPulse: GenerateForTemplate = (templateId, range, now) =>
+  generateSessions(pulseCaller, { templateId, ...range }, now);
+
+/**
+ * Keeps every template's sessions generated up to `rollingHorizonWeeks` ahead of `now`, by running
+ * `generateSessions` over `rollingRange(now)` for each. Safe to run twice: a date that already has
+ * a session is left as it is, so a second run creates nothing. Not tied to a request, so it takes no
+ * caller from one. A template that throws is counted in `failed` and the next one still runs, so
+ * one bad template neither loses the others' results nor starves the templates after it.
+ * `generate` is the seam a test uses to make one template throw.
+ */
+export async function extendSessionHorizon(
+  now: Date,
+  generate: GenerateForTemplate = generateAsPulse,
+): Promise<ExtendHorizonResult> {
+  const range = rollingRange(now);
+  const templates = await db
+    .select({ id: sessionTemplates.id })
+    .from(sessionTemplates)
+    .orderBy(sessionTemplates.id);
+  const experienceIds = new Set<string>();
+  let created = 0;
+  let skipped = 0;
+  let failed = 0;
+  let firstErrorName: string | null = null;
+  for (const { id } of templates) {
+    try {
+      const result = await generate(id, range, now);
+      if (!result.ok) {
+        skipped += 1;
+      } else if (result.created.length > 0) {
+        created += result.created.length;
+        experienceIds.add(result.experienceId);
+      }
+    } catch (error) {
+      failed += 1;
+      firstErrorName ??= errorKind(error, 'NonError');
+    }
+  }
+  return {
+    created,
+    experienceIds: [...experienceIds],
+    skipped,
+    failed,
+    firstErrorName,
+  };
 }

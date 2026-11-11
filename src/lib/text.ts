@@ -1,5 +1,14 @@
 import { z } from 'zod';
 
+/** "1 adult", "2 adults", "2 children": a count and its noun, the plural `s` unless one is given. */
+export function countLabel(
+  count: number,
+  one: string,
+  many = `${one}s`,
+): string {
+  return `${String(count)} ${count === 1 ? one : many}`;
+}
+
 /**
  * Whether Postgres can store this string: it refuses U+0000 in text and jsonb, and a lone
  * surrogate cannot be encoded as UTF-8 or written as a JSON escape. A write that reaches the
@@ -94,4 +103,11 @@ export function oneLineClipped(text: string, max: number): string {
     .slice(0, max - 1)
     .join('')
     .trimEnd()}…`;
+}
+
+/** The first value of a query parameter, which Next gives as one string or a list when it repeats. */
+export function firstQueryValue(
+  raw: string | string[] | undefined,
+): string | undefined {
+  return Array.isArray(raw) ? raw[0] : raw;
 }

@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   bigint,
   check,
+  date,
   index,
   integer,
   jsonb,
@@ -14,9 +15,16 @@ import {
 } from 'drizzle-orm/pg-core';
 import { auditActorKinds, auditLimits, auditPatterns } from '@/lib/audit';
 import { privacyRequestKinds, privacyRequestStatuses } from '@/lib/guests';
+import {
+  emailAddressPattern,
+  maxEmailAddressLength,
+} from '@/lib/email/address';
 import { rateLimitKeyPattern } from '@/lib/rateLimits';
+import { privateSessionLimits } from '@/lib/privateSession';
+import { supportLimits, supportTopics } from '@/lib/support';
+import { experiences } from './catalog';
 import { guests } from './people';
-import { isReadableDate, maxChars } from './shared';
+import { isReadableDate, maxChars, optionalText, requiredText } from './shared';
 
 // No `import 'server-only'` here: drizzle-kit loads the schema outside Next.js, where that import throws.
 
@@ -156,5 +164,98 @@ export const auditLog = pgTable(
     check('audit_log_recorded_at_in_range', isReadableDate(table.recordedAt)),
     index('audit_log_recorded_at_idx').on(table.recordedAt),
     index('audit_log_subject_idx').on(table.subjectKind, table.subjectId),
+  ],
+);
+
+export const supportTopicEnum = pgEnum('support_topic', supportTopics);
+
+/**
+ * A guest's message through the contact form. It holds exactly what the form collects and no guest
+ * id: the sender may not have an account or a booking. The support queue (a later unit) reads it.
+ */
+export const supportRequests = pgTable(
+  'support_requests',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    name: text().notNull(),
+    email: text().notNull(),
+    topic: supportTopicEnum().notNull(),
+    message: text().notNull(),
+    createdAt: timestamp({ withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+  },
+  (table) => [
+    check(
+      'support_requests_name_shape',
+      requiredText(table.name, supportLimits.nameMaxChars),
+    ),
+    check(
+      'support_requests_email_shape',
+      sql`${table.email} ~ ${sql.raw(`'${emailAddressPattern}'`)} AND ${maxChars(table.email, maxEmailAddressLength)}`,
+    ),
+    check(
+      'support_requests_message_shape',
+      requiredText(table.message, supportLimits.messageMaxChars),
+    ),
+    check(
+      'support_requests_created_at_in_range',
+      isReadableDate(table.createdAt),
+    ),
+    index('support_requests_created_at_idx').on(table.createdAt.desc()),
+  ],
+);
+
+/**
+ * A guest's request for a private session of one experience (PRD-35). Like a support request it
+ * holds what the form collects and no guest id: the sender may not have an account. The budget is
+ * integer cents, whole dollars as typed. The host's queue (a later unit) reads it by experience.
+ */
+export const privateRequests = pgTable(
+  'private_requests',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    experienceId: uuid()
+      .notNull()
+      .references(() => experiences.id, { onDelete: 'restrict' }),
+    requestedDate: date({ mode: 'string' }).notNull(),
+    groupSize: integer().notNull(),
+    budgetMinor: integer().notNull(),
+    name: text().notNull(),
+    email: text().notNull(),
+    message: text(),
+    createdAt: timestamp({ withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+  },
+  (table) => [
+    check(
+      'private_requests_group_size_in_range',
+      sql`${table.groupSize} BETWEEN 1 AND ${sql.raw(String(privateSessionLimits.maxGroupSize))}`,
+    ),
+    check(
+      'private_requests_budget_in_range',
+      sql`${table.budgetMinor} BETWEEN 100 AND ${sql.raw(String(privateSessionLimits.maxBudgetDollars * 100))}`,
+    ),
+    check(
+      'private_requests_name_shape',
+      requiredText(table.name, privateSessionLimits.nameMaxChars),
+    ),
+    check(
+      'private_requests_email_shape',
+      sql`${table.email} ~ ${sql.raw(`'${emailAddressPattern}'`)} AND ${maxChars(table.email, maxEmailAddressLength)}`,
+    ),
+    check(
+      'private_requests_message_shape',
+      optionalText(table.message, privateSessionLimits.messageMaxChars),
+    ),
+    check(
+      'private_requests_created_at_in_range',
+      isReadableDate(table.createdAt),
+    ),
+    index('private_requests_experience_created_at_idx').on(
+      table.experienceId,
+      table.createdAt.desc(),
+    ),
   ],
 );

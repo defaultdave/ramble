@@ -25,7 +25,7 @@ setupProviderEventsDatabase(raise);
 // Behaviours under test, one per decision, branch, or risk:
 // - failed (a try; the hold reopens only while unexpired; the fifth try cancels and voids; a non-pending order changes the attempt only;
 //   a terminal attempt never changes), requires_action (the hold's paying_until extended once), canceled
-// - refund, transfer, and dispute events are left alone: no retry job, no alert, no try counted
+// - transfer and dispute events are left alone (refund events are handled: tests/db/refunds-events.db.test.ts): no retry job, no alert, no try counted
 
 describe('payment.failed', () => {
   it('records a try, moves the order to payment_failed, and reopens the paying hold', async () => {
@@ -122,7 +122,7 @@ describe('payment.requires_action and payment.canceled', () => {
 });
 
 describe('events that belong to later units', () => {
-  it.each(['refund.succeeded', 'transfer.paid', 'dispute.opened'] as const)(
+  it.each(['transfer.paid', 'dispute.opened'] as const)(
     'leaves %s unprocessed with no retry, no alert, and no try counted',
     async (type) => {
       await clearJobs();

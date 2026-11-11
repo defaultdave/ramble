@@ -258,17 +258,53 @@ export function isFreshTimestamp(
   return Math.abs(nowSeconds - timestamp) <= toleranceSeconds;
 }
 
-/**
- * Whether the dev mailbox may be used and who is let in. It exists only where mail does not really
- * leave: it is off in live mode and until a secret is set. `cookieMatches` is the constant-time
- * comparison of the presented cookie with the one the secret yields.
- */
-export function mailboxAccess(input: {
-  liveMode: boolean;
+export type MailboxAccess =
+  | { status: 'disabled' | 'locked' }
+  | { status: 'open'; via: 'ops_role' | 'secret' };
+
+type MailboxDeployment = {
+  /** The deployment's `VERCEL_ENV`, or undefined where there is none. */
+  vercelEnv: string | undefined;
+  /** The `EMAIL_MODE` setting. */
+  emailMode: string;
   secretConfigured: boolean;
-  hasCookie: boolean;
-  cookieMatches: boolean;
-}): 'disabled' | 'locked' | 'open' {
-  if (input.liveMode || !input.secretConfigured) return 'disabled';
-  return input.hasCookie && input.cookieMatches ? 'open' : 'locked';
+};
+
+// The shared secret is for a tester on a deployment that is not production, where mail does not
+// really leave: it is closed in production, in live mode, and until a secret is set.
+function secretPathOpen(deployment: MailboxDeployment): boolean {
+  return (
+    deployment.vercelEnv !== 'production' &&
+    deployment.emailMode !== 'live' &&
+    deployment.secretConfigured
+  );
+}
+
+/**
+ * Who may read the mailbox. A caller with the ops role always may, in every deployment; anyone
+ * else needs the secret path open and the cookie the secret yields. `cookieMatches` is the
+ * constant-time comparison of the presented cookie with that cookie.
+ */
+export function mailboxAccess(
+  input: MailboxDeployment & {
+    ops: boolean;
+    hasCookie: boolean;
+    cookieMatches: boolean;
+  },
+): MailboxAccess {
+  if (input.ops) return { status: 'open', via: 'ops_role' };
+  if (!secretPathOpen(input)) return { status: 'disabled' };
+  return input.hasCookie && input.cookieMatches
+    ? { status: 'open', via: 'secret' }
+    : { status: 'locked' };
+}
+
+/**
+ * Whether a submitted secret unlocks the mailbox: the secret path is open and the submission
+ * matched the secret (`secretMatches`, a constant-time comparison). The ops role plays no part.
+ */
+export function mailboxUnlockAllowed(
+  input: MailboxDeployment & { secretMatches: boolean },
+): boolean {
+  return secretPathOpen(input) && input.secretMatches;
 }

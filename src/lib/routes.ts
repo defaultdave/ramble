@@ -1,5 +1,4 @@
 import { EntityIdSchema, isSlug } from './catalog';
-import { contactPath } from './paths';
 
 // ---- Fixed addresses, in `paths` so client modules can reach them without the catalog ----
 
@@ -25,6 +24,9 @@ export function experiencePath({ slug, id }: ExperienceAddress): string {
 export function guidePath({ slug, id }: ExperienceAddress): string {
   return `/guide/${slug}-${id}`;
 }
+
+/** The host's profile page; the slug is unique, so it is the whole address. */
+export const hostPath = (slug: string) => `/hosts/${slug}`;
 
 /** A card links to the experience page, or to the guide entry when the experience is guide only. */
 export function experienceCardPath(
@@ -107,8 +109,6 @@ export const legalDocPath = (doc: string) => `/legal/${doc}`;
 /** The manage page a booking email links to. The token is a capability: it is never logged or stored. */
 export const managePath = (token: string) => `/manage/${token}`;
 
-/**
- * Where a guest asks about a private session until the private-request form exists.
- * @alias
- */
-export const privateSessionPath = contactPath;
+/** The private session request form for one experience. */
+export const privateSessionPath = (address: ExperienceAddress): string =>
+  `${experiencePath(address)}/private-session`;

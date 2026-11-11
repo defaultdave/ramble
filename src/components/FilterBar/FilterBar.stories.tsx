@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
-import { noFilters } from '@/lib/filters';
+import { noFilters, type BrowseFilters } from '@/lib/filters';
 import { FilterBar } from '@/components/FilterBar';
 import styles from './FilterBar.stories.module.css';
 
@@ -70,15 +70,23 @@ export const WithFilters: Story = {
       neighborhoods: ['carroll-gardens'],
       date: '2026-10-31',
       guests: null,
+      price: null,
+      age: null,
+      setting: null,
+      search: null,
     },
   },
 };
 
-const manyChosen = {
+const manyChosen: BrowseFilters = {
   categories: categories.slice(0, 5).map(({ slug }) => slug),
   neighborhoods: neighborhoods.map(({ slug }) => slug),
   date: '2026-10-31',
   guests: 4,
+  price: '50-to-100',
+  age: 'kids',
+  setting: 'outdoor',
+  search: 'kayak',
 };
 
 /** Every group chosen: the row grows past the screen and scrolls sideways inside its own box. */

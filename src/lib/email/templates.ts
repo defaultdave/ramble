@@ -6,10 +6,12 @@ import {
   GuestConfirmationDataSchema,
   HostBookingNoticeDataSchema,
   PaidAfterLapseDataSchema,
+  SessionReminderDataSchema,
   bookingSubjects,
   confirmationAttachments,
 } from './bookingTemplates';
 import { IdempotencyKeySchema, type EmailAttachment } from './message';
+import { OpsNoticeDataSchema, opsNoticeSubject } from './opsNotice';
 
 /**
  * Every template's data shape, subject line, and attachments. The markup for each lives in
@@ -20,9 +22,15 @@ const templateSchemas = {
   'dev-check': z.object({ recipientName: z.string().min(1).max(80) }),
   'guest-confirmation': GuestConfirmationDataSchema,
   'host-booking-notice': HostBookingNoticeDataSchema,
+  'session-reminder': SessionReminderDataSchema,
   'booking-cancellation': BookingCancellationDataSchema,
   'booking-refund': BookingRefundDataSchema,
   'paid-after-lapse': PaidAfterLapseDataSchema,
+  'ops-notice': OpsNoticeDataSchema,
+  'sign-in-link': z.object({
+    url: z.url({ protocol: /^https?$/ }).max(2048),
+    expiresInMinutes: z.int().min(1).max(60),
+  }),
 } as const;
 
 export type EmailTemplateName = keyof typeof templateSchemas;
@@ -39,9 +47,12 @@ const subjects: {
   'dev-check': () => 'Ramble email check',
   'guest-confirmation': bookingSubjects.guestConfirmation,
   'host-booking-notice': bookingSubjects.hostBookingNotice,
+  'session-reminder': bookingSubjects.sessionReminder,
   'booking-cancellation': bookingSubjects.bookingCancellation,
   'booking-refund': bookingSubjects.bookingRefund,
   'paid-after-lapse': bookingSubjects.paidAfterLapse,
+  'ops-notice': opsNoticeSubject,
+  'sign-in-link': () => 'Your Ramble sign-in link',
 };
 
 const attachments: {
@@ -52,9 +63,12 @@ const attachments: {
   'dev-check': () => [],
   'guest-confirmation': confirmationAttachments,
   'host-booking-notice': () => [],
+  'session-reminder': () => [],
   'booking-cancellation': () => [],
   'booking-refund': () => [],
   'paid-after-lapse': () => [],
+  'ops-notice': () => [],
+  'sign-in-link': () => [],
 };
 
 export type EmailRequest = {

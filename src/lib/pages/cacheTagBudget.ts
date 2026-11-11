@@ -1,5 +1,6 @@
 import { browsePageSize } from './browse';
 import { homeLimits } from './home';
+import { cardLookupLimit } from '../idLookup';
 import { photoLimits } from '../photos';
 
 // Test-only by design: the budget is enforced by tests against the real tagging code, so nothing in
@@ -31,6 +32,8 @@ export const cacheEntryTagCounts = {
   landing: 2,
   /** `taxonomy` and the experience's own tag. */
   experiencePage: 2,
+  /** `catalog` and an experience tag for each experience the host lists. */
+  host: 1 + cardLookupLimit,
   /** The settings tag. */
   settings: 1,
 } as const;

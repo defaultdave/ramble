@@ -3,7 +3,6 @@ import type { Category, Neighborhood } from '../catalog';
 import {
   ageLabel,
   buildExperiencePage,
-  cancellationTerms,
   experienceHead,
   galleryGridPhotos,
   galleryView,
@@ -125,42 +124,6 @@ describe('weatherTerms', () => {
         weatherDecisionHours: null,
       }),
     ).toThrow(RangeError);
-  });
-});
-
-describe('cancellationTerms', () => {
-  it.each([
-    [1, '1 hour'],
-    [24, '24 hours'],
-    [36, '36 hours'],
-    [48, '2 days'],
-    [168, '7 days'],
-  ])('names a window of %i hours as %s', (hours, window) => {
-    const terms = cancellationTerms({ fullRefundHoursBefore: hours });
-    expect(terms.fact).toBe(`Free cancellation up to ${window} before`);
-    expect(terms.detail).toBe(
-      `Free cancellation up to ${window} before start. After that, no refund. If the host or the weather cancels, you get everything back.`,
-    );
-  });
-
-  it('reads a window of nothing as free until the start', () => {
-    expect(cancellationTerms({ fullRefundHoursBefore: 0 })).toEqual({
-      fact: 'Free cancellation until it starts',
-      detail:
-        'Free cancellation until the experience starts. If the host or the weather cancels, you get everything back.',
-    });
-  });
-
-  it.each([-1, 1.5, 24 * 365 + 1, Number.NaN])('refuses %s hours', (hours) => {
-    expect(() => cancellationTerms({ fullRefundHoursBefore: hours })).toThrow(
-      RangeError,
-    );
-  });
-
-  it('takes the longest window', () => {
-    expect(
-      cancellationTerms({ fullRefundHoursBefore: 24 * 365 }).fact,
-    ).toContain('365 days');
   });
 });
 
@@ -348,7 +311,7 @@ describe('buildExperiencePage', () => {
       paused: false,
       checkoutBase: '/checkout/',
       similarHref: '/new-york/things-to-do/outdoors',
-      privateSessionHref: '/contact',
+      privateSessionHref: `/experiences/sunset-kayak-${id(1)}/private-session`,
       fullRefundHoursBefore: 24,
     });
   });
@@ -418,7 +381,9 @@ describe('buildExperiencePage', () => {
     expect(build()?.giftHref).toBe(`/gifts/checkout/${id(1)}`);
     const off = build({ giftsEnabled: false });
     expect(off?.giftHref).toBeNull();
-    expect(off?.privateSessionHref).toBe('/contact');
+    expect(off?.privateSessionHref).toBe(
+      `/experiences/sunset-kayak-${id(1)}/private-session`,
+    );
   });
 
   it('orders the gallery by position, whatever order the photos arrive in', () => {
@@ -447,7 +412,7 @@ describe('buildExperiencePage', () => {
     });
   });
 
-  it('gives the meeting point a Maps link, and the host an initial and a trimmed description', () => {
+  it('gives the meeting point a Maps link, and the host an initial, a trimmed description, and the address of their page', () => {
     const view = build({
       experience: experience({
         host: {
@@ -464,6 +429,7 @@ describe('buildExperiencePage', () => {
       name: 'élan Studio',
       initial: 'É',
       description: null,
+      href: '/hosts/h',
     });
   });
 

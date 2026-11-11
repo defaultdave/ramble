@@ -49,6 +49,7 @@ import { capabilityToken } from '@/server/tokens';
 import { db, type Transaction } from './client';
 import { findOrCreateGuest, recordConsent } from './guests';
 import { readAlternatives, readOpenHeldSeats } from './holds';
+import { readLatestAttempt } from './ordersAttempts';
 import {
   getCurrentLegalDocument,
   getPublishedLegalDocument,
@@ -129,16 +130,6 @@ async function readHeldItems(
     .innerJoin(priceOptions, eq(priceOptions.id, holdItems.priceOptionId))
     .where(eq(holdItems.holdId, holdId))
     .limit(MAX_LINES + 1);
-}
-
-async function readLatestAttempt(tx: Transaction, orderId: string) {
-  const [row] = await tx
-    .select()
-    .from(paymentAttempts)
-    .where(eq(paymentAttempts.orderId, orderId))
-    .orderBy(desc(paymentAttempts.attemptNo))
-    .limit(1);
-  return row ? PaymentAttemptSchema.parse(row) : null;
 }
 
 /**

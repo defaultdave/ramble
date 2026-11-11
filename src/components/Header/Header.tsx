@@ -19,6 +19,8 @@ export type DefaultHeaderProps = HeaderBaseProps & {
   searchLabel: string;
   searchHref: string;
   menu: ReactNode;
+  /** The sign-in or sign-out control (see AccountControl), at every width. */
+  account?: ReactNode;
 };
 
 export type CheckoutHeaderProps = HeaderBaseProps & {
@@ -59,6 +61,7 @@ function DefaultHeader({
   searchLabel,
   searchHref,
   menu,
+  account,
   ...rest
 }: DefaultHeaderProps) {
   return (
@@ -85,6 +88,7 @@ function DefaultHeader({
             <Search className={styles.searchIcon} />
           </span>
         </Link>
+        {account ? <div className={styles.account}>{account}</div> : null}
         <div className={styles.actions}>
           {showGifts ? (
             <Link href={giftsHref} className={styles.gifts}>

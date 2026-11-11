@@ -2790,3 +2790,171 @@ units:
     tokens: null
     status: todo
     note: "Added 2026-10-22 after the freeze at Dave's request (DECISIONS, delta log); PM estimate, not panelled. Overrides ADR 0007's no-third-party-analytics line for the guest pages only"
+  - id: U-120
+    title: "Sign-in screens"
+    section: platform
+    slice: "Access"
+    priority: Must
+    prd: []
+    scope: "/sign-in with the email form and its rate-limit key; check-your-email, expired-link and used-link states; the landing page on U-004a's verify route; sign-out; a `next` redirect limited to same-origin paths; the sign-in entry in the header. Out: passkeys, social login, the account page (U-107), ops nav (U-073)"
+    depends_on: [U-004a]
+    spike: false
+    mode: both
+    phase: P5
+    complexity: 1
+    uncertainty: 1
+    execution: agent-fan-out
+    review: critical
+    estimate_days: { o: 0.5, m: 0.75, p: 1.5 }
+    actual_days: null
+    dave_minutes: null
+    tokens: null
+    status: todo
+    note: "Added 2026-11-10 by the MVP re-plan (NEW-1 in ramble-pm drafts/mvp-replan-2026-11-10.md; DECISIONS, delta log); PM estimate, not panelled"
+  - id: U-121
+    title: "Ops admin UI kit"
+    section: ops
+    slice: "Shell"
+    priority: Must
+    prd: []
+    scope: "DataTable (sort, cursor pagination, empty and error states), Select, Textarea, SearchField, StatusBadge with a filter bar, a ConfirmDestructive dialog, a flash message after a Server Action; Storybook stories under axe. Out: any ops page or data function"
+    depends_on: []
+    spike: false
+    mode: both
+    phase: P5
+    complexity: 1
+    uncertainty: 1
+    execution: agent-fan-out
+    review: standard
+    estimate_days: { o: 0.75, m: 1.25, p: 2.5 }
+    actual_days: null
+    dave_minutes: null
+    tokens: null
+    status: todo
+    note: "Added 2026-11-10 by the MVP re-plan (NEW-2 in ramble-pm drafts/mvp-replan-2026-11-10.md; DECISIONS, delta log), issue 910; PM estimate, not panelled"
+  - id: U-122
+    title: "Rolling session horizon"
+    section: host
+    slice: "Sessions"
+    priority: Must
+    prd: []
+    scope: "A pulse step that runs generateSessions to keep 12 weeks of sessions ahead of now, idempotent, with a DST test. Out: the template UI (U-074c), the host week view (U-068)"
+    depends_on: []
+    spike: false
+    mode: both
+    phase: P5
+    complexity: 1
+    uncertainty: 1
+    execution: agent-fan-out
+    review: standard
+    estimate_days: { o: 0.5, m: 0.75, p: 1.5 }
+    actual_days: null
+    dave_minutes: null
+    tokens: null
+    status: todo
+    note: "Added 2026-11-10 by the MVP re-plan (NEW-3 in ramble-pm drafts/mvp-replan-2026-11-10.md; DECISIONS, delta log); PM estimate, not panelled"
+  - id: U-123
+    title: "Test-site console"
+    section: ops
+    slice: "Settings"
+    priority: Must
+    prd: []
+    scope: "/ops/dev for ops and admin only, refused in production: the jobs list (status, attempts, last error), run one job, drain, trigger the pulse; set or advance the Clock port so a tester can reach hold lapse, reminders, review invites and gift send. Out: fake-gateway outcome controls (FakePaymentForm has them), data reset (U-124)"
+    depends_on: [U-073, U-121]
+    spike: false
+    mode: both
+    phase: P5
+    complexity: 2
+    uncertainty: 2
+    execution: agent-fan-out
+    review: standard
+    estimate_days: { o: 0.75, m: 1.25, p: 2.5 }
+    actual_days: null
+    dave_minutes: null
+    tokens: null
+    status: todo
+    note: "Added 2026-11-10 by the MVP re-plan (NEW-4 in ramble-pm drafts/mvp-replan-2026-11-10.md; DECISIONS, delta log); PM estimate, not panelled"
+  - id: U-124
+    title: "Reset demo data"
+    section: ops
+    slice: "Settings"
+    priority: Should
+    prd: []
+    scope: "A confirm-guarded admin action and CLI that wipe orders, holds, gifts, reviews, messages and jobs, then rerun the seed; a hard refusal in production, with a test. Out: partial and scheduled resets"
+    depends_on: [U-123]
+    spike: false
+    mode: both
+    phase: P5
+    complexity: 1
+    uncertainty: 1
+    execution: agent-fan-out
+    review: standard
+    estimate_days: { o: 0.25, m: 0.5, p: 1 }
+    actual_days: null
+    dave_minutes: null
+    tokens: null
+    status: todo
+    note: "Added 2026-11-10 by the MVP re-plan (NEW-5 in ramble-pm drafts/mvp-replan-2026-11-10.md; DECISIONS, delta log); PM estimate, not panelled"
+  - id: U-125
+    title: "Host listings and settings"
+    section: host
+    slice: "Shell"
+    priority: Should
+    prd: []
+    scope: "/host/experiences read-only (status, price options, cancellation terms, waiver); /host/settings to edit notificationEmail, name and about. Out: host-side experience editing, payouts"
+    depends_on: [U-067, U-074b]
+    spike: false
+    mode: both
+    phase: P5
+    complexity: 1
+    uncertainty: 1
+    execution: agent-fan-out
+    review: standard
+    estimate_days: { o: 0.5, m: 0.75, p: 1.5 }
+    actual_days: null
+    dave_minutes: null
+    tokens: null
+    status: todo
+    note: "Added 2026-11-10 by the MVP re-plan (NEW-6 in ramble-pm drafts/mvp-replan-2026-11-10.md; DECISIONS, delta log); PM estimate, not panelled"
+  - id: U-126
+    title: "Ops dashboard"
+    section: ops
+    slice: "Shell"
+    priority: Should
+    prd: []
+    scope: "The /ops landing: counts and links for the approval queue, refund-failed, support, private requests, today's sessions and recent audit rows. Out: metrics, charts, finance numbers"
+    depends_on: [U-073, U-121, U-075, U-077, U-083a, U-083b]
+    spike: false
+    mode: both
+    phase: P5
+    complexity: 1
+    uncertainty: 1
+    execution: agent-fan-out
+    review: standard
+    estimate_days: { o: 0.25, m: 0.5, p: 1 }
+    actual_days: null
+    dave_minutes: null
+    tokens: null
+    status: todo
+    note: "Added 2026-11-10 by the MVP re-plan (NEW-7 in ramble-pm drafts/mvp-replan-2026-11-10.md; DECISIONS, delta log); PM estimate, not panelled"
+  - id: U-127
+    title: "Host profile page"
+    section: catalog
+    slice: "Browse"
+    priority: Should
+    prd: []
+    scope: "/hosts/[slug] on the browse template: about, the host's live experiences, cancellation terms; a link from the experience page's host block. Out: host reviews, a contact form"
+    depends_on: []
+    spike: false
+    mode: both
+    phase: P5
+    complexity: 1
+    uncertainty: 1
+    execution: agent-fan-out
+    review: standard
+    estimate_days: { o: 0.5, m: 0.75, p: 1.5 }
+    actual_days: null
+    dave_minutes: null
+    tokens: null
+    status: todo
+    note: "Added 2026-11-10 by the MVP re-plan (NEW-8 in ramble-pm drafts/mvp-replan-2026-11-10.md; DECISIONS, delta log); PM estimate, not panelled"

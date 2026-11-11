@@ -13,6 +13,7 @@ import {
   guidePath,
   helpPath,
   homePicksHref,
+  hostPath,
   legalPath,
   managePath,
   maxAddressLength,
@@ -99,6 +100,11 @@ describe('literal addresses', () => {
     ['the home page at Ramble Picks', homePicksHref, '/#picks'],
     ['the Ramble Picks anchor', picksAnchor, 'picks'],
     ['a picks page', picksPath('summer'), '/picks/summer'],
+    [
+      'a host page',
+      hostPath('hudson-paddle-club'),
+      '/hosts/hudson-paddle-club',
+    ],
     ['a category', categoryPath('outdoors'), '/new-york/things-to-do/outdoors'],
     [
       'a neighborhood',
@@ -124,7 +130,11 @@ describe('literal addresses', () => {
     ['accessibility', accessibilityPath, '/accessibility'],
     ['the terms', legalPath('terms'), '/legal/terms'],
     ['the privacy policy', legalPath('privacy'), '/legal/privacy'],
-    ['a private session', privateSessionPath, '/contact'],
+    [
+      'a private session request',
+      privateSessionPath({ slug: 'thing-1', id: id(1) }),
+      `/experiences/thing-1-${id(1)}/private-session`,
+    ],
     ['a manage page', managePath('abc'), '/manage/abc'],
   ])('writes %s', (_name, actual, expected) => {
     expect(actual).toBe(expected);

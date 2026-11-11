@@ -141,6 +141,38 @@
   height: var(--space-5);
 }
 
+/* On a phone the control sits in the menu, where the 320px header has no room for it. */
+.account {
+  display: none;
+  margin-inline-start: auto;
+}
+
+.accountControl {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--size-touch-target);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  font-family: inherit;
+  font-size: var(--font-size-label);
+  line-height: var(--font-line-height-label);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.accountControl:focus-visible {
+  outline: 2px solid transparent;
+  box-shadow:
+    0 0 0 2px var(--color-bg-canvas),
+    0 0 0 4px var(--color-focus-ring);
+}
+
 .menu {
   display: flex;
 }
@@ -200,5 +232,9 @@
 
   .actions {
     display: none;
+  }
+
+  .account {
+    display: flex;
   }
 }

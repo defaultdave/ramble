@@ -151,6 +151,13 @@ describe('ExperiencePage', () => {
     expect(screen.getByText(/Six guides, all trained/)).toBeInTheDocument();
   });
 
+  it('links the host name to the host page', () => {
+    render(<ExperiencePage dates={dates} view={sunsetKayak} />);
+    expect(
+      screen.getByRole('link', { name: 'Hudson Paddle Club' }),
+    ).toHaveAttribute('href', '/hosts/hudson-paddle-club');
+  });
+
   it('gives the meeting point as text with a Maps link that opens in a new tab', () => {
     render(<ExperiencePage dates={dates} view={sunsetKayak} />);
     expect(

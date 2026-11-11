@@ -147,6 +147,10 @@ describe('hero search', () => {
         neighborhoods: [],
         date: expected,
         guests: 2,
+        price: null,
+        age: null,
+        setting: null,
+        search: null,
       });
     },
   );

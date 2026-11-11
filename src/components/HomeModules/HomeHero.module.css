@@ -72,35 +72,6 @@
   min-width: 0;
 }
 
-.label {
-  font-size: var(--font-size-label);
-  line-height: var(--font-line-height-label);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-}
-
-.select {
-  position: relative;
-}
-
-.selectControl {
-  composes: input from '../Input/Input.module.css';
-  padding-right: var(--space-10);
-  appearance: none;
-  text-overflow: ellipsis;
-}
-
-.chevron {
-  position: absolute;
-  top: 50%;
-  right: var(--space-4);
-  width: var(--space-5);
-  height: var(--space-5);
-  color: var(--color-text-secondary);
-  pointer-events: none;
-  transform: translateY(-50%);
-}
-
 .submit {
   display: flex;
 }

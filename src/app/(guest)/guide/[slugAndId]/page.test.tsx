@@ -15,7 +15,9 @@ import GuideEntryRoute, {
 
 // Behaviours under test, one per decision, branch or risk:
 // - an address that is not a slug and an ID is a not-found, before anything is read
-// - an experience that is not visible, and a live one, are a not-found
+// - an experience that is not visible is a not-found
+// - a wrong or retired slug with the right ID is a permanent redirect to the entry's current guide address
+// - an entry that has gone live is a permanent redirect to its experience address, whatever slug was asked for
 // - a guide entry renders its page, read by the ID in the address, lower-cased
 // - the "you can book" module is handed the entry, its category slug, and its category name
 // - a failed read logs only the digest and kind and renders the error state, which retries at the page's own address
@@ -47,6 +49,7 @@ const guide = () => ({
   experience: experience({
     status: 'guide_only',
     name: 'Sourdough mornings',
+    slug: 'sourdough-mornings',
     linkOutUrl: 'https://rise.example/',
     priceOptions: [],
   }),
@@ -83,17 +86,33 @@ describe('the guide entry route', () => {
     });
   });
 
-  it('is a not-found for a live experience, which has its own page', async () => {
-    server.page.mockResolvedValue({
-      experience: experience(),
-      photos: [],
-      place,
-    });
+  it.each([
+    ['a retired slug', `old-name-${id(1)}`],
+    ['a wrong slug', `anything-${id(1)}`],
+    ['a wrong slug and an upper-case ID', `anything-${id(1).toUpperCase()}`],
+  ])(
+    'redirects %s to the current guide address, without rendering',
+    async (_label, slugAndId) => {
+      await expect(GuideEntryRoute(props(slugAndId))).rejects.toMatchObject({
+        digest: `NEXT_REDIRECT;replace;/guide/sourdough-mornings-${id(1)};308;`,
+      });
+    },
+  );
 
-    await expect(GuideEntryRoute(props(address))).rejects.toMatchObject({
-      digest: notFoundDigest,
-    });
-  });
+  it.each([`sourdough-mornings-${id(1)}`, `old-name-${id(1)}`])(
+    'redirects an entry that has gone live to its experience address from %s',
+    async (slugAndId) => {
+      server.page.mockResolvedValue({
+        experience: experience({ slug: 'sunset-kayak' }),
+        photos: [],
+        place,
+      });
+
+      await expect(GuideEntryRoute(props(slugAndId))).rejects.toMatchObject({
+        digest: `NEXT_REDIRECT;replace;/experiences/sunset-kayak-${id(1)};308;`,
+      });
+    },
+  );
 
   it('reads the entry by the ID in the address, lower-cased, and renders it', async () => {
     render(

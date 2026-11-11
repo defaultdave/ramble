@@ -1,7 +1,14 @@
 import 'server-only';
 import { z } from 'zod';
+import {
+  GuestCancellationPayloadSchema,
+  GuestRefundPayloadSchema,
+  HostCancellationPayloadSchema,
+} from '@/lib/cancelBooking';
 import { AuditExportPayloadSchema, auditExportKind } from '@/lib/audit';
+import { OpsNoticeDataSchema, opsNoticeKind } from '@/lib/email/opsNotice';
 import { MaxAttemptsSchema, jobLimits } from '@/lib/jobs';
+import { ProcessRefundPayloadSchema, processRefundKind } from '@/lib/refunds';
 import {
   ProcessProviderEventPayloadSchema,
   processProviderEventKind,
@@ -13,7 +20,15 @@ import {
   BookingEmailPayloadSchema,
   sendGuestConfirmation,
   sendHostBookingNotice,
+  sendSessionReminder,
 } from './bookingEmails';
+import {
+  sendGuestCancellation,
+  sendGuestRefund,
+  sendHostCancellationNotice,
+} from './cancellationEmails';
+import { sendOpsNotice } from './opsNotice';
+import { handleRefund, prepareRefund } from './refund';
 import { handleProviderEvent, prepareProviderEvent } from './providerEvents';
 
 type JobContext<Payload> = {
@@ -103,5 +118,36 @@ export const jobRegistry = {
     payload: BookingEmailPayloadSchema,
     maxAttempts: jobLimits.defaultMaxAttempts,
     handleIdempotent: sendHostBookingNotice,
+  }),
+  'session-reminder': defineJob({
+    payload: BookingEmailPayloadSchema,
+    maxAttempts: jobLimits.defaultMaxAttempts,
+    handleIdempotent: sendSessionReminder,
+  }),
+  [opsNoticeKind]: defineJob({
+    payload: OpsNoticeDataSchema,
+    maxAttempts: jobLimits.defaultMaxAttempts,
+    handleIdempotent: sendOpsNotice,
+  }),
+  [processRefundKind]: defineJob({
+    payload: ProcessRefundPayloadSchema,
+    maxAttempts: jobLimits.defaultMaxAttempts,
+    prepare: (payload) => prepareRefund(payload),
+    handleIdempotent: (context) => handleRefund(context),
+  }),
+  'guest-cancellation': defineJob({
+    payload: GuestCancellationPayloadSchema,
+    maxAttempts: jobLimits.defaultMaxAttempts,
+    handleIdempotent: sendGuestCancellation,
+  }),
+  'host-cancellation-notice': defineJob({
+    payload: HostCancellationPayloadSchema,
+    maxAttempts: jobLimits.defaultMaxAttempts,
+    handleIdempotent: sendHostCancellationNotice,
+  }),
+  'guest-refund': defineJob({
+    payload: GuestRefundPayloadSchema,
+    maxAttempts: jobLimits.defaultMaxAttempts,
+    handleIdempotent: sendGuestRefund,
   }),
 } satisfies JobRegistry;

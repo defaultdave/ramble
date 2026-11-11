@@ -21,6 +21,7 @@ const server = vi.hoisted(() => ({
   options: vi.fn(),
   dates: vi.fn(),
   results: vi.fn(),
+  suggestions: vi.fn().mockResolvedValue([]),
   logError: vi.fn(),
 }));
 vi.mock('next/server', () => ({ connection: () => Promise.resolve() }));
@@ -30,6 +31,7 @@ vi.mock('@/server/filterOptions', () => ({
 vi.mock('@/server/browse', () => ({
   getBrowseDates: server.dates,
   getBrowseResults: server.results,
+  getZeroResultSuggestions: server.suggestions,
 }));
 vi.mock('@/server/actions/browse', () => ({ chooseBrowseDate: vi.fn() }));
 vi.mock('@/server/monitoring/logger', () => ({
@@ -241,6 +243,10 @@ describe('BrowseContent', () => {
             neighborhoods: [],
             date: null,
             guests: null,
+            price: null,
+            age: null,
+            setting: null,
+            search: null,
           },
           after: null,
         },

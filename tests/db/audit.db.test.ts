@@ -14,6 +14,7 @@ import {
   parseAuditEntry,
   type AuditEntryInput,
 } from '@/lib/audit';
+import { ForbiddenError, Role } from '@/server/auth/caller';
 import {
   createFreshDatabase,
   expectConstraint,
@@ -58,6 +59,9 @@ vi.mock('@/server/monitoring/logger', () => ({
 // - audit_writer cannot log in, holds INSERT and SELECT only, can insert and read, and is refused update, delete, and truncate
 // writeAudit:
 // - writes inside the caller's transaction and returns the id; a rollback leaves nothing; a refused entry writes nothing
+// recordAudit and recordOpsAccess:
+// - recordAudit writes its row in a transaction of its own, and a refused entry writes nothing
+// - the ops role opening the ops area writes one ops.accessed row naming the user; guest, host, admin, and nobody are refused with ForbiddenError and write none
 // The export, against the real table and the fake store:
 // - a day holds the rows recorded in [00:00, 24:00) UTC, the boundary instants on the right sides, and no other day
 // - rows are paged by id past one page, each exactly once, even when recorded times are out of id order
@@ -469,6 +473,79 @@ describe('writeAudit', () => {
     ).rejects.toThrow();
 
     expect(await countRows(sql`subject_id = ${marker}`)).toBe(0);
+  });
+});
+
+describe('recordAudit and recordOpsAccess', () => {
+  const marker = randomUUID();
+
+  it('writes the row in a transaction of its own', async () => {
+    await audit.recordAudit({
+      actorKind: 'guest',
+      action: 'mailbox.listed',
+      subjectKind: 'mailbox',
+      subjectId: marker,
+      details: { via: 'secret' },
+    });
+
+    expect(await countRows(sql`subject_id = ${marker}`)).toBe(1);
+  });
+
+  it('writes nothing for an entry the lib refuses', async () => {
+    const refused = randomUUID();
+
+    await expect(
+      audit.recordAudit({
+        actorKind: 'guest',
+        action: 'mailbox.listed',
+        subjectKind: 'mailbox',
+        subjectId: refused,
+        details: { to: 'ada@example.com' },
+      }),
+    ).rejects.toThrow();
+
+    expect(await countRows(sql`subject_id = ${refused}`)).toBe(0);
+  });
+
+  it('records the ops user opening the ops area', async () => {
+    const opsUser = randomUUID();
+
+    await audit.recordOpsAccess({
+      userId: opsUser,
+      roles: [Role.Ops],
+      hostIds: [],
+    });
+
+    const { rows } = await client.db.execute<{
+      actor_kind: string;
+      action: string;
+      details: unknown;
+    }>(
+      sql`SELECT actor_kind::text, action, details FROM audit_log WHERE actor_id = ${opsUser}`,
+    );
+    expect(rows).toEqual([
+      {
+        actor_kind: 'user',
+        action: 'ops.accessed',
+        details: { area: 'dashboard' },
+      },
+    ]);
+  });
+
+  it.each([
+    ['a guest', [Role.Guest]],
+    ['a host owner', [Role.HostOwner]],
+    ['an admin without the ops role', [Role.Admin]],
+    ['nobody signed in', []],
+  ])('refuses %s and writes no row', async (_label, roles) => {
+    const person = randomUUID();
+    const before = await countRows(sql`action = 'ops.accessed'`);
+
+    await expect(
+      audit.recordOpsAccess({ userId: person, roles, hostIds: [] }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+
+    expect(await countRows(sql`action = 'ops.accessed'`)).toBe(before);
   });
 });
 

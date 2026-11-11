@@ -117,13 +117,130 @@ export const piiColumns: readonly PiiColumn[] = [
       'No anonymize step: a row is dead at expires_at (windows are at most one hour) and the purge removes it, so nothing outlives its window',
   },
   {
-    table: 'jobs',
-    column: 'payload',
-    kind: 'link',
-    data: 'The ids of the rows a job works on (an order id for the guest and host emails); a handler reads any address from the row',
+    table: 'auth_users',
+    column: 'email',
+    kind: 'identifier',
+    data: 'The address a person signed in with, folded to lower case',
     location: databaseLocation,
     deletionPath:
-      'Finished jobs are purged on a schedule; a job kind that puts an address or a name in its payload must be added here with its own step',
+      'Not yet anonymized: the privacy-requests work (U-085) adds a step to anonymizeGuest that deletes the sign-in user and its sessions',
+  },
+  {
+    table: 'auth_users',
+    column: 'name',
+    kind: 'identifier',
+    data: 'A display name, empty unless a sign-in request supplied one',
+    location: databaseLocation,
+    deletionPath:
+      'Not yet anonymized: deleted with the sign-in user by the privacy-requests work (U-085)',
+  },
+  {
+    table: 'auth_verifications',
+    column: 'value',
+    kind: 'identifier',
+    data: 'The address a sign-in link was sent to, until the link is used or lapses (5 minutes)',
+    location: databaseLocation,
+    deletionPath:
+      'The row is deleted when the link is used. A link that is never used lapses but its row stays until a purge is built; the expiry job (a suggestion in the U-004a report) removes them',
+  },
+  {
+    table: 'auth_sessions',
+    column: 'user_id',
+    kind: 'link',
+    data: 'Which signed-in person a session belongs to',
+    location: databaseLocation,
+    deletionPath:
+      'Deleted with the sign-in user (cascade) by the privacy-requests work (U-085)',
+  },
+  {
+    table: 'auth_accounts',
+    column: 'user_id',
+    kind: 'link',
+    data: 'Which signed-in person an account belongs to',
+    location: databaseLocation,
+    deletionPath:
+      'Deleted with the sign-in user (cascade) by the privacy-requests work (U-085)',
+  },
+  {
+    table: 'auth_accounts',
+    column: 'account_id',
+    kind: 'link',
+    data: "The person's id at the sign-in method; for email links, none is written",
+    location: databaseLocation,
+    deletionPath:
+      'Deleted with the sign-in user (cascade) by the privacy-requests work (U-085)',
+  },
+  {
+    table: 'role_grants',
+    column: 'user_id',
+    kind: 'link',
+    data: 'Which signed-in person holds a role',
+    location: databaseLocation,
+    deletionPath:
+      'Deleted with the sign-in user (cascade); a role grant is access, not a record to keep (the audit log keeps who changed it)',
+  },
+  {
+    table: 'jobs',
+    column: 'payload',
+    kind: 'identifier',
+    data: "The ids of the rows a job works on (an order id for the guest and host emails); a handler reads any address from the row. The one exception is the ops notice, whose payload is the finished text of the email to Ramble: for a contact message that is the sender's name, address, and message",
+    location: databaseLocation,
+    deletionPath:
+      'Finished jobs are purged on a schedule, which bounds how long an ops notice keeps its text; a job kind that puts an address or a name in its payload must be added here with its own step',
+  },
+  {
+    table: 'support_requests',
+    column: 'name',
+    kind: 'identifier',
+    data: 'The name a guest typed into the contact form',
+    location: databaseLocation,
+    deletionPath:
+      "Not yet anonymized: the support queue work adds a step keyed on the sender's address, because a sender need not be a guest",
+  },
+  {
+    table: 'support_requests',
+    column: 'email',
+    kind: 'identifier',
+    data: 'The address a guest typed into the contact form, folded to lower case',
+    location: databaseLocation,
+    deletionPath:
+      "Not yet anonymized: the support queue work adds a step keyed on the sender's address, because a sender need not be a guest",
+  },
+  {
+    table: 'support_requests',
+    column: 'message',
+    kind: 'identifier',
+    data: 'Free text a guest typed into the contact form, which can name a booking, a person, or anything else they chose to write',
+    location: databaseLocation,
+    deletionPath:
+      "Not yet anonymized: the support queue work adds a step keyed on the sender's address, because a sender need not be a guest",
+  },
+  {
+    table: 'private_requests',
+    column: 'name',
+    kind: 'identifier',
+    data: 'The name a guest typed into the private session form',
+    location: databaseLocation,
+    deletionPath:
+      "Not yet anonymized: the host queue work adds a step keyed on the sender's address, because a sender need not be a guest",
+  },
+  {
+    table: 'private_requests',
+    column: 'email',
+    kind: 'identifier',
+    data: 'The address a guest typed into the private session form, folded to lower case',
+    location: databaseLocation,
+    deletionPath:
+      "Not yet anonymized: the host queue work adds a step keyed on the sender's address, because a sender need not be a guest",
+  },
+  {
+    table: 'private_requests',
+    column: 'message',
+    kind: 'identifier',
+    data: 'Free text a guest typed into the private session form, which can name a person or anything else they chose to write',
+    location: databaseLocation,
+    deletionPath:
+      "Not yet anonymized: the host queue work adds a step keyed on the sender's address, because a sender need not be a guest",
   },
   {
     table: 'jobs',
@@ -271,6 +388,8 @@ const notPersonal = (
 ) => columns.map((column) => ({ table, column, reason }));
 
 const aRandomId = 'A random uuid';
+const neverWritten =
+  'Always empty: Better Auth needs the column, and a CHECK refuses any value, so sign-in keeps no browser address, user agent, picture, or credential';
 const aFixedList = 'A fixed list of values';
 const aTime = 'A time';
 const aCountOrTime = 'A count or a time';
@@ -322,6 +441,59 @@ export const nonPiiColumns: readonly {
     'window_started_at',
     'expires_at',
   ]),
+  ...notPersonal('support_requests', aRandomId, ['id']),
+  ...notPersonal('support_requests', aFixedList, ['topic']),
+  ...notPersonal('support_requests', aTime, ['created_at']),
+  ...notPersonal('private_requests', aRandomId, ['id', 'experience_id']),
+  ...notPersonal(
+    'private_requests',
+    'A date or a number the guest chose, with no name in it',
+    ['requested_date', 'group_size', 'budget_minor'],
+  ),
+  ...notPersonal('private_requests', aTime, ['created_at']),
+  ...notPersonal('auth_users', aRandomId, ['id']),
+  ...notPersonal('auth_users', 'A flag', ['email_verified']),
+  ...notPersonal('auth_users', aTime, ['created_at', 'updated_at']),
+  ...notPersonal('auth_users', neverWritten, ['image']),
+  ...notPersonal('auth_sessions', neverWritten, ['ip_address', 'user_agent']),
+  ...notPersonal('auth_accounts', neverWritten, [
+    'access_token',
+    'refresh_token',
+    'id_token',
+    'access_token_expires_at',
+    'refresh_token_expires_at',
+    'scope',
+    'password',
+  ]),
+  ...notPersonal('auth_sessions', aRandomId, ['id']),
+  ...notPersonal(
+    'auth_sessions',
+    'A random secret held in the cookie; it names no one without the user_id beside it',
+    ['token'],
+  ),
+  ...notPersonal('auth_sessions', aTime, [
+    'expires_at',
+    'created_at',
+    'updated_at',
+  ]),
+  ...notPersonal('auth_accounts', aRandomId, ['id']),
+  ...notPersonal('auth_accounts', aFixedList, ['provider_id']),
+  ...notPersonal('auth_accounts', aTime, ['created_at', 'updated_at']),
+  ...notPersonal('auth_verifications', aRandomId, ['id']),
+  ...notPersonal(
+    'auth_verifications',
+    'A keyed hash of a random token, with no address in it',
+    ['identifier'],
+  ),
+  ...notPersonal('auth_verifications', aTime, [
+    'expires_at',
+    'created_at',
+    'updated_at',
+  ]),
+  ...notPersonal('role_grants', aRandomId, ['id']),
+  ...notPersonal('role_grants', aFixedList, ['role']),
+  ...notPersonal('role_grants', structure, ['host_id']),
+  ...notPersonal('role_grants', aTime, ['created_at']),
   ...notPersonal('jobs', aRandomId, ['id']),
   ...notPersonal('jobs', 'The job type, from a registry in code', ['kind']),
   ...notPersonal('jobs', aFixedList, ['status']),
@@ -402,6 +574,7 @@ export const nonPiiColumns: readonly {
     'slug',
     'name',
     'description',
+    'search_vector',
     'meeting_point',
     'included',
     'accessibility_notes',
@@ -907,6 +1080,12 @@ export const retentionSchedule: readonly RetentionRow[] = [
     startsAt: 'The time the request was resolved',
     period: pendingCounsel,
     note: 'Kept as the record that a request was made and how it ended',
+  },
+  {
+    dataset: 'support_requests',
+    startsAt: "The row's creation",
+    period: pendingCounsel,
+    note: 'A contact message is kept until the support queue resolves it; the queue work adds the removal once the period is set',
   },
   {
     dataset: 'audit_log',

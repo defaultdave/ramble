@@ -14,7 +14,10 @@ import { BookingRefund } from './templates/BookingRefund';
 import { DevCheck } from './templates/DevCheck';
 import { GuestConfirmation } from './templates/GuestConfirmation';
 import { HostBookingNotice } from './templates/HostBookingNotice';
+import { OpsNotice } from './templates/OpsNotice';
 import { PaidAfterLapse } from './templates/PaidAfterLapse';
+import { SessionReminder } from './templates/SessionReminder';
+import { SignInLink } from './templates/SignInLink';
 
 type Markup = {
   [Name in EmailTemplateName]: (
@@ -31,6 +34,9 @@ const markup: Markup = {
   'host-booking-notice': (data, helpUrl) => (
     <HostBookingNotice data={data} helpUrl={helpUrl} />
   ),
+  'session-reminder': (data, helpUrl) => (
+    <SessionReminder data={data} helpUrl={helpUrl} />
+  ),
   'booking-cancellation': (data, helpUrl) => (
     <BookingCancellation data={data} helpUrl={helpUrl} />
   ),
@@ -39,6 +45,10 @@ const markup: Markup = {
   ),
   'paid-after-lapse': (data, helpUrl) => (
     <PaidAfterLapse data={data} helpUrl={helpUrl} />
+  ),
+  'ops-notice': (data, helpUrl) => <OpsNotice data={data} helpUrl={helpUrl} />,
+  'sign-in-link': (data, helpUrl) => (
+    <SignInLink data={data} helpUrl={helpUrl} />
   ),
 };
 

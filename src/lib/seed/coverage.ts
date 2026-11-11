@@ -91,6 +91,9 @@ export type SeedSnapshot = {
 /** How far ahead the `bookable-party` probe looks for a session with room for six. */
 const bookablePartyDays = 14;
 
+/** More live experiences than the curated catalog holds, so only the scale fixture can pass it. */
+const manyResultsLive = 40;
+
 const kayak = 'sunset-kayak-on-the-hudson';
 const kidsWheel = 'kids-wheel-class';
 
@@ -228,9 +231,9 @@ export const probes = {
   },
   'many-results': {
     holds:
-      'At least 24 live experiences, so a listing has a second page behind "Show more". The curated set is smaller; the scale fixture supplies the rest.',
+      'At least 40 live experiences, so a listing runs to several pages behind "Show more". The curated catalog holds about 35; the scale fixture supplies the rest.',
     needsScale: true,
-    check: (s) => s.experiences.filter(isLive).length >= 24,
+    check: (s) => s.experiences.filter(isLive).length >= manyResultsLive,
   },
   'filter-variety': {
     holds:
@@ -664,8 +667,7 @@ export const coverage: CoverageEntry[] = [
     title: 'Experience',
     probes: ['kayak-page', 'kayak-session-states', 'neighbors'],
     trigger: 'Open the kayak page.',
-    // TODO(U-021b): seed the photo pool, then drop this gap.
-    gap: 'The seed writes no photo rows yet; the gallery shows its placeholder.',
+    gap: 'The seed writes photo rows only when STORAGE_PROVIDER=vercel-blob; with the fake provider the gallery shows its placeholder.',
   },
   {
     id: '03b',

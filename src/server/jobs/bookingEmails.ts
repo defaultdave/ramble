@@ -3,8 +3,12 @@ import { z } from 'zod';
 import {
   bookingEmailKey,
   confirmationDecision,
+  type ConfirmationDecision,
   guestConfirmationData,
   hostBookingNoticeData,
+  hostNoticeDecision,
+  reminderDecision,
+  sessionReminderData,
 } from '@/lib/bookingEmails';
 import { WriteIdSchema } from '@/lib/catalog';
 import type { Transaction } from '@/server/db/client';
@@ -14,6 +18,7 @@ import {
 } from '@/server/db/bookingEmails';
 import { env } from '@/server/env';
 import { logger } from '@/server/monitoring/logger';
+import type { Clock } from '@/server/ports/clock';
 import { sendEmail } from '@/server/ports/email';
 import { secureEqual } from '@/server/hash';
 import { capabilityToken, hashToken } from '@/server/tokens';
@@ -32,20 +37,26 @@ export type BookingEmailPayload = z.output<typeof BookingEmailPayloadSchema>;
 type Context = { tx: Transaction; payload: BookingEmailPayload; jobId: string };
 
 /** Thrown for an order that should not have a job. The message names no address, name, or token. */
-class BookingEmailError extends Error {
+export class BookingEmailError extends Error {
   constructor(reason: string) {
     super(`Booking email refused: ${reason}`);
     this.name = 'BookingEmailError';
   }
 }
 
-async function loadOrder(tx: Transaction, orderId: string) {
+/** Reads the order and applies the email's decision to it; a `refuse` is a job that should not exist, and throws `refusal`. */
+export async function loadOrder(
+  tx: Transaction,
+  orderId: string,
+  decide: (
+    source: BookingEmailOrder['source'],
+  ) => ConfirmationDecision = confirmationDecision,
+  refusal = 'the order is not a confirmed booking',
+) {
   const order = await readBookingEmailOrder(tx, orderId);
   if (!order) throw new BookingEmailError('there is no such booking');
-  const decision = confirmationDecision(order.source);
-  if (decision === 'refuse') {
-    throw new BookingEmailError('the order is not a confirmed booking');
-  }
+  const decision = decide(order.source);
+  if (decision === 'refuse') throw new BookingEmailError(refusal);
   return { order, decision };
 }
 
@@ -100,13 +111,46 @@ export async function sendHostBookingNotice({
     logger.info('booking email skipped', { jobId, reason: 'cancelled' });
     return;
   }
-  if (order.hostNotificationEmail === null) {
+  const notice = hostNoticeDecision(order);
+  if (notice.kind === 'refuse') {
     throw new BookingEmailError('the host has no notification address');
   }
   await sendEmail({
     template: 'host-booking-notice',
-    to: order.hostNotificationEmail,
+    to: notice.to,
     data: hostBookingNoticeData(order.source),
     idempotencyKey: bookingEmailKey('host-booking-notice', payload.orderId),
+  });
+}
+
+/**
+ * The reminder to the guest (PRD-27). It was queued at confirm to run 24 hours before the session,
+ * so the order may have been cancelled since: that, and a session that has already started, send
+ * nothing.
+ */
+export async function sendSessionReminder({
+  tx,
+  payload,
+  jobId,
+  clock,
+}: Context & { clock: Clock }): Promise<void> {
+  const order = await readBookingEmailOrder(tx, payload.orderId);
+  if (!order) throw new BookingEmailError('there is no such booking');
+  const decision = reminderDecision(order.source, clock.now());
+  if (decision === 'refuse') {
+    throw new BookingEmailError('the order is not a confirmed booking');
+  }
+  if (decision === 'skip') {
+    logger.info('booking email skipped', { jobId, reason: 'not-due' });
+    return;
+  }
+  await sendEmail({
+    template: 'session-reminder',
+    to: order.contactEmail,
+    data: sessionReminderData(order.source, {
+      appUrl: env.APP_URL,
+      manageToken: liveManageToken(order),
+    }),
+    idempotencyKey: bookingEmailKey('session-reminder', payload.orderId),
   });
 }

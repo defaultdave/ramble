@@ -1,0 +1,21 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* The button lines up with the input, not the label above it. */
+.row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.input {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.clear {
+  align-self: flex-start;
+}

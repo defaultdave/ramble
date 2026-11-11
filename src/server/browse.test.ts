@@ -6,7 +6,12 @@ import {
 } from '@/lib/pages/cacheTagBudget';
 import { browsePageSize, browseTitle } from '@/lib/pages/browse';
 import { noFilters } from '@/lib/filters';
-import { getBrowseDates, getBrowseResults, getBrowseTitle } from './browse';
+import {
+  getBrowseDates,
+  getBrowseResults,
+  getBrowseTitle,
+  getZeroResultSuggestions,
+} from './browse';
 import { makeDriverError } from '../../tests/support/driverError';
 
 // Behaviours under test, one per decision, branch or risk:
@@ -14,6 +19,9 @@ import { makeDriverError } from '../../tests/support/driverError';
 // - a cursor nobody can see is not kept: the uncached profile is named; a page that was found names no other
 // - a failed read throws only the name of the read and the kind of the failure, never the query, its values, or the cause
 // - a framework control-flow error passes through unchanged
+// - the suggestions count each filter that is on without it, in one read each, and offer the removals that bring something back
+// - a removal that leaves a slug the catalog does not have, or a date outside the window, is counted as none without a read
+// - a failed count throws only the name of the read and the kind of the failure
 
 const cache = vi.hoisted(() => ({ life: vi.fn(), tag: vi.fn() }));
 vi.mock('next/cache', () => ({
@@ -24,12 +32,14 @@ vi.mock('next/cache', () => ({
 const db = vi.hoisted(() => ({
   results: vi.fn(),
   dates: vi.fn(),
+  count: vi.fn(),
   categories: vi.fn(),
   neighborhoods: vi.fn(),
 }));
 vi.mock('@/server/db/browse', () => ({
   listBrowseExperiences: db.results,
   listBrowseDayRows: db.dates,
+  countBrowseExperiences: db.count,
 }));
 vi.mock('@/server/db/catalog', () => ({
   listCategories: db.categories,
@@ -208,5 +218,96 @@ describe('getBrowseTitle', () => {
       digest: expect.stringContaining('NEXT_HTTP_ERROR_FALLBACK') as string,
     });
     expect(log.error).not.toHaveBeenCalled();
+  });
+});
+
+describe('getZeroResultSuggestions', () => {
+  const cooking = { id: '1', slug: 'cooking', name: 'Cooking' };
+  const dumbo = { id: '2', slug: 'dumbo', name: 'DUMBO' };
+
+  beforeEach(() => {
+    db.categories.mockResolvedValue([cooking]);
+    db.neighborhoods.mockResolvedValue([dumbo]);
+  });
+
+  it('counts the browse without each filter that is on, and offers those that bring something back', async () => {
+    db.count.mockImplementation(({ categories }: { categories: string[] }) =>
+      Promise.resolve(categories.length === 0 ? 7 : 0),
+    );
+    const filters = {
+      ...noFilters,
+      categories: ['cooking'],
+      neighborhoods: ['dumbo'],
+    };
+
+    const offered = await getZeroResultSuggestions(filters, asOf);
+
+    expect(db.count).toHaveBeenCalledTimes(2);
+    expect(db.count).toHaveBeenCalledWith({ ...filters, categories: [] }, asOf);
+    expect(db.count).toHaveBeenCalledWith(
+      { ...filters, neighborhoods: [] },
+      asOf,
+    );
+    expect(offered).toEqual([
+      {
+        param: 'categories',
+        label: 'Cooking',
+        count: 7,
+        href: '/new-york/browse?neighborhood=dumbo',
+      },
+    ]);
+    expect(cache.life).toHaveBeenCalledWith('browse');
+    expect(cache.tag.mock.calls.flat()).toContain('catalog');
+  });
+
+  it('reads nothing when no filter is on', async () => {
+    await expect(getZeroResultSuggestions(noFilters, asOf)).resolves.toEqual(
+      [],
+    );
+    expect(db.count).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      'a slug the catalog does not have',
+      { ...noFilters, categories: ['gone'], neighborhoods: ['dumbo'] },
+    ],
+    [
+      'a date outside the window',
+      { ...noFilters, date: '2027-06-01', neighborhoods: ['dumbo'] },
+    ],
+  ])(
+    'counts a removal that still leaves %s as none, without a read',
+    async (_, filters) => {
+      db.count.mockResolvedValue(5);
+
+      const offered = await getZeroResultSuggestions(filters, asOf);
+
+      expect(db.count).not.toHaveBeenCalledWith(
+        expect.objectContaining({ categories: ['gone'] }),
+        asOf,
+      );
+      expect(db.count).not.toHaveBeenCalledWith(
+        expect.objectContaining({ date: '2027-06-01' }),
+        asOf,
+      );
+      expect(offered.map(({ param }) => param)).not.toContain('neighborhoods');
+    },
+  );
+
+  it('offers nothing, and logs only the kind of the failure, when a count fails', async () => {
+    db.count.mockRejectedValue(driverError);
+
+    const offered = await getZeroResultSuggestions(
+      { ...noFilters, neighborhoods: ['dumbo'] },
+      asOf,
+    );
+
+    expect(offered).toEqual([]);
+    expect(log.error).toHaveBeenCalledWith(
+      'Browse suggestions could not be read',
+      expect.objectContaining({ kind: 'CachedReadError' }),
+    );
+    expect(JSON.stringify(log.error.mock.calls)).not.toContain('secret-slug');
   });
 });

@@ -1,8 +1,12 @@
 import type { Metadata } from 'next';
-import { RoutePlaceholder } from '@/components/RoutePlaceholder';
+import { AccessibilityStatement } from '@/components/AccessibilityStatement';
 
-export const metadata: Metadata = { title: 'Accessibility' };
+export const metadata: Metadata = {
+  title: 'Accessibility',
+  description:
+    'How Ramble is built for access, where it falls short, and how to tell us about a barrier.',
+};
 
 export default function AccessibilityPage() {
-  return <RoutePlaceholder name="Accessibility" covers="PRD-69" />;
+  return <AccessibilityStatement />;
 }

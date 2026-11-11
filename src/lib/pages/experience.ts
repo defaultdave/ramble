@@ -1,15 +1,13 @@
 import { durationLabel } from '../duration';
 import {
-  type CancellationTier,
   type Category,
   type GuestExperience,
   type Neighborhood,
 } from '../catalog';
-import { MAX_FULL_REFUND_HOURS } from '../cancellation';
+import { hoursLabel, cancellationTerms } from '../cancellation';
 import { allowedChildAges } from '../checkout';
-import { presentText, textLines } from '../displayText';
+import { initialOf, presentText, textLines } from '../displayText';
 import { holdLimits } from '../holds';
-import { isSafeIntegerInRange } from '../integers';
 import { mapsHref } from '../maps';
 import type { GuestPhoto } from '../photos';
 import { photoView, type PhotoView } from '../photoViews';
@@ -19,15 +17,12 @@ import {
   categoryPath,
   checkoutPath,
   giftCheckoutPath,
+  hostPath,
   neighborhoodPath,
   privateSessionPath,
 } from '../routes';
 
 // ---- Words ----
-
-function hoursLabel(hours: number): string {
-  return `${String(hours)} ${hours === 1 ? 'hour' : 'hours'}`;
-}
 
 /** The most rows "What's included" shows; the rest of a longer list is not drawn. */
 export const maxIncludedItems = 20;
@@ -81,44 +76,6 @@ export function weatherTerms({
   return {
     fact: `Weather call ${before} before start`,
     detail: `Go or no-go is decided ${before} before start. If it's off, you're refunded in full and emailed right away.`,
-  };
-}
-
-/**
- * How long before the start a guest can still cancel, in the tier's own words: whole days from two
- * up, hours otherwise ("24 hours" stays hours, as the design shows it).
- */
-function windowLabel(hours: number): string {
-  const day = 24;
-  return hours >= 2 * day && hours % day === 0
-    ? `${String(hours / day)} days`
-    : hoursLabel(hours);
-}
-
-/**
- * What the page says about cancelling, from the experience's tier (PRD-10, PRD-46). It is stated
- * before any date is chosen, so it names the window; the deadline for one session comes from
- * `cancellationWindow` when a session is picked. A tier outside 0 to a year is refused, as there.
- */
-export function cancellationTerms(
-  tier: Pick<CancellationTier, 'fullRefundHoursBefore'>,
-): { fact: string; detail: string } {
-  const hours = tier.fullRefundHoursBefore;
-  if (!isSafeIntegerInRange(hours, 0, MAX_FULL_REFUND_HOURS)) {
-    throw new RangeError('The cancellation window is out of range');
-  }
-  const refunded =
-    'If the host or the weather cancels, you get everything back.';
-  if (hours === 0) {
-    return {
-      fact: 'Free cancellation until it starts',
-      detail: `Free cancellation until the experience starts. ${refunded}`,
-    };
-  }
-  const window = windowLabel(hours);
-  return {
-    fact: `Free cancellation up to ${window} before`,
-    detail: `Free cancellation up to ${window} before start. After that, no refund. ${refunded}`,
   };
 }
 
@@ -261,7 +218,12 @@ export type ExperiencePageView = {
   gallery: GalleryView;
   about: string[];
   included: string[];
-  host: { name: string; initial: string; description: string | null };
+  host: {
+    name: string;
+    initial: string;
+    description: string | null;
+    href: string;
+  };
   meeting: { text: string; mapsHref: string | null } | null;
   accessibility: string | null;
   weather: string | null;
@@ -359,8 +321,9 @@ export function buildExperiencePage(
     included: includedItems(experience.included),
     host: {
       name: experience.host.name,
-      initial: Array.from(experience.host.name)[0]?.toUpperCase() ?? '',
+      initial: initialOf(experience.host.name),
       description: presentText(experience.host.description),
+      href: hostPath(experience.host.slug),
     },
     meeting:
       meetingText === null
@@ -392,10 +355,10 @@ export function buildExperiencePage(
       paused: bookingsPaused,
       checkoutBase: checkoutPath(''),
       similarHref: categoryPath(place.category.slug),
-      privateSessionHref: privateSessionPath,
+      privateSessionHref: privateSessionPath(experience),
       fullRefundHoursBefore: experience.cancellationTier.fullRefundHoursBefore,
     },
-    privateSessionHref: privateSessionPath,
+    privateSessionHref: privateSessionPath(experience),
   };
 }
 

@@ -1,14 +1,14 @@
-import { ChevronDown, Search, Star } from 'lucide-react';
+import { Search, Star } from 'lucide-react';
 import { useId, type ReactNode } from 'react';
 import { Button } from '@/components/Button';
 import { Illustration } from '@/components/Illustration';
 import { Input } from '@/components/Input';
+import { Select } from '@/components/Select';
 import {
   browseParamNames,
   defaultGuests,
   guestOptions,
   neighborhoodOptions,
-  type SelectOption,
 } from '@/lib/filters';
 import { browsePath } from '@/lib/routes';
 import { Eyebrow } from './Eyebrow';
@@ -23,39 +23,6 @@ export type HomeHeroProps = {
   /** Today in New York as YYYY-MM-DD: the date field's starting day and the earliest it offers. */
   today: string;
 };
-
-type SelectFieldProps = {
-  label: string;
-  name: string;
-  defaultValue: string;
-  options: readonly SelectOption[];
-};
-
-function SelectField({ label, name, defaultValue, options }: SelectFieldProps) {
-  const id = useId();
-  return (
-    <div className={styles.field}>
-      <label className={styles.label} htmlFor={id}>
-        {label}
-      </label>
-      <div className={styles.select}>
-        <select
-          id={id}
-          className={styles.selectControl}
-          name={name}
-          defaultValue={defaultValue}
-        >
-          {options.map(({ value, label: optionLabel }) => (
-            <option key={value} value={value}>
-              {optionLabel}
-            </option>
-          ))}
-        </select>
-        <ChevronDown className={styles.chevron} aria-hidden="true" />
-      </div>
-    </div>
-  );
-}
 
 /**
  * The hero and its search. The search is a plain GET form to the browse page, so it works with no
@@ -86,12 +53,15 @@ export function HomeHero({
             method="get"
             aria-label="Find something to do"
           >
-            <SelectField
-              label="Neighborhood"
-              name={browseParamNames.neighborhoods}
-              defaultValue=""
-              options={neighborhoodOptions(neighborhoods)}
-            />
+            <div className={styles.field}>
+              <Select
+                variant="hero"
+                label="Neighborhood"
+                name={browseParamNames.neighborhoods}
+                defaultValue=""
+                options={neighborhoodOptions(neighborhoods)}
+              />
+            </div>
             <div className={styles.field}>
               <Input
                 type="date"
@@ -101,12 +71,15 @@ export function HomeHero({
                 defaultValue={today}
               />
             </div>
-            <SelectField
-              label="Guests"
-              name={browseParamNames.guests}
-              defaultValue={String(defaultGuests)}
-              options={guestOptions}
-            />
+            <div className={styles.field}>
+              <Select
+                variant="hero"
+                label="Guests"
+                name={browseParamNames.guests}
+                defaultValue={String(defaultGuests)}
+                options={guestOptions}
+              />
+            </div>
             <div className={styles.submit}>
               <Button type="submit" size="lg" iconStart={<Search />}>
                 Find something to do

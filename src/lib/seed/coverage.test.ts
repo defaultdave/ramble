@@ -160,9 +160,13 @@ const breakers: Record<
       status: 'paused',
     }),
   'cooking-page': (s) =>
-    editExperiences(s, slug('hand-rolled-pasta-in-carroll-gardens'), {
-      status: 'paused',
-    }),
+    editExperiences(
+      s,
+      (e) =>
+        e.categorySlug === 'cooking' &&
+        e.neighborhoodSlug === 'carroll-gardens',
+      { status: 'paused' },
+    ),
   'filter-variety': (s) => editExperiences(s, () => true, { outdoor: false }),
   'home-modules': (s) => ({
     ...s,
@@ -240,9 +244,11 @@ const breakers: Record<
       taxTreatment: 'taxable',
     }),
   neighbors: (s) =>
-    editExperiences(s, slug('cast-iron-and-cobblestones'), {
-      status: 'paused',
-    }),
+    editExperiences(
+      s,
+      (e) => e.neighborhoodSlug === 'tribeca' && e.slug !== kayak,
+      { status: 'paused' },
+    ),
   'kids-zero-results': (s) => ({
     ...s,
     sessions: [
@@ -263,7 +269,7 @@ const breakers: Record<
   'tiers-all': (s) =>
     editExperiences(s, (e) => e.tier === 'strict', { tier: 'flexible' }),
   'weather-both': (s) =>
-    editExperiences(s, slug('cast-iron-and-cobblestones'), {
+    editExperiences(s, (e) => e.weatherPolicy === 'rain_or_shine', {
       weatherPolicy: 'decided_before_start',
     }),
   'allocation-host': (s) => editSessions(s, () => true, { source: 'ramble' }),

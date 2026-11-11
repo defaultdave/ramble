@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { presentText, textLines } from './displayText';
+import { initialOf, presentText, textLines } from './displayText';
 
 // Behaviours under test, one per decision, branch or risk:
 // - presentText trims the ends, and is null for no text or only blanks
+// - initialOf is the first character of a name in capitals, whole for an emoji, and empty for no name
 // - textLines has one trimmed entry per non-blank line, and none for no text
 
 describe('presentText', () => {
@@ -29,5 +30,16 @@ describe('textLines', () => {
 
   it.each([null, '', '  \n \n'])('has none for %j', (value) => {
     expect(textLines(value)).toEqual([]);
+  });
+});
+
+describe('initialOf', () => {
+  it.each([
+    ['Hudson Paddle Club', 'H'],
+    ['élan Studio', 'É'],
+    ['😀 Fun', '😀'],
+    ['', ''],
+  ])('takes the initial of %j as %j', (name, initial) => {
+    expect(initialOf(name)).toBe(initial);
   });
 });

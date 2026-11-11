@@ -23,7 +23,7 @@ export const routes: readonly RouteRow[] = [
   },
   { path: '/gifts', group: 'guest', heading: 'Gift guide', noindex: false },
   { path: '/help', group: 'guest', heading: 'Help', noindex: false },
-  { path: '/legal/sample', group: 'guest', heading: 'Legal', noindex: false },
+  { path: '/legal/terms', group: 'guest', heading: 'Legal', noindex: false },
   {
     path: '/accessibility',
     group: 'guest',
@@ -38,18 +38,11 @@ export const routes: readonly RouteRow[] = [
     noindex: true,
   },
   {
-    path: '/manage/sample',
-    group: 'checkout',
-    heading: 'Manage booking',
-    noindex: true,
-  },
-  {
     path: '/gift/sample',
     group: 'checkout',
     heading: 'Redeem a gift',
     noindex: true,
   },
-  { path: '/host', group: 'host', heading: 'Host tools', noindex: true },
   { path: '/ops', group: 'ops', heading: 'Operations', noindex: true },
   { path: '/ops/mailbox', group: 'ops', heading: 'Dev mailbox', noindex: true },
 ];
@@ -113,6 +106,16 @@ export const experiencePaths = {
 export const guidePaths = {
   notFound: '/guide/sample',
   readFails: '/guide/sourdough-mornings-00000000-0000-4000-8000-000000000001',
+} as const;
+
+/**
+ * The host page reads the host from the database, which the e2e server does not have. A path that
+ * is not a slug is a not-found (`sample` is a slug, so it would read), and a well-formed one shows
+ * the error state.
+ */
+export const hostPaths = {
+  notFound: '/hosts/not_a_host',
+  readFails: '/hosts/harbor-kayak-co',
 } as const;
 
 /**

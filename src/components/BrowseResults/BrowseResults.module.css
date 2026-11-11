@@ -43,3 +43,43 @@
   gap: var(--space-2);
   padding-block-start: var(--space-2);
 }
+
+.suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-block: var(--space-2);
+}
+
+.suggestionsTitle {
+  margin: 0;
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.suggestionList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Each row is a full-width touch target, so a thumb finds it whatever the label's length. */
+.suggestionLink {
+  display: flex;
+  align-items: center;
+  min-block-size: var(--size-touch-target);
+  color: var(--color-text-link);
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  text-decoration: underline;
+  border-radius: var(--radius-sm);
+}
+
+.suggestionLink:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}

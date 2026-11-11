@@ -1,4 +1,8 @@
-import type { CollectionInput, HomeModulesInput } from '@/lib/editorial';
+import type {
+  CollectionInput,
+  HelpArticleInput,
+  HomeModulesInput,
+} from '@/lib/editorial';
 import type {
   ageRules,
   experienceStatuses,
@@ -97,6 +101,9 @@ export type PageCopyFixture = {
   body: RichTextDoc;
 };
 
+/** A help article as the editor saves it, minus the id the seed finds by slug. */
+export type HelpArticleFixture = Omit<HelpArticleInput, 'id'>;
+
 export type CuratedFixtures = {
   categories: TaxonomyFixture[];
   neighborhoods: TaxonomyFixture[];
@@ -106,6 +113,7 @@ export type CuratedFixtures = {
   collections: CollectionFixture[];
   homeModules: HomeModuleFixture[];
   pageCopy: PageCopyFixture[];
+  helpArticles: HelpArticleFixture[];
 };
 
 export type ScaleFixtures = {

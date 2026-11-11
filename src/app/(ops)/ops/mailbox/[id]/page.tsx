@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { MailboxMessageView } from '@/components/DevMailbox';
 import { PageHeading } from '@/components/PageHeading';
+import { readOpsCaller } from '@/server/opsCaller';
 import {
   loadMailboxMessage,
   mailboxCookieName,
@@ -15,8 +16,13 @@ export const metadata: Metadata = { title: 'Dev mailbox message' };
 export default async function MailboxMessagePage({
   params,
 }: PageProps<'/ops/mailbox/[id]'>) {
-  const [jar, { id }] = await Promise.all([cookies(), params]);
+  const [jar, { id }, caller] = await Promise.all([
+    cookies(),
+    params,
+    readOpsCaller(),
+  ]);
   const result = await loadMailboxMessage(
+    caller,
     jar.get(mailboxCookieName)?.value,
     id,
   );

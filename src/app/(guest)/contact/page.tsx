@@ -1,8 +1,21 @@
 import type { Metadata } from 'next';
-import { RoutePlaceholder } from '@/components/RoutePlaceholder';
+import { Suspense } from 'react';
+import { PageHeading } from '@/components/PageHeading';
+import { Skeleton } from '@/components/Skeleton';
+import { ContactContent, contactTitle } from './ContactContent';
 
-export const metadata: Metadata = { title: 'Contact' };
+export const metadata: Metadata = { title: contactTitle };
 
 export default function ContactPage() {
-  return <RoutePlaceholder name="Contact" covers="PRD-54" />;
+  return (
+    <Suspense
+      fallback={
+        <PageHeading title={contactTitle}>
+          <Skeleton kind="text" />
+        </PageHeading>
+      }
+    >
+      <ContactContent />
+    </Suspense>
+  );
 }

@@ -186,7 +186,6 @@ export async function listHomePicks(
   );
 }
 
-// TODO(U-036): first caller
 /** Null when the slug is malformed, the Pick is missing, or it is still a draft. */
 export async function getPublishedPick(
   slug: string,
@@ -217,7 +216,6 @@ export async function getHomeGiftGuide(): Promise<HomeGiftGuide | null> {
   return guide ? HomeGiftGuideSchema.parse(guide.collection) : null;
 }
 
-// TODO(U-036): first caller
 export async function getPublishedGiftGuide(): Promise<Collection | null> {
   const [guide] = await readCollections(
     and(publishedCollection, eq(collections.kind, 'gift_guide')),
@@ -283,7 +281,6 @@ export async function getPublishedPageCopy(
   return copy ?? null;
 }
 
-// TODO(U-038): first caller
 export async function listPublishedHelpArticles(): Promise<
   HelpArticleSummary[]
 > {
@@ -300,7 +297,6 @@ export async function listPublishedHelpArticles(): Promise<
   return HelpArticleSummarySchema.array().parse(rows);
 }
 
-// TODO(U-038): first caller
 export async function getPublishedHelpArticle(
   slug: string,
 ): Promise<HelpArticle | null> {

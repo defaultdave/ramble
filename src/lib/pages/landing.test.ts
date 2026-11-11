@@ -79,6 +79,10 @@ describe('the kind of page', () => {
         ...lists,
         date: null,
         guests: null,
+        price: null,
+        age: null,
+        setting: null,
+        search: null,
       });
       expect(landingQuery(kind, 'cooking').after).toBeNull();
       expect(landingBrowseHref(kind, 'cooking')).toBe(href);

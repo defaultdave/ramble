@@ -114,8 +114,8 @@ describe('pickOrderToken', () => {
   });
 });
 
-describe('tokenRouteHeaders', () => {
-  it.each([`/orders/${reference}`, `/orders/${reference}/`])(
+describe('tokenRouteHeaders for the sign-in confirm page', () => {
+  it.each(['/sign-in/confirm', '/sign-in/confirm/'])(
     'keeps %s out of indexes and caches',
     (pathname) => {
       expect(tokenRouteHeaders(pathname)).toEqual([
@@ -125,12 +125,35 @@ describe('tokenRouteHeaders', () => {
     },
   );
 
+  it.each(['/sign-in', '/sign-in/confirm/x', '/sign-in/confirmed'])(
+    'adds nothing to %s',
+    (pathname) => {
+      expect(tokenRouteHeaders(pathname)).toEqual([]);
+    },
+  );
+});
+
+describe('tokenRouteHeaders', () => {
+  it.each([
+    `/orders/${reference}`,
+    `/orders/${reference}/`,
+    `/manage/${token}`,
+    `/manage/${token}/`,
+  ])('keeps %s out of indexes and caches', (pathname) => {
+    expect(tokenRouteHeaders(pathname)).toEqual([
+      { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' },
+      { key: 'Cache-Control', value: 'no-store' },
+    ]);
+  });
+
   it.each([
     '/',
     '/new-york/browse',
     '/checkout/abc',
     '/orders',
-    `/manage/${token}`,
+    '/manage',
+    '/manage/',
+    `/manage/${token}/extra`,
   ])('adds nothing to %s', (pathname) => {
     expect(tokenRouteHeaders(pathname)).toEqual([]);
   });

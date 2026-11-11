@@ -5,6 +5,7 @@ import { db } from '@/server/db/client';
 import { experiences, photos } from '@/server/db/schema';
 import { photoLimits } from '@/lib/photos';
 import { curated } from '@/lib/seed/fixtures';
+import { photoPoolRights } from '@/lib/seed/fixtures/photoManifest';
 import { experienceId } from '@/lib/seed/rows';
 import {
   orphanedTestPhotos,
@@ -89,8 +90,7 @@ export async function seedTestPhotos(
                   decorative: false,
                   altText: photo.altText,
                   blurDataUrl: ingested.blurDataUrl,
-                  rightsBasis: 'ramble_owned' as const,
-                  rightsHolder: 'Ramble (generated test image)',
+                  ...photoPoolRights,
                 })),
               )
               .onConflictDoNothing()

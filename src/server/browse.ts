@@ -3,14 +3,27 @@ import { cacheLife, cacheTag } from 'next/cache';
 import {
   browseDays,
   browseTitle,
+  browseWindowDays,
   toBrowsePage,
   type BrowsePage,
 } from '@/lib/pages/browse';
 import { tags } from '@/lib/cacheTags';
-import type { BrowseFilters, BrowseQuery } from '@/lib/filters';
+import { type BrowseFilters, type BrowseQuery } from '@/lib/filters';
+import { upcomingWindow } from '@/lib/sessionWindow';
+import {
+  omittedFor,
+  readsFor,
+  suggestions,
+  type FilterParam,
+  type ZeroResultSuggestion,
+} from '@/lib/zeroResults';
 import { readOrRefuse } from '@/server/cache/readOrRefuse';
 import { tagExperiences } from '@/server/cache/tagExperiences';
-import { listBrowseDayRows, listBrowseExperiences } from '@/server/db/browse';
+import {
+  countBrowseExperiences,
+  listBrowseDayRows,
+  listBrowseExperiences,
+} from '@/server/db/browse';
 import { getFilterOptions } from '@/server/filterOptions';
 import { rethrowOrLog } from '@/server/monitoring/rethrowOrLog';
 
@@ -58,5 +71,45 @@ export async function getBrowseTitle(filters: BrowseFilters): Promise<string> {
   } catch (error) {
     rethrowOrLog('Browse title could not be read', error);
     return browseTitle(filters, { categories: [], neighborhoods: [] });
+  }
+}
+
+// Cached, so a failed read throws and nothing is remembered; `getZeroResultSuggestions` is the one that forgives it.
+async function readZeroResultSuggestions(
+  filters: BrowseFilters,
+  asOf: string,
+): Promise<ZeroResultSuggestion[]> {
+  'use cache';
+  cacheLife('browse');
+  cacheTag(tags.catalog);
+  const options = await getFilterOptions();
+  const window = upcomingWindow(asOf, browseWindowDays);
+  const counts: Partial<Record<FilterParam, number>> = {};
+  await readOrRefuse('Zero results', () =>
+    Promise.all(
+      readsFor(filters, options, window).map(
+        async ({ param, filters: without }) => {
+          counts[param] = await countBrowseExperiences(without, asOf);
+        },
+      ),
+    ),
+  );
+  return suggestions(filters, options, counts, omittedFor(filters));
+}
+
+/**
+ * The filters worth taking off a page with no results, with what browse would list without each. A
+ * count is one cheap read per filter that is on, so this is asked for only when the page is empty.
+ * A way forward is a courtesy: when its reads fail the empty state shows without it.
+ */
+export async function getZeroResultSuggestions(
+  filters: BrowseFilters,
+  asOf: string,
+): Promise<ZeroResultSuggestion[]> {
+  try {
+    return await readZeroResultSuggestions(filters, asOf);
+  } catch (error) {
+    rethrowOrLog('Browse suggestions could not be read', error);
+    return [];
   }
 }

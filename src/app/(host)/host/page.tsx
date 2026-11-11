@@ -1,13 +1,19 @@
 import type { Metadata } from 'next';
-import { RoutePlaceholder } from '@/components/RoutePlaceholder';
+import { notFound, redirect } from 'next/navigation';
+import { HostDashboard, hostDashboardTitle } from '@/components/HostDashboard';
+import { signInHref } from '@/lib/signIn';
+import { loadHostDashboard } from '@/server/hostDashboard';
 
-export const metadata: Metadata = { title: 'Host tools' };
+export const metadata: Metadata = { title: hostDashboardTitle };
 
-export default function HostToolsPage() {
-  return (
-    <RoutePlaceholder
-      name="Host tools"
-      covers="PRD-28, PRD-41, PRD-45, PRD-47, PRD-48"
-    />
-  );
+/**
+ * Every host page checks the caller itself: a layout is not rendered again on a client navigation,
+ * so it cannot be the gate. Nobody signed in goes to sign in and comes back here; anyone signed in
+ * who owns no host sees the area's not-found page, which does not say the area exists.
+ */
+export default async function HostDashboardPage() {
+  const result = await loadHostDashboard();
+  if (result.status === 'signed_out') redirect(signInHref('/host'));
+  if (result.status === 'refused') notFound();
+  return <HostDashboard view={result.view} />;
 }

@@ -3,9 +3,19 @@ import { createHmac } from 'node:crypto';
 import { z } from 'zod';
 import {
   mailboxAccess,
+  mailboxUnlockAllowed,
+  type MailboxAccess,
   type MailboxMessage,
   type MailboxSummary,
 } from '@/lib/email/message';
+import {
+  mailboxListEntry,
+  mailboxMessageEntry,
+  mailboxUnlockEntry,
+} from '@/lib/opsAudit';
+import type { Caller } from '@/server/auth/caller';
+import { holdsOpsRole } from '@/lib/opsNav';
+import { recordAudit } from '@/server/db/audit';
 import { findMailboxMessage, listMailboxSummaries } from '@/server/db/messages';
 import { env } from '@/server/env';
 import { secureEqual } from '@/server/hash';
@@ -27,18 +37,22 @@ function sessionToken(secret: string): string {
     .digest('hex');
 }
 
-/** The cookie value for a submitted secret, or null when the mailbox is off or the secret is wrong. */
-export function unlockMailbox(submitted: string): string | null {
-  const secret = configuredSecret();
-  if (gate(undefined) === 'disabled' || secret === null) return null;
-  return secureEqual(submitted, secret) ? sessionToken(secret) : null;
+function deployment(secret: string | null) {
+  return {
+    vercelEnv: env.VERCEL_ENV,
+    emailMode: env.EMAIL_MODE,
+    secretConfigured: secret !== null,
+  };
 }
 
-function gate(cookie: string | undefined): 'disabled' | 'locked' | 'open' {
-  const secret = configuredSecret();
+function access(
+  caller: Caller,
+  cookie: string | undefined,
+  secret: string | null,
+): MailboxAccess {
   return mailboxAccess({
-    liveMode: env.EMAIL_MODE === 'live',
-    secretConfigured: secret !== null,
+    ...deployment(secret),
+    ops: holdsOpsRole(caller.roles),
     hasCookie: cookie !== undefined,
     cookieMatches:
       secret !== null &&
@@ -47,25 +61,48 @@ function gate(cookie: string | undefined): 'disabled' | 'locked' | 'open' {
   });
 }
 
-// TODO(U-004a): replace the shared secret with requireRole(caller, Role.Ops, {}).
+/**
+ * The cookie value for a submitted secret, or null when the lib refuses it. A right secret is
+ * recorded before the cookie is issued, so a failed audit write issues none.
+ */
+export async function unlockMailbox(
+  caller: Caller,
+  submitted: string,
+): Promise<string | null> {
+  const secret = configuredSecret();
+  const allowed = mailboxUnlockAllowed({
+    ...deployment(secret),
+    secretMatches: secret !== null && secureEqual(submitted, secret),
+  });
+  if (!allowed || secret === null) return null;
+  await recordAudit(mailboxUnlockEntry(caller.userId));
+  return sessionToken(secret);
+}
+
+/** The list for the ops role, or for a tester holding the secret's cookie off production. The read is recorded first. */
 export async function loadMailbox(
+  caller: Caller,
   cookie: string | undefined,
 ): Promise<Locked | { status: 'open'; messages: MailboxSummary[] }> {
-  const access = gate(cookie);
-  if (access !== 'open') return { status: access };
+  const result = access(caller, cookie, configuredSecret());
+  if (result.status !== 'open') return { status: result.status };
+  await recordAudit(mailboxListEntry(caller.userId, result.via));
   return { status: 'open', messages: await listMailboxSummaries() };
 }
 
-// TODO(U-004a): replace the shared secret with requireRole(caller, Role.Ops, {}).
+/** One message, recorded when it is found; a malformed or unknown id reads and records nothing. */
 export async function loadMailboxMessage(
+  caller: Caller,
   cookie: string | undefined,
   id: string,
 ): Promise<
   Locked | { status: 'missing' } | { status: 'open'; message: MailboxMessage }
 > {
-  const access = gate(cookie);
-  if (access !== 'open') return { status: access };
+  const result = access(caller, cookie, configuredSecret());
+  if (result.status !== 'open') return { status: result.status };
   if (!z.uuid().safeParse(id).success) return { status: 'missing' };
   const message = await findMailboxMessage(id);
-  return message ? { status: 'open', message } : { status: 'missing' };
+  if (!message) return { status: 'missing' };
+  await recordAudit(mailboxMessageEntry(caller.userId, result.via, message.id));
+  return { status: 'open', message };
 }

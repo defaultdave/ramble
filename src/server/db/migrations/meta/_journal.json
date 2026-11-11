@@ -183,6 +183,34 @@
       "when": 1794324346699,
       "tag": "0025_gifts",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794325848460,
+      "tag": "0026_auth_and_role_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1794327543814,
+      "tag": "0027_support_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1794329521512,
+      "tag": "0028_experiences_search_vector",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1794330017503,
+      "tag": "0029_private_requests",
+      "breakpoints": true
     }
   ]
 }

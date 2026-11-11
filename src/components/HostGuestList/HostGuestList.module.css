@@ -1,0 +1,110 @@
+.page {
+  display: contents;
+}
+
+/* Lines up under PageHeading: the same column, gutter, and type. */
+.body {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, var(--size-content-max));
+  justify-content: center;
+  gap: var(--space-3);
+  padding: 0 var(--size-gutter) var(--space-8);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  color: var(--color-text-primary);
+}
+
+.body p {
+  margin: 0;
+}
+
+.empty {
+  color: var(--color-text-secondary);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-block: var(--space-3);
+  border-block-end: 1px solid var(--color-border-default);
+}
+
+.name {
+  font-weight: var(--font-weight-semibold);
+}
+
+.meta {
+  font-size: var(--font-size-body-s);
+  line-height: var(--font-line-height-body-s);
+  color: var(--color-text-secondary);
+}
+
+.details {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--font-size-body-s);
+  line-height: var(--font-line-height-body-s);
+}
+
+.details dt {
+  display: inline;
+  font-weight: var(--font-weight-semibold);
+}
+
+.details dt::after {
+  content: ': ';
+}
+
+.details dd {
+  display: inline;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The details sit side by side once the page has room for them. */
+@media (min-width: 48rem) {
+  .details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--space-4);
+  }
+}
+
+/* A clean sheet for the day: the site's header and footer, the way back, and the hint stay off the page, and no guest splits across two. */
+@media print {
+  :global(body):has(.page) > :global(header),
+  :global(body):has(.page) > :global(footer),
+  :global(body):has(.page) > :global(a),
+  .screenOnly {
+    display: none;
+  }
+
+  .body {
+    padding: 0;
+    color: CanvasText;
+  }
+
+  .row {
+    break-inside: avoid;
+    border-block-end-color: CanvasText;
+  }
+
+  .meta {
+    color: CanvasText;
+  }
+
+  .details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

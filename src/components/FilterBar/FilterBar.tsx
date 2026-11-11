@@ -9,10 +9,13 @@ import {
 } from '@/lib/filterBar';
 import {
   activeFilterCount,
+  ageChips,
   browseParamNames,
   guestChips,
   hrefForFilters,
   listChips,
+  priceChips,
+  settingChips,
   toQuery,
   toQueryEntries,
   withDate,
@@ -24,6 +27,7 @@ import { ChipGroup, type ChipGroupProps } from './ChipGroup';
 import styles from './FilterBar.module.css';
 import { DrawerButton, FilterRow } from './FilterDrawerHost';
 import { LazyDatePicker } from './LazyDatePicker';
+import { KeywordSearch } from './KeywordSearch';
 import { NoScriptFilters } from './NoScriptFilters';
 import { WhenDetails } from './WhenDetails';
 
@@ -47,7 +51,7 @@ type ChipGroupsOptions = Pick<FilterBarProps, 'filters'> & {
   neighborhoods: readonly FilterOption[];
 };
 
-/** The drawer's three chip groups, which the no-script bar shows again in the page. */
+/** The drawer's chip groups, which the no-script bar shows again in the page. */
 function chipGroups({
   filters,
   categories,
@@ -60,6 +64,9 @@ function chipGroups({
       chips: listChips(filters, 'neighborhoods', neighborhoods),
     },
     { legend: 'Category', chips: listChips(filters, 'categories', categories) },
+    { legend: 'Price', chips: priceChips(filters) },
+    { legend: 'Age', chips: ageChips(filters) },
+    { legend: 'Indoor or outdoor', chips: settingChips(filters) },
   ];
 }
 
@@ -126,6 +133,15 @@ export function FilterBar({
   const groups = chipGroups({ filters, categories, neighborhoods });
   return (
     <div className={styles.bar}>
+      <KeywordSearch
+        action={browsePath}
+        name={browseParamNames.search}
+        kept={toQueryEntries({
+          filters: { ...filters, search: null },
+          after: null,
+        })}
+        value={filters.search}
+      />
       <FilterRow
         filtersKey={toQuery({ filters, after: null })}
         // The number of results is not read for the bar, so the button cannot say how many.

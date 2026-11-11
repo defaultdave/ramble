@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { andList } from '../andList';
 import {
   toExperienceCard,
   type CardExperience,
@@ -16,6 +17,7 @@ import { guestsLabel } from '../orderSummary';
 import { browsePath } from '../routes';
 import { IsoDateSchema, TimeZoneSchema, isKnownTimeZone } from '../sessions';
 import { calendarDateFormat, dateChipLabel } from '../time';
+import type { ZeroResultSuggestion } from '../zeroResults';
 
 /** The id of the streamed results, which the skip link shown with scripting off points at. */
 export const browseResultsId = 'browse-results';
@@ -142,11 +144,6 @@ export function browseHeading(view: BrowseView): string | null {
 
 type TitleOption = { slug: string; name: string };
 
-const titleList = new Intl.ListFormat('en-US', {
-  style: 'long',
-  type: 'conjunction',
-});
-
 /**
  * The page title for the filters, so the route announcer reads something new after each change:
  * "Browse Cooking experiences in DUMBO on Sat, Nov 7 for 4 guests". Names are the chosen categories and
@@ -168,9 +165,9 @@ export function browseTitle(
   const neighborhoods = named(filters.neighborhoods, options.neighborhoods);
   return [
     'Browse',
-    categories.length > 0 ? titleList.format(categories) : null,
+    categories.length > 0 ? andList.format(categories) : null,
     'experiences',
-    neighborhoods.length > 0 ? `in ${titleList.format(neighborhoods)}` : null,
+    neighborhoods.length > 0 ? `in ${andList.format(neighborhoods)}` : null,
     filters.date ? `on ${dateChipLabel(filters.date)}` : null,
     filters.guests === null ? null : `for ${guestsLabel(filters.guests)}`,
   ]
@@ -223,6 +220,8 @@ export type BrowseView =
       filtered: boolean;
       /** Set when the browse has a date: a way out of a day with nothing on it. */
       dated: DatedEmpty | null;
+      /** Filters to take off, with what each would bring back. Set by `withSuggestions`, after the page is known to be empty. */
+      suggestions?: ZeroResultSuggestion[];
       /** A page that has no filters to take off words its empty state for itself. */
       wording?: 'landing';
     }
@@ -284,6 +283,15 @@ export function browseView(
         : targetFor({ filters, after: page.nextCursor }),
     startHref: after === null ? null : hrefForFilters(filters),
   };
+}
+
+/** The filters to take off, on an empty view. Any other view comes back as it was. */
+export function withSuggestions(
+  view: BrowseView,
+  offered: readonly ZeroResultSuggestion[],
+): BrowseView {
+  if (view.state !== 'empty' || offered.length === 0) return view;
+  return { ...view, suggestions: [...offered] };
 }
 
 /** The same address again: a retry reloads exactly what failed. */

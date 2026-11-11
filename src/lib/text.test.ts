@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  countLabel,
   everyJsonNode,
+  firstQueryValue,
   isStorableJson,
   notBlankPattern,
   oneLineClipped,
@@ -95,5 +97,28 @@ describe('oneLineClipped', () => {
     ['only whitespace', ' \n ', 5, ''],
   ])('gives %s', (_label, input, max, expected) => {
     expect(oneLineClipped(input, max)).toBe(expected);
+  });
+});
+
+describe('firstQueryValue', () => {
+  it.each([
+    ['one value', 'a', 'a'],
+    ['a repeated parameter', ['a', 'b'], 'a'],
+    ['an empty list', [], undefined],
+    ['an absent parameter', undefined, undefined],
+  ])('gives the first of %s', (_label, input, expected) => {
+    expect(firstQueryValue(input)).toBe(expected);
+  });
+});
+
+describe('countLabel', () => {
+  it.each([
+    [1, 'adult', undefined, '1 adult'],
+    [0, 'adult', undefined, '0 adults'],
+    [2, 'adult', undefined, '2 adults'],
+    [1, 'child', 'children', '1 child'],
+    [3, 'child', 'children', '3 children'],
+  ])('says %i %s (plural %s) as "%s"', (count, one, many, label) => {
+    expect(countLabel(count, one, many)).toBe(label);
   });
 });

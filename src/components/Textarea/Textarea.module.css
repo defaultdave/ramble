@@ -1,0 +1,14 @@
+.control {
+  display: flex;
+}
+
+.textarea {
+  composes: input from '../Input/Input.module.css';
+}
+
+/* Two classes outrank the composed one whichever sheet loads last. */
+.control .textarea {
+  display: block;
+  min-block-size: calc(var(--space-16) * 2);
+  resize: vertical;
+}

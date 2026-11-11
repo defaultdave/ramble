@@ -1,6 +1,7 @@
-import { TriangleAlert } from 'lucide-react';
 import type { ComponentPropsWithoutRef } from 'react';
 import { useId } from 'react';
+import { Field } from '@/components/Field';
+import { fieldControl } from '@/lib/fieldIds';
 import styles from './Input.module.css';
 
 export type InputProps = Omit<
@@ -23,41 +24,30 @@ export function Input({
   ...rest
 }: InputProps) {
   const generatedId = useId();
-  const inputId = id ?? generatedId;
-  const hintId = `${inputId}-hint`;
-  const errorId = `${inputId}-error`;
-  const describedByIds = [
-    hint ? hintId : undefined,
-    errorText ? errorId : undefined,
+  const control = fieldControl({
+    id,
+    generatedId,
+    hint,
+    errorText,
     describedBy,
-  ]
-    .filter(Boolean)
-    .join(' ');
+    ariaInvalid: rest['aria-invalid'],
+  });
 
   return (
-    <div className={styles.field}>
-      <label className={styles.label} htmlFor={inputId}>
-        {label}
-        {optional ? <span className={styles.optional}> (optional)</span> : null}
-      </label>
+    <Field
+      fieldId={control.fieldId}
+      label={label}
+      hint={hint}
+      errorText={errorText}
+      optional={optional}
+    >
       <input
         {...rest}
-        id={inputId}
+        id={control.fieldId}
         className={styles.input}
-        aria-invalid={errorText ? true : rest['aria-invalid']}
-        aria-describedby={describedByIds || undefined}
+        aria-invalid={control.ariaInvalid}
+        aria-describedby={control.describedBy}
       />
-      {hint ? (
-        <p className={styles.hint} id={hintId}>
-          {hint}
-        </p>
-      ) : null}
-      {errorText ? (
-        <p className={styles.error} id={errorId}>
-          <TriangleAlert className={styles.errorIcon} aria-hidden="true" />
-          {errorText}
-        </p>
-      ) : null}
-    </div>
+    </Field>
   );
 }

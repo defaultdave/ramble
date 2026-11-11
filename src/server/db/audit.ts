@@ -6,7 +6,12 @@ import {
   type AuditRow,
 } from '@/lib/audit';
 import { opsAccessEntry } from '@/lib/opsAudit';
-import { requireRole, Role, type Caller } from '@/server/auth/caller';
+import {
+  ForbiddenError,
+  requireRole,
+  Role,
+  type Caller,
+} from '@/server/auth/caller';
 import { db, type Transaction } from './client';
 import { auditLog } from './schema';
 
@@ -36,6 +41,16 @@ export async function writeAudit(
  */
 export async function recordAudit(entry: AuditEntryInput): Promise<void> {
   await db.transaction((tx) => writeAudit(tx, entry));
+}
+
+/**
+ * The id of the ops user behind this caller, for an audit row that names who acted. Throws
+ * ForbiddenError for anyone without the ops role; an ops caller always has a user.
+ */
+export function requireOpsUserId(caller: Caller): string {
+  requireRole(caller, Role.Ops, {});
+  if (caller.userId === null) throw new ForbiddenError(Role.Ops);
+  return caller.userId;
 }
 
 /** Records the ops user opening the ops area. Throws ForbiddenError, and writes nothing, for anyone else. */

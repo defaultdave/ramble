@@ -29,6 +29,7 @@ describe('opsLandingLinks', () => {
   it('lists every area but the landing page', () => {
     expect(opsLandingLinks().map((link) => link.href)).toEqual([
       '/ops/mailbox',
+      '/ops/hosts',
     ]);
   });
 });

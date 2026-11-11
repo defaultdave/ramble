@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  agreementRecordPrompt,
+  agreementTickLabel,
   acceptanceRecordLabel,
   agreementNotice,
   agreementRefusal,
@@ -529,5 +531,21 @@ describe('buildHostDetail acceptance', () => {
     ['no agreement published', null, null, 'no_document'],
   ])('a host that %s is %s', (_label, accepted, current, state) => {
     expect(build(accepted, current)).toBe(state);
+  });
+});
+
+describe('agreement wording', () => {
+  const agreement = { title: 'Host agreement', version: 3 };
+
+  it('names the document and version in the tick label', () => {
+    expect(agreementTickLabel(agreement)).toBe(
+      'The host has accepted the current Host agreement (version 3), which includes the content-rights terms.',
+    );
+  });
+
+  it('names the document and version in the record prompt', () => {
+    expect(agreementRecordPrompt(agreement)).toBe(
+      'Record that this host accepted the current Host agreement, version 3, which includes the content-rights terms.',
+    );
   });
 });

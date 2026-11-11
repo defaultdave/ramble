@@ -5,6 +5,7 @@ import {
   acceptanceLabels,
   acceptanceRecordLabel,
   acceptanceTones,
+  agreementRecordPrompt,
   type HostDetail,
   type HostFormField,
 } from '@/lib/hostSetup';
@@ -89,9 +90,7 @@ export function HostDetailView({
           <form action={actions.accept} className={styles.section}>
             <input type="hidden" name="hostId" value={host.id} />
             <input type="hidden" name="legalDocumentId" value={agreement.id} />
-            <p className={styles.muted}>
-              {`Record that this host accepted the current ${agreement.title}, version ${String(agreement.version)}, which includes the content-rights terms.`}
-            </p>
+            <p className={styles.muted}>{agreementRecordPrompt(agreement)}</p>
             <Button type="submit" variant="secondary">
               {`Record acceptance of version ${String(agreement.version)}`}
             </Button>

@@ -2,6 +2,8 @@ import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { Textarea } from '@/components/Textarea';
 import {
+  agreementTickLabel,
+  defaultHostTimeZone,
   hostFieldProblems,
   hostLimits,
   type HostFormField,
@@ -22,8 +24,6 @@ export type HostFormProps = {
   /** On the create form: the agreement version the box accepts, or null when none is published. */
   agreement?: { id: string; version: number; title: string } | null | undefined;
 };
-
-const defaultZone = 'America/New_York';
 
 /** The host record form. With no values it creates a host and its owner; with values it edits the host. */
 export function HostForm({
@@ -75,7 +75,7 @@ export function HostForm({
         name="timeZone"
         label="Time zone"
         hint="Session times are read in this zone."
-        defaultValue={values?.timeZone ?? defaultZone}
+        defaultValue={values?.timeZone ?? defaultHostTimeZone}
         maxLength={maxTimeZoneLength}
         autoComplete="off"
         required
@@ -116,9 +116,7 @@ export function HostForm({
                 name="acceptLegalDocumentId"
                 value={agreement.id}
               />
-              <span>
-                {`The host has accepted the current ${agreement.title} (version ${String(agreement.version)}), which includes the content-rights terms.`}
-              </span>
+              <span>{agreementTickLabel(agreement)}</span>
             </label>
           ) : (
             <p className={styles.muted}>

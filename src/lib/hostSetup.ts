@@ -1,7 +1,11 @@
 import { z } from 'zod';
 import type { AlertTone } from './alertTone';
 import { SlugSchema, WriteIdSchema, slugify } from './catalog';
-import { EmailAddressSchema, normalizeEmailAddress } from './email/address';
+import {
+  EmailAddressSchema,
+  maxEmailAddressLength,
+  normalizeEmailAddress,
+} from './email/address';
 import { pickKnown } from './pickKnown';
 import { isKnownTimeZone, maxTimeZoneLength, TimeZoneSchema } from './sessions';
 import { requiredText } from './text';
@@ -74,7 +78,7 @@ function textOf(get: FormGetter, name: string): string | undefined {
 
 const optionalEmail = z
   .string()
-  .max(254)
+  .max(maxEmailAddressLength)
   .transform(normalizeEmailAddress)
   .pipe(EmailAddressSchema);
 
@@ -249,6 +253,25 @@ export function isSlugTakenError(error: unknown): boolean {
 
 export type HostAcceptanceState =
   'accepted' | 'outdated' | 'missing' | 'no_document';
+
+/** The zone the new-host form starts on. */
+export const defaultHostTimeZone = 'America/New_York';
+
+/** The sentence beside the box that says the host accepted the current agreement. */
+export function agreementTickLabel(agreement: {
+  title: string;
+  version: number;
+}): string {
+  return `The host has accepted the current ${agreement.title} (version ${String(agreement.version)}), which includes the content-rights terms.`;
+}
+
+/** The sentence above the button that records an acceptance on a host's page. */
+export function agreementRecordPrompt(agreement: {
+  title: string;
+  version: number;
+}): string {
+  return `Record that this host accepted the current ${agreement.title}, version ${String(agreement.version)}, which includes the content-rights terms.`;
+}
 
 /** Where a host stands against the current agreement: accepted it, accepted an older one, accepted none, or there is none to accept. */
 export function hostAcceptanceState(input: {

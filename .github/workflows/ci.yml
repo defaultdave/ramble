@@ -76,6 +76,23 @@ jobs:
   e2e:
     name: e2e
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: ramble
+          POSTGRES_PASSWORD: ramble
+          POSTGRES_DB: ramble
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ramble -d ramble"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      # Read by playwright.config.ts: with it set, the booking-path spec runs against this database.
+      E2E_DATABASE_URL: postgres://ramble:ramble@localhost:5432/ramble
     steps:
       - uses: actions/checkout@v7
         with:
@@ -85,8 +102,20 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
+      # The seed and the Neon HTTP shim the seeded server reads through both run under Bun.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.9
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
+      - name: Migrate and seed the e2e database
+        env:
+          DATABASE_URL: ${{ env.E2E_DATABASE_URL }}
+          DATABASE_URL_UNPOOLED: ${{ env.E2E_DATABASE_URL }}
+          SEED_TARGET: local
+        run: |
+          pnpm db:migrate
+          pnpm db:seed
       - run: pnpm e2e
       - uses: actions/upload-artifact@v7
         if: failure()

@@ -1,8 +1,10 @@
 import 'server-only';
-import { eq } from 'drizzle-orm';
+import { and, count, eq, gt, ne } from 'drizzle-orm';
 import { WriteIdSchema } from '@/lib/catalog';
+import type { ExperienceAddress } from '@/lib/routes';
 import type { Transaction } from './client';
-import { refunds } from './schema';
+import { experiences, orders, refunds, sessions } from './schema';
+import { readDatabaseTime } from './time';
 
 // What the refund email job reads. Apart from ./orderCancel, which enqueues jobs: the job files
 // import this, and `enqueue` imports the job registry that imports them.
@@ -30,4 +32,44 @@ export async function readRefundForEmail(
     .from(refunds)
     .where(eq(refunds.id, id));
   return row ?? null;
+}
+
+export type OtherDatesFacts = {
+  experience: ExperienceAddress;
+  /** Scheduled sessions of the booking's experience that start after now, the booking's own not counted. */
+  otherUpcomingSessions: number;
+};
+
+/** What the cancellation email needs to point a guest at another date. Null when there is no such booking. */
+export async function readOtherDatesFacts(
+  tx: Transaction,
+  orderId: string,
+): Promise<OtherDatesFacts | null> {
+  const id = WriteIdSchema.parse(orderId);
+  const [booking] = await tx
+    .select({
+      experienceId: experiences.id,
+      slug: experiences.slug,
+      sessionId: orders.sessionId,
+    })
+    .from(orders)
+    .innerJoin(experiences, eq(experiences.id, orders.experienceId))
+    .where(eq(orders.id, id));
+  if (!booking || booking.sessionId === null) return null;
+  const at = await readDatabaseTime(tx);
+  const [others] = await tx
+    .select({ total: count() })
+    .from(sessions)
+    .where(
+      and(
+        eq(sessions.experienceId, booking.experienceId),
+        ne(sessions.id, booking.sessionId),
+        eq(sessions.status, 'scheduled'),
+        gt(sessions.startsAt, at),
+      ),
+    );
+  return {
+    experience: { slug: booking.slug, id: booking.experienceId },
+    otherUpcomingSessions: others?.total ?? 0,
+  };
 }

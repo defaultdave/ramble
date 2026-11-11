@@ -109,11 +109,18 @@ export function payingLapse(
     kind: 'cancel_first',
     attemptId: attempt.id,
     idempotencyKey: cancelAttemptKey(attempt.providerKey),
-    target:
-      attempt.providerPaymentId === null
-        ? { kind: 'metadata', orderId: order.id, recordId: attempt.id }
-        : { kind: 'payment', paymentId: attempt.providerPaymentId },
+    target: attemptCancelTarget(order.id, attempt),
   };
+}
+
+/** Where the provider's payment for an attempt is found: by the id Ramble stored, or by its own ids when none was stored (rule 7). */
+export function attemptCancelTarget(
+  orderId: string,
+  attempt: Pick<LapseAttempt, 'id' | 'providerPaymentId'>,
+): LapseTarget {
+  return attempt.providerPaymentId === null
+    ? { kind: 'metadata', orderId, recordId: attempt.id }
+    : { kind: 'payment', paymentId: attempt.providerPaymentId };
 }
 
 /**
@@ -146,6 +153,6 @@ export function cancelStep(
 }
 
 /** The idempotency key of the cancel, derived from the attempt's own key so a repeated sweep repeats one call (FORM-8). */
-function cancelAttemptKey(attemptProviderKey: string): string {
+export function cancelAttemptKey(attemptProviderKey: string): string {
   return `cancel:${attemptProviderKey}`;
 }

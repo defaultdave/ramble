@@ -9,6 +9,10 @@ import { AuditExportPayloadSchema, auditExportKind } from '@/lib/audit';
 import { OpsNoticeDataSchema, opsNoticeKind } from '@/lib/email/opsNotice';
 import { MaxAttemptsSchema, jobLimits } from '@/lib/jobs';
 import { GuestMovePayloadSchema } from '@/lib/moveBooking';
+import {
+  PaidAfterLapsePayloadSchema,
+  paidAfterLapseJobKind,
+} from '@/lib/refundPath';
 import { ProcessRefundPayloadSchema, processRefundKind } from '@/lib/refunds';
 import {
   ProcessProviderEventPayloadSchema,
@@ -30,6 +34,7 @@ import {
   sendHostCancellationNotice,
 } from './cancellationEmails';
 import { sendOpsNotice } from './opsNotice';
+import { sendPaidAfterLapse } from './paidAfterLapseEmail';
 import { handleRefund, prepareRefund } from './refund';
 import { handleProviderEvent, prepareProviderEvent } from './providerEvents';
 
@@ -151,6 +156,11 @@ export const jobRegistry = {
     payload: HostCancellationPayloadSchema,
     maxAttempts: jobLimits.defaultMaxAttempts,
     handleIdempotent: sendHostCancellationNotice,
+  }),
+  [paidAfterLapseJobKind]: defineJob({
+    payload: PaidAfterLapsePayloadSchema,
+    maxAttempts: jobLimits.defaultMaxAttempts,
+    handleIdempotent: sendPaidAfterLapse,
   }),
   'guest-refund': defineJob({
     payload: GuestRefundPayloadSchema,

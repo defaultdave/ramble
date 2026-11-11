@@ -3,6 +3,7 @@ import {
   type BookingNotice,
   type ReserveEffect,
 } from './bookingOutcome';
+import { countLabel } from './text';
 import type {
   ReserveResult,
   ReserveSpacesInput,
@@ -547,10 +548,6 @@ function summaryOf(
     label,
     terms: session.cancelNote,
   };
-}
-
-function countLabel(count: number, one: string, many = `${one}s`): string {
-  return `${String(count)} ${count === 1 ? one : many}`;
 }
 
 export function choicesView(

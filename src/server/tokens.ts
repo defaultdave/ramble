@@ -28,6 +28,7 @@ import {
   writeManageHashes,
   writeOrderTokenVersion,
   type OrderTokenRow,
+  type ResolvedManageToken,
 } from '@/server/db/orderTokens';
 import { env } from '@/server/env';
 import { secureEqual, sha256Hex } from '@/server/hash';
@@ -65,7 +66,6 @@ export function hashToken(token: string): string {
 
 export type ResolvedToken = OrderTokenRow;
 
-// TODO(U-055): first caller, the manage page; U-054 and U-107 follow.
 // TODO(U-064a): first caller of the `gift` kind, redeemGift; U-064b follows.
 export async function resolveToken(
   kind: 'manage' | 'gift',
@@ -101,6 +101,16 @@ export async function resolveToken(
   return secureEqual(capabilityToken(kind, row.id, row.version), token)
     ? row
     : null;
+}
+
+/** The order a `manage` token opens, branded so the code that cancels it takes this and not an id. Null for every refusal alike. */
+export async function resolveManageToken(
+  token: string,
+): Promise<ResolvedManageToken | null> {
+  const row = await resolveToken('manage', token);
+  return row === null
+    ? null
+    : ({ ...row, kind: 'manage' } as ResolvedManageToken);
 }
 
 // TODO(U-077): first caller, "void earlier links"; U-113 follows for gifts.

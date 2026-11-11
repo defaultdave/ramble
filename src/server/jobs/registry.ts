@@ -1,5 +1,10 @@
 import 'server-only';
 import { z } from 'zod';
+import {
+  GuestCancellationPayloadSchema,
+  GuestRefundPayloadSchema,
+  HostCancellationPayloadSchema,
+} from '@/lib/cancelBooking';
 import { AuditExportPayloadSchema, auditExportKind } from '@/lib/audit';
 import { OpsNoticeDataSchema, opsNoticeKind } from '@/lib/email/opsNotice';
 import { MaxAttemptsSchema, jobLimits } from '@/lib/jobs';
@@ -17,6 +22,11 @@ import {
   sendHostBookingNotice,
   sendSessionReminder,
 } from './bookingEmails';
+import {
+  sendGuestCancellation,
+  sendGuestRefund,
+  sendHostCancellationNotice,
+} from './cancellationEmails';
 import { sendOpsNotice } from './opsNotice';
 import { handleRefund, prepareRefund } from './refund';
 import { handleProviderEvent, prepareProviderEvent } from './providerEvents';
@@ -124,5 +134,20 @@ export const jobRegistry = {
     maxAttempts: jobLimits.defaultMaxAttempts,
     prepare: (payload) => prepareRefund(payload),
     handleIdempotent: (context) => handleRefund(context),
+  }),
+  'guest-cancellation': defineJob({
+    payload: GuestCancellationPayloadSchema,
+    maxAttempts: jobLimits.defaultMaxAttempts,
+    handleIdempotent: sendGuestCancellation,
+  }),
+  'host-cancellation-notice': defineJob({
+    payload: HostCancellationPayloadSchema,
+    maxAttempts: jobLimits.defaultMaxAttempts,
+    handleIdempotent: sendHostCancellationNotice,
+  }),
+  'guest-refund': defineJob({
+    payload: GuestRefundPayloadSchema,
+    maxAttempts: jobLimits.defaultMaxAttempts,
+    handleIdempotent: sendGuestRefund,
   }),
 } satisfies JobRegistry;

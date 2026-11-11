@@ -27,6 +27,9 @@ export let side: Pool;
 let clock: typeof import('@/server/ports/clock');
 let parents: Awaited<ReturnType<typeof createOrderParents>>;
 
+/** The rows an order points at, made once per test file by `setupRefundsDatabase`. */
+export const getParents = () => parents;
+
 /** Registers the hooks that give a test file its own database; `raise` is the file's mocked alert. */
 export function setupRefundsDatabase(raise: { mockClear: () => void }) {
   beforeAll(async () => {

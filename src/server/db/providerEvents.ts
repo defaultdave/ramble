@@ -40,6 +40,7 @@ import { db, type Transaction } from './client';
 import type { ConfirmOrder } from './confirmOrder';
 import {
   lockHoldRow,
+  readOrderLockIds,
   lockOrderEvents,
   lockOrderById,
   lockSessionRow,
@@ -185,10 +186,7 @@ async function lockOrderRows(
   tx: Transaction,
   orderId: string,
 ): Promise<EventOrder | null> {
-  const [unlocked] = await tx
-    .select({ holdId: orders.holdId, sessionId: orders.sessionId })
-    .from(orders)
-    .where(eq(orders.id, orderId));
+  const unlocked = await readOrderLockIds(tx, orderId);
   if (!unlocked) return null;
   if (unlocked.sessionId !== null) await lockSessionRow(tx, unlocked.sessionId);
   const hold =

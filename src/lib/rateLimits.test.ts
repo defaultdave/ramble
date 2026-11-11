@@ -10,6 +10,8 @@ import {
   rateLimitSurfaces,
   decideRateLimit,
   normalizeSubject,
+  retryAfterMinutes,
+  waitMinutesLabel,
 } from './rateLimits';
 
 const digest = 'a'.repeat(64);
@@ -135,5 +137,28 @@ describe('decideRateLimit', () => {
     expect(decideRateLimit({ count, limit, retryAfterSeconds: 9 })).toEqual(
       expected,
     );
+  });
+});
+
+describe('waitMinutesLabel', () => {
+  it.each([
+    [1, '1 minute'],
+    [2, '2 minutes'],
+    [10, '10 minutes'],
+  ])('says %i as "%s"', (minutes, label) => {
+    expect(waitMinutesLabel(minutes)).toBe(label);
+  });
+});
+
+describe('retryAfterMinutes', () => {
+  it.each([
+    [0, 1],
+    [1, 1],
+    [60, 1],
+    [61, 2],
+    [600, 10],
+    [601, 11],
+  ])('rounds %i seconds up to %i minutes', (seconds, minutes) => {
+    expect(retryAfterMinutes(seconds)).toBe(minutes);
   });
 });

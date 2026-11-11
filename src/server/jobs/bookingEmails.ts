@@ -3,8 +3,10 @@ import { z } from 'zod';
 import {
   bookingEmailKey,
   confirmationDecision,
+  type ConfirmationDecision,
   guestConfirmationData,
   hostBookingNoticeData,
+  hostNoticeDecision,
   reminderDecision,
   sessionReminderData,
 } from '@/lib/bookingEmails';
@@ -35,20 +37,26 @@ export type BookingEmailPayload = z.output<typeof BookingEmailPayloadSchema>;
 type Context = { tx: Transaction; payload: BookingEmailPayload; jobId: string };
 
 /** Thrown for an order that should not have a job. The message names no address, name, or token. */
-class BookingEmailError extends Error {
+export class BookingEmailError extends Error {
   constructor(reason: string) {
     super(`Booking email refused: ${reason}`);
     this.name = 'BookingEmailError';
   }
 }
 
-async function loadOrder(tx: Transaction, orderId: string) {
+/** Reads the order and applies the email's decision to it; a `refuse` is a job that should not exist, and throws `refusal`. */
+export async function loadOrder(
+  tx: Transaction,
+  orderId: string,
+  decide: (
+    source: BookingEmailOrder['source'],
+  ) => ConfirmationDecision = confirmationDecision,
+  refusal = 'the order is not a confirmed booking',
+) {
   const order = await readBookingEmailOrder(tx, orderId);
   if (!order) throw new BookingEmailError('there is no such booking');
-  const decision = confirmationDecision(order.source);
-  if (decision === 'refuse') {
-    throw new BookingEmailError('the order is not a confirmed booking');
-  }
+  const decision = decide(order.source);
+  if (decision === 'refuse') throw new BookingEmailError(refusal);
   return { order, decision };
 }
 
@@ -103,12 +111,13 @@ export async function sendHostBookingNotice({
     logger.info('booking email skipped', { jobId, reason: 'cancelled' });
     return;
   }
-  if (order.hostNotificationEmail === null) {
+  const notice = hostNoticeDecision(order);
+  if (notice.kind === 'refuse') {
     throw new BookingEmailError('the host has no notification address');
   }
   await sendEmail({
     template: 'host-booking-notice',
-    to: order.hostNotificationEmail,
+    to: notice.to,
     data: hostBookingNoticeData(order.source),
     idempotencyKey: bookingEmailKey('host-booking-notice', payload.orderId),
   });

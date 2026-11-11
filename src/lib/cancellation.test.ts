@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   cancellationTerms,
   cancellationWindow,
+  isWithinFreeWindow,
   MAX_FULL_REFUND_HOURS,
 } from './cancellation';
 import { PPM } from './pricing';
@@ -293,5 +294,17 @@ describe('cancellationTerms', () => {
     expect(
       cancellationTerms({ fullRefundHoursBefore: 24 * 365 }).fact,
     ).toContain('365 days');
+  });
+});
+
+describe('isWithinFreeWindow', () => {
+  const deadline = new Date('2026-11-19T18:00:00.000Z');
+
+  it.each([
+    ['a minute before', new Date(deadline.getTime() - 60_000), true],
+    ['the deadline to the millisecond', deadline, true],
+    ['a millisecond after', new Date(deadline.getTime() + 1), false],
+  ])('at %s', (_name, now, expected) => {
+    expect(isWithinFreeWindow(deadline, now)).toBe(expected);
   });
 });

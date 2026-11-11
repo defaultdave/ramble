@@ -64,10 +64,55 @@ export type BookingEmailSource = {
  * so the provider delivers each message once however often the job runs.
  */
 export function bookingEmailKey(
-  kind: 'guest-confirmation' | 'host-booking-notice' | 'session-reminder',
+  kind:
+    | 'guest-confirmation'
+    | 'host-booking-notice'
+    | 'session-reminder'
+    | 'guest-cancellation'
+    | 'host-cancellation-notice',
   orderId: string,
 ): string {
   return `${kind}:${orderId}`;
+}
+
+/** One refund email per refund, whichever order it belongs to. */
+export function refundEmailKey(refundId: string): string {
+  return `guest-refund:${refundId.toLowerCase()}`;
+}
+
+/**
+ * Whether the refund email goes out for a refund. It is queued when the provider confirms a refund,
+ * so any other status is a bug in the caller. Only a guest's own cancellation sends it: the other
+ * reasons have their own emails (a session cancelled, a payment that arrived late).
+ */
+export function refundEmailDecision(refund: {
+  status: string;
+  reason: string;
+}): 'send' | 'skip' | 'refuse' {
+  if (refund.status !== 'succeeded') return 'refuse';
+  return refund.reason === 'guest_cancel' ? 'send' : 'skip';
+}
+
+/** A host with no notification address cannot be told: the job is refused so it fails and alerts, not skipped. */
+export function hostNoticeDecision(order: {
+  hostNotificationEmail: string | null;
+}): { kind: 'send'; to: string } | { kind: 'refuse' } {
+  return order.hostNotificationEmail === null
+    ? { kind: 'refuse' }
+    : { kind: 'send', to: order.hostNotificationEmail };
+}
+
+/**
+ * Whether the cancellation emails go out for an order. Only a cancelled booking gets them; a
+ * booking still confirmed means the job was queued for a cancellation that did not happen.
+ */
+export function cancellationDecision(source: {
+  kind: BookingEmailSource['kind'];
+  status: OrderStatus;
+}): 'send' | 'refuse' {
+  return source.kind === 'booking' && source.status === 'cancelled'
+    ? 'send'
+    : 'refuse';
 }
 
 export type ConfirmationDecision = 'send' | 'skip' | 'refuse';
@@ -199,11 +244,29 @@ export function manageLink(token: string, appUrl: string): string {
   return absolute(managePath(token), appUrl);
 }
 
-export function guestConfirmationData(
+/** What a booking page or email says about the booking itself: who, what, when, and the itemized money. */
+export type BookingSummaryData = Pick<
+  GuestConfirmationData,
+  | 'recipientName'
+  | 'reference'
+  | 'experienceName'
+  | 'hostName'
+  | 'dayLabel'
+  | 'timeLabel'
+  | 'durationLabel'
+  | 'meetingPoint'
+  | 'partyLabel'
+  | 'lines'
+  | 'taxLine'
+  | 'total'
+  | 'giftApplied'
+  | 'charged'
+>;
+
+/** The booking's own facts as finished text, for any order state: the confirmation email and the manage page both start here. */
+export function bookingSummaryData(
   source: BookingEmailSource,
-  input: { appUrl: string; manageToken: string },
-): GuestConfirmationData {
-  const confirmedAt = requireConfirmedAt(source);
+): BookingSummaryData {
   const amounts = orderSummaryAmounts({
     lines: source.items.map((item) => ({
       label: `${item.label} x ${String(item.quantity)}`,
@@ -213,7 +276,6 @@ export function guestConfirmationData(
     taxMinor: source.taxMinor,
     totalMinor: source.totalMinor,
   });
-  const event = bookingCalendarEvent(source, input.appUrl);
   const paidWithGift = source.giftAppliedMinor > 0;
   return {
     recipientName: greetingName(source.leadGuestName),
@@ -236,6 +298,17 @@ export function guestConfirmationData(
     total: amounts.total,
     giftApplied: paidWithGift ? formatMoney(source.giftAppliedMinor) : null,
     charged: paidWithGift ? formatMoney(source.amountDueMinor) : null,
+  };
+}
+
+export function guestConfirmationData(
+  source: BookingEmailSource,
+  input: { appUrl: string; manageToken: string },
+): GuestConfirmationData {
+  const confirmedAt = requireConfirmedAt(source);
+  const event = bookingCalendarEvent(source, input.appUrl);
+  return {
+    ...bookingSummaryData(source),
     cancellationTerms: cancellationTermsLabel(
       source.freeCancelUntil,
       confirmedAt,
@@ -341,7 +414,6 @@ type CancellationInput = {
   appUrl: string;
 };
 
-// TODO(U-055): first caller, the cancellation email job.
 export function bookingCancellationData(
   input: CancellationInput,
 ): BookingCancellationData {
@@ -366,11 +438,10 @@ export function bookingCancellationData(
   };
 }
 
-/** When a refund shows up, said once for every refund email. */
+/** When a refund shows up, said once for every refund email and the manage page. */
 export const refundArrivalLine =
   'Your bank usually shows it within 5 to 10 business days.';
 
-// TODO(U-055): first caller, the refund email job.
 export function bookingRefundData(input: {
   recipientName: string | null;
   reference: string;

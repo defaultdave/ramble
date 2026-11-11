@@ -7,6 +7,7 @@ import {
   type HostFormField,
   type HostInput,
 } from '@/lib/hostSetup';
+import { maxEmailAddressLength } from '@/lib/email/address';
 import { maxTimeZoneLength } from '@/lib/sessions';
 import styles from './HostSetup.module.css';
 
@@ -86,7 +87,7 @@ export function HostForm({
         label="Booking notice address"
         hint="Where booking and cancellation emails go. Not shown to guests."
         defaultValue={values?.notificationEmail ?? undefined}
-        maxLength={254}
+        maxLength={maxEmailAddressLength}
         autoComplete="off"
         optional
         {...errorFor('notificationEmail')}
@@ -98,7 +99,7 @@ export function HostForm({
             type="email"
             label="Owner email"
             hint="The owner gets a sign-in link at this address. No password."
-            maxLength={254}
+            maxLength={maxEmailAddressLength}
             autoComplete="off"
             required
             {...errorFor('ownerEmail')}

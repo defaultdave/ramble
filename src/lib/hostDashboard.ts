@@ -76,12 +76,13 @@ export type HostDashboardView = {
   bookings: readonly HostBookingRowView[];
 };
 
-const bookingStatusLabels = {
+export const bookingStatusLabels = {
   confirmed: 'Confirmed',
   cancelled: 'Cancelled',
 } as const satisfies Record<HostDashboardBooking['status'], string>;
 
-const whenLabel = (instant: Date, timeZone: string) =>
+/** "Sat, Nov 14 · 2:00 PM EST", on the session's own calendar and clock. */
+export const whenLabel = (instant: Date, timeZone: string) =>
   `${zonedShortDayLabel(instant, timeZone)} · ${zonedTimeLabel(instant, timeZone)}`;
 
 /** How much of the allocation is sold, as a whole percent. 100 means full: a session one seat short never reads as full, and an allocation of 0 is full. */
@@ -94,6 +95,10 @@ export function soldPercent(seatsSold: number, allocation: number): number {
 export function soldFillStep(percent: number): number {
   return Math.floor(percent / 10);
 }
+
+/** "1 seat", "3 seats". */
+export const seatsLabel = (seats: number) =>
+  seats === 1 ? '1 seat' : `${String(seats)} seats`;
 
 function sessionRow(session: HostDashboardSession): HostSessionRowView {
   return {
@@ -113,8 +118,7 @@ function bookingRow(booking: HostDashboardBooking): HostBookingRowView {
     guestName: booking.leadGuestName,
     experienceName: booking.experienceName,
     whenLabel: whenLabel(booking.sessionStartsAt, booking.timeZone),
-    seatsLabel:
-      booking.seats === 1 ? '1 seat' : `${String(booking.seats)} seats`,
+    seatsLabel: seatsLabel(booking.seats),
     totalLabel: formatMoney(booking.totalMinor),
     statusLabel: bookingStatusLabels[booking.status],
   };

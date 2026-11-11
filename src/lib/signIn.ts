@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { waitMinutesLabel } from './rateLimits';
+import { retryAfterMinutes, waitMinutesLabel } from './rateLimits';
 
 // The sign-in pages' decisions: where a person may be sent afterwards, what the link in the email
 // points at, and which state a refused request or a failed link becomes.
@@ -126,7 +126,7 @@ const maxRetryMinutes = 24 * 60;
 function retryMinutes(header: string | null): number {
   const seconds =
     header !== null && /^\d{1,7}$/.test(header) ? Number(header) : 0;
-  return Math.min(maxRetryMinutes, Math.max(1, Math.ceil(seconds / 60)));
+  return Math.min(maxRetryMinutes, retryAfterMinutes(seconds));
 }
 
 /** The form's state after the sign-in request was answered with `status`. 200 sent, 429 counted out, 400 a bad address. */

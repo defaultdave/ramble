@@ -438,11 +438,9 @@ export function bookingCancellationData(
   };
 }
 
-/** How long a refund takes to show up, said once for every email and page that says it. */
-export const refundArrivalWindow = '5 to 10 business days';
-
-/** When a refund shows up, said once for every refund email. */
-export const refundArrivalLine = `Your bank usually shows it within ${refundArrivalWindow}.`;
+/** When a refund shows up, said once for every refund email and the manage page. */
+export const refundArrivalLine =
+  'Your bank usually shows it within 5 to 10 business days.';
 
 export function bookingRefundData(input: {
   recipientName: string | null;

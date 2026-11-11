@@ -1,6 +1,6 @@
 import 'server-only';
-import { openManageGate, type GateRefusal } from '@/lib/cancelBooking';
-import { manageView, type ManageView } from '@/lib/manageBooking';
+import { openManageGate } from '@/lib/cancelBooking';
+import { manageReadOutcome, type ManageReadOutcome } from '@/lib/manageBooking';
 import { db } from '@/server/db/client';
 import { readBookingEmailOrder } from '@/server/db/bookingEmails';
 import { readCancelFacts } from '@/server/db/ordersCancelFacts';
@@ -22,11 +22,10 @@ export function openManageToken(token: unknown) {
   });
 }
 
-export type ManagePage =
-  { kind: 'ok'; view: ManageView } | { kind: 'refused'; refusal: GateRefusal };
-
 /** The page for the booking a manage token opens. Each view spends one try of the `manage` count. */
-export async function readManagePage(token: string): Promise<ManagePage> {
+export async function readManagePage(
+  token: string,
+): Promise<ManageReadOutcome> {
   const gate = await openManageToken(token);
   if (gate.kind === 'refused') return gate;
   const { id } = gate.row;
@@ -35,11 +34,9 @@ export async function readManagePage(token: string): Promise<ManagePage> {
     booking: await readCancelFacts(tx, id),
     now: await readDatabaseTime(tx),
   }));
-  if (read.order === null || read.booking === null) {
-    return { kind: 'refused', refusal: { status: 'not_found' } };
-  }
-  return {
-    kind: 'ok',
-    view: manageView(read.order.source, read.booking.facts, read.now),
-  };
+  return manageReadOutcome({
+    order: read.order?.source ?? null,
+    facts: read.booking?.facts ?? null,
+    now: read.now,
+  });
 }

@@ -170,7 +170,7 @@ function refusalResult(
         freeCancelUntil: freeCancelUntil?.toISOString() ?? null,
       };
     case 'token_stale':
-      return { status: 'not_found' };
+      return missingOrderResult;
   }
 }
 
@@ -249,7 +249,9 @@ export type CancelPlan =
   | { kind: 'stop'; result: CancelBookingResult };
 
 /** The answer when no booking stands behind the order: the same as every other refusal of a link. */
-export const missingOrderResult: CancelBookingResult = { status: 'not_found' };
+export const missingOrderResult = {
+  status: 'not_found',
+} as const satisfies CancelBookingResult;
 
 /**
  * What the data layer does with the locked order: a refused verdict is its typed answer; otherwise the cancellation goes on, asking for a refund only
@@ -319,7 +321,7 @@ export async function openManageGate<Row>(
 ): Promise<ManageGate<Row>> {
   const parsed = CapabilityTokenSchema.safeParse(token);
   if (!parsed.success) {
-    return { kind: 'refused', refusal: { status: 'not_found' } };
+    return { kind: 'refused', refusal: missingOrderResult };
   }
   const spent = await steps.spendTry(parsed.data);
   if (!spent.allowed) {
@@ -333,7 +335,7 @@ export async function openManageGate<Row>(
   }
   const row = await steps.open(parsed.data);
   return row === null
-    ? { kind: 'refused', refusal: { status: 'not_found' } }
+    ? { kind: 'refused', refusal: missingOrderResult }
     : { kind: 'opened', row };
 }
 
@@ -346,8 +348,11 @@ export function parseCancelInput(
   const parsed = CancelBookingInputSchema.safeParse(input);
   return parsed.success
     ? { kind: 'ok', input: parsed.data }
-    : { kind: 'refused', result: { status: 'not_found' } };
+    : { kind: 'refused', result: missingOrderResult };
 }
+
+/** What a form refund that is not digits becomes: below zero, so the schema refuses it. */
+const invalidRefundMinor = -1;
 
 /** The form's two fields as the action's input; the refund travels as digits and is parsed strictly. */
 export function cancelInputFromForm(fields: {
@@ -361,7 +366,7 @@ export function cancelInputFromForm(fields: {
       typeof expectedRefundMinor === 'string' &&
       /^\d{1,10}$/.test(expectedRefundMinor)
         ? Number(expectedRefundMinor)
-        : -1,
+        : invalidRefundMinor,
   };
 }
 

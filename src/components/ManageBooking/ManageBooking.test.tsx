@@ -81,7 +81,7 @@ describe('the first step', () => {
     expect(screen.getByText(/full refund of \$234\.12/)).toBeVisible();
     expect(
       screen.getByText(
-        'Refunds go back to your card in 5 to 10 business days.',
+        'Your bank usually shows it within 5 to 10 business days.',
       ),
     ).toBeVisible();
   });

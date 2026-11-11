@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { countLabel } from './text';
 
 export const rateLimitSurfaces = [
   'sign_in_link',
@@ -127,7 +128,14 @@ export function normalizeSubject(
 
 /** "1 minute" or "3 minutes": how a wait is said wherever a limit tells a guest to try again. */
 export function waitMinutesLabel(minutes: number): string {
-  return minutes === 1 ? '1 minute' : `${String(minutes)} minutes`;
+  return countLabel(minutes, 'minute');
+}
+
+const secondsPerMinute = 60;
+
+/** A wait in seconds as whole minutes, rounded up (never under one) so a guest is never told to retry too early. */
+export function retryAfterMinutes(seconds: number): number {
+  return Math.max(1, Math.ceil(seconds / secondsPerMinute));
 }
 
 export type RateLimitDecision =

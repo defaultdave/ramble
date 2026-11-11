@@ -265,6 +265,19 @@ describe('the verdict, through the plan', () => {
     },
   );
 
+  it('asks for a refund of one minor unit, the rest of an order after partial refunds', () => {
+    expect(
+      ask({
+        facts: {
+          ...facts,
+          refundedTicketMinor: 12_999,
+          commissionReturnedMinor: 1_949,
+        },
+        expectedRefundMinor: 1,
+      }),
+    ).toEqual({ kind: 'proceed', refundMinor: 1, requestsRefund: true });
+  });
+
   it('goes on at no refund when no refund was shown and none is due', () => {
     expect(
       ask({
@@ -332,13 +345,21 @@ describe('the refund request answer', () => {
     },
   );
 
-  it('passes a refusal on', () => {
-    expect(
-      refundRequestOutcome({ status: 'refused', reason: 'no_payment' }, 13_000),
-    ).toEqual({
-      kind: 'refused',
-      result: { status: 'refund_unavailable', reason: 'no_payment' },
-    });
+  it.each([
+    'order_not_found',
+    'order_not_refundable',
+    'nothing_left',
+    'exceeds_remaining',
+    'exceeds_card_payment',
+    'no_payment',
+    'request_changed',
+  ] as const)('passes the refusal %s on, as its own reason', (reason) => {
+    expect(refundRequestOutcome({ status: 'refused', reason }, 13_000)).toEqual(
+      {
+        kind: 'refused',
+        result: { status: 'refund_unavailable', reason },
+      },
+    );
   });
 
   it.each([12_999, 13_001])(

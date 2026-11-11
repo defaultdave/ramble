@@ -79,6 +79,20 @@ describe('the bound on the refund read', () => {
     expect(await refundsOf(world)).toHaveLength(61);
   });
 
+  it('cancels an order with exactly 100 failed refund rows, the most one read holds', async () => {
+    const world = await fresh({
+      gatewayPayment: true,
+      freeCancelInMinutes: -1,
+    });
+    await addFailedRefunds(world, 100);
+
+    expect(await cancel(world, 0)).toMatchObject({
+      status: 'cancelled',
+      refundMinor: 0,
+    });
+    expect((await orderOf(world)).status).toBe('cancelled');
+  });
+
   it('rolls the cancellation back whole for an order whose refund rows pass the bound', async () => {
     // No refund is due, so no new row is added and only the bound can tell the check anything.
     const world = await fresh({
@@ -114,7 +128,54 @@ describe('a cancel writes only its own order', () => {
   });
 });
 
+describe('a cancel next to another booking of the same session', () => {
+  it('leaves the other booking, on the same session and its own hold, untouched', async () => {
+    const mine = await fresh({ gatewayPayment: true });
+    const base = await orderOf(mine);
+    const sibling = await seedBooking(client.db, getParents(), {
+      on: {
+        experienceId: base.experienceId,
+        hostId: base.hostId,
+        sessionId: mine.sessionId,
+      },
+    });
+    await side.query(
+      `UPDATE orders SET status = 'confirmed', confirmed_at = clock_timestamp() WHERE id = $1`,
+      [sibling.orderId],
+    );
+    await side.query(`UPDATE holds SET status = 'converted' WHERE id = $1`, [
+      sibling.holdId,
+    ]);
+
+    expect(await cancel(mine, 13_000)).toMatchObject({ status: 'cancelled' });
+
+    expect(await orderOf(sibling)).toMatchObject({
+      status: 'confirmed',
+      cancelledAt: null,
+      cancelledBy: null,
+      refundedTicketMinor: 0,
+      refundedTaxMinor: 0,
+    });
+    expect((await orderOf(mine)).status).toBe('cancelled');
+  });
+});
+
 describe('the time a cancellation is stamped', () => {
+  it('is read from the database clock, so an app clock far behind cannot put it before the order was confirmed', async () => {
+    const world = await fresh({ gatewayPayment: true });
+    vi.useFakeTimers({
+      toFake: ['Date'],
+      now: Date.now() - 10 * 24 * 60 * 60_000,
+    });
+
+    expect(await cancel(world, 13_000)).toMatchObject({ status: 'cancelled' });
+
+    const order = await orderOf(world);
+    expect(order.cancelledAt?.getTime()).toBeGreaterThanOrEqual(
+      order.confirmedAt?.getTime() ?? Infinity,
+    );
+  });
+
   it('is after the writer it waited for, so it never reads before the order was confirmed', async () => {
     const world = await fresh({ gatewayPayment: true });
     const holder = await side.connect();
@@ -166,6 +227,14 @@ describe('an order that is not a booking to cancel', () => {
 
     expect(await direct(randomUUID())).toEqual({ status: 'not_found' });
     expect(await counts()).toEqual(before);
+  });
+
+  it('reads no facts for an order that does not exist', async () => {
+    const { readCancelFacts } = await import('@/server/db/ordersCancelFacts');
+
+    expect(
+      await client.db.transaction((tx) => readCancelFacts(tx, randomUUID())),
+    ).toBeNull();
   });
 
   it('answers not found for an order with no session and no hold (a gift purchase)', async () => {

@@ -1,26 +1,34 @@
 import type { AlertTone } from './alertTone';
 import {
   bookingSummaryData,
+  cancellationRefundLine,
   refundArrivalLine,
-  refundArrivalWindow,
   type BookingEmailSource,
   type BookingSummaryData,
 } from './bookingEmails';
 import {
   cancelQuote,
+  missingOrderResult,
+  refundEtaLine,
   type CancelBookingResult,
+  type GateRefusal,
   type CancelFacts,
   type CancelQuote,
   type RefundBasis,
 } from './cancelBooking';
 import { formatMoney } from './money';
-import { rateLimitPolicies, waitMinutesLabel } from './rateLimits';
+import {
+  rateLimitPolicies,
+  retryAfterMinutes,
+  waitMinutesLabel,
+} from './rateLimits';
 import { managePath } from './routes';
 import { zonedDeadlineLabel } from './zonedLabels';
 
 // What the manage page says for a booking, built from the same quote the cancel action checks, so
 // the refund shown first is the refund `expectedRefundMinor` carries back. The page and its form
-// render what these functions return; none of this copy lives in a component.
+// render what these functions return: the booking's own wording, the refund sentences, the notices,
+// and the labels live here; only the page's fixed chrome (heading, help line, links) is in the component.
 
 export type ManageBooking = BookingSummaryData & {
   totalLabel: string;
@@ -55,8 +63,6 @@ export type ManageView =
     }
   /** Confirmed, but not cancellable now (the session has started). */
   | { kind: 'closed'; booking: ManageBooking };
-
-const refundFootnote = `Refunds go back to your card in ${refundArrivalWindow}.`;
 
 function manageBooking(source: BookingEmailSource): ManageBooking {
   const summary = bookingSummaryData(source);
@@ -112,7 +118,7 @@ function cancelPrompt(
       ? `Your booking will be cancelled and ${formatMoney(refundMinor)} goes back to your card. This cannot be undone.`
       : 'Your booking will be cancelled and nothing will be refunded. This cannot be undone.',
     keepLabel: 'Keep my booking',
-    footnote: refunded ? refundFootnote : null,
+    footnote: refunded ? refundArrivalLine : null,
   };
 }
 
@@ -156,12 +162,9 @@ const cancelNoticeCodes = [
 ] as const satisfies readonly CancelBookingResult['status'][];
 export type CancelNoticeCode = (typeof cancelNoticeCodes)[number];
 
-const secondsPerMinute = 60;
-
-/** "Try again in 3 minutes", rounded up so a guest is never told to retry too early. */
+/** "Try again in 3 minutes". */
 function retryAfterLine(retryAfterSeconds: number): string {
-  const minutes = Math.max(1, Math.ceil(retryAfterSeconds / secondsPerMinute));
-  return `Try again in ${waitMinutesLabel(minutes)}.`;
+  return `Try again in ${waitMinutesLabel(retryAfterMinutes(retryAfterSeconds))}.`;
 }
 
 /**
@@ -181,10 +184,12 @@ export function cancelNotice(
       return {
         tone: 'success',
         title: 'Your booking is cancelled',
-        body:
-          (context.refundMinor ?? 0) > 0
-            ? `Your refund of ${formatMoney(context.refundMinor ?? 0)} goes back to your original payment method. ${refundArrivalLine}`
-            : 'No refund is due under the cancellation terms.',
+        body: [
+          cancellationRefundLine(context.refundMinor ?? 0),
+          refundEtaLine(context.refundMinor ?? 0),
+        ]
+          .filter((line) => line !== null)
+          .join(' '),
       };
     case 'terms_changed':
       return {
@@ -300,4 +305,23 @@ export function cancelResultPath(
   result: CancelBookingResult,
 ): string {
   return `${managePath(token)}?result=${result.status}`;
+}
+
+/** What reading the manage page found: the page for the booking, or the refusal that says no more than "not found". */
+export type ManageReadOutcome =
+  { kind: 'ok'; view: ManageView } | { kind: 'refused'; refusal: GateRefusal };
+
+/**
+ * The page for what the data layer read: an order and a booking behind it, judged at `now`. Either
+ * one missing is the refusal every other bad link gets.
+ */
+export function manageReadOutcome(read: {
+  order: BookingEmailSource | null;
+  facts: CancelFacts | null;
+  now: Date;
+}): ManageReadOutcome {
+  if (read.order === null || read.facts === null) {
+    return { kind: 'refused', refusal: missingOrderResult };
+  }
+  return { kind: 'ok', view: manageView(read.order, read.facts, read.now) };
 }

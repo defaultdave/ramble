@@ -16,6 +16,7 @@ import type {
 } from '@/lib/cancelBooking';
 import type { Transaction } from '@/server/db/client';
 import { readBookingEmailOrder } from '@/server/db/bookingEmails';
+import { BookingEmailError, loadOrder } from './bookingEmails';
 import { readRefundForEmail } from '@/server/db/cancellationEmails';
 import { env } from '@/server/env';
 import { logger } from '@/server/monitoring/logger';
@@ -26,22 +27,13 @@ import { sendEmail } from '@/server/ports/email';
 // are ids and amounts, so a job row holds no address or name. Each handler is safe to run twice: the
 // email's idempotency key is built from the order or the refund.
 
-/** Thrown for a job that should not exist. The message names no address, name, or token. */
-class CancellationEmailError extends Error {
-  constructor(reason: string) {
-    super(`Cancellation email refused: ${reason}`);
-    this.name = 'CancellationEmailError';
-  }
-}
-
-async function loadCancelledOrder(tx: Transaction, orderId: string) {
-  const order = await readBookingEmailOrder(tx, orderId);
-  if (!order) throw new CancellationEmailError('there is no such booking');
-  if (cancellationDecision(order.source) === 'refuse') {
-    throw new CancellationEmailError('the order is not a cancelled booking');
-  }
-  return order;
-}
+const loadCancelledOrder = (tx: Transaction, orderId: string) =>
+  loadOrder(
+    tx,
+    orderId,
+    cancellationDecision,
+    'the order is not a cancelled booking',
+  ).then(({ order }) => order);
 
 export async function sendGuestCancellation({
   tx,
@@ -82,7 +74,7 @@ export async function sendHostCancellationNotice({
   const order = await loadCancelledOrder(tx, payload.orderId);
   const notice = hostNoticeDecision(order);
   if (notice.kind === 'refuse') {
-    throw new CancellationEmailError('the host has no notification address');
+    throw new BookingEmailError('the host has no notification address');
   }
   const { source } = order;
   await sendEmail({
@@ -119,17 +111,17 @@ export async function sendGuestRefund({
   jobId: string;
 }): Promise<void> {
   const refund = await readRefundForEmail(tx, payload.refundId);
-  if (!refund) throw new CancellationEmailError('there is no such refund');
+  if (!refund) throw new BookingEmailError('there is no such refund');
   const decision = refundEmailDecision(refund);
   if (decision === 'refuse') {
-    throw new CancellationEmailError('the refund has not succeeded');
+    throw new BookingEmailError('the refund has not succeeded');
   }
   if (decision === 'skip') {
     logger.info('refund email skipped', { jobId, reason: 'other-reason' });
     return;
   }
   const order = await readBookingEmailOrder(tx, refund.orderId);
-  if (!order) throw new CancellationEmailError('there is no such booking');
+  if (!order) throw new BookingEmailError('there is no such booking');
   await sendEmail({
     template: 'booking-refund',
     to: order.contactEmail,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { orderA, orderB } from './bookingEmails.fixtures';
 import { type CancelFacts } from './cancelBooking';
+import { manageReadOutcome } from './manageBooking';
 import {
   cancelNotice,
   cancelResultPath,
@@ -73,7 +74,7 @@ describe('the manage view of a booking', () => {
       confirmBody:
         'Your booking will be cancelled and $234.12 goes back to your card. This cannot be undone.',
       keepLabel: 'Keep my booking',
-      footnote: 'Refunds go back to your card in 5 to 10 business days.',
+      footnote: 'Your bank usually shows it within 5 to 10 business days.',
     });
   });
 
@@ -391,5 +392,84 @@ describe('the paths', () => {
     expect(cancelResultPath(token, result)).toBe(
       `/manage/${token}?result=${word}`,
     );
+  });
+});
+
+describe('a refund of one minor unit, the smallest there is', () => {
+  // After a partial refund the rest of an order can be a single cent.
+  const oneCentLeft: CancelFacts = {
+    ...facts,
+    ticketSubtotalMinor: 13_000,
+    taxMinor: 0,
+    totalMinor: 13_000,
+    amountDueMinor: 13_000,
+    commissionMinor: 1_950,
+    refundedTicketMinor: 12_999,
+    commissionReturnedMinor: 1_949,
+  };
+
+  it('is still a refund: the button, the confirmation, and the footnote say so', () => {
+    const view = manageView(orderA, oneCentLeft, before);
+    if (view.kind !== 'active') throw new Error('not active');
+
+    expect(view.prompt).toMatchObject({
+      refundMinor: 1,
+      buttonLabel: 'Cancel and refund $0.01',
+      confirmBody:
+        'Your booking will be cancelled and $0.01 goes back to your card. This cannot be undone.',
+      footnote: 'Your bank usually shows it within 5 to 10 business days.',
+    });
+  });
+});
+
+describe('what a cancelled booking gave back', () => {
+  it.each([
+    ['nothing', 0, 0, 'No refund is due under the cancellation terms.'],
+    ['one cent of ticket', 1, 0, 'Your refund of $0.01 goes back'],
+    ['ticket and tax', 100, 25, 'Your refund of $1.25 goes back'],
+  ])(
+    'for %s of a larger order: the sum of the refunded ticket and tax, not the total',
+    (_name, ticket, tax, line) => {
+      const view = manageView(
+        { ...orderA, status: 'cancelled' },
+        {
+          ...facts,
+          status: 'cancelled',
+          refundedTicketMinor: ticket,
+          refundedTaxMinor: tax,
+        },
+        before,
+      );
+
+      expect(view).toMatchObject({
+        kind: 'cancelled',
+        refundedMinor: ticket + tax,
+      });
+      expect(
+        managePageState(view, { result: 'cancelled' }).notice?.body,
+      ).toContain(line);
+    },
+  );
+});
+
+describe('reading the page', () => {
+  const read = { order: orderA, facts, now: before };
+
+  it('is the page for a booking that was found', () => {
+    expect(manageReadOutcome(read)).toEqual({
+      kind: 'ok',
+      view: manageView(orderA, facts, before),
+    });
+  });
+
+  it.each([
+    ['no order', { order: null }],
+    ['no booking behind the order', { facts: null }],
+    ['neither', { order: null, facts: null }],
+  ])('is not found for %s', (_name, over) => {
+    expect(manageReadOutcome({ ...read, ...over })).toEqual({
+      kind: 'refused',
+      refusal: { status: 'not_found' },
+    });
   });
 });

@@ -4,8 +4,6 @@ import {
   bookingEmailKey,
   bookingCancellationData,
   bookingSummaryData,
-  refundArrivalLine,
-  refundArrivalWindow,
   cancellationDecision,
   guestConfirmationData,
   hostNoticeDecision,
@@ -161,14 +159,5 @@ describe('who a cancellation email greets', () => {
         cancelledBy: 'guest',
       }).reasonLine,
     ).toBe('The guest cancelled this booking.');
-  });
-});
-
-describe('how long a refund takes', () => {
-  it('is said once, in the refund email and on the manage page alike', () => {
-    expect(refundArrivalWindow).toBe('5 to 10 business days');
-    expect(refundArrivalLine).toBe(
-      'Your bank usually shows it within 5 to 10 business days.',
-    );
   });
 });

@@ -34,8 +34,7 @@ describe('locksCoverOrder', () => {
 });
 
 describe('lockRetryLimit', () => {
-  it('is a few tries: more than one, fewer than ten', () => {
-    expect(lockRetryLimit).toBeGreaterThan(1);
-    expect(lockRetryLimit).toBeLessThan(10);
+  it('is three tries', () => {
+    expect(lockRetryLimit).toBe(3);
   });
 });

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { auditOf, seatsSoldOf } from './cancelFixtures';
@@ -88,13 +89,12 @@ async function moveBlockedOn(
   };
 }
 
-/** A date whose id sorts on the wanted side of the booking's own session id. */
-async function dateOn(world: MoveWorld, side_: 'before' | 'after') {
-  for (let tries = 0; tries < 40; tries += 1) {
-    const id = await addDate(world);
-    if (id < world.sessionId === (side_ === 'before')) return id;
-  }
-  throw new Error('no session id on that side');
+/** A date whose id sorts on the wanted side of the booking's own session id, by construction (the booking's id is random). */
+function dateOn(world: MoveWorld, side_: 'before' | 'after') {
+  const tail = randomUUID().slice(8);
+  return addDate(world, {
+    id: side_ === 'before' ? `00000000${tail}` : `ffffffff${tail}`,
+  });
 }
 
 describe.each(['before', 'after'] as const)(
@@ -187,6 +187,55 @@ describe('two moves at once', () => {
       (await sessionOf(first)).seatsSold + (await sessionOf(second)).seatsSold,
     ).toBe(world.seats);
     expect(await auditOf(world)).toHaveLength(2);
+  });
+});
+
+describe('a move that read the booking before another move committed', () => {
+  it('starts over from the session the first move left it on, taking that session lock before the hold and order', async () => {
+    const world = await seedMovable();
+    // `first` already counts the seats, as it does once move 1 has committed.
+    const first = await addDate(world, { seatsSold: 3 + world.seats });
+    const second = await addDate(world, { seatsSold: 1 });
+    const firstHolder = await side.connect();
+    await firstHolder.query('BEGIN');
+    await firstHolder.query(
+      'SELECT id FROM sessions WHERE id = $1 FOR NO KEY UPDATE',
+      [first],
+    );
+    const blocked = await moveBlockedOn(
+      'sessions',
+      world.sessionId,
+      world,
+      second,
+    );
+    // Move 1 as it commits: the order and hold on `first`, the seats off the old session.
+    await blocked.holder.query(
+      'UPDATE orders SET session_id = $2 WHERE id = $1',
+      [world.orderId, first],
+    );
+    await blocked.holder.query(
+      'UPDATE holds SET session_id = $2 WHERE id = $1',
+      [world.holdId, first],
+    );
+    await blocked.holder.query(
+      'UPDATE sessions SET seats_sold = seats_sold - $2 WHERE id = $1',
+      [world.sessionId, world.seats],
+    );
+    await blocked.release();
+
+    // Move 2 starts over and waits for `first`, the session the booking is on now, holding no hold or order lock.
+    await waitUntilBlocked(side, { blockedBy: await backendPid(firstHolder) });
+    expect(await isLocked('holds', world.holdId)).toBe(false);
+    expect(await isLocked('orders', world.orderId)).toBe(false);
+    await firstHolder.query('COMMIT');
+    firstHolder.release();
+
+    expect(await blocked.waiting).toEqual({ status: 'moved' });
+    expect((await orderOf(world)).sessionId).toBe(second);
+    expect((await holdOf(world.holdId)).sessionId).toBe(second);
+    expect(await seatsSoldOf(world)).toBe(world.seatsSoldBefore - world.seats);
+    expect((await sessionOf(first)).seatsSold).toBe(3);
+    expect((await sessionOf(second)).seatsSold).toBe(1 + world.seats);
   });
 });
 

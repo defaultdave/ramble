@@ -52,6 +52,8 @@ type SessionOver = {
   seatsSold?: number;
   status?: 'scheduled' | 'cancelled' | 'completed';
   experienceId?: string;
+  /** A chosen id, to put the date on a wanted side of another id. */
+  id?: string;
 };
 
 /** Another date of the booking's experience (or of the one named), with the room the test asks for. */
@@ -66,6 +68,7 @@ export async function addDate(
     {
       startsAt: sql`now() + make_interval(mins => ${minutes})`,
       endsAt: sql`now() + make_interval(mins => ${minutes + 120})`,
+      ...(over.id === undefined ? {} : { id: over.id }),
       allocation: over.allocation ?? 10,
       seatsSold: over.seatsSold ?? 0,
       ...(over.status === undefined ? {} : { status: over.status }),

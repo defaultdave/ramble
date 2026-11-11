@@ -13,7 +13,6 @@ import {
   moveInputFromForm,
   movePlan,
   moveStart,
-  moveTargetVerdict,
   parseMoveInput,
   type MoveSubject,
   type MoveTarget,
@@ -78,8 +77,21 @@ function dateIn(
   };
 }
 
-const verdict = (target: MoveTarget | null, over: Partial<MoveSubject> = {}) =>
-  moveTargetVerdict({ subject: { ...subject, ...over }, target, now });
+/** The date's verdict, read through the plan of a booking that is inside the terms. */
+const verdict = (
+  target: MoveTarget | null,
+  over: Partial<MoveSubject> = {},
+) => {
+  const plan = movePlan({
+    subject: { ...subject, ...over },
+    target,
+    openedTokenVersion: 1,
+    now,
+  });
+  return plan.kind === 'proceed'
+    ? ({ kind: 'ok', freeCancelUntil: plan.freeCancelUntil } as const)
+    : ({ kind: 'refused', refusal: plan.result.status } as const);
+};
 
 describe('isMovable', () => {
   it('is true inside the window', () => {
@@ -122,13 +134,12 @@ describe('isMovable', () => {
   });
 });
 
-describe('moveTargetVerdict', () => {
+describe('the verdict on a date, through movePlan', () => {
   it('accepts a later date of the same experience and carries the new deadline', () => {
     const target = dateIn(72);
 
     expect(verdict(target)).toEqual({
       kind: 'ok',
-      target,
       freeCancelUntil: new Date(
         target.startsAt.getTime() - tierHours * hoursMs,
       ),

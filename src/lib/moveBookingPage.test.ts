@@ -11,7 +11,6 @@ import { manageViewOf } from './manageBooking.fixtures';
 import {
   isMoveNoticeCode,
   moveNotice,
-  moveNoticeCodes,
   movePickerPath,
   movePrompt,
   moveResultPath,
@@ -29,6 +28,14 @@ import {
 // - the offer names the deadline, or says nothing of it when there is none
 
 const token = 'A'.repeat(43);
+const moveNoticeCodes = [
+  'moved',
+  'not_movable',
+  'same_date',
+  'date_unavailable',
+  'sold_out',
+  'too_soon',
+] as const;
 const facts: CancelFacts = {
   status: 'confirmed',
   kind: 'booking',
@@ -302,6 +309,10 @@ describe('the notices', () => {
     expect(
       moveNoticeCodes.filter((code) => moveNotice(code).tone === 'success'),
     ).toEqual(['moved']);
+  });
+
+  it.each(moveNoticeCodes)('takes %s for a move status', (value) => {
+    expect(isMoveNoticeCode(value)).toBe(true);
   });
 
   it.each(['not_found', 'rate_limited', 'cancelled', '', 'MOVED'])(

@@ -49,4 +49,24 @@ describe('untilLocksCoverOrder', () => {
     await expect(untilLocksCoverOrder(attempt)).rejects.toThrow('kept moving');
     expect(attempt).toHaveBeenCalledTimes(lockRetryLimit);
   });
+
+  it('succeeds when two tries are stale and the third is done', async () => {
+    const attempt = vi
+      .fn<() => Promise<LockedAttempt<string>>>()
+      .mockResolvedValueOnce(stale)
+      .mockResolvedValueOnce(stale)
+      .mockResolvedValueOnce(done('third'));
+
+    expect(await untilLocksCoverOrder(attempt)).toBe('third');
+    expect(attempt).toHaveBeenCalledTimes(3);
+  });
+
+  it('throws when three tries in a row are stale, and tries a fourth never', async () => {
+    const attempt = vi
+      .fn<() => Promise<LockedAttempt<string>>>()
+      .mockResolvedValue(stale);
+
+    await expect(untilLocksCoverOrder(attempt)).rejects.toThrow('kept moving');
+    expect(attempt).toHaveBeenCalledTimes(3);
+  });
 });

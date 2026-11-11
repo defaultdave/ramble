@@ -95,7 +95,7 @@ type TargetVerdict =
  * nothing about sessions it does not belong to. The new deadline is the booking's own tier before
  * the new start; a date already inside it would make a booking that cannot be cancelled.
  */
-export function moveTargetVerdict(input: {
+function moveTargetVerdict(input: {
   subject: MoveSubject;
   target: MoveTarget | null;
   now: Date;
@@ -355,7 +355,7 @@ export function movePrompt(input: {
   };
 }
 
-export const moveNoticeCodes = [
+const moveNoticeCodes = [
   'moved',
   'not_movable',
   'same_date',

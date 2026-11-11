@@ -6,6 +6,7 @@ import {
   type MoveSubject,
   type MoveTarget,
 } from '@/lib/moveBooking';
+import { remainingSpaces } from '@/lib/holds';
 import type { Transaction } from './client';
 import { readOpenHeldSeats } from './holds';
 import { readCancelFacts } from './ordersCancelFacts';
@@ -61,7 +62,10 @@ async function withSpacesLeft(
 ): Promise<MoveTarget> {
   const { allocation, seatsSold, ...rest } = row;
   const held = await readOpenHeldSeats(tx, row.id, at);
-  return { ...rest, spacesLeft: allocation - seatsSold - held };
+  return {
+    ...rest,
+    spacesLeft: remainingSpaces({ allocation, seatsSold }, held),
+  };
 }
 
 /** The session as a date to move to, as of `at`; null when there is no such session. Read after the session's lock. */

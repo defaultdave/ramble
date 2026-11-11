@@ -19,7 +19,7 @@ import {
   refundRequestOutcome,
   refundsReconcileWithin,
   missingOrderResult,
-  returnsSpaces,
+  cancelCacheChanges,
   type CancelBookingResult,
   type CancelFacts,
 } from './cancelBooking';
@@ -248,7 +248,7 @@ describe('the verdict, through the plan', () => {
     });
 
   it('goes on when the refund shown is the refund now', () => {
-    expect(ask()).toEqual({
+    expect(ask()).toMatchObject({
       kind: 'proceed',
       refundMinor: 13_000,
       requestsRefund: true,
@@ -275,7 +275,7 @@ describe('the verdict, through the plan', () => {
         },
         expectedRefundMinor: 1,
       }),
-    ).toEqual({ kind: 'proceed', refundMinor: 1, requestsRefund: true });
+    ).toMatchObject({ kind: 'proceed', refundMinor: 1, requestsRefund: true });
   });
 
   it('goes on at no refund when no refund was shown and none is due', () => {
@@ -284,7 +284,7 @@ describe('the verdict, through the plan', () => {
         now: new Date(freeUntil.getTime() + 1),
         expectedRefundMinor: 0,
       }),
-    ).toEqual({ kind: 'proceed', refundMinor: 0, requestsRefund: false });
+    ).toMatchObject({ kind: 'proceed', refundMinor: 0, requestsRefund: false });
   });
 
   it('reports changed terms when the window closed after a refund was shown', () => {
@@ -443,7 +443,7 @@ describe('the plan for the locked order', () => {
   });
 
   it('goes on, asking for a refund, when one is due', () => {
-    expect(plan()).toEqual({
+    expect(plan()).toMatchObject({
       kind: 'proceed',
       refundMinor: 13_000,
       requestsRefund: true,
@@ -453,7 +453,7 @@ describe('the plan for the locked order', () => {
   it('goes on, asking for no refund, when none is due', () => {
     expect(
       plan({ now: new Date(freeUntil.getTime() + 1), expectedRefundMinor: 0 }),
-    ).toEqual({ kind: 'proceed', refundMinor: 0, requestsRefund: false });
+    ).toMatchObject({ kind: 'proceed', refundMinor: 0, requestsRefund: false });
   });
 
   it.each([
@@ -559,7 +559,9 @@ describe('whether spaces return', () => {
     [{ status: 'terms_changed', refundMinor: 0 }, false],
     [{ status: 'not_found' }, false],
   ] as [CancelBookingResult, boolean][])('for %o', (result, expected) => {
-    expect(returnsSpaces(result)).toBe(expected);
+    expect(cancelCacheChanges(result, 'S')).toEqual(
+      expected ? [{ kind: 'spaces', sessionId: 'S' }] : [],
+    );
   });
 });
 

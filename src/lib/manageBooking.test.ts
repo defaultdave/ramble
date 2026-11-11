@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { manageViewOf } from './manageBooking.fixtures';
 import { orderA, orderB } from './bookingEmails.fixtures';
 import { type CancelFacts } from './cancelBooking';
 import { manageReadOutcome } from './manageBooking';
@@ -6,7 +7,6 @@ import {
   cancelNotice,
   cancelResultPath,
   confirmPath,
-  manageView,
   managePageState,
   type CancelNoticeCode,
   type ManageQuery,
@@ -53,13 +53,13 @@ const cancelledFacts: CancelFacts = {
   refundedTaxMinor: 1_912,
   commissionReturnedMinor: 3_225,
 };
-const cancelled = manageView(
+const cancelled = manageViewOf(
   { ...orderA, status: 'cancelled' },
   cancelledFacts,
   before,
 );
-const active = manageView(orderA, facts, before);
-const closed = manageView(orderA, facts, orderA.startsAt);
+const active = manageViewOf(orderA, facts, before);
+const closed = manageViewOf(orderA, facts, orderA.startsAt);
 
 describe('the manage view of a booking', () => {
   it('shows the refund first, with a button that names the amount', () => {
@@ -104,7 +104,7 @@ describe('the manage view of a booking', () => {
   });
 
   it('says the window closed, offers a cancel with no refund, and no footnote, after the deadline', () => {
-    const view = manageView(orderA, facts, afterWindow);
+    const view = manageViewOf(orderA, facts, afterWindow);
     if (view.kind !== 'active') throw new Error('not active');
     expect(view.prompt).toMatchObject({
       refundMinor: 0,
@@ -117,7 +117,7 @@ describe('the manage view of a booking', () => {
   });
 
   it('says so when no deadline was recorded', () => {
-    const view = manageView(
+    const view = manageViewOf(
       { ...orderA, freeCancelUntil: null },
       { ...facts, freeCancelUntil: null },
       before,
@@ -129,7 +129,7 @@ describe('the manage view of a booking', () => {
   });
 
   it('says a gift-paid booking is not refunded to a card, and shows the split', () => {
-    const view = manageView(
+    const view = manageViewOf(
       orderB,
       {
         ...facts,
@@ -150,6 +150,8 @@ describe('the manage view of a booking', () => {
     );
     expect(view.booking).toMatchObject({
       giftApplied: '$40.00',
+      giftAppliedLabel: 'Paid with your gift',
+      chargedLabel: 'Charged to your card',
       charged: '$55.00',
       taxLine: null,
       meetingPoint: null,
@@ -159,7 +161,7 @@ describe('the manage view of a booking', () => {
   });
 
   it('says everything was refunded when nothing is left to refund', () => {
-    const view = manageView(
+    const view = manageViewOf(
       orderA,
       {
         ...facts,
@@ -273,13 +275,14 @@ describe('the query is not trusted', () => {
     [{ confirm: '1' }, true, null],
     [{ confirm: '0' }, false, null],
     [{ confirm: 'true' }, false, null],
-    [{ confirm: ['1'] }, false, null],
+    [{ confirm: ['1'] }, true, null],
     [{ confirm: ['1', '1'] }, false, null],
+    [{ result: ['terms_changed', 'terms_changed'] }, false, null],
     [{ result: 'terms_changed' }, false, 'terms_changed'],
     [{ result: 'rate_limited' }, false, 'rate_limited'],
     [{ result: 'Rate_limited' }, false, null],
     [{ result: '<script>' }, false, null],
-    [{ result: ['terms_changed'] }, false, null],
+    [{ result: ['terms_changed'] }, false, 'terms_changed'],
     [{ result: 'constructor' }, false, null],
     [{ result: '' }, false, null],
     [
@@ -409,7 +412,7 @@ describe('a refund of one minor unit, the smallest there is', () => {
   };
 
   it('is still a refund: the button, the confirmation, and the footnote say so', () => {
-    const view = manageView(orderA, oneCentLeft, before);
+    const view = manageViewOf(orderA, oneCentLeft, before);
     if (view.kind !== 'active') throw new Error('not active');
 
     expect(view.prompt).toMatchObject({
@@ -430,7 +433,7 @@ describe('what a cancelled booking gave back', () => {
   ])(
     'for %s of a larger order: the sum of the refunded ticket and tax, not the total',
     (_name, ticket, tax, line) => {
-      const view = manageView(
+      const view = manageViewOf(
         { ...orderA, status: 'cancelled' },
         {
           ...facts,
@@ -455,10 +458,22 @@ describe('what a cancelled booking gave back', () => {
 describe('reading the page', () => {
   const read = { order: orderA, facts, now: before };
 
+  it('judges the booking at the time it is given: past the window the prompt is the closed one', () => {
+    const outcome = manageReadOutcome({ ...read, now: afterWindow });
+
+    expect(outcome).toMatchObject({
+      kind: 'ok',
+      view: {
+        kind: 'active',
+        prompt: { refundMinor: 0, buttonLabel: 'Cancel without a refund' },
+      },
+    });
+  });
+
   it('is the page for a booking that was found', () => {
     expect(manageReadOutcome(read)).toEqual({
       kind: 'ok',
-      view: manageView(orderA, facts, before),
+      view: manageViewOf(orderA, facts, before),
     });
   });
 

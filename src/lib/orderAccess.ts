@@ -1,6 +1,6 @@
 import { isCapabilityTokenShape } from './capabilityTokens';
 import { isOrderReference } from './orders';
-import { managePath, orderPath, orderTokenParam } from './routes';
+import { orderPath, orderTokenParam } from './routes';
 
 // How a guest keeps access to one order's confirmation page after the token has left the address
 // bar: the token arrives once in the URL, the proxy moves it into a cookie scoped to
@@ -14,7 +14,7 @@ export const orderAccessCookieMaxAgeSeconds = 2 * 60 * 60;
 
 const confirmationPathPattern = /^\/orders\/([^/]+)\/?$/;
 const signInConfirmPathPattern = /^\/sign-in\/confirm\/?$/;
-const managePathPattern = new RegExp(`^${managePath('')}[^/]+/?$`);
+const managePathPattern = /^\/manage\/[^/]+\/?$/;
 
 export type OrderAccessHandoff = {
   reference: string;

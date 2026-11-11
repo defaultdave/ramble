@@ -6,7 +6,7 @@ import { readBookingEmailOrder } from '@/server/db/bookingEmails';
 import { readCancelFacts } from '@/server/db/ordersCancelFacts';
 import { readDatabaseTime } from '@/server/db/time';
 import { consumeRateLimit } from '@/server/ports/rate-limit';
-import { resolveToken } from '@/server/tokens';
+import { resolveManageToken } from '@/server/tokens';
 
 // The booking behind a manage link: the token is the guest's right, so it is checked first, and a
 // malformed token, an unknown one, and one from before a bump all end the same way, in `not_found`.
@@ -18,7 +18,7 @@ import { resolveToken } from '@/server/tokens';
 export function openManageToken(token: unknown) {
   return openManageGate(token, {
     spendTry: (checked) => consumeRateLimit('manage', checked),
-    open: (checked) => resolveToken('manage', checked),
+    open: (checked) => resolveManageToken(checked),
   });
 }
 

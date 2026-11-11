@@ -6,6 +6,7 @@ import {
   type ConfirmationDecision,
   guestConfirmationData,
   hostBookingNoticeData,
+  hostNoticeDecision,
   reminderDecision,
   sessionReminderData,
 } from '@/lib/bookingEmails';
@@ -110,12 +111,13 @@ export async function sendHostBookingNotice({
     logger.info('booking email skipped', { jobId, reason: 'cancelled' });
     return;
   }
-  if (order.hostNotificationEmail === null) {
+  const notice = hostNoticeDecision(order);
+  if (notice.kind === 'refuse') {
     throw new BookingEmailError('the host has no notification address');
   }
   await sendEmail({
     template: 'host-booking-notice',
-    to: order.hostNotificationEmail,
+    to: notice.to,
     data: hostBookingNoticeData(order.source),
     idempotencyKey: bookingEmailKey('host-booking-notice', payload.orderId),
   });

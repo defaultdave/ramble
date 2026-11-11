@@ -64,6 +64,19 @@ export async function lockClientAddress(
 }
 
 /**
+ * The session and hold an order points at, read without a lock, for the paths that start from an
+ * order and take the locks in their order afterwards. Null when there is no such order; either id
+ * is null for an order that is not a booking.
+ */
+export async function readOrderLockIds(tx: Transaction, orderId: string) {
+  const [row] = await tx
+    .select({ holdId: orders.holdId, sessionId: orders.sessionId })
+    .from(orders)
+    .where(eq(orders.id, orderId));
+  return row ?? null;
+}
+
+/**
  * Lock 2. The session row, with what the hold and payment paths need to know about its experience:
  * the owner (for the capacity editor's check), the status a guest may book, the tax treatment,
  * the age and waiver rules, and the cancellation tier. Undefined when there is no such session.

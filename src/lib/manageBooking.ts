@@ -1,8 +1,8 @@
+import { z } from 'zod';
 import type { AlertTone } from './alertTone';
 import {
   bookingSummaryData,
   cancellationRefundLine,
-  refundArrivalLine,
   type BookingEmailSource,
   type BookingSummaryData,
 } from './bookingEmails';
@@ -16,6 +16,7 @@ import {
   type CancelQuote,
   type RefundBasis,
 } from './cancelBooking';
+import { parseSingle } from './filters';
 import { formatMoney } from './money';
 import {
   rateLimitPolicies,
@@ -32,6 +33,8 @@ import { zonedDeadlineLabel } from './zonedLabels';
 
 export type ManageBooking = BookingSummaryData & {
   totalLabel: string;
+  giftAppliedLabel: string;
+  chargedLabel: string;
   /** "Saturday, November 7, 2026 · 4:00 PM EST · 3 guests". */
   metaLine: string;
   /** "Confirmation RMB-A3K7MN · with Harbor Light Sailing". */
@@ -69,6 +72,8 @@ function manageBooking(source: BookingEmailSource): ManageBooking {
   return {
     ...summary,
     totalLabel: 'Total charged',
+    giftAppliedLabel: 'Paid with your gift',
+    chargedLabel: 'Charged to your card',
     metaLine: `${summary.dayLabel} · ${summary.timeLabel} · ${summary.partyLabel}`,
     referenceLine: `Confirmation ${summary.reference} · with ${summary.hostName}`,
     meetingLine:
@@ -118,12 +123,12 @@ function cancelPrompt(
       ? `Your booking will be cancelled and ${formatMoney(refundMinor)} goes back to your card. This cannot be undone.`
       : 'Your booking will be cancelled and nothing will be refunded. This cannot be undone.',
     keepLabel: 'Keep my booking',
-    footnote: refunded ? refundArrivalLine : null,
+    footnote: refundEtaLine(refundMinor),
   };
 }
 
 /** The page for a booking, judged at `now` (the database's clock). */
-export function manageView(
+function manageView(
   source: BookingEmailSource,
   facts: CancelFacts,
   now: Date,
@@ -237,9 +242,6 @@ function isNoticeCode(value: string): value is CancelNoticeCode {
 }
 
 /** The first value of a query key, only when it is one string: an array or nothing is nothing. */
-function single(value: string | string[] | undefined): string | null {
-  return typeof value === 'string' ? value : null;
-}
 
 export type ManageQuery = {
   confirm?: string | string[];
@@ -251,9 +253,9 @@ function parseManageQuery(query: ManageQuery): {
   confirming: boolean;
   code: CancelNoticeCode | null;
 } {
-  const result = single(query.result);
+  const result = parseSingle(query.result, z.string());
   return {
-    confirming: single(query.confirm) === '1',
+    confirming: parseSingle(query.confirm, z.string()) === '1',
     code: result !== null && isNoticeCode(result) ? result : null,
   };
 }

@@ -46,8 +46,7 @@ export async function cancelBooking(
   const gate = await openManageToken(parsed.input.manageToken);
   if (gate.kind === 'refused') return gate.refusal;
   return cancelBookingOrder({
-    orderId: gate.row.id,
-    openedTokenVersion: gate.row.version,
+    token: gate.row,
     expectedRefundMinor: parsed.input.expectedRefundMinor,
   });
 }

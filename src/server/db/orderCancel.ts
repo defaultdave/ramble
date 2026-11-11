@@ -8,22 +8,28 @@ import {
   cancelRefundReason,
   cancellationAuditEntry,
   giftReinstated,
-  isBookingRow,
-  missingOrderResult,
+  cancelCacheChanges,
+  cancelStart,
   reconcileReadLimit,
   refundEtaLine,
   refundRequestOutcome,
   refundsReconcileWithin,
-  returnsSpaces,
   type CancelBookingResult,
   type CancelOrderInput,
 } from '@/lib/cancelBooking';
+import type { CapabilityTokenKind } from '@/lib/capabilityTokens';
 import { requireOrderTransition } from '@/lib/providerEvents';
 import { revalidateTagsForChanges } from '@/server/cache/invalidate';
 import { enqueue } from '@/server/jobs/enqueue';
 import { db, type Transaction } from './client';
 import { writeAudit } from './audit';
-import { lockHoldRow, lockOrderById, lockSessionRow } from './locks';
+import {
+  lockHoldRow,
+  lockOrderById,
+  lockSessionRow,
+  readOrderLockIds,
+} from './locks';
+import type { ResolvedManageToken } from './orderTokens';
 import { readCancelFacts } from './ordersCancelFacts';
 import { orders, refunds, sessions } from './schema';
 import { requestRefund } from './refunds';
@@ -33,19 +39,6 @@ import { readDatabaseTime } from './time';
 // gives, whether it is what the guest saw, what a refusal answers, whether the refunds reconcile)
 // is a function in `src/lib/cancelBooking.ts`; this file locks, reads, writes, and executes what
 // those say.
-
-/** The ids the locks are taken from, read without a lock: the order's session and hold. */
-async function readLockIds(
-  orderId: string,
-): Promise<{ sessionId: string; holdId: string } | null> {
-  const [row] = await db
-    .select({ sessionId: orders.sessionId, holdId: orders.holdId })
-    .from(orders)
-    .where(eq(orders.id, orderId));
-  return row && isBookingRow(row)
-    ? { sessionId: row.sessionId, holdId: row.holdId }
-    : null;
-}
 
 /** The standing refunds reconcile with the order's totals (design doc 4.2.3), or the cancellation rolls back. */
 async function requireRefundsReconcile(
@@ -83,22 +76,27 @@ type Cancelled = { result: CancelBookingResult; sessionId: string | null };
 
 async function cancelInTransaction(
   tx: Transaction,
-  input: CancelOrderInput & { sessionId: string; holdId: string },
+  input: CancelOrderInput & { tokenKind: CapabilityTokenKind },
 ): Promise<Cancelled> {
+  const start = cancelStart({
+    tokenKind: input.tokenKind,
+    ids: await readOrderLockIds(tx, input.orderId),
+  });
+  if (start.kind === 'stop') return { result: start.result, sessionId: null };
+  const { sessionId } = start;
   // Lock order: session, hold, order (db/locks.ts); `requestRefund` takes the order's lock again.
-  await lockSessionRow(tx, input.sessionId);
-  await lockHoldRow(tx, input.holdId);
+  await lockSessionRow(tx, sessionId);
+  await lockHoldRow(tx, start.holdId);
   await lockOrderById(tx, input.orderId);
   const found = await readCancelFacts(tx, input.orderId);
-  if (found === null) return { result: missingOrderResult, sessionId: null };
-  const { facts, sessionId } = found;
   const plan = cancelPlan({
-    facts,
+    facts: found?.facts ?? null,
     openedTokenVersion: input.openedTokenVersion,
     expectedRefundMinor: input.expectedRefundMinor,
     now: await readDatabaseTime(tx),
   });
   if (plan.kind === 'stop') return { result: plan.result, sessionId: null };
+  const { facts } = plan;
 
   let refundId: string | null = null;
   if (plan.requestsRefund) {
@@ -171,23 +169,25 @@ async function cancelInTransaction(
 }
 
 /**
- * Cancels the booking a manage token opened, as the system: the token is the guest's right and the
- * caller has already checked it. The order is judged again under the session, hold, and order
- * locks, so a cancellation that lost a race to another one answers `already_cancelled` and writes
- * nothing. A refusal writes nothing at all. The refund request, the order, the spaces, the audit
- * row, and the email jobs commit together or not at all.
+ * Cancels the booking a manage token opened, as the system: the token is the guest's right, and the
+ * only way to hold one here is `resolveManageToken`, so the order and the version it was opened at
+ * come from it and not from the caller. The order is judged again under the session, hold, and
+ * order locks, so a cancellation that lost a race to another one answers `already_cancelled` and
+ * writes nothing. A refusal writes nothing at all. The refund request, the order, the spaces, the
+ * audit row, and the email jobs commit together or not at all.
  */
-export async function cancelBookingOrder(
-  input: CancelOrderInput,
-): Promise<CancelBookingResult> {
-  const parsed = CancelOrderInputSchema.parse(input);
-  const ids = await readLockIds(parsed.orderId);
-  if (ids === null) return missingOrderResult;
+export async function cancelBookingOrder(input: {
+  token: ResolvedManageToken;
+  expectedRefundMinor: number;
+}): Promise<CancelBookingResult> {
+  const parsed = CancelOrderInputSchema.parse({
+    orderId: input.token.id,
+    openedTokenVersion: input.token.version,
+    expectedRefundMinor: input.expectedRefundMinor,
+  });
   const { result, sessionId } = await db.transaction((tx) =>
-    cancelInTransaction(tx, { ...parsed, ...ids }),
+    cancelInTransaction(tx, { ...parsed, tokenKind: input.token.kind }),
   );
-  if (sessionId !== null && returnsSpaces(result)) {
-    revalidateTagsForChanges([{ kind: 'spaces', sessionId }]);
-  }
+  revalidateTagsForChanges(cancelCacheChanges(result, sessionId));
   return result;
 }

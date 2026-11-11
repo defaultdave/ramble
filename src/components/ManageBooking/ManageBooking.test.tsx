@@ -1,13 +1,10 @@
 import '@testing-library/jest-dom/vitest';
+import { manageViewOf } from '@/lib/manageBooking.fixtures';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { orderA, orderB } from '@/lib/bookingEmails.fixtures';
 import type { CancelFacts } from '@/lib/cancelBooking';
-import {
-  managePageState,
-  manageView,
-  type ManageQuery,
-} from '@/lib/manageBooking';
+import { managePageState, type ManageQuery } from '@/lib/manageBooking';
 import {
   ManageBooking,
   ManageTooManyTries,
@@ -54,7 +51,7 @@ beforeEach(() => {
 });
 
 function renderPage(
-  view = manageView(orderA, facts, before),
+  view = manageViewOf(orderA, facts, before),
   query: ManageQuery = {},
 ) {
   const props: ManageBookingProps = {
@@ -99,7 +96,7 @@ describe('the first step', () => {
 
   it('shows a gift split for a booking paid with a gift', () => {
     renderPage(
-      manageView(
+      manageViewOf(
         orderB,
         {
           ...facts,
@@ -121,7 +118,7 @@ describe('the first step', () => {
   });
 
   it('offers a cancel with no refund after the window', () => {
-    renderPage(manageView(orderA, facts, new Date('2026-11-06T22:00:00Z')));
+    renderPage(manageViewOf(orderA, facts, new Date('2026-11-06T22:00:00Z')));
 
     expect(
       screen.getByRole('link', { name: 'Cancel without a refund' }),
@@ -172,7 +169,7 @@ describe('the second step', () => {
 
   it('posts a refund of 0 for a cancel with no refund', () => {
     const { container } = renderPage(
-      manageView(orderA, facts, new Date('2026-11-06T22:00:00Z')),
+      manageViewOf(orderA, facts, new Date('2026-11-06T22:00:00Z')),
       { confirm: '1' },
     );
 
@@ -188,7 +185,7 @@ describe('the notice', () => {
     ['cancelled', 'status'],
     ['refund_unavailable', 'alert'],
   ] as const)('shows the answer %s with its role', (code, role) => {
-    const cancelled = manageView(
+    const cancelled = manageViewOf(
       { ...orderA, status: 'cancelled' },
       {
         ...facts,
@@ -206,7 +203,7 @@ describe('the notice', () => {
 
   it('shows the refund a cancelled booking gave back', () => {
     renderPage(
-      manageView(
+      manageViewOf(
         { ...orderA, status: 'cancelled' },
         {
           ...facts,
@@ -236,7 +233,7 @@ describe('the notice', () => {
 describe('a booking that cannot be cancelled', () => {
   it('shows a cancelled booking with nothing to press and other experiences to explore', () => {
     renderPage(
-      manageView(
+      manageViewOf(
         { ...orderA, status: 'cancelled' },
         { ...facts, status: 'cancelled' },
         before,
@@ -252,7 +249,7 @@ describe('a booking that cannot be cancelled', () => {
   });
 
   it('shows a booking that has started with nothing to press', () => {
-    renderPage(manageView(orderA, facts, orderA.startsAt));
+    renderPage(manageViewOf(orderA, facts, orderA.startsAt));
 
     expect(
       screen.getByText("This booking can't be cancelled here"),
@@ -262,7 +259,7 @@ describe('a booking that cannot be cancelled', () => {
   });
 
   it('always offers the help center and contact page', () => {
-    renderPage(manageView(orderA, facts, orderA.startsAt));
+    renderPage(manageViewOf(orderA, facts, orderA.startsAt));
 
     expect(screen.getByRole('link', { name: 'help center' })).toHaveAttribute(
       'href',

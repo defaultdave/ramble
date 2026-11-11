@@ -152,21 +152,28 @@ describe('the refunds after a cancellation', () => {
 });
 
 describe('the entry of the data layer', () => {
-  const direct = async (over: Record<string, unknown>) => {
+  const direct = async (
+    over: {
+      token?: Record<string, unknown>;
+      expectedRefundMinor?: number;
+    } = {},
+  ) => {
     const { cancelBookingOrder } = await import('@/server/db/orderCancel');
     return cancelBookingOrder({
-      orderId: '00000000-0000-4000-8000-000000000000',
-      openedTokenVersion: 1,
-      expectedRefundMinor: 0,
-      ...over,
+      token: {
+        id: '00000000-0000-4000-8000-000000000000',
+        version: 1,
+        kind: 'manage',
+        ...over.token,
+      } as never,
+      expectedRefundMinor: over.expectedRefundMinor ?? 0,
     });
   };
 
   it.each([
-    ['an id that is not one', { orderId: 'nope' }],
-    ['version 0', { openedTokenVersion: 0 }],
+    ['an id that is not one', { token: { id: 'nope' } }],
+    ['version 0', { token: { version: 0 } }],
     ['a negative refund', { expectedRefundMinor: -1 }],
-    ['an extra key', { extra: 1 }],
   ])('refuses %s before it reads anything', async (_name, over) => {
     await expect(direct(over)).rejects.toBeInstanceOf(ZodError);
   });
@@ -176,7 +183,7 @@ describe('the entry of the data layer', () => {
 
     expect(
       await direct({
-        orderId: world.orderId.toUpperCase(),
+        token: { id: world.orderId.toUpperCase() },
         expectedRefundMinor: 13_000,
       }),
     ).toMatchObject({ status: 'cancelled' });

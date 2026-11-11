@@ -205,12 +205,77 @@ describe('the time a cancellation is stamped', () => {
   });
 });
 
+describe('a token that is not the one that opened this order', () => {
+  const forged = async (token: Record<string, unknown>, world: CancelWorld) => {
+    const { cancelBookingOrder } = await import('@/server/db/orderCancel');
+    return cancelBookingOrder({
+      token: {
+        id: world.orderId,
+        version: 1,
+        kind: 'manage',
+        ...token,
+      } as never,
+      expectedRefundMinor: 13_000,
+    });
+  };
+
+  it.each([
+    ['a gift token', { kind: 'gift' }],
+    ['an order token', { kind: 'order' }],
+    ['a token from before a bump', { version: 2 }],
+  ])(
+    'refuses %s inside the data layer, and writes nothing',
+    async (_name, token) => {
+      const world = await fresh({ gatewayPayment: true });
+      const before = await cancelSnapshot(world);
+
+      expect(await forged(token, world)).toEqual({ status: 'not_found' });
+
+      expect(await cancelSnapshot(world)).toEqual(before);
+      expect((await orderOf(world)).status).toBe('confirmed');
+    },
+  );
+
+  it('cancels with the token that opened the order', async () => {
+    const world = await fresh({ gatewayPayment: true });
+
+    expect(await forged({}, world)).toMatchObject({ status: 'cancelled' });
+  });
+});
+
+describe('the lock ids of an order', () => {
+  const read = async (orderId: string) => {
+    const { readOrderLockIds } = await import('@/server/db/locks');
+    return client.db.transaction((tx) => readOrderLockIds(tx, orderId));
+  };
+
+  it('are the session and hold of a booking', async () => {
+    const world = await fresh();
+
+    expect(await read(world.orderId)).toEqual({
+      sessionId: world.sessionId,
+      holdId: world.holdId,
+    });
+  });
+
+  it('are null ids for an order that is not a booking, and null for no order', async () => {
+    const gift = await seedBooking(client.db, getParents(), {
+      orderKind: 'gift_purchase',
+    });
+
+    expect(await read(gift.orderId)).toEqual({
+      sessionId: null,
+      holdId: null,
+    });
+    expect(await read(randomUUID())).toBeNull();
+  });
+});
+
 describe('an order that is not a booking to cancel', () => {
   const direct = async (orderId: string) => {
     const { cancelBookingOrder } = await import('@/server/db/orderCancel');
     return cancelBookingOrder({
-      orderId,
-      openedTokenVersion: 1,
+      token: { id: orderId, version: 1, kind: 'manage' } as never,
       expectedRefundMinor: 0,
     });
   };

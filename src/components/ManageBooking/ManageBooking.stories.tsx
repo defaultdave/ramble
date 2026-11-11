@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { manageViewOf } from '@/lib/manageBooking.fixtures';
 import { fn } from 'storybook/test';
 import { orderA, orderB } from '@/lib/bookingEmails.fixtures';
 import type { CancelFacts } from '@/lib/cancelBooking';
 import {
-  manageView,
   managePageState,
   type ManageQuery,
   type ManageView,
@@ -45,7 +45,7 @@ const cancelledFacts: CancelFacts = {
   refundedTaxMinor: 1_912,
   commissionReturnedMinor: 3_225,
 };
-const cancelledView = manageView(
+const cancelledView = manageViewOf(
   { ...orderA, status: 'cancelled' },
   cancelledFacts,
   inWindow,
@@ -64,7 +64,7 @@ function page(view: ManageView, query: ManageQuery = {}): ManageBookingProps {
 const meta = {
   title: 'Pages/ManageBooking',
   component: ManageBooking,
-  args: page(manageView(orderA, facts, inWindow)),
+  args: page(manageViewOf(orderA, facts, inWindow)),
   parameters: {
     a11y: {
       config: {
@@ -88,18 +88,18 @@ export const RefundShownFirstMobile: Story = { parameters: mobile };
 export const RefundShownFirstDesktop: Story = { parameters: desktop };
 
 export const ConfirmStep: Story = {
-  args: page(manageView(orderA, facts, inWindow), { confirm: '1' }),
+  args: page(manageViewOf(orderA, facts, inWindow), { confirm: '1' }),
   parameters: mobile,
 };
 
 export const NoRefundAfterTheWindow: Story = {
-  args: page(manageView(orderA, facts, afterWindow)),
+  args: page(manageViewOf(orderA, facts, afterWindow)),
   parameters: mobile,
 };
 
 export const PaidWithAGift: Story = {
   args: page(
-    manageView(
+    manageViewOf(
       orderB,
       {
         ...facts,
@@ -123,7 +123,7 @@ export const Cancelled: Story = {
 };
 
 export const SessionStarted: Story = {
-  args: page(manageView(orderA, facts, orderA.startsAt)),
+  args: page(manageViewOf(orderA, facts, orderA.startsAt)),
   parameters: mobile,
 };
 
@@ -133,19 +133,21 @@ export const JustCancelled: Story = {
 };
 
 export const RefundChanged: Story = {
-  args: page(manageView(orderA, facts, inWindow), { result: 'terms_changed' }),
+  args: page(manageViewOf(orderA, facts, inWindow), {
+    result: 'terms_changed',
+  }),
   parameters: mobile,
 };
 
 export const RefundCouldNotStart: Story = {
-  args: page(manageView(orderA, facts, inWindow), {
+  args: page(manageViewOf(orderA, facts, inWindow), {
     result: 'refund_unavailable',
   }),
   parameters: mobile,
 };
 
 export const TooManyTriesWhileCancelling: Story = {
-  args: page(manageView(orderA, facts, inWindow), { result: 'rate_limited' }),
+  args: page(manageViewOf(orderA, facts, inWindow), { result: 'rate_limited' }),
   parameters: mobile,
 };
 

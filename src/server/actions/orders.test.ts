@@ -2,10 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cancelBooking, cancelBookingForm } from './orders';
 
 const consumeRateLimit = vi.hoisted(() => vi.fn());
-const resolveToken = vi.hoisted(() => vi.fn());
+const resolveManageToken = vi.hoisted(() => vi.fn());
 const cancelBookingOrder = vi.hoisted(() => vi.fn());
 vi.mock('@/server/ports/rate-limit', () => ({ consumeRateLimit }));
-vi.mock('@/server/tokens', () => ({ resolveToken }));
+vi.mock('@/server/tokens', () => ({ resolveManageToken }));
 vi.mock('@/server/db/orderCancel', () => ({ cancelBookingOrder }));
 const redirect = vi.hoisted(() =>
   vi.fn((path: string): never => {
@@ -33,6 +33,7 @@ vi.mock('@/server/orderConfirmation', () => ({ readOrderState: vi.fn() }));
 // - a form answered by the limit or a dead link still lands on the page, carrying that answer
 
 const token = 'A'.repeat(43);
+const resolved = { id: 'order-1', version: 3, kind: 'manage' };
 const input = { manageToken: token, expectedRefundMinor: 13_000 };
 
 beforeEach(() => {
@@ -44,7 +45,7 @@ beforeEach(() => {
     throw new Error('not-found');
   });
   consumeRateLimit.mockResolvedValue({ allowed: true, remaining: 29 });
-  resolveToken.mockResolvedValue({ id: 'order-1', version: 3 });
+  resolveManageToken.mockResolvedValue(resolved);
   cancelBookingOrder.mockResolvedValue({ status: 'already_cancelled' });
 });
 
@@ -57,7 +58,7 @@ describe('cancelBooking', () => {
   ])('answers not found for %s without spending a try', async (_name, bad) => {
     expect(await cancelBooking(bad as never)).toEqual({ status: 'not_found' });
     expect(consumeRateLimit).not.toHaveBeenCalled();
-    expect(resolveToken).not.toHaveBeenCalled();
+    expect(resolveManageToken).not.toHaveBeenCalled();
     expect(cancelBookingOrder).not.toHaveBeenCalled();
   });
 
@@ -66,7 +67,7 @@ describe('cancelBooking', () => {
 
     expect(consumeRateLimit).toHaveBeenCalledWith('manage', token);
     expect(consumeRateLimit.mock.invocationCallOrder[0]).toBeLessThan(
-      resolveToken.mock.invocationCallOrder[0] ?? 0,
+      resolveManageToken.mock.invocationCallOrder[0] ?? 0,
     );
   });
 
@@ -80,15 +81,15 @@ describe('cancelBooking', () => {
       status: 'rate_limited',
       retryAfterSeconds: 90,
     });
-    expect(resolveToken).not.toHaveBeenCalled();
+    expect(resolveManageToken).not.toHaveBeenCalled();
     expect(cancelBookingOrder).not.toHaveBeenCalled();
   });
 
   it('answers not found for a token that opens nothing', async () => {
-    resolveToken.mockResolvedValue(null);
+    resolveManageToken.mockResolvedValue(null);
 
     expect(await cancelBooking(input)).toEqual({ status: 'not_found' });
-    expect(resolveToken).toHaveBeenCalledWith('manage', token);
+    expect(resolveManageToken).toHaveBeenCalledWith(token);
     expect(cancelBookingOrder).not.toHaveBeenCalled();
   });
 
@@ -103,8 +104,7 @@ describe('cancelBooking', () => {
       refundMinor: 0,
     });
     expect(cancelBookingOrder).toHaveBeenCalledExactlyOnceWith({
-      orderId: 'order-1',
-      openedTokenVersion: 3,
+      token: resolved,
       expectedRefundMinor: 13_000,
     });
   });
@@ -117,7 +117,7 @@ describe('cancelBooking', () => {
   });
 
   it('throws when the token lookup fails, and cancels nothing', async () => {
-    resolveToken.mockRejectedValue(new Error('lookup down'));
+    resolveManageToken.mockRejectedValue(new Error('lookup down'));
 
     await expect(cancelBooking(input)).rejects.toThrow('lookup down');
     expect(cancelBookingOrder).not.toHaveBeenCalled();
@@ -144,8 +144,7 @@ describe('cancelBookingForm', () => {
       `redirect:/manage/${token}?result=cancelled`,
     );
     expect(cancelBookingOrder).toHaveBeenCalledExactlyOnceWith({
-      orderId: 'order-1',
-      openedTokenVersion: 3,
+      token: resolved,
       expectedRefundMinor: 13_000,
     });
   });
@@ -174,7 +173,7 @@ describe('cancelBookingForm', () => {
   });
 
   it('carries a dead link back to the page', async () => {
-    resolveToken.mockResolvedValue(null);
+    resolveManageToken.mockResolvedValue(null);
 
     await expect(cancelBookingForm(good)).rejects.toThrow(
       `redirect:/manage/${token}?result=not_found`,

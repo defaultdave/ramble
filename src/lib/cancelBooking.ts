@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { refundArrivalLine } from './bookingEmails';
-import { CapabilityTokenSchema, maxTokenVersion } from './capabilityTokens';
+import type { CacheChange } from './cacheTags';
+import {
+  CapabilityTokenSchema,
+  maxTokenVersion,
+  type CapabilityTokenKind,
+} from './capabilityTokens';
 import { WriteIdSchema } from './catalog';
 import { isWithinFreeWindow } from './cancellation';
 import { orderCancelledBys, orderLimits, type OrderKind } from './orders';
@@ -244,7 +249,13 @@ export function cancellationAuditEntry(input: {
 }
 
 export type CancelPlan =
-  | { kind: 'proceed'; refundMinor: number; requestsRefund: boolean }
+  | {
+      kind: 'proceed';
+      refundMinor: number;
+      requestsRefund: boolean;
+      /** The locked order the plan was made on, for the writes that follow. */
+      facts: CancelFacts;
+    }
   /** Nothing is cancelled: this is the answer. */
   | { kind: 'stop'; result: CancelBookingResult };
 
@@ -254,18 +265,38 @@ export const missingOrderResult = {
 } as const satisfies CancelBookingResult;
 
 /**
- * What the data layer does with the locked order: a refused verdict is its typed answer; otherwise the cancellation goes on, asking for a refund only
+ * Whether a cancellation may start, from the kind of token it was opened with and the lock ids read
+ * for its order: only a manage token cancels, and only an order with a session and a hold behind it.
+ * Anything else is the answer for a missing order, before any lock is taken.
+ */
+export function cancelStart(input: {
+  tokenKind: CapabilityTokenKind;
+  ids: { sessionId: string | null; holdId: string | null } | null;
+}):
+  | { kind: 'lock'; sessionId: string; holdId: string }
+  | { kind: 'stop'; result: CancelBookingResult } {
+  const { ids } = input;
+  if (input.tokenKind !== 'manage' || ids === null || !isBookingRow(ids)) {
+    return { kind: 'stop', result: missingOrderResult };
+  }
+  return { kind: 'lock', sessionId: ids.sessionId, holdId: ids.holdId };
+}
+
+/**
+ * What the data layer does with the locked order (null when it is gone): a missing order or a
+ * refused verdict is its typed answer; otherwise the cancellation goes on, asking for a refund only
  * when one is due. The data layer executes this and decides nothing.
  */
 export function cancelPlan(input: {
-  facts: CancelFacts;
+  facts: CancelFacts | null;
   openedTokenVersion: number;
   expectedRefundMinor: number;
   now: Date;
 }): CancelPlan {
   const { facts, ...rest } = input;
+  if (facts === null) return { kind: 'stop', result: missingOrderResult };
   const verdict = cancelVerdict({ facts, ...rest });
-  if (verdict.kind === 'proceed') return verdict;
+  if (verdict.kind === 'proceed') return { ...verdict, facts };
   return {
     kind: 'stop',
     result: refusalResult(verdict, facts.freeCancelUntil),
@@ -295,8 +326,13 @@ export function refundsReconcileWithin(
 }
 
 /** Only a cancellation that went through returns spaces to sale, so only it invalidates the spaces cache. */
-export function returnsSpaces(result: CancelBookingResult): boolean {
-  return result.status === 'cancelled';
+export function cancelCacheChanges(
+  result: CancelBookingResult,
+  sessionId: string | null,
+): CacheChange[] {
+  return result.status === 'cancelled' && sessionId !== null
+    ? [{ kind: 'spaces', sessionId }]
+    : [];
 }
 
 /** Why a try at a manage link was refused before it reached the order. */

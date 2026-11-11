@@ -192,6 +192,28 @@ describe('what a manage link opens', () => {
   });
 });
 
+describe('the order a manage token resolves to', () => {
+  it('is the order and version, branded as a manage token, and nothing for another kind or a stale link', async () => {
+    const a = await confirmed();
+    const manage = await emailedToken(a);
+
+    expect(await tokens.resolveManageToken(manage)).toEqual({
+      id: a.orderId,
+      version: 1,
+      kind: 'manage',
+    });
+    expect(
+      await tokens.resolveManageToken(
+        tokens.capabilityToken('order', a.orderId, 1),
+      ),
+    ).toBeNull();
+    await client.db.transaction((tx) =>
+      tokens.bumpTokenVersion(tx, 'manage', a.orderId),
+    );
+    expect(await tokens.resolveManageToken(manage)).toBeNull();
+  });
+});
+
 describe('a token that cannot be one', () => {
   it.each(['short', 'A'.repeat(44), `${'A'.repeat(42)}!`, ''])(
     'is not found and spends no try of the manage count (%s)',

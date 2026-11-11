@@ -140,13 +140,13 @@ function BookingCard({ booking }: { booking: ManageBookingDetails }) {
         </div>
         {booking.giftApplied ? (
           <div className={styles.line}>
-            <dt>Paid with your gift</dt>
+            <dt>{booking.giftAppliedLabel}</dt>
             <dd>{booking.giftApplied}</dd>
           </div>
         ) : null}
         {booking.charged ? (
           <div className={styles.line}>
-            <dt>Charged to your card</dt>
+            <dt>{booking.chargedLabel}</dt>
             <dd>{booking.charged}</dd>
           </div>
         ) : null}

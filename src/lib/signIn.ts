@@ -189,8 +189,8 @@ export function signInSentBody(email: string): string {
 }
 
 /** The rate-limited notice's text, naming the wait. */
-export function rateLimitBody(retryAfterMinutes: number): string {
-  const wait = waitMinutesLabel(retryAfterMinutes);
+export function rateLimitBody(minutes: number): string {
+  const wait = waitMinutesLabel(minutes);
   return `Try again in about ${wait}. A link you already have still works until it expires.`;
 }
 

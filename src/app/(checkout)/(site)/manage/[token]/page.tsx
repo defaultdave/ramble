@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { connection } from 'next/server';
 import { ManageBooking, ManageTooManyTries } from '@/components/ManageBooking';
-import { managePageState } from '@/lib/manageBooking';
+import { managePageState, manageScreen } from '@/lib/manageBooking';
 import { cancelBookingForm } from '@/server/actions/orders';
 import { readManagePage } from '@/server/manageBooking';
 
@@ -23,21 +23,15 @@ export default async function ManageBookingPage({
 }: PageProps<'/manage/[token]'>) {
   await connection();
   const [{ token }, query] = await Promise.all([params, searchParams]);
-  const page = await readManagePage(token);
-  if (page.kind === 'refused') {
-    if (page.refusal.status === 'rate_limited') {
-      return (
-        <ManageTooManyTries
-          retryAfterSeconds={page.refusal.retryAfterSeconds}
-        />
-      );
-    }
-    notFound();
+  const screen = manageScreen(await readManagePage(token));
+  if (screen.kind === 'not_found') notFound();
+  if (screen.kind === 'too_many_tries') {
+    return <ManageTooManyTries retryAfterSeconds={screen.retryAfterSeconds} />;
   }
-  const { notice, confirming } = managePageState(page.view, query);
+  const { notice, confirming } = managePageState(screen.view, query);
   return (
     <ManageBooking
-      view={page.view}
+      view={screen.view}
       token={token}
       notice={notice}
       confirming={confirming}

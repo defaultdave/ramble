@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { manageViewOf } from './manageBooking.fixtures';
 import { orderA, orderB } from './bookingEmails.fixtures';
 import { type CancelFacts } from './cancelBooking';
-import { manageReadOutcome } from './manageBooking';
+import { manageReadOutcome, manageScreen } from './manageBooking';
 import {
   cancelNotice,
   cancelResultPath,
@@ -486,5 +486,23 @@ describe('reading the page', () => {
       kind: 'refused',
       refusal: { status: 'not_found' },
     });
+  });
+});
+
+describe('which screen the route renders', () => {
+  it('is the booking page for a page that was read', () => {
+    const view = manageViewOf(orderA, facts, before);
+
+    expect(manageScreen({ kind: 'ok', view })).toEqual({ kind: 'page', view });
+  });
+
+  it.each([
+    [
+      { status: 'rate_limited', retryAfterSeconds: 90 },
+      { kind: 'too_many_tries', retryAfterSeconds: 90 },
+    ],
+    [{ status: 'not_found' }, { kind: 'not_found' }],
+  ] as const)('maps the refusal %o to the screen %o', (refusal, screen) => {
+    expect(manageScreen({ kind: 'refused', refusal })).toEqual(screen);
   });
 });

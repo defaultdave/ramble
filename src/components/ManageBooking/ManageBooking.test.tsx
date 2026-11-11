@@ -127,6 +127,34 @@ describe('the first step', () => {
   });
 });
 
+describe('the labels of a gift split', () => {
+  it('shows the labels the view carries, not its own', () => {
+    const view = manageViewOf(
+      orderB,
+      {
+        ...facts,
+        amountDueMinor: 5_500,
+        giftAppliedMinor: 4_000,
+        sessionStartsAt: orderB.startsAt,
+        freeCancelUntil: orderB.freeCancelUntil,
+      },
+      before,
+    );
+    renderPage({
+      ...view,
+      booking: {
+        ...view.booking,
+        giftAppliedLabel: 'Gift used',
+        chargedLabel: 'On your card',
+      },
+    });
+
+    expect(screen.getByText('Gift used')).toBeVisible();
+    expect(screen.getByText('On your card')).toBeVisible();
+    expect(screen.queryByText('Paid with your gift')).toBeNull();
+  });
+});
+
 describe('the second step', () => {
   it('says the refund again, and posts the token and the refund that was shown', () => {
     const { container } = renderPage(undefined, { confirm: '1' });

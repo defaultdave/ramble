@@ -241,8 +241,6 @@ function isNoticeCode(value: string): value is CancelNoticeCode {
   return (cancelNoticeCodes as readonly string[]).includes(value);
 }
 
-/** The first value of a query key, only when it is one string: an array or nothing is nothing. */
-
 export type ManageQuery = {
   confirm?: string | string[];
   result?: string | string[];
@@ -312,6 +310,23 @@ export function cancelResultPath(
 /** What reading the manage page found: the page for the booking, or the refusal that says no more than "not found". */
 export type ManageReadOutcome =
   { kind: 'ok'; view: ManageView } | { kind: 'refused'; refusal: GateRefusal };
+
+/** What the route renders: the booking's page, the too-many-tries page, or the not-found page. */
+export type ManageScreen =
+  | { kind: 'page'; view: ManageView }
+  | { kind: 'too_many_tries'; retryAfterSeconds: number }
+  | { kind: 'not_found' };
+
+/** The screen for what reading the page found: every refusal maps to its own page, so the route only switches on the kind. */
+export function manageScreen(outcome: ManageReadOutcome): ManageScreen {
+  if (outcome.kind === 'ok') return { kind: 'page', view: outcome.view };
+  return outcome.refusal.status === 'rate_limited'
+    ? {
+        kind: 'too_many_tries',
+        retryAfterSeconds: outcome.refusal.retryAfterSeconds,
+      }
+    : { kind: 'not_found' };
+}
 
 /**
  * The page for what the data layer read: an order and a booking behind it, judged at `now`. Either

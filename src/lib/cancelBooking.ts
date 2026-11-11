@@ -8,10 +8,11 @@ import {
 } from './capabilityTokens';
 import { WriteIdSchema } from './catalog';
 import { isWithinFreeWindow } from './cancellation';
-import { orderCancelledBys, orderLimits, type OrderKind } from './orders';
+import { orderCancelledBys, type OrderKind } from './orders';
 import type { RateLimitDecision } from './rateLimits';
 import {
   planRefund,
+  RefundMinorSchema,
   refundsReconcile,
   type RefundableOrder,
   type RefundRequestRefusal,
@@ -29,7 +30,7 @@ export const cancelRefundKey = 'guest-cancel';
 const CancelBookingInputSchema = z.strictObject({
   manageToken: CapabilityTokenSchema,
   /** The refund the guest was shown, in minor units. */
-  expectedRefundMinor: z.int().min(0).max(orderLimits.maxMinor),
+  expectedRefundMinor: RefundMinorSchema,
 });
 export type CancelBookingInput = z.input<typeof CancelBookingInputSchema>;
 
@@ -37,7 +38,7 @@ export type CancelBookingInput = z.input<typeof CancelBookingInputSchema>;
 export const CancelOrderInputSchema = z.strictObject({
   orderId: WriteIdSchema,
   openedTokenVersion: z.int().min(1).max(maxTokenVersion),
-  expectedRefundMinor: z.int().min(0).max(orderLimits.maxMinor),
+  expectedRefundMinor: RefundMinorSchema,
 });
 export type CancelOrderInput = z.input<typeof CancelOrderInputSchema>;
 
@@ -412,7 +413,7 @@ export const GuestCancellationPayloadSchema = z.strictObject({
   orderId: WriteIdSchema,
   cancelledBy: z.enum(orderCancelledBys),
   /** What the guest gets back, as the cancellation decided it. */
-  refundMinor: z.int().min(0).max(orderLimits.maxMinor),
+  refundMinor: RefundMinorSchema,
 });
 
 export const HostCancellationPayloadSchema = z.strictObject({

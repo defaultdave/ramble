@@ -123,16 +123,17 @@ function refundRuleIssues(refund: RefundRuleFields): RuleIssue[] {
   return issues;
 }
 
-const refundMinor = z.int().min(0).max(orderLimits.maxMinor);
+/** A refund amount, in minor units: a whole number from 0 to the most an order can hold. */
+export const RefundMinorSchema = z.int().min(0).max(orderLimits.maxMinor);
 
 export const RefundSchema = z
   .object({
     id: EntityIdSchema,
     orderId: EntityIdSchema,
     paymentAttemptId: EntityIdSchema.nullable(),
-    ticketMinor: refundMinor,
-    taxMinor: refundMinor,
-    commissionReturnedMinor: refundMinor,
+    ticketMinor: RefundMinorSchema,
+    taxMinor: RefundMinorSchema,
+    commissionReturnedMinor: RefundMinorSchema,
     amountMinor: z.int().min(1).max(orderLimits.maxMinor),
     reason: z.enum(refundReasons),
     initiatedBy: EntityIdSchema.nullable(),

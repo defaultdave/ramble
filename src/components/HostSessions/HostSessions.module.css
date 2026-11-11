@@ -1,0 +1,111 @@
+/* Lines up under PageHeading: the same column, gutter, and type. */
+.sections {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, var(--size-content-max));
+  justify-content: center;
+  gap: var(--space-8);
+  padding: 0 var(--size-gutter) var(--space-8);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  color: var(--color-text-primary);
+}
+
+.weekNav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.week {
+  flex-basis: 100%;
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+}
+
+.heading {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-heading-m);
+  line-height: var(--font-line-height-heading-m);
+  font-weight: var(--font-weight-semibold);
+}
+
+.day {
+  margin: var(--space-4) 0 0;
+  font-size: var(--font-size-body-m);
+  font-weight: var(--font-weight-semibold);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-block: var(--space-3);
+  border-block-end: 1px solid var(--color-border-default);
+}
+
+.row p,
+.secondary,
+.note {
+  margin: 0;
+}
+
+.primary {
+  font-weight: var(--font-weight-semibold);
+}
+
+.secondary,
+.note {
+  font-size: var(--font-size-body-s);
+  line-height: var(--font-line-height-body-s);
+  color: var(--color-text-secondary);
+}
+
+.empty {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.edit {
+  margin-block-start: var(--space-2);
+}
+
+.edit summary {
+  cursor: pointer;
+  font-weight: var(--font-weight-semibold);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 28rem;
+  margin-block-start: var(--space-3);
+}
+
+.notice {
+  max-width: 28rem;
+}
+
+.notice:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: calc(var(--space-1) / 2);
+  border-radius: var(--radius-md);
+}
+
+@media (min-width: 768px) {
+  .form > button {
+    align-self: flex-start;
+  }
+}

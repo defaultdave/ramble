@@ -1,7 +1,9 @@
 import { AccountControl } from '@/components/Header/AccountControl';
+import { ButtonLink } from '@/components/Button';
 import { PageHeading } from '@/components/PageHeading';
 import { classNames } from '@/lib/classNames';
 import { soldFillStep } from '@/lib/hostDashboard';
+import { hostSessionsPath } from '@/lib/hostSessions';
 import type {
   HostBookingRowView,
   HostDashboardView,
@@ -58,6 +60,9 @@ export function HostDashboard({ view }: { view: HostDashboardView }) {
         <AccountControl signedIn />
       </PageHeading>
       <div className={styles.sections}>
+        <ButtonLink href={hostSessionsPath} variant="secondary">
+          Manage sessions
+        </ButtonLink>
         <section aria-labelledby="host-upcoming">
           <h2 id="host-upcoming" className={styles.heading}>
             Upcoming sessions

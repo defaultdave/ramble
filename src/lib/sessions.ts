@@ -5,8 +5,9 @@ import {
   toZoned,
 } from '@internationalized/date';
 import { z } from 'zod';
-import { EntityIdSchema } from './catalog';
-import { isoDateOf, msPerDay } from './time';
+import { EntityIdSchema, priceKinds } from './catalog';
+import { MAX_UNIT_PRICE_MINOR } from './pricing';
+import { calendarDateFormat, isoDateOf, msPerDay } from './time';
 
 export const sessionSources = ['ramble', 'allocation', 'external'] as const;
 
@@ -354,4 +355,99 @@ export function splitUpcoming(
 /** Of the dates a call tried to write, how many already had a session. */
 export function countAlreadyExisted(attempted: number, inserted: number) {
   return attempted - inserted;
+}
+
+export const UpdateSessionTimeInputSchema = z.object({
+  sessionId: EntityIdSchema,
+  /** HH:MM on the session's own date, in the host's time zone. */
+  startTime: WallTimeInputSchema,
+  durationMinutes: z.int().min(1).max(maxSessionMinutes),
+  expectedVersion: z.int().min(1),
+});
+export type UpdateSessionTimeInput = z.input<
+  typeof UpdateSessionTimeInputSchema
+>;
+
+export const CancelSessionInputSchema = z.object({
+  sessionId: EntityIdSchema,
+  expectedVersion: z.int().min(1),
+});
+export type CancelSessionInput = z.input<typeof CancelSessionInputSchema>;
+
+export const UpdateSessionPriceInputSchema = z.object({
+  sessionId: EntityIdSchema,
+  kind: z.enum(priceKinds),
+  priceMinor: z.int().min(0).max(MAX_UNIT_PRICE_MINOR),
+});
+export type UpdateSessionPriceInput = z.input<
+  typeof UpdateSessionPriceInputSchema
+>;
+
+export const AddOneOffSessionInputSchema = z.object({
+  experienceId: EntityIdSchema,
+  localDate: IsoDateSchema,
+  startTime: WallTimeInputSchema,
+  durationMinutes: z.int().min(1).max(maxSessionMinutes),
+  allocation: AllocationSchema.min(1),
+});
+export type AddOneOffSessionInput = z.input<typeof AddOneOffSessionInputSchema>;
+
+export type UnbookedCheck =
+  | { ok: true }
+  | {
+      ok: false;
+      reason: 'has_bookings' | 'has_holds';
+      seatsSold: number;
+      heldSeats: number;
+    };
+
+/**
+ * A session's time moves, or it is cancelled, only while nobody has a claim on it (PRD-41: a change
+ * to a booked session runs the cancellation flow, which this does not). An open hold is a guest
+ * partway through paying, so it counts as a claim until it lapses.
+ */
+export function checkUnbooked(
+  seatsSold: number,
+  heldSeats: number,
+): UnbookedCheck {
+  if (seatsSold > 0) {
+    return { ok: false, reason: 'has_bookings', seatsSold, heldSeats };
+  }
+  return heldSeats > 0
+    ? { ok: false, reason: 'has_holds', seatsSold, heldSeats }
+    : { ok: true };
+}
+
+/** A session that has started, or starts at this instant, is not edited. */
+export function isUpcoming(startsAt: Date, now: Date): boolean {
+  return startsAt.getTime() > now.getTime();
+}
+
+/**
+ * The one occurrence on `localDate` at `startTime` in `timeZone`, for an edit or a one-off date.
+ * It reads the date's weekday itself, so the DST rules are the ones the generator applies.
+ */
+export function occurrenceOn(
+  localDate: string,
+  startTime: string,
+  durationMinutes: number,
+  timeZone: string,
+): Occurrence {
+  const [occurrence] = occurrencesBetween(
+    {
+      weekday: getDayOfWeek(parseLocalDate(localDate), 'en-US'),
+      startTime,
+      durationMinutes,
+    },
+    timeZone,
+    localDate,
+    localDate,
+  );
+  if (!occurrence) throw new RangeError('A date has an occurrence on itself');
+  return occurrence;
+}
+
+/** The date `instant` falls on in `timeZone`, as the session's own calendar names it. */
+export function localDateIn(instant: Date, timeZone: string): string {
+  return calendarDateFormat(timeZone).format(instant);
 }

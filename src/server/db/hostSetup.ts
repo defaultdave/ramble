@@ -10,6 +10,8 @@ import {
 import {
   buildHostDetail,
   buildHostListRows,
+  agreementRefusal,
+  isSlugTakenError,
   changedHostFields,
   hostAgreementDoc,
   hostsPageSize,
@@ -44,7 +46,8 @@ class AgreementRefusal extends Error {
 
 export type CreateHostResult =
   | { status: 'created'; hostId: string; ownerUserId: string }
-  | { status: 'agreement_refused'; reason: 'stale' | 'no_current_document' };
+  | { status: 'agreement_refused'; reason: 'stale' | 'no_current_document' }
+  | { status: 'slug_taken' };
 
 /**
  * Makes the host, its owner account (found by address, or made with the address marked
@@ -94,9 +97,8 @@ export async function createHost(
           host.id,
           input.acceptedLegalDocumentId,
         );
-        if (outcome === 'stale' || outcome === 'no_current_document') {
-          throw new AgreementRefusal(outcome);
-        }
+        const refusal = agreementRefusal(outcome);
+        if (refusal !== null) throw new AgreementRefusal(refusal);
       }
       return {
         status: 'created' as const,
@@ -108,12 +110,13 @@ export async function createHost(
     if (error instanceof AgreementRefusal) {
       return { status: 'agreement_refused', reason: error.outcome };
     }
+    if (isSlugTakenError(error)) return { status: 'slug_taken' };
     throw error;
   }
 }
 
 export type UpdateHostResult =
-  { status: 'updated' | 'unchanged' } | { status: 'not_found' };
+  { status: 'updated' | 'unchanged' | 'slug_taken' } | { status: 'not_found' };
 
 /** Saves the host's editable fields. Nothing differing writes nothing, audit row included. */
 export async function updateHost(
@@ -122,28 +125,33 @@ export async function updateHost(
   input: HostInput,
 ): Promise<UpdateHostResult> {
   const userId = requireOpsUserId(caller);
-  return db.transaction(async (tx) => {
-    const [current] = await tx
-      .select()
-      .from(hosts)
-      .where(eq(hosts.id, hostId))
-      .for('update');
-    if (!current) return { status: 'not_found' } as const;
-    const changed = changedHostFields(
-      {
-        name: current.name,
-        slug: current.slug,
-        description: current.description,
-        timeZone: current.timeZone,
-        notificationEmail: current.notificationEmail,
-      },
-      input,
-    );
-    if (changed.length === 0) return { status: 'unchanged' } as const;
-    await tx.update(hosts).set(input).where(eq(hosts.id, hostId));
-    await writeAudit(tx, hostUpdatedEntry(userId, hostId, changed));
-    return { status: 'updated' } as const;
-  });
+  try {
+    return await db.transaction(async (tx) => {
+      const [current] = await tx
+        .select()
+        .from(hosts)
+        .where(eq(hosts.id, hostId))
+        .for('update');
+      if (!current) return { status: 'not_found' } as const;
+      const changed = changedHostFields(
+        {
+          name: current.name,
+          slug: current.slug,
+          description: current.description,
+          timeZone: current.timeZone,
+          notificationEmail: current.notificationEmail,
+        },
+        input,
+      );
+      if (changed.length === 0) return { status: 'unchanged' } as const;
+      await tx.update(hosts).set(input).where(eq(hosts.id, hostId));
+      await writeAudit(tx, hostUpdatedEntry(userId, hostId, changed));
+      return { status: 'updated' } as const;
+    });
+  } catch (error) {
+    if (isSlugTakenError(error)) return { status: 'slug_taken' };
+    throw error;
+  }
 }
 
 export type HostsPage = { rows: HostListRow[]; nextCursor: string | null };

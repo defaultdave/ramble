@@ -1,7 +1,11 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { HostDetail, HostListRow } from '@/lib/hostSetup';
+import {
+  buildHostDetail,
+  type HostDetail,
+  type HostListRow,
+} from '@/lib/hostSetup';
 import { HostDetailView } from './HostDetailView';
 import { HostForm } from './HostForm';
 import { HostNotice } from './HostNotice';
@@ -30,18 +34,31 @@ const host = {
   notificationEmail: 'bookings@example.com',
 };
 
-const detail = (overrides: Partial<HostDetail> = {}): HostDetail => ({
-  host,
-  owners: [
-    {
-      userId: '1a1e2d3c-4b5a-4697-8a9b-0c1d2e3f4a5b',
-      email: 'owner@example.com',
-    },
-  ],
-  agreement,
-  acceptances: [],
-  ...overrides,
-});
+const owners = [
+  {
+    userId: '1a1e2d3c-4b5a-4697-8a9b-0c1d2e3f4a5b',
+    email: 'owner@example.com',
+  },
+];
+
+const detail = (
+  overrides: Partial<
+    Pick<HostDetail, 'owners' | 'agreement' | 'acceptances'>
+  > = {},
+): HostDetail =>
+  buildHostDetail({
+    host,
+    owners: (overrides.owners ?? owners).map((owner) => ({
+      ...owner,
+      hostId: host.id,
+    })),
+    acceptances: (overrides.acceptances ?? []).map((record) => ({
+      ...record,
+      hostId: host.id,
+    })),
+    agreement:
+      overrides.agreement === undefined ? agreement : overrides.agreement,
+  });
 
 const actions = { save: noop, accept: noop, resendInvite: noop };
 
@@ -187,10 +204,12 @@ describe('HostDetailView', () => {
       <HostDetailView detail={detail()} problems={[]} actions={actions} />,
     );
 
-    const owners = screen.getByRole('region', { name: 'Owners' });
-    expect(within(owners).getByText('owner@example.com')).toBeInTheDocument();
+    const ownersRegion = screen.getByRole('region', { name: 'Owners' });
     expect(
-      within(owners).getByRole('button', { name: 'Send a sign-in link' }),
+      within(ownersRegion).getByText('owner@example.com'),
+    ).toBeInTheDocument();
+    expect(
+      within(ownersRegion).getByRole('button', { name: 'Send a sign-in link' }),
     ).toBeInTheDocument();
     expect(container.querySelector('input[name="ownerUserId"]')).toHaveValue(
       '1a1e2d3c-4b5a-4697-8a9b-0c1d2e3f4a5b',

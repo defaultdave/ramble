@@ -5,7 +5,6 @@ import {
   acceptanceLabels,
   acceptanceRecordLabel,
   acceptanceTones,
-  hostAcceptanceState,
   type HostDetail,
   type HostFormField,
 } from '@/lib/hostSetup';
@@ -31,10 +30,7 @@ export function HostDetailView({
   actions,
 }: HostDetailViewProps) {
   const { host, owners, agreement, acceptances } = detail;
-  const state = hostAcceptanceState({
-    currentId: agreement?.id ?? null,
-    acceptedIds: acceptances.map((record) => record.legalDocumentId),
-  });
+  const state = detail.acceptance;
   return (
     <div className={styles.stack}>
       <section className={styles.section} aria-labelledby="host-owners">

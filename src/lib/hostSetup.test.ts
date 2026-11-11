@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   acceptanceRecordLabel,
   agreementNotice,
+  agreementRefusal,
+  isSlugTakenError,
   buildHostDetail,
   buildHostListRows,
   changedHostFields,
@@ -157,7 +159,6 @@ describe('parseHostCreateForm', () => {
       '0F1E2D3C-4B5A-4697-8A9B-0C1D2E3F4A5B',
       '0f1e2d3c-4b5a-4697-8a9b-0c1d2e3f4a5b',
     ],
-    ['text that is not an id', 'on', null],
     ['nothing', undefined, null],
   ])('reads the agreement box as %s', (_label, ticked, expected) => {
     const result = parseHostCreateForm(
@@ -421,5 +422,112 @@ describe('the notice an action ends on', () => {
     ['no_current_document', 'no_agreement'],
   ] as const)('an acceptance %s is %s', (outcome, notice) => {
     expect(agreementNotice(outcome)).toBe(notice);
+  });
+});
+
+describe('a ticked agreement box that cannot be read', () => {
+  it.each([['on'], ['not-an-id'], [42]])(
+    'refuses %j as a bad form, not as not ticked',
+    (ticked) => {
+      expect(
+        parseHostCreateForm(
+          formOf({ ...filled, acceptLegalDocumentId: ticked }),
+        ),
+      ).toEqual({ ok: false, fields: ['acceptLegalDocumentId'] });
+    },
+  );
+
+  it.each([[''], [undefined], [null]])('reads %j as not ticked', (empty) => {
+    expect(
+      parseHostCreateForm(formOf({ ...filled, acceptLegalDocumentId: empty })),
+    ).toMatchObject({ ok: true, value: { acceptedLegalDocumentId: null } });
+  });
+});
+
+describe('agreementRefusal', () => {
+  it.each([
+    ['stale', 'stale'],
+    ['no_current_document', 'no_current_document'],
+    ['recorded', null],
+    ['already_accepted', null],
+  ] as const)('%s refuses as %s', (outcome, refusal) => {
+    expect(agreementRefusal(outcome)).toBe(refusal);
+  });
+});
+
+describe('isSlugTakenError', () => {
+  const unique = (constraint: string, code = '23505') => ({ code, constraint });
+
+  it.each([
+    [
+      'a driver error wrapped by the query layer',
+      { cause: unique('hosts_slug_unique') },
+      true,
+    ],
+    ['the bare driver error', unique('hosts_slug_unique'), true],
+    [
+      'another unique index',
+      { cause: unique('auth_users_email_unique') },
+      false,
+    ],
+    [
+      'another error code',
+      { cause: unique('hosts_slug_unique', '23514') },
+      false,
+    ],
+    ['an error with no cause', new Error('x'), false],
+    ['a value that is not an error', 'hosts_slug_unique', false],
+    ['null', null, false],
+  ])('%s is %s', (_label, error, expected) => {
+    expect(isSlugTakenError(error)).toBe(expected);
+  });
+});
+
+describe('the slug-taken notice', () => {
+  it('is a known notice that names the slug field', () => {
+    expect(parseHostNotice('slug_taken')).toBe('slug_taken');
+    expect(noticeHref('/ops/hosts/new', 'slug_taken', ['slug'])).toBe(
+      '/ops/hosts/new?notice=slug_taken&fields=slug',
+    );
+    expect(hostNotices.slug_taken.tone).toBe('danger');
+  });
+});
+
+describe('buildHostDetail acceptance', () => {
+  const host = {
+    id: 'h',
+    name: 'H',
+    slug: 'h',
+    timeZone: 'UTC',
+    description: null,
+    notificationEmail: null,
+  };
+  const at = new Date('2026-11-01T15:00:00Z');
+  const build = (acceptedId: string | null, agreementId: string | null) =>
+    buildHostDetail({
+      host,
+      owners: [],
+      acceptances: acceptedId
+        ? [
+            {
+              hostId: 'h',
+              legalDocumentId: acceptedId,
+              version: 1,
+              acceptedAt: at,
+            },
+          ]
+        : [],
+      agreement: agreementId
+        ? { id: agreementId, version: 2, title: 'A' }
+        : null,
+    }).acceptance;
+
+  it.each([
+    ['accepted the current one', 'x', 'x', 'accepted'],
+    ['accepted an older one', 'old', 'x', 'outdated'],
+    ['accepted none', null, 'x', 'missing'],
+    ['no agreement published', null, null, 'no_document'],
+  ])('a host that %s is %s', (_label, accepted, current, state) => {
+    expect(build(accepted, current)).toBe(state);
   });
 });

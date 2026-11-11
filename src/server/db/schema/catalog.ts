@@ -100,6 +100,7 @@ export const hosts = pgTable(
     createdAt: timestampTz().notNull().defaultNow(),
   },
   (table) => [
+    uniqueIndex('hosts_slug_unique').on(table.slug),
     check('hosts_slug_kebab', sql`${table.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
     check('hosts_name_not_blank', notBlank(table.name)),
     check(

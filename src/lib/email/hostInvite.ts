@@ -1,11 +1,12 @@
 import { z } from 'zod';
 import { signInLinkTtlSeconds } from '../auth';
+import { hostLimits } from '../hostSetup';
 import { signInConfirmUrl, signInPath } from '../signIn';
 import { oneLineClipped } from '../text';
 
 // The email that tells a new host owner they have been set up and carries their first sign-in link.
 
-const hostInviteHostNameMaxChars = 120;
+const hostInviteHostNameMaxChars = hostLimits.name;
 
 export const HostInviteDataSchema = z.object({
   hostName: z.string().min(1).max(hostInviteHostNameMaxChars),

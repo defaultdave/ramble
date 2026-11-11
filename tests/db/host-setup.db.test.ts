@@ -573,6 +573,66 @@ describe('reading', () => {
   });
 });
 
+describe('host slugs are unique', () => {
+  const base = (slug: string) => ({
+    name: 'Same slug',
+    slug,
+    description: null,
+    timeZone: 'UTC',
+    notificationEmail: null,
+  });
+
+  it('refuses a second host with a taken slug on create, writing nothing', async () => {
+    await created({ slug: 'taken-on-create' });
+    const before = await snapshot();
+
+    const result = await setup.createHost(
+      ops,
+      input({ slug: 'taken-on-create' }),
+    );
+
+    expect(result).toEqual({ status: 'slug_taken' });
+    expect(await snapshot()).toEqual(before);
+  });
+
+  it('refuses a rename to a taken slug on update, changing nothing', async () => {
+    await created({ slug: 'taken-on-update' });
+    const { hostId } = await created({ slug: 'free-on-update' });
+    const before = await snapshot();
+
+    const result = await setup.updateHost(ops, hostId, base('taken-on-update'));
+
+    expect(result).toEqual({ status: 'slug_taken' });
+    expect(await snapshot()).toEqual(before);
+    const [host] = await client.db
+      .select()
+      .from(hosts)
+      .where(eq(hosts.id, hostId));
+    expect(host?.slug).toBe('free-on-update');
+  });
+
+  it('lets a host keep its own slug while changing another field', async () => {
+    const { hostId } = await created({ slug: 'keeps-its-slug' });
+
+    expect(await setup.updateHost(ops, hostId, base('keeps-its-slug'))).toEqual(
+      {
+        status: 'updated',
+      },
+    );
+  });
+
+  it('is enforced by the database', async () => {
+    await created({ slug: 'db-unique' });
+
+    await expectConstraint(
+      client.db
+        .insert(hosts)
+        .values({ slug: 'db-unique', name: 'Dup', timeZone: 'UTC' }),
+      'hosts_slug_unique',
+    );
+  });
+});
+
 describe('the database refuses what Zod refuses on a host', () => {
   const insert = (values: Record<string, unknown>) =>
     client.db.insert(hosts).values({

@@ -3,7 +3,7 @@ import type { AlertTone } from './alertTone';
 import { SlugSchema, WriteIdSchema, slugify } from './catalog';
 import { EmailAddressSchema, normalizeEmailAddress } from './email/address';
 import { pickKnown } from './pickKnown';
-import { isKnownTimeZone, TimeZoneSchema } from './sessions';
+import { isKnownTimeZone, maxTimeZoneLength, TimeZoneSchema } from './sessions';
 import { requiredText } from './text';
 import { zonedDayLabel } from './zonedLabels';
 
@@ -39,7 +39,11 @@ const hostEditableFields = [
 ] as const;
 export type HostEditableField = (typeof hostEditableFields)[number];
 
-const hostFormFields = [...hostEditableFields, 'ownerEmail'] as const;
+const hostFormFields = [
+  ...hostEditableFields,
+  'ownerEmail',
+  'acceptLegalDocumentId',
+] as const;
 export type HostFormField = (typeof hostFormFields)[number];
 
 export type HostInput = {
@@ -80,7 +84,7 @@ const FieldsSchema = z.strictObject({
   description: requiredText(hostLimits.description).optional(),
   timeZone: z
     .string()
-    .max(64)
+    .max(maxTimeZoneLength)
     .pipe(TimeZoneSchema)
     .refine(isKnownTimeZone, { message: 'A time zone name' }),
   notificationEmail: optionalEmail.optional(),
@@ -152,7 +156,17 @@ export function parseHostCreateForm(
 ): HostFormResult<HostCreateInput> {
   const fields = parseFields(get, { requireOwner: true, deriveSlug: true });
   if (!fields.ok) return fields;
-  const accepted = WriteIdSchema.safeParse(get('acceptLegalDocumentId'));
+  // A ticked box names the version it was shown; one that does not is a bad form, never "not ticked".
+  const ticked = get('acceptLegalDocumentId');
+  const accepted = WriteIdSchema.safeParse(ticked);
+  if (
+    !accepted.success &&
+    ticked !== undefined &&
+    ticked !== null &&
+    ticked !== ''
+  ) {
+    return { ok: false, fields: ['acceptLegalDocumentId'] };
+  }
   const { ownerEmail, ...host } = fields.value;
   return {
     ok: true,
@@ -206,6 +220,31 @@ export function decideHostAcceptance(input: {
   return input.acceptedIds.includes(input.currentId)
     ? 'already_accepted'
     : 'recorded';
+}
+
+/** The outcomes that refuse the whole setup: a version that is not current cannot be accepted. */
+export function agreementRefusal(
+  outcome: HostAcceptanceOutcome,
+): 'stale' | 'no_current_document' | null {
+  return outcome === 'stale' || outcome === 'no_current_document'
+    ? outcome
+    : null;
+}
+
+/** Whether a database error is the unique index on host slugs refusing a second host with one. */
+export function isSlugTakenError(error: unknown): boolean {
+  const cause =
+    typeof error === 'object' && error !== null && 'cause' in error
+      ? error.cause
+      : error;
+  return (
+    typeof cause === 'object' &&
+    cause !== null &&
+    'code' in cause &&
+    cause.code === '23505' &&
+    'constraint' in cause &&
+    cause.constraint === 'hosts_slug_unique'
+  );
 }
 
 export type HostAcceptanceState =
@@ -288,7 +327,14 @@ export function buildHostDetail(input: {
   agreement: { id: string; version: number; title: string } | null;
 }): HostDetail {
   const { host } = input;
+  const acceptances = input.acceptances.filter(
+    (record) => record.hostId === host.id,
+  );
   return {
+    acceptance: hostAcceptanceState({
+      currentId: input.agreement?.id ?? null,
+      acceptedIds: acceptances.map((record) => record.legalDocumentId),
+    }),
     host: {
       id: host.id,
       name: host.name,
@@ -307,13 +353,13 @@ export function buildHostDetail(input: {
           title: input.agreement.title,
         }
       : null,
-    acceptances: input.acceptances
-      .filter((record) => record.hostId === host.id)
-      .map(({ legalDocumentId, version, acceptedAt }) => ({
+    acceptances: acceptances.map(
+      ({ legalDocumentId, version, acceptedAt }) => ({
         legalDocumentId,
         version,
         acceptedAt,
-      })),
+      }),
+    ),
   };
 }
 
@@ -335,6 +381,7 @@ export type HostAcceptanceRecord = {
 };
 
 export type HostDetail = {
+  acceptance: HostAcceptanceState;
   host: HostInput & { id: string };
   owners: HostOwner[];
   agreement: { id: string; version: number; title: string } | null;
@@ -351,11 +398,13 @@ export function acceptanceRecordLabel(
 
 export const hostFieldProblems = {
   name: 'Enter the host name, up to 120 characters.',
-  slug: 'Use lower-case words joined by hyphens, up to 80 characters.',
+  slug: 'Use lower-case words joined by hyphens, up to 80 characters, that no other host uses.',
   description: 'Keep the description under 2000 characters, or leave it empty.',
   timeZone: 'Enter a time zone name such as America/New_York.',
   notificationEmail: 'Enter an email address, like bookings@example.com.',
   ownerEmail: 'Enter the owner email address, like name@example.com.',
+  acceptLegalDocumentId:
+    'The agreement version could not be read. Reload the form and try again.',
 } as const satisfies Record<HostFormField, string>;
 
 const noticeCodes = [
@@ -371,6 +420,7 @@ const noticeCodes = [
   'stale_agreement',
   'no_agreement',
   'invalid',
+  'slug_taken',
 ] as const;
 export type HostNoticeCode = (typeof noticeCodes)[number];
 
@@ -413,6 +463,11 @@ export const hostNotices = {
     title: 'There is no published host agreement to accept yet.',
   },
   invalid: { tone: 'danger', title: 'Some details need another look.' },
+  slug_taken: {
+    tone: 'danger',
+    title:
+      'Another host already uses that address name. Choose a different one.',
+  },
 } as const satisfies Record<HostNoticeCode, { tone: AlertTone; title: string }>;
 
 /** The notice a page address names, or null for none or an unknown one. */

@@ -7,6 +7,7 @@ import {
   type HostFormField,
   type HostInput,
 } from '@/lib/hostSetup';
+import { maxTimeZoneLength } from '@/lib/sessions';
 import styles from './HostSetup.module.css';
 
 type FormAction = (formData: FormData) => void | Promise<void>;
@@ -74,7 +75,7 @@ export function HostForm({
         label="Time zone"
         hint="Session times are read in this zone."
         defaultValue={values?.timeZone ?? defaultZone}
-        maxLength={64}
+        maxLength={maxTimeZoneLength}
         autoComplete="off"
         required
         {...errorFor('timeZone')}
@@ -102,6 +103,11 @@ export function HostForm({
             required
             {...errorFor('ownerEmail')}
           />
+          {problems.includes('acceptLegalDocumentId') ? (
+            <p role="alert" className={styles.muted}>
+              {hostFieldProblems.acceptLegalDocumentId}
+            </p>
+          ) : null}
           {agreement ? (
             <label className={styles.check}>
               <input

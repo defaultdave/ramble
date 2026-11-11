@@ -218,6 +218,13 @@
       "when": 1794420657233,
       "tag": "0030_host_record_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1794421344323,
+      "tag": "0031_host_slug_unique",
+      "breakpoints": true
     }
   ]
 }

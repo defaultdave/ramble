@@ -1,6 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { PageHeading } from '@/components/PageHeading';
-import type { HostDetail, HostListRow } from '@/lib/hostSetup';
+import {
+  buildHostDetail,
+  type HostDetail,
+  type HostListRow,
+} from '@/lib/hostSetup';
 import { HostDetailView } from './HostDetailView';
 import { HostForm } from './HostForm';
 import { HostNotice } from './HostNotice';
@@ -27,13 +31,24 @@ const owners = [
     email: 'owner@spokeandsaddle.example',
   },
 ];
-const detail = (overrides: Partial<HostDetail> = {}): HostDetail => ({
-  host,
-  owners,
-  agreement,
-  acceptances: [],
-  ...overrides,
-});
+const detail = (
+  overrides: Partial<
+    Pick<HostDetail, 'owners' | 'agreement' | 'acceptances'>
+  > = {},
+): HostDetail =>
+  buildHostDetail({
+    host,
+    owners: (overrides.owners ?? owners).map((owner) => ({
+      ...owner,
+      hostId: host.id,
+    })),
+    acceptances: (overrides.acceptances ?? []).map((record) => ({
+      ...record,
+      hostId: host.id,
+    })),
+    agreement:
+      overrides.agreement === undefined ? agreement : overrides.agreement,
+  });
 const rows: HostListRow[] = [
   {
     id: host.id,

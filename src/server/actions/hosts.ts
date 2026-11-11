@@ -40,7 +40,10 @@ export async function createHostAction(formData: FormData): Promise<void> {
   if (!parsed.ok) redirect(noticeHref(newHostPath, 'invalid', parsed.fields));
 
   const created = await createHost(caller, parsed.value);
-  if (created.status !== 'created') {
+  if (created.status === 'slug_taken') {
+    redirect(noticeHref(newHostPath, 'slug_taken', ['slug']));
+  }
+  if (created.status === 'agreement_refused') {
     redirect(noticeHref(newHostPath, agreementNotice(created.reason)));
   }
   const invite = await inviteHostOwner(
@@ -60,6 +63,9 @@ export async function updateHostAction(formData: FormData): Promise<void> {
   }
   const result = await updateHost(caller, hostId, parsed.value);
   if (result.status === 'not_found') redirect(hostsPath);
+  if (result.status === 'slug_taken') {
+    redirect(noticeHref(hostPath(hostId), 'slug_taken', ['slug']));
+  }
   redirect(noticeHref(hostPath(hostId), result.status));
 }
 

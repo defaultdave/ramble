@@ -19,6 +19,17 @@ import {
 import { parseSingle } from './filters';
 import { formatMoney } from './money';
 import {
+  isMovable,
+  isMoveNoticeCode,
+  moveChoices,
+  moveNotice,
+  movePrompt,
+  type MoveNoticeCode,
+  type MovePrompt,
+  type MoveSubject,
+  type MoveTarget,
+} from './moveBooking';
+import {
   rateLimitPolicies,
   retryAfterMinutes,
   waitMinutesLabel,
@@ -57,7 +68,13 @@ type CancelPrompt = {
 };
 
 export type ManageView =
-  | { kind: 'active'; booking: ManageBooking; prompt: CancelPrompt }
+  | {
+      kind: 'active';
+      booking: ManageBooking;
+      prompt: CancelPrompt;
+      /** The offer to move to another date; null when the booking is outside the terms for it. */
+      move: MovePrompt | null;
+    }
   | {
       kind: 'cancelled';
       booking: ManageBooking;
@@ -127,17 +144,35 @@ function cancelPrompt(
   };
 }
 
+/** What the picker offers: the booking's terms and the other dates read for it. Null when the picker is closed. */
+export type MovePickerRead = {
+  subject: MoveSubject;
+  candidates: readonly MoveTarget[];
+};
+
 /** The page for a booking, judged at `now` (the database's clock). */
 function manageView(
   source: BookingEmailSource,
   facts: CancelFacts,
   now: Date,
+  picker: MovePickerRead | null,
 ): ManageView {
   const booking = manageBooking(source);
   const quote = cancelQuote(facts, now);
   switch (quote.kind) {
     case 'cancellable':
-      return { kind: 'active', booking, prompt: cancelPrompt(quote, source) };
+      return {
+        kind: 'active',
+        booking,
+        prompt: cancelPrompt(quote, source),
+        move: isMovable(facts, now)
+          ? movePrompt({
+              freeCancelUntil: source.freeCancelUntil,
+              timeZone: source.timeZone,
+              choices: picker === null ? null : moveChoices({ ...picker, now }),
+            })
+          : null,
+      };
     case 'already_cancelled':
       return {
         kind: 'cancelled',
@@ -244,17 +279,29 @@ function isNoticeCode(value: string): value is CancelNoticeCode {
 export type ManageQuery = {
   confirm?: string | string[];
   result?: string | string[];
+  move?: string | string[];
+  moved?: string | string[];
 };
 
-/** `?confirm=1` is the second step; `?result=` is a cancel's answer. Neither is trusted as data: a value that is not exactly one of these is nothing. */
+/** Whether the query opens the move picker (`?move=1`), which the page reads the other dates for. */
+export function wantsMovePicker(query: ManageQuery): boolean {
+  return parseSingle(query.move, z.string()) === '1';
+}
+
+/** `?confirm=1` and `?move=1` are the second steps; `?result=` is a cancel's answer and `?moved=` a move's. None is trusted as data: a value that is not exactly one of these is nothing. */
 function parseManageQuery(query: ManageQuery): {
   confirming: boolean;
+  moving: boolean;
   code: CancelNoticeCode | null;
+  movedCode: MoveNoticeCode | null;
 } {
   const result = parseSingle(query.result, z.string());
+  const moved = parseSingle(query.moved, z.string());
   return {
     confirming: parseSingle(query.confirm, z.string()) === '1',
+    moving: wantsMovePicker(query),
     code: result !== null && isNoticeCode(result) ? result : null,
+    movedCode: moved !== null && isMoveNoticeCode(moved) ? moved : null,
   };
 }
 
@@ -272,12 +319,32 @@ const answerFitsView: Record<CancelNoticeCode, readonly ManageView['kind'][]> =
     rate_limited: everyView,
   };
 
-/** What the page shows for a view and a query: the one notice, and whether the second step is open. */
+/** The booking states each move answer can be about: a move happened to a booking still active, a refusal can come at any state. */
+const moveAnswerFitsView: Record<
+  MoveNoticeCode,
+  readonly ManageView['kind'][]
+> = {
+  moved: ['active'],
+  not_movable: everyView,
+  same_date: ['active'],
+  date_unavailable: ['active'],
+  sold_out: ['active'],
+  too_soon: ['active'],
+};
+
+/**
+ * What the page shows for a view and a query: the one notice, whether the cancel's second step is
+ * open, and whether the move picker is. A move's answer outranks a cancel's when a query carries both.
+ */
 export function managePageState(
   view: ManageView,
   query: ManageQuery,
-): { notice: CancelNotice | null; confirming: boolean } {
-  const { confirming, code } = parseManageQuery(query);
+): {
+  notice: CancelNotice | null;
+  confirming: boolean;
+  moving: boolean;
+} {
+  const { confirming, moving, code, movedCode } = parseManageQuery(query);
   const refundMinor = view.kind === 'cancelled' ? view.refundedMinor : 0;
   // A query can say anything, so an answer is shown only for a booking it could be the answer about.
   const shown =
@@ -288,9 +355,19 @@ export function managePageState(
       : view.kind === 'closed'
         ? cancelNotice('not_refundable')
         : null;
+  const movedShown =
+    movedCode !== null && moveAnswerFitsView[movedCode].includes(view.kind)
+      ? movedCode
+      : null;
   return {
-    notice: shown === null ? standing : cancelNotice(shown, { refundMinor }),
+    notice:
+      movedShown !== null
+        ? moveNotice(movedShown)
+        : shown === null
+          ? standing
+          : cancelNotice(shown, { refundMinor }),
     confirming: confirming && view.kind === 'active',
+    moving: moving && view.kind === 'active' && view.move !== null,
   };
 }
 
@@ -336,9 +413,14 @@ export function manageReadOutcome(read: {
   order: BookingEmailSource | null;
   facts: CancelFacts | null;
   now: Date;
+  /** What the move picker offers, read only when the guest opened it. */
+  picker?: MovePickerRead | null;
 }): ManageReadOutcome {
   if (read.order === null || read.facts === null) {
     return { kind: 'refused', refusal: missingOrderResult };
   }
-  return { kind: 'ok', view: manageView(read.order, read.facts, read.now) };
+  return {
+    kind: 'ok',
+    view: manageView(read.order, read.facts, read.now, read.picker ?? null),
+  };
 }

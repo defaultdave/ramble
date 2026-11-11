@@ -1,5 +1,8 @@
 import 'server-only';
-import { guestConfirmationBody } from '@/lib/email/bookingBody';
+import {
+  guestConfirmationBody,
+  type ConfirmationBody,
+} from '@/lib/email/bookingBody';
 import type { EmailTemplateData } from '@/lib/email/templates';
 import { EmailLayout } from './EmailLayout';
 import {
@@ -13,11 +16,16 @@ import {
 type Props = {
   data: EmailTemplateData<'guest-confirmation'>;
   helpUrl: string;
+  /** The words, when this is the confirmation of a booking that moved. */
+  body?: ConfirmationBody;
 };
 
-/** The guest's confirmation (PRD-25). */
-export function GuestConfirmation({ data, helpUrl }: Props) {
-  const body = guestConfirmationBody(data);
+/** The guest's confirmation (PRD-25), and with `body` the one a move sends. */
+export function GuestConfirmation({
+  data,
+  helpUrl,
+  body = guestConfirmationBody(data),
+}: Props) {
   return (
     <EmailLayout previewText={body.preview} helpUrl={helpUrl}>
       <EmailHeading>{body.heading}</EmailHeading>

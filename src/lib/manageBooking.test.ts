@@ -339,6 +339,7 @@ describe('what the page shows', () => {
     expect(managePageState(cancelled, { result: 'cancelled' })).toEqual({
       notice: cancelNotice('cancelled', { refundMinor: 23_412 }),
       confirming: false,
+      moving: false,
     });
   });
 

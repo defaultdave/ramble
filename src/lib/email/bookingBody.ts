@@ -69,6 +69,18 @@ export function guestConfirmationBody(
   };
 }
 
+/** The confirmation again for a booking that moved: the same rows, said to be the new date. */
+export function bookingMovedBody(
+  data: GuestConfirmationData,
+): ConfirmationBody {
+  return {
+    ...guestConfirmationBody(data),
+    preview: `Your booking for ${data.experienceName} has moved to ${data.dayLabel}.`,
+    heading: 'Your booking has moved',
+    intro: `Hi ${data.recipientName}, your booking is now on ${data.dayLabel} at ${data.timeLabel}. The price has not changed. A calendar file for the new date is attached.`,
+  };
+}
+
 export function hostBookingNoticeBody(data: HostBookingNoticeData): Body {
   return {
     preview: `New booking for ${data.experienceName}.`,

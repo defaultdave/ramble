@@ -21,6 +21,7 @@ import { OpsNoticeDataSchema, opsNoticeSubject } from './opsNotice';
 const templateSchemas = {
   'dev-check': z.object({ recipientName: z.string().min(1).max(80) }),
   'guest-confirmation': GuestConfirmationDataSchema,
+  'booking-moved': GuestConfirmationDataSchema,
   'host-booking-notice': HostBookingNoticeDataSchema,
   'session-reminder': SessionReminderDataSchema,
   'booking-cancellation': BookingCancellationDataSchema,
@@ -46,6 +47,7 @@ const subjects: {
 } = {
   'dev-check': () => 'Ramble email check',
   'guest-confirmation': bookingSubjects.guestConfirmation,
+  'booking-moved': bookingSubjects.bookingMoved,
   'host-booking-notice': bookingSubjects.hostBookingNotice,
   'session-reminder': bookingSubjects.sessionReminder,
   'booking-cancellation': bookingSubjects.bookingCancellation,
@@ -62,6 +64,7 @@ const attachments: {
 } = {
   'dev-check': () => [],
   'guest-confirmation': confirmationAttachments,
+  'booking-moved': confirmationAttachments,
   'host-booking-notice': () => [],
   'session-reminder': () => [],
   'booking-cancellation': () => [],

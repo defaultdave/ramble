@@ -75,6 +75,11 @@ export function bookingEmailKey(
   return `${kind}:${orderId}`;
 }
 
+/** One move-confirmation email per move: a booking moved twice sends two, and a retry of one sends one. */
+export function moveEmailKey(moveId: string): string {
+  return `guest-move-confirmation:${moveId.toLowerCase()}`;
+}
+
 /** One refund email per refund, whichever order it belongs to. */
 export function refundEmailKey(refundId: string): string {
   return `guest-refund:${refundId.toLowerCase()}`;

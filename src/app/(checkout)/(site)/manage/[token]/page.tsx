@@ -2,8 +2,12 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { connection } from 'next/server';
 import { ManageBooking, ManageTooManyTries } from '@/components/ManageBooking';
-import { managePageState, manageScreen } from '@/lib/manageBooking';
-import { cancelBookingForm } from '@/server/actions/orders';
+import {
+  managePageState,
+  manageScreen,
+  wantsMovePicker,
+} from '@/lib/manageBooking';
+import { cancelBookingForm, moveBookingForm } from '@/server/actions/orders';
 import { readManagePage } from '@/server/manageBooking';
 
 // The address is a capability, so nothing here may describe the booking: a generic title, no
@@ -23,12 +27,14 @@ export default async function ManageBookingPage({
 }: PageProps<'/manage/[token]'>) {
   await connection();
   const [{ token }, query] = await Promise.all([params, searchParams]);
-  const screen = manageScreen(await readManagePage(token));
+  const screen = manageScreen(
+    await readManagePage(token, { picker: wantsMovePicker(query) }),
+  );
   if (screen.kind === 'not_found') notFound();
   if (screen.kind === 'too_many_tries') {
     return <ManageTooManyTries retryAfterSeconds={screen.retryAfterSeconds} />;
   }
-  const { notice, confirming } = managePageState(screen.view, query);
+  const { notice, confirming, moving } = managePageState(screen.view, query);
   return (
     <ManageBooking
       view={screen.view}
@@ -36,6 +42,8 @@ export default async function ManageBookingPage({
       notice={notice}
       confirming={confirming}
       cancelAction={cancelBookingForm}
+      moving={moving}
+      moveAction={moveBookingForm}
     />
   );
 }

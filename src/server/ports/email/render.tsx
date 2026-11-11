@@ -1,6 +1,7 @@
 import 'server-only';
 import { render } from 'react-email';
 import type { ReactElement } from 'react';
+import { bookingMovedBody } from '@/lib/email/bookingBody';
 import { RenderedEmailSchema, type RenderedEmail } from '@/lib/email/message';
 import {
   attachmentsFor,
@@ -30,6 +31,13 @@ const markup: Markup = {
   'dev-check': (data, helpUrl) => <DevCheck data={data} helpUrl={helpUrl} />,
   'guest-confirmation': (data, helpUrl) => (
     <GuestConfirmation data={data} helpUrl={helpUrl} />
+  ),
+  'booking-moved': (data, helpUrl) => (
+    <GuestConfirmation
+      data={data}
+      helpUrl={helpUrl}
+      body={bookingMovedBody(data)}
+    />
   ),
   'host-booking-notice': (data, helpUrl) => (
     <HostBookingNotice data={data} helpUrl={helpUrl} />

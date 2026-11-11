@@ -7,10 +7,12 @@ import {
   guestConfirmationData,
   hostBookingNoticeData,
   hostNoticeDecision,
+  moveEmailKey,
   reminderDecision,
   sessionReminderData,
 } from '@/lib/bookingEmails';
 import { WriteIdSchema } from '@/lib/catalog';
+import type { GuestMovePayloadSchema } from '@/lib/moveBooking';
 import type { Transaction } from '@/server/db/client';
 import {
   readBookingEmailOrder,
@@ -98,6 +100,35 @@ export async function sendGuestConfirmation({
       manageToken: liveManageToken(order),
     }),
     idempotencyKey: bookingEmailKey('guest-confirmation', payload.orderId),
+  });
+}
+
+/**
+ * The confirmation of a move: the booking as it now stands, with a link rebuilt from the order's
+ * version. A booking cancelled since is skipped, as for the first confirmation.
+ */
+export async function sendGuestMoveConfirmation({
+  tx,
+  payload,
+  jobId,
+}: {
+  tx: Transaction;
+  payload: z.output<typeof GuestMovePayloadSchema>;
+  jobId: string;
+}): Promise<void> {
+  const { order, decision } = await loadOrder(tx, payload.orderId);
+  if (decision === 'skip') {
+    logger.info('booking email skipped', { jobId, reason: 'cancelled' });
+    return;
+  }
+  await sendEmail({
+    template: 'booking-moved',
+    to: order.contactEmail,
+    data: guestConfirmationData(order.source, {
+      appUrl: env.APP_URL,
+      manageToken: liveManageToken(order),
+    }),
+    idempotencyKey: moveEmailKey(payload.moveId),
   });
 }
 

@@ -424,11 +424,15 @@ const rows: Row[] = [
   {
     fn: 'updateSessionPrice',
     invoke: (c, t) =>
-      data.sessions.updateSessionPrice(c, {
-        sessionId: t.sessionId,
-        kind: 'adult',
-        priceMinor: 100,
-      }),
+      data.sessions.updateSessionPrice(
+        c,
+        {
+          sessionId: t.sessionId,
+          kind: 'adult',
+          priceMinor: 100,
+        },
+        new Date(),
+      ),
     allows: sessionRules,
   },
   {

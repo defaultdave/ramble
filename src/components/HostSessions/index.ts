@@ -1,5 +1,2 @@
-export {
-  HostSessions,
-  hostSessionsTitle,
-  type HostSessionActions,
-} from './HostSessions';
+export { HostSessions, hostSessionsTitle } from './HostSessions';
+export type { HostSessionActions } from './HostSessionForms';

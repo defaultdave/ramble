@@ -52,7 +52,7 @@ import {
   type Caller,
 } from '@/server/auth/caller';
 import { updateTagsForChanges } from '@/server/cache/invalidate';
-import { db } from './client';
+import { db, type Transaction } from './client';
 import { readOpenHeldSeats } from './holds';
 import { lockSessionRow } from './locks';
 import {
@@ -63,6 +63,7 @@ import {
   sessions,
 } from './schema';
 import { readDatabaseTime } from './time';
+import { systemClock } from '@/server/ports/clock';
 
 type Source = Session['source'];
 
@@ -156,8 +157,20 @@ export async function generateSessions(
   input: GenerateSessionsInput,
   now: Date,
 ): Promise<GenerateSessionsResult> {
+  return generateSessionsIn(db, caller, input, now);
+}
+
+/** Where a generation reads and writes: the pool, or a transaction that wants several templates done together. */
+type Executor = Pick<Transaction, 'select' | 'insert'>;
+
+async function generateSessionsIn(
+  executor: Executor,
+  caller: Caller,
+  input: GenerateSessionsInput,
+  now: Date,
+): Promise<GenerateSessionsResult> {
   const data = GenerateSessionsInputSchema.parse(input);
-  const [row] = await db
+  const [row] = await executor
     .select({
       template: sessionTemplates,
       hostId: hosts.id,
@@ -199,7 +212,7 @@ export async function generateSessions(
     };
   }
 
-  const inserted = await db
+  const inserted = await executor
     .insert(sessions)
     .values(
       upcoming.map((occurrence) => ({
@@ -234,6 +247,7 @@ export type UpdateSessionAllocationResult =
         | 'session_not_found'
         | 'not_scheduled'
         | 'version_conflict'
+        | 'in_the_past'
         | 'below_sold_and_held';
       seatsSold?: number;
       heldSeats?: number;
@@ -246,10 +260,12 @@ export type UpdateSessionAllocationResult =
  * `seats_sold` stays the backstop under it. A saved edit invalidates the session's spaces-left tag,
  * so this runs in a Server Action only.
  * `expectedVersion` is the version the editor read; a different one means another edit came first.
+ * A session that has started (its start is not after `now`) is left as it is.
  */
 export async function updateSessionAllocation(
   caller: Caller,
   input: UpdateSessionAllocationInput,
+  now: Date = systemClock.now(),
 ): Promise<UpdateSessionAllocationResult> {
   const data = UpdateSessionAllocationInputSchema.parse(input);
   const [found] = await db
@@ -276,6 +292,9 @@ export async function updateSessionAllocation(
         data.expectedVersion,
       );
       if (!version.ok) return version;
+      if (!isUpcoming(current.startsAt, now)) {
+        return { ok: false, reason: 'in_the_past' };
+      }
       const heldSeats = await readOpenHeldSeats(
         tx,
         current.id,
@@ -433,16 +452,24 @@ export async function cancelUnbookedSession(
 
 export type UpdateSessionPriceResult =
   | { ok: true; priceMinor: number }
-  | { ok: false; reason: 'session_not_found' | 'no_such_price' };
+  | {
+      ok: false;
+      reason:
+        'session_not_found' | 'not_scheduled' | 'in_the_past' | 'no_such_price';
+    };
 
 /**
- * Sets the price of one kind for the session's experience. Prices belong to the experience, so
- * every one of its sessions sells at the new price from now on; a hold and an order keep the price
- * they were made at, so only new bookings pay it (PRD-41).
+ * Sets the price of one kind for the experience of the session the form was posted from. Prices
+ * belong to the experience, so every one of its sessions sells at the new price from now on; a hold
+ * and an order keep the price they were made at, so only new bookings pay it (PRD-41). The posted
+ * session gates the edit: it must be the caller's to edit, scheduled, and not started, so a form
+ * left open on a cancelled or past session changes nothing. The caller is checked before the row is
+ * locked and again under the lock.
  */
 export async function updateSessionPrice(
   caller: Caller,
   input: UpdateSessionPriceInput,
+  now: Date,
 ): Promise<UpdateSessionPriceResult> {
   const data = UpdateSessionPriceInputSchema.parse(input);
   const [found] = await db
@@ -459,21 +486,39 @@ export async function updateSessionPrice(
     return { ok: false, reason: 'session_not_found' };
   }
   requireSessionEditor(caller, found.hostId, found.source);
-  const [updated] = await db
-    .update(priceOptions)
-    .set({ priceMinor: data.priceMinor })
-    .where(
-      and(
-        eq(priceOptions.experienceId, found.experienceId),
-        eq(priceOptions.kind, data.kind),
-      ),
-    )
-    .returning({ priceMinor: priceOptions.priceMinor });
-  if (!updated) return { ok: false, reason: 'no_such_price' };
-  updateTagsForChanges([
-    { kind: 'schedule', experienceId: found.experienceId },
-  ]);
-  return { ok: true, priceMinor: updated.priceMinor };
+
+  const result = await db.transaction(
+    async (tx): Promise<UpdateSessionPriceResult> => {
+      const row = await lockSessionRow(tx, data.sessionId);
+      if (!row) return { ok: false, reason: 'session_not_found' };
+      const current = SessionSchema.parse(row.session);
+      requireSessionEditor(caller, row.hostId, current.source);
+      const editable = checkAllocationEditable(current.status);
+      if (!editable.ok) return editable;
+      if (!isUpcoming(current.startsAt, now)) {
+        return { ok: false, reason: 'in_the_past' };
+      }
+      const [updated] = await tx
+        .update(priceOptions)
+        .set({ priceMinor: data.priceMinor })
+        .where(
+          and(
+            eq(priceOptions.experienceId, current.experienceId),
+            eq(priceOptions.kind, data.kind),
+          ),
+        )
+        .returning({ priceMinor: priceOptions.priceMinor });
+      return updated
+        ? { ok: true, priceMinor: updated.priceMinor }
+        : { ok: false, reason: 'no_such_price' };
+    },
+  );
+  if (result.ok) {
+    updateTagsForChanges([
+      { kind: 'schedule', experienceId: found.experienceId },
+    ]);
+  }
+  return result;
 }
 
 export type AddOneOffSessionResult =
@@ -538,6 +583,14 @@ export async function addOneOffSession(
   return { ok: true, session: SessionSchema.parse(inserted) };
 }
 
+/** Publishing a week stopped for a reason the host can act on; thrown inside the transaction so every slot rolls back. */
+class WeekNotPublished extends Error {
+  constructor(readonly reason: 'invalid_time_zone') {
+    super(`The week was not published: ${reason}`);
+    this.name = 'WeekNotPublished';
+  }
+}
+
 export type PublishWeekResult =
   | {
       ok: true;
@@ -569,37 +622,64 @@ export async function publishWeek(
   if (isBeyondHorizon(toDate, now))
     return { ok: false, reason: 'beyond_horizon' };
 
-  const slots = await db
-    .select({ id: sessionTemplates.id })
-    .from(sessionTemplates)
-    .innerJoin(experiences, eq(experiences.id, sessionTemplates.experienceId))
-    .where(
-      and(eq(experiences.hostId, id), eq(sessionTemplates.source, 'ramble')),
-    )
-    .orderBy(sessionTemplates.id);
-  const total = { created: 0, alreadyExisted: 0, inThePast: 0 };
-  const grown = new Set<string>();
-  for (const slot of slots) {
-    const result = await generateSessions(
-      caller,
-      { templateId: slot.id, fromDate, toDate },
-      now,
-    );
-    if (!result.ok) {
-      if (result.reason === 'invalid_time_zone') {
-        return { ok: false, reason: 'invalid_time_zone' };
+  const published = await db
+    .transaction(async (tx) => {
+      const slots = await tx
+        .select({ id: sessionTemplates.id })
+        .from(sessionTemplates)
+        .innerJoin(
+          experiences,
+          eq(experiences.id, sessionTemplates.experienceId),
+        )
+        .where(
+          and(
+            eq(experiences.hostId, id),
+            eq(sessionTemplates.source, 'ramble'),
+          ),
+        )
+        .orderBy(experiences.id, sessionTemplates.id);
+      const total = { created: 0, alreadyExisted: 0, inThePast: 0 };
+      const grown = new Set<string>();
+      for (const slot of slots) {
+        const result = await generateSessionsIn(
+          tx,
+          caller,
+          { templateId: slot.id, fromDate, toDate },
+          now,
+        );
+        if (!result.ok) {
+          // A zone the host must fix is reported. The rest cannot happen here: the slot was read a
+          // moment ago, and the horizon was checked above.
+          if (result.reason === 'invalid_time_zone') {
+            throw new WeekNotPublished(result.reason);
+          }
+          throw new Error(`Publishing a week was refused: ${result.reason}`);
+        }
+        total.created += result.created.length;
+        total.alreadyExisted += result.alreadyExisted;
+        total.inThePast += result.inThePast;
+        if (result.created.length > 0) grown.add(result.experienceId);
       }
-      continue;
-    }
-    total.created += result.created.length;
-    total.alreadyExisted += result.alreadyExisted;
-    total.inThePast += result.inThePast;
-    if (result.created.length > 0) grown.add(result.experienceId);
+      return { templates: slots.length, grown: [...grown], ...total };
+    })
+    .catch((error: unknown) => {
+      if (error instanceof WeekNotPublished) return error;
+      throw error;
+    });
+  if (published instanceof WeekNotPublished) {
+    return { ok: false, reason: published.reason };
   }
+  // After the commit, so a week that rolled back invalidates nothing.
   updateTagsForChanges(
-    [...grown].map((experienceId) => ({ kind: 'schedule', experienceId })),
+    published.grown.map((experienceId) => ({ kind: 'schedule', experienceId })),
   );
-  return { ok: true, templates: slots.length, ...total };
+  return {
+    ok: true,
+    templates: published.templates,
+    created: published.created,
+    alreadyExisted: published.alreadyExisted,
+    inThePast: published.inThePast,
+  };
 }
 
 /**

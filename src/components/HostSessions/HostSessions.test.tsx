@@ -3,7 +3,8 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HostSessionFormState } from '@/lib/hostSessions';
-import { HostSessions, type HostSessionActions } from './HostSessions';
+import type { HostSessionActions } from './HostSessionForms';
+import { HostSessions } from './HostSessions';
 import { emptyWeek, week } from './HostSessions.fixtures';
 
 // Behaviours under test, one per decision, branch or risk:

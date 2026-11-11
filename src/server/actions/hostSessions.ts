@@ -82,7 +82,11 @@ export async function updateSessionCapacityAction(
     hostSessionFormValues.capacity,
     'capacity',
     async (caller, input) => {
-      const result = await updateSessionAllocation(caller, input);
+      const result = await updateSessionAllocation(
+        caller,
+        input,
+        systemClock.now(),
+      );
       return result.ok ? ok('Capacity saved.') : result;
     },
   );
@@ -114,7 +118,7 @@ export async function updateSessionPriceAction(
     hostSessionFormValues.price,
     'price',
     async (caller, input) => {
-      const result = await updateSessionPrice(caller, input);
+      const result = await updateSessionPrice(caller, input, systemClock.now());
       return result.ok
         ? ok('Price saved. It applies to new bookings only.')
         : result;

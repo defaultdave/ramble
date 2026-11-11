@@ -1,7 +1,7 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ForbiddenError } from '@/server/auth/caller';
-import { priceOptions, sessions } from '@/server/db/schema';
+import { hosts, priceOptions, sessions } from '@/server/db/schema';
 import {
   createFreshDatabase,
   serveNeonHttp,
@@ -16,7 +16,11 @@ import {
   sessionsFixtures,
 } from './sessionsFixtures';
 
-vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
+const cache = vi.hoisted(() => ({
+  updateTag: vi.fn<(tag: string) => void>(),
+  revalidateTag: vi.fn<(tag: string, profile: string) => void>(),
+}));
+vi.mock('next/cache', () => cache);
 
 // Behaviours under test, one per decision, branch or risk. The generated session is Saturday
 // 2026-06-06, 10:00 to 12:00 New York (14:00Z to 16:00Z), version 1, 8 seats, nothing sold.
@@ -59,11 +63,19 @@ afterAll(async () => {
   vi.unstubAllEnvs();
 });
 
-const { setup, generated, stored, createTemplate, sessionsOf, insertSession } =
-  sessionsFixtures(
-    () => client,
-    () => sessionData,
-  );
+const {
+  setup,
+  generated,
+  stored,
+  createTemplate,
+  sessionsOf,
+  insertSession,
+  insertExperience,
+  countSessions,
+} = sessionsFixtures(
+  () => client,
+  () => sessionData,
+);
 
 const beforeTheDay = new Date('2026-06-01T00:00:00Z');
 const timeInput = (sessionId: string, overrides = {}) => ({
@@ -345,6 +357,46 @@ describe('cancelUnbookedSession', () => {
   });
 });
 
+describe('updateSessionAllocation on a session that is not open to edits', () => {
+  it('refuses a session that has started, and a cancelled one, and changes nothing', async () => {
+    const { session, owner } = await generated();
+    const edit = { sessionId: session.id, allocation: 12, expectedVersion: 1 };
+
+    expect(
+      await sessionData.updateSessionAllocation(
+        owner,
+        edit,
+        new Date('2026-06-07T00:00:00Z'),
+      ),
+    ).toEqual({ ok: false, reason: 'in_the_past' });
+    await sessionData.cancelUnbookedSession(
+      owner,
+      { sessionId: session.id, expectedVersion: 1 },
+      beforeTheDay,
+    );
+    expect(
+      await sessionData.updateSessionAllocation(
+        owner,
+        { ...edit, expectedVersion: 2 },
+        beforeTheDay,
+      ),
+    ).toEqual({ ok: false, reason: 'not_scheduled' });
+    expect(await stored(session.id)).toMatchObject({ allocation: 8 });
+  });
+
+  it('changes a session that has not started', async () => {
+    const { session, owner } = await generated();
+
+    expect(
+      await sessionData.updateSessionAllocation(
+        owner,
+        { sessionId: session.id, allocation: 12, expectedVersion: 1 },
+        beforeTheDay,
+      ),
+    ).toMatchObject({ ok: true, session: { allocation: 12 } });
+  });
+});
+
 describe('updateSessionPrice', () => {
   async function addPrices(experienceId: string) {
     await client.db.insert(priceOptions).values([
@@ -364,11 +416,11 @@ describe('updateSessionPrice', () => {
     const { session, owner, experience } = await generated();
     await addPrices(experience.id);
 
-    const result = await sessionData.updateSessionPrice(owner, {
-      sessionId: session.id,
-      kind: 'adult',
-      priceMinor: 6250,
-    });
+    const result = await sessionData.updateSessionPrice(
+      owner,
+      { sessionId: session.id, kind: 'adult', priceMinor: 6250 },
+      beforeTheDay,
+    );
 
     expect(result).toEqual({ ok: true, priceMinor: 6250 });
     expect(await priceOf(experience.id, 'adult')).toBe(6250);
@@ -379,12 +431,39 @@ describe('updateSessionPrice', () => {
     const { session, owner } = await generated();
 
     expect(
-      await sessionData.updateSessionPrice(owner, {
-        sessionId: session.id,
-        kind: 'adult',
-        priceMinor: 6250,
-      }),
+      await sessionData.updateSessionPrice(
+        owner,
+        { sessionId: session.id, kind: 'adult', priceMinor: 6250 },
+        beforeTheDay,
+      ),
     ).toEqual({ ok: false, reason: 'no_such_price' });
+  });
+
+  it('refuses a form posted for a session that has started or been cancelled, and changes nothing', async () => {
+    const { session, owner, experience } = await generated();
+    await addPrices(experience.id);
+    const input = {
+      sessionId: session.id,
+      kind: 'adult' as const,
+      priceMinor: 6250,
+    };
+
+    expect(
+      await sessionData.updateSessionPrice(
+        owner,
+        input,
+        new Date('2026-06-07T00:00:00Z'),
+      ),
+    ).toEqual({ ok: false, reason: 'in_the_past' });
+    await sessionData.cancelUnbookedSession(
+      owner,
+      { sessionId: session.id, expectedVersion: 1 },
+      beforeTheDay,
+    );
+    expect(
+      await sessionData.updateSessionPrice(owner, input, beforeTheDay),
+    ).toEqual({ ok: false, reason: 'not_scheduled' });
+    expect(await priceOf(experience.id, 'adult')).toBe(5000);
   });
 
   it('refuses the owner of another host, a guest, and an allocation session’s own owner', async () => {
@@ -400,11 +479,11 @@ describe('updateSessionPrice', () => {
       [allocationOwner, allocated.id],
     ] as const) {
       await expect(
-        sessionData.updateSessionPrice(caller, {
-          sessionId,
-          kind: 'adult',
-          priceMinor: 1,
-        }),
+        sessionData.updateSessionPrice(
+          caller,
+          { sessionId, kind: 'adult', priceMinor: 1 },
+          beforeTheDay,
+        ),
       ).rejects.toBeInstanceOf(ForbiddenError);
     }
     expect(await priceOf(experience.id, 'adult')).toBe(5000);
@@ -571,6 +650,55 @@ describe('publishWeek', () => {
       alreadyExisted: 0,
       inThePast: 0,
     });
+  });
+
+  it('reports a host zone that is not usable and writes nothing, even for slots before the bad one', async () => {
+    const { host, experience, owner } = await setup();
+    await createTemplate(experience.id);
+    await createTemplate(experience.id, { startTime: '12:00' });
+    await client.db
+      .update(hosts)
+      .set({ timeZone: 'Nowhere/Land' })
+      .where(eq(hosts.id, host.id));
+
+    expect(
+      await sessionData.publishWeek(owner, host.id, '2026-06-01', earlyNow),
+    ).toEqual({ ok: false, reason: 'invalid_time_zone' });
+    expect(await countSessions(experience.id)).toBe(0);
+  });
+
+  it('rolls back every slot when a later one fails, and invalidates nothing', async () => {
+    const { host, experience, owner } = await setup();
+    const second = await insertExperience(host.id);
+    // Slots run in experience order, so the one that fails is the one that runs second.
+    const [first, last] =
+      experience.id < second.id ? [experience, second] : [second, experience];
+    await createTemplate(first.id);
+    await createTemplate(last.id);
+    const name = `refuse_${last.id.replaceAll('-', '')}`;
+    await client.db.execute(
+      sql.raw(`CREATE FUNCTION ${name}() RETURNS trigger AS $$
+        BEGIN
+          IF NEW.experience_id = '${last.id}' THEN
+            RAISE EXCEPTION 'refused for the test';
+          END IF;
+          RETURN NEW;
+        END $$ LANGUAGE plpgsql`),
+    );
+    await client.db.execute(
+      sql.raw(
+        `CREATE TRIGGER ${name} BEFORE INSERT ON sessions FOR EACH ROW EXECUTE FUNCTION ${name}()`,
+      ),
+    );
+    cache.updateTag.mockClear();
+
+    await expect(
+      sessionData.publishWeek(owner, host.id, '2026-06-01', earlyNow),
+    ).rejects.toThrow();
+
+    expect(await countSessions(first.id)).toBe(0);
+    expect(await countSessions(last.id)).toBe(0);
+    expect(cache.updateTag).not.toHaveBeenCalled();
   });
 
   it('refuses a week that ends past the horizon', async () => {

@@ -15,6 +15,7 @@ import {
 } from './harness';
 import {
   admin,
+  earlyNow,
   guest,
   ops,
   ownerOf,
@@ -55,6 +56,12 @@ const { setup, generated, stored } = sessionsFixtures(
   () => sessionData,
 );
 
+/** The sessions here are in June 2026, so every edit is made on a day before them. */
+const editCapacity = (
+  caller: Caller,
+  input: Parameters<typeof sessionData.updateSessionAllocation>[1],
+) => sessionData.updateSessionAllocation(caller, input, earlyNow);
+
 describe('updateSessionAllocation', () => {
   it('gives a caller who is not staff the same refusal for a missing row, another host and a staff-only row', async () => {
     const { session } = await generated('allocation');
@@ -69,7 +76,7 @@ describe('updateSessionAllocation', () => {
         [anonymousCaller, session.id],
       ].map(async ([caller, sessionId]) => {
         try {
-          await sessionData.updateSessionAllocation(caller as Caller, {
+          await editCapacity(caller as Caller, {
             sessionId: sessionId as string,
             allocation: 4,
             expectedVersion: 1,
@@ -95,7 +102,7 @@ describe('updateSessionAllocation', () => {
     const other = ownerOf((await setup()).host.id);
     const message = async (caller: Caller) => {
       try {
-        await sessionData.updateSessionAllocation(caller, {
+        await editCapacity(caller, {
           sessionId: session.id,
           allocation: 4,
           expectedVersion: 1,
@@ -115,7 +122,7 @@ describe('updateSessionAllocation', () => {
   ])('lets %s edit an allocation session', async (_name, caller) => {
     const { session } = await generated('allocation');
 
-    const result = await sessionData.updateSessionAllocation(caller, {
+    const result = await editCapacity(caller, {
       sessionId: session.id,
       allocation: 10,
       expectedVersion: 1,
@@ -128,7 +135,7 @@ describe('updateSessionAllocation', () => {
     const { session, owner } = await generated('allocation');
 
     await expect(
-      sessionData.updateSessionAllocation(owner, {
+      editCapacity(owner, {
         sessionId: session.id,
         allocation: 10,
         expectedVersion: 1,
@@ -145,7 +152,7 @@ describe('updateSessionAllocation', () => {
     const { session } = await generated();
 
     await expect(
-      sessionData.updateSessionAllocation(await getCaller(), {
+      editCapacity(await getCaller(), {
         sessionId: session.id,
         allocation: 10,
         expectedVersion: 1,
@@ -158,7 +165,7 @@ describe('updateSessionAllocation', () => {
   });
 
   it('reports a session that does not exist', async () => {
-    const result = await sessionData.updateSessionAllocation(ops, {
+    const result = await editCapacity(ops, {
       sessionId: '11111111-1111-4111-8111-111111111111',
       allocation: 4,
       expectedVersion: 1,
@@ -175,7 +182,7 @@ describe('updateSessionAllocation', () => {
     'refuses %s for a session that does not exist',
     async (_name, getCaller) => {
       await expect(
-        sessionData.updateSessionAllocation(getCaller(), {
+        editCapacity(getCaller(), {
           sessionId: '11111111-1111-4111-8111-111111111111',
           allocation: 4,
           expectedVersion: 1,
@@ -196,7 +203,7 @@ describe('updateSessionAllocation', () => {
         .set(change)
         .where(eq(sessions.id, session.id));
 
-      const result = await sessionData.updateSessionAllocation(owner, {
+      const result = await editCapacity(owner, {
         sessionId: session.id,
         allocation: 4,
         expectedVersion: 1,
@@ -221,7 +228,7 @@ describe('updateSessionAllocation', () => {
       ]);
 
       await expect(
-        sessionData.updateSessionAllocation(guest, {
+        editCapacity(guest, {
           sessionId: session.id,
           allocation: 4,
           expectedVersion: 1,
@@ -242,7 +249,7 @@ describe('updateSessionAllocation', () => {
     const { session } = await generated();
 
     await expect(
-      sessionData.updateSessionAllocation(ops, {
+      editCapacity(ops, {
         sessionId: session.id,
         allocation: 4,
         expectedVersion: 1,

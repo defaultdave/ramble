@@ -37,10 +37,7 @@ export function weekStartOf(date: string): string {
 }
 
 /** The first week the host may open (eight weeks back from today's) and the last, which must end inside the generation horizon. */
-function weekLimits(
-  today: string,
-  now: Date,
-): { first: string; last: string } {
+function weekLimits(today: string, now: Date): { first: string; last: string } {
   return {
     first: addDays(weekStartOf(today), -weeksBack * daysInWeek),
     last: addDays(weekStartOf(generationHorizon(now)), -daysInWeek),
@@ -126,9 +123,9 @@ export type HostWeekRowView = {
   allocation: number;
   /** Dollars as typed, "85" or "12.50"; null when the experience has no adult price. */
   adultPrice: string | null;
-  /** A scheduled session that has not started: its capacity and price may change. */
+  /** A scheduled session that has not started: the only kind whose capacity and price the server will change (a started or cancelled one is refused). */
   editable: boolean;
-  /** The same, with nobody booked: its time may change and it may be cancelled. */
+  /** The same, with no seat sold: its time may change and it may be cancelled. The server also refuses while a guest holds seats mid-payment. */
   movable: boolean;
 };
 

@@ -10,7 +10,7 @@ import {
   waitUntilBlocked,
   type FreshDatabase,
 } from './harness';
-import { sessionsFixtures } from './sessionsFixtures';
+import { earlyNow, sessionsFixtures } from './sessionsFixtures';
 
 vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 
@@ -44,11 +44,17 @@ const { generated, stored } = sessionsFixtures(
   () => sessionData,
 );
 
+/** The sessions here are in June 2026, so every edit is made on a day before them. */
+const editCapacity = (
+  caller: Caller,
+  input: Parameters<typeof sessionData.updateSessionAllocation>[1],
+) => sessionData.updateSessionAllocation(caller, input, earlyNow);
+
 describe('updateSessionAllocation', () => {
   it('raises the capacity and bumps the version', async () => {
     const { session, owner } = await generated();
 
-    const result = await sessionData.updateSessionAllocation(owner, {
+    const result = await editCapacity(owner, {
       sessionId: session.id,
       allocation: 12,
       expectedVersion: 1,
@@ -71,7 +77,7 @@ describe('updateSessionAllocation', () => {
       .set({ seatsSold: 5 })
       .where(eq(sessions.id, session.id));
 
-    const result = await sessionData.updateSessionAllocation(owner, {
+    const result = await editCapacity(owner, {
       sessionId: session.id,
       allocation: 5,
       expectedVersion: 1,
@@ -87,7 +93,7 @@ describe('updateSessionAllocation', () => {
       .set({ seatsSold: 5 })
       .where(eq(sessions.id, session.id));
 
-    const result = await sessionData.updateSessionAllocation(owner, {
+    const result = await editCapacity(owner, {
       sessionId: session.id,
       allocation: 4,
       expectedVersion: 1,
@@ -108,13 +114,13 @@ describe('updateSessionAllocation', () => {
 
   it('refuses a stale version and changes nothing', async () => {
     const { session, owner } = await generated();
-    await sessionData.updateSessionAllocation(owner, {
+    await editCapacity(owner, {
       sessionId: session.id,
       allocation: 9,
       expectedVersion: 1,
     });
 
-    const result = await sessionData.updateSessionAllocation(owner, {
+    const result = await editCapacity(owner, {
       sessionId: session.id,
       allocation: 10,
       expectedVersion: 1,
@@ -131,12 +137,12 @@ describe('updateSessionAllocation', () => {
     const { session, owner } = await generated();
 
     const results = await Promise.all([
-      sessionData.updateSessionAllocation(owner, {
+      editCapacity(owner, {
         sessionId: session.id,
         allocation: 9,
         expectedVersion: 1,
       }),
-      sessionData.updateSessionAllocation(owner, {
+      editCapacity(owner, {
         sessionId: session.id,
         allocation: 10,
         expectedVersion: 1,
@@ -158,7 +164,7 @@ describe('updateSessionAllocation', () => {
       await booking.query('SELECT id FROM sessions WHERE id = $1 FOR UPDATE', [
         session.id,
       ]);
-      const pending = sessionData.updateSessionAllocation(owner, {
+      const pending = editCapacity(owner, {
         sessionId: session.id,
         allocation: 2,
         expectedVersion: 1,
@@ -201,7 +207,7 @@ describe('updateSessionAllocation', () => {
       ]);
       const holderPid = await backendPid(held);
       const pending = sessionData
-        .updateSessionAllocation(caller, { sessionId, ...edit })
+        .updateSessionAllocation(caller, { sessionId, ...edit }, earlyNow)
         .then(
           (value) => ({ value }) as const,
           (error: unknown) => ({ error }) as const,
@@ -260,7 +266,7 @@ describe('updateSessionAllocation', () => {
       .update(sessions)
       .set({ status: 'scheduled', cancelReason: null })
       .where(eq(sessions.id, session.id));
-    const stale = await sessionData.updateSessionAllocation(owner, {
+    const stale = await editCapacity(owner, {
       sessionId: session.id,
       ...staleAndBelowSold,
     });

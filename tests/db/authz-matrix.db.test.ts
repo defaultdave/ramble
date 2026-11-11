@@ -48,6 +48,7 @@ setupAuthzDatabase();
 
 type Data = {
   audit: typeof import('@/server/db/audit');
+  cancelSession: typeof import('@/server/db/cancelSession');
   anonymize: typeof import('@/server/db/anonymize');
   catalog: typeof import('@/server/db/catalog');
   editorial: typeof import('@/server/db/editorial');
@@ -111,6 +112,7 @@ const platform = (...who: readonly Subject[]) => ({ platform: who });
 beforeAll(async () => {
   data = {
     audit: await import('@/server/db/audit'),
+    cancelSession: await import('@/server/db/cancelSession'),
     anonymize: await import('@/server/db/anonymize'),
     catalog: await import('@/server/db/catalog'),
     editorial: await import('@/server/db/editorial'),
@@ -506,6 +508,21 @@ const rows: Row[] = [
     fn: 'recordOpsAccess',
     invoke: (c) => data.audit.recordOpsAccess(c),
     allows: platform(...opsOnly),
+  },
+  // Cancelling a session cancels it for good, so the row sits after every row that still needs a scheduled one.
+  {
+    fn: 'cancelSession',
+    invoke: (c, t) =>
+      data.cancelSession.cancelSession(c, {
+        sessionId: t.sessionId,
+        reason: 'host',
+      }),
+    allows: {
+      hostA: ['ownerA', ...staff],
+      hostB: ['ownerB', ...staff],
+      allocationOnHostA: ['ownerA', ...staff],
+      missing: staff,
+    },
   },
   // Seed and persona writes: ops alone. These write the most, so they come last.
   {

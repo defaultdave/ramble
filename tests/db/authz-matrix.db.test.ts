@@ -53,6 +53,7 @@ type Data = {
   editorial: typeof import('@/server/db/editorial');
   guests: typeof import('@/server/db/guests');
   hostDashboard: typeof import('@/server/db/hostDashboard');
+  hostGuestLists: typeof import('@/server/db/hostGuestLists');
   ledger: typeof import('@/server/db/ledger');
   legal: typeof import('@/server/db/legal');
   photos: typeof import('@/server/db/photos');
@@ -115,6 +116,7 @@ beforeAll(async () => {
     editorial: await import('@/server/db/editorial'),
     guests: await import('@/server/db/guests'),
     hostDashboard: await import('@/server/db/hostDashboard'),
+    hostGuestLists: await import('@/server/db/hostGuestLists'),
     ledger: await import('@/server/db/ledger'),
     legal: await import('@/server/db/legal'),
     photos: await import('@/server/db/photos'),
@@ -366,6 +368,17 @@ const rows: Row[] = [
         isoDateOf(new Date(Date.now() + 8 * msPerDay)),
         new Date(),
       ),
+    allows: { hostA: ['ownerA'], hostB: ['ownerB'], missing: [] },
+  },
+  {
+    fn: 'readHostBookings',
+    invoke: (c, t) => data.hostGuestLists.readHostBookings(c, t.hostId, ''),
+    allows: { hostA: ['ownerA'], hostB: ['ownerB'], missing: [] },
+  },
+  {
+    fn: 'readHostGuestList',
+    invoke: (c, t) =>
+      data.hostGuestLists.readHostGuestList(c, t.hostId, t.sessionId),
     allows: { hostA: ['ownerA'], hostB: ['ownerB'], missing: [] },
   },
   // The owner of the host, or staff.

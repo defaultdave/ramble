@@ -354,6 +354,23 @@ const rows: Row[] = [
     allows: { hostA: ['ownerA'], hostB: ['ownerB'], missing: [] },
   },
   {
+    fn: 'readHostWeek',
+    invoke: (c, t) =>
+      data.sessions.readHostWeek(c, t.hostId, undefined, new Date()),
+    allows: { hostA: ['ownerA'], hostB: ['ownerB'], missing: [] },
+  },
+  {
+    fn: 'publishWeek',
+    invoke: (c, t) =>
+      data.sessions.publishWeek(
+        c,
+        t.hostId,
+        isoDateOf(new Date(Date.now() + 8 * msPerDay)),
+        new Date(),
+      ),
+    allows: { hostA: ['ownerA'], hostB: ['ownerB'], missing: [] },
+  },
+  {
     fn: 'readHostBookings',
     invoke: (c, t) => data.hostGuestLists.readHostBookings(c, t.hostId, ''),
     allows: { hostA: ['ownerA'], hostB: ['ownerB'], missing: [] },
@@ -400,6 +417,69 @@ const rows: Row[] = [
         allocation: 8,
         expectedVersion: 1,
       }),
+    allows: sessionRules,
+  },
+  {
+    fn: 'updateSessionTime',
+    invoke: (c, t) =>
+      data.sessions.updateSessionTime(
+        c,
+        {
+          sessionId: t.sessionId,
+          startTime: '09:00',
+          durationMinutes: 60,
+          expectedVersion: 1,
+        },
+        new Date(),
+      ),
+    allows: sessionRules,
+  },
+  {
+    fn: 'updateSessionPrice',
+    invoke: (c, t) =>
+      data.sessions.updateSessionPrice(
+        c,
+        {
+          sessionId: t.sessionId,
+          kind: 'adult',
+          priceMinor: 100,
+        },
+        new Date(),
+      ),
+    allows: sessionRules,
+  },
+  {
+    fn: 'addOneOffSession',
+    invoke: (c, t) =>
+      data.sessions.addOneOffSession(
+        c,
+        {
+          experienceId: t.experienceId,
+          localDate: isoDateOf(new Date(Date.now() + 2 * msPerDay)),
+          startTime: '03:00',
+          durationMinutes: 60,
+          allocation: 2,
+        },
+        new Date(),
+      ),
+    // A one-off date is always the host's own capacity, so the owner may add one to an experience
+    // that also has an allocation.
+    allows: {
+      hostA: ['ownerA', ...staff],
+      hostB: ['ownerB', ...staff],
+      allocationOnHostA: ['ownerA', ...staff],
+      missing: staff,
+    },
+  },
+  // Last of the session rows: it cancels the target session the rows above act on.
+  {
+    fn: 'cancelUnbookedSession',
+    invoke: (c, t) =>
+      data.sessions.cancelUnbookedSession(
+        c,
+        { sessionId: t.sessionId, expectedVersion: 1 },
+        new Date(),
+      ),
     allows: sessionRules,
   },
   {

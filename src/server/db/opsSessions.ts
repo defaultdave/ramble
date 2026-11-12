@@ -21,6 +21,7 @@ import {
   PauseIncompleteError,
   pausePlanFor,
   pauseView,
+  cursorFrom,
   impactIsCurrent,
   impactOrders,
   impactView,
@@ -155,9 +156,7 @@ export async function readOpsSessions(
   options: { when: SessionWhen | null; term: string; cursor: string | null },
 ): Promise<OpsSessionsPage> {
   const userId = requireOpsUserId(caller);
-  // A cursor that is no id (a hand-edited address) starts again from the first page.
-  const parsedCursor = WriteIdSchema.safeParse(options.cursor);
-  const cursor = parsedCursor.success ? parsedCursor.data : null;
+  const cursor = cursorFrom(options.cursor);
   const at = await currentDatabaseTime();
   const direction = sessionListDirection(options.when);
   const pattern = containsPattern(options.term);
@@ -403,7 +402,7 @@ export async function pauseExperienceAndCancel(
   }
 
   const steps: PauseStep[] = [];
-  let total = 0;
+  let total: number | null = null;
   try {
     const at = await currentDatabaseTime();
     const { targets } = await readPauseImpact(db, found.experienceId, at);

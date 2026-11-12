@@ -5,6 +5,7 @@ import {
   type CancelSessionResult,
   type SessionCancelReason,
 } from './cancelSession';
+import { WriteIdSchema } from './catalog';
 import { pauseActionFor } from './experiencePause';
 import {
   hostSessionFormValues,
@@ -41,6 +42,12 @@ import { zonedDeadlineLabel } from './zonedLabels';
 
 export const opsSessionsPath = '/ops/sessions';
 export const opsSessionsPageSize = 25;
+
+/** The list cursor an address carries, lower-cased; none, or one that is no id (a hand-edited address), starts again from the first page. */
+export function cursorFrom(raw: string | null | undefined): string | null {
+  const parsed = WriteIdSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
 
 export function opsSessionPath(sessionId: string): string {
   return `${opsSessionsPath}/${sessionId}`;
@@ -660,7 +667,8 @@ export function pauseView(input: {
 export type PauseOutcome =
   | { status: 'not_found' | 'not_pausable' | 'blocked' | 'stale' }
   | ({ status: 'paused' } & PauseTally)
-  | { status: 'incomplete'; cancelled: number; total: number };
+  /** `total` is null when the failure came before the number of sessions was known. */
+  | { status: 'incomplete'; cancelled: number; total: number | null };
 
 export type PauseTally = {
   cancelled: number;
@@ -709,7 +717,7 @@ export function tallyPauseResults(steps: readonly PauseStep[]): PauseTally {
 export class PauseIncompleteError extends Error {
   constructor(
     readonly cancelled: number,
-    readonly total: number,
+    readonly total: number | null,
     cause: unknown,
   ) {
     super('The pause stopped before every session was cancelled', { cause });
@@ -731,11 +739,13 @@ export function pauseOutcomeHref(path: string, outcome: PauseOutcome): string {
           : {}),
       });
     case 'incomplete':
-      return tableHref(path, {
-        notice: 'pause_incomplete',
-        done: String(outcome.cancelled),
-        of: String(outcome.total),
-      });
+      return outcome.total === null
+        ? tableHref(path, { notice: 'pause_incomplete' })
+        : tableHref(path, {
+            notice: 'pause_incomplete',
+            done: String(outcome.cancelled),
+            of: String(outcome.total),
+          });
     default:
       return tableHref(path, { notice: outcome.status });
   }

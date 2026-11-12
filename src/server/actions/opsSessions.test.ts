@@ -251,6 +251,15 @@ describe('pauseOpsExperienceAction', () => {
     );
   });
 
+  it('omits the counts when the pause failed before the sessions were counted', async () => {
+    mocks.pauseExperienceAndCancel.mockRejectedValue(
+      new PauseIncompleteError(0, null, new Error('boom')),
+    );
+    expect(await redirectOf(() => pauseOpsExperienceAction(form(values)))).toBe(
+      `${page}?notice=pause_incomplete`,
+    );
+  });
+
   it('does not swallow any other failure', async () => {
     mocks.pauseExperienceAndCancel.mockRejectedValue(new Error('boom'));
     await expect(pauseOpsExperienceAction(form(values))).rejects.toThrow(

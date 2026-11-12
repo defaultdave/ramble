@@ -9,7 +9,7 @@ import {
   it,
   vi,
 } from 'vitest';
-import { opsSessionsPageSize } from '@/lib/opsSessions';
+import { opsListPageSize } from '@/lib/tableQuery';
 import { ForbiddenError, Role, type Caller } from '@/server/auth/caller';
 import { testCaller } from '@/server/auth/test-caller';
 import {
@@ -233,12 +233,12 @@ describe('readOpsSessions', () => {
   });
 
   it('pages by cursor so each session shows once, and starts again from the first page for a cursor that is no id', async () => {
-    for (let n = 0; n < opsSessionsPageSize + 3; n += 1) {
+    for (let n = 0; n < opsListPageSize + 3; n += 1) {
       await newSession({ startsAt: new Date(Date.now() + (100 + n) * day) });
     }
     const options = { when: 'upcoming', term: '' } as const;
     const first = await data.readOpsSessions(ops, { ...options, cursor: null });
-    expect(first.rows).toHaveLength(opsSessionsPageSize);
+    expect(first.rows).toHaveLength(opsListPageSize);
     expect(first.nextCursor).not.toBeNull();
     const second = await data.readOpsSessions(ops, {
       ...options,

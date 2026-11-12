@@ -50,6 +50,23 @@ describe('opsViewEntry', () => {
       details: {},
     });
   });
+
+  it('carries the details it is given', () => {
+    expect(
+      parseAuditEntry(
+        opsViewEntry(userId, 'session.viewed', 'session', messageId, {
+          refunded_cents: 1200,
+        }),
+      ),
+    ).toEqual({
+      actorKind: 'user',
+      actorId: userId,
+      action: 'session.viewed',
+      subjectKind: 'session',
+      subjectId: messageId,
+      details: { refunded_cents: 1200 },
+    });
+  });
 });
 
 describe('opsAccessEntry', () => {
@@ -109,21 +126,6 @@ describe('mailboxUnlockEntry', () => {
       subjectKind: 'mailbox',
       subjectId: opsAreaIds.mailbox,
       details: { via: 'secret' },
-    });
-  });
-});
-
-describe('opsViewEntry', () => {
-  it('names the ops user, the kind of record, and its id, with no details', () => {
-    expect(
-      parseAuditEntry(opsViewEntry(userId, 'host.viewed', 'host', userId)),
-    ).toEqual({
-      actorKind: 'user',
-      actorId: userId,
-      action: 'host.viewed',
-      subjectKind: 'host',
-      subjectId: userId,
-      details: {},
     });
   });
 });

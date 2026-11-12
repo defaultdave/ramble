@@ -21,10 +21,10 @@ export function opsBookingActionRows() {
     {
       fn: 'refundBookingAsOps',
       invoke: async (c) =>
-        (await import('@/server/db/opsBookings')).refundBookingAsOps(
-          c,
-          randomUUID(),
-        ),
+        (await import('@/server/db/opsBookings')).refundBookingAsOps(c, {
+          orderId: randomUUID(),
+          expectedRefundMinor: 0,
+        }),
       allows: opsOnly,
     },
     {
@@ -48,10 +48,10 @@ export function opsBookingActionRows() {
     {
       fn: 'resendBookingConfirmation',
       invoke: async (c) =>
-        (await import('@/server/opsBookingResend')).resendBookingConfirmation(
-          c,
-          randomUUID(),
-        ),
+        (await import('@/server/db/opsBookings')).resendBookingConfirmation(c, {
+          orderId: randomUUID(),
+          resendId: randomUUID(),
+        }),
       allows: opsOnly,
     },
   ] satisfies {

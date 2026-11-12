@@ -12,13 +12,12 @@ import {
   linksVoidedEntry,
   opsBookingNotices,
   opsNoticeCodes,
-  opsRefundDecision,
-  opsRefundRequest,
+  opsRefundQuote,
+  opsRefundVerdict,
   parseBookingFilter,
   parseBookingSearch,
-  parseCancelForm,
+  parseExpectedRefundForm,
   refundNoticeCode,
-  refundRequestedEntry,
   resendNoticeCode,
   searchSummary,
   voidNoticeCode,
@@ -184,45 +183,72 @@ function detailOf(overrides: Partial<OpsBookingDetailRecord> = {}) {
     emailSource: source,
     refunds: [],
     history: [],
+    resendId: '2f1e2d3c-4b5a-4697-8a9b-0c1d2e3f4a5b',
     now: new Date('2026-11-11T12:00:00Z'),
     ...overrides,
   });
 }
 
-describe('opsRefundDecision', () => {
+describe('opsRefundQuote', () => {
+  const cancelled = {
+    kind: 'booking',
+    status: 'cancelled',
+    refundFailed: false,
+  } as const;
+  const held = { ...facts, status: 'cancelled' } as const;
+
+  it('quotes the whole rest of a cancelled booking that still holds money', () => {
+    expect(opsRefundQuote(cancelled, held)).toEqual({ amountMinor: 10800 });
+  });
+
   it.each([
-    ['booking', 'cancelled', false, 'go'],
-    ['booking', 'confirmed', false, 'refused'],
-    ['booking', 'cancelled', true, 'refused'],
-    ['gift_purchase', 'cancelled', false, 'refused'],
-  ] as const)(
-    '%s %s with refundFailed %s is %s',
-    (kind, status, refundFailed, expected) => {
-      expect(opsRefundDecision({ kind, status, refundFailed })).toBe(expected);
-    },
-  );
+    ['a live booking', { ...cancelled, status: 'confirmed' }, held],
+    ['one whose refund failed', { ...cancelled, refundFailed: true }, held],
+    ['a gift purchase', { ...cancelled, kind: 'gift_purchase' }, held],
+    [
+      'one already given back',
+      cancelled,
+      { ...held, refundedTicketMinor: 10000, refundedTaxMinor: 800 },
+    ],
+  ] as const)('quotes nothing for %s', (_name, order, orderFacts) => {
+    expect(opsRefundQuote(order, orderFacts)).toBeNull();
+  });
 });
 
-describe('opsRefundRequest', () => {
-  it('asks for the whole rest under the one ops key, naming the ops user', () => {
-    expect(opsRefundRequest(orderId, userId)).toEqual({
-      orderId,
-      reason: 'ops_adjustment',
-      key: 'ops-refund',
-      ticketMinor: 'remaining',
-      initiatedBy: userId,
-    });
+describe('opsRefundVerdict', () => {
+  const cancelled = {
+    kind: 'booking',
+    status: 'cancelled',
+    refundFailed: false,
+  } as const;
+  const held = { ...facts, status: 'cancelled' } as const;
+
+  it.each([
+    [10800, 'go'],
+    [0, 'terms_changed'],
+    [10799, 'terms_changed'],
+  ] as const)('judges the amount shown, %s, as %s', (shown, expected) => {
+    expect(opsRefundVerdict(cancelled, held, shown)).toBe(expected);
+  });
+
+  it('refuses a booking that cannot be refunded whatever amount was shown', () => {
+    expect(
+      opsRefundVerdict({ ...cancelled, status: 'confirmed' }, held, 10800),
+    ).toBe('refused');
   });
 });
 
 describe('buildOpsBookingDetail', () => {
   it('offers cancel with the refund the tier gives, and resend, for a confirmed booking in its window', () => {
-    expect(detailOf()).toMatchObject({
-      cancel: { refundMinor: 10800, basis: 'full' },
-      canRefund: false,
-      canRetryRefund: false,
-      canResend: true,
+    const { actions } = detailOf();
+    expect(actions.cancel).toMatchObject({
+      label: 'Cancel booking',
+      fields: [{ name: 'expectedRefundMinor', value: '10800' }],
     });
+    expect(actions.resend?.fields).toEqual([
+      { name: 'resendId', value: '2f1e2d3c-4b5a-4697-8a9b-0c1d2e3f4a5b' },
+    ]);
+    expect([actions.refund, actions.retryRefund]).toEqual([null, null]);
   });
 
   it('offers a refund, not cancel or resend, for a cancelled booking that still holds money', () => {
@@ -232,7 +258,16 @@ describe('buildOpsBookingDetail', () => {
         facts: { ...facts, status: 'cancelled' },
         emailSource: { kind: 'booking', status: 'cancelled' } as never,
       }),
-    ).toMatchObject({ cancel: null, canRefund: true, canResend: false });
+    ).toMatchObject({
+      actions: {
+        cancel: null,
+        refund: {
+          label: 'Refund $108.00',
+          fields: [{ name: 'expectedRefundMinor', value: '10800' }],
+        },
+        resend: null,
+      },
+    });
   });
 
   it('offers retry, not a new refund, for a booking whose refund failed', () => {
@@ -241,7 +276,9 @@ describe('buildOpsBookingDetail', () => {
         booking: { ...booking, status: 'cancelled', refundFailed: true },
         facts: { ...facts, status: 'cancelled' },
       }),
-    ).toMatchObject({ canRefund: false, canRetryRefund: true });
+    ).toMatchObject({
+      actions: { refund: null, retryRefund: { label: 'Retry refund' } },
+    });
   });
 
   it('offers no refund when everything is already given back', () => {
@@ -261,7 +298,10 @@ describe('buildOpsBookingDetail', () => {
           commissionReturnedMinor: 1500,
         },
       }),
-    ).toMatchObject({ canRefund: false, refundedLabel: '$108.00' });
+    ).toMatchObject({
+      actions: { refund: null },
+      refundedLabel: '$108.00',
+    });
   });
 
   it('lists the order dates and ops actions oldest first, leaving out reads and unknown actions', () => {
@@ -321,13 +361,15 @@ describe('buildOpsBookingDetail', () => {
   });
 });
 
-describe('parseCancelForm', () => {
+describe('parseExpectedRefundForm', () => {
   it.each([
     ['10800', 10800],
     ['0', 0],
     [' 500 ', 500],
   ])('carries the refund ops was shown, %j', (shown, expected) => {
-    expect(parseCancelForm(get({ expectedRefundMinor: shown }))).toEqual({
+    expect(
+      parseExpectedRefundForm(get({ expectedRefundMinor: shown })),
+    ).toEqual({
       ok: true,
       expectedRefundMinor: expected,
     });
@@ -337,7 +379,7 @@ describe('parseCancelForm', () => {
     'refuses a refund of %j',
     (shown) => {
       expect(
-        parseCancelForm(
+        parseExpectedRefundForm(
           get(shown === undefined ? {} : { expectedRefundMinor: shown }),
         ),
       ).toEqual({ ok: false });
@@ -387,7 +429,7 @@ describe('notices', () => {
   });
 
   it.each([
-    [resendNoticeCode('sent'), 'resent'],
+    [resendNoticeCode('queued'), 'resent'],
     [resendNoticeCode('not_resendable'), 'not_resendable'],
     [resendNoticeCode('not_found'), 'not_found'],
     [voidNoticeCode({ version: 2 }), 'links_voided'],
@@ -407,7 +449,6 @@ describe('audit entries', () => {
   it.each([
     ['the list read', bookingsListEntry(userId)],
     ['a booking read', bookingViewedEntry(userId, orderId)],
-    ['a refund', refundRequestedEntry(userId, orderId, orderId)],
     ['a void', linksVoidedEntry(userId, orderId, 2)],
     ['a resend', confirmationResentEntry(userId, orderId, orderId)],
   ])('writes %s as ids and codes the audit log accepts', (_name, entry) => {

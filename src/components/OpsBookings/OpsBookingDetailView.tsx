@@ -1,12 +1,11 @@
 import Link from 'next/link';
-import type { ReactNode } from 'react';
 import { Button } from '@/components/Button';
 import { StatusBadge } from '@/components/StatusBadge';
 import {
-  cancelBasisLines,
   opsBookingsPath,
   orderStatusLabels,
   orderStatusTones,
+  type OpsActionView,
   type OpsBookingDetail,
 } from '@/lib/opsBookings';
 import styles from './OpsBookings.module.css';
@@ -24,24 +23,27 @@ export type OpsBookingActions = {
 function ActionForm({
   action,
   orderId,
-  label,
-  help,
-  children,
+  view,
 }: {
   action: FormAction;
   orderId: string;
-  label: string;
-  help: string;
-  children?: ReactNode;
+  view: OpsActionView;
 }) {
   return (
     <li className={styles.row}>
       <form action={action} className={styles.actionForm}>
         <input type="hidden" name="orderId" value={orderId} />
-        {children}
-        <p className={styles.muted}>{help}</p>
+        {view.fields.map((field) => (
+          <input
+            key={field.name}
+            type="hidden"
+            name={field.name}
+            value={field.value}
+          />
+        ))}
+        <p className={styles.muted}>{view.help}</p>
         <Button type="submit" variant="secondary">
-          {label}
+          {view.label}
         </Button>
       </form>
     </li>
@@ -90,50 +92,25 @@ export function OpsBookingDetailView({
           Actions
         </h2>
         <ul className={styles.list}>
-          {detail.cancel === null ? null : (
-            <ActionForm
-              action={actions.cancel}
-              orderId={row.id}
-              label="Cancel booking"
-              help={cancelBasisLines[detail.cancel.basis]}
-            >
-              <input
-                type="hidden"
-                name="expectedRefundMinor"
-                value={detail.cancel.refundMinor}
+          {(
+            [
+              ['cancel', actions.cancel],
+              ['refund', actions.refund],
+              ['retryRefund', actions.retryRefund],
+              ['resend', actions.resend],
+              ['voidLinks', actions.voidLinks],
+            ] as const
+          ).map(([name, action]) => {
+            const view = detail.actions[name];
+            return view === null ? null : (
+              <ActionForm
+                key={name}
+                action={action}
+                orderId={row.id}
+                view={view}
               />
-            </ActionForm>
-          )}
-          {detail.canRefund ? (
-            <ActionForm
-              action={actions.refund}
-              orderId={row.id}
-              label="Refund the rest"
-              help="Sends back everything this booking still holds, to the card it was paid with."
-            />
-          ) : null}
-          {detail.canRetryRefund ? (
-            <ActionForm
-              action={actions.retryRefund}
-              orderId={row.id}
-              label="Retry refund"
-              help="The last refund failed. This asks the payment provider again."
-            />
-          ) : null}
-          {detail.canResend ? (
-            <ActionForm
-              action={actions.resend}
-              orderId={row.id}
-              label="Resend confirmation"
-              help="Emails the confirmation and calendar file to the address on the booking, with a working link."
-            />
-          ) : null}
-          <ActionForm
-            action={actions.voidLinks}
-            orderId={row.id}
-            label="Void earlier links"
-            help="Stops every link already emailed from opening this booking. Resend the confirmation for a new one."
-          />
+            );
+          })}
         </ul>
       </section>
 

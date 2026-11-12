@@ -8,11 +8,13 @@ import {
   hostBookingNoticeData,
   hostNoticeDecision,
   moveEmailKey,
+  resendEmailKey,
   reminderDecision,
   sessionReminderData,
 } from '@/lib/bookingEmails';
 import { WriteIdSchema } from '@/lib/catalog';
 import type { GuestMovePayloadSchema } from '@/lib/moveBooking';
+import type { GuestResendPayloadSchema } from '@/lib/opsBookings';
 import type { Transaction } from '@/server/db/client';
 import {
   readBookingEmailOrder,
@@ -144,6 +146,30 @@ export async function sendGuestMoveConfirmation({
     }),
     idempotencyKey: moveEmailKey(payload.moveId),
   });
+}
+
+/**
+ * The confirmation an ops resend queued: the booking as it now stands, with a link rebuilt from the
+ * order's version, to the address on the order, under the resend's own key. A booking cancelled since
+ * is skipped, as for the first confirmation.
+ */
+export async function sendGuestResend({
+  tx,
+  payload,
+  jobId,
+}: {
+  tx: Transaction;
+  payload: z.output<typeof GuestResendPayloadSchema>;
+  jobId: string;
+}): Promise<void> {
+  const { order, decision } = await loadOrder(tx, payload.orderId);
+  if (decision === 'skip') {
+    logger.info('booking email skipped', { jobId, reason: 'cancelled' });
+    return;
+  }
+  await sendEmail(
+    guestConfirmationRequest(order, resendEmailKey(payload.resendId)),
+  );
 }
 
 export async function sendHostBookingNotice({

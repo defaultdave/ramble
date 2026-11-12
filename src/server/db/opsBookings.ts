@@ -1,5 +1,7 @@
 import 'server-only';
+import { randomUUID } from 'node:crypto';
 import { and, desc, eq, inArray, or, type SQL } from 'drizzle-orm';
+import { confirmationDecision, resendEmailKey } from '@/lib/bookingEmails';
 import type { CancelBookingResult } from '@/lib/cancelBooking';
 import { WriteIdSchema } from '@/lib/catalog';
 import { splitPage } from '@/lib/pagination';
@@ -11,15 +13,21 @@ import {
   buildOpsBookingRow,
   linksVoidedEntry,
   opsHistoryActions,
-  opsRefundDecision,
-  opsRefundRequest,
-  refundRequestedEntry,
+  confirmationResentEntry,
+  opsRefundVerdict,
+  resendJobKind,
   type BookingFilter,
   type BookingSearch,
   type OpsBookingDetail,
   type OpsBookingRow,
 } from '@/lib/opsBookings';
+import { opsFullRefundRequest, refundAuditEntry } from '@/lib/refundRetry';
 import type { Caller } from '@/server/auth/caller';
+import {
+  BookingEmailError,
+  guestConfirmationRequest,
+} from '@/server/jobs/bookingEmails';
+import { enqueue } from '@/server/jobs/enqueue';
 import {
   bumpTokenVersion,
   capabilityToken,
@@ -32,7 +40,7 @@ import { db, dbRead } from './client';
 import { byColumnThenId, pastKeysetCursor } from './keysetPage';
 import { lockOrderById } from './locks';
 import { readCancelFacts } from './ordersCancelFacts';
-import { requestRefund } from './refunds';
+import { requestAuditedRefund } from './refunds';
 import {
   auditLog,
   experiences,
@@ -48,6 +56,7 @@ import { readDatabaseTime } from './time';
 // cancel; nothing here decides an amount. A failed retry of a refund is in `./orderRefundRetry`.
 
 const refundsShownLimit = 50;
+const historyShownLimit = 50;
 
 export type OpsBookingsPage = {
   rows: OpsBookingRow[];
@@ -163,6 +172,7 @@ export async function readOpsBooking(
       booking,
       facts: found.facts,
       emailSource: email?.source ?? null,
+      resendId: randomUUID(),
       now,
       history: await tx
         .select({ action: auditLog.action, recordedAt: auditLog.recordedAt })
@@ -175,7 +185,7 @@ export async function readOpsBooking(
           ),
         )
         .orderBy(desc(auditLog.recordedAt), desc(auditLog.id))
-        .limit(refundsShownLimit),
+        .limit(historyShownLimit),
       refunds: await tx
         .select({
           id: refunds.id,
@@ -203,17 +213,18 @@ export async function readOpsBooking(
 export async function cancelBookingAsOps(
   caller: Caller,
   input: { orderId: string; expectedRefundMinor: number },
-): Promise<CancelBookingResult> {
+): Promise<CancelBookingResult | { status: 'try_again' }> {
   const userId = requireOpsUserId(caller);
   const id = WriteIdSchema.parse(input.orderId);
   const [order] = await db
     .select({ version: orders.manageTokenVersion })
     .from(orders)
     .where(eq(orders.id, id));
-  const token = order
-    ? await resolveManageToken(capabilityToken('manage', id, order.version))
-    : null;
-  if (token === null) return { status: 'not_found' };
+  if (!order) return { status: 'not_found' };
+  const token = await resolveManageToken(
+    capabilityToken('manage', id, order.version),
+  );
+  if (token === null) return { status: 'try_again' };
   return cancelBookingOrder({
     token,
     expectedRefundMinor: input.expectedRefundMinor,
@@ -222,18 +233,17 @@ export async function cancelBookingAsOps(
 }
 
 type OpsRefundOutcome =
-  'requested' | 'already_requested' | 'refused' | 'not_found';
+  'requested' | 'already_requested' | 'refused' | 'terms_changed' | 'not_found';
 
-/** Refunds the whole rest of a cancelled booking's order, once: the refund, the order's totals, the ledger postings, the job, and the audit row commit together. */
+/** Refunds the whole rest of a cancelled booking's order, once, if it is the amount ops was shown: the refund, the order's totals, the ledger postings, the job, and the audit row commit together. */
 export async function refundBookingAsOps(
   caller: Caller,
-  orderId: string,
+  input: { orderId: string; expectedRefundMinor: number },
 ): Promise<OpsRefundOutcome> {
   const userId = requireOpsUserId(caller);
-  const id = WriteIdSchema.parse(orderId);
+  const id = WriteIdSchema.parse(input.orderId);
   return db.transaction(async (tx) => {
-    const locked = await lockOrderById(tx, id);
-    if (!locked) return 'not_found';
+    if (!(await lockOrderById(tx, id))) return 'not_found';
     const [order] = await tx
       .select({
         kind: orders.kind,
@@ -242,14 +252,18 @@ export async function refundBookingAsOps(
       })
       .from(orders)
       .where(eq(orders.id, id));
-    if (!order || opsRefundDecision(order) === 'refused') return 'refused';
-    const result = await requestRefund(tx, opsRefundRequest(id, userId));
-    if (result.status === 'requested') {
-      await writeAudit(
-        tx,
-        refundRequestedEntry(userId, id, result.refund.refundId),
-      );
-    }
+    const found = await readCancelFacts(tx, id);
+    const verdict =
+      order && found
+        ? opsRefundVerdict(order, found.facts, input.expectedRefundMinor)
+        : 'refused';
+    if (verdict !== 'go') return verdict;
+    const result = await requestAuditedRefund(
+      tx,
+      opsFullRefundRequest(id, userId),
+      (refundId) =>
+        refundAuditEntry('booking.ops_refund_requested', userId, id, refundId),
+    );
     return result.status;
   });
 }
@@ -268,5 +282,43 @@ export async function voidBookingLinks(
       await writeAudit(tx, linksVoidedEntry(userId, id, bumped.version));
     }
     return bumped;
+  });
+}
+
+type ResendOutcome = 'queued' | 'not_found' | 'not_resendable';
+
+/**
+ * Queues the booking's confirmation again, with a manage link rebuilt at the order's current token
+ * version and the `.ics`, for the address on the booking and no other: the address is read from the
+ * order when the job runs, never from the request. The job and the audit row commit in one
+ * transaction, so the audit log never records a resend that was not queued, and the resend's id keys
+ * the job, so a form posted twice queues one email. A booking with no live manage link is not resendable.
+ */
+export async function resendBookingConfirmation(
+  caller: Caller,
+  input: { orderId: string; resendId: string },
+): Promise<ResendOutcome> {
+  const userId = requireOpsUserId(caller);
+  const id = WriteIdSchema.parse(input.orderId);
+  const resendId = WriteIdSchema.parse(input.resendId);
+  return db.transaction(async (tx) => {
+    const order = await readBookingEmailOrder(tx, id);
+    if (order === null) return 'not_found';
+    if (confirmationDecision(order.source) !== 'send') return 'not_resendable';
+    try {
+      guestConfirmationRequest(order, resendEmailKey(resendId));
+    } catch (error) {
+      if (error instanceof BookingEmailError) return 'not_resendable';
+      throw error;
+    }
+    const queued = await enqueue(tx, {
+      kind: resendJobKind,
+      payload: { orderId: id, resendId },
+      dedupeKey: resendEmailKey(resendId),
+    });
+    if (queued !== null) {
+      await writeAudit(tx, confirmationResentEntry(userId, id, resendId));
+    }
+    return 'queued';
   });
 }

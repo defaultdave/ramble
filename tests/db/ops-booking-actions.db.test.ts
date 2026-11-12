@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Role, type Caller } from '@/server/auth/caller';
 import { testCaller } from '@/server/auth/test-caller';
+import { dueClock } from '../support/dueClock';
 import {
   seatsSoldOf,
   seedCancellable,
@@ -10,7 +11,9 @@ import {
 } from './cancelFixtures';
 import {
   client,
+  ask,
   clearJobs,
+  drain,
   handleEvent,
   jobsOfKind,
   orderOf,
@@ -53,18 +56,20 @@ setupRefundsDatabase(raise);
 // cancel
 // - an ops cancel is the guest's cancel (the order, seats, tier refund, and emails are the same) with the actor ops: the order records Ramble as the canceller, and `order.cancelled` and `booking.ops_cancel_requested` both name the ops user
 // - the guest's own cancel, the default actor, still records the guest and writes no ops row
+// - the guest and host notice jobs carry cancelledBy ramble for an ops cancel; links voided under the cancel ask to try again
 // - the cancellation and both audit rows are one transaction: an audit row that cannot be written leaves the order, spaces, and refunds as they were; a cancel that changes the terms, or finds no booking, writes no audit row at all
 // refund
-// - a cancelled booking is refunded once, in full, under the ops reason and the ops user, with one audit row naming the refund; asking again changes nothing
+// - a cancelled booking is refunded once, in full, under the ops reason and the ops user, with one audit row naming the refund; asking again, with nothing left to refund, is refused and changes nothing; an amount that is not the one shown changes the terms and refunds nothing
 // - a confirmed booking, and one whose refund failed, are refused with nothing written
 // retry
-// - a booking whose refund failed gets one new refund of the rest, the flag cleared, and one audit row in one transaction; a second try finds nothing to retry; a retry after the retry failed too asks again
+// - a booking whose refund failed gets one new refund of that refund's own amount, the flag cleared, and one audit row in one transaction; a second try finds nothing to retry; a retry after the retry failed too asks again
+// - a failed partial refund of a confirmed booking retries for only its amount; a second retry of the same failed refund is a no-op; a retry that would take the refunds past what the card paid is refused and writes nothing
 // - a retry the refund path refuses leaves the flag set and writes nothing; one whose audit row cannot be written leaves the flag set and no new refund
 // void links
 // - the token version goes up with the audit row in one transaction: the old link opens nothing and the new one opens the booking; an audit row that cannot be written leaves the version alone; a missing booking is null with no audit row
 // resend
-// - the confirmation goes to the address on the booking with a link that opens it and a key made from the resend id the audit row carries
-// - a cancelled booking and a missing one send nothing and write no audit row; a resend whose audit row cannot be written sends nothing
+// - the confirmation job and its audit row are one transaction; the job sends to the address on the booking with a link that opens it and a key made from the resend id the audit row carries; a form posted twice queues one email
+// - a cancelled booking, one with no live manage link, and a missing one queue nothing and write no audit row; a resend whose audit row cannot be written queues nothing
 // history
 // - the booking page lists what ops did to it
 
@@ -73,14 +78,12 @@ const ops: Caller = testCaller({ userId: opsUser, roles: [Role.Ops] });
 
 let data: typeof import('@/server/db/opsBookings');
 let retry: typeof import('@/server/db/orderRefundRetry');
-let resend: typeof import('@/server/opsBookingResend');
 let tokens: typeof import('@/server/tokens');
 let guestCancel: typeof import('@/server/db/orderCancel');
 
 beforeAll(async () => {
   data = await import('@/server/db/opsBookings');
   retry = await import('@/server/db/orderRefundRetry');
-  resend = await import('@/server/opsBookingResend');
   tokens = await import('@/server/tokens');
   guestCancel = await import('@/server/db/orderCancel');
 });
@@ -140,7 +143,12 @@ describe('cancelling', () => {
       cancelledBy: 'ramble',
     });
     expect(await refundsOf(world)).toHaveLength(1);
-    expect((await jobsOfKind('guest-cancellation')).length).toBe(1);
+    expect(await jobsOfKind('guest-cancellation')).toMatchObject([
+      { payload: { orderId: world.orderId, cancelledBy: 'ramble' } },
+    ]);
+    expect(await jobsOfKind('host-cancellation-notice')).toMatchObject([
+      { payload: { orderId: world.orderId, cancelledBy: 'ramble' } },
+    ]);
     expect(await auditRows(world.orderId, 'order.cancelled')).toMatchObject([
       {
         actorKind: 'user',
@@ -205,6 +213,22 @@ describe('cancelling', () => {
     expect(await auditRows(world.orderId)).toHaveLength(0);
   });
 
+  it('asks to try again when the links were voided under it, and writes nothing', async () => {
+    const world = await seedCancellable({ gatewayPayment: true });
+    await client.db
+      .update(schema.orders)
+      .set({ manageTokenHash: 'f'.repeat(64) })
+      .where(eq(schema.orders.id, world.orderId));
+    expect(
+      await data.cancelBookingAsOps(ops, {
+        orderId: world.orderId,
+        expectedRefundMinor: 13_000,
+      }),
+    ).toEqual({ status: 'try_again' });
+    expect((await orderOf(world)).status).toBe('confirmed');
+    expect(await auditRows(world.orderId)).toHaveLength(0);
+  });
+
   it('does not find a missing booking and writes no audit row', async () => {
     const id = randomUUID();
     expect(
@@ -222,10 +246,18 @@ describe('refunding', () => {
     const world = await cancelled({ freeCancelInMinutes: -60 });
     expect(await refundsOf(world)).toHaveLength(0);
 
-    expect(await data.refundBookingAsOps(ops, world.orderId)).toBe('requested');
-    expect(await data.refundBookingAsOps(ops, world.orderId)).toBe(
-      'already_requested',
-    );
+    expect(
+      await data.refundBookingAsOps(ops, {
+        orderId: world.orderId,
+        expectedRefundMinor: 13_000,
+      }),
+    ).toBe('requested');
+    expect(
+      await data.refundBookingAsOps(ops, {
+        orderId: world.orderId,
+        expectedRefundMinor: 13_000,
+      }),
+    ).toBe('refused');
 
     const [refund, ...others] = await refundsOf(world);
     expect(others).toHaveLength(0);
@@ -242,21 +274,48 @@ describe('refunding', () => {
 
   it('refuses a confirmed booking, and one whose refund failed, and writes nothing', async () => {
     const confirmed = await seedCancellable({ gatewayPayment: true });
-    expect(await data.refundBookingAsOps(ops, confirmed.orderId)).toBe(
-      'refused',
-    );
+    expect(
+      await data.refundBookingAsOps(ops, {
+        orderId: confirmed.orderId,
+        expectedRefundMinor: 13_000,
+      }),
+    ).toBe('refused');
     expect(await refundsOf(confirmed)).toHaveLength(0);
 
     const failed = await cancelled();
     await failTheRefund(failed);
-    expect(await data.refundBookingAsOps(ops, failed.orderId)).toBe('refused');
+    expect(
+      await data.refundBookingAsOps(ops, {
+        orderId: failed.orderId,
+        expectedRefundMinor: 13_000,
+      }),
+    ).toBe('refused');
     expect(
       await auditRows(failed.orderId, 'booking.ops_refund_requested'),
     ).toHaveLength(0);
   });
 
+  it('changes the terms for an amount that is not the one shown, and writes nothing', async () => {
+    const world = await cancelled({ freeCancelInMinutes: -60 });
+    expect(
+      await data.refundBookingAsOps(ops, {
+        orderId: world.orderId,
+        expectedRefundMinor: 12_999,
+      }),
+    ).toBe('terms_changed');
+    expect(await refundsOf(world)).toHaveLength(0);
+    expect(
+      await auditRows(world.orderId, 'booking.ops_refund_requested'),
+    ).toHaveLength(0);
+  });
+
   it('does not find a missing booking', async () => {
-    expect(await data.refundBookingAsOps(ops, randomUUID())).toBe('not_found');
+    expect(
+      await data.refundBookingAsOps(ops, {
+        orderId: randomUUID(),
+        expectedRefundMinor: 0,
+      }),
+    ).toBe('not_found');
   });
 });
 
@@ -297,6 +356,98 @@ describe('retrying a failed refund', () => {
 
     expect(await retry.retryFailedRefund(ops, world.orderId)).toBe('requested');
     expect(await refundsOf(world)).toHaveLength(3);
+  });
+
+  it('retries a failed partial refund of a confirmed booking for only its own amount', async () => {
+    const world = await seedCancellable({
+      gatewayPayment: true,
+      taxable: true,
+    });
+    const partial = await ask(world, {
+      reason: 'goodwill',
+      key: 'partial',
+      ticketMinor: 5_000,
+    });
+    if (partial.status !== 'requested') throw new Error('not requested');
+    await handleEvent(
+      await storeEvent(
+        refundEvent(
+          world,
+          {
+            id: partial.refund.refundId,
+            amountMinor: partial.refund.amountMinor,
+          },
+          'refund.failed',
+        ),
+      ),
+    );
+    expect((await orderOf(world)).status).toBe('confirmed');
+
+    expect(await retry.retryFailedRefund(ops, world.orderId)).toBe('requested');
+
+    const [, second] = await refundsOf(world);
+    expect(second).toMatchObject({
+      status: 'pending',
+      reason: 'goodwill',
+      ticketMinor: 5_000,
+      amountMinor: partial.refund.amountMinor,
+      initiatedBy: opsUser,
+    });
+    expect((await orderOf(world)).refundedTicketMinor).toBe(5_000);
+  });
+
+  it('makes a second retry of the same failed refund a no-op', async () => {
+    const world = await cancelled();
+    await failTheRefund(world);
+    expect(await retry.retryFailedRefund(ops, world.orderId)).toBe('requested');
+    await client.db
+      .update(schema.orders)
+      .set({ refundFailed: true })
+      .where(eq(schema.orders.id, world.orderId));
+
+    expect(await retry.retryFailedRefund(ops, world.orderId)).toBe(
+      'already_requested',
+    );
+
+    expect(await refundsOf(world)).toHaveLength(2);
+    expect((await orderOf(world)).refundFailed).toBe(true);
+    expect(
+      await auditRows(world.orderId, 'booking.ops_refund_retried'),
+    ).toHaveLength(1);
+    expect((await jobsOfKind('process-refund')).length).toBe(2);
+  });
+
+  it('refuses a retry that would take the refunds past what the card paid, and writes nothing', async () => {
+    const world = await seedCancellable({ gatewayPayment: true });
+    const partial = await ask(world, {
+      reason: 'goodwill',
+      key: 'partial',
+      ticketMinor: 5_000,
+    });
+    if (partial.status !== 'requested') throw new Error('not requested');
+    await handleEvent(
+      await storeEvent(
+        refundEvent(
+          world,
+          {
+            id: partial.refund.refundId,
+            amountMinor: partial.refund.amountMinor,
+          },
+          'refund.failed',
+        ),
+      ),
+    );
+    const rest = await ask(world, { reason: 'goodwill', key: 'rest' });
+    expect(rest.status).toBe('requested');
+    const before = await refundsOf(world);
+
+    expect(await retry.retryFailedRefund(ops, world.orderId)).toBe('refused');
+
+    expect(await refundsOf(world)).toHaveLength(before.length);
+    expect((await orderOf(world)).refundFailed).toBe(true);
+    expect(
+      await auditRows(world.orderId, 'booking.ops_refund_retried'),
+    ).toHaveLength(0);
   });
 
   it('leaves the flag set and writes nothing when the refund path refuses the request', async () => {
@@ -374,12 +525,34 @@ describe('voiding earlier links', () => {
 });
 
 describe('resending the confirmation', () => {
-  it('sends to the address on the booking with a link that opens it, keyed by the audited resend id', async () => {
-    const world = await seedCancellable();
+  const send = (world: CancelWorld, resendId = randomUUID()) =>
+    data.resendBookingConfirmation(ops, {
+      orderId: world.orderId,
+      resendId,
+    });
 
-    expect(await resend.resendBookingConfirmation(ops, world.orderId)).toBe(
-      'sent',
-    );
+  const settle = async () => {
+    for (let round = 0; round < 4; round += 1) {
+      const report = await drain.drainJobs(dueClock);
+      if (report.succeeded + report.retried + report.dead === 0) return;
+    }
+  };
+
+  it('queues the confirmation with its audit row in one transaction, and the job sends to the address on the booking with a link that opens it', async () => {
+    const world = await seedCancellable();
+    const resendId = randomUUID();
+
+    expect(await send(world, resendId)).toBe('queued');
+
+    expect(await jobsOfKind('guest-confirmation-resend')).toMatchObject([
+      { payload: { orderId: world.orderId, resendId } },
+    ]);
+    expect(
+      await auditRows(world.orderId, 'booking.ops_confirmation_resent'),
+    ).toMatchObject([{ actorId: opsUser, details: { resend_id: resendId } }]);
+    expect(sendEmail).not.toHaveBeenCalled();
+
+    await settle();
 
     expect(sendEmail).toHaveBeenCalledTimes(1);
     const [request] = sendEmail.mock.calls[0] as [
@@ -393,23 +566,28 @@ describe('resending the confirmation', () => {
     expect(request).toMatchObject({
       template: 'guest-confirmation',
       to: (await orderOf(world)).contactEmail,
+      idempotencyKey: `guest-confirmation-resend:${resendId}`,
     });
     expect(request.data.manageUrl).toContain(world.token);
     expect(request.data.calendar).toBeDefined();
-    const [row] = await auditRows(
-      world.orderId,
-      'booking.ops_confirmation_resent',
-    );
-    const details = row?.details as { resend_id: string };
-    expect(request.idempotencyKey).toBe(
-      `guest-confirmation-resend:${details.resend_id}`,
-    );
+  });
+
+  it('queues one email and writes one audit row for a form posted twice', async () => {
+    const world = await seedCancellable();
+    const resendId = randomUUID();
+    expect(await send(world, resendId)).toBe('queued');
+    expect(await send(world, resendId)).toBe('queued');
+    expect(await jobsOfKind('guest-confirmation-resend')).toHaveLength(1);
+    expect(
+      await auditRows(world.orderId, 'booking.ops_confirmation_resent'),
+    ).toHaveLength(1);
   });
 
   it('carries a rebuilt link after the earlier ones are voided', async () => {
     const world = await seedCancellable();
     await data.voidBookingLinks(ops, world.orderId);
-    await resend.resendBookingConfirmation(ops, world.orderId);
+    await send(world);
+    await settle();
     const [request] = sendEmail.mock.calls[0] as [
       { data: { manageUrl: string } },
     ];
@@ -419,27 +597,37 @@ describe('resending the confirmation', () => {
     expect(request.data.manageUrl).not.toContain(world.token);
   });
 
-  it('sends nothing for a cancelled booking or a missing one, and writes no audit row', async () => {
-    const world = await cancelled();
-    expect(await resend.resendBookingConfirmation(ops, world.orderId)).toBe(
-      'not_resendable',
-    );
+  it('queues nothing for a cancelled booking, one with no live manage link, or a missing one', async () => {
+    const gone = await cancelled();
+    const unlinked = await seedCancellable();
+    await client.db
+      .update(schema.orders)
+      .set({ manageTokenHash: null })
+      .where(eq(schema.orders.id, unlinked.orderId));
     const id = randomUUID();
-    expect(await resend.resendBookingConfirmation(ops, id)).toBe('not_found');
-    expect(sendEmail).not.toHaveBeenCalled();
+
+    expect(await send(gone)).toBe('not_resendable');
+    expect(await send(unlinked)).toBe('not_resendable');
     expect(
-      await auditRows(world.orderId, 'booking.ops_confirmation_resent'),
-    ).toHaveLength(0);
-    expect(await auditRows(id)).toHaveLength(0);
+      await data.resendBookingConfirmation(ops, {
+        orderId: id,
+        resendId: randomUUID(),
+      }),
+    ).toBe('not_found');
+
+    expect(await jobsOfKind('guest-confirmation-resend')).toHaveLength(0);
+    for (const orderId of [gone.orderId, unlinked.orderId, id]) {
+      expect(
+        await auditRows(orderId, 'booking.ops_confirmation_resent'),
+      ).toHaveLength(0);
+    }
   });
 
-  it('sends nothing when the audit row cannot be written', async () => {
+  it('queues nothing when the audit row cannot be written', async () => {
     const world = await seedCancellable();
     audit.failWith = new Error('audit down');
-    await expect(
-      resend.resendBookingConfirmation(ops, world.orderId),
-    ).rejects.toThrow('audit down');
-    expect(sendEmail).not.toHaveBeenCalled();
+    await expect(send(world)).rejects.toThrow('audit down');
+    expect(await jobsOfKind('guest-confirmation-resend')).toHaveLength(0);
   });
 });
 
@@ -452,11 +640,15 @@ describe('the booking page', () => {
 
     expect(detail?.events.map((event) => event.label)).toEqual(
       expect.arrayContaining([
-        'Cancelled by ramble',
+        'Cancelled by Ramble',
         'Cancelled by ops',
         'Earlier links voided by ops',
       ]),
     );
-    expect(detail).toMatchObject({ canRefund: false, canResend: false });
+    expect(detail?.actions).toMatchObject({
+      cancel: null,
+      refund: null,
+      resend: null,
+    });
   });
 });

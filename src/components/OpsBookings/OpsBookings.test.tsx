@@ -109,6 +109,9 @@ describe('OpsBookingDetailView', () => {
     expect(
       container.querySelector('input[name="expectedRefundMinor"]'),
     ).toHaveValue('10800');
+    expect(container.querySelector('input[name="resendId"]')).toHaveValue(
+      '2f1e2d3c-4b5a-4697-8a9b-0c1d2e3f4a5b',
+    );
     for (const input of container.querySelectorAll('input[name="orderId"]')) {
       expect(input).toHaveValue(confirmedDetail.row.id);
     }
@@ -125,7 +128,7 @@ describe('OpsBookingDetailView', () => {
 
   it('offers a refund of the rest for a cancelled booking', () => {
     render(<OpsBookingDetailView detail={cancelledDetail} actions={actions} />);
-    expect(buttons()).toEqual(['Refund the rest', 'Void earlier links']);
+    expect(buttons()).toEqual(['Refund $130.00', 'Void earlier links']);
   });
 
   it('shows the booking and its history in order', () => {

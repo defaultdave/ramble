@@ -1,22 +1,27 @@
 import 'server-only';
 import { and, desc, eq } from 'drizzle-orm';
 import { WriteIdSchema } from '@/lib/catalog';
-import { refundRetriedEntry, retryPlan } from '@/lib/refundRetry';
+import { refundAuditEntry, retryPlan } from '@/lib/refundRetry';
 import type { Caller } from '@/server/auth/caller';
-import { requireOpsUserId, writeAudit } from './audit';
+import { requireOpsUserId } from './audit';
 import { db } from './client';
 import { lockOrderById } from './locks';
-import { requestRefund, type RequestRefundResult } from './refunds';
+import {
+  clearRefundFailed,
+  requestAuditedRefund,
+  type RequestRefundResult,
+} from './refunds';
 import { orders, refunds } from './schema';
 
 type RetryRefundOutcome = RequestRefundResult['status'] | 'not_found';
 
 /**
- * Asks again for an order whose refund failed, and takes it out of the refund-failed queue, in one
- * transaction: a new refund of the rest of the order, the cleared `refund_failed` flag, and the
- * audit row commit together or not at all. A request the refund path refuses, or any error, leaves
- * the flag set. If the new refund fails too, the provider's event flags the order again. The only
- * write to `orders` outside the refund path is the flag, and it is here.
+ * Asks again for the refund of an order that failed, for that refund's own ticket part, and takes the
+ * order out of the refund-failed queue, in one transaction under the order's lock: the new refund,
+ * the cleared flag, and the audit row commit together or not at all. A request the refund path
+ * refuses (the refunds standing plus this one would pass what the card paid), a repeat of the same
+ * retry, or any error leaves the flag set and writes nothing. If the new refund fails too, the
+ * provider's event flags the order again.
  */
 export async function retryFailedRefund(
   caller: Caller,
@@ -31,7 +36,11 @@ export async function retryFailedRefund(
       .from(orders)
       .where(eq(orders.id, id));
     const [failed] = await tx
-      .select({ id: refunds.id, reason: refunds.reason })
+      .select({
+        id: refunds.id,
+        reason: refunds.reason,
+        ticketMinor: refunds.ticketMinor,
+      })
       .from(refunds)
       .where(and(eq(refunds.orderId, id), eq(refunds.status, 'failed')))
       .orderBy(desc(refunds.createdAt), desc(refunds.id))
@@ -43,18 +52,10 @@ export async function retryFailedRefund(
       failed: failed ?? null,
     });
     if (plan.kind === 'stop') return 'refused';
-    const result = await requestRefund(tx, plan.request);
-    if (result.status === 'refused') return 'refused';
-    await tx
-      .update(orders)
-      .set({ refundFailed: false })
-      .where(eq(orders.id, id));
-    if (result.status === 'requested') {
-      await writeAudit(
-        tx,
-        refundRetriedEntry(userId, id, result.refund.refundId),
-      );
-    }
+    const result = await requestAuditedRefund(tx, plan.request, (refundId) =>
+      refundAuditEntry('booking.ops_refund_retried', userId, id, refundId),
+    );
+    if (result.status === 'requested') await clearRefundFailed(tx, id);
     return result.status;
   });
 }

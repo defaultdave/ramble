@@ -1,4 +1,6 @@
+import { z } from 'zod';
 import { userOrderEntry, type AuditEntryInput } from './audit';
+import { WriteIdSchema } from './catalog';
 import { confirmationDecision, type BookingEmailSource } from './bookingEmails';
 import {
   cancelQuote,
@@ -19,12 +21,7 @@ import {
   type OrderKind,
   type OrderStatus,
 } from './orders';
-import {
-  orderRefundReasons,
-  planRefund,
-  type RefundRequestInput,
-} from './refunds';
-import { opsRefundReason } from './refundRetry';
+import { orderRefundReasons, planRefund } from './refunds';
 import { statusFilter, type StatusTone } from './statusBadge';
 import { parseSearchTerm } from './tableQuery';
 import { countLabel } from './text';
@@ -181,16 +178,28 @@ export type OpsBookingDetailRecord = {
   emailSource: BookingEmailSource | null;
   refunds: readonly OpsRefundRecord[];
   history: readonly OpsHistoryRecord[];
+  /** Names one send of the confirmation: the form carries it, so a double click queues one email. */
+  resendId: string;
   now: Date;
+};
+
+/** One action ops may take: its words, and the fields its form carries beside the booking id. */
+export type OpsActionView = {
+  label: string;
+  help: string;
+  fields: readonly { name: string; value: string }[];
 };
 
 export type OpsBookingDetail = {
   row: OpsBookingRow;
-  /** What cancelling refunds now (the amount the form carries back), or null when it cannot be cancelled. */
-  cancel: { refundMinor: number; basis: RefundBasis } | null;
-  canRefund: boolean;
-  canRetryRefund: boolean;
-  canResend: boolean;
+  /** Each action the booking allows now, or null for one it does not. */
+  actions: {
+    cancel: OpsActionView | null;
+    refund: OpsActionView | null;
+    retryRefund: OpsActionView | null;
+    resend: OpsActionView | null;
+    voidLinks: OpsActionView;
+  };
   refundedLabel: string;
   refunds: readonly {
     id: string;
@@ -221,21 +230,65 @@ function isHistoryAction(
   return action in historyActionLabels;
 }
 
-/**
- * Whether ops may refund the order: the booking is cancelled (a refund of a live booking would
- * leave the guest holding the spaces) and no refund failed that ops should retry instead.
- */
-export function opsRefundDecision(order: {
+type RefundableBooking = {
   kind: OrderKind;
   status: OrderStatus;
   refundFailed: boolean;
-}): 'go' | 'refused' {
-  return order.kind === 'booking' &&
-    order.status === 'cancelled' &&
-    !order.refundFailed
-    ? 'go'
-    : 'refused';
+};
+
+/**
+ * What an ops refund of the whole rest of the order would send back, or null when ops may not
+ * refund it: the booking is cancelled (a refund of a live booking would leave the guest holding the
+ * spaces), no refund failed that ops should retry instead, and something is left to give back.
+ */
+export function opsRefundQuote(
+  order: RefundableBooking,
+  facts: CancelFacts,
+): { amountMinor: number } | null {
+  if (
+    order.kind !== 'booking' ||
+    order.status !== 'cancelled' ||
+    order.refundFailed
+  ) {
+    return null;
+  }
+  const plan = planRefund(facts, 'remaining');
+  return plan.status === 'planned'
+    ? { amountMinor: plan.split.amountMinor }
+    : null;
 }
+
+/** The refund under the lock against the amount ops was shown: a different amount changes the terms and refunds nothing. */
+export function opsRefundVerdict(
+  order: RefundableBooking,
+  facts: CancelFacts,
+  expectedMinor: number,
+): 'go' | 'refused' | 'terms_changed' {
+  const quote = opsRefundQuote(order, facts);
+  if (quote === null) return 'refused';
+  return quote.amountMinor === expectedMinor ? 'go' : 'terms_changed';
+}
+
+const actionCopy = {
+  cancel: 'Cancel booking',
+  retryRefund: {
+    label: 'Retry refund',
+    help: 'The last refund failed. This asks the payment provider again for that refund.',
+  },
+  resend: {
+    label: 'Resend confirmation',
+    help: 'Queues the confirmation and calendar file for the address on the booking, with a working link.',
+  },
+  voidLinks: {
+    label: 'Void earlier links',
+    help: 'Stops every link already emailed from opening this booking. Resend the confirmation for a new one.',
+  },
+} as const;
+
+const expectedRefundField = (amountMinor: number) => ({
+  name: 'expectedRefundMinor',
+  value: String(amountMinor),
+});
 
 const refundStatusLabels = {
   pending: 'Pending',
@@ -265,6 +318,7 @@ export function buildOpsBookingDetail(
 ): OpsBookingDetail {
   const { booking, facts } = record;
   const quote = cancelQuote(facts, record.now);
+  const refund = opsRefundQuote({ ...booking, kind: facts.kind }, facts);
   const events = [
     { at: booking.createdAt, label: 'Booking placed' },
     ...(booking.confirmedAt === null
@@ -289,17 +343,36 @@ export function buildOpsBookingDetail(
   ].toSorted((a, b) => a.at.getTime() - b.at.getTime());
   return {
     row: buildOpsBookingRow(booking),
-    cancel:
-      quote.kind === 'cancellable'
-        ? { refundMinor: quote.refundMinor, basis: quote.basis }
+    actions: {
+      cancel:
+        quote.kind === 'cancellable'
+          ? {
+              label: actionCopy.cancel,
+              help: cancelBasisLines[quote.basis],
+              fields: [expectedRefundField(quote.refundMinor)],
+            }
+          : null,
+      refund:
+        refund === null
+          ? null
+          : {
+              label: `Refund ${formatMoney(refund.amountMinor)}`,
+              help: `Sends ${formatMoney(refund.amountMinor)}, everything this booking still holds, back to the card it was paid with.`,
+              fields: [expectedRefundField(refund.amountMinor)],
+            },
+      retryRefund: booking.refundFailed
+        ? { ...actionCopy.retryRefund, fields: [] }
         : null,
-    canRefund:
-      opsRefundDecision({ ...booking, kind: facts.kind }) === 'go' &&
-      planRefund(facts, 'remaining').status === 'planned',
-    canRetryRefund: booking.refundFailed,
-    canResend:
-      record.emailSource !== null &&
-      confirmationDecision(record.emailSource) === 'send',
+      resend:
+        record.emailSource !== null &&
+        confirmationDecision(record.emailSource) === 'send'
+          ? {
+              ...actionCopy.resend,
+              fields: [{ name: 'resendId', value: record.resendId }],
+            }
+          : null,
+      voidLinks: { ...actionCopy.voidLinks, fields: [] },
+    },
     refundedLabel: formatMoney(
       booking.refundedTicketMinor + booking.refundedTaxMinor,
     ),
@@ -319,7 +392,7 @@ export function buildOpsBookingDetail(
   };
 }
 
-export const cancelBasisLines = {
+const cancelBasisLines = {
   full: 'Cancelling refunds the whole booking to the card.',
   window_closed:
     'The free cancellation window has closed: cancelling refunds nothing.',
@@ -330,28 +403,14 @@ export const cancelBasisLines = {
 export type OpsCancelForm =
   { ok: true; expectedRefundMinor: number } | { ok: false };
 
-/** The cancel form: the refund ops was shown, in digits, which the cancel checks against what the tier gives now. */
-export function parseCancelForm(get: FormGetter): OpsCancelForm {
+/** The cancel and refund forms: the refund ops was shown, in digits, which the cancel checks against what the tier gives now. */
+export function parseExpectedRefundForm(get: FormGetter): OpsCancelForm {
   const expectedRefundMinor = refundMinorFromText(
     formText(get, 'expectedRefundMinor'),
   );
   return expectedRefundMinor < 0
     ? { ok: false }
     : { ok: true, expectedRefundMinor };
-}
-
-/** One ops refund of the whole rest of an order: the same key asks again and changes nothing. */
-export function opsRefundRequest(
-  orderId: string,
-  userId: string,
-): RefundRequestInput {
-  return {
-    orderId,
-    reason: opsRefundReason,
-    key: 'ops-refund',
-    ticketMinor: 'remaining',
-    initiatedBy: userId,
-  };
 }
 
 export const opsNoticeCodes = [
@@ -367,6 +426,7 @@ export const opsNoticeCodes = [
   'resent',
   'not_resendable',
   'links_voided',
+  'try_again',
   'invalid',
 ] as const;
 export type OpsNoticeCode = (typeof opsNoticeCodes)[number];
@@ -376,7 +436,7 @@ export const opsBookingNotices = {
   terms_changed: {
     tone: 'warning',
     title:
-      'The refund changed while this page was open. Nothing was cancelled: check the refund and try again.',
+      'The refund changed while this page was open. Nothing was done: check the amount and try again.',
   },
   not_cancellable: {
     tone: 'info',
@@ -403,7 +463,7 @@ export const opsBookingNotices = {
   },
   resent: {
     tone: 'success',
-    title: 'Confirmation email sent to the address on the booking.',
+    title: 'Confirmation email queued for the address on the booking.',
   },
   not_resendable: {
     tone: 'info',
@@ -414,12 +474,20 @@ export const opsBookingNotices = {
     title:
       'Earlier links voided. Resend the confirmation to give the guest a new one.',
   },
+  try_again: {
+    tone: 'warning',
+    title:
+      'The booking changed while this page was open. Reload it and try again.',
+  },
   invalid: { tone: 'warning', title: 'That request could not be read.' },
 } satisfies Record<OpsNoticeCode, NoticeText>;
 
 /** The notice for what the guest-facing cancel answered. Ops spends no try of the guest's limit, so a limit answer is a bug. */
-export function cancelNoticeCode(result: CancelBookingResult): OpsNoticeCode {
+export function cancelNoticeCode(
+  result: CancelBookingResult | { status: 'try_again' },
+): OpsNoticeCode {
   switch (result.status) {
+    case 'try_again':
     case 'cancelled':
     case 'terms_changed':
     case 'already_cancelled':
@@ -435,11 +503,17 @@ export function cancelNoticeCode(result: CancelBookingResult): OpsNoticeCode {
 
 /** The notice for what a refund or a retry answered. */
 export function refundNoticeCode(
-  status: 'requested' | 'already_requested' | 'refused' | 'not_found',
+  status:
+    | 'requested'
+    | 'already_requested'
+    | 'refused'
+    | 'not_found'
+    | 'terms_changed',
 ): OpsNoticeCode {
   switch (status) {
     case 'not_found':
-      return 'not_found';
+    case 'terms_changed':
+      return status;
     case 'requested':
       return 'refund_requested';
     case 'already_requested':
@@ -450,9 +524,9 @@ export function refundNoticeCode(
 }
 
 export function resendNoticeCode(
-  outcome: 'sent' | 'not_found' | 'not_resendable',
+  outcome: 'queued' | 'not_found' | 'not_resendable',
 ): OpsNoticeCode {
-  return outcome === 'sent' ? 'resent' : outcome;
+  return outcome === 'queued' ? 'resent' : outcome;
 }
 
 /** The notice for voiding the links: no result means there was no such booking. */
@@ -472,15 +546,6 @@ export const bookingViewedEntry = (
   orderId: string,
 ): AuditEntryInput => opsViewEntry(userId, 'booking.viewed', 'order', orderId);
 
-export const refundRequestedEntry = (
-  userId: string,
-  orderId: string,
-  refundId: string,
-) =>
-  userOrderEntry(userId, 'booking.ops_refund_requested', orderId, {
-    refund_id: refundId,
-  });
-
 export const linksVoidedEntry = (
   userId: string,
   orderId: string,
@@ -499,3 +564,11 @@ export const confirmationResentEntry = (
   userOrderEntry(userId, 'booking.ops_confirmation_resent', orderId, {
     resend_id: resendId,
   });
+
+export const resendJobKind = 'guest-confirmation-resend';
+
+/** The job an ops resend queues: ids only, so a job row holds no address or name. */
+export const GuestResendPayloadSchema = z.strictObject({
+  orderId: WriteIdSchema,
+  resendId: z.uuid(),
+});

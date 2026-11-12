@@ -5,7 +5,7 @@ import {
   cancelNoticeCode,
   opsBookingPath,
   opsBookingsPath,
-  parseCancelForm,
+  parseExpectedRefundForm,
   refundNoticeCode,
   resendNoticeCode,
   voidNoticeCode,
@@ -15,11 +15,11 @@ import { noticeHref } from '@/lib/opsForm';
 import {
   cancelBookingAsOps,
   refundBookingAsOps,
+  resendBookingConfirmation,
   voidBookingLinks,
 } from '@/server/db/opsBookings';
 import { retryFailedRefund } from '@/server/db/orderRefundRetry';
 import { idOrLeave, opsCallerOrLeave } from '@/server/opsAccess';
-import { resendBookingConfirmation } from '@/server/opsBookingResend';
 
 // Each action sends ops back to the booking it acted on, with the answer as a notice. A form that
 // carries no booking id goes back to the list.
@@ -34,7 +34,7 @@ function backToBooking(orderId: string, code: OpsNoticeCode): never {
 export async function cancelBookingAction(formData: FormData): Promise<void> {
   const caller = await opsCallerOrLeave(opsBookingsPath);
   const orderId = orderIdOrLeave(formData);
-  const form = parseCancelForm((name) => formData.get(name));
+  const form = parseExpectedRefundForm((name) => formData.get(name));
   if (!form.ok) return backToBooking(orderId, 'invalid');
   return backToBooking(
     orderId,
@@ -50,9 +50,16 @@ export async function cancelBookingAction(formData: FormData): Promise<void> {
 export async function refundBookingAction(formData: FormData): Promise<void> {
   const caller = await opsCallerOrLeave(opsBookingsPath);
   const orderId = orderIdOrLeave(formData);
+  const form = parseExpectedRefundForm((name) => formData.get(name));
+  if (!form.ok) return backToBooking(orderId, 'invalid');
   return backToBooking(
     orderId,
-    refundNoticeCode(await refundBookingAsOps(caller, orderId)),
+    refundNoticeCode(
+      await refundBookingAsOps(caller, {
+        orderId,
+        expectedRefundMinor: form.expectedRefundMinor,
+      }),
+    ),
   );
 }
 
@@ -70,9 +77,12 @@ export async function resendConfirmationAction(
 ): Promise<void> {
   const caller = await opsCallerOrLeave(opsBookingsPath);
   const orderId = orderIdOrLeave(formData);
+  const resendId = idOrLeave(formData, 'resendId', opsBookingPath(orderId));
   return backToBooking(
     orderId,
-    resendNoticeCode(await resendBookingConfirmation(caller, orderId)),
+    resendNoticeCode(
+      await resendBookingConfirmation(caller, { orderId, resendId }),
+    ),
   );
 }
 

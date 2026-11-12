@@ -5,6 +5,7 @@ import {
   maxEmailAddressLength,
   normalizeEmailAddress,
 } from './email/address';
+import { pauseNoticeOf } from './experiencePause';
 import {
   changedFields,
   fieldsFromIssues,
@@ -12,7 +13,9 @@ import {
   inFieldOrder,
   inviteFailureNotices,
   inviteNoticeFor,
+  noticeText,
   oversizedFields,
+  parseNotice,
   slugFor,
   type FormGetter,
   type InviteResult,
@@ -513,4 +516,14 @@ export function agreementNotice(
 /** The owner column: the addresses, or a word for a host nobody owns yet. */
 export function ownerCellLabel(emails: readonly string[]): string {
   return emails.length > 0 ? emails.join(', ') : 'None';
+}
+
+/** What the host page shows for its address: the notice of the last save, agreement, invite, suspension or unsuspension. */
+export function hostPageNotice(
+  raw: string | readonly string[] | undefined,
+): NoticeText | null {
+  return (
+    noticeText(hostNotices, parseNotice(raw, hostNoticeCodes)) ??
+    pauseNoticeOf(raw)
+  );
 }

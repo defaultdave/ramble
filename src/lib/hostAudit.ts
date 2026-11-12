@@ -1,4 +1,5 @@
 import { userActor, type AuditEntryInput } from './audit';
+import type { PauseKind } from './experiencePause';
 import type { HostEditableField } from './hostSetup';
 import { opsAreaIds, opsAreaListEntry, opsViewEntry } from './opsAudit';
 
@@ -79,5 +80,21 @@ export function hostOwnerInviteEntry(
     subjectKind: 'host',
     subjectId: hostId,
     details: { owner_user_id: ownerUserId },
+  };
+}
+
+/** A host suspended or unsuspended by ops, with how many experiences that paused or unpaused. */
+export function hostSuspensionEntry(
+  userId: string,
+  hostId: string,
+  kind: PauseKind,
+  changedCount: number,
+): AuditEntryInput {
+  return {
+    ...userActor(userId),
+    action: kind === 'pause' ? 'host.suspended' : 'host.unsuspended',
+    subjectKind: 'host',
+    subjectId: hostId,
+    details: { experiences_changed: changedCount },
   };
 }

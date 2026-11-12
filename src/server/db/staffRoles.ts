@@ -1,6 +1,7 @@
 import 'server-only';
 import { and, asc, eq, inArray, isNull, type SQL } from 'drizzle-orm';
 import { EntityIdSchema } from '@/lib/catalog';
+import { EmailAddressSchema, normalizeEmailAddress } from '@/lib/email/address';
 import { hostStaffGrant, maxHostStaff } from '@/lib/hostStaff';
 import { isValidGrantScope, type RoleGrant } from '@/lib/roleGrants';
 import {
@@ -145,9 +146,9 @@ export function requireHostOwnerId(caller: Caller, hostId: string): string {
  * A host owner gives an address the read-only staff role on their own host, making the account if
  * there is none, with its audit row. It is the one door to the grant functions for a host role:
  * the owner is checked against the host before anything is written, the role is always
- * `host_staff`, and a host that already has `maxHostStaff` staff gets no new one (an address that already holds the
- * role is not new, and gets its link). Two invitations at
- * once can pass the count together; the invite rate limit bounds how far past it they get.
+ * `host_staff`, and a host that already has `maxHostStaff` staff gets no new one (an address that
+ * already holds the role is not new, and gets its link). Two invitations at once can pass the
+ * count together; the invite rate limit bounds how far past it they get.
  */
 export async function grantHostStaff(
   caller: Caller,
@@ -155,13 +156,14 @@ export async function grantHostStaff(
   email: string,
 ): Promise<{ userId: string; outcome: GrantOutcome } | 'cap_reached'> {
   const id = EntityIdSchema.parse(hostId);
+  const address = EmailAddressSchema.parse(normalizeEmailAddress(email));
   const actorId = requireHostOwnerId(caller, id);
   const held = await listGrantHolders(hostStaffMatch(id));
-  const alreadyStaff = held.some((holder) => holder.email === email);
+  const alreadyStaff = held.some((holder) => holder.email === address);
   if (!alreadyStaff && held.length >= maxHostStaff) return 'cap_reached';
   return grantRoleToAddress(
     { kind: 'user', userId: actorId },
-    email,
+    address,
     hostStaffGrant(id),
   );
 }

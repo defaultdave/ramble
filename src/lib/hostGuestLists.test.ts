@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   agesLabel,
-  redactMinors,
   buildHostBookingList,
   buildHostGuestList,
   HostBookingSearchSchema,
+  HostGuestListBookingSchema,
   hostBookingListLimit,
   hostBookingListResult,
   hostGuestListHref,
@@ -13,11 +13,13 @@ import {
   waiverLabel,
   type HostBookingListRow,
   type HostGuestListData,
+  type HostGuestListOwnerBooking,
 } from './hostGuestLists';
 
 // Behaviours under test, one per decision, branch or risk:
 // - ages read as the children's ages, else the booker's confirmation, else "no age details"
 // - the waiver reads accepted, not accepted (asked for and missing), or not required
+// - a staff guest list has no children's ages or guardian fields at all, and keeps the contacts; an owner's shows them
 // - a guest row carries party, ages, waiver, and email; the phone and guardian only when the booking holds them
 // - the guest list totals seats and bookings, with the singular for one
 // - a booking row links to its session's guest list and reads its status and time on the session's own clock
@@ -43,9 +45,10 @@ const bookingRow = (n: number, over: Partial<HostBookingListRow> = {}) => ({
 });
 
 const guestData = (
-  bookings: HostGuestListData['bookings'],
+  bookings: readonly HostGuestListOwnerBooking[],
   waiverRequired = true,
 ): HostGuestListData => ({
+  scope: 'owner',
   session: {
     hostName: 'Harbor Kayak Co',
     id: id(100),
@@ -57,9 +60,7 @@ const guestData = (
   bookings,
 });
 
-const guestBooking = (
-  over: Partial<HostGuestListData['bookings'][number]> = {},
-) => ({
+const guestBooking = (over: Partial<HostGuestListOwnerBooking> = {}) => ({
   id: id(1),
   reference: 'RMB-AAAA01',
   leadGuestName: 'Ada Lovelace',
@@ -74,30 +75,6 @@ const guestBooking = (
   ...over,
 });
 
-describe('redactMinors', () => {
-  const held = {
-    leadGuestName: 'Ada Lovelace',
-    contactEmail: 'ada@example.com',
-    childrenAges: [8, 11],
-    guardianName: 'Ada Lovelace',
-    guardianContact: 'ada@example.com',
-  };
-
-  it('leaves an owner’s booking as it is', () => {
-    expect(redactMinors(held, true)).toEqual(held);
-  });
-
-  it('withholds the children’s ages and the guardian from staff, and nothing else', () => {
-    expect(redactMinors(held, false)).toEqual({
-      leadGuestName: 'Ada Lovelace',
-      contactEmail: 'ada@example.com',
-      childrenAges: null,
-      guardianName: null,
-      guardianContact: null,
-    });
-  });
-});
-
 describe('agesLabel', () => {
   it.each([
     [[7], null, 'Child aged 7'],
@@ -108,6 +85,47 @@ describe('agesLabel', () => {
     [null, null, 'No age details'],
   ] as const)('reads %j and %j as "%s"', (ages, confirmed, label) => {
     expect(agesLabel(ages, confirmed)).toBe(label);
+  });
+});
+
+describe('a staff guest list', () => {
+  it('has no guardian or ages, whatever the booking holds, and keeps the contacts', () => {
+    const owner = guestData([
+      guestBooking({
+        childrenAges: [8, 11],
+        guardianName: 'Ada Lovelace',
+        guardianContact: 'ada@example.com',
+        ageConfirmed: null,
+        contactPhone: '+1 555 0100',
+      }),
+    ]);
+    const staff = {
+      ...owner,
+      scope: 'staff' as const,
+      bookings: HostGuestListBookingSchema.array().parse(owner.bookings),
+    };
+
+    const keys = Object.keys(staff.bookings[0] ?? {});
+    expect(keys).not.toContain('childrenAges');
+    expect(keys).not.toContain('guardianName');
+    expect(keys).not.toContain('guardianContact');
+    const row = buildHostGuestList(staff).rows[0];
+    expect(row?.agesLabel).toBe('No age details');
+    expect(row?.contacts.map((c) => c.label)).toEqual(['Email', 'Phone']);
+  });
+
+  it('shows an owner the children and the guardian', () => {
+    const row = buildHostGuestList(
+      guestData([
+        guestBooking({
+          childrenAges: [8, 11],
+          guardianName: 'Ada Lovelace',
+          guardianContact: 'ada@example.com',
+        }),
+      ]),
+    ).rows[0];
+    expect(row?.agesLabel).toBe('Children aged 8, 11');
+    expect(row?.contacts.map((c) => c.label)).toContain('Guardian');
   });
 });
 

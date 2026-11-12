@@ -64,22 +64,43 @@ export const HostGuestListBookingSchema = z.object({
   seats: z.int().min(0),
   /** True when the booker confirmed every attendee is of age; null when the experience asks no such thing. */
   ageConfirmed: z.boolean().nullable(),
-  childrenAges: z.array(z.int().min(0)).nullable(),
-  guardianName: z.string().nullable(),
-  guardianContact: z.string().nullable(),
   waiverAccepted: z.boolean(),
   contactEmail: z.string().min(1),
   contactPhone: z.string().nullable(),
 });
 
+/** The children's ages and the guardian: the host's owner's to see, never read-only staff's. */
+const HostGuestListMinorsSchema = z.object({
+  childrenAges: z.array(z.int().min(0)).nullable(),
+  guardianName: z.string().nullable(),
+  guardianContact: z.string().nullable(),
+});
+
+export const HostGuestListOwnerBookingSchema =
+  HostGuestListBookingSchema.extend(HostGuestListMinorsSchema.shape);
+
 export type HostBookingListData = {
   bookings: readonly HostBookingListRow[];
 };
 
-export type HostGuestListData = {
-  session: z.infer<typeof HostGuestListSessionSchema>;
-  bookings: readonly z.infer<typeof HostGuestListBookingSchema>[];
-};
+type HostGuestListBooking = z.infer<typeof HostGuestListBookingSchema>;
+export type HostGuestListOwnerBooking = z.infer<
+  typeof HostGuestListOwnerBookingSchema
+>;
+type HostGuestListSession = z.infer<typeof HostGuestListSessionSchema>;
+
+/** Two shapes, so a read-only staff page cannot reference what it was never given: only the owner's has the minors' fields. */
+export type HostGuestListData =
+  | {
+      scope: 'owner';
+      session: HostGuestListSession;
+      bookings: readonly HostGuestListOwnerBooking[];
+    }
+  | {
+      scope: 'staff';
+      session: HostGuestListSession;
+      bookings: readonly HostGuestListBooking[];
+    };
 
 export type HostBookingListItemView = {
   id: string;
@@ -151,28 +172,6 @@ export function buildHostBookingList(
 }
 
 /** What the booking holds about ages: the children's, or the booker's confirmation that all attendees are of age. */
-/**
- * What a caller's guest list carries of the children and their guardian. The host's owner sees
- * them; read-only staff see the booking and the booker's contacts, never the children's ages or
- * the guardian, which come back null.
- */
-export function redactMinors<
-  T extends {
-    childrenAges: readonly number[] | null;
-    guardianName: string | null;
-    guardianContact: string | null;
-  },
->(booking: T, isOwner: boolean): T {
-  return isOwner
-    ? booking
-    : {
-        ...booking,
-        childrenAges: null,
-        guardianName: null,
-        guardianContact: null,
-      };
-}
-
 export function agesLabel(
   childrenAges: readonly number[] | null,
   ageConfirmed: boolean | null,
@@ -190,6 +189,36 @@ export function waiverLabel(required: boolean, accepted: boolean): string {
   return required ? 'Not accepted' : 'Not required';
 }
 
+function guestRowView(
+  session: HostGuestListSession,
+  b: HostGuestListBooking,
+  minors: z.infer<typeof HostGuestListMinorsSchema> | null,
+): HostGuestRowView {
+  const contacts = [{ label: 'Email', value: b.contactEmail }];
+  if (b.contactPhone !== null) {
+    contacts.push({ label: 'Phone', value: b.contactPhone });
+  }
+  if (
+    minors !== null &&
+    minors.guardianName !== null &&
+    minors.guardianContact !== null
+  ) {
+    contacts.push({
+      label: 'Guardian',
+      value: `${minors.guardianName}, ${minors.guardianContact}`,
+    });
+  }
+  return {
+    id: b.id,
+    reference: b.reference,
+    guestName: b.leadGuestName,
+    seatsLabel: seatsLabel(b.seats),
+    agesLabel: agesLabel(minors?.childrenAges ?? null, b.ageConfirmed),
+    waiverLabel: waiverLabel(session.waiverRequired, b.waiverAccepted),
+    contacts,
+  };
+}
+
 export function buildHostGuestList(data: HostGuestListData): HostGuestListView {
   const { session } = data;
   const seats = data.bookings.reduce((sum, b) => sum + b.seats, 0);
@@ -198,27 +227,10 @@ export function buildHostGuestList(data: HostGuestListData): HostGuestListView {
     experienceName: session.experienceName,
     whenLabel: whenLabel(session.startsAt, session.timeZone),
     totalLabel: `${seatsLabel(seats)} across ${plural(data.bookings.length, 'booking', 'bookings')}`,
-    rows: data.bookings.map((b) => {
-      const contacts = [{ label: 'Email', value: b.contactEmail }];
-      if (b.contactPhone !== null) {
-        contacts.push({ label: 'Phone', value: b.contactPhone });
-      }
-      if (b.guardianName !== null && b.guardianContact !== null) {
-        contacts.push({
-          label: 'Guardian',
-          value: `${b.guardianName}, ${b.guardianContact}`,
-        });
-      }
-      return {
-        id: b.id,
-        reference: b.reference,
-        guestName: b.leadGuestName,
-        seatsLabel: seatsLabel(b.seats),
-        agesLabel: agesLabel(b.childrenAges, b.ageConfirmed),
-        waiverLabel: waiverLabel(session.waiverRequired, b.waiverAccepted),
-        contacts,
-      };
-    }),
+    rows:
+      data.scope === 'owner'
+        ? data.bookings.map((b) => guestRowView(session, b, b))
+        : data.bookings.map((b) => guestRowView(session, b, null)),
   };
 }
 

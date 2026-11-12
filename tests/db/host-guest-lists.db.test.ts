@@ -28,7 +28,7 @@ import {
 // - a session of another host reads as null, as does a missing one, and none of the other host's guests are in the owner's read
 // - the owner of another host asking for this host is refused
 // - a booking the host's experience asks a waiver for reads required, and an accepted one reads accepted
-// - host staff of the host read the list with contacts and booking facts, but with no children's ages and no guardian, which come back null; host staff of another host are refused
+// - host staff of the host read the list with contacts and booking facts, but with no children's ages and no guardian (the fields are absent, not null); the owner still sees them; host staff of another host are refused
 // - nobody signed in, a guest, ops, admin, and host staff of another host are refused; an id that is no uuid is refused before the database is asked
 // bookings list and search
 // - the list is the host's confirmed and cancelled bookings, latest first, never another host's, never one still being paid for
@@ -252,14 +252,16 @@ describe('readHostGuestList', () => {
       session.id,
     );
 
+    expect(data?.scope).toBe('staff');
     expect(data?.bookings[0]).toMatchObject({
       leadGuestName: 'Ada Lovelace',
       contactEmail: 'ada@example.com',
       contactPhone: '+1 555 0100',
-      childrenAges: null,
-      guardianName: null,
-      guardianContact: null,
     });
+    const keys = Object.keys(data?.bookings[0] ?? {});
+    expect(keys).not.toContain('childrenAges');
+    expect(keys).not.toContain('guardianName');
+    expect(keys).not.toContain('guardianContact');
   });
 
   it('refuses the owner of another host asking for this host', async () => {

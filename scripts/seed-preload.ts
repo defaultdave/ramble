@@ -1,6 +1,6 @@
-// Preloaded by `pnpm db:seed` (bun --preload). The data layer imports two things that only work
+// Preloaded by `pnpm db:seed` and `pnpm db:grant-role` (bun --preload). The data layer imports two things that only work
 // inside Next.js: `server-only`, which throws anywhere else, and `next/cache`, whose `updateTag`
-// throws outside a Server Action. The seed runs outside Next.js, so both are replaced here. Nothing
+// throws outside a Server Action. These commands run outside Next.js, so both are replaced here. Nothing
 // is cached in this process, so the no-op invalidation loses nothing; a running deployment keeps
 // serving its cached pages until they expire or it is redeployed (docs/runbooks/seed.md).
 import { plugin } from "bun";

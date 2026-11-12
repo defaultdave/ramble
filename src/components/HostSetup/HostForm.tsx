@@ -1,5 +1,6 @@
 import { Button } from '@/components/Button';
 import { CheckField } from '@/components/CheckField';
+import { EmailField } from '@/components/EmailField';
 import { Input } from '@/components/Input';
 import { Textarea } from '@/components/Textarea';
 import {
@@ -96,14 +97,10 @@ export function HostForm({
       />
       {creating ? (
         <>
-          <Input
+          <EmailField
             name="ownerEmail"
-            type="email"
             label="Owner email"
             hint="The owner gets a sign-in link at this address. No password."
-            maxLength={maxEmailAddressLength}
-            autoComplete="off"
-            required
             {...errorFor('ownerEmail')}
           />
           {problems.includes('acceptLegalDocumentId') ? (

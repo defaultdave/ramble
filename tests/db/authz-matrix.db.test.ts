@@ -17,17 +17,18 @@ import { createFakeStorageAdapter } from '@/server/ports/storage/fake';
 import { personaHostSlugs } from '@/lib/seed/personas';
 import { editorialListRows } from './authzEditorialRows';
 import { experienceEditorRows } from './authzExperienceRows';
+import { accountBookingsRows } from './authzAccountRows';
 import { hostSetupRows } from './authzHostRows';
 import { opsBookingActionRows } from './authzBookingActionRows';
 import { opsBookingRows } from './authzBookingRows';
+import { seedRows } from './authzSeedRows';
+import { staffRows } from './authzStaffRows';
 import { supportQueueRows } from './authzSupportRows';
 import { experienceReviewRows } from './authzReviewRows';
 import { cancelSessionRows } from './authzSessionRows';
 import { collectionInput, doc, helpInput } from './editorialFixtures';
 import {
   client,
-  personaSeed,
-  seedNow,
   setupAuthzDatabase,
   signInEverySubject,
   subjects,
@@ -39,18 +40,15 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 // Behaviours under test, against the real database, with every caller made by a real sign-in by
 // link as a seeded persona. One row per guarded function and resource, and each row names who gets
 // through; every other subject must be refused with a ForbiddenError, and a subject listed must not be:
-// - nobody signed in, a guest, host staff, and the owner of the other host are refused everywhere a
-//   host owner or staff member is required; host staff are granted nothing by any function yet
+// - nobody signed in, a guest, host staff, and the other host's owner are refused where a host owner or staff is required
 // - platform actions (editorial, legal, settings, finance, privacy, seed) admit ops and admin, or ops
 //   alone where the function says so, and no host role
 // - host-owner-only actions admit the owner of that host only: not ops, not admin, not the other owner
 // - session and photo actions admit the owner of the host, and ops and admin on any host; a template
 //   or session sourced from an allocation is staff only, so its own host's owner is refused
 // - a missing row is refused to everyone but staff, so the answer does not say which ids exist
-// - requireRole on its own: a guest owns only the row whose owner is them; a host role needs the
-//   host it was granted; a role is not satisfied by a different role
-// - coverage: every function in src/server that takes a Caller is a row here, or is named below as a
-//   guard itself, so a new guarded function fails this file until it is added
+// - requireRole on its own: a guest owns only their row; a host role needs its host; one role never satisfies another
+// - coverage: every function in src/server that takes a Caller is a row here or a named guard, so a new one fails until added
 
 setupAuthzDatabase();
 
@@ -67,9 +65,6 @@ type Data = {
   photos: typeof import('@/server/db/photos');
   sessions: typeof import('@/server/db/sessions');
   settings: typeof import('@/server/db/settings');
-  seedPhotos: typeof import('@/server/db/seed/photos');
-  seedRead: typeof import('@/server/db/seed/read');
-  seedRun: typeof import('@/server/db/seed/run');
 };
 
 /** Where an action lands. A host owner is checked against the host of the row, so each place is one cell of the matrix. */
@@ -130,9 +125,6 @@ beforeAll(async () => {
     photos: await import('@/server/db/photos'),
     sessions: await import('@/server/db/sessions'),
     settings: await import('@/server/db/settings'),
-    seedPhotos: await import('@/server/db/seed/photos'),
-    seedRead: await import('@/server/db/seed/read'),
-    seedRun: await import('@/server/db/seed/run'),
   };
   people = await signInEverySubject();
   upload = await sharp({
@@ -496,7 +488,9 @@ const rows: Row[] = [
     invoke: (c) => data.audit.recordOpsAccess(c),
     allows: platform(...opsOnly),
   },
+  ...accountBookingsRows(),
   ...hostSetupRows(),
+  ...staffRows(),
   ...supportQueueRows(),
   ...experienceEditorRows(),
   ...experienceReviewRows(),
@@ -504,31 +498,7 @@ const rows: Row[] = [
   ...opsBookingActionRows(),
   ...cancelSessionRows(sessionRules, 'ownerA', staff),
   // Seed and persona writes: ops alone. These write the most, so they come last.
-  {
-    fn: 'seedPersonas',
-    invoke: (c) => personaSeed.seedPersonas(c),
-    allows: platform(...opsOnly),
-  },
-  {
-    fn: 'readSeedSnapshot',
-    invoke: (c) => data.seedRead.readSeedSnapshot(c, seedNow),
-    allows: platform(...opsOnly),
-  },
-  {
-    fn: 'readPhotoCoverageGaps',
-    invoke: (c) => data.seedPhotos.readPhotoCoverageGaps(c),
-    allows: platform(...opsOnly),
-  },
-  {
-    fn: 'seedTestPhotos',
-    invoke: (c) => data.seedPhotos.seedTestPhotos(c, storage),
-    allows: platform(...opsOnly),
-  },
-  {
-    fn: 'runSeed',
-    invoke: (c) => data.seedRun.runSeed({ caller: c, now: seedNow }),
-    allows: platform(...opsOnly),
-  },
+  ...seedRows(),
 ];
 
 async function verdictOf(

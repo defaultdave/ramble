@@ -21,7 +21,7 @@ import {
 } from '@/lib/hostSetup';
 import { splitPage } from '@/lib/pagination';
 import { opsListPageSize } from '@/lib/tableQuery';
-import { requireRole, Role, type Caller } from '@/server/auth/caller';
+import type { Caller } from '@/server/auth/caller';
 import { recordAudit, requireOpsUserId, writeAudit } from './audit';
 import { db, dbRead } from './client';
 import { byNameThenId, pastNameCursor } from './keysetPage';
@@ -31,6 +31,7 @@ import {
   recordHostAcceptanceIn,
 } from './legal';
 import { authUsers, hosts, roleGrants } from './schema';
+import { ensureAuthUserIn, readRoleHolder } from './staffRoles';
 
 // Everything here is for the ops role: each function checks it, and each read records its audit
 // row before it returns anything.
@@ -76,20 +77,12 @@ export async function createHost(
         .returning({ id: hosts.id });
       if (!host) throw new Error('The host write returned no row');
 
-      await tx
-        .insert(authUsers)
-        .values({ email: input.ownerEmail, emailVerified: true })
-        .onConflictDoNothing();
-      const [owner] = await tx
-        .select({ id: authUsers.id })
-        .from(authUsers)
-        .where(eq(authUsers.email, input.ownerEmail));
-      if (!owner) throw new Error('The owner account was not found');
+      const ownerId = await ensureAuthUserIn(tx, input.ownerEmail);
       await tx
         .insert(roleGrants)
-        .values({ userId: owner.id, role: 'host_owner', hostId: host.id })
+        .values({ userId: ownerId, role: 'host_owner', hostId: host.id })
         .onConflictDoNothing();
-      await writeAudit(tx, hostCreatedEntry(userId, host.id, owner.id));
+      await writeAudit(tx, hostCreatedEntry(userId, host.id, ownerId));
 
       if (input.acceptedLegalDocumentId !== null) {
         const outcome = await recordHostAcceptanceIn(
@@ -104,7 +97,7 @@ export async function createHost(
       return {
         status: 'created' as const,
         hostId: host.id,
-        ownerUserId: owner.id,
+        ownerUserId: ownerId,
       };
     });
   } catch (error) {
@@ -246,18 +239,10 @@ export async function readHostInviteTarget(
   hostId: string,
   ownerUserId: string,
 ): Promise<{ hostName: string; email: string } | null> {
-  requireRole(caller, Role.Ops, {});
-  const [row] = await db
-    .select({ hostName: hosts.name, email: authUsers.email })
-    .from(roleGrants)
-    .innerJoin(hosts, eq(hosts.id, roleGrants.hostId))
-    .innerJoin(authUsers, eq(authUsers.id, roleGrants.userId))
-    .where(
-      and(
-        eq(roleGrants.hostId, hostId),
-        eq(roleGrants.userId, ownerUserId),
-        eq(roleGrants.role, 'host_owner'),
-      ),
-    );
-  return row ?? null;
+  const holder = await readRoleHolder(caller, ownerUserId, {
+    role: 'host_owner',
+    hostId,
+  });
+  if (holder === null || holder.hostName === null) return null;
+  return { hostName: holder.hostName, email: holder.email };
 }

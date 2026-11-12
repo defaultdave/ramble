@@ -23,6 +23,27 @@ export function formHas(get: FormGetter, name: string): boolean {
   return raw !== null && raw !== undefined;
 }
 
+/** The fields of `fields` that `failed` holds, in the list's order: the order the form shows them. */
+export function inFieldOrder<F extends string>(
+  fields: readonly F[],
+  failed: ReadonlySet<F>,
+): F[] {
+  return fields.filter((field) => failed.has(field));
+}
+
+/** The fields a schema's issues name, each once, in the list's order. An issue on a name outside the list is not a form field and is left out. */
+export function fieldsFromIssues<F extends string>(
+  issues: readonly { path: readonly PropertyKey[] }[],
+  fields: readonly F[],
+): F[] {
+  const named = new Set<F>();
+  for (const issue of issues) {
+    const field = pickKnown(String(issue.path[0]), fields, null);
+    if (field !== null) named.add(field);
+  }
+  return inFieldOrder(fields, named);
+}
+
 /** The fields whose posted text is over the limit, so no rule walks an unbounded string. */
 export function oversizedFields<F extends string>(
   get: FormGetter,

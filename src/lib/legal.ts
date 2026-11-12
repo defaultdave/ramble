@@ -41,6 +41,16 @@ export function legalKindOf(doc: string): LegalKind | null {
   }
 }
 
+/** Whether a document is a waiver a guest can accept: a waiver key, and a published version. */
+export function isPublishedWaiver(document: {
+  doc: string;
+  status: string;
+}): boolean {
+  return (
+    document.status === 'published' && legalKindOf(document.doc) === 'waiver'
+  );
+}
+
 const legalStatuses = ['draft', 'published'] as const;
 
 const titleField = requiredText(editorialLimits.title);

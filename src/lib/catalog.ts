@@ -12,6 +12,11 @@ export const experienceStatuses = [
 /** The statuses a guest can see. A paused experience, which also covers a discontinued one, is hidden. */
 export const guestVisibleStatuses = ['live', 'guide_only'] as const;
 
+/** Whether guests can see an experience in this status. */
+export function isGuestVisible(status: string): boolean {
+  return (guestVisibleStatuses as readonly string[]).includes(status);
+}
+
 /** The guest-visible statuses a guest can book: everything visible except a guide entry, which only links out. */
 export const bookableStatuses = guestVisibleStatuses.filter(
   (status) => status !== 'guide_only',

@@ -8,14 +8,13 @@ import {
   newExperienceValues,
   parseExperienceCreateForm,
   parseExperienceEditForm,
-  parsePriceMinor,
-  priceInputValue,
+  priceFieldValue,
   type ExperienceFormField,
 } from './experienceEditor';
 
 // Behaviours under test, one per decision, branch or risk:
-// - a price is read in integer cents from the ways a person types it, and a malformed or
-//   out-of-range one is null; the form shows a price back with two decimals and no symbol
+// - a price in the form is read in integer cents, one past the limit or malformed is refused,
+//   and a saved price shows back as a person would type it
 // - a valid create form yields the content and the host, a blank slug is made from the name, and
 //   the host is required
 // - an edit form with a blank slug is refused, never renamed, and it carries no host
@@ -47,34 +46,39 @@ function failedFields(entries: Record<string, string | null>) {
   return result.ok ? [] : result.fields;
 }
 
-describe('parsePriceMinor', () => {
+describe('prices in the form', () => {
+  const priced = (adultPrice: string) => {
+    const result = parseExperienceCreateForm(formOf({ adultPrice }));
+    return result.ok ? result.value.adultPriceMinor : result.fields;
+  };
+
   it.each([
     ['12', 1200],
-    ['12.5', 1250],
-    ['12.50', 1250],
     ['$12.50', 1250],
-    [' 0 ', 0],
-    ['0.05', 5],
+    ['1,200.00', 120_000],
+    ['0', 0],
     ['99999.99', experienceLimits.priceMinor],
-    ['100000', null],
-    ['12.505', null],
-    ['-1', null],
-    ['1e3', null],
-    ['12,50', null],
-    ['', null],
-  ])('%j is %j cents', (text, minor) => {
-    expect(parsePriceMinor(text)).toBe(minor);
+  ])('reads %j as %j cents', (text, minor) => {
+    expect(priced(text)).toBe(minor);
   });
+
+  it.each(['100000', '12.505', '-1', '1e3', 'free'])(
+    'refuses %j as the adult price',
+    (text) => {
+      expect(priced(text)).toEqual(['adultPrice']);
+    },
+  );
 });
 
-describe('priceInputValue', () => {
+describe('priceFieldValue', () => {
   it.each([
     [null, ''],
-    [0, '0.00'],
+    [0, '0'],
     [1250, '12.50'],
-    [170_000, '1700.00'],
+    [8500, '85'],
+    [170_000, '1700'],
   ])('%j shows as %j', (minor, shown) => {
-    expect(priceInputValue(minor)).toBe(shown);
+    expect(priceFieldValue(minor)).toBe(shown);
   });
 });
 

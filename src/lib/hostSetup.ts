@@ -6,13 +6,14 @@ import {
   normalizeEmailAddress,
 } from './email/address';
 import {
+  fieldsFromIssues,
   formText,
+  inFieldOrder,
   oversizedFields,
   slugFor,
   type FormGetter,
   type NoticeText,
 } from './opsForm';
-import { pickKnown } from './pickKnown';
 import { isKnownTimeZone, maxTimeZoneLength, TimeZoneSchema } from './sessions';
 import { requiredText } from './text';
 import { zonedDayLabel } from './zonedLabels';
@@ -109,11 +110,10 @@ function parseFields(
   });
   const failed = new Set<HostFormField>();
   if (!parsed.success) {
-    for (const issue of parsed.error.issues) {
-      const field = pickKnown(String(issue.path[0]), hostFormFields, null);
-      if (field !== null) failed.add(field);
-    }
-    return { ok: false, fields: hostFormFields.filter((f) => failed.has(f)) };
+    return {
+      ok: false,
+      fields: fieldsFromIssues(parsed.error.issues, hostFormFields),
+    };
   }
   const { data } = parsed;
   const slug = slugFor(
@@ -128,7 +128,7 @@ function parseFields(
     failed.add('ownerEmail');
   }
   if (failed.size > 0) {
-    return { ok: false, fields: hostFormFields.filter((f) => failed.has(f)) };
+    return { ok: false, fields: inFieldOrder(hostFormFields, failed) };
   }
   return {
     ok: true,

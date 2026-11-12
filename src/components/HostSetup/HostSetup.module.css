@@ -53,28 +53,6 @@
   line-height: var(--font-line-height-body-s);
 }
 
-.check {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-  min-height: var(--size-touch-target);
-}
-
-.check input {
-  flex: none;
-  width: var(--space-6);
-  height: var(--space-6);
-  margin: 0;
-  accent-color: var(--color-text-link);
-}
-
-.check input:focus-visible {
-  outline: 2px solid transparent;
-  box-shadow:
-    0 0 0 2px var(--color-bg-canvas),
-    0 0 0 4px var(--color-focus-ring);
-}
-
 .cellLink {
   color: var(--color-text-link);
   font-weight: var(--font-weight-semibold);

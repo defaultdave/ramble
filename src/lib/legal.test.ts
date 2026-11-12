@@ -6,6 +6,7 @@ import {
   OrderAcceptancesInputSchema,
   legalChange,
   isSuperseded,
+  isPublishedWaiver,
   legalKindOf,
   nextLegalVersion,
 } from './legal';
@@ -164,5 +165,17 @@ describe('the acceptances a checkout records', () => {
     ],
   ])('refuses %s', (_name, input) => {
     expect(OrderAcceptancesInputSchema.safeParse(input).success).toBe(false);
+  });
+});
+
+describe('isPublishedWaiver', () => {
+  it.each([
+    ['a published waiver', 'waiver-clay', 'published', true],
+    ['a draft waiver', 'waiver-clay', 'draft', false],
+    ['published terms', 'terms', 'published', false],
+    ['a published host agreement', 'host-agreement', 'published', false],
+    ['a published key that is no document', 'nope', 'published', false],
+  ])('%s is %s', (_label, doc, status, expected) => {
+    expect(isPublishedWaiver({ doc, status })).toBe(expected);
   });
 });

@@ -5,8 +5,6 @@ import {
   hostSessionFormValues,
   hostSessionInvalid,
   hostSessionProblem,
-  priceInputText,
-  priceMinorFromText,
   publishWeekMessage,
   resolveWeek,
   weekBounds,
@@ -210,35 +208,6 @@ describe('buildHostWeek rows', () => {
     const [row] =
       week([session({ adultPriceMinor: null })]).days[0]?.sessions ?? [];
     expect([row?.priceLabel, row?.adultPrice]).toEqual([null, null]);
-  });
-});
-
-describe('prices', () => {
-  it.each([
-    ['85', 8500],
-    ['$85', 8500],
-    ['12.5', 1250],
-    ['12.05', 1205],
-    ['1,200.00', 120000],
-    [' 0 ', 0],
-  ])('reads %s as %i cents', (text, minor) => {
-    expect(priceMinorFromText(text)).toBe(minor);
-  });
-
-  it.each(['', 'free', '12.345', '-5', '1e3', '12.', '1234567'])(
-    'does not read %j as a price',
-    (text) => {
-      expect(priceMinorFromText(text)).toBeUndefined();
-    },
-  );
-
-  it.each([
-    [8500, '85'],
-    [1250, '12.50'],
-    [1205, '12.05'],
-    [0, '0'],
-  ])('writes %i cents as %s', (minor, text) => {
-    expect(priceInputText(minor)).toBe(text);
   });
 });
 

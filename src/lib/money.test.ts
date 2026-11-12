@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { formatMoney, formatPrice } from './money';
+import {
+  formatMoney,
+  formatPrice,
+  priceInputText,
+  priceMinorFromText,
+} from './money';
 
 describe('formatMoney', () => {
   it.each([
@@ -40,5 +45,35 @@ describe.each([
     ['a value past the safe integer range', Number.MAX_SAFE_INTEGER + 1],
   ])('throws on %s', (_label, value) => {
     expect(() => format(value)).toThrow(RangeError);
+  });
+});
+
+describe('prices typed in a form', () => {
+  it.each([
+    ['85', 8500],
+    ['$85', 8500],
+    ['12.5', 1250],
+    ['12.05', 1205],
+    ['1,200.00', 120000],
+    [' 0 ', 0],
+  ])('reads %s as %i cents', (text, minor) => {
+    expect(priceMinorFromText(text)).toBe(minor);
+  });
+
+  it.each(['', 'free', '12.345', '-5', '1e3', '12.', '1234567'])(
+    'does not read %j as a price',
+    (text) => {
+      expect(priceMinorFromText(text)).toBeUndefined();
+    },
+  );
+
+  it.each([
+    [8500, '85'],
+    [1250, '12.50'],
+    [1205, '12.05'],
+    [0, '0'],
+    [170000, '1700'],
+  ])('writes %i cents as %s', (minor, text) => {
+    expect(priceInputText(minor)).toBe(text);
   });
 });

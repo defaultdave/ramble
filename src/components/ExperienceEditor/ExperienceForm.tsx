@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Button } from '@/components/Button';
+import { CheckField } from '@/components/CheckField';
 import { Input } from '@/components/Input';
 import { Select } from '@/components/Select';
 import { Textarea } from '@/components/Textarea';
@@ -9,7 +10,7 @@ import {
   experienceLimits,
   labelledOptions,
   numberInputValue,
-  priceInputValue,
+  priceFieldValue,
   taxTreatmentLabels,
   weatherPolicyLabels,
   type ExperienceChoices,
@@ -39,32 +40,6 @@ function Group({ legend, children }: { legend: string; children: ReactNode }) {
       <legend className={styles.legend}>{legend}</legend>
       {children}
     </fieldset>
-  );
-}
-
-function CheckField({
-  name,
-  label,
-  checked,
-  problem,
-}: {
-  name: string;
-  label: string;
-  checked: boolean;
-  problem?: string | undefined;
-}) {
-  return (
-    <div>
-      <label className={styles.check}>
-        <input type="checkbox" name={name} defaultChecked={checked} />
-        <span>{label}</span>
-      </label>
-      {problem ? (
-        <p role="alert" className={styles.muted}>
-          {problem}
-        </p>
-      ) : null}
-    </div>
   );
 }
 
@@ -197,7 +172,7 @@ export function ExperienceForm({
             label="Adult price (USD)"
             hint="A saved price can be changed but not removed."
             inputMode="decimal"
-            defaultValue={priceInputValue(values.adultPriceMinor)}
+            defaultValue={priceFieldValue(values.adultPriceMinor)}
             autoComplete="off"
             optional
             {...errorFor('adultPrice')}
@@ -206,7 +181,7 @@ export function ExperienceForm({
             name="childPrice"
             label="Child price (USD)"
             inputMode="decimal"
-            defaultValue={priceInputValue(values.childPriceMinor)}
+            defaultValue={priceFieldValue(values.childPriceMinor)}
             autoComplete="off"
             optional
             {...errorFor('childPrice')}
@@ -215,7 +190,7 @@ export function ExperienceForm({
         <CheckField
           name="childUsesSpace"
           label="A child takes a space in the session."
-          checked={values.childUsesSpace}
+          defaultChecked={values.childUsesSpace}
           problem={problemText('childUsesSpace')}
         />
       </Group>
@@ -263,7 +238,7 @@ export function ExperienceForm({
         <CheckField
           name="outdoor"
           label="This experience is outdoors."
-          checked={values.outdoor}
+          defaultChecked={values.outdoor}
           problem={problemText('outdoor')}
         />
         <Select
@@ -297,7 +272,7 @@ export function ExperienceForm({
         <CheckField
           name="waiverRequired"
           label="Guests accept a waiver at checkout."
-          checked={values.waiverRequired}
+          defaultChecked={values.waiverRequired}
           problem={problemText('waiverRequired')}
         />
         <Select

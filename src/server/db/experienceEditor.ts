@@ -21,7 +21,6 @@ import {
   experienceColumnsOf,
   experienceContentOf,
   experienceRuleFailures,
-  isGuestVisible,
   listingChanges,
   experiencesPageSize,
   removedPriceFields,
@@ -34,7 +33,8 @@ import {
   type ExperienceListRow,
   type PlaceSlugs,
 } from '@/lib/experienceEditor';
-import { legalKindOf } from '@/lib/legal';
+import { isGuestVisible } from '@/lib/catalog';
+import { isPublishedWaiver } from '@/lib/legal';
 import { splitPage } from '@/lib/pagination';
 import { updateTagsForChanges } from '@/server/cache/invalidate';
 import { Role, requireRole, type Caller } from '@/server/auth/caller';
@@ -215,7 +215,7 @@ async function referencesExist(
     .select({ doc: legalDocuments.doc, status: legalDocuments.status })
     .from(legalDocuments)
     .where(eq(legalDocuments.id, refs.waiverDocumentId));
-  return waiver?.status === 'published' && legalKindOf(waiver.doc) === 'waiver';
+  return waiver !== undefined && isPublishedWaiver(waiver);
 }
 
 async function writePriceOptions(

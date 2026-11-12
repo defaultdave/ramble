@@ -5,7 +5,6 @@ import {
   ageRules,
   experienceRuleIssues,
   experienceStatuses,
-  guestVisibleStatuses,
   HttpUrlSchema,
   SlugSchema,
   taxTreatments,
@@ -17,10 +16,12 @@ import {
   type Neighborhood,
 } from './catalog';
 import { parseSingle, type SelectOption } from './filters';
-import { formatMoney } from './money';
+import { priceInputText, priceMinorFromText } from './money';
 import {
+  fieldsFromIssues,
   formHas,
   formText,
+  inFieldOrder,
   oversizedFields,
   slugFor,
   type FormGetter,
@@ -157,28 +158,18 @@ export type ExperienceFormField = (typeof experienceFormFields)[number];
 export type ExperienceFormResult<T> =
   { ok: true; value: T } | { ok: false; fields: ExperienceFormField[] };
 
-const CENTS_PER_DOLLAR = 100;
-const priceText = /^\$?(\d{1,5})(?:\.(\d{1,2}))?$/;
-
-/** A price as typed, "12", "12.5" or "$12.50", in minor units; null when it is not a price in range. Integer arithmetic only. */
-export function parsePriceMinor(text: string): number | null {
-  const match = priceText.exec(text.trim());
-  if (!match) return null;
-  const [, dollars = '', cents = ''] = match;
-  const minor =
-    Number(dollars) * CENTS_PER_DOLLAR + Number(cents.padEnd(2, '0'));
-  return minor <= experienceLimits.priceMinor ? minor : null;
-}
-
-/** A price as the form shows it for editing: "12.50", with no symbol or grouping. */
-export function priceInputValue(minor: number | null): string {
-  return minor === null ? '' : formatMoney(minor).replace(/[$,]/g, '');
+/** A price field as the form shows it for editing, empty for none. */
+export function priceFieldValue(minor: number | null): string {
+  return minor === null ? '' : priceInputText(minor);
 }
 
 const PriceSchema = z.string().transform((text, ctx) => {
-  const minor = parsePriceMinor(text);
-  if (minor === null) ctx.addIssue({ code: 'custom', message: 'A price' });
-  return minor ?? 0;
+  const minor = priceMinorFromText(text);
+  if (minor === undefined || minor > experienceLimits.priceMinor) {
+    ctx.addIssue({ code: 'custom', message: 'A price' });
+    return 0;
+  }
+  return minor;
 });
 
 const IntegerFieldSchema = (max: number, min = 0) =>
@@ -243,10 +234,6 @@ const textFields = [
   'childPrice',
 ] as const satisfies readonly ExperienceFormField[];
 
-function inFormOrder(failed: ReadonlySet<ExperienceFormField>) {
-  return experienceFormFields.filter((field) => failed.has(field));
-}
-
 type ParseOptions = { creating: boolean };
 
 /**
@@ -273,18 +260,16 @@ function parseFields(
   );
   const failed = new Set<ExperienceFormField>();
   if (!parsed.success) {
-    for (const issue of parsed.error.issues) {
-      const field = pickKnown(
-        String(issue.path[0]),
-        experienceFormFields,
-        null,
-      );
-      if (field !== null) failed.add(field);
+    for (const field of fieldsFromIssues(
+      parsed.error.issues,
+      experienceFormFields,
+    )) {
+      failed.add(field);
     }
     if (options.creating && formText(get, 'hostId') === undefined) {
       failed.add('hostId');
     }
-    return { ok: false, fields: inFormOrder(failed) };
+    return { ok: false, fields: inFieldOrder(experienceFormFields, failed) };
   }
   const { data } = parsed;
   const slug = slugFor(
@@ -338,7 +323,9 @@ function parseFields(
   // A guide-only entry's link is checked again where the status is known (`experienceRuleFailures`).
   for (const field of experienceRuleFailures(content, 'draft'))
     failed.add(field);
-  if (failed.size > 0) return { ok: false, fields: inFormOrder(failed) };
+  if (failed.size > 0) {
+    return { ok: false, fields: inFieldOrder(experienceFormFields, failed) };
+  }
   return { ok: true, value: { content, hostId: data.hostId ?? null } };
 }
 
@@ -366,12 +353,11 @@ export function experienceRuleFailures(
   content: ExperienceContent,
   status: ExperienceStatus,
 ): ExperienceFormField[] {
-  const failed = new Set<ExperienceFormField>();
-  for (const issue of experienceRuleIssues({ ...content, status })) {
-    const field = pickKnown(issue.path, experienceFormFields, null);
-    if (field !== null) failed.add(field);
-  }
-  return inFormOrder(failed);
+  const issues = experienceRuleIssues({ ...content, status });
+  return fieldsFromIssues(
+    issues.map(({ path }) => ({ path: [path] })),
+    experienceFormFields,
+  );
 }
 
 const contentFields = [
@@ -551,11 +537,6 @@ export function experienceColumnsOf(
 /** A guide-only entry links out, so its link is required. */
 export function linksOut(status: ExperienceStatus): boolean {
   return status === 'guide_only';
-}
-
-/** Whether guests can see an experience in this status, so a change to it reaches cached pages. */
-export function isGuestVisible(status: ExperienceStatus): boolean {
-  return (guestVisibleStatuses as readonly string[]).includes(status);
 }
 
 export type PlaceSlugs = { categorySlug: string; neighborhoodSlug: string };

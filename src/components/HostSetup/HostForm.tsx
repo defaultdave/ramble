@@ -1,4 +1,5 @@
 import { Button } from '@/components/Button';
+import { CheckField } from '@/components/CheckField';
 import { Input } from '@/components/Input';
 import { Textarea } from '@/components/Textarea';
 import {
@@ -110,14 +111,11 @@ export function HostForm({
             </p>
           ) : null}
           {agreement ? (
-            <label className={styles.check}>
-              <input
-                type="checkbox"
-                name="acceptLegalDocumentId"
-                value={agreement.id}
-              />
-              <span>{agreementTickLabel(agreement)}</span>
-            </label>
+            <CheckField
+              name="acceptLegalDocumentId"
+              value={agreement.id}
+              label={agreementTickLabel(agreement)}
+            />
           ) : (
             <p className={styles.muted}>
               No host agreement is published yet, so acceptance cannot be

@@ -27,3 +27,20 @@ export function formatPrice(minor: number): string {
     ? `$${dollars}`
     : `$${dollars}.${String(cents).padStart(2, '0')}`;
 }
+
+const dollarsPattern = /^(\d{1,6})(?:\.(\d{1,2}))?$/;
+
+/** Dollars as typed ("85", "$12.5", "1,200.00") in cents, or undefined when it is not a price. Integer arithmetic only. */
+export function priceMinorFromText(value: string): number | undefined {
+  const match = dollarsPattern.exec(value.replace(/[$,\s]/g, ''));
+  if (!match) return undefined;
+  const [, dollars = '', cents = ''] = match;
+  return Number(dollars) * CENTS_PER_DOLLAR + Number(cents.padEnd(2, '0'));
+}
+
+/** Cents as the dollars a person types: "85" for 8500, "12.50" for 1250. */
+export function priceInputText(minor: number): string {
+  const { dollars, cents } = splitMinor(minor);
+  const plain = dollars.replaceAll(',', '');
+  return cents === 0 ? plain : `${plain}.${String(cents).padStart(2, '0')}`;
+}

@@ -1,5 +1,5 @@
 import { browseWindowDays } from '@/lib/pages/browse';
-import { guestVisibleStatuses } from '@/lib/catalog';
+import { isGuestVisible } from '@/lib/catalog';
 import { homeModuleKinds } from '@/lib/editorial';
 import { homeLimits } from '@/lib/pages/home';
 import {
@@ -98,8 +98,7 @@ const kayak = 'sunset-kayak-on-the-hudson';
 const kidsWheel = 'kids-wheel-class';
 
 const isLive = (e: SnapshotExperience) => e.status === 'live';
-const isVisible = (e: SnapshotExperience) =>
-  (guestVisibleStatuses as readonly string[]).includes(e.status);
+const isVisible = (e: SnapshotExperience) => isGuestVisible(e.status);
 
 function upcoming(snapshot: SeedSnapshot, slug?: string): SnapshotSession[] {
   const window = seedBrowseWindow(snapshot);

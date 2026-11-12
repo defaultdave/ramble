@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { isGuestVisible } from './catalog';
 import { id } from '../../tests/support/ids';
 import {
   ageRuleLabels,
   buildExperienceChoices,
   desiredPriceOptions,
   experienceColumnsOf,
-  isGuestVisible,
   labelledOptions,
   listingChanges,
   newExperienceValues,

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  fieldsFromIssues,
   formHas,
+  inFieldOrder,
   formText,
   noticeHref,
   noticeText,
@@ -125,5 +127,33 @@ describe('noticeHref', () => {
     expect(noticeHref('/ops/x', 'invalid', ['name', 'price'])).toBe(
       '/ops/x?notice=invalid&fields=name%2Cprice',
     );
+  });
+});
+
+describe('inFieldOrder', () => {
+  it('keeps the list order and only the failed fields', () => {
+    expect(
+      inFieldOrder(['a', 'b', 'c'], new Set<'a' | 'b' | 'c'>(['c', 'a'])),
+    ).toEqual(['a', 'c']);
+  });
+});
+
+describe('fieldsFromIssues', () => {
+  const fields = ['name', 'slug', 'price'] as const;
+
+  it('names each field once, in the list order, and drops a name outside the list', () => {
+    const issues = [
+      { path: ['price'] },
+      { path: ['name'] },
+      { path: ['price', 0] },
+      { path: ['bogus'] },
+      { path: [] },
+    ];
+
+    expect(fieldsFromIssues(issues, fields)).toEqual(['name', 'price']);
+  });
+
+  it('names nothing for no issues', () => {
+    expect(fieldsFromIssues([], fields)).toEqual([]);
   });
 });

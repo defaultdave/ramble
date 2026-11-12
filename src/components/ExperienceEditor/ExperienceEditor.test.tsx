@@ -91,7 +91,7 @@ describe('ExperienceForm, editing', () => {
   it('shows the prices as typed and the flags as saved', () => {
     renderEdit();
 
-    expect(screen.getByLabelText(/Adult price/)).toHaveValue('85.00');
+    expect(screen.getByLabelText(/Adult price/)).toHaveValue('85');
     expect(screen.getByLabelText(/Child price/)).toHaveValue('40.50');
     expect(
       screen.getByRole('checkbox', { name: /child takes a space/ }),

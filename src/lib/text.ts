@@ -1,5 +1,18 @@
 import { z } from 'zod';
 
+/** Plain digits, up to seven: a count, an age, a number of minutes typed in a field. */
+export const wholeNumberPattern = /^\d{1,7}$/;
+
+/** A whole number typed in a field, trimmed, from `min` to `max`. The schema's error names no range; the caller's field message does. */
+export function wholeNumberText(min: number, max: number) {
+  return z
+    .string()
+    .transform((value) => value.trim())
+    .refine((value) => wholeNumberPattern.test(value))
+    .transform(Number)
+    .refine((value) => value >= min && value <= max);
+}
+
 /** "1 adult", "2 adults", "2 children": a count and its noun, the plural `s` unless one is given. */
 export function countLabel(
   count: number,

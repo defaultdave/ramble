@@ -30,6 +30,7 @@ describe('opsLandingLinks', () => {
     expect(opsLandingLinks().map((link) => link.href)).toEqual([
       '/ops/mailbox',
       '/ops/hosts',
+      '/ops/experiences',
     ]);
   });
 });

@@ -1,7 +1,8 @@
 import { CalendarDateTime, toZoned } from '@internationalized/date';
 import { z } from 'zod';
 import { EntityIdSchema } from './catalog';
-import { formatPrice } from './money';
+import { formatPrice, priceInputTextOrNull, priceMinorFromText } from './money';
+import { wholeNumberPattern } from './text';
 import {
   IsoDateSchema,
   TimeZoneSchema,
@@ -21,7 +22,6 @@ export const hostSessionsPath = '/host/sessions';
 const daysInWeek = 7;
 /** How far back a host can look: eight weeks. */
 const weeksBack = 8;
-const centsPerDollar = 100;
 
 /** A calendar date moved by whole days. It is calendar arithmetic, so no zone or DST moves it. */
 export function addDays(date: string, days: number): string {
@@ -163,13 +163,6 @@ const wallClock = (instant: Date, timeZone: string) =>
     hourCycle: 'h23',
   }).format(instant);
 
-/** Cents as the dollars a host types: "85" for 8500, "12.50" for 1250. */
-export function priceInputText(minor: number): string {
-  const cents = minor % centsPerDollar;
-  const dollars = String((minor - cents) / centsPerDollar);
-  return cents === 0 ? dollars : `${dollars}.${String(cents).padStart(2, '0')}`;
-}
-
 function rowView(session: HostWeekSession, now: Date): HostWeekRowView {
   const editable =
     session.status === 'scheduled' && isUpcoming(session.startsAt, now);
@@ -189,10 +182,7 @@ function rowView(session: HostWeekSession, now: Date): HostWeekRowView {
       (session.endsAt.getTime() - session.startsAt.getTime()) / msPerMinute,
     ),
     allocation: session.allocation,
-    adultPrice:
-      session.adultPriceMinor === null
-        ? null
-        : priceInputText(session.adultPriceMinor),
+    adultPrice: priceInputTextOrNull(session.adultPriceMinor),
     editable,
     movable: editable && session.seatsSold === 0,
   };
@@ -261,22 +251,10 @@ function text(get: Get, field: string): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-const wholeNumberPattern = /^\d{1,7}$/;
-
 /** A whole number typed in a field, or undefined for anything else, so the schema names the field. */
 function wholeNumber(get: Get, field: string): number | undefined {
   const value = text(get, field);
   return wholeNumberPattern.test(value) ? Number(value) : undefined;
-}
-
-const dollarsPattern = /^(\d{1,6})(?:\.(\d{1,2}))?$/;
-
-/** Dollars as typed ("85", "$12.5", "1,200.00") in cents, or undefined when it is not a price. */
-export function priceMinorFromText(value: string): number | undefined {
-  const match = dollarsPattern.exec(value.replace(/[$,\s]/g, ''));
-  if (!match) return undefined;
-  const [, dollars = '', cents = ''] = match;
-  return Number(dollars) * centsPerDollar + Number(cents.padEnd(2, '0'));
 }
 
 /** The values of the session forms as the schemas expect them: a field that is not a number is left undefined. */

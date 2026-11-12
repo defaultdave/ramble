@@ -5,15 +5,16 @@ import {
   hostSessionFormValues,
   hostSessionInvalid,
   hostSessionProblem,
-  priceInputText,
-  priceMinorFromText,
   publishWeekMessage,
   resolveWeek,
   weekBounds,
   weekStartOf,
   type HostWeekSession,
 } from './hostSessions';
-import { UpdateSessionAllocationInputSchema } from './sessions';
+import {
+  UpdateSessionAllocationInputSchema,
+  UpdateSessionPriceInputSchema,
+} from './sessions';
 
 // Behaviours under test, one per decision, branch or risk:
 // - a week runs Monday to Sunday, and any date in it names it (Sunday belongs to the week before the next Monday)
@@ -213,35 +214,6 @@ describe('buildHostWeek rows', () => {
   });
 });
 
-describe('prices', () => {
-  it.each([
-    ['85', 8500],
-    ['$85', 8500],
-    ['12.5', 1250],
-    ['12.05', 1205],
-    ['1,200.00', 120000],
-    [' 0 ', 0],
-  ])('reads %s as %i cents', (text, minor) => {
-    expect(priceMinorFromText(text)).toBe(minor);
-  });
-
-  it.each(['', 'free', '12.345', '-5', '1e3', '12.', '1234567'])(
-    'does not read %j as a price',
-    (text) => {
-      expect(priceMinorFromText(text)).toBeUndefined();
-    },
-  );
-
-  it.each([
-    [8500, '85'],
-    [1250, '12.50'],
-    [1205, '12.05'],
-    [0, '0'],
-  ])('writes %i cents as %s', (minor, text) => {
-    expect(priceInputText(minor)).toBe(text);
-  });
-});
-
 describe('form values and refusals', () => {
   const get = (fields: Record<string, unknown>) => (field: string) =>
     fields[field];
@@ -275,6 +247,17 @@ describe('form values and refusals', () => {
       errors: { allocation: containing('whole number') },
     });
   });
+
+  it.each(['12,50', '1,25', 'free'])(
+    'names the price field for %j, never reading a comma as a decimal',
+    (price) => {
+      const parsed = UpdateSessionPriceInputSchema.safeParse(
+        hostSessionFormValues.price(get({ sessionId: id(1), price })),
+      );
+      if (parsed.success) throw new Error('expected a refusal');
+      expect(hostSessionInvalid(parsed.error).status).toBe('invalid');
+    },
+  );
 
   it('calls a bad session id or version a stale form, not a field', () => {
     const parsed = UpdateSessionAllocationInputSchema.safeParse(

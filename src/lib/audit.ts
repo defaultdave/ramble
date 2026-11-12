@@ -86,6 +86,10 @@ const DetailsSchema = z
     z.record(wordSchema(auditLimits.detailsKeyMaxChars), DetailValueSchema),
   );
 
+/** The actor of a row written for a named, signed-in user. */
+export const userActor = (userId: string) =>
+  ({ actorKind: 'user', actorId: userId }) as const;
+
 /** Whether the actor kind and the actor id agree: a signed-in user is named, a guest or the system is not. */
 export function actorMatchesKind(
   kind: AuditActorKind,

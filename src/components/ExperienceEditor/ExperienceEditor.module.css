@@ -1,0 +1,73 @@
+.stack {
+  composes: stack from '../HostSetup/HostSetup.module.css';
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  max-width: 40rem;
+  font-family: var(--font-family-body);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+
+.legend {
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  font-size: var(--font-size-label);
+  line-height: var(--font-line-height-label);
+  font-weight: var(--font-weight-semibold);
+}
+
+.pair {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.muted {
+  composes: muted from '../HostSetup/HostSetup.module.css';
+}
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 40rem;
+}
+
+.cellLink {
+  composes: cellLink from '../HostSetup/HostSetup.module.css';
+}
+
+/* The two fields of a pair sit side by side from tablet up, and the button keeps its own width. */
+@media (min-width: 768px) {
+  .pair {
+    flex-direction: row;
+  }
+
+  .pair > * {
+    flex: 1;
+  }
+
+  .form > button,
+  .filters > button {
+    align-self: flex-start;
+  }
+}

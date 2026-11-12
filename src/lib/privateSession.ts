@@ -3,7 +3,12 @@ import { opsNoticeLimits, type OpsNoticeData } from '@/lib/email/opsNotice';
 import { readTextFields } from '@/lib/formFields';
 import { formatMoney } from '@/lib/money';
 import { EmailFieldSchema, supportLimits } from '@/lib/support';
-import { oneLineClipped, requiredText } from '@/lib/text';
+import {
+  oneLineClipped,
+  requiredText,
+  wholeNumberPattern,
+  wholeNumberText,
+} from '@/lib/text';
 
 export const privateSessionLimits = {
   nameMaxChars: supportLimits.nameMaxChars,
@@ -39,8 +44,6 @@ function isRealDate(value: string): boolean {
   );
 }
 
-const wholeNumber = /^\d{1,7}$/;
-
 /** Dollars as a person types them: "1200", "$1,200", " 1 200 ". Cents are not asked for. */
 const dollarsText = (value: string) => value.replace(/[$,\s]/g, '');
 
@@ -55,18 +58,11 @@ export function privateRequestSchema(today: string) {
       .transform(trim)
       .refine(isRealDate)
       .refine((value) => value >= today),
-    groupSize: z
-      .string()
-      .transform(trim)
-      .refine((value) => wholeNumber.test(value))
-      .transform(Number)
-      .refine(
-        (value) => value >= 1 && value <= privateSessionLimits.maxGroupSize,
-      ),
+    groupSize: wholeNumberText(1, privateSessionLimits.maxGroupSize),
     budgetMinor: z
       .string()
       .transform(dollarsText)
-      .refine((value) => wholeNumber.test(value))
+      .refine((value) => wholeNumberPattern.test(value))
       .transform((value) => Number(value) * centsPerDollar)
       .refine(
         (value) =>

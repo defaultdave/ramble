@@ -59,13 +59,14 @@ export async function getCurrentLegalDocument(
   return row ? LegalDocumentSchema.parse(row) : null;
 }
 
-/** One published version by ID, such as the waiver text an experience points at. */
+/** One published version by ID, such as the waiver text an experience points at. Inside a transaction, pass it so the read sees the same snapshot. */
 export async function getPublishedLegalDocument(
   id: string,
+  tx?: Transaction,
 ): Promise<LegalDocument | null> {
   const parsed = EntityIdSchema.safeParse(id);
   if (!parsed.success) return null;
-  const [row] = await dbRead
+  const [row] = await (tx ?? dbRead)
     .select()
     .from(legalDocuments)
     .where(

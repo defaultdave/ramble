@@ -11,6 +11,8 @@ export const opsAreaIds = {
   mailbox: '00000000-0000-4000-8000-0000000000a2',
   hosts: '00000000-0000-4000-8000-0000000000a3',
   support: '00000000-0000-4000-8000-0000000000a4',
+  staff: '00000000-0000-4000-8000-0000000000a5',
+  audit: '00000000-0000-4000-8000-0000000000a6',
 } as const;
 
 /** An ops area's list was read by a named ops user: one row, naming the area by its fixed id. */

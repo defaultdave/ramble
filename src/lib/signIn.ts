@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { signInLinkTtlSeconds } from './auth';
 import { retryAfterMinutes, waitMinutesLabel } from './rateLimits';
 
 // The sign-in pages' decisions: where a person may be sent afterwards, what the link in the email
@@ -87,6 +88,14 @@ export function signInConfirmUrl(
   url.searchParams.set('token', token);
   url.searchParams.set('next', safeNextPath(next));
   return url.toString();
+}
+
+/** The data of every sign-in link email: the confirm address and how long the link lives. */
+export function signInLinkData(token: string, origin: string, next: unknown) {
+  return {
+    url: signInConfirmUrl(origin, token, next),
+    expiresInMinutes: signInLinkTtlSeconds / 60,
+  };
 }
 
 /** What the confirm page and its post carry. A Better Auth token is 32 letters and digits. */

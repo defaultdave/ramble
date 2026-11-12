@@ -32,6 +32,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:check": "drizzle-kit check",
     "db:http": "bun scripts/dev/neon-http.ts",
+    "db:grant-role": "bun --preload ./scripts/seed-preload.ts scripts/grant-role.ts",
     "db:seed": "bun --preload ./scripts/seed-preload.ts scripts/seed.ts",
     "e2e:db": "DATABASE_URL=$E2E_DATABASE_URL DATABASE_URL_UNPOOLED=$E2E_DATABASE_URL SEED_TARGET=local sh -c 'pnpm db:migrate && pnpm db:seed'",
     "storybook": "storybook dev -p 6006",

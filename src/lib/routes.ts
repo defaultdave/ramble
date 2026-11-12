@@ -106,6 +106,9 @@ export const legalDocPath = (doc: string) => `/legal/${doc}`;
 
 // ---- Post-booking ----
 
+/** A signed-in guest's own bookings. */
+export const accountPath = '/account';
+
 /** The manage page a booking email links to. The token is a capability: it is never logged or stored. */
 export const managePath = (token: string) => `/manage/${token}`;
 

@@ -16,6 +16,7 @@ import { experiences } from '@/server/db/schema';
 import { createFakeStorageAdapter } from '@/server/ports/storage/fake';
 import { personaHostSlugs } from '@/lib/seed/personas';
 import { experienceEditorRows } from './authzExperienceRows';
+import { accountBookingsRows } from './authzAccountRows';
 import { hostSetupRows } from './authzHostRows';
 import { supportQueueRows } from './authzSupportRows';
 import { cancelSessionRows } from './authzSessionRows';
@@ -511,6 +512,7 @@ const rows: Row[] = [
     invoke: (c) => data.audit.recordOpsAccess(c),
     allows: platform(...opsOnly),
   },
+  ...accountBookingsRows(),
   ...hostSetupRows(),
   ...supportQueueRows(),
   ...experienceEditorRows(),

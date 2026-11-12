@@ -1,0 +1,41 @@
+/* The same list as the host's bookings page; only the group headings are new. */
+.body {
+  composes: body from '../../../components/HostGuestLists/HostGuestLists.module.css';
+}
+
+.list {
+  composes: list from '../../../components/HostGuestLists/HostGuestLists.module.css';
+}
+
+.row {
+  composes: row from '../../../components/HostGuestLists/HostGuestLists.module.css';
+}
+
+.primary {
+  composes: primary from '../../../components/HostGuestLists/HostGuestLists.module.css';
+}
+
+.secondary {
+  composes: secondary from '../../../components/HostGuestLists/HostGuestLists.module.css';
+}
+
+.link {
+  composes: link from '../../../components/HostGuestLists/HostGuestLists.module.css';
+}
+
+.visuallyHidden {
+  composes: visuallyHidden from '../../../styles/visually-hidden.module.css';
+}
+
+.group {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.heading {
+  margin: 0;
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-heading-m);
+  line-height: var(--font-line-height-heading-m);
+  font-weight: var(--font-weight-semibold);
+}

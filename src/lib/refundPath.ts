@@ -61,8 +61,3 @@ export const PaidAfterLapsePayloadSchema = z.strictObject({
   reason: z.enum(lapseReasons),
   amountMinor: RefundMinorSchema.min(1),
 });
-
-/** One email per order: a second event for the same payment queues nothing. */
-export function paidAfterLapseDedupeKey(orderId: string): string {
-  return `${paidAfterLapseJobKind}:${orderId.toLowerCase()}`;
-}

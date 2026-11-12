@@ -1,8 +1,8 @@
 import 'server-only';
 import type { z } from 'zod';
-import { paidAfterLapseData } from '@/lib/bookingEmails';
+import { bookingEmailKey, paidAfterLapseData } from '@/lib/bookingEmails';
 import {
-  paidAfterLapseDedupeKey,
+  paidAfterLapseJobKind,
   type PaidAfterLapsePayloadSchema,
 } from '@/lib/refundPath';
 import type { Transaction } from '@/server/db/client';
@@ -39,6 +39,6 @@ export async function sendPaidAfterLapse({
       reason: payload.reason,
       appUrl: env.APP_URL,
     }),
-    idempotencyKey: paidAfterLapseDedupeKey(payload.orderId),
+    idempotencyKey: bookingEmailKey(paidAfterLapseJobKind, payload.orderId),
   });
 }

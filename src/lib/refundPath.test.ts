@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { bookingEmailKey } from './bookingEmails';
 import { refundPathReasons } from './confirmOrder';
 import { holdStatuses } from './holds';
 import { orderStatuses } from './orders';
@@ -7,7 +8,8 @@ import {
   PaidAfterLapsePayloadSchema,
   isRefundPathBuilt,
   lateRefundPlan,
-  paidAfterLapseDedupeKey,
+  lateRefundKey,
+  paidAfterLapseJobKind,
 } from './refundPath';
 
 // Behaviours under test, one per decision, branch, or risk:
@@ -109,9 +111,15 @@ describe('the email payload', () => {
 });
 
 describe('the email key', () => {
-  it('is one per order, in lower case', () => {
-    expect(paidAfterLapseDedupeKey(id.toUpperCase())).toBe(
+  it('is one per order under the job kind', () => {
+    expect(bookingEmailKey(paidAfterLapseJobKind, id)).toBe(
       `guest-paid-after-lapse:${id}`,
     );
+  });
+});
+
+describe('the refund key', () => {
+  it('is fixed, so a retried event asks for the same refund', () => {
+    expect(lateRefundKey).toBe('late-payment');
   });
 });

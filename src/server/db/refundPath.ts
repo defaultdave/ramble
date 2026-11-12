@@ -1,6 +1,7 @@
 import 'server-only';
 import { eq } from 'drizzle-orm';
 import { requireSessionRefund, releasedHold } from '@/lib/cancelSession';
+import { bookingEmailKey } from '@/lib/bookingEmails';
 import type { RefundPathReason } from '@/lib/confirmOrder';
 import { isSimulatedPayment } from '@/lib/confirmOrder';
 import { bookingPaid } from '@/lib/ledger';
@@ -9,7 +10,6 @@ import {
   lateRefundKey,
   lateRefundPlan,
   lateRefundReason,
-  paidAfterLapseDedupeKey,
   paidAfterLapseJobKind,
 } from '@/lib/refundPath';
 import { enqueue } from '@/server/jobs/enqueue';
@@ -112,7 +112,7 @@ export const takeRefundPath: TakeRefundPath = async (tx, input) => {
       reason: input.reason,
       amountMinor: refund.amountMinor,
     },
-    dedupeKey: paidAfterLapseDedupeKey(input.orderId),
+    dedupeKey: bookingEmailKey(paidAfterLapseJobKind, input.orderId),
   });
   return { status: 'refunded' };
 };

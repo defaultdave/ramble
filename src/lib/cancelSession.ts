@@ -26,11 +26,6 @@ export const CancelSessionInputSchema = z.strictObject({
 });
 export type CancelSessionInput = z.input<typeof CancelSessionInputSchema>;
 
-/** Ops and admin cancel any host's session; anyone else must own the session's host. */
-export function cancelsAsStaff(roles: readonly string[]): boolean {
-  return roles.includes('ops') || roles.includes('admin');
-}
-
 /** The refund reason each cancelling party's refunds carry. */
 const refundReasons = {
   host: 'host_cancel',
@@ -141,6 +136,42 @@ export function holdFanOut(status: HoldStatus): 'release' | 'leave' {
 export const fanOutHoldStatuses = holdStatuses.filter(
   (status) => holdFanOut(status) === 'release',
 );
+
+/** The confirmed bookings to refund and the unpaid orders to void, each in the order given. */
+export function partitionOrders<T extends { status: OrderStatus }>(
+  rows: readonly T[],
+): { toRefund: T[]; toVoid: T[] } {
+  return {
+    toRefund: rows.filter((row) => orderFanOut(row.status) === 'refund'),
+    toVoid: rows.filter((row) => orderFanOut(row.status) === 'void'),
+  };
+}
+
+/**
+ * What the session row is written with, or null when there is nothing to write: a first
+ * cancellation writes the status, and any cancellation that returned seats writes the count.
+ */
+export function sessionRowWrite(input: {
+  writesSession: boolean;
+  seatsReturned: number;
+}): { cancels: boolean; seatsReturned: number } | null {
+  return input.writesSession || input.seatsReturned > 0
+    ? { cancels: input.writesSession, seatsReturned: input.seatsReturned }
+    : null;
+}
+
+/** Whether the cache tags are invalidated: the session was cancelled now, or the walk changed a row. */
+export function revalidatesCache(result: {
+  status: 'cancelled' | 'already_cancelled';
+  ordersRefunded: number;
+  ordersVoided: number;
+  holdsReleased: number;
+}): boolean {
+  return (
+    result.status === 'cancelled' ||
+    result.ordersRefunded + result.ordersVoided + result.holdsReleased > 0
+  );
+}
 
 /** Every row the fan-out reads is bounded: more than `fanOutLimit` is refused, and nothing is decided on a part. */
 export function requireWithinFanOut<T>(

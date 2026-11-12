@@ -4,12 +4,13 @@ import { bookingEmailKey } from '@/lib/bookingEmails';
 import {
   CancelSessionInputSchema,
   cancelledStatus,
-  cancelsAsStaff,
+  partitionOrders,
+  revalidatesCache,
+  sessionRowWrite,
   fanOutHoldStatuses,
   fanOutLimit,
   fanOutOrderStatuses,
   orderCancelledAudit,
-  orderFanOut,
   releasedHold,
   requireSessionRefund,
   requireWithinFanOut,
@@ -31,12 +32,7 @@ import {
 } from '@/lib/holdLapse';
 import { requireAttemptTransition } from '@/lib/providerEvents';
 import { revalidateTagsForChanges } from '@/server/cache/invalidate';
-import {
-  ForbiddenError,
-  requireRole,
-  Role,
-  type Caller,
-} from '@/server/auth/caller';
+import { requireAnyRole, Role, type Caller } from '@/server/auth/caller';
 import { enqueue } from '@/server/jobs/enqueue';
 import type { PaymentsPort } from '@/server/ports/payments';
 import { getPaymentsPort } from '@/server/ports/payments/gateway';
@@ -81,13 +77,11 @@ async function walkSession(
   input: { sessionId: string; reason: SessionCancelReason },
 ): Promise<Walked> {
   const locked = await lockSessionRow(tx, input.sessionId);
-  if (!locked) {
-    if (!cancelsAsStaff(caller.roles)) throw new ForbiddenError(Role.HostOwner);
-    return { kind: 'stop', result: { status: 'not_found' } };
-  }
-  if (!cancelsAsStaff(caller.roles)) {
-    requireRole(caller, Role.HostOwner, { hostId: locked.hostId });
-  }
+  // Staff may cancel any session and learn one is missing; a host owner only their own host's.
+  requireAnyRole(caller, [Role.Ops, Role.Admin, Role.HostOwner], {
+    ...(locked ? { hostId: locked.hostId } : {}),
+  });
+  if (!locked) return { kind: 'stop', result: { status: 'not_found' } };
   const plan = sessionCancelPlan(locked.session, input.reason);
   if (plan.kind === 'stop') return { kind: 'stop', result: plan.result };
   const { reason } = plan;
@@ -139,9 +133,7 @@ async function walkSession(
       );
   }
 
-  const unpaid = fanOutOrders.filter(
-    (order) => orderFanOut(order.status) === 'void',
-  );
+  const { toRefund, toVoid: unpaid } = partitionOrders(fanOutOrders);
   const voided = unpaid.map((order) => voidedStatus(order.status));
   if (voided[0]) {
     await tx
@@ -157,8 +149,7 @@ async function walkSession(
 
   let seatsReturned = 0;
   let ordersRefunded = 0;
-  for (const order of fanOutOrders) {
-    if (orderFanOut(order.status) !== 'refund') continue;
+  for (const order of toRefund) {
     const refund = requireSessionRefund(
       await requestRefund(tx, {
         orderId: order.id,
@@ -202,18 +193,22 @@ async function walkSession(
     });
   }
 
-  if (plan.writesSession || seatsReturned > 0) {
+  const write = sessionRowWrite({
+    writesSession: plan.writesSession,
+    seatsReturned,
+  });
+  if (write) {
     await tx
       .update(sessions)
       .set({
-        ...(plan.writesSession
+        ...(write.cancels
           ? {
               status: 'cancelled' as const,
               cancelReason: reason,
               version: sql`${sessions.version} + 1`,
             }
           : {}),
-        seatsSold: sql`${sessions.seatsSold} - ${seatsReturned}`,
+        seatsSold: sql`${sessions.seatsSold} - ${write.seatsReturned}`,
       })
       .where(eq(sessions.id, input.sessionId));
   }
@@ -322,6 +317,7 @@ async function markAttemptCanceled(attempt: {
  * again, finishing what a failed run left, and writes nothing a second time. Runs in a Server Action
  * only (it invalidates cache tags). Commission return and gift reinstatement are not part of it.
  */
+// TODO(U-070): first caller (U-108 also)
 export async function cancelSession(
   caller: Caller,
   input: CancelSessionInput,
@@ -331,10 +327,7 @@ export async function cancelSession(
   const walked = await db.transaction((tx) => walkSession(tx, caller, parsed));
   if (walked.kind === 'stop') return walked.result;
   const { result } = walked;
-  if (
-    result.status === 'cancelled' ||
-    result.ordersRefunded + result.ordersVoided + result.holdsReleased > 0
-  ) {
+  if (revalidatesCache(result)) {
     revalidateTagsForChanges(
       sessionCancelCacheChanges({
         sessionId: parsed.sessionId,

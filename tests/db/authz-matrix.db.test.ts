@@ -743,7 +743,7 @@ describe('a host owner asking about an experience', () => {
 
 describe('the matrix is complete', () => {
   /** Functions that take a Caller and are the guard or its parts, not guarded functions. */
-  const guards = new Set(['requireRole', 'requireStaff']);
+  const guards = new Set(['requireRole', 'requireAnyRole', 'requireStaff']);
   /** The mailbox opens to the ops role or, off production, to the shared secret, so its access rule is not a role row; src/server/ports/email/mailbox.test.ts and tests/db/email-mailbox.db.test.ts cover every combination. */
   const mailboxGate = ['unlockMailbox', 'loadMailbox', 'loadMailboxMessage'];
 

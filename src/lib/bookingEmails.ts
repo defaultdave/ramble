@@ -69,7 +69,8 @@ export function bookingEmailKey(
     | 'host-booking-notice'
     | 'session-reminder'
     | 'guest-cancellation'
-    | 'host-cancellation-notice',
+    | 'host-cancellation-notice'
+    | 'guest-paid-after-lapse',
   orderId: string,
 ): string {
   return `${kind}:${orderId}`;

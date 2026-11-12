@@ -323,8 +323,9 @@ describe('a repeat', () => {
 
   it('finishes what a half-done run left, under the reason the session carries', async () => {
     const session = await newSession();
-    const booking = await seedConfirmedOn(session.id);
+    const booking = await seedConfirmedOn(session.id, 2);
     const { eq } = await import('drizzle-orm');
+    expect((await sessionOf(session.id)).seatsSold).toBe(2);
     await client.db
       .update(schema.sessions)
       .set({ status: 'cancelled', cancelReason: 'weather' })
@@ -342,6 +343,7 @@ describe('a repeat', () => {
     });
     expect((await refundsOf(booking))[0]?.reason).toBe('weather');
     expect((await sessionOf(session.id)).version).toBe(1);
+    expect((await sessionOf(session.id)).seatsSold).toBe(0);
   });
 
   it('cancels a payment the first run could not reach', async () => {

@@ -3,7 +3,10 @@ import { parseAuditEntry } from './audit';
 import {
   CancelSessionInputSchema,
   cancelledStatus,
-  cancelsAsStaff,
+  partitionOrders,
+  revalidatesCache,
+  sessionRowWrite,
+  sessionRefundKey,
   fanOutHoldStatuses,
   fanOutLimit,
   fanOutOrderStatuses,
@@ -254,17 +257,58 @@ describe('the refund of a cancelled booking', () => {
   );
 });
 
-describe('who may cancel', () => {
+describe('the orders a cancellation acts on', () => {
+  const rows = orderStatuses.map((status) => ({ status }));
+
+  it('splits the refunds from the voids, in the order given, and drops the rest', () => {
+    const { toRefund, toVoid } = partitionOrders(rows);
+    expect(toRefund.map((row) => row.status)).toEqual(['confirmed']);
+    expect(toVoid.map((row) => row.status)).toEqual([
+      'pending_payment',
+      'payment_failed',
+    ]);
+  });
+});
+
+describe('the session row write', () => {
   it.each([
-    [['ops'], true],
-    [['admin'], true],
-    [['guest', 'ops'], true],
-    [['host_owner'], false],
-    [['host_staff'], false],
-    [['guest'], false],
-    [[], false],
-  ])('%j is staff: %s', (roles, staff) => {
-    expect(cancelsAsStaff(roles)).toBe(staff);
+    [true, 0, { cancels: true, seatsReturned: 0 }],
+    [true, 3, { cancels: true, seatsReturned: 3 }],
+    [false, 1, { cancels: false, seatsReturned: 1 }],
+    [false, 0, null],
+  ])(
+    'writesSession %s with %s seats returned',
+    (writesSession, seats, expected) => {
+      expect(sessionRowWrite({ writesSession, seatsReturned: seats })).toEqual(
+        expected,
+      );
+    },
+  );
+});
+
+describe('when the cache is invalidated', () => {
+  const walked = { ordersRefunded: 0, ordersVoided: 0, holdsReleased: 0 };
+  const repeat = { ...walked, status: 'already_cancelled' as const };
+
+  it.each([
+    [
+      'a cancellation just made',
+      { ...walked, status: 'cancelled' as const },
+      true,
+    ],
+    ['a repeat that changed nothing', repeat, false],
+    ['a repeat that refunded', { ...repeat, ordersRefunded: 1 }, true],
+    ['a repeat that voided', { ...repeat, ordersVoided: 1 }, true],
+    ['a repeat that released', { ...repeat, holdsReleased: 1 }, true],
+  ])('%s', (_name, result, expected) => {
+    expect(revalidatesCache(result)).toBe(expected);
+  });
+});
+
+describe('the constants', () => {
+  it('fix the limit and the refund key', () => {
+    expect(fanOutLimit).toBe(5000);
+    expect(sessionRefundKey).toBe('session-cancel');
   });
 });
 

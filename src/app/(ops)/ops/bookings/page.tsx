@@ -24,7 +24,8 @@ export default async function OpsBookingsPage({
   }
 
   const cursor = parseCursor(query.cursor);
-  const search = parseBookingSearch(query.q);
+  const term = parseSearchTerm(query.q);
+  const search = parseBookingSearch(term);
   const page = await readOpsBookings(caller, {
     search,
     filter: parseBookingFilter(query.status),
@@ -35,7 +36,7 @@ export default async function OpsBookingsPage({
       <OpsBookingsList
         rows={page.rows}
         query={query}
-        term={parseSearchTerm(query.q)}
+        term={term}
         summary={searchSummary(search, page.rows.length)}
         cursor={cursor}
         nextCursor={page.nextCursor}

@@ -21,7 +21,7 @@ import {
 // - an email the sign-in has not verified reads nothing, though bookings exist at the address
 // - an address no guest booked with reads an empty list
 // - an order still being paid for and a void one are not listed
-// - a gift purchase is not listed; a sign-in and a guest whose addresses differ only in case meet
+// - a gift purchase is not listed; a mixed-case address cannot be stored on either side, so the join needs no folding
 // - the list stops at the limit and keeps the latest sessions
 // - nobody signed in, and a verified person with bookings but no guest role, are refused before the database is asked
 
@@ -156,14 +156,9 @@ describe('readAccountBookings', () => {
     expect(rows.map((row) => row.id)).toEqual([kept]);
   });
 
-  it('meets a sign-in and a guest whose addresses differ only in case', async () => {
-    const guestId = await guestAt('case@example.com');
-    const caller = await signedIn('Case@Example.com');
-    const mine = await booking(guestId, 16);
-
-    const rows = await reads.readAccountBookings(caller);
-
-    expect(rows.map((row) => row.id)).toEqual([mine]);
+  it('compares addresses as stored because neither table can hold a mixed-case one', async () => {
+    await expect(guestAt('Case@Example.com')).rejects.toThrow();
+    await expect(signedIn('Case@Example.com')).rejects.toThrow();
   });
 
   it('stops at the limit and keeps the latest sessions', async () => {

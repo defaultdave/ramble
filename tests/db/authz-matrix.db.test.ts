@@ -37,18 +37,15 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 // Behaviours under test, against the real database, with every caller made by a real sign-in by
 // link as a seeded persona. One row per guarded function and resource, and each row names who gets
 // through; every other subject must be refused with a ForbiddenError, and a subject listed must not be:
-// - nobody signed in, a guest, host staff, and the owner of the other host are refused everywhere a
-//   host owner or staff member is required; host staff are granted nothing by any function yet
+// - nobody signed in, a guest, host staff, and the other host's owner are refused where a host owner or staff is required
 // - platform actions (editorial, legal, settings, finance, privacy, seed) admit ops and admin, or ops
 //   alone where the function says so, and no host role
 // - host-owner-only actions admit the owner of that host only: not ops, not admin, not the other owner
 // - session and photo actions admit the owner of the host, and ops and admin on any host; a template
 //   or session sourced from an allocation is staff only, so its own host's owner is refused
 // - a missing row is refused to everyone but staff, so the answer does not say which ids exist
-// - requireRole on its own: a guest owns only the row whose owner is them; a host role needs the
-//   host it was granted; a role is not satisfied by a different role
-// - coverage: every function in src/server that takes a Caller is a row here, or is named below as a
-//   guard itself, so a new guarded function fails this file until it is added
+// - requireRole on its own: a guest owns only their row; a host role needs its host; one role never satisfies another
+// - coverage: every function in src/server that takes a Caller is a row here or a named guard, so a new one fails until added
 
 setupAuthzDatabase();
 

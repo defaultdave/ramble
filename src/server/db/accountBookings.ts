@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import {
   AccountBookingRowSchema,
   accountBookingLimit,
@@ -25,8 +25,7 @@ export async function readAccountBookings(
     manageTokenVersion: orders.manageTokenVersion,
   })
     .innerJoin(guests, eq(guests.id, orders.guestId))
-    // A guest's address is stored lower-case (`normalizeEmailAddress`); the sign-in's need not be.
-    .innerJoin(authUsers, eq(sql`lower(${authUsers.email})`, guests.email))
+    .innerJoin(authUsers, eq(authUsers.email, guests.email))
     .where(
       and(
         eq(authUsers.id, userId),

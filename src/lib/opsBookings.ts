@@ -414,12 +414,12 @@ export type OpsCancelForm =
 
 /** The cancel and refund forms: the refund ops was shown, in digits, which the cancel checks against what the tier gives now. */
 export function parseExpectedRefundForm(get: FormGetter): OpsCancelForm {
-  const expectedRefundMinor = refundMinorFromText(
-    formText(get, 'expectedRefundMinor'),
+  const parsed = RefundMinorSchema.safeParse(
+    refundMinorFromText(formText(get, 'expectedRefundMinor')),
   );
-  return expectedRefundMinor < 0
-    ? { ok: false }
-    : { ok: true, expectedRefundMinor };
+  return parsed.success
+    ? { ok: true, expectedRefundMinor: parsed.data }
+    : { ok: false };
 }
 
 export const opsNoticeCodes = [

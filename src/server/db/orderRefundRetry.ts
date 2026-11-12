@@ -2,19 +2,14 @@ import 'server-only';
 import { and, desc, eq } from 'drizzle-orm';
 import { reconcileReadLimit } from '@/lib/cancelBooking';
 import { WriteIdSchema } from '@/lib/catalog';
-import {
-  RefundRequestSchema,
-  refundIdFromDigest,
-  refundRequestIdentity,
-} from '@/lib/refunds';
 import { refundAuditEntry, retryPlan } from '@/lib/refundRetry';
 import type { Caller } from '@/server/auth/caller';
-import { sha256Hex } from '@/server/hash';
 import { requireOpsUserId } from './audit';
 import { db } from './client';
 import { lockOrderById } from './locks';
 import {
   clearRefundFailed,
+  refundIdFor,
   requestAuditedRefund,
   type RequestRefundResult,
 } from './refunds';
@@ -66,16 +61,7 @@ export async function retryFailedRefund(
     const failed =
       failedRefunds.find((candidate) => {
         const plan = retryPlanFor(candidate);
-        return (
-          plan.kind === 'stop' ||
-          !standing.has(
-            refundIdFromDigest(
-              sha256Hex(
-                refundRequestIdentity(RefundRequestSchema.parse(plan.request)),
-              ),
-            ),
-          )
-        );
+        return plan.kind === 'stop' || !standing.has(refundIdFor(plan.request));
       }) ?? null;
     const plan = retryPlanFor(failed);
     if (plan.kind === 'stop') return 'refused';

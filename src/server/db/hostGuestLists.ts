@@ -1,7 +1,6 @@
 import 'server-only';
-import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { EntityIdSchema } from '@/lib/catalog';
-import { hostDashboardBookingStatuses } from '@/lib/hostDashboard';
 import {
   HostBookingListRowSchema,
   HostBookingSearchSchema,
@@ -13,6 +12,7 @@ import {
 } from '@/lib/hostGuestLists';
 import { containsPattern } from '@/lib/pages/help';
 import { Role, requireRole, type Caller } from '@/server/auth/caller';
+import { liveBookings, selectBookings } from './bookingRows';
 import { db } from './client';
 import { experiences, hosts, orderItems, orders, sessions } from './schema';
 
@@ -40,26 +40,15 @@ export async function readHostBookings(
   requireRole(caller, Role.HostOwner, { hostId: id });
 
   const pattern = containsPattern(search);
-  const rows = await db
-    .select({
-      id: orders.id,
-      reference: orders.reference,
-      leadGuestName: orders.leadGuestName,
-      experienceName: experiences.name,
-      sessionId: orders.sessionId,
-      sessionStartsAt: sessions.startsAt,
-      timeZone: sessions.timeZone,
-      seats: seatsOf,
-      status: orders.status,
-    })
-    .from(orders)
-    .innerJoin(sessions, eq(sessions.id, orders.sessionId))
-    .innerJoin(experiences, eq(experiences.id, orders.experienceId))
+  const rows = await selectBookings({
+    leadGuestName: orders.leadGuestName,
+    sessionId: orders.sessionId,
+    seats: seatsOf,
+  })
     .where(
       and(
         eq(orders.hostId, id),
-        eq(orders.kind, 'booking'),
-        inArray(orders.status, [...hostDashboardBookingStatuses]),
+        liveBookings,
         search === ''
           ? undefined
           : or(

@@ -11,6 +11,7 @@ import {
   verifyOutcome,
   safeNextPath,
   signInConfirmUrl,
+  signInLinkData,
   signInHref,
   signInProblemFor,
   signInStateFor,
@@ -105,6 +106,18 @@ describe('signInConfirmUrl', () => {
     );
     expect(url).not.toContain('/api/auth');
     expect(new URL(url).searchParams.get('next')).toBe('/');
+  });
+});
+
+describe('signInLinkData', () => {
+  it('carries the confirm address for the landing page and the link lifetime in minutes', () => {
+    const data = signInLinkData('AbC123', 'https://ramble.example', '/ops');
+
+    expect(data.url).toBe(
+      signInConfirmUrl('https://ramble.example', 'AbC123', '/ops'),
+    );
+    expect(data.expiresInMinutes).toBeGreaterThan(0);
+    expect(data.expiresInMinutes).toBeLessThanOrEqual(60);
   });
 });
 

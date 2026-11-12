@@ -38,6 +38,16 @@ export const opsNavLinks: readonly OpsNavLink[] = [
     summary: 'Approve experiences waiting for review, or send them back.',
   },
   {
+    label: 'Staff',
+    href: '/ops/staff',
+    summary: 'Invite Ramble staff and remove their access.',
+  },
+  {
+    label: 'Audit log',
+    href: '/ops/audit',
+    summary: 'Read what was changed and who changed it, a day at a time.',
+  },
+  {
     label: 'Bookings',
     href: '/ops/bookings',
     summary:

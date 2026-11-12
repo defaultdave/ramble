@@ -6,7 +6,7 @@ import { Header } from './Header';
 
 // Behaviours under test:
 // - signed out: a Sign in link to /sign-in and no sign-out form
-// - signed in: Sign out is a submit button in a form that posts to the end-session address, so it works with no script, and there is no sign-in link
+// - signed in: a My bookings link to /account, and Sign out is a submit button in a form that posts to the end-session address, so it works with no script, and there is no sign-in link
 // - the header shows the account control it is given, and nothing extra when it is given none
 
 describe('AccountControl', () => {
@@ -17,11 +17,17 @@ describe('AccountControl', () => {
       'href',
       '/sign-in',
     );
+    expect(screen.queryByRole('link', { name: 'My bookings' })).toBeNull();
     expect(container.querySelector('form')).toBeNull();
   });
 
-  it('gives a signed-in person a Sign out form that posts', () => {
+  it('gives a signed-in person a link to their bookings and a Sign out form that posts', () => {
     const { container } = render(<AccountControl signedIn />);
+
+    expect(screen.getByRole('link', { name: 'My bookings' })).toHaveAttribute(
+      'href',
+      '/account',
+    );
 
     const form = container.querySelector('form');
     expect(form).toHaveAttribute('method', 'post');

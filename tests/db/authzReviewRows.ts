@@ -1,4 +1,5 @@
 import type { Caller } from '@/server/auth/caller';
+import { experiencePauseRows } from './authzPauseRows';
 
 // The experience-review row of the authorization matrix, kept apart so the matrix file stays under
 // the size limit. The function is ops alone. The target is an experience that does not exist, so an
@@ -21,6 +22,8 @@ export function experienceReviewRows() {
         ),
       allows: opsOnly,
     },
+    // The matrix file is at its size limit, so the pause rows ride with the review rows.
+    ...experiencePauseRows(),
   ] satisfies {
     fn: string;
     invoke: (caller: Caller, target: Target) => Promise<unknown>;

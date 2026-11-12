@@ -73,20 +73,23 @@ export function photosNeedingAlt(photos: readonly PhotoAlt[]): number[] {
 
 export type ReviewRefusal =
   | { status: 'not_in_review' }
+  | { status: 'host_suspended' }
   | { status: 'alt_missing'; photoNumbers: number[] };
 
 /**
- * Why a decision cannot go ahead, or null when it can. Only an experience in review is decided,
- * and an approval also needs every photo to have alt text or be marked decorative. A rejection
- * does not wait on the photos.
+ * Why a decision cannot go ahead, or null when it can. Only an experience in review is decided.
+ * An approval also waits while the host is suspended, since a suspended host has nothing live, and
+ * needs every photo to have alt text or be marked decorative. A rejection waits on neither.
  */
 export function reviewRefusal(
   status: ExperienceStatus,
   decision: ReviewDecision,
   photos: readonly PhotoAlt[],
+  hostSuspended: boolean,
 ): ReviewRefusal | null {
   if (status !== 'in_review') return { status: 'not_in_review' };
   if (decision.kind === 'reject') return null;
+  if (hostSuspended) return { status: 'host_suspended' };
   const photoNumbers = photosNeedingAlt(photos);
   return photoNumbers.length === 0
     ? null
@@ -113,6 +116,7 @@ export const reviewNoticeCodes = [
   'approved',
   'rejected',
   'not_in_review',
+  'host_suspended',
   'alt_missing',
   'no_reason',
 ] as const;
@@ -124,6 +128,11 @@ const reviewNotices = {
   not_in_review: {
     tone: 'info',
     title: 'That experience is not waiting for review, so nothing changed.',
+  },
+  host_suspended: {
+    tone: 'danger',
+    title:
+      'Approval refused. This host is suspended. Unsuspend the host first.',
   },
   alt_missing: {
     tone: 'danger',

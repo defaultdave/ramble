@@ -6,7 +6,6 @@ import {
   EntityIdSchema,
   experienceStatuses,
   HostExperienceSchema,
-  WriteIdSchema,
 } from '@/lib/catalog';
 import {
   experienceCreatedEntry,
@@ -37,8 +36,8 @@ import { isGuestVisible } from '@/lib/catalog';
 import { isPublishedWaiver } from '@/lib/legal';
 import { GuestPhotoSchema } from '@/lib/photos';
 import { splitPage } from '@/lib/pagination';
-import { updateTagsForChanges } from '@/server/cache/invalidate';
 import { Role, requireRole, type Caller } from '@/server/auth/caller';
+import { withLockedExperience } from './lockedExperience';
 import { requireOpsUserId, writeAudit } from './audit';
 import { listCategories, listNeighborhoods } from './catalog';
 import { byNameThenId, pastNameCursor } from './keysetPage';
@@ -283,60 +282,66 @@ export async function updateExperience(
   input: ExperienceContent,
 ): Promise<UpdateExperienceResult> {
   const userId = requireOpsUserId(caller);
-  const parsedId = WriteIdSchema.safeParse(experienceId);
-  if (!parsedId.success) return { status: 'not_found' };
-  const id = parsedId.data;
+  return await withLockedExperience<UpdateExperienceResult>(
+    experienceId,
+    { status: 'not_found' },
+    async (tx, current): Promise<Saved> => {
+      const id = current.id;
+      const prices = await tx
+        .select()
+        .from(priceOptions)
+        .where(eq(priceOptions.experienceId, id));
+      const before = experienceContentOf(current, prices);
+      const changed = changedExperienceFields(before, input);
+      if (changed.length === 0) {
+        return { result: { status: 'unchanged' }, changes: [] };
+      }
 
-  const saved = await db.transaction(async (tx): Promise<Saved> => {
-    const [current] = await tx
-      .select()
-      .from(experiences)
-      .where(eq(experiences.id, id))
-      .for('update');
-    if (!current) return { result: { status: 'not_found' }, changes: [] };
-    const prices = await tx
-      .select()
-      .from(priceOptions)
-      .where(eq(priceOptions.experienceId, id));
-    const before = experienceContentOf(current, prices);
-    const changed = changedExperienceFields(before, input);
-    if (changed.length === 0) {
-      return { result: { status: 'unchanged' }, changes: [] };
-    }
+      const refused = [
+        ...experienceRuleFailures(input, current.status),
+        ...removedPriceFields(before, input),
+      ];
+      if (refused.length > 0) {
+        return {
+          result: { status: 'invalid', fields: refused },
+          changes: [],
+        };
+      }
+      if (!(await referencesExist(tx, input))) {
+        return { result: { status: 'reference_missing' }, changes: [] };
+      }
 
-    const refused = [
-      ...experienceRuleFailures(input, current.status),
-      ...removedPriceFields(before, input),
-    ];
-    if (refused.length > 0) {
-      return { result: { status: 'invalid', fields: refused }, changes: [] };
-    }
-    if (!(await referencesExist(tx, input))) {
-      return { result: { status: 'reference_missing' }, changes: [] };
-    }
+      await tx
+        .update(experiences)
+        .set(experienceColumnsOf(input))
+        .where(eq(experiences.id, id));
+      await writePriceOptions(tx, id, input);
+      await writeAudit(tx, experienceUpdatedEntry(userId, id, changed, input));
+      const changes = isGuestVisible(current.status)
+        ? listingChanges(
+            id,
+            await placeSlugs(tx, before),
+            await placeSlugs(tx, input),
+          )
+        : [];
+      return { result: { status: 'updated' }, changes };
+    },
+  );
+}
 
-    await tx
-      .update(experiences)
-      .set(experienceColumnsOf(input))
-      .where(eq(experiences.id, id));
-    await writePriceOptions(tx, id, input);
-    await writeAudit(tx, experienceUpdatedEntry(userId, id, changed, input));
-    const changes = isGuestVisible(current.status)
-      ? listingChanges(
-          id,
-          await placeSlugs(tx, before),
-          await placeSlugs(tx, input),
-        )
-      : [];
-    return { result: { status: 'updated' }, changes };
-  });
-  // After the commit, so a save that rolled back invalidates nothing.
-  updateTagsForChanges(saved.changes);
-  return saved.result;
+/** The cache changes of an experience that stays in the place it is in while its listing for guests appears or disappears: approved, paused or unpaused. */
+export async function placeChanges(
+  tx: Transaction,
+  experience: Pick<ExperienceContent, 'categoryId' | 'neighborhoodId'> & {
+    id: string;
+  },
+): Promise<CacheChange[]> {
+  const place = await placeSlugs(tx, experience);
+  return listingChanges(experience.id, place, place);
 }
 
 /** The slugs a listing's cache tags are built from. */
-export async function placeSlugs(
+async function placeSlugs(
   tx: Transaction,
   content: Pick<ExperienceContent, 'categoryId' | 'neighborhoodId'>,
 ): Promise<PlaceSlugs> {

@@ -12,7 +12,8 @@ import { getHostListing } from '@/server/db/hosts';
  * has it. A malformed address is refused before the cache is asked. Publishing, editing, or taking
  * down one of the host's experiences reaches the entry through that experience's tag, and `catalog`
  * covers one that was hidden when the entry was made, as for a collection. Nothing reaches the
- * host's own name or about text, so an edit shows when the profile runs out. A miss is not kept
+ * host's own name or about text through the experiences, so a host's settings change invalidates
+ * the `catalog` tag (`hostProfile`); an edit by ops does not, and shows when the profile runs out. A miss is not kept
  * (the `uncached` profile), so made-up addresses fill nothing.
  */
 export async function getHostPage(slug: string): Promise<HostPageData | null> {

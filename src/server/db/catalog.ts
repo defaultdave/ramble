@@ -101,7 +101,6 @@ export async function findRetiredSlug(
   return row ? RetiredSlugSchema.parse(row) : null;
 }
 
-// TODO(U-074b): first caller
 /** Every experience of the host in any status, for the host's owner. A malformed host ID lists nothing. */
 export async function listHostExperiences(
   caller: Caller,
@@ -121,7 +120,7 @@ export async function listHostExperiences(
   return HostExperienceSchema.array().parse(rows);
 }
 
-// TODO(U-074b): first caller
+// TODO(host-experience-detail): first caller; /host/experiences shows every fact in its list, so no unit reads one experience yet.
 /** The row is read once and its host checked before it is returned, so the owner of another host learns nothing from it. */
 export async function getHostExperience(
   caller: Caller,

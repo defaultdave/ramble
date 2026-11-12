@@ -9,6 +9,8 @@ import {
 } from './spaces';
 import { zonedShortDayLabel, zonedTimeLabel } from './zonedLabels';
 
+export const hostDashboardPath = '/host';
+
 /** How much of a host's schedule and bookings the dashboard reads: the next ten sessions and the ten latest bookings. */
 export const hostDashboardLimits = { sessions: 10, bookings: 10 } as const;
 

@@ -189,6 +189,61 @@ export function parseHostEditForm(get: FormGetter): HostFormResult<HostInput> {
   };
 }
 
+/** What a host owner edits on their own host: the name and about text guests see, and where booking emails go. The slug and time zone stay with ops. */
+export const hostSettingsFields = [
+  'name',
+  'description',
+  'notificationEmail',
+] as const satisfies readonly HostEditableField[];
+export type HostSettingsField = (typeof hostSettingsFields)[number];
+export type HostSettingsInput = Pick<HostInput, HostSettingsField>;
+
+/** The settings form, read with the ops form's own limits and parsers. A field it refuses is named, and nothing posted beyond its three fields is read. */
+export function parseHostSettingsForm(
+  get: FormGetter,
+):
+  | { ok: true; value: HostSettingsInput }
+  | { ok: false; fields: HostSettingsField[] } {
+  const oversized = oversizedFields(
+    get,
+    hostSettingsFields,
+    hostLimits.rawField,
+  );
+  if (oversized.length > 0) return { ok: false, fields: oversized };
+  const parsed = FieldsSchema.pick({
+    name: true,
+    description: true,
+    notificationEmail: true,
+  }).safeParse({
+    name: formText(get, 'name'),
+    description: formText(get, 'description'),
+    notificationEmail: formText(get, 'notificationEmail'),
+  });
+  if (!parsed.success) {
+    return {
+      ok: false,
+      fields: fieldsFromIssues(parsed.error.issues, hostSettingsFields),
+    };
+  }
+  const { name, description, notificationEmail } = parsed.data;
+  return {
+    ok: true,
+    value: {
+      name,
+      description: description ?? null,
+      notificationEmail: notificationEmail ?? null,
+    },
+  };
+}
+
+/** Which settings differ, in form order. Nothing differing means nothing is written. */
+export function changedHostSettings(
+  before: HostSettingsInput,
+  after: HostSettingsInput,
+): HostSettingsField[] {
+  return changedFields(hostSettingsFields, before, after);
+}
+
 /** Which editable fields differ, in form order. Nothing differing means nothing is written. */
 export function changedHostFields(
   before: HostInput,

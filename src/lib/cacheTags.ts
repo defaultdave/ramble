@@ -48,6 +48,8 @@ export type CacheChange =
   | { kind: 'neighborhoodCopy'; slug: string }
   | { kind: 'helpArticles' }
   | { kind: 'legalDocument'; doc: string }
+  /** A host's name or about text changed: the host page, which the catalog tag reaches. The host's experiences are named by their own `experience` changes. */
+  | { kind: 'hostProfile' }
   | { kind: 'settings' };
 
 function tagsFor(change: CacheChange): string[] {
@@ -78,6 +80,8 @@ function tagsFor(change: CacheChange): string[] {
       return [tags.helpArticles];
     case 'legalDocument':
       return [tags.legalDocument(change.doc)];
+    case 'hostProfile':
+      return [tags.catalog];
     case 'settings':
       return [tags.settings];
   }

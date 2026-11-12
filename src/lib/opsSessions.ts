@@ -238,19 +238,22 @@ export function cancelBlocked(impact: Impact): boolean {
   return impact.blocked.length > 0;
 }
 
-/** What the forms carry back so the server can tell the impact they read from the impact now: the refunds (count and sum), the unpaid orders, the held seats, and the blocked bookings. */
-export function impactFingerprint(impact: Impact): string {
-  const refundSum = impact.refunds.reduce((sum, r) => sum + r.amountMinor, 0);
+const refundTotalMinor = (impact: Impact) =>
+  impact.refunds.reduce((sum, r) => sum + r.amountMinor, 0);
+
+/** What the forms carry back so the server can tell the impact they read from the impact now: everything the page shows (the refunds' count and sum, the unpaid orders, the holds and the seats they hold) and the blocked bookings. */
+function impactFingerprint(impact: Impact): string {
   return [
     impact.refunds.length,
-    refundSum,
+    refundTotalMinor(impact),
     impact.unpaidCount,
     impact.heldSeats,
+    impact.openHolds,
     impact.blocked.length,
   ].join(':');
 }
 
-const fingerprintPattern = /^\d{1,15}(?::\d{1,15}){4}$/;
+const fingerprintPattern = /^\d{1,15}(?::\d{1,15}){5}$/;
 
 /** The bookings listed one by one; the rest are counted. */
 const impactListLimit = 50;
@@ -264,7 +267,7 @@ export type ImpactView = {
 };
 
 export function impactView(impact: Impact): ImpactView {
-  const total = impact.refunds.reduce((sum, r) => sum + r.amountMinor, 0);
+  const total = refundTotalMinor(impact);
   const parts = [
     `${countLabel(impact.refunds.length, 'booking')} refunded in full, ${formatMoney(total)} in all`,
     `${countLabel(impact.unpaidCount, 'unpaid order')} voided`,

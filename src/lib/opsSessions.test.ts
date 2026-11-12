@@ -7,7 +7,6 @@ import {
   cancelBlocked,
   cancelGate,
   cancelOutcomeNotice,
-  impactFingerprint,
   impactIsCurrent,
   impactOrders,
   impactView,
@@ -254,11 +253,13 @@ describe('sessionImpact', () => {
   });
 });
 
-describe('impactFingerprint and impactIsCurrent', () => {
+describe('the impact fingerprint and impactIsCurrent', () => {
   const base = sessionImpact([order()], [hold()], now);
+  const fingerprintOf = (impact: ReturnType<typeof sessionImpact>) =>
+    impactView(impact).fingerprint;
 
-  it('writes the refund count and sum, the unpaid orders, the held seats and the blocked bookings', () => {
-    expect(impactFingerprint(base)).toBe('1:10800:0:2:0');
+  it('writes the refund count and sum, the unpaid orders, the held seats, the holds and the blocked bookings', () => {
+    expect(fingerprintOf(base)).toBe('1:10800:0:2:1:0');
   });
 
   it.each([
@@ -284,15 +285,23 @@ describe('impactFingerprint and impactIsCurrent', () => {
     ],
     ['other held seats', sessionImpact([order()], [hold({ seats: 5 })], now)],
     [
+      'one more hold released, though it holds no seats',
+      sessionImpact(
+        [order()],
+        [hold(), hold({ expiresAt: new Date(now.getTime() - 1000) })],
+        now,
+      ),
+    ],
+    [
       'a blocked booking',
       sessionImpact([order(), order({ attempts: [] })], [hold()], now),
     ],
   ])('is no longer current after %s', (_name, changed) => {
-    expect(impactIsCurrent(impactFingerprint(base), changed)).toBe(false);
+    expect(impactIsCurrent(fingerprintOf(base), changed)).toBe(false);
   });
 
   it('is current when nothing changed', () => {
-    expect(impactIsCurrent(impactFingerprint(base), base)).toBe(true);
+    expect(impactIsCurrent(fingerprintOf(base), base)).toBe(true);
   });
 });
 
@@ -310,7 +319,7 @@ describe('impactView', () => {
     ]);
     expect(view.moreLabel).toBeNull();
     expect(view.blockedText).toBeNull();
-    expect(view.fingerprint).toBe('2:21600:0:2:0');
+    expect(view.fingerprint).toBe('2:21600:0:2:1:0');
   });
 
   it('says one booking in the singular', () => {
@@ -410,14 +419,14 @@ describe('parseCancelForm', () => {
   const fields = {
     sessionId: sessionId.toUpperCase(),
     reason: 'weather',
-    fingerprint: '1:10800:0:2:0',
+    fingerprint: '1:10800:0:2:1:0',
     confirm: 'on',
   };
 
   it('reads the id (lower-cased), an ops reason, the fingerprint, and the box ticked', () => {
     expect(parseCancelForm(form(fields))).toEqual({
       ok: true,
-      value: { sessionId, reason: 'weather', fingerprint: '1:10800:0:2:0' },
+      value: { sessionId, reason: 'weather', fingerprint: '1:10800:0:2:1:0' },
     });
   });
 
@@ -429,7 +438,8 @@ describe('parseCancelForm', () => {
     ['an id that is not one', { sessionId: 'x' }],
     ['no fingerprint', { fingerprint: undefined }],
     ['a fingerprint of the wrong shape', { fingerprint: '1:2:3' }],
-    ['a fingerprint with letters', { fingerprint: '1:2:3:4:x' }],
+    ['a fingerprint of the old shape', { fingerprint: '1:2:3:4:5' }],
+    ['a fingerprint with letters', { fingerprint: '1:2:3:4:5:x' }],
     [
       'a fingerprint that is far too long',
       { fingerprint: `${'9'.repeat(5000)}:1:1:1:1` },

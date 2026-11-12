@@ -57,7 +57,7 @@ const photoColumns = Object.fromEntries(
 ) as Pick<typeof tableColumns, keyof GuestPhoto>;
 
 // The guest cover rule, written once: of an experience's photos, the one with the lowest position.
-const coverOrder = asc(photos.position);
+export const coverOrder = asc(photos.position);
 
 /**
  * The cover as a relational `with` entry, for reads that load an experience with `findMany`. It

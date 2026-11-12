@@ -3,6 +3,7 @@ import {
   blurDataUrlFrom,
   blurDataUrlPattern,
   GuestPhotoSchema,
+  hasPhotoDescription,
   NewPhotoSchema,
   nextPhotoPosition,
   PhotoRightsSchema,
@@ -198,6 +199,21 @@ describe('NewPhotoSchema', () => {
   const rights = { basis: 'ramble_owned' };
   const parse = (input: object) =>
     NewPhotoSchema.safeParse({ experienceId, rights, ...input });
+
+  it.each([
+    [{ decorative: true, altText: null }],
+    [{ decorative: false, altText: 'A potter' }],
+    [{ decorative: false, altText: null }],
+    [{ decorative: false, altText: '   ' }],
+    [{ decorative: false, altText: '' }],
+  ])(
+    'accepts %j exactly when hasPhotoDescription does, so the stored check and the upload rule agree',
+    (description) => {
+      expect(parse({ description }).success).toBe(
+        hasPhotoDescription(description),
+      );
+    },
+  );
 
   it('reads alt text, trimmed', () => {
     const result = parse({

@@ -13,9 +13,9 @@ import {
 import {
   altNeededText,
   photosNeedingAlt,
+  reviewListingFacts,
   rejectionReasonOptions,
 } from '@/lib/experienceReview';
-import { formatPrice } from '@/lib/money';
 import styles from './ExperienceReview.module.css';
 
 export type ExperienceReviewViewProps = {
@@ -23,21 +23,6 @@ export type ExperienceReviewViewProps = {
   approve: (formData: FormData) => void | Promise<void>;
   reject: (formData: FormData) => void | Promise<void>;
 };
-
-/** The facts ops reads before deciding, one line each; a field the host left empty is left out. */
-function listingFacts({ content }: ExperienceEditView): string[] {
-  const facts = [
-    content.description,
-    content.meetingPoint && `Meet at: ${content.meetingPoint}`,
-    content.included && `Included: ${content.included}`,
-    content.accessibilityNotes && `Access: ${content.accessibilityNotes}`,
-    content.adultPriceMinor !== null &&
-      `Adult price: ${formatPrice(content.adultPriceMinor)}`,
-    content.childPriceMinor !== null &&
-      `Child price: ${formatPrice(content.childPriceMinor)}`,
-  ];
-  return facts.filter((fact): fact is string => typeof fact === 'string');
-}
 
 /**
  * One experience put forward for review: what it says, its photos with the alt text check, and the
@@ -67,7 +52,7 @@ export function ExperienceReviewView({
         <h2 className={styles.heading} id="review-listing">
           Listing
         </h2>
-        {listingFacts(view).map((fact) => (
+        {reviewListingFacts(view.content).map((fact) => (
           <p key={fact} className={styles.text}>
             {fact}
           </p>

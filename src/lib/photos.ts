@@ -240,6 +240,17 @@ const PhotoDescriptionSchema = z.discriminatedUnion('decorative', [
   }),
 ]);
 
+/**
+ * Whether a stored photo meets the rule above: decorative, or alt text with something in it. The
+ * schema checks it going in; this is the same rule for a photo already stored, which the review
+ * check reads.
+ */
+export function hasPhotoDescription(
+  photo: Pick<GuestPhoto, 'decorative' | 'altText'>,
+): boolean {
+  return photo.decorative || (photo.altText ?? '').trim() !== '';
+}
+
 export const NewPhotoSchema = z.object({
   experienceId: EntityIdSchema,
   description: PhotoDescriptionSchema,

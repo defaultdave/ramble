@@ -10,6 +10,7 @@ import {
   vi,
 } from 'vitest';
 import { tags } from '@/lib/cacheTags';
+import { hasPhotoDescription } from '@/lib/photos';
 import { ForbiddenError, Role, type Caller } from '@/server/auth/caller';
 import { testCaller } from '@/server/auth/test-caller';
 import { experiences, photos } from '@/server/db/schema';
@@ -43,6 +44,7 @@ vi.mock('next/cache', () => ({
 let fresh: FreshDatabase;
 let stopHttp: () => Promise<void>;
 let client: typeof import('@/server/db/client');
+let editor: typeof import('@/server/db/experienceEditor');
 let review: typeof import('@/server/db/experienceReview');
 let fixtures: ReturnType<typeof catalogFixtures>;
 
@@ -70,6 +72,7 @@ beforeAll(async () => {
   stopHttp = await serveNeonHttp(fresh.url);
   vi.stubEnv('DATABASE_URL', fresh.url);
   client = await import('@/server/db/client');
+  editor = await import('@/server/db/experienceEditor');
   review = await import('@/server/db/experienceReview');
   fixtures = catalogFixtures(() => client.db);
 }, 120_000);
@@ -123,6 +126,12 @@ async function addPhoto(
     blurDataUrl: 'data:image/jpeg;base64,/9j/4AAQ',
     rightsBasis: 'ramble_owned',
   });
+}
+
+async function dropAltCheck() {
+  await client.db.execute(
+    sql`ALTER TABLE photos DROP CONSTRAINT IF EXISTS photos_alt_or_decorative`,
+  );
 }
 
 async function statusOf(experienceId: string) {
@@ -262,12 +271,10 @@ describe('refusals', () => {
     expect(await auditRows(target.id)).toHaveLength(1);
   });
 
-  // Last, because it drops the table's own alt-text CHECK from this file's database to put in a
+  // These last two drop the table's own alt-text CHECK from this file's database to put in a
   // photo the database would never let in: the check in the decision is the one under test.
   it('refuses an approval naming each photo with no alt text, changes nothing, and still allows a rejection', async () => {
-    await client.db.execute(
-      sql`ALTER TABLE photos DROP CONSTRAINT photos_alt_or_decorative`,
-    );
+    await dropAltCheck();
     const target = await inReview('in_review');
     await addPhoto(target.id, 0, { altText: 'A bowl on the wheel' });
     await addPhoto(target.id, 2, { altText: '   ' });
@@ -285,5 +292,23 @@ describe('refusals', () => {
         status: 'rejected',
       },
     );
+  });
+
+  it('numbers the photos a refusal names as the gallery the page shows them, whatever order they were added in', async () => {
+    await dropAltCheck();
+    const target = await inReview('in_review');
+    await addPhoto(target.id, 9, { altText: null });
+    await addPhoto(target.id, 3, { altText: 'Described' });
+    await addPhoto(target.id, 0, { altText: null });
+    await addPhoto(target.id, 6, { decorative: true });
+
+    const result = await review.decideExperienceReview(ops, target.id, approve);
+
+    const view = await editor.readExperienceForOps(ops, target.id);
+    const shown = (view?.photos ?? [])
+      .map((photo, index) => (hasPhotoDescription(photo) ? null : index + 1))
+      .filter((number) => number !== null);
+    expect(shown).toEqual([1, 4]);
+    expect(result).toEqual({ status: 'alt_missing', photoNumbers: shown });
   });
 });

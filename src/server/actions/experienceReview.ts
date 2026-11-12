@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import {
-  parseRejectionReason,
+  parseRejectDecision,
   reviewItemPath,
   reviewPath,
   type ReviewDecision,
@@ -46,6 +46,8 @@ export async function approveExperienceAction(
 export async function rejectExperienceAction(
   formData: FormData,
 ): Promise<void> {
-  const reason = parseRejectionReason((name) => formData.get(name));
-  await decide(formData, reason === null ? null : { kind: 'reject', reason });
+  await decide(
+    formData,
+    parseRejectDecision((name) => formData.get(name)),
+  );
 }

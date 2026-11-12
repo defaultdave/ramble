@@ -1,8 +1,18 @@
 import { andList } from './andList';
-import type { ExperienceStatus } from './experienceEditor';
-import { formText, type FormGetter, type NoticeText } from './opsForm';
+import {
+  labelledOptions,
+  type ExperienceContent,
+  type ExperienceStatus,
+} from './experienceEditor';
+import {
+  formText,
+  noticeText,
+  type FormGetter,
+  type NoticeText,
+} from './opsForm';
+import { formatPrice } from './money';
 import { pickKnown } from './pickKnown';
-import { photoLimits, type GuestPhoto } from './photos';
+import { hasPhotoDescription, photoLimits, type GuestPhoto } from './photos';
 
 // The review of an experience a host has put forward: the pure decisions, the form reading and the
 // copy. A host puts a listing in review (a later unit); ops approves it to live or sends it back to
@@ -30,17 +40,21 @@ const rejectionReasonLabels = {
   other: 'Something else needs work',
 } as const satisfies Record<RejectionReason, string>;
 
-export const rejectionReasonOptions = Object.entries(rejectionReasonLabels).map(
-  ([value, label]) => ({ value, label }),
-);
+export const rejectionReasonOptions = labelledOptions(rejectionReasonLabels);
 
 /** The reason a posted reject form names, or null when it names none of the list. */
-export function parseRejectionReason(get: FormGetter): RejectionReason | null {
+function parseRejectionReason(get: FormGetter): RejectionReason | null {
   return pickKnown(formText(get, 'reason'), rejectionReasons, null);
 }
 
 export type ReviewDecision =
   { kind: 'approve' } | { kind: 'reject'; reason: RejectionReason };
+
+/** The rejection a posted reject form asks for, or null when it names no reason: a rejection always says why. */
+export function parseRejectDecision(get: FormGetter): ReviewDecision | null {
+  const reason = parseRejectionReason(get);
+  return reason === null ? null : { kind: 'reject', reason };
+}
 
 /** Where an experience goes on each decision: approved is live, rejected goes back to draft. */
 export const decisionStatuses = {
@@ -53,7 +67,7 @@ type PhotoAlt = Pick<GuestPhoto, 'decorative' | 'altText'>;
 /** The photos that would be refused, each by its place in the gallery counted from 1, the cover being 1. */
 export function photosNeedingAlt(photos: readonly PhotoAlt[]): number[] {
   return photos.flatMap((photo, index) =>
-    photo.decorative || (photo.altText ?? '').trim() !== '' ? [] : [index + 1],
+    hasPhotoDescription(photo) ? [] : [index + 1],
   );
 }
 
@@ -123,12 +137,37 @@ export function reviewNoticeText(
   code: ReviewNoticeCode | null,
   photoNumbers: readonly string[],
 ): NoticeText | null {
-  if (code === null) return null;
-  if (code !== 'alt_missing' || photoNumbers.length === 0) {
-    return reviewNotices[code];
+  const notice = noticeText(reviewNotices, code);
+  if (notice === null || code !== 'alt_missing' || photoNumbers.length === 0) {
+    return notice;
   }
   return {
     tone: 'danger',
     title: `Approval refused. ${altNeededText(photoNumbers)}`,
   };
+}
+
+/** The facts ops reads before deciding, one line each; a field the host left empty is left out. */
+export function reviewListingFacts(
+  content: Pick<
+    ExperienceContent,
+    | 'description'
+    | 'meetingPoint'
+    | 'included'
+    | 'accessibilityNotes'
+    | 'adultPriceMinor'
+    | 'childPriceMinor'
+  >,
+): string[] {
+  const facts = [
+    content.description,
+    content.meetingPoint && `Meet at: ${content.meetingPoint}`,
+    content.included && `Included: ${content.included}`,
+    content.accessibilityNotes && `Access: ${content.accessibilityNotes}`,
+    content.adultPriceMinor !== null &&
+      `Adult price: ${formatPrice(content.adultPriceMinor)}`,
+    content.childPriceMinor !== null &&
+      `Child price: ${formatPrice(content.childPriceMinor)}`,
+  ];
+  return facts.filter((fact): fact is string => typeof fact === 'string');
 }

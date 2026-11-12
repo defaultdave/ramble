@@ -1,5 +1,5 @@
 import 'server-only';
-import { asc, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { WriteIdSchema } from '@/lib/catalog';
 import {
   experienceApprovedEntry,
@@ -13,11 +13,13 @@ import {
   type ReviewRefusal,
 } from '@/lib/experienceReview';
 import type { CacheChange } from '@/lib/cacheTags';
+import { photoLimits } from '@/lib/photos';
 import type { Caller } from '@/server/auth/caller';
 import { updateTagsForChanges } from '@/server/cache/invalidate';
 import { requireOpsUserId, writeAudit } from './audit';
 import { db } from './client';
 import { placeSlugs } from './experienceEditor';
+import { coverOrder } from './photos';
 import { experiences, photos } from './schema';
 
 export type ReviewResult =
@@ -50,11 +52,15 @@ export async function decideExperienceReview(
       .where(eq(experiences.id, id))
       .for('update');
     if (!current) return { result: { status: 'not_found' }, changes: [] };
+    // The gallery in the order and to the length the page shows it, so a refusal's photo numbers
+    // are the ones ops sees. The alt-text rule is also a CHECK on `photos`; this refusal is defence
+    // in depth beyond that CHECK, for a row the CHECK did not guard.
     const gallery = await tx
       .select({ decorative: photos.decorative, altText: photos.altText })
       .from(photos)
       .where(eq(photos.experienceId, id))
-      .orderBy(asc(photos.position));
+      .orderBy(coverOrder)
+      .limit(photoLimits.maxPerExperience);
     const refusal = reviewRefusal(current.status, decision, gallery);
     if (refusal) return { result: refusal, changes: [] };
 

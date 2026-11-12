@@ -6,7 +6,9 @@ import {
 } from './experienceAudit';
 import {
   decisionStatuses,
-  parseRejectionReason,
+  parseRejectDecision,
+  rejectionReasonOptions,
+  reviewListingFacts,
   photoNumberFields,
   photosNeedingAlt,
   rejectionReasons,
@@ -86,17 +88,70 @@ describe('reviewRefusal', () => {
   });
 });
 
-describe('parseRejectionReason', () => {
-  it.each(rejectionReasons.map((reason) => [reason]))('reads %s', (reason) => {
-    expect(parseRejectionReason(() => reason)).toBe(reason);
-  });
-
-  it.each([[undefined], [''], ['   '], ['spam'], [5], [['photos']]])(
-    'reads %j as no reason',
-    (posted) => {
-      expect(parseRejectionReason(() => posted)).toBeNull();
+describe('parseRejectDecision', () => {
+  it.each(rejectionReasons.map((reason) => [reason]))(
+    'reads %s as a rejection with that reason',
+    (reason) => {
+      expect(parseRejectDecision(() => reason)).toEqual({
+        kind: 'reject',
+        reason,
+      });
     },
   );
+
+  it.each([[undefined], [''], ['   '], ['spam'], [5], [['photos']]])(
+    'reads %j as no decision, because a rejection says why',
+    (posted) => {
+      expect(parseRejectDecision(() => posted)).toBeNull();
+    },
+  );
+
+  it('offers every reason as a choice, in order', () => {
+    expect(rejectionReasonOptions.map((option) => option.value)).toEqual(
+      rejectionReasons,
+    );
+  });
+});
+
+describe('reviewListingFacts', () => {
+  const empty = {
+    description: null,
+    meetingPoint: null,
+    included: null,
+    accessibilityNotes: null,
+    adultPriceMinor: null,
+    childPriceMinor: null,
+  };
+
+  it('leaves out every field the host left empty', () => {
+    expect(reviewListingFacts(empty)).toEqual([]);
+  });
+
+  it('words each field it has, in reading order, with prices as the site shows them', () => {
+    expect(
+      reviewListingFacts({
+        description: 'Throw a bowl.',
+        meetingPoint: 'The blue door',
+        included: 'Clay',
+        accessibilityNotes: 'Step-free',
+        adultPriceMinor: 8500,
+        childPriceMinor: 4050,
+      }),
+    ).toEqual([
+      'Throw a bowl.',
+      'Meet at: The blue door',
+      'Included: Clay',
+      'Access: Step-free',
+      'Adult price: $85',
+      'Child price: $40.50',
+    ]);
+  });
+
+  it('keeps a free price of zero, which is a price', () => {
+    expect(reviewListingFacts({ ...empty, adultPriceMinor: 0 })).toEqual([
+      'Adult price: $0',
+    ]);
+  });
 });
 
 describe('reviewNoticeText', () => {

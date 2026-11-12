@@ -17,6 +17,7 @@ import {
   gateway,
   refundsOf,
   schema,
+  side,
   setupRefundsDatabase,
 } from './refundFixtures';
 
@@ -103,6 +104,35 @@ describe('the locks on what is read', () => {
     expect(result).toMatchObject({ ordersRefunded: 1, ordersVoided: 0 });
     expect((await orderRow(unpaid.orderId)).status).toBe('cancelled');
     expect(await refundsOf(unpaid)).toHaveLength(1);
+  });
+});
+
+describe('the order read', () => {
+  it('is blocked by a lock on the order alone, at the select that reads it', async () => {
+    const session = await newSession();
+    const unpaid = await seedUnpaidOn(session.id);
+    const { lockOrderById } = await import('@/server/db/locks');
+    let blockedQuery = '';
+
+    const result = await raceAgainstOpenTransaction(
+      inTransaction,
+      async (tx) => {
+        await lockOrderById(tx, unpaid.orderId);
+      },
+      () => cancel(session.id),
+      {
+        whileWaiting: async () => {
+          const { rows } = await side.query<{ query: string }>(
+            `SELECT query FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND datname = current_database()`,
+          );
+          blockedQuery = rows.map((row) => row.query).join('\n');
+        },
+      },
+    );
+
+    // Without the row lock on the read, the cancel runs past it and waits later, at its first write.
+    expect(blockedQuery).toMatch(/^select .*from "orders".* for update/im);
+    expect(result).toMatchObject({ ordersVoided: 1 });
   });
 });
 

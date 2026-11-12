@@ -15,6 +15,7 @@ import {
 import { experiences } from '@/server/db/schema';
 import { createFakeStorageAdapter } from '@/server/ports/storage/fake';
 import { personaHostSlugs } from '@/lib/seed/personas';
+import { experienceEditorRows } from './authzExperienceRows';
 import { hostSetupRows } from './authzHostRows';
 import { collectionInput, doc, helpInput } from './editorialFixtures';
 import {
@@ -509,6 +510,7 @@ const rows: Row[] = [
     allows: platform(...opsOnly),
   },
   ...hostSetupRows(),
+  ...experienceEditorRows(),
   // Seed and persona writes: ops alone. These write the most, so they come last.
   {
     fn: 'seedPersonas',

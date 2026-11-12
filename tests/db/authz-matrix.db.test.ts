@@ -15,6 +15,7 @@ import {
 import { experiences } from '@/server/db/schema';
 import { createFakeStorageAdapter } from '@/server/ports/storage/fake';
 import { personaHostSlugs } from '@/lib/seed/personas';
+import { editorialListRows } from './authzEditorialRows';
 import { experienceEditorRows } from './authzExperienceRows';
 import { hostSetupRows } from './authzHostRows';
 import { supportQueueRows } from './authzSupportRows';
@@ -223,26 +224,7 @@ const sessionRules = {
 
 const rows: Row[] = [
   // Editorial, legal, settings, finance, privacy: ops or admin.
-  {
-    fn: 'listCollectionsForEditing',
-    invoke: (c) => data.editorial.listCollectionsForEditing(c),
-    allows: platform(...staff),
-  },
-  {
-    fn: 'listHomeModulesForEditing',
-    invoke: (c) => data.editorial.listHomeModulesForEditing(c),
-    allows: platform(...staff),
-  },
-  {
-    fn: 'listPageCopyForEditing',
-    invoke: (c) => data.editorial.listPageCopyForEditing(c),
-    allows: platform(...staff),
-  },
-  {
-    fn: 'listHelpArticlesForEditing',
-    invoke: (c) => data.editorial.listHelpArticlesForEditing(c),
-    allows: platform(...staff),
-  },
+  ...editorialListRows(() => data.editorial),
   {
     fn: 'saveCollection',
     invoke: (c) => data.editorial.saveCollection(c, collectionInput()),

@@ -76,6 +76,22 @@ const hostMatches = (grant: RoleGrant): SQL =>
     ? isNull(roleGrants.hostId)
     : eq(roleGrants.hostId, grant.hostId);
 
+/**
+ * Makes the account for an address if there is none and gives it a role, in one transaction with
+ * its audit row. Returns the person and whether the role was new. It is how an invite and the
+ * grant command give a role to an address; the caller has already authorized the action.
+ */
+export async function grantRoleToAddress(
+  actor: RoleActor,
+  email: string,
+  grant: RoleGrant,
+): Promise<{ userId: string; outcome: GrantOutcome }> {
+  return db.transaction(async (tx) => {
+    const userId = await ensureAuthUserIn(tx, email);
+    return { userId, outcome: await grantRoleIn(tx, actor, userId, grant) };
+  });
+}
+
 /** Ops takes a role back, with its audit row. Nobody removes their own access, and admin is removed from the command line. */
 export async function revokeRole(
   caller: Caller,

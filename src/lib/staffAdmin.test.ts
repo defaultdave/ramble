@@ -5,7 +5,8 @@ import {
   auditViewRow,
   auditCursorLabel,
   groupStaff,
-  hasStaffInviteProblem,
+  isManagedStaffRow,
+  parseStaffInviteProblems,
   parseAuditCursor,
   parseAuditDay,
   parseStaffEmail,
@@ -70,15 +71,24 @@ describe('staffRolesText', () => {
   });
 });
 
-describe('hasStaffInviteProblem and auditCursorLabel', () => {
+describe('staff row and address helpers', () => {
   it.each([
-    ['email', true],
-    ['email,other', true],
-    ['other', false],
-    [undefined, false],
-    [['email', 'email'], false],
-  ])('the fields %j make the invite problem %s', (raw, expected) => {
-    expect(hasStaffInviteProblem(raw)).toBe(expected);
+    [['ops'], true],
+    [['ops', 'admin'], true],
+    [['admin'], false],
+    [[], false],
+  ] as const)('a row holding %j is managed: %s', (roles, expected) => {
+    expect(isManagedStaffRow({ roles })).toBe(expected);
+  });
+
+  it.each([
+    ['email', ['email']],
+    ['email,other', ['email']],
+    ['other', []],
+    [undefined, []],
+    [['email', 'email'], []],
+  ])('the fields %j name the problems %j', (raw, expected) => {
+    expect(parseStaffInviteProblems(raw)).toEqual(expected);
   });
 
   it.each([

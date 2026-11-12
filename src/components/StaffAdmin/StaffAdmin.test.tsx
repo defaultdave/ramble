@@ -25,12 +25,7 @@ const staff: StaffRow[] = [
 describe('StaffView', () => {
   it('asks for one required email address', () => {
     render(
-      <StaffView
-        rows={staff}
-        query={{}}
-        emailProblem={false}
-        actions={actions}
-      />,
+      <StaffView rows={staff} query={{}} problems={[]} actions={actions} />,
     );
 
     const field = screen.getByLabelText(/Email address/);
@@ -44,7 +39,12 @@ describe('StaffView', () => {
 
   it('shows the refusal on the field', () => {
     render(
-      <StaffView rows={staff} query={{}} emailProblem actions={actions} />,
+      <StaffView
+        rows={staff}
+        query={{}}
+        problems={['email']}
+        actions={actions}
+      />,
     );
 
     expect(screen.getByLabelText(/Email address/)).toHaveAttribute(
@@ -56,12 +56,7 @@ describe('StaffView', () => {
 
   it('offers the link and removal for ops rows only, each carrying the person', () => {
     render(
-      <StaffView
-        rows={staff}
-        query={{}}
-        emailProblem={false}
-        actions={actions}
-      />,
+      <StaffView rows={staff} query={{}} problems={[]} actions={actions} />,
     );
 
     const opsRow = screen.getByRole('row', { name: /ops@example.com/ });
@@ -90,7 +85,7 @@ describe('StaffView', () => {
           },
         ]}
         query={{}}
-        emailProblem={false}
+        problems={[]}
         actions={actions}
       />,
     );
@@ -108,9 +103,7 @@ describe('StaffView', () => {
   });
 
   it('shows an empty state with no staff', () => {
-    render(
-      <StaffView rows={[]} query={{}} emailProblem={false} actions={actions} />,
-    );
+    render(<StaffView rows={[]} query={{}} problems={[]} actions={actions} />);
 
     expect(screen.getByText('No staff yet')).toBeInTheDocument();
   });

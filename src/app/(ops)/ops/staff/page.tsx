@@ -6,7 +6,7 @@ import { StaffView } from '@/components/StaffAdmin';
 import { noticeText, parseNotice } from '@/lib/opsForm';
 import { holdsOpsRole } from '@/lib/opsNav';
 import {
-  hasStaffInviteProblem,
+  parseStaffInviteProblems,
   staffNoticeCodes,
   staffNotices,
   staffPath,
@@ -39,7 +39,7 @@ export default async function StaffPage({
       <StaffView
         rows={rows}
         query={query}
-        emailProblem={hasStaffInviteProblem(query.fields)}
+        problems={parseStaffInviteProblems(query.fields)}
         actions={{
           invite: inviteStaffAction,
           resend: resendStaffLinkAction,

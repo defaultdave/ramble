@@ -1,8 +1,7 @@
 import 'server-only';
 import { errorKind } from '@/lib/errorKind';
 import { grantRoleUsage, parseGrantRoleArgs } from '@/lib/grantRoleArgs';
-import { db } from '@/server/db/client';
-import { ensureAuthUserIn, grantRoleIn } from '@/server/db/staffRoles';
+import { grantRoleToAddress } from '@/server/db/staffRoles';
 
 export type GrantRoleCommand = {
   argv: readonly string[];
@@ -22,10 +21,11 @@ export async function runGrantRole(command: GrantRoleCommand): Promise<number> {
     return 2;
   }
   try {
-    const outcome = await db.transaction(async (tx) => {
-      const userId = await ensureAuthUserIn(tx, args.email);
-      return grantRoleIn(tx, { kind: 'system' }, userId, args.grant);
-    });
+    const { outcome } = await grantRoleToAddress(
+      { kind: 'system' },
+      args.email,
+      args.grant,
+    );
     command.write(
       outcome === 'granted'
         ? `Granted ${args.grant.role} to ${args.email}. They sign in with a link from /sign-in.`

@@ -65,6 +65,13 @@ export function revokeRefusal(
   return null;
 }
 
+const staffInviteFields = [staffInviteField] as const;
+export type StaffInviteField = (typeof staffInviteFields)[number];
+
+export const staffInviteProblems = {
+  email: 'Enter the staff member’s email address, like name@example.com.',
+} as const satisfies Record<StaffInviteField, string>;
+
 export const staffNoticeCodes = [
   'invited',
   'granted_rate_limited',
@@ -95,10 +102,7 @@ export const staffNotices = {
       'Staff access granted, but the sign-in link could not be sent. Send it again below.',
   },
   ...inviteFailureNotices,
-  invalid: {
-    tone: 'danger',
-    title: 'Enter the staff member’s email address, like name@example.com.',
-  },
+  invalid: { tone: 'danger', title: staffInviteProblems.email },
   revoked: { tone: 'success', title: 'Staff access removed.' },
   revoke_self: {
     tone: 'warning',
@@ -155,11 +159,16 @@ export function staffRolesText(roles: readonly GrantableRole[]): string {
   return roles.map((role) => staffRoleLabels[role]).join(', ');
 }
 
-/** Whether the address names the invite field as needing another look. */
-export function hasStaffInviteProblem(
+/** Whether a row of the staff table is one ops can manage here: it holds ops. Admin is not managed here. */
+export function isManagedStaffRow(row: Pick<StaffRow, 'roles'>): boolean {
+  return row.roles.includes(staffGrant.role);
+}
+
+/** The invite fields the address names as needing another look. */
+export function parseStaffInviteProblems(
   raw: string | readonly string[] | undefined,
-): boolean {
-  return parseProblemFields(raw, [staffInviteField]).length > 0;
+): StaffInviteField[] {
+  return parseProblemFields(raw, staffInviteFields);
 }
 
 export type StaffRow = {

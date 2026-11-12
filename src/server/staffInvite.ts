@@ -8,12 +8,7 @@ import { staffLinkSentEntry } from '@/lib/staffAudit';
 import type { Caller } from '@/server/auth/caller';
 import { appOrigin } from '@/server/auth/forms';
 import { requireOpsUserId } from '@/server/db/audit';
-import { db } from '@/server/db/client';
-import {
-  ensureAuthUserIn,
-  grantRoleIn,
-  readRoleHolder,
-} from '@/server/db/staffRoles';
+import { grantRoleToAddress, readRoleHolder } from '@/server/db/staffRoles';
 import { sendSignInInvite } from './signInInvite';
 
 function sendStaffLink(
@@ -47,11 +42,11 @@ export async function inviteStaff(
   const actorId = requireOpsUserId(caller);
   // A caller hands over an address it has already read; one that is not an address is a bug, not input to repair.
   const email = EmailAddressSchema.parse(normalizeEmailAddress(rawEmail));
-  const userId = await db.transaction(async (tx) => {
-    const id = await ensureAuthUserIn(tx, email);
-    await grantRoleIn(tx, { kind: 'user', userId: actorId }, id, staffGrant);
-    return id;
-  });
+  const { userId } = await grantRoleToAddress(
+    { kind: 'user', userId: actorId },
+    email,
+    staffGrant,
+  );
   return sendStaffLink(actorId, userId, email);
 }
 

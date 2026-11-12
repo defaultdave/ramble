@@ -61,20 +61,17 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const staffPage = (rows: StaffRow[], emailProblem = false) => (
+const staffPage = (rows: StaffRow[], problems: readonly 'email'[] = []) => (
   <PageHeading title="Staff">
-    <StaffView
-      rows={rows}
-      query={{}}
-      emailProblem={emailProblem}
-      actions={actions}
-    />
+    <StaffView rows={rows} query={{}} problems={problems} actions={actions} />
   </PageHeading>
 );
 
 export const Staff: Story = { render: () => staffPage(staff) };
 export const NoStaff: Story = { render: () => staffPage([]) };
-export const InviteRefused: Story = { render: () => staffPage(staff, true) };
+export const InviteRefused: Story = {
+  render: () => staffPage(staff, ['email']),
+};
 
 const auditPage = (
   rows: AuditViewRow[],

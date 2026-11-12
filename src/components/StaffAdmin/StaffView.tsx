@@ -2,13 +2,15 @@ import { Button } from '@/components/Button';
 import { DataTable, type DataTableColumn } from '@/components/DataTable';
 import { EmailField } from '@/components/EmailField';
 import {
-  staffGrant,
+  isManagedStaffRow,
+  staffInviteProblems,
   staffRolesText,
   staffInviteField,
-  staffNotices,
+  type StaffInviteField,
   staffPath,
   type StaffRow,
 } from '@/lib/staffAdmin';
+import { errorProps } from '@/lib/opsForm';
 import type { TableQuery } from '@/lib/tableQuery';
 import styles from './StaffAdmin.module.css';
 
@@ -18,7 +20,7 @@ export type StaffViewProps = {
   rows: readonly StaffRow[];
   query: TableQuery;
   /** The invite form's address was refused on the last try. */
-  emailProblem: boolean;
+  problems: readonly StaffInviteField[];
   actions: { invite: FormAction; resend: FormAction; revoke: FormAction };
 };
 
@@ -30,7 +32,7 @@ function StaffActions({
   actions: StaffViewProps['actions'];
 }) {
   // Only the ops role is managed here; admin is granted and removed from the command line.
-  if (!row.roles.includes(staffGrant.role)) return null;
+  if (!isManagedStaffRow(row)) return null;
   return (
     <div className={styles.actions}>
       <form action={actions.resend}>
@@ -50,12 +52,7 @@ function StaffActions({
 }
 
 /** The ops staff: an invite form on top, then who holds ops or admin, with the link and removal buttons. */
-export function StaffView({
-  rows,
-  query,
-  emailProblem,
-  actions,
-}: StaffViewProps) {
+export function StaffView({ rows, query, problems, actions }: StaffViewProps) {
   const columns: DataTableColumn<StaffRow>[] = [
     {
       id: 'email',
@@ -81,7 +78,7 @@ export function StaffView({
           name={staffInviteField}
           label="Email address"
           hint="Gives the ops role and emails a single-use sign-in link."
-          {...(emailProblem ? { errorText: staffNotices.invalid.title } : {})}
+          {...errorProps(problems, staffInviteProblems, staffInviteField)}
         />
         <Button type="submit">Invite staff member</Button>
       </form>

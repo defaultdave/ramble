@@ -19,6 +19,7 @@ import { editorialListRows } from './authzEditorialRows';
 import { experienceEditorRows } from './authzExperienceRows';
 import { accountBookingsRows } from './authzAccountRows';
 import { hostSetupRows } from './authzHostRows';
+import { opsBookingActionRows } from './authzBookingActionRows';
 import { opsBookingRows } from './authzBookingRows';
 import {
   hostReaderFunctions,
@@ -496,6 +497,7 @@ const rows: Row[] = [
   ...experienceEditorRows(),
   ...experienceReviewRows(),
   ...opsBookingRows(),
+  ...opsBookingActionRows(),
   ...cancelSessionRows(sessionRules, 'ownerA', staff),
   // Seed and persona writes: ops alone. These write the most, so they come last.
   ...seedRows(),

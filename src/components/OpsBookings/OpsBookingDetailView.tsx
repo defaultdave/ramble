@@ -1,15 +1,63 @@
 import Link from 'next/link';
+import { Button } from '@/components/Button';
 import { StatusBadge } from '@/components/StatusBadge';
 import {
   opsBookingsPath,
   orderStatusLabels,
   orderStatusTones,
+  type OpsActionView,
   type OpsBookingDetail,
 } from '@/lib/opsBookings';
 import styles from './OpsBookings.module.css';
 
-/** One booking: who and what, its refunds, and its history. */
-export function OpsBookingDetailView({ detail }: { detail: OpsBookingDetail }) {
+type FormAction = (formData: FormData) => void | Promise<void>;
+
+export type OpsBookingActions = {
+  cancel: FormAction;
+  refund: FormAction;
+  retryRefund: FormAction;
+  resend: FormAction;
+  voidLinks: FormAction;
+};
+
+function ActionForm({
+  action,
+  orderId,
+  view,
+}: {
+  action: FormAction;
+  orderId: string;
+  view: OpsActionView;
+}) {
+  return (
+    <li className={styles.row}>
+      <form action={action} className={styles.actionForm}>
+        <input type="hidden" name="orderId" value={orderId} />
+        {view.fields.map((field) => (
+          <input
+            key={field.name}
+            type="hidden"
+            name={field.name}
+            value={field.value}
+          />
+        ))}
+        <p className={styles.muted}>{view.help}</p>
+        <Button type="submit" variant="secondary">
+          {view.label}
+        </Button>
+      </form>
+    </li>
+  );
+}
+
+/** One booking: who and what, the actions ops may take on it (each a plain form), its refunds, and its history. */
+export function OpsBookingDetailView({
+  detail,
+  actions,
+}: {
+  detail: OpsBookingDetail;
+  actions: OpsBookingActions;
+}) {
   const { row } = detail;
   return (
     <div className={styles.stack}>
@@ -38,6 +86,33 @@ export function OpsBookingDetailView({ detail }: { detail: OpsBookingDetail }) {
         <dt>Refunded or on its way</dt>
         <dd>{detail.refundedLabel}</dd>
       </dl>
+
+      <section className={styles.section} aria-labelledby="actions-heading">
+        <h2 id="actions-heading" className={styles.heading}>
+          Actions
+        </h2>
+        <ul className={styles.list}>
+          {(
+            [
+              ['cancel', actions.cancel],
+              ['refund', actions.refund],
+              ['retryRefund', actions.retryRefund],
+              ['resend', actions.resend],
+              ['voidLinks', actions.voidLinks],
+            ] as const
+          ).map(([name, action]) => {
+            const view = detail.actions[name];
+            return view === null ? null : (
+              <ActionForm
+                key={name}
+                action={action}
+                orderId={row.id}
+                view={view}
+              />
+            );
+          })}
+        </ul>
+      </section>
 
       <section className={styles.section} aria-labelledby="refunds-heading">
         <h2 id="refunds-heading" className={styles.heading}>

@@ -31,6 +31,8 @@ import {
 import { refundFailed, refundRequested, refundSucceeded } from '@/lib/ledger';
 import { sha256Hex } from '@/server/hash';
 import { enqueue } from '@/server/jobs/enqueue';
+import type { AuditEntryInput } from '@/lib/audit';
+import { writeAudit } from './audit';
 import { db, type Transaction } from './client';
 import { postEntries } from './ledger';
 import { lockOrderById } from './locks';
@@ -45,6 +47,13 @@ import { readDatabaseTime } from './time';
 // checked their own subject.
 
 type RefundRow = typeof refunds.$inferSelect;
+
+/** The id of the refund a request names: the same order, reason, and key are always the same refund. */
+export function refundIdFor(input: RefundRequestInput): string {
+  return refundIdFromDigest(
+    sha256Hex(refundRequestIdentity(RefundRequestSchema.parse(input))),
+  );
+}
 
 export type RequestedRefund = {
   refundId: string;
@@ -97,9 +106,7 @@ export async function requestRefund(
   input: RefundRequestInput,
 ): Promise<RequestRefundResult> {
   const request = RefundRequestSchema.parse(input);
-  const refundId = refundIdFromDigest(
-    sha256Hex(refundRequestIdentity(request)),
-  );
+  const refundId = refundIdFor(request);
 
   const locked = await lockOrderById(tx, request.orderId);
   const [existing] = locked
@@ -197,6 +204,33 @@ export async function requestRefund(
     dedupeKey: processRefundDedupeKey(refundId),
   });
   return { status: 'requested', refund: requestedRefund(row) };
+}
+
+/**
+ * `requestRefund` and, when it wrote a new refund, the audit row for it, in the caller's transaction:
+ * a repeat of a request and a refusal write no audit row.
+ */
+export async function requestAuditedRefund(
+  tx: Transaction,
+  input: RefundRequestInput,
+  auditEntry: (refundId: string) => AuditEntryInput,
+): Promise<RequestRefundResult> {
+  const result = await requestRefund(tx, input);
+  if (result.status === 'requested') {
+    await writeAudit(tx, auditEntry(result.refund.refundId));
+  }
+  return result;
+}
+
+/** Takes the order out of the refund-failed queue; `applyRefundEvent` is the only other writer of the flag. */
+export async function clearRefundFailed(
+  tx: Transaction,
+  orderId: string,
+): Promise<void> {
+  await tx
+    .update(orders)
+    .set({ refundFailed: false })
+    .where(eq(orders.id, orderId));
 }
 
 type RefundSend = Extract<RefundToSend, { kind: 'send' }>;

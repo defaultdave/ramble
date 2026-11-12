@@ -8,6 +8,13 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/server/opsCaller', () => ({ readOpsCaller: mocks.readOpsCaller }));
+vi.mock('@/server/actions/opsBookings', () => ({
+  cancelBookingAction: vi.fn(),
+  refundBookingAction: vi.fn(),
+  resendConfirmationAction: vi.fn(),
+  retryRefundAction: vi.fn(),
+  voidLinksAction: vi.fn(),
+}));
 vi.mock('@/server/db/opsBookings', () => ({
   readOpsBookings: mocks.readOpsBookings,
   readOpsBooking: mocks.readOpsBooking,

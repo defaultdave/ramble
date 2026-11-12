@@ -104,6 +104,7 @@ describe('cancelBooking', () => {
       refundMinor: 0,
     });
     expect(cancelBookingOrder).toHaveBeenCalledExactlyOnceWith({
+      actor: { kind: 'guest' },
       token: resolved,
       expectedRefundMinor: 13_000,
     });
@@ -144,6 +145,7 @@ describe('cancelBookingForm', () => {
       `redirect:/manage/${token}?result=cancelled`,
     );
     expect(cancelBookingOrder).toHaveBeenCalledExactlyOnceWith({
+      actor: { kind: 'guest' },
       token: resolved,
       expectedRefundMinor: 13_000,
     });

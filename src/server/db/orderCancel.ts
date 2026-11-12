@@ -7,6 +7,8 @@ import {
   cancelRefundKey,
   cancelRefundReason,
   cancellationAuditEntry,
+  cancelledByFor,
+  opsCancelRequestedEntry,
   giftReinstated,
   cancelCacheChanges,
   cancelStart,
@@ -14,6 +16,7 @@ import {
   refundEtaLine,
   refundRequestOutcome,
   refundsReconcileWithin,
+  type CancelActor,
   type CancelBookingResult,
   type CancelOrderInput,
 } from '@/lib/cancelBooking';
@@ -78,7 +81,10 @@ type Cancelled = { result: CancelBookingResult; sessionId: string | null };
 
 async function cancelInTransaction(
   tx: Transaction,
-  input: CancelOrderInput & { tokenKind: CapabilityTokenKind },
+  input: CancelOrderInput & {
+    tokenKind: CapabilityTokenKind;
+    actor: CancelActor;
+  },
 ): Promise<LockedAttempt<Cancelled>> {
   const start = cancelStart({
     tokenKind: input.tokenKind,
@@ -133,7 +139,7 @@ async function cancelInTransaction(
     .update(orders)
     .set({
       status: 'cancelled',
-      cancelledBy: 'guest',
+      cancelledBy: cancelledByFor(input.actor),
       // Not the decision time: that is whole milliseconds, which can read earlier than the order's microsecond `confirmed_at`.
       cancelledAt: sql`clock_timestamp()`,
     })
@@ -147,27 +153,39 @@ async function cancelInTransaction(
   const reinstated = giftReinstated();
   await writeAudit(
     tx,
-    cancellationAuditEntry({
-      orderId: input.orderId,
-      sessionId,
-      refundMinor: plan.refundMinor,
-      refundId,
-      seatsReturned: facts.seats,
-      giftReinstated: reinstated,
-    }),
+    cancellationAuditEntry(
+      {
+        orderId: input.orderId,
+        sessionId,
+        refundMinor: plan.refundMinor,
+        refundId,
+        seatsReturned: facts.seats,
+        giftReinstated: reinstated,
+      },
+      input.actor,
+    ),
   );
+  if (input.actor.kind === 'ops') {
+    await writeAudit(
+      tx,
+      opsCancelRequestedEntry(input.actor.userId, input.orderId),
+    );
+  }
   await enqueue(tx, {
     kind: 'guest-cancellation',
     payload: {
       orderId: input.orderId,
-      cancelledBy: 'guest',
+      cancelledBy: cancelledByFor(input.actor),
       refundMinor: plan.refundMinor,
     },
     dedupeKey: bookingEmailKey('guest-cancellation', input.orderId),
   });
   await enqueue(tx, {
     kind: 'host-cancellation-notice',
-    payload: { orderId: input.orderId, cancelledBy: 'guest' },
+    payload: {
+      orderId: input.orderId,
+      cancelledBy: cancelledByFor(input.actor),
+    },
     dedupeKey: bookingEmailKey('host-cancellation-notice', input.orderId),
   });
   return {
@@ -195,6 +213,8 @@ async function cancelInTransaction(
 export async function cancelBookingOrder(input: {
   token: ResolvedManageToken;
   expectedRefundMinor: number;
+  /** Who cancels: the guest by their link, or ops acting for Ramble, in which case the order and its audit rows name ops. */
+  actor: CancelActor;
 }): Promise<CancelBookingResult> {
   const parsed = CancelOrderInputSchema.parse({
     orderId: input.token.id,
@@ -203,7 +223,11 @@ export async function cancelBookingOrder(input: {
   });
   const { result, sessionId } = await untilLocksCoverOrder(() =>
     db.transaction((tx) =>
-      cancelInTransaction(tx, { ...parsed, tokenKind: input.token.kind }),
+      cancelInTransaction(tx, {
+        ...parsed,
+        tokenKind: input.token.kind,
+        actor: input.actor,
+      }),
     ),
   );
   revalidateTagsForChanges(cancelCacheChanges(result, sessionId));

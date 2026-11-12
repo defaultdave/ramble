@@ -1,31 +1,34 @@
 import 'server-only';
-import { and, count, eq, sql, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import type { CacheChange } from '@/lib/cacheTags';
 import { WriteIdSchema } from '@/lib/catalog';
 import { experiencePauseEntry } from '@/lib/experienceAudit';
+import type { ExperienceStatus } from '@/lib/experienceEditor';
 import {
   experienceOutcome,
   hostChanges,
   hostOutcome,
   noSuspension,
+  pausableStatuses,
   pauseRefusal,
-  pauseTransitions,
+  pausedStatus,
+  restoredStatus,
   type HostSuspension,
   type PauseKind,
   type PauseRefusal,
 } from '@/lib/experiencePause';
 import { hostSuspensionEntry } from '@/lib/hostAudit';
 import type { Caller } from '@/server/auth/caller';
-import { updateTagsForChanges } from '@/server/cache/invalidate';
 import { requireOpsUserId, writeAudit } from './audit';
-import { db, dbRead, type Transaction } from './client';
-import { stillListedChanges } from './experienceEditor';
+import { dbRead, type Transaction } from './client';
+import { placeChanges } from './experienceEditor';
 import {
   hostIsSuspended,
   withLockedExperience,
+  withLockedHost,
   type LockedExperience,
 } from './lockedExperience';
-import { experiences, hosts } from './schema';
+import { auditLog, experiences } from './schema';
 
 export type PauseResult =
   { status: 'paused' | 'unpaused' | 'not_found' } | PauseRefusal;
@@ -55,9 +58,30 @@ const pausedByHostSuspension = sql`coalesce((
   LIMIT 1
 ), false)`;
 
+/** The status the latest pause of an experience was made from, which an unpause restores; live when no pause was recorded. */
+async function statusBeforePause(
+  tx: Transaction,
+  experience: LockedExperience,
+): Promise<ReturnType<typeof restoredStatus>> {
+  const [latest] = await tx
+    .select({ from: sql<string | null>`${auditLog.details} ->> 'from_status'` })
+    .from(auditLog)
+    .where(
+      and(
+        eq(auditLog.subjectKind, 'experience'),
+        eq(auditLog.subjectId, experience.id),
+        eq(auditLog.action, 'experience.paused'),
+      ),
+    )
+    .orderBy(desc(auditLog.id))
+    .limit(1);
+  return restoredStatus(latest?.from ?? null, experience.linkOutUrl !== null);
+}
+
 /**
- * Moves each locked experience to the status `kind` leads to, one audit row each, and returns the
- * cache changes of the listings guests stop or start seeing. Runs inside the caller's transaction.
+ * Pauses each locked experience from the status it is in, or unpauses it back to the status its
+ * latest pause was made from, one audit row each, and returns the cache changes of the listings
+ * guests stop or start seeing. Runs inside the caller's transaction.
  */
 async function moveExperiences(
   tx: Transaction,
@@ -68,21 +92,25 @@ async function moveExperiences(
 ): Promise<CacheChange[]> {
   const changes: CacheChange[] = [];
   for (const row of rows) {
+    const moved =
+      kind === 'pause'
+        ? { from: row.status, to: pausedStatus }
+        : { from: pausedStatus, to: await statusBeforePause(tx, row) };
     await tx
       .update(experiences)
-      .set({ status: pauseTransitions[kind].to })
+      .set({ status: moved.to })
       .where(eq(experiences.id, row.id));
     await writeAudit(
       tx,
-      experiencePauseEntry(userId, row.id, kind, viaHostSuspension),
+      experiencePauseEntry(userId, row.id, kind, viaHostSuspension, moved),
     );
-    changes.push(...(await stillListedChanges(tx, row)));
+    changes.push(...(await placeChanges(tx, row)));
   }
   return changes;
 }
 
 /**
- * Pauses a live experience, or unpauses a paused one whose host is not suspended. The status
+ * Pauses an experience guests can see, or unpauses a paused one, back to the status it was paused from, when its host is not suspended. The status
  * check, the status change and the audit row are one transaction, on a locked row, so two ops
  * users acting at once cannot both win. A pause removes the listing from every guest page, and an
  * unpause puts it back, so its cache tags are invalidated after the commit. Runs in a Server
@@ -126,27 +154,22 @@ export async function setHostSuspended(
   kind: PauseKind,
 ): Promise<HostPauseResult> {
   const userId = requireOpsUserId(caller);
-  const parsedId = WriteIdSchema.safeParse(hostId);
-  if (!parsedId.success) return { status: 'not_found' };
-
-  const moved = await db.transaction(
-    async (
-      tx,
-    ): Promise<{ result: HostPauseResult; changes: CacheChange[] }> => {
-      const [host] = await tx
-        .select({ id: hosts.id })
-        .from(hosts)
-        .where(eq(hosts.id, parsedId.data))
-        .for('update');
-      if (!host) return { result: { status: 'not_found' }, changes: [] };
+  return await withLockedHost<HostPauseResult>(
+    hostId,
+    { status: 'not_found' },
+    async (tx, host) => {
       const rows = await tx
         .select()
         .from(experiences)
         .where(
           and(
             eq(experiences.hostId, host.id),
-            eq(experiences.status, pauseTransitions[kind].from),
-            kind === 'unpause' ? pausedByHostSuspension : undefined,
+            kind === 'pause'
+              ? inArray(experiences.status, [...pausableStatuses])
+              : and(
+                  eq(experiences.status, pausedStatus),
+                  pausedByHostSuspension,
+                ),
           ),
         )
         .for('update');
@@ -166,11 +189,9 @@ export async function setHostSuspended(
       return { result: { status: hostOutcome(kind, true) }, changes };
     },
   );
-  updateTagsForChanges(moved.changes);
-  return moved.result;
 }
 
-/** Whether a host is suspended, how many live experiences a suspension would pause, and how many paused ones it paused. Ops only. */
+/** Whether a host is suspended, how many experiences guests can see a suspension would pause, and how many paused ones it paused. Ops only. */
 export async function readHostSuspension(
   caller: Caller,
   hostId: string,
@@ -178,14 +199,17 @@ export async function readHostSuspension(
   requireOpsUserId(caller);
   const parsedId = WriteIdSchema.safeParse(hostId);
   if (!parsedId.success) return noSuspension;
-  const countWhere = async (status: 'live' | 'paused', extra?: SQL) => {
+  const countWhere = async (
+    statuses: readonly ExperienceStatus[],
+    extra?: SQL,
+  ) => {
     const [row] = await dbRead
       .select({ total: count() })
       .from(experiences)
       .where(
         and(
           eq(experiences.hostId, parsedId.data),
-          eq(experiences.status, status),
+          inArray(experiences.status, [...statuses]),
           extra,
         ),
       );
@@ -193,8 +217,8 @@ export async function readHostSuspension(
   };
   const [suspended, liveCount, suspendedCount] = await Promise.all([
     hostIsSuspended(dbRead, parsedId.data),
-    countWhere('live'),
-    countWhere('paused', pausedByHostSuspension),
+    countWhere(pausableStatuses),
+    countWhere([pausedStatus], pausedByHostSuspension),
   ]);
   return { suspended, liveCount, suspendedCount };
 }

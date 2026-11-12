@@ -1,9 +1,10 @@
 import { userActor, type AuditEntryInput } from './audit';
-import { pauseTransitions, type PauseKind } from './experiencePause';
+import type { PauseKind } from './experiencePause';
 import type { RejectionReason } from './experienceReview';
 import type {
   ExperienceContent,
   ExperienceContentField,
+  ExperienceStatus,
 } from './experienceEditor';
 
 // The audit rows of the experience editor. An ops user does these, so the actor is always a named
@@ -144,16 +145,16 @@ export function experiencePauseEntry(
   experienceId: string,
   kind: PauseKind,
   viaHostSuspension: boolean,
+  moved: { from: ExperienceStatus; to: ExperienceStatus },
 ): AuditEntryInput {
-  const { from, to } = pauseTransitions[kind];
   return {
     ...userActor(userId),
     action: kind === 'pause' ? 'experience.paused' : 'experience.unpaused',
     subjectKind: 'experience',
     subjectId: experienceId,
     details: {
-      from_status: from,
-      to_status: to,
+      from_status: moved.from,
+      to_status: moved.to,
       via_host_suspension: viaHostSuspension,
     },
   };

@@ -48,6 +48,7 @@ vi.mock('next/cache', () => ({
 // Unsuspending:
 // - unpauses only the experiences a suspension paused: not one paused by hand, or with no audit row, or paused by hand after an earlier suspension was lifted
 // - a host that is not suspended has nothing to do
+// A guide entry (guest visible like live): pause and unpause restore guide_only, the latest pause decides, a missing pause row restores live, and a suspension takes it down and restores it
 // The state the host page shows: whether it is suspended, the live count and the suspension-paused count; an id that is no id shows nothing
 
 let fresh: FreshDatabase;
@@ -96,12 +97,15 @@ beforeEach(() => {
   cache.updateTag.mockClear();
 });
 
-type Status = 'live' | 'paused' | 'draft' | 'in_review';
+type Status = 'live' | 'guide_only' | 'paused' | 'draft' | 'in_review';
 
 /** An experience in `status`, on a new host or the host given, with the slugs its tags are built from. */
 async function experienceOf(status: Status, hostId?: string) {
   const parents = await fixtures.parents(hostId);
-  const row = await fixtures.insertExperience(parents, { status });
+  const row = await fixtures.insertExperience(parents, {
+    status,
+    linkOutUrl: status === 'guide_only' ? 'https://guide.example/entry' : null,
+  });
   const [category, neighborhood] = await Promise.all([
     client.db.query.categories.findFirst({
       where: (t, { eq: is }) => is(t.id, parents.categoryId),
@@ -140,21 +144,21 @@ async function auditRows(subjectId: string) {
 const invalidated = () =>
   cache.updateTag.mock.calls.map(([tag]) => tag as string);
 
-const pausedBy = (viaHostSuspension: boolean) => ({
+const pausedBy = (viaHostSuspension: boolean, from = 'live') => ({
   action: 'experience.paused',
   actor_id: opsUser,
   details: {
-    from_status: 'live',
+    from_status: from,
     to_status: 'paused',
     via_host_suspension: viaHostSuspension,
   },
 });
-const unpausedBy = (viaHostSuspension: boolean) => ({
+const unpausedBy = (viaHostSuspension: boolean, to = 'live') => ({
   action: 'experience.unpaused',
   actor_id: opsUser,
   details: {
     from_status: 'paused',
-    to_status: 'live',
+    to_status: to,
     via_host_suspension: viaHostSuspension,
   },
 });
@@ -396,7 +400,7 @@ describe('while a host is suspended', () => {
     for (const target of [suspended, byHand]) {
       expect(
         await pause.setExperiencePaused(ops, target.id, 'unpause'),
-      ).toEqual({ status: 'host_suspended' });
+      ).toEqual({ status: 'unpause_host_suspended' });
       expect(await statusOf(target.id)).toBe('paused');
     }
     expect(await auditRows(suspended.id)).toEqual([pausedBy(true)]);
@@ -480,6 +484,90 @@ describe('unsuspending a host', () => {
       { status: 'nothing_to_unsuspend' },
     );
     expect(await auditRows(target.hostId)).toEqual([]);
+  });
+});
+
+describe('an experience guests see as a guide entry', () => {
+  it('is paused from guide_only and unpaused back to guide_only, the pause row recording where it came from', async () => {
+    const target = await experienceOf('guide_only');
+
+    expect(await pause.setExperiencePaused(ops, target.id, 'pause')).toEqual({
+      status: 'paused',
+    });
+    expect(await statusOf(target.id)).toBe('paused');
+    expect(await pause.setExperiencePaused(ops, target.id, 'unpause')).toEqual({
+      status: 'unpaused',
+    });
+
+    expect(await statusOf(target.id)).toBe('guide_only');
+    expect(await auditRows(target.id)).toEqual([
+      pausedBy(false, 'guide_only'),
+      unpausedBy(false, 'guide_only'),
+    ]);
+    expect(invalidated()).toContain(tags.experience(target.id));
+  });
+
+  it('goes back to the status of its latest pause, not an earlier one', async () => {
+    const target = await experienceOf('guide_only');
+    await pause.setExperiencePaused(ops, target.id, 'pause');
+    await pause.setExperiencePaused(ops, target.id, 'unpause');
+    await client.db
+      .update(experiences)
+      .set({ status: 'live' })
+      .where(eq(experiences.id, target.id));
+    await pause.setExperiencePaused(ops, target.id, 'pause');
+    await pause.setExperiencePaused(ops, target.id, 'unpause');
+
+    expect(await statusOf(target.id)).toBe('live');
+  });
+
+  it('comes back as live when its link out was removed while it was paused, which the database requires of a guide entry', async () => {
+    const target = await experienceOf('guide_only');
+    await pause.setExperiencePaused(ops, target.id, 'pause');
+    await client.db
+      .update(experiences)
+      .set({ linkOutUrl: null })
+      .where(eq(experiences.id, target.id));
+
+    await pause.setExperiencePaused(ops, target.id, 'unpause');
+
+    expect(await statusOf(target.id)).toBe('live');
+  });
+
+  it('comes back as live when no pause was recorded, as for one paused outside the app', async () => {
+    const target = await experienceOf('paused');
+
+    await pause.setExperiencePaused(ops, target.id, 'unpause');
+
+    expect(await statusOf(target.id)).toBe('live');
+  });
+
+  it('is paused by a host suspension with the live ones, and each comes back as it was', async () => {
+    const live = await experienceOf('live');
+    const guide = await experienceOf('guide_only', live.hostId);
+    const draft = await experienceOf('draft', live.hostId);
+
+    expect(await pause.setHostSuspended(ops, live.hostId, 'pause')).toEqual({
+      status: 'suspended',
+    });
+    expect(await statusOf(guide.id)).toBe('paused');
+    expect(await statusOf(draft.id)).toBe('draft');
+    expect(await auditRows(live.hostId)).toEqual([
+      {
+        action: 'host.suspended',
+        actor_id: opsUser,
+        details: { experiences_changed: 2 },
+      },
+    ]);
+
+    await pause.setHostSuspended(ops, live.hostId, 'unpause');
+
+    expect(await statusOf(live.id)).toBe('live');
+    expect(await statusOf(guide.id)).toBe('guide_only');
+    expect(await auditRows(guide.id)).toEqual([
+      pausedBy(true, 'guide_only'),
+      unpausedBy(true, 'guide_only'),
+    ]);
   });
 });
 

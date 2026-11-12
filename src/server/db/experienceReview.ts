@@ -13,7 +13,7 @@ import {
 import { photoLimits } from '@/lib/photos';
 import type { Caller } from '@/server/auth/caller';
 import { requireOpsUserId, writeAudit } from './audit';
-import { stillListedChanges } from './experienceEditor';
+import { placeChanges } from './experienceEditor';
 import { hostIsSuspended, withLockedExperience } from './lockedExperience';
 import { coverOrder } from './photos';
 import { experiences, photos } from './schema';
@@ -72,7 +72,7 @@ export async function decideExperienceReview(
       await writeAudit(tx, experienceApprovedEntry(userId, current.id));
       return {
         result: { status: 'approved' },
-        changes: await stillListedChanges(tx, current),
+        changes: await placeChanges(tx, current),
       };
     },
   );

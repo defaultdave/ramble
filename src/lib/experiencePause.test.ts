@@ -1,42 +1,80 @@
 import { describe, expect, it } from 'vitest';
 import { id } from '../../tests/support/ids';
 import { parseAuditEntry } from './audit';
-import { experienceStatuses } from './catalog';
+import { experienceStatuses, guestVisibleStatuses } from './catalog';
 import { experiencePauseEntry } from './experienceAudit';
 import { experienceNoticeCodes } from './experienceEditor';
 import {
   experienceOutcome,
   hostChanges,
   hostOutcome,
-  pauseNoticeCodes,
+  pausableStatuses,
+  pauseActionFor,
+  pauseActionLabel,
+  pauseExplainerText,
   pauseNoticeFor,
   pauseNoticeOf,
   pauseRefusal,
-  pauseTransitions,
+  restoredStatus,
   suspensionLiveText,
   suspensionUndoText,
+  type PauseNoticeCode,
 } from './experiencePause';
 import { reviewNoticeCodes } from './experienceReview';
 import { hostSuspensionEntry } from './hostAudit';
 import { hostNoticeCodes, hostPageNotice } from './hostSetup';
-import { experiencePageNotice, photoNoticeCodes } from './photoForm';
+import { experiencePageNotice, photoNotices } from './photoForm';
 
 // Behaviours under test:
-// - only a live experience can be paused and only a paused one unpaused; every other status is refused with the matching code
+// - the statuses a pause takes down are exactly the ones guests can see, so a status added to the public set fails here until it is handled
+// - the action a status offers: pause for each of those, unpause for paused, none for the rest
+// - an unpause restores the status the latest pause recorded, and live when there is none or it is not one a pause can come from, and a guide entry that lost its link out while paused comes back live
+// - only an experience guests can see can be paused and only a paused one unpaused; every other status is refused with the matching code
 // - an unpause is refused while the host is suspended, after the status check, and a pause is not
-// - a pause leads to paused and an unpause to live
 // - one experience reports paused or unpaused; a host reports suspended or unsuspended when it changed anything, and a nothing code when it did not
 // - a host change counts when it moves an experience or flips the suspension, even with nothing to move
 // - every notice code has a notice, and no code means no notice
 // - no pause code is also a host, experience or photo notice code, so the host and experience pages read one address unambiguously, and each page resolves a pause notice and its own
+// - the button and explainer of each action
 // - the sentences for the host's suspension follow the counts: none, one, many
 // - the pause audit row names the user, the statuses and whether a host suspension did it, and the audit log accepts it
 // - the host suspension audit row carries the count and no text, and the audit log accepts it
 
+const pausable: readonly string[] = pausableStatuses;
+
+describe('the statuses a pause takes down', () => {
+  it('are the ones guests can see', () => {
+    expect([...pausableStatuses].sort()).toEqual(
+      [...guestVisibleStatuses].sort(),
+    );
+  });
+
+  it.each(experienceStatuses)('offers the action for %s', (status) => {
+    const expected = pausable.includes(status)
+      ? 'pause'
+      : status === 'paused'
+        ? 'unpause'
+        : null;
+
+    expect(pauseActionFor(status)).toBe(expected);
+  });
+
+  it.each([
+    ['guide_only', true, 'guide_only'],
+    ['guide_only', false, 'live'],
+    ['live', true, 'live'],
+    [null, true, 'live'],
+    ['draft', true, 'live'],
+    ['paused', true, 'live'],
+  ])('restores %s with a link out %s as %s', (pausedFrom, link, restored) => {
+    expect(restoredStatus(pausedFrom, link)).toBe(restored);
+  });
+});
+
 describe('pauseRefusal', () => {
   it.each(experienceStatuses)('pausing from %s', (status) => {
     expect(pauseRefusal(status, 'pause', false)).toEqual(
-      status === 'live' ? null : { status: 'not_live' },
+      pausable.includes(status) ? null : { status: 'not_live' },
     );
   });
 
@@ -48,17 +86,13 @@ describe('pauseRefusal', () => {
 
   it('refuses an unpause while the host is suspended, but not a pause, and checks the status first', () => {
     expect(pauseRefusal('paused', 'unpause', true)).toEqual({
-      status: 'host_suspended',
+      status: 'unpause_host_suspended',
     });
     expect(pauseRefusal('live', 'pause', true)).toBeNull();
+    expect(pauseRefusal('guide_only', 'pause', true)).toBeNull();
     expect(pauseRefusal('live', 'unpause', true)).toEqual({
       status: 'not_paused',
     });
-  });
-
-  it('leads a pause to paused and an unpause to live', () => {
-    expect(pauseTransitions.pause.to).toBe('paused');
-    expect(pauseTransitions.unpause.to).toBe('live');
   });
 });
 
@@ -94,45 +128,48 @@ describe('the outcomes', () => {
   );
 });
 
+// Every pause code, so a code added to the list fails to compile here until it is covered.
+const pauseCodes = {
+  paused: true,
+  unpaused: true,
+  not_live: true,
+  not_paused: true,
+  unpause_host_suspended: true,
+  suspended: true,
+  unsuspended: true,
+  nothing_to_suspend: true,
+  nothing_to_unsuspend: true,
+} as const satisfies Record<PauseNoticeCode, true>;
+
 describe('the notices', () => {
-  it.each(pauseNoticeCodes)('has a notice for %s', (code) => {
-    expect(pauseNoticeFor(code)?.title).toBeTruthy();
-  });
+  it.each(Object.keys(pauseCodes) as PauseNoticeCode[])(
+    'has a notice for %s, read from an address',
+    (code) => {
+      expect(pauseNoticeFor(code)?.title).toBeTruthy();
+      expect(pauseNoticeOf(code)).toEqual(pauseNoticeFor(code));
+    },
+  );
 
   it('has none for no code', () => {
     expect(pauseNoticeFor(null)).toBeNull();
+    expect(pauseNoticeOf('nonsense')).toBeNull();
   });
 
   it.each([
     ['host', hostNoticeCodes],
     ['experience', experienceNoticeCodes],
-    ['photo', photoNoticeCodes],
+    ['photo', Object.keys(photoNotices)],
+    ['review', reviewNoticeCodes],
   ])('shares no code with the %s notices', (_name, codes) => {
-    const shared = codes.filter((code) =>
-      (pauseNoticeCodes as readonly string[]).includes(code),
-    );
-
-    expect(shared).toEqual([]);
-  });
-
-  it('keeps the review page its own host_suspended notice for the same refusal', () => {
-    expect(reviewNoticeCodes).toContain('host_suspended');
-  });
-
-  it.each([
-    ['suspended', 'Host suspended. Its live experiences are paused.'],
-    ['host_suspended', undefined],
-    ['nonsense', null],
-  ])('reads %s from an address on the host page', (code, title) => {
-    expect(hostPageNotice(code)?.title ?? null).toBe(
-      title === undefined ? pauseNoticeFor('host_suspended')?.title : title,
-    );
+    expect(codes.filter((code) => code in pauseCodes)).toEqual([]);
   });
 
   it('reads a host notice before a pause one on the host page, and a pause one on the experience page', () => {
     expect(hostPageNotice('updated')?.title).toBe('Host saved.');
-    expect(experiencePageNotice('paused').notice?.title).toBe(
-      pauseNoticeFor('paused')?.title,
+    expect(hostPageNotice('suspended')).toEqual(pauseNoticeFor('suspended'));
+    expect(hostPageNotice('nonsense')).toBeNull();
+    expect(experiencePageNotice('paused').notice).toEqual(
+      pauseNoticeFor('paused'),
     );
     expect(experiencePageNotice('updated').notice?.title).toBe(
       'Experience saved.',
@@ -141,12 +178,22 @@ describe('the notices', () => {
   });
 });
 
+describe('the action text', () => {
+  it.each([
+    ['pause', 'Pause experience', /hides this experience/],
+    ['unpause', 'Unpause experience', /puts it back as it was/],
+  ] as const)('for %s', (kind, label, explainer) => {
+    expect(pauseActionLabel(kind)).toBe(label);
+    expect(pauseExplainerText(kind)).toMatch(explainer);
+  });
+});
+
 describe('the suspension sentences', () => {
   it.each([
-    [0, /no live experiences.*records the suspension/],
-    [1, /pauses 1 experience that is live/],
-    [4, /pauses 4 experiences that are live/],
-  ])('say what suspending does with %s live', (count, expected) => {
+    [0, /none of this host experiences.*records the suspension/],
+    [1, /pauses 1 experience that guests can see.*stop seeing and booking it/],
+    [4, /pauses 4 experiences that guests can see.*booking them/],
+  ])('say what suspending does with %s visible', (count, expected) => {
     expect(suspensionLiveText(count)).toMatch(expected);
   });
 
@@ -161,12 +208,18 @@ describe('the suspension sentences', () => {
 
 describe('the audit rows', () => {
   it.each([
-    ['pause', 'experience.paused', 'live', 'paused', false],
-    ['unpause', 'experience.unpaused', 'paused', 'live', true],
+    ['pause', 'experience.paused', 'guide_only', 'paused', false],
+    ['unpause', 'experience.unpaused', 'paused', 'guide_only', true],
   ] as const)(
     'an experience %s',
     (kind, action, from, to, viaHostSuspension) => {
-      const entry = experiencePauseEntry(id(1), id(2), kind, viaHostSuspension);
+      const entry = experiencePauseEntry(
+        id(1),
+        id(2),
+        kind,
+        viaHostSuspension,
+        { from, to },
+      );
 
       expect(parseAuditEntry(entry)).toMatchObject({
         actorKind: 'user',

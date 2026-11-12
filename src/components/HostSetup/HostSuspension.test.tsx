@@ -35,7 +35,7 @@ describe('HostSuspension', () => {
       screen.getByRole('button', { name: 'Suspend host' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/pauses 3 experiences that are live/),
+      screen.getByText(/pauses 3 experiences that guests can see/),
     ).toBeVisible();
     expect(
       screen.queryByRole('button', { name: 'Unsuspend host' }),

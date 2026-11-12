@@ -5,7 +5,7 @@ import { experienceStatuses } from '@/lib/catalog';
 import { ExperiencePauseForm } from './ExperiencePauseForm';
 
 // Behaviours under test:
-// - a live experience offers Pause, with the experience id in the form, and no Unpause
+// - a live or guide-only experience offers Pause, with the experience id in the form, and no Unpause
 // - a paused experience offers Unpause, with the experience id in the form, and no Pause
 // - any other status offers neither, because neither action accepts it
 
@@ -26,6 +26,7 @@ function renderFor(status: (typeof experienceStatuses)[number]) {
 describe('ExperiencePauseForm', () => {
   it.each([
     ['live', 'Pause experience', 'Unpause experience'],
+    ['guide_only', 'Pause experience', 'Unpause experience'],
     ['paused', 'Unpause experience', 'Pause experience'],
   ] as const)(
     "offers only %s's action, carrying the id",
@@ -42,12 +43,13 @@ describe('ExperiencePauseForm', () => {
     },
   );
 
-  it.each(experienceStatuses.filter((s) => s !== 'live' && s !== 'paused'))(
-    'offers nothing for %s',
-    (status) => {
-      const { container } = renderFor(status);
+  it.each(
+    experienceStatuses.filter(
+      (s) => s !== 'live' && s !== 'guide_only' && s !== 'paused',
+    ),
+  )('offers nothing for %s', (status) => {
+    const { container } = renderFor(status);
 
-      expect(container).toBeEmptyDOMElement();
-    },
-  );
+    expect(container).toBeEmptyDOMElement();
+  });
 });

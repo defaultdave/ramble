@@ -201,17 +201,16 @@ describe('NewPhotoSchema', () => {
     NewPhotoSchema.safeParse({ experienceId, rights, ...input });
 
   it.each([
-    [{ decorative: true, altText: null }],
-    [{ decorative: false, altText: 'A potter' }],
-    [{ decorative: false, altText: null }],
-    [{ decorative: false, altText: '   ' }],
-    [{ decorative: false, altText: '' }],
+    [{ decorative: true, altText: null }, true],
+    [{ decorative: false, altText: 'A potter' }, true],
+    [{ decorative: false, altText: null }, false],
+    [{ decorative: false, altText: '   ' }, false],
+    [{ decorative: false, altText: '' }, false],
   ])(
-    'accepts %j exactly when hasPhotoDescription does, so the stored check and the upload rule agree',
-    (description) => {
-      expect(parse({ description }).success).toBe(
-        hasPhotoDescription(description),
-      );
+    'treats %j as described: %s, on upload and as a stored photo',
+    (description, described) => {
+      expect(parse({ description }).success).toBe(described);
+      expect(hasPhotoDescription(description)).toBe(described);
     },
   );
 

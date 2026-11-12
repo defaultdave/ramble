@@ -9,6 +9,7 @@ import { StaffView } from './StaffView';
 // - the staff view has an invite form with one required email field, and shows the refusal text on the field when the last try was refused
 // - an ops row offers a sign-in link and a removal button that each carry the person's id; an admin row offers neither
 // - a person holding ops and admin is one row with the ops buttons
+// - a page that names another role (host staff) gets the buttons on that role's rows, its own hint and its own empty text
 // - no staff shows the empty state
 // - the audit view asks for a day with a date field set to the day shown, and lists each row's time, actor, action, subject and details
 // - a full audit page links to the next page, and an empty day says nothing was recorded
@@ -99,6 +100,47 @@ describe('StaffView', () => {
       within(rows[0] as HTMLElement).getByRole('button', {
         name: 'Remove access',
       }),
+    ).toBeInTheDocument();
+  });
+
+  it('manages the role the page names, with the page’s own hint and empty text', () => {
+    const host: StaffRow[] = [
+      {
+        userId: ownerId,
+        email: 'host-staff@example.com',
+        roles: ['host_staff'],
+      },
+    ];
+    const { rerender } = render(
+      <StaffView
+        rows={host}
+        query={{}}
+        problems={[]}
+        actions={actions}
+        managedRole="host_staff"
+        inviteHint="Staff only look."
+        emptyBody="Invite a staff member above."
+      />,
+    );
+
+    const row = screen.getByRole('row', { name: /host-staff@example.com/ });
+    expect(within(row).getByText('Host staff')).toBeInTheDocument();
+    expect(
+      within(row).getByRole('button', { name: 'Remove access' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Staff only look.')).toBeInTheDocument();
+
+    rerender(
+      <StaffView
+        rows={[]}
+        query={{}}
+        problems={[]}
+        actions={actions}
+        emptyBody="Invite a staff member above."
+      />,
+    );
+    expect(
+      screen.getByText('Invite a staff member above.'),
     ).toBeInTheDocument();
   });
 

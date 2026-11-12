@@ -1,5 +1,5 @@
 import 'server-only';
-import { hostAccessFor, readableHostId } from '@/lib/hostAccess';
+import { hostAccessFor, ownedHostId, readableHostId } from '@/lib/hostAccess';
 import { buildHostWeek, type HostWeekView } from '@/lib/hostSessions';
 import { getCaller } from '@/server/auth/caller';
 import { readHostWeek } from '@/server/db/sessions';
@@ -8,7 +8,7 @@ import { systemClock } from '@/server/ports/clock';
 export type HostWeekResult =
   | { status: 'signed_out' }
   | { status: 'refused' }
-  | { status: 'ok'; view: HostWeekView; canEdit: boolean };
+  | { status: 'ok'; view: HostWeekView };
 
 /**
  * The week of the host the request's caller owns or is staff of (staff read it and cannot edit it).
@@ -30,7 +30,6 @@ export async function loadHostWeek(
     ? { status: 'refused' }
     : {
         status: 'ok',
-        view: buildHostWeek(data, now),
-        canEdit: access.kind === 'owner',
+        view: buildHostWeek(data, now, ownedHostId(access) !== null),
       };
 }

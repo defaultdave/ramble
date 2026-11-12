@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { maxHostStaff } from '@/lib/hostStaff';
 import { ForbiddenError, Role, type Caller } from '@/server/auth/caller';
 import { testCaller } from '@/server/auth/test-caller';
 import { authUsers, hosts, roleGrants } from '@/server/db/schema';
@@ -24,7 +25,9 @@ vi.mock('@/server/monitoring/logger', () => ({
 // - the link signs the person in as host staff of that host: they read the dashboard and are refused every write and the staff page
 // Revoking:
 // - an owner removes the role with one audit row; a person who does not hold it is not_found; another host's staff member is not touched
-// - the owner's own role is never removed by it, and a removed member no longer reads the host
+// - the owner's own role is never removed by it, whether they ask to remove themselves or also hold the staff role
+// Limits:
+// - a host with the cap of staff refuses another grant and writes nothing; the owner of one host cannot grant on another
 // Reading:
 // - the list holds the host's staff only, not its owner and not another host's staff
 
@@ -324,6 +327,96 @@ describe('revoking', () => {
 
     expect(await staffRows(target.id, hostB)).toHaveLength(1);
     expect(await auditRows()).toEqual(before);
+  });
+});
+
+describe('limits', () => {
+  it('refuses a grant past the cap and writes nothing', async () => {
+    const crowded = await host();
+    const crowdedOwner = testCaller(ownerOf(crowded));
+    for (let n = 0; n < maxHostStaff; n += 1) {
+      const result = await roles.grantHostStaff(
+        crowdedOwner,
+        crowded,
+        `crowd${String(next())}@example.com`,
+      );
+      expect(result).not.toBe('cap_reached');
+    }
+    const before = await auditRows();
+
+    expect(
+      await roles.grantHostStaff(
+        crowdedOwner,
+        crowded,
+        'one-too-many@example.com',
+      ),
+    ).toBe('cap_reached');
+
+    expect(await roles.readHostStaff(crowdedOwner, crowded)).toHaveLength(
+      maxHostStaff,
+    );
+    expect(await auditRows()).toEqual(before);
+    const accounts = await client.db
+      .select()
+      .from(authUsers)
+      .where(eq(authUsers.email, 'one-too-many@example.com'));
+    expect(accounts).toEqual([]);
+  });
+
+  it('refuses the owner of one host granting on another, and writes nothing', async () => {
+    const before = await auditRows();
+
+    await expect(
+      roles.grantHostStaff(owner, hostB, 'wrong-host@example.com'),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+
+    expect(await auditRows()).toEqual(before);
+    expect(await addressesOn(hostB)).not.toContain('wrong-host@example.com');
+  });
+});
+
+describe('the owner’s own access', () => {
+  const ownerGrants = (userId: string) =>
+    client.db
+      .select()
+      .from(roleGrants)
+      .where(
+        and(
+          eq(roleGrants.userId, userId),
+          eq(roleGrants.role, 'host_owner'),
+          eq(roleGrants.hostId, hostA),
+        ),
+      );
+
+  it('is not removed when the owner asks to remove themselves', async () => {
+    const self = await person();
+    await client.db
+      .insert(roleGrants)
+      .values({ userId: self.id, role: 'host_owner', hostId: hostA });
+    const asSelf = testCaller({
+      userId: self.id,
+      roles: [Role.HostOwner],
+      hostIds: [hostA],
+    });
+
+    expect(await roles.revokeHostStaff(asSelf, hostA, self.id)).toBe(
+      'not_found',
+    );
+
+    expect(await ownerGrants(self.id)).toHaveLength(1);
+  });
+
+  it('is not removed with the staff role of someone who holds both', async () => {
+    const both = await person();
+    await client.db.insert(roleGrants).values([
+      { userId: both.id, role: 'host_owner', hostId: hostA },
+      { userId: both.id, role: 'host_staff', hostId: hostA },
+    ]);
+
+    expect(await roles.revokeHostStaff(owner, hostA, both.id)).toBe('revoked');
+
+    expect(await ownerGrants(both.id)).toHaveLength(1);
+    expect(await staffRows(both.id, hostA)).toEqual([]);
   });
 });
 

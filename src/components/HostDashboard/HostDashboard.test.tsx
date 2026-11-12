@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { hostNavLinks } from '@/lib/hostStaff';
 import { HostDashboard } from './HostDashboard';
 import { busy, empty } from './HostDashboard.fixtures';
 
@@ -14,7 +15,7 @@ import { busy, empty } from './HostDashboard.fixtures';
 
 describe('HostDashboard', () => {
   it('names the host under one heading and offers sign out', () => {
-    render(<HostDashboard view={busy} canManage />);
+    render(<HostDashboard view={busy} links={hostNavLinks(true)} />);
     expect(
       screen.getByRole('heading', { level: 1, name: 'Host dashboard' }),
     ).toBeInTheDocument();
@@ -25,7 +26,7 @@ describe('HostDashboard', () => {
   });
 
   it('lists upcoming sessions with seats sold against the allocation', () => {
-    render(<HostDashboard view={busy} canManage />);
+    render(<HostDashboard view={busy} links={hostNavLinks(true)} />);
     const section = screen.getByRole('region', { name: 'Upcoming sessions' });
     const rows = within(section).getAllByRole('listitem');
     expect(rows).toHaveLength(3);
@@ -45,7 +46,7 @@ describe('HostDashboard', () => {
   });
 
   it('lists recent bookings with guest, seats, total, status, and reference', () => {
-    render(<HostDashboard view={busy} canManage />);
+    render(<HostDashboard view={busy} links={hostNavLinks(true)} />);
     const section = screen.getByRole('region', { name: 'Recent bookings' });
     const rows = within(section).getAllByRole('listitem');
     expect(rows).toHaveLength(2);
@@ -56,14 +57,14 @@ describe('HostDashboard', () => {
   });
 
   it('says so when there are no sessions or bookings', () => {
-    render(<HostDashboard view={empty} canManage />);
+    render(<HostDashboard view={empty} links={hostNavLinks(true)} />);
     expect(screen.getByText('No sessions are scheduled yet.')).toBeVisible();
     expect(screen.getByText('No bookings yet.')).toBeVisible();
     expect(screen.queryByRole('list')).not.toBeInTheDocument();
   });
 
   it('offers an owner session management and the staff page', () => {
-    render(<HostDashboard view={busy} canManage />);
+    render(<HostDashboard view={busy} links={hostNavLinks(true)} />);
     const nav = screen.getByRole('navigation', { name: 'Host pages' });
     expect(
       within(nav).getByRole('link', { name: 'Manage sessions' }),
@@ -75,7 +76,7 @@ describe('HostDashboard', () => {
   });
 
   it('offers host staff the sessions to look at and no staff page', () => {
-    render(<HostDashboard view={busy} canManage={false} />);
+    render(<HostDashboard view={busy} links={hostNavLinks(false)} />);
     expect(screen.getByRole('link', { name: 'Sessions' })).toHaveAttribute(
       'href',
       '/host/sessions',

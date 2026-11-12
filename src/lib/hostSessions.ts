@@ -137,6 +137,8 @@ type HostWeekDayView = {
 
 export type HostWeekView = {
   hostName: string;
+  /** The host's owner changes the week; read-only staff only look. */
+  canEdit: boolean;
   weekStart: string;
   /** "Mon, Nov 9 to Sun, Nov 15". */
   weekLabel: string;
@@ -189,7 +191,11 @@ function rowView(session: HostWeekSession, now: Date): HostWeekRowView {
 }
 
 /** The week's rows grouped by the day each falls on in its own zone, in the order handed over; a day with no session is left out. */
-export function buildHostWeek(data: HostWeekData, now: Date): HostWeekView {
+export function buildHostWeek(
+  data: HostWeekData,
+  now: Date,
+  canEdit: boolean,
+): HostWeekView {
   const today = localDateIn(now, data.timeZone);
   const limits = weekLimits(today, now);
   const previous = addDays(data.weekStart, -daysInWeek);
@@ -204,6 +210,7 @@ export function buildHostWeek(data: HostWeekData, now: Date): HostWeekView {
   }
   return {
     hostName: data.hostName,
+    canEdit,
     weekStart: data.weekStart,
     weekLabel: `${dateChipLabel(data.weekStart)} to ${dateChipLabel(addDays(data.weekStart, daysInWeek - 1))}`,
     timeZone: data.timeZone,

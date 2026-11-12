@@ -8,6 +8,7 @@ import { listFiles, root, src } from '../../../tests/support/importGraph';
 // someone deciding it should.
 // - `grantRoleIn` is used by the staff roles module alone
 // - `grantRoleToAddress` is used by the staff roles module, the staff invite path, and the grant command
+// - `grantHostStaff`, the owner-checked door for a host role, and `requireHostOwnerId` are used by the staff roles module and the host invite alone
 
 const sources = [src, path.join(root, 'scripts')]
   .flatMap(listFiles)
@@ -28,6 +29,15 @@ describe('who can write a grant without a caller', () => {
 
   it('lets only the staff roles module use grantRoleIn', () => {
     expect(usersOf('grantRoleIn')).toEqual(['src/server/db/staffRoles.ts']);
+  });
+
+  it('lets only the staff roles module and the host invite use grantHostStaff and requireHostOwnerId', () => {
+    const allowed = [
+      'src/server/db/staffRoles.ts',
+      'src/server/hostStaffInvite.ts',
+    ];
+    expect(usersOf('grantHostStaff')).toEqual(allowed);
+    expect(usersOf('requireHostOwnerId')).toEqual(allowed);
   });
 
   it('lets only the staff roles module, the invite path and the grant command use grantRoleToAddress', () => {

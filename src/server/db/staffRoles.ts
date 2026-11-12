@@ -1,6 +1,7 @@
 import 'server-only';
 import { and, asc, eq, inArray, isNull, type SQL } from 'drizzle-orm';
-import { hostStaffGrant, type HostStaffRow } from '@/lib/hostStaff';
+import { hostStaffGrant, maxHostStaff } from '@/lib/hostStaff';
+import { EntityIdSchema } from '@/lib/catalog';
 import { isValidGrantScope, type RoleGrant } from '@/lib/roleGrants';
 import {
   groupStaff,
@@ -15,14 +16,14 @@ import {
   staffListedEntry,
   type RoleActor,
 } from '@/lib/staffAudit';
+import { requireRole, Role, type Caller } from '@/server/auth/caller';
 import {
-  ForbiddenError,
-  requireRole,
-  Role,
-  type Caller,
-} from '@/server/auth/caller';
-import { recordAudit, requireOpsUserId, writeAudit } from './audit';
-import { db, dbRead, type Transaction } from './client';
+  recordAudit,
+  requireOpsUserId,
+  requireUserId,
+  writeAudit,
+} from './audit';
+import { db, type Transaction } from './client';
 import { authUsers, hosts, roleGrants } from './schema';
 
 // Who holds which role. The writes here are the one way a grant is made or taken back, so each
@@ -137,31 +138,30 @@ export async function revokeRole(
 /** The signed-in user of a caller who owns this host; anyone else is refused before anything is written or sent. */
 export function requireHostOwnerId(caller: Caller, hostId: string): string {
   requireRole(caller, Role.HostOwner, { hostId });
-  if (caller.userId === null) throw new ForbiddenError(Role.HostOwner);
-  return caller.userId;
+  return requireUserId(caller, Role.HostOwner);
 }
 
 /**
  * A host owner gives an address the read-only staff role on their own host, making the account if
- * there is none, with its audit row. It is the one door to `grantRoleIn` for a host role: the owner
- * is checked against the host before anything is written, and the role is always `host_staff`.
+ * there is none, with its audit row. It is the one door to the grant functions for a host role:
+ * the owner is checked against the host before anything is written, the role is always
+ * `host_staff`, and a host that already has `maxHostStaff` staff gets no more. Two invitations at
+ * once can pass the count together; the invite rate limit bounds how far past it they get.
  */
 export async function grantHostStaff(
   caller: Caller,
   hostId: string,
   email: string,
-): Promise<{ userId: string; outcome: GrantOutcome }> {
-  const actorId = requireHostOwnerId(caller, hostId);
-  return db.transaction(async (tx) => {
-    const userId = await ensureAuthUserIn(tx, email);
-    const outcome = await grantRoleIn(
-      tx,
-      { kind: 'user', userId: actorId },
-      userId,
-      hostStaffGrant(hostId),
-    );
-    return { userId, outcome };
-  });
+): Promise<{ userId: string; outcome: GrantOutcome } | 'cap_reached'> {
+  const id = EntityIdSchema.parse(hostId);
+  const actorId = requireHostOwnerId(caller, id);
+  const held = await listGrantHolders(hostStaffMatch(id));
+  if (held.length >= maxHostStaff) return 'cap_reached';
+  return grantRoleToAddress(
+    { kind: 'user', userId: actorId },
+    email,
+    hostStaffGrant(id),
+  );
 }
 
 /** A host owner takes the staff role back from one person on their own host, with its audit row. Owner access is never touched here. */
@@ -170,9 +170,11 @@ export async function revokeHostStaff(
   hostId: string,
   userId: string,
 ): Promise<'revoked' | 'not_found'> {
-  const actorId = requireHostOwnerId(caller, hostId);
+  const id = EntityIdSchema.parse(hostId);
+  const target = EntityIdSchema.parse(userId);
+  const actorId = requireHostOwnerId(caller, id);
   return db.transaction((tx) =>
-    deleteGrantIn(tx, actorId, userId, hostStaffGrant(hostId)),
+    deleteGrantIn(tx, actorId, target, hostStaffGrant(id)),
   );
 }
 
@@ -180,17 +182,10 @@ export async function revokeHostStaff(
 export async function readHostStaff(
   caller: Caller,
   hostId: string,
-): Promise<HostStaffRow[]> {
-  requireRole(caller, Role.HostOwner, { hostId });
-  return db
-    .select({ userId: authUsers.id, email: authUsers.email })
-    .from(roleGrants)
-    .innerJoin(authUsers, eq(authUsers.id, roleGrants.userId))
-    .where(
-      and(eq(roleGrants.role, 'host_staff'), eq(roleGrants.hostId, hostId)),
-    )
-    .orderBy(asc(roleGrants.createdAt), asc(roleGrants.id))
-    .limit(staffReadLimit);
+): Promise<StaffRow[]> {
+  const id = EntityIdSchema.parse(hostId);
+  requireRole(caller, Role.HostOwner, { hostId: id });
+  return groupStaff(await listGrantHolders(hostStaffMatch(id)));
 }
 
 /** The address of a person who holds the staff role on this host, or null; where the owner's resend sends a fresh link. */
@@ -199,25 +194,19 @@ export async function readHostStaffAddress(
   hostId: string,
   userId: string,
 ): Promise<string | null> {
-  requireRole(caller, Role.HostOwner, { hostId });
-  const [row] = await db
-    .select({ email: authUsers.email })
-    .from(roleGrants)
-    .innerJoin(authUsers, eq(authUsers.id, roleGrants.userId))
-    .where(
-      and(
-        eq(roleGrants.userId, userId),
-        eq(roleGrants.role, 'host_staff'),
-        eq(roleGrants.hostId, hostId),
-      ),
-    );
-  return row?.email ?? null;
+  const id = EntityIdSchema.parse(hostId);
+  const target = EntityIdSchema.parse(userId);
+  requireRole(caller, Role.HostOwner, { hostId: id });
+  const holder = await findRoleHolder(target, hostStaffGrant(id));
+  return holder?.email ?? null;
 }
 
-/** Everyone who holds ops or admin, one row each, oldest grant first. Audited before it returns. */
-export async function readStaffForOps(caller: Caller): Promise<StaffRow[]> {
-  const actorId = requireOpsUserId(caller);
-  const grants = await dbRead
+const hostStaffMatch = (hostId: string) =>
+  and(eq(roleGrants.role, 'host_staff'), hostMatches(hostStaffGrant(hostId)));
+
+/** One row per grant that `where` picks, oldest first, cut at the staff read limit. */
+async function listGrantHolders(where: SQL | undefined) {
+  return db
     .select({
       userId: authUsers.id,
       email: authUsers.email,
@@ -225,9 +214,33 @@ export async function readStaffForOps(caller: Caller): Promise<StaffRow[]> {
     })
     .from(roleGrants)
     .innerJoin(authUsers, eq(authUsers.id, roleGrants.userId))
-    .where(inArray(roleGrants.role, ['ops', 'admin']))
+    .where(where)
     .orderBy(asc(roleGrants.createdAt), asc(roleGrants.id))
     .limit(staffReadLimit);
+}
+
+async function findRoleHolder(userId: string, grant: RoleGrant) {
+  const [row] = await db
+    .select({ email: authUsers.email, hostName: hosts.name })
+    .from(roleGrants)
+    .innerJoin(authUsers, eq(authUsers.id, roleGrants.userId))
+    .leftJoin(hosts, eq(hosts.id, roleGrants.hostId))
+    .where(
+      and(
+        eq(roleGrants.userId, userId),
+        eq(roleGrants.role, grant.role),
+        hostMatches(grant),
+      ),
+    );
+  return row ?? null;
+}
+
+/** Everyone who holds ops or admin, one row each, oldest grant first. Audited before it returns. */
+export async function readStaffForOps(caller: Caller): Promise<StaffRow[]> {
+  const actorId = requireOpsUserId(caller);
+  const grants = await listGrantHolders(
+    inArray(roleGrants.role, ['ops', 'admin']),
+  );
   await recordAudit(staffListedEntry(actorId));
   return groupStaff(grants);
 }
@@ -242,17 +255,5 @@ export async function readRoleHolder(
   grant: RoleGrant,
 ): Promise<{ email: string; hostName: string | null } | null> {
   requireRole(caller, Role.Ops, {});
-  const [row] = await db
-    .select({ email: authUsers.email, hostName: hosts.name })
-    .from(roleGrants)
-    .innerJoin(authUsers, eq(authUsers.id, roleGrants.userId))
-    .leftJoin(hosts, eq(hosts.id, roleGrants.hostId))
-    .where(
-      and(
-        eq(roleGrants.userId, userId),
-        eq(roleGrants.role, grant.role),
-        hostMatches(grant),
-      ),
-    );
-  return row ?? null;
+  return findRoleHolder(userId, grant);
 }

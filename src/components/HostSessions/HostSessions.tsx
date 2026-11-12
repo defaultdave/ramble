@@ -15,9 +15,11 @@ export const hostSessionsTitle = 'Sessions';
 function SessionRow({
   row,
   actions,
+  canEdit,
 }: {
   row: HostWeekRowView;
-  actions: HostSessionActions | null;
+  actions: HostSessionActions;
+  canEdit: boolean;
 }) {
   return (
     <li className={styles.row}>
@@ -29,7 +31,7 @@ function SessionRow({
         {row.soldLabel}
         {row.priceLabel ? ` · ${row.priceLabel}` : ''}
       </p>
-      {row.editable && actions ? (
+      {row.editable && canEdit ? (
         <EditSessionForms row={row} actions={actions} />
       ) : null}
     </li>
@@ -38,14 +40,14 @@ function SessionRow({
 
 /**
  * The host's week: sessions by day with what may change on each, publishing the week from the weekly
- * slots, and one-off dates. With no `actions` (read-only staff) it shows the days and nothing to change.
+ * slots, and one-off dates. For read-only staff (`view.canEdit` false) it shows the days and nothing to change.
  */
 export function HostSessions({
   view,
   actions,
 }: {
   view: HostWeekView;
-  actions: HostSessionActions | null;
+  actions: HostSessionActions;
 }) {
   return (
     <>
@@ -73,7 +75,7 @@ export function HostSessions({
           ) : null}
         </nav>
         <p className={styles.secondary}>Times are in {view.timeZone}.</p>
-        {actions ? (
+        {view.canEdit ? (
           <section>
             <h2 className={styles.heading}>Publish this week</h2>
             <p className={styles.secondary}>
@@ -97,14 +99,19 @@ export function HostSessions({
                 <h3 className={styles.day}>{day.label}</h3>
                 <ul className={styles.list}>
                   {day.sessions.map((row) => (
-                    <SessionRow key={row.id} row={row} actions={actions} />
+                    <SessionRow
+                      key={row.id}
+                      row={row}
+                      actions={actions}
+                      canEdit={view.canEdit}
+                    />
                   ))}
                 </ul>
               </div>
             ))
           )}
         </section>
-        {actions ? (
+        {view.canEdit ? (
           <section>
             <h2 className={styles.heading}>Add a one-off session</h2>
             {view.experiences.length === 0 ? (

@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import type { z } from 'zod';
 import { errorKind } from '@/lib/errorKind';
-import { hostAccessFor } from '@/lib/hostAccess';
+import { hostAccessFor, ownedHostId } from '@/lib/hostAccess';
 import {
   hostSessionFormValues,
   hostSessionInvalid,
@@ -174,10 +174,11 @@ export async function publishWeekAction(
   try {
     const caller = await getCaller();
     const access = hostAccessFor(caller);
-    if (access.kind !== 'owner') return hostSessionProblem('session_not_found');
+    const hostId = ownedHostId(access);
+    if (hostId === null) return hostSessionProblem('session_not_found');
     const result = await publishWeek(
       caller,
-      access.hostId,
+      hostId,
       week.data,
       systemClock.now(),
     );

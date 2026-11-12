@@ -1,16 +1,18 @@
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { ActionNotice } from '@/components/ActionNotice';
-import { HostStaff } from '@/components/HostStaff';
 import { PageHeading } from '@/components/PageHeading';
-import { hostStaffPath } from '@/lib/hostStaff';
+import { StaffView } from '@/components/StaffAdmin';
+import {
+  hostStaffEmptyBody,
+  hostStaffInviteHint,
+  hostStaffNoticeCodes,
+  hostStaffNotices,
+  hostStaffPath,
+} from '@/lib/hostStaff';
 import { noticeText, parseNotice } from '@/lib/opsForm';
 import { signInHref } from '@/lib/signIn';
-import {
-  parseStaffInviteProblems,
-  staffNoticeCodes,
-  staffNotices,
-} from '@/lib/staffAdmin';
+import { parseStaffInviteProblems } from '@/lib/staffAdmin';
 import {
   inviteHostStaffAction,
   resendHostStaffLinkAction,
@@ -32,13 +34,17 @@ export default async function HostStaffPage({
     <PageHeading title="Staff">
       <ActionNotice
         notice={noticeText(
-          staffNotices,
-          parseNotice(query.notice, staffNoticeCodes),
+          hostStaffNotices,
+          parseNotice(query.notice, hostStaffNoticeCodes),
         )}
       />
-      <HostStaff
+      <StaffView
         rows={result.rows}
         query={query}
+        path={hostStaffPath}
+        managedRole="host_staff"
+        inviteHint={hostStaffInviteHint}
+        emptyBody={hostStaffEmptyBody}
         problems={parseStaffInviteProblems(query.fields)}
         actions={{
           invite: inviteHostStaffAction,

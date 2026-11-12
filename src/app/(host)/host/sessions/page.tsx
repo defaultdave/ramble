@@ -39,10 +39,5 @@ export default async function HostSessionsPage({
   );
   if (result.status === 'signed_out') redirect(signInHref(hostSessionsPath));
   if (result.status === 'refused') notFound();
-  return (
-    <HostSessions
-      view={result.view}
-      actions={result.canEdit ? actions : null}
-    />
-  );
+  return <HostSessions view={result.view} actions={actions} />;
 }

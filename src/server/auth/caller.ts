@@ -96,9 +96,16 @@ export function requireRole(
   role: Role,
   resource: Resource,
 ): void {
-  if (!caller.roles.includes(role) || !ownsResource(caller, role, resource)) {
-    throw new ForbiddenError(role);
-  }
+  if (!holdsRole(caller, role, resource)) throw new ForbiddenError(role);
+}
+
+/** `requireRole` as an answer: whether the caller holds `role` and owns the resource. */
+export function holdsRole(
+  caller: Caller,
+  role: Role,
+  resource: Resource,
+): boolean {
+  return caller.roles.includes(role) && ownsResource(caller, role, resource);
 }
 
 /** The roles that may read a host's dashboard, sessions and guest lists; only the owner changes them. */
@@ -115,7 +122,7 @@ export function requireAnyRole(
   resource: Resource,
 ): void {
   const held = roles.filter((role) => caller.roles.includes(role));
-  if (held.some((role) => ownsResource(caller, role, resource))) return;
+  if (roles.some((role) => holdsRole(caller, role, resource))) return;
   requireRole(caller, held[0] ?? roles[0], resource);
 }
 

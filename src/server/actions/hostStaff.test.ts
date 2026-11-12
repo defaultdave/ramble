@@ -122,7 +122,9 @@ describe('inviteHostStaffAction', () => {
     ['sent', 'invited'],
     ['rate_limited', 'granted_rate_limited'],
     ['failed', 'granted_invite_failed'],
-  ])('a link that is %s says %s', async (result, notice) => {
+    ['cap_reached', 'staff_cap'],
+    ['too_many_invites', 'invites_limited'],
+  ])('a result of %s says %s', async (result, notice) => {
     mocks.inviteHostStaff.mockResolvedValue(result);
 
     const href = await redirectOf(() =>

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { pairEveryHostRole } from '@/lib/roleGrants';
 import {
   ForbiddenError,
   Role,
@@ -18,6 +19,7 @@ const caller = (held: Caller['roles'], hostIds: string[] = []): Caller => ({
   userId: null,
   roles: held,
   hostIds,
+  hostGrants: pairEveryHostRole(held, hostIds),
 });
 
 describe('requireAnyRole', () => {

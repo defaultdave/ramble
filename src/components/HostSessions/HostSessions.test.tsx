@@ -14,7 +14,7 @@ import { emptyWeek, week } from './HostSessions.fixtures';
 //   a cancelled one offers nothing
 // - a form posts its hidden ids and version with what was typed, and the answer is shown in words
 // - a refused field is marked with its message; a refusal and a failure each show a notice
-// - with no actions (read-only staff) the week is shown with no form, button, publish or one-off section
+// - for read-only staff (canEdit false) the week is shown with no form, button, publish or one-off section
 // - publishing posts the week it was drawn for; the one-off form is there only when the host has experiences
 
 const reply =
@@ -68,7 +68,9 @@ describe('HostSessions', () => {
   });
 
   it('shows read-only staff the week with nothing to change', () => {
-    render(<HostSessions view={week} actions={null} />);
+    render(
+      <HostSessions view={{ ...week, canEdit: false }} actions={actions} />,
+    );
     const row = rowFor('Sunset kayak', '4:00 PM EST');
     expect(row).toBeVisible();
     expect(within(row).queryByRole('button')).not.toBeInTheDocument();

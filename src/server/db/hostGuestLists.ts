@@ -13,8 +13,10 @@ import {
 } from '@/lib/hostGuestLists';
 import { containsPattern } from '@/lib/pages/help';
 import {
+  holdsRole,
   hostReaderRoles,
   requireAnyRole,
+  Role,
   type Caller,
 } from '@/server/auth/caller';
 import { db } from './client';
@@ -22,7 +24,8 @@ import { experiences, hosts, orderItems, orders, sessions } from './schema';
 
 // Guest personal data (names, emails, phones, children's ages, guardians) leaves here only for the
 // host that owns the booking (PRD-73). The caller is checked against `hostId` before anything is
-// read, and every query is cut to that host.
+// read, and every query is cut to that host. Read-only host staff get the booking facts and the
+// booker's contact details, never the children's ages or the guardian: those are the host owner's.
 
 const seatsOf = sql<number>`coalesce((
   select sum(${orderItems.quantity})::int from ${orderItems}
@@ -81,7 +84,8 @@ export async function readHostBookings(
 /**
  * The guest list of one session of the host: its confirmed bookings, by lead guest's name. Null
  * when the session is missing or belongs to another host, so the two read alike. A cancelled
- * booking is not a guest on the day and is left out. Refused to everyone but the host's owner and staff.
+ * booking is not a guest on the day and is left out. Refused to everyone but the host's owner and
+ * staff; staff read it without the children's ages and the guardian, which come back null.
  */
 export async function readHostGuestList(
   caller: Caller,
@@ -91,6 +95,7 @@ export async function readHostGuestList(
   const id = EntityIdSchema.parse(hostId);
   const sid = EntityIdSchema.parse(sessionId);
   requireAnyRole(caller, hostReaderRoles, { hostId: id });
+  const seesMinors = holdsRole(caller, Role.HostOwner, { hostId: id });
 
   const [session] = await db
     .select({
@@ -114,9 +119,9 @@ export async function readHostGuestList(
       leadGuestName: orders.leadGuestName,
       seats: seatsOf,
       ageConfirmed: orders.ageConfirmed,
-      childrenAges: orders.childrenAges,
-      guardianName: orders.guardianName,
-      guardianContact: orders.guardianContact,
+      childrenAges: seesMinors ? orders.childrenAges : sql<null>`null`,
+      guardianName: seesMinors ? orders.guardianName : sql<null>`null`,
+      guardianContact: seesMinors ? orders.guardianContact : sql<null>`null`,
       waiverAccepted: sql<boolean>`${orders.waiverDocumentId} is not null`,
       contactEmail: orders.contactEmail,
       contactPhone: orders.contactPhone,

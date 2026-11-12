@@ -22,6 +22,11 @@ export function readableHostId(access: HostAccess): string | null {
     : null;
 }
 
+/** The host a caller owns, which only an owner may manage (sessions, staff); null for staff and everyone else. */
+export function ownedHostId(access: HostAccess): string | null {
+  return access.kind === 'owner' ? access.hostId : null;
+}
+
 /**
  * Which host a request to the host area acts for. The host comes from the caller's own grants and
  * never from the address, so no URL can name another host's data. An owner of several hosts gets
@@ -58,6 +63,6 @@ export function hostDashboardResult(
   return {
     status: 'ok',
     view: buildHostDashboard(data),
-    canManage: access.kind === 'owner',
+    canManage: ownedHostId(access) !== null,
   };
 }

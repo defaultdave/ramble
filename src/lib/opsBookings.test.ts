@@ -372,16 +372,22 @@ describe('parseExpectedRefundForm', () => {
     });
   });
 
-  it.each([undefined, '', '-1', '1.5', '1e3', '12345678901', 'abc'])(
-    'refuses a refund of %j',
-    (shown) => {
-      expect(
-        parseExpectedRefundForm(
-          get(shown === undefined ? {} : { expectedRefundMinor: shown }),
-        ),
-      ).toEqual({ ok: false });
-    },
-  );
+  it.each([
+    undefined,
+    '',
+    '-1',
+    '1.5',
+    '1e3',
+    '12345678901',
+    '9999999999',
+    'abc',
+  ])('refuses a refund of %j', (shown) => {
+    expect(
+      parseExpectedRefundForm(
+        get(shown === undefined ? {} : { expectedRefundMinor: shown }),
+      ),
+    ).toEqual({ ok: false });
+  });
 });
 
 describe('notices', () => {

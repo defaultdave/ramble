@@ -40,35 +40,52 @@ export const opsFullRefundRequest = (orderId: string, userId: string) =>
 export type RetryPlan =
   { kind: 'retry'; request: RefundRequestInput } | { kind: 'stop' };
 
+type FailedRefund = { id: string; reason: string; ticketMinor: number };
+
+/** The retry of one failed refund: that refund's own ticket part, under a key named for it, keeping its reason (a guest's cancellation still emails the guest). */
+function retryRequest(
+  orderId: string,
+  userId: string,
+  failed: FailedRefund,
+): RefundRequestInput {
+  return opsRefundRequest({
+    orderId,
+    userId,
+    reason:
+      orderRefundReasons.find((known) => known === failed.reason) ??
+      opsRefundReason,
+    key: `retry:${failed.id}`,
+    ticketMinor: failed.ticketMinor,
+  });
+}
+
 /**
- * What retrying a failed refund asks for, from the order as it stands under its lock: that refund's
- * own ticket part, under a key named for it. The refund keeps its reason (a guest's cancellation
- * still emails the guest). An order with no failed refund, one not flagged, or one that is not a
- * booking is left alone.
+ * Which failed refund of the order to ask for again, from the rows read under its lock, newest
+ * first. A failed refund is passed over when it has no ticket part to ask for or when its retry
+ * already exists (`standingIds` holds the order's refund ids, and `refundIdOf` names the refund a
+ * request would write), so an older failure is never stuck behind a newer one. An order that is not
+ * a flagged booking, or has no failed refund left to retry, is left alone.
  */
-export function retryPlan(input: {
+export function pickRetry(input: {
   orderId: string;
   userId: string;
   order: { kind: OrderKind; refundFailed: boolean } | null;
-  failed: { id: string; reason: string; ticketMinor: number } | null;
+  failed: readonly FailedRefund[];
+  standingIds: ReadonlySet<string>;
+  refundIdOf: (request: RefundRequestInput) => string;
 }): RetryPlan {
-  const { order, failed } = input;
+  const { order } = input;
   if (order === null || order.kind !== 'booking' || !order.refundFailed) {
     return { kind: 'stop' };
   }
-  if (failed === null || failed.ticketMinor < 1) return { kind: 'stop' };
-  return {
-    kind: 'retry',
-    request: opsRefundRequest({
-      orderId: input.orderId,
-      userId: input.userId,
-      reason:
-        orderRefundReasons.find((known) => known === failed.reason) ??
-        opsRefundReason,
-      key: `retry:${failed.id}`,
-      ticketMinor: failed.ticketMinor,
-    }),
-  };
+  for (const failed of input.failed) {
+    if (failed.ticketMinor < 1) continue;
+    const request = retryRequest(input.orderId, input.userId, failed);
+    if (!input.standingIds.has(input.refundIdOf(request))) {
+      return { kind: 'retry', request };
+    }
+  }
+  return { kind: 'stop' };
 }
 
 /** An ops refund was requested or retried: the new refund's id names it. */

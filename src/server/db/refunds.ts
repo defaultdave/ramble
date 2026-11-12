@@ -48,6 +48,13 @@ import { readDatabaseTime } from './time';
 
 type RefundRow = typeof refunds.$inferSelect;
 
+/** The id of the refund a request names: the same order, reason, and key are always the same refund. */
+export function refundIdFor(input: RefundRequestInput): string {
+  return refundIdFromDigest(
+    sha256Hex(refundRequestIdentity(RefundRequestSchema.parse(input))),
+  );
+}
+
 export type RequestedRefund = {
   refundId: string;
   ticketMinor: number;
@@ -99,9 +106,7 @@ export async function requestRefund(
   input: RefundRequestInput,
 ): Promise<RequestRefundResult> {
   const request = RefundRequestSchema.parse(input);
-  const refundId = refundIdFromDigest(
-    sha256Hex(refundRequestIdentity(request)),
-  );
+  const refundId = refundIdFor(request);
 
   const locked = await lockOrderById(tx, request.orderId);
   const [existing] = locked

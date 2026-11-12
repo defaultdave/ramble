@@ -63,6 +63,7 @@ setupRefundsDatabase(raise);
 // - a confirmed booking, and one whose refund failed, are refused with nothing written
 // retry
 // - a booking whose refund failed gets one new refund of that refund's own amount, the flag cleared, and one audit row in one transaction; a second try finds nothing to retry; a retry after the retry failed too asks again
+// - a refund's id is the same from the request that wrote it and from the lookup the retry skips by
 // - an older failed refund is retried once the newer one has its retry; two parallel retries ask once and refuse once
 // - a failed partial refund of a confirmed booking retries for only its amount; a second retry of the same failed refund is a no-op; a retry that would take the refunds past what the card paid is refused and writes nothing
 // - a retry the refund path refuses leaves the flag set and writes nothing; one whose audit row cannot be written leaves the flag set and no new refund
@@ -480,6 +481,24 @@ describe('retrying a failed refund', () => {
       3_000, 4_000,
     ]);
     expect((await orderOf(world)).refundFailed).toBe(false);
+  });
+
+  it('names a refund by the same id whether it is requested or looked up for a retry', async () => {
+    const { refundIdFor } = await import('@/server/db/refunds');
+    const world = await seedCancellable({ gatewayPayment: true });
+    const request = {
+      orderId: world.orderId,
+      reason: 'goodwill',
+      key: 'named',
+      ticketMinor: 2_000,
+    } as const;
+    const asked = await ask(world, request);
+    if (asked.status !== 'requested') throw new Error('not requested');
+
+    expect(refundIdFor(request)).toBe(asked.refund.refundId);
+    expect((await refundsOf(world)).map((refund) => refund.id)).toContain(
+      refundIdFor(request),
+    );
   });
 
   it('lets one of two parallel retries ask and refuses the other', async () => {

@@ -6,8 +6,8 @@ import {
   parseCancelInput,
   type CancelBookingInput,
   type CancelBookingResult,
+  guestCancelActor,
 } from '@/lib/cancelBooking';
-import { guestCancelActor } from '@/lib/cancelBooking';
 import { cancelResultPath } from '@/lib/manageBooking';
 import {
   moveInputFromForm,

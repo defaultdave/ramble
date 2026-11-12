@@ -18,7 +18,6 @@ import {
   impactOrders,
   impactView,
   openHeldSeatsBySession,
-  opsSessionsPageSize,
   sessionImpact,
   sessionListDirection,
   type Impact,
@@ -31,6 +30,7 @@ import {
 } from '@/lib/opsSessions';
 import { containsPattern } from '@/lib/pages/help';
 import { splitPage } from '@/lib/pagination';
+import { opsListPageSize } from '@/lib/tableQuery';
 import { attemptReadLimit } from '@/lib/refunds';
 import { sessionsListEntry, sessionViewedEntry } from '@/lib/sessionAudit';
 import type { Caller } from '@/server/auth/caller';
@@ -171,8 +171,8 @@ export async function readOpsSessions(
       ),
     )
     .orderBy(...byColumnThenId(sessions, sessions.startsAt, direction))
-    .limit(opsSessionsPageSize + 1);
-  const { items, nextCursor } = splitPage(fetched, opsSessionsPageSize);
+    .limit(opsListPageSize + 1);
+  const { items, nextCursor } = splitPage(fetched, opsListPageSize);
   const held = openHeldSeatsBySession(
     await readReleasableHolds(
       dbRead,

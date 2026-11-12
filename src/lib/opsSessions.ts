@@ -31,7 +31,6 @@ import { zonedDeadlineLabel } from './zonedLabels';
 // `cancelSession.ts`; this file decides what the preview says and when the form is refused.
 
 export const opsSessionsPath = '/ops/sessions';
-export const opsSessionsPageSize = 25;
 
 /** The list cursor an address carries, lower-cased; none, or one that is no id (a hand-edited address), starts again from the first page. */
 export function cursorFrom(raw: string | null | undefined): string | null {

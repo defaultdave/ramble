@@ -38,7 +38,7 @@ const page = `/ops/sessions/${sessionId}`;
 const ops = { userId: 'u', roles: ['ops'], hostIds: [] };
 const fields = {
   reason: 'weather',
-  fingerprint: '1:10800:0:2:0',
+  fingerprint: '1:10800:0:2:1:0',
   confirm: 'on',
 };
 
@@ -124,7 +124,7 @@ describe('cancelOpsSessionAction', () => {
     expect(mocks.cancelSessionAsOps).toHaveBeenCalledWith(ops, {
       sessionId,
       reason: 'weather',
-      fingerprint: '1:10800:0:2:0',
+      fingerprint: '1:10800:0:2:1:0',
     });
   });
 });

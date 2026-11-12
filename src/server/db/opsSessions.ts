@@ -141,8 +141,9 @@ export async function readOpsSessions(
   options: { when: SessionWhen | null; term: string; cursor: string | null },
 ): Promise<OpsSessionsPage> {
   const userId = requireOpsUserId(caller);
-  const cursor =
-    options.cursor === null ? null : WriteIdSchema.parse(options.cursor);
+  // A cursor that is no id (a hand-edited address) starts again from the first page.
+  const parsedCursor = WriteIdSchema.safeParse(options.cursor);
+  const cursor = parsedCursor.success ? parsedCursor.data : null;
   const at = await currentDatabaseTime();
   const direction = sessionListDirection(options.when);
   const pattern = containsPattern(options.term);

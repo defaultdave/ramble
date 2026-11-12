@@ -41,7 +41,7 @@ export function opsSessionRows() {
         (await import('@/server/db/opsSessions')).cancelSessionAsOps(c, {
           sessionId,
           reason: 'ramble',
-          fingerprint: '9:9:9:9:9',
+          fingerprint: '9:9:9:9:9:9',
         }),
       allows: sessionOps,
     },

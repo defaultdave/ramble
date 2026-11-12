@@ -51,7 +51,7 @@ setupRefundsDatabase(raise);
 const opsUser = '5b3d7ad4-6f3c-4c2f-9d58-3a0a2f0e8a10';
 const ops = testCaller({ userId: opsUser, roles: [Role.Ops] });
 const day = 86_400_000;
-const wrong = '9:9:9:9:9';
+const wrong = '9:9:9:9:9:9';
 
 const refused: [string, () => Caller][] = [
   ['a guest', () => testCaller({ userId: randomUUID() })],
@@ -232,7 +232,7 @@ describe('readOpsSessions', () => {
     expect(await ids({ when: null, term: '100%', cursor: null })).toEqual([]);
   });
 
-  it('pages by cursor so each session shows once, and refuses a cursor that is no id', async () => {
+  it('pages by cursor so each session shows once, and starts again from the first page for a cursor that is no id', async () => {
     for (let n = 0; n < opsSessionsPageSize + 3; n += 1) {
       await newSession({ startsAt: new Date(Date.now() + (100 + n) * day) });
     }
@@ -247,9 +247,13 @@ describe('readOpsSessions', () => {
     const seen = new Set(first.rows.map((row) => row.id));
     expect(second.rows.length).toBeGreaterThan(0);
     expect(second.rows.some((row) => seen.has(row.id))).toBe(false);
-    await expect(
-      data.readOpsSessions(ops, { ...options, cursor: 'not-an-id' }),
-    ).rejects.toThrow();
+    const again = await data.readOpsSessions(ops, {
+      ...options,
+      cursor: 'not-an-id',
+    });
+    expect(again.rows.map((row) => row.id)).toEqual(
+      first.rows.map((row) => row.id),
+    );
   });
 });
 

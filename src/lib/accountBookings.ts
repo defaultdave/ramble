@@ -1,12 +1,7 @@
 import { z } from 'zod';
-import { EntityIdSchema } from './catalog';
-import {
-  bookingStatusLabels,
-  hostDashboardBookingStatuses,
-  whenLabel,
-} from './hostDashboard';
+import { bookingStatusLabels, whenLabel } from './hostDashboard';
+import { BookingListRowSchema } from './hostGuestLists';
 import { managePath } from './routes';
-import { TimeZoneSchema } from './sessions';
 
 // A signed-in guest's own bookings (PRD-37): the confirmed and the since-cancelled, split into
 // what is still ahead and what is behind them. Each links to the manage page, which is where a
@@ -15,13 +10,7 @@ import { TimeZoneSchema } from './sessions';
 /** The most bookings the page reads; a guest has a handful, and a larger result is cut, latest first. */
 export const accountBookingLimit = 100;
 
-export const AccountBookingRowSchema = z.object({
-  id: EntityIdSchema,
-  reference: z.string().min(1),
-  experienceName: z.string().min(1),
-  startsAt: z.date(),
-  timeZone: TimeZoneSchema,
-  status: z.enum(hostDashboardBookingStatuses),
+export const AccountBookingRowSchema = BookingListRowSchema.extend({
   manageTokenVersion: z.int().min(1),
 });
 export type AccountBookingData = z.infer<typeof AccountBookingRowSchema>;
@@ -54,14 +43,14 @@ function bookingView(row: AccountBookingRow): AccountBookingView {
     id: row.id,
     reference: row.reference,
     experienceName: row.experienceName,
-    whenLabel: whenLabel(row.startsAt, row.timeZone),
+    whenLabel: whenLabel(row.sessionStartsAt, row.timeZone),
     statusLabel: bookingStatusLabels[row.status],
     manageHref: managePath(row.manageToken),
   };
 }
 
 const byStart = (a: AccountBookingRow, b: AccountBookingRow) =>
-  a.startsAt.getTime() - b.startsAt.getTime();
+  a.sessionStartsAt.getTime() - b.sessionStartsAt.getTime();
 
 /**
  * Upcoming is a confirmed booking whose session has not started, soonest first; everything else,
@@ -72,7 +61,8 @@ export function buildAccountBookings(
   now: Date,
 ): AccountBookingsView {
   const isUpcoming = (row: AccountBookingRow) =>
-    row.status === 'confirmed' && row.startsAt.getTime() >= now.getTime();
+    row.status === 'confirmed' &&
+    row.sessionStartsAt.getTime() >= now.getTime();
   return {
     upcoming: rows.filter(isUpcoming).sort(byStart).map(bookingView),
     past: rows

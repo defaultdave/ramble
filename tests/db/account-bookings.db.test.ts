@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { accountBookingLimit } from '@/lib/accountBookings';
 import { anonymousCaller, ForbiddenError } from '@/server/auth/caller';
 import { testCaller } from '@/server/auth/test-caller';
 import { guests } from '@/server/db/schema';
 import { insertSession } from './holdFixtures';
 import {
   client,
+  giftPurchaseRow,
   insert,
   later,
   newOrder,
@@ -19,7 +21,9 @@ import {
 // - an email the sign-in has not verified reads nothing, though bookings exist at the address
 // - an address no guest booked with reads an empty list
 // - an order still being paid for and a void one are not listed
-// - nobody signed in, and a caller with no guest role, are refused before the database is asked
+// - a gift purchase is not listed; a sign-in and a guest whose addresses differ only in case meet
+// - the list stops at the limit and keeps the latest sessions
+// - nobody signed in, and a verified person with bookings but no guest role, are refused before the database is asked
 
 let reads: typeof import('@/server/db/accountBookings');
 const now = new Date('2026-11-10T12:00:00Z');
@@ -134,12 +138,62 @@ describe('readAccountBookings', () => {
     expect(rows.map((row) => row.id)).toEqual([kept]);
   });
 
-  it.each([
-    ['nobody signed in', () => anonymousCaller],
-    ['a caller with no role', () => testCaller({ roles: [] })],
-  ])('refuses %s before reading', async (_name, caller) => {
-    await expect(reads.readAccountBookings(caller())).rejects.toBeInstanceOf(
-      ForbiddenError,
+  it('leaves out a gift purchase', async () => {
+    const guestId = await guestAt('gifter@example.com');
+    const caller = await signedIn('gifter@example.com');
+    const kept = await booking(guestId, 15);
+    await insert(
+      'orders',
+      giftPurchaseRow({
+        guest_id: guestId,
+        status: 'confirmed',
+        confirmed_at: later,
+      }),
     );
+
+    const rows = await reads.readAccountBookings(caller);
+
+    expect(rows.map((row) => row.id)).toEqual([kept]);
+  });
+
+  it('meets a sign-in and a guest whose addresses differ only in case', async () => {
+    const guestId = await guestAt('case@example.com');
+    const caller = await signedIn('Case@Example.com');
+    const mine = await booking(guestId, 16);
+
+    const rows = await reads.readAccountBookings(caller);
+
+    expect(rows.map((row) => row.id)).toEqual([mine]);
+  });
+
+  it('stops at the limit and keeps the latest sessions', async () => {
+    const guestId = await guestAt('many@example.com');
+    const caller = await signedIn('many@example.com');
+    const ids: string[] = [];
+    for (let hours = 1; hours <= accountBookingLimit + 1; hours += 1) {
+      ids.push(await booking(guestId, hours));
+    }
+
+    const rows = await reads.readAccountBookings(caller);
+
+    expect(rows).toHaveLength(accountBookingLimit);
+    expect(rows[0]?.id).toBe(ids.at(-1));
+    expect(rows.map((row) => row.id)).not.toContain(ids[0]);
+  });
+
+  it('refuses nobody signed in before reading', async () => {
+    await expect(
+      reads.readAccountBookings(anonymousCaller),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it('refuses a verified person with bookings who holds no guest role', async () => {
+    const guestId = await guestAt('roleless@example.com');
+    const caller = await signedIn('roleless@example.com');
+    await booking(guestId, 17);
+
+    await expect(
+      reads.readAccountBookings({ ...caller, roles: [] }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
   });
 });

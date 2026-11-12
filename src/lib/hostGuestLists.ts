@@ -30,16 +30,20 @@ export function parseSessionId(raw: string): string | null {
   return parsed.success ? parsed.data.toLowerCase() : null;
 }
 
-export const HostBookingListRowSchema = z.object({
+/** What every list of bookings reads of one: the order, its experience and session, and its status. */
+export const BookingListRowSchema = z.object({
   id: EntityIdSchema,
   reference: z.string().min(1),
-  leadGuestName: z.string().min(1),
   experienceName: z.string().min(1),
-  sessionId: EntityIdSchema,
   sessionStartsAt: z.date(),
   timeZone: TimeZoneSchema,
-  seats: z.int().min(0),
   status: z.enum(hostDashboardBookingStatuses),
+});
+
+export const HostBookingListRowSchema = BookingListRowSchema.extend({
+  leadGuestName: z.string().min(1),
+  sessionId: EntityIdSchema,
+  seats: z.int().min(0),
 });
 export type HostBookingListRow = z.infer<typeof HostBookingListRowSchema>;
 

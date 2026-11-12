@@ -1,14 +1,13 @@
 import 'server-only';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import {
   AccountBookingRowSchema,
   accountBookingLimit,
   type AccountBookingData,
 } from '@/lib/accountBookings';
-import { hostDashboardBookingStatuses } from '@/lib/hostDashboard';
 import { Role, requireRole, type Caller } from '@/server/auth/caller';
-import { db } from './client';
-import { authUsers, experiences, guests, orders, sessions } from './schema';
+import { liveBookings, selectBookings } from './bookingRows';
+import { authUsers, guests, orders, sessions } from './schema';
 
 /**
  * The bookings of the guest who holds the caller's verified email, latest session first. A guest
@@ -22,27 +21,17 @@ export async function readAccountBookings(
   const userId = caller.userId ?? '';
   requireRole(caller, Role.Guest, { ownerId: userId });
 
-  const rows = await db
-    .select({
-      id: orders.id,
-      reference: orders.reference,
-      experienceName: experiences.name,
-      startsAt: sessions.startsAt,
-      timeZone: sessions.timeZone,
-      status: orders.status,
-      manageTokenVersion: orders.manageTokenVersion,
-    })
-    .from(authUsers)
-    .innerJoin(guests, eq(guests.email, authUsers.email))
-    .innerJoin(orders, eq(orders.guestId, guests.id))
-    .innerJoin(sessions, eq(sessions.id, orders.sessionId))
-    .innerJoin(experiences, eq(experiences.id, orders.experienceId))
+  const rows = await selectBookings({
+    manageTokenVersion: orders.manageTokenVersion,
+  })
+    .innerJoin(guests, eq(guests.id, orders.guestId))
+    // A guest's address is stored lower-case (`normalizeEmailAddress`); the sign-in's need not be.
+    .innerJoin(authUsers, eq(sql`lower(${authUsers.email})`, guests.email))
     .where(
       and(
         eq(authUsers.id, userId),
         eq(authUsers.emailVerified, true),
-        eq(orders.kind, 'booking'),
-        inArray(orders.status, [...hostDashboardBookingStatuses]),
+        liveBookings,
       ),
     )
     .orderBy(desc(sessions.startsAt), desc(orders.id))

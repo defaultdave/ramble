@@ -32,7 +32,7 @@ function BookingGroup({
 }) {
   if (bookings.length === 0) return null;
   return (
-    <section aria-labelledby={`${heading}-heading`} className={styles.group}>
+    <section aria-labelledby={`${heading}-heading`}>
       <h2 id={`${heading}-heading`} className={styles.heading}>
         {heading}
       </h2>

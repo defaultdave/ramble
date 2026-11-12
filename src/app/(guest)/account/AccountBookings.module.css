@@ -1,4 +1,4 @@
-/* The same list as the host's bookings page; only the group headings are new. */
+/* The same list as the host's bookings page, under the host dashboard's section heading. */
 .body {
   composes: body from '../../../components/HostGuestLists/HostGuestLists.module.css';
 }
@@ -27,15 +27,6 @@
   composes: visuallyHidden from '../../../styles/visually-hidden.module.css';
 }
 
-.group {
-  display: grid;
-  gap: var(--space-2);
-}
-
 .heading {
-  margin: 0;
-  font-family: var(--font-family-display);
-  font-size: var(--font-size-heading-m);
-  line-height: var(--font-line-height-heading-m);
-  font-weight: var(--font-weight-semibold);
+  composes: heading from '../../../components/HostDashboard/HostDashboard.module.css';
 }

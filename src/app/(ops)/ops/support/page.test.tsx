@@ -38,7 +38,10 @@ describe('the support page', () => {
     'shows %s the access-denied view and reads nothing',
     async (_who, caller) => {
       mocks.readOpsCaller.mockResolvedValue(caller);
-      const page = await SupportPage({ searchParams: Promise.resolve({}) });
+      const page = await SupportPage({
+        params: Promise.resolve({}),
+        searchParams: Promise.resolve({}),
+      });
       expect(isValidElement(page) && page.type).toBe(OpsAccessDenied);
       expect(mocks.readSupportQueue).not.toHaveBeenCalled();
     },
@@ -47,6 +50,7 @@ describe('the support page', () => {
   it('reads the queue for ops by the status and cursor in the address', async () => {
     mocks.readOpsCaller.mockResolvedValue(ops);
     await SupportPage({
+      params: Promise.resolve({}),
       searchParams: Promise.resolve({ status: 'open', cursor }),
     });
     expect(mocks.readSupportQueue).toHaveBeenCalledWith(ops, {

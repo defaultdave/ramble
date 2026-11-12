@@ -29,7 +29,8 @@ export function pastKeysetCursor(
 ): SQL | undefined {
   if (cursor === null) return undefined;
   const past = direction === 'asc' ? sql`>` : sql`<`;
-  return sql`(${column}, ${table.id}) ${past} (SELECT c.${sql.identifier(column.name)}, c.id FROM ${table} c WHERE c.id = ${cursor})`;
+  // The subquery's own table shadows the outer one, so its qualified columns read the cursor's row.
+  return sql`(${column}, ${table.id}) ${past} (SELECT ${column}, ${table.id} FROM ${table} WHERE ${table.id} = ${cursor})`;
 }
 
 /** The `ORDER BY` of a list paged by name. */

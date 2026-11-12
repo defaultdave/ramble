@@ -27,6 +27,7 @@ import {
   taxTreatments,
   weatherPolicies,
 } from '@/lib/catalog';
+import { hostLimits } from '@/lib/hostSetup';
 import {
   emailAddressPattern,
   maxEmailAddressLength,
@@ -48,7 +49,7 @@ import {
   sessionStatuses,
 } from '@/lib/sessions';
 import { cancellationTiers, legalDocuments } from './policies';
-import { notBlank } from './shared';
+import { maxChars, notBlank, optionalText } from './shared';
 
 export const experienceStatusEnum = pgEnum(
   'experience_status',
@@ -99,6 +100,7 @@ export const hosts = pgTable(
     createdAt: timestampTz().notNull().defaultNow(),
   },
   (table) => [
+    uniqueIndex('hosts_slug_unique').on(table.slug),
     check('hosts_slug_kebab', sql`${table.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
     check('hosts_name_not_blank', notBlank(table.name)),
     check(
@@ -107,6 +109,17 @@ export const hosts = pgTable(
     ),
     check('hosts_created_at_in_range', isReadableDate(table.createdAt)),
     check('hosts_time_zone_not_blank', notBlank(table.timeZone)),
+    check('hosts_name_length', maxChars(table.name, hostLimits.name)),
+    check('hosts_slug_length', maxChars(table.slug, hostLimits.slug)),
+    check(
+      'hosts_description_shape',
+      optionalText(table.description, hostLimits.description),
+    ),
+    // The shape is not checked: `resolveHostZone` reads a stored zone that is not a name as an error, on purpose.
+    check(
+      'hosts_time_zone_length',
+      maxChars(table.timeZone, maxTimeZoneLength),
+    ),
   ],
 );
 

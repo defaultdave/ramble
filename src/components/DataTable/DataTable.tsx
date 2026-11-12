@@ -65,7 +65,6 @@ function SortIcon({
 }
 
 /**
- * TODO(U-073): first caller.
  * Sorting and paging are links to the same address with other params, so the server reads the
  * order and the page and the table works with no script.
  */

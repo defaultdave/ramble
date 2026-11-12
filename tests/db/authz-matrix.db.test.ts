@@ -15,6 +15,7 @@ import {
 import { experiences } from '@/server/db/schema';
 import { createFakeStorageAdapter } from '@/server/ports/storage/fake';
 import { personaHostSlugs } from '@/lib/seed/personas';
+import { hostSetupRows } from './authzHostRows';
 import { collectionInput, doc, helpInput } from './editorialFixtures';
 import {
   client,
@@ -509,6 +510,7 @@ const rows: Row[] = [
     invoke: (c) => data.audit.recordOpsAccess(c),
     allows: platform(...opsOnly),
   },
+  ...hostSetupRows(),
   // Cancelling is for good, so this row sits after every row that still needs a scheduled session.
   {
     fn: 'cancelSession',
@@ -738,7 +740,7 @@ describe('a host owner asking about an experience', () => {
 
 describe('the matrix is complete', () => {
   /** Functions that take a Caller and are the guard or its parts, not guarded functions. */
-  const guards = new Set(['requireRole', 'requireAnyRole', 'requireStaff']);
+  const guards = new Set(['requireRole', 'requireAnyRole', 'requireStaff', 'requireOpsUserId']);
   /** The mailbox opens to the ops role or, off production, to the shared secret, so its access rule is not a role row; src/server/ports/email/mailbox.test.ts and tests/db/email-mailbox.db.test.ts cover every combination. */
   const mailboxGate = ['unlockMailbox', 'loadMailbox', 'loadMailboxMessage'];
 

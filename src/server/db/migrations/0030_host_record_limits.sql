@@ -1,0 +1,4 @@
+ALTER TABLE "hosts" ADD CONSTRAINT "hosts_name_length" CHECK (char_length("hosts"."name") <= 120);--> statement-breakpoint
+ALTER TABLE "hosts" ADD CONSTRAINT "hosts_slug_length" CHECK (char_length("hosts"."slug") <= 80);--> statement-breakpoint
+ALTER TABLE "hosts" ADD CONSTRAINT "hosts_description_shape" CHECK ("hosts"."description" IS NULL OR ("hosts"."description" ~ '[^\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]' AND char_length("hosts"."description") <= 2000));--> statement-breakpoint
+ALTER TABLE "hosts" ADD CONSTRAINT "hosts_time_zone_length" CHECK (char_length("hosts"."time_zone") <= 64);

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "hosts_slug_unique" ON "hosts" USING btree ("slug");

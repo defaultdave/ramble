@@ -15,6 +15,7 @@ import { BookingRefund } from './templates/BookingRefund';
 import { DevCheck } from './templates/DevCheck';
 import { GuestConfirmation } from './templates/GuestConfirmation';
 import { HostBookingNotice } from './templates/HostBookingNotice';
+import { HostInvite } from './templates/HostInvite';
 import { OpsNotice } from './templates/OpsNotice';
 import { PaidAfterLapse } from './templates/PaidAfterLapse';
 import { SessionReminder } from './templates/SessionReminder';
@@ -55,6 +56,9 @@ const markup: Markup = {
     <PaidAfterLapse data={data} helpUrl={helpUrl} />
   ),
   'ops-notice': (data, helpUrl) => <OpsNotice data={data} helpUrl={helpUrl} />,
+  'host-invite': (data, helpUrl) => (
+    <HostInvite data={data} helpUrl={helpUrl} />
+  ),
   'sign-in-link': (data, helpUrl) => (
     <SignInLink data={data} helpUrl={helpUrl} />
   ),

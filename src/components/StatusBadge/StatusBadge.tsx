@@ -23,7 +23,6 @@ const toneIcon = {
   neutral: CircleDashed,
 } satisfies Record<StatusTone, LucideIcon>;
 
-/** TODO(U-073): first caller. */
 export function StatusBadge({ tone, label }: StatusBadgeProps) {
   const Icon = toneIcon[tone];
   return <Badge tone={statusBadgeTone[tone]} label={label} icon={<Icon />} />;

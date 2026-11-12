@@ -19,7 +19,8 @@ import { handleAuthRequest } from './handler';
 const maxFormBytes = 2048;
 const noStore = { 'Cache-Control': 'no-store' } as const;
 
-const appOrigin = () => new URL(env.APP_URL).origin;
+/** The site's own origin, for an address that goes in an email or a redirect. */
+export const appOrigin = () => new URL(env.APP_URL).origin;
 
 /** A cross-site post is refused, so another site cannot sign a visitor in to its own account or out of theirs. */
 function refuseForeignOrigin(request: Request): Response | null {

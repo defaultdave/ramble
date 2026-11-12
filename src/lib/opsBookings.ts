@@ -1,13 +1,18 @@
-import { userActor, type AuditEntryInput } from './audit';
+import type { AuditEntryInput } from './audit';
 import { GuestEmailSchema } from './guests';
 import { defaultHostTimeZone } from './hostSetup';
 import { bookingStatusLabels, whenLabel } from './hostDashboard';
 import { formatMoney } from './money';
-import { opsAreaIds, opsAreaListEntry } from './opsAudit';
-import { isOrderReference, type OrderStatus } from './orders';
+import { opsAreaIds, opsAreaListEntry, opsViewEntry } from './opsAudit';
+import {
+  isOrderReference,
+  orderCancelledBys,
+  type OrderStatus,
+} from './orders';
 import { orderRefundReasons } from './refunds';
-import { parseStatusParam, type StatusTone } from './statusBadge';
+import { statusFilter, type StatusTone } from './statusBadge';
 import { parseSearchTerm } from './tableQuery';
+import { countLabel } from './text';
 import { zonedDeadlineLabel } from './zonedLabels';
 
 // The ops bookings area (PRD-51, lite cut), read side: finding a booking and what its page shows.
@@ -16,21 +21,17 @@ import { zonedDeadlineLabel } from './zonedLabels';
 export const opsBookingsPath = '/ops/bookings';
 export const opsBookingPath = (orderId: string) =>
   `${opsBookingsPath}/${orderId}`;
-export const opsBookingsPageSize = 25;
 
 const bookingFilters = ['refund_failed'] as const;
 export type BookingFilter = (typeof bookingFilters)[number];
 
-export const bookingFilterOptions = [
-  { value: 'refund_failed', label: 'Refund failed' },
-] as const;
+const bookingFilter = statusFilter(bookingFilters, {
+  refund_failed: 'Refund failed',
+});
+export const bookingFilterOptions = bookingFilter.options;
 
 /** The filter the address names, or null (every booking) for none, a repeated one, or one the list does not have. */
-export function parseBookingFilter(
-  raw: string | readonly string[] | undefined,
-): BookingFilter | null {
-  return parseStatusParam(raw, bookingFilters, bookingFilterOptions);
-}
+export const parseBookingFilter = bookingFilter.parse;
 
 export type BookingSearch =
   | { kind: 'none' }
@@ -66,7 +67,7 @@ export function searchSummary(search: BookingSearch, count: number): string {
     return 'Search by a booking reference such as RMB-ABC234, or by a guest’s full email address.';
   }
   if (search.kind === 'none') return '';
-  const found = count === 1 ? '1 booking' : `${String(count)} bookings`;
+  const found = countLabel(count, 'booking');
   return `${found} for ${search.kind === 'email' ? search.email : search.reference}.`;
 }
 
@@ -104,7 +105,8 @@ export type OpsBookingRow = {
   id: string;
   reference: string;
   status: OrderStatus;
-  refundFailed: boolean;
+  /** The flag shown on a booking whose refund failed, or null. */
+  refundFailedBadge: { tone: StatusTone; label: string } | null;
   guestName: string;
   email: string;
   experienceName: string;
@@ -114,21 +116,21 @@ export type OpsBookingRow = {
 };
 
 /** A booking as the list shows it: the session on its own clock, the total in dollars. */
-export function buildOpsBookingRows(
-  records: readonly OpsBookingRecord[],
-): OpsBookingRow[] {
-  return records.map((record) => ({
+export function buildOpsBookingRow(record: OpsBookingRecord): OpsBookingRow {
+  return {
     id: record.id,
     reference: record.reference,
     status: record.status,
-    refundFailed: record.refundFailed,
+    refundFailedBadge: record.refundFailed
+      ? { tone: 'danger', label: 'Refund failed' }
+      : null,
     guestName: record.leadGuestName ?? '—',
     email: record.contactEmail,
     experienceName: record.experienceName,
     whenLabel: whenLabel(record.sessionStartsAt, record.timeZone),
     totalLabel: formatMoney(record.totalMinor),
     href: opsBookingPath(record.id),
-  }));
+  };
 }
 
 const refundReasonLabels = {
@@ -152,7 +154,7 @@ type OpsRefundRecord = {
 
 export type OpsBookingDetailRecord = {
   booking: OpsBookingRecord & {
-    cancelledBy: string | null;
+    cancelledBy: (typeof orderCancelledBys)[number] | null;
     createdAt: Date;
     confirmedAt: Date | null;
     cancelledAt: Date | null;
@@ -182,6 +184,13 @@ const refundStatusLabels = {
   gift_reinstated: 'Gift put back',
 } satisfies Record<OpsRefundRecord['status'], string>;
 
+const cancelledByLabels = {
+  guest: 'Cancelled by guest',
+  host: 'Cancelled by host',
+  weather: 'Cancelled for weather',
+  ramble: 'Cancelled by Ramble',
+} satisfies Record<(typeof orderCancelledBys)[number], string>;
+
 const at = (instant: Date) => zonedDeadlineLabel(instant, defaultHostTimeZone);
 
 function isKnownReason(
@@ -205,12 +214,15 @@ export function buildOpsBookingDetail(
       : [
           {
             at: booking.cancelledAt,
-            label: `Cancelled by ${booking.cancelledBy ?? 'the system'}`,
+            label:
+              booking.cancelledBy === null
+                ? 'Cancelled'
+                : cancelledByLabels[booking.cancelledBy],
           },
         ]),
   ].toSorted((a, b) => a.at.getTime() - b.at.getTime());
   return {
-    row: buildOpsBookingRows([booking])[0] as OpsBookingRow,
+    row: buildOpsBookingRow(booking),
     refundedLabel: formatMoney(
       booking.refundedTicketMinor + booking.refundedTaxMinor,
     ),
@@ -238,10 +250,4 @@ export const bookingsListEntry = (userId: string): AuditEntryInput =>
 export const bookingViewedEntry = (
   userId: string,
   orderId: string,
-): AuditEntryInput => ({
-  ...userActor(userId),
-  action: 'booking.viewed',
-  subjectKind: 'order',
-  subjectId: orderId,
-  details: {},
-});
+): AuditEntryInput => opsViewEntry(userId, 'booking.viewed', 'order', orderId);

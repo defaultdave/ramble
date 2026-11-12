@@ -78,9 +78,9 @@ export function OpsBookingsList({
             tone={orderStatusTones[row.status]}
             label={orderStatusLabels[row.status]}
           />
-          {row.refundFailed ? (
-            <StatusBadge tone="danger" label="Refund failed" />
-          ) : null}
+          {row.refundFailedBadge === null ? null : (
+            <StatusBadge {...row.refundFailedBadge} />
+          )}
         </span>
       ),
     },

@@ -2,12 +2,12 @@ import 'server-only';
 import { and, desc, eq, or, type SQL } from 'drizzle-orm';
 import { WriteIdSchema } from '@/lib/catalog';
 import { splitPage } from '@/lib/pagination';
+import { opsListPageSize } from '@/lib/tableQuery';
 import {
   bookingsListEntry,
   bookingViewedEntry,
   buildOpsBookingDetail,
-  buildOpsBookingRows,
-  opsBookingsPageSize,
+  buildOpsBookingRow,
   type BookingFilter,
   type BookingSearch,
   type OpsBookingDetail,
@@ -58,6 +58,8 @@ export async function readOpsBookings(
   },
 ): Promise<OpsBookingsPage> {
   const userId = requireOpsUserId(caller);
+  const cursor =
+    options.cursor === null ? null : WriteIdSchema.parse(options.cursor);
   if (options.search.kind === 'invalid') {
     await recordAudit(bookingsListEntry(userId));
     return { rows: [], nextCursor: null };
@@ -86,14 +88,14 @@ export async function readOpsBookings(
         options.filter === 'refund_failed'
           ? eq(orders.refundFailed, true)
           : undefined,
-        pastKeysetCursor(orders, orders.createdAt, 'desc', options.cursor),
+        pastKeysetCursor(orders, orders.createdAt, 'desc', cursor),
       ),
     )
     .orderBy(...byColumnThenId(orders, orders.createdAt, 'desc'))
-    .limit(opsBookingsPageSize + 1);
-  const { items, nextCursor } = splitPage(fetched, opsBookingsPageSize);
+    .limit(opsListPageSize + 1);
+  const { items, nextCursor } = splitPage(fetched, opsListPageSize);
   await recordAudit(bookingsListEntry(userId));
-  return { rows: buildOpsBookingRows(items), nextCursor };
+  return { rows: items.map(buildOpsBookingRow), nextCursor };
 }
 
 /** One booking with its refunds, read in one snapshot with the audit row for the read. Null when there is no such booking. */

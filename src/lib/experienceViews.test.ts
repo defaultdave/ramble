@@ -189,11 +189,13 @@ describe('notices', () => {
     );
   });
 
-  it('has a problem sentence for every field and a title for every notice', () => {
+  it('has a sentence for every field and a title for every notice', () => {
     expect(
-      Object.values(experienceFieldProblems).every((text) => text !== ''),
+      Object.values(experienceFieldProblems).every((text) => text.length > 0),
     ).toBe(true);
-    expect(Object.keys(experienceNotices)).toHaveLength(5);
+    expect(
+      Object.values(experienceNotices).every(({ title }) => title.length > 0),
+    ).toBe(true);
   });
 });
 

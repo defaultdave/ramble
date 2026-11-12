@@ -1,10 +1,12 @@
 import { z } from 'zod';
 import type { AlertTone } from './alertTone';
+import type { CacheChange } from './cacheTags';
 import { cancellationTerms } from './cancellation';
 import {
   ageRules,
   experienceRuleIssues,
   experienceStatuses,
+  guestVisibleStatuses,
   HttpUrlSchema,
   slugify,
   SlugSchema,
@@ -50,6 +52,9 @@ export const experienceLimits = {
 } as const;
 
 export const experiencesPageSize = 25;
+
+/** The most rows a read of choices returns, so a read cannot grow with the catalog. */
+export const experienceChoiceLimits = { hosts: 500, waivers: 200 } as const;
 
 export const experiencesPath = '/ops/experiences';
 export const newExperiencePath = '/ops/experiences/new';
@@ -499,6 +504,95 @@ export function newExperienceValues(
   };
 }
 
+type PriceKind = 'adult' | 'child';
+
+/** The price options the content asks for. An adult option always takes a space; a child's is the form's choice. */
+export function desiredPriceOptions(
+  content: ExperienceContent,
+): { kind: PriceKind; priceMinor: number; usesSpace: boolean }[] {
+  const options: { kind: PriceKind; priceMinor: number; usesSpace: boolean }[] =
+    [];
+  if (content.adultPriceMinor !== null) {
+    options.push({
+      kind: 'adult',
+      priceMinor: content.adultPriceMinor,
+      usesSpace: true,
+    });
+  }
+  if (content.childPriceMinor !== null) {
+    options.push({
+      kind: 'child',
+      priceMinor: content.childPriceMinor,
+      usesSpace: content.childUsesSpace,
+    });
+  }
+  return options;
+}
+
+/** A saved price can be changed but not removed: holds and orders point at the option. These are the form fields that tried. */
+export function removedPriceFields(
+  before: ExperienceContent,
+  after: ExperienceContent,
+): ('adultPrice' | 'childPrice')[] {
+  const removed: ('adultPrice' | 'childPrice')[] = [];
+  if (before.adultPriceMinor !== null && after.adultPriceMinor === null) {
+    removed.push('adultPrice');
+  }
+  if (before.childPriceMinor !== null && after.childPriceMinor === null) {
+    removed.push('childPrice');
+  }
+  return removed;
+}
+
+const priceFields = [
+  'adultPriceMinor',
+  'childPriceMinor',
+  'childUsesSpace',
+] as const satisfies readonly ExperienceContentField[];
+
+export type ExperienceColumns = Omit<
+  ExperienceContent,
+  (typeof priceFields)[number]
+>;
+
+/** The columns of the experience row the content sets: everything but the price options. */
+export function experienceColumnsOf(
+  content: ExperienceContent,
+): ExperienceColumns {
+  const columns: Partial<ExperienceContent> = { ...content };
+  for (const field of priceFields) delete columns[field];
+  return columns as ExperienceColumns;
+}
+
+/** Whether guests can see an experience in this status, so a change to it reaches cached pages. */
+export function isGuestVisible(status: ExperienceStatus): boolean {
+  return (guestVisibleStatuses as readonly string[]).includes(status);
+}
+
+export type PlaceSlugs = { categorySlug: string; neighborhoodSlug: string };
+
+/**
+ * The cache changes of an edit to a listing guests see: one for where it was and one for where it
+ * is now, so a move invalidates both places. An edit that stays in one place is one change.
+ */
+export function listingChanges(
+  experienceId: string,
+  before: PlaceSlugs,
+  after: PlaceSlugs,
+): CacheChange[] {
+  const places =
+    before.categorySlug === after.categorySlug &&
+    before.neighborhoodSlug === after.neighborhoodSlug
+      ? [after]
+      : [before, after];
+  return places.map((place) => ({
+    kind: 'listing',
+    id: experienceId,
+    categorySlugs: [place.categorySlug],
+    neighborhoodSlug: place.neighborhoodSlug,
+  }));
+}
+
 /** One saved experience as the editor shows it. */
 export type ExperienceEditView = {
   id: string;
@@ -543,6 +637,8 @@ export type ExperienceChoices = {
   categories: Choice[];
   neighborhoods: Choice[];
   cancellationTiers: Choice[];
+  /** The tier a new experience starts on; empty when the reference data holds none. */
+  defaultCancellationTierId: string;
   waivers: Choice[];
 };
 
@@ -569,6 +665,8 @@ export function buildExperienceChoices(input: {
       value: tier.id,
       label: `${tier.name}: ${cancellationTerms(tier).fact}`,
     })),
+    defaultCancellationTierId:
+      input.cancellationTiers.find((tier) => tier.isDefault)?.id ?? '',
     waivers: input.waivers.map(({ id, title, version }) => ({
       value: id,
       label: `${title} (version ${String(version)})`,
@@ -674,4 +772,34 @@ export function experienceNoticeHref(
   fields: readonly ExperienceFormField[] = [],
 ): string {
   return tableHref(path, { notice, fields: fields.join(',') });
+}
+
+export const ageRuleLabels = {
+  all_ages: 'All ages',
+  minimum_age: 'Minimum age',
+  age_range: 'Age range',
+  twenty_one_plus: '21 and over',
+} as const satisfies Record<(typeof ageRules)[number], string>;
+
+export const weatherPolicyLabels = {
+  rain_or_shine: 'Runs rain or shine',
+  decided_before_start: 'Decided before the start',
+} as const satisfies Record<(typeof weatherPolicies)[number], string>;
+
+export const taxTreatmentLabels = {
+  taxable: 'Taxable',
+  not_taxable: 'Not taxable',
+  unknown: 'Unknown (treated as not taxable)',
+} as const satisfies Record<(typeof taxTreatments)[number], string>;
+
+/** A select's options from a label map, in the map's order. */
+export function labelledOptions(
+  labels: Readonly<Record<string, string>>,
+): Choice[] {
+  return Object.entries(labels).map(([value, label]) => ({ value, label }));
+}
+
+/** A whole number as a form field shows it, empty for none. */
+export function numberInputValue(value: number | null): string {
+  return value === null ? '' : String(value);
 }

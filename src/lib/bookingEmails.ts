@@ -69,7 +69,8 @@ export function bookingEmailKey(
     | 'host-booking-notice'
     | 'session-reminder'
     | 'guest-cancellation'
-    | 'host-cancellation-notice',
+    | 'host-cancellation-notice'
+    | 'guest-paid-after-lapse',
   orderId: string,
 ): string {
   return `${kind}:${orderId}`;
@@ -476,7 +477,6 @@ export function lapseReasonLine(reason: LapseReason): string {
   return lapseReasons[reason];
 }
 
-// TODO(U-109): first caller, the refund path.
 export function paidAfterLapseData(input: {
   recipientName: string | null;
   reference: string;

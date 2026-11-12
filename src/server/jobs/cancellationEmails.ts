@@ -9,6 +9,7 @@ import {
   refundEmailDecision,
   refundEmailKey,
 } from '@/lib/bookingEmails';
+import { otherDatesPath } from '@/lib/cancelSession';
 import type {
   GuestCancellationPayloadSchema,
   GuestRefundPayloadSchema,
@@ -17,7 +18,10 @@ import type {
 import type { Transaction } from '@/server/db/client';
 import { readBookingEmailOrder } from '@/server/db/bookingEmails';
 import { BookingEmailError, loadOrder } from './bookingEmails';
-import { readRefundForEmail } from '@/server/db/cancellationEmails';
+import {
+  readOtherDatesFacts,
+  readRefundForEmail,
+} from '@/server/db/cancellationEmails';
 import { env } from '@/server/env';
 import { logger } from '@/server/monitoring/logger';
 import { sendEmail } from '@/server/ports/email';
@@ -44,6 +48,7 @@ export async function sendGuestCancellation({
 }): Promise<void> {
   const order = await loadCancelledOrder(tx, payload.orderId);
   const { source } = order;
+  const otherDates = await readOtherDatesFacts(tx, payload.orderId);
   await sendEmail({
     template: 'booking-cancellation',
     to: order.contactEmail,
@@ -57,7 +62,9 @@ export async function sendGuestCancellation({
       items: source.items,
       cancelledBy: payload.cancelledBy,
       refundMinor: payload.refundMinor,
-      otherDatesPath: null,
+      otherDatesPath: otherDates
+        ? otherDatesPath({ cancelledBy: payload.cancelledBy, ...otherDates })
+        : null,
       appUrl: env.APP_URL,
     }),
     idempotencyKey: bookingEmailKey('guest-cancellation', payload.orderId),

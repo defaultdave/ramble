@@ -43,7 +43,9 @@ type ConfirmOrderResult =
   | { status: 'confirmed'; reference: string }
   /** The order was confirmed before; nothing was written. */
   | { status: 'already_confirmed'; reference: string }
-  /** The payment cannot be confirmed and the refund path is not built yet: the event stays unprocessed. */
+  /** The payment could not be confirmed and took the refund path: the order is refunded after the lapse. */
+  | { status: 'refunded' }
+  /** The payment cannot be confirmed and its refund path is not built yet: the event stays unprocessed. */
   | { status: 'unavailable' };
 
 /**

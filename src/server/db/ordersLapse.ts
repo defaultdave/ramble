@@ -105,9 +105,12 @@ async function lookAtHold(
  * payment is read first and `cancelStep` decides; a cancel that then fails, for any reason, is not
  * caught: the sweep stops with nothing written and the next pulse reads the payment again.
  */
-async function settleAtProvider(
+export async function settleAtProvider(
   payments: PaymentsPort,
-  look: Extract<Look, { done: false }>,
+  look: Pick<
+    Extract<Look, { done: false }>,
+    'attemptId' | 'idempotencyKey' | 'target'
+  >,
 ): Promise<boolean> {
   const payment = await payments.retrieve(
     look.target.kind === 'payment'

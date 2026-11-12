@@ -101,6 +101,19 @@ export function requireRole(
   }
 }
 
+/**
+ * `requireRole` for an action more than one role may take: the first role in `roles` the caller
+ * holds is checked against the resource, and a caller who holds none is refused as the first.
+ */
+export function requireAnyRole(
+  caller: Caller,
+  roles: readonly [Role, ...Role[]],
+  resource: Resource,
+): void {
+  const held = roles.find((role) => caller.roles.includes(role));
+  requireRole(caller, held ?? roles[0], resource);
+}
+
 function ownsResource(caller: Caller, role: Role, resource: Resource) {
   switch (role) {
     case Role.Ops:

@@ -1,0 +1,53 @@
+.stack {
+  composes: stack from '../HostSetup/HostSetup.module.css';
+}
+
+.section {
+  composes: section from '../HostSetup/HostSetup.module.css';
+}
+
+.heading {
+  composes: heading from '../HostSetup/HostSetup.module.css';
+}
+
+.list {
+  composes: list from '../HostSetup/HostSetup.module.css';
+}
+
+.row {
+  composes: row from '../HostSetup/HostSetup.module.css';
+}
+
+.muted {
+  composes: muted from '../HostSetup/HostSetup.module.css';
+}
+
+.form {
+  composes: form from '../ExperienceEditor/ExperienceEditor.module.css';
+}
+
+.group {
+  composes: group from '../ExperienceEditor/ExperienceEditor.module.css';
+}
+
+.legend {
+  composes: legend from '../ExperienceEditor/ExperienceEditor.module.css';
+}
+
+.slotTitle {
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+}
+
+.seatsForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .seatsForm {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+}

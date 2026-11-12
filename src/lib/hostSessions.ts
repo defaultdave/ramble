@@ -1,8 +1,9 @@
 import { CalendarDateTime, toZoned } from '@internationalized/date';
 import { z } from 'zod';
 import { EntityIdSchema } from './catalog';
+import { formWholeNumber as wholeNumber } from './opsForm';
 import { formatPrice, priceInputTextOrNull, priceMinorFromText } from './money';
-import { countLabel, wholeNumberPattern } from './text';
+import { countLabel } from './text';
 import {
   IsoDateSchema,
   TimeZoneSchema,
@@ -137,6 +138,8 @@ type HostWeekDayView = {
 
 export type HostWeekView = {
   hostName: string;
+  /** The host's owner changes the week; read-only staff only look. */
+  canEdit: boolean;
   weekStart: string;
   /** "Mon, Nov 9 to Sun, Nov 15". */
   weekLabel: string;
@@ -189,7 +192,11 @@ function rowView(session: HostWeekSession, now: Date): HostWeekRowView {
 }
 
 /** The week's rows grouped by the day each falls on in its own zone, in the order handed over; a day with no session is left out. */
-export function buildHostWeek(data: HostWeekData, now: Date): HostWeekView {
+export function buildHostWeek(
+  data: HostWeekData,
+  now: Date,
+  canEdit: boolean,
+): HostWeekView {
   const today = localDateIn(now, data.timeZone);
   const limits = weekLimits(today, now);
   const previous = addDays(data.weekStart, -daysInWeek);
@@ -204,6 +211,7 @@ export function buildHostWeek(data: HostWeekData, now: Date): HostWeekView {
   }
   return {
     hostName: data.hostName,
+    canEdit,
     weekStart: data.weekStart,
     weekLabel: `${dateChipLabel(data.weekStart)} to ${dateChipLabel(addDays(data.weekStart, daysInWeek - 1))}`,
     timeZone: data.timeZone,
@@ -249,12 +257,6 @@ type Get = (field: string) => unknown;
 function text(get: Get, field: string): string {
   const value = get(field);
   return typeof value === 'string' ? value.trim() : '';
-}
-
-/** A whole number typed in a field, or undefined for anything else, so the schema names the field. */
-function wholeNumber(get: Get, field: string): number | undefined {
-  const value = text(get, field);
-  return wholeNumberPattern.test(value) ? Number(value) : undefined;
 }
 
 /** The values of the session forms as the schemas expect them: a field that is not a number is left undefined. */

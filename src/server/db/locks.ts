@@ -23,6 +23,8 @@ import {
  *                                                     second transaction only
  *   6. the gift row                                   (a later unit)
  *
+ * The session template row (ops availability only) is locked before the sessions it generated.
+ *
  * A path that starts from a hold, an order, or a provider event reads the ids it needs without a
  * lock, then locks in this order and re-checks what it read. Locks are transaction-level only
  * (`pg_advisory_xact_lock`, `FOR UPDATE`), because app traffic goes through the pooler in

@@ -2,16 +2,19 @@ import { describe, expect, it } from 'vitest';
 import {
   hostAccessFor,
   hostDashboardResult,
+  readableHostId,
+  type HostAccess,
   type HostAccessInput,
 } from './hostAccess';
 
 // Behaviours under test, one per decision, branch or risk:
 // - nobody signed in is told to sign in
-// - a guest, ops, admin, and host staff are signed in but own no host
-// - an owner gets the host they own, from their grants and nowhere else
+// - a guest, ops, and admin are signed in but hold no host role
+// - an owner gets the host they own, and host staff the host they staff, from their grants and nowhere else
 // - owner of one host and staff of another gets the owned host, not the staffed one
 // - an owner of several hosts gets the first granted
-// - the page's outcome: sign in for nobody, refused for a non-owner or a missing host, the view for an owner with data
+// - only an owner or staff has a host to read
+// - the page's outcome: sign in for nobody, refused for no host role or a missing host, the view for an owner (who may manage) or staff (who may not)
 
 const hostA = '00000000-0000-4000-8000-00000000000a';
 const hostB = '00000000-0000-4000-8000-00000000000b';
@@ -30,9 +33,19 @@ describe('hostAccessFor', () => {
   it.each([
     ['a guest, ops, or admin', signedIn([])],
     ['a caller with no grants listed', signedIn()],
-    ['host staff', signedIn([{ role: 'host_staff', hostId: hostA }])],
-  ])('owns no host for %s', (_name, caller) => {
-    expect(hostAccessFor(caller)).toEqual({ kind: 'not_a_host_owner' });
+  ])('holds no host role for %s', (_name, caller) => {
+    expect(hostAccessFor(caller)).toEqual({ kind: 'no_host_role' });
+  });
+
+  it('gives host staff the host they staff, the first granted of several', () => {
+    expect(
+      hostAccessFor(
+        signedIn([
+          { role: 'host_staff', hostId: hostB },
+          { role: 'host_staff', hostId: hostA },
+        ]),
+      ),
+    ).toEqual({ kind: 'staff', hostId: hostB });
   });
 
   it('gives an owner their host', () => {
@@ -64,6 +77,20 @@ describe('hostAccessFor', () => {
   });
 });
 
+describe('readableHostId', () => {
+  it.each([
+    [{ kind: 'owner', hostId: hostA } as const, hostA],
+    [{ kind: 'staff', hostId: hostB } as const, hostB],
+    [{ kind: 'no_host_role' } as const, null],
+    [{ kind: 'signed_out' } as const, null],
+  ] satisfies [HostAccess, string | null][])(
+    'reads %j as %s',
+    (access, expected) => {
+      expect(readableHostId(access)).toBe(expected);
+    },
+  );
+});
+
 describe('hostDashboardResult', () => {
   const data = { hostName: 'Harbor Co', sessions: [], bookings: [] };
 
@@ -78,8 +105,8 @@ describe('hostDashboardResult', () => {
 
   it.each([
     [
-      'a non-owner, even with data',
-      { kind: 'not_a_host_owner' } as const,
+      'a caller with no host role, even with data',
+      { kind: 'no_host_role' } as const,
       data,
     ],
     [
@@ -91,12 +118,17 @@ describe('hostDashboardResult', () => {
     expect(hostDashboardResult(access, given)).toEqual({ status: 'refused' });
   });
 
-  it('builds the view for an owner with data', () => {
-    expect(hostDashboardResult({ kind: 'owner', hostId: hostA }, data)).toEqual(
-      {
+  it.each([
+    ['an owner', { kind: 'owner', hostId: hostA } as const, true],
+    ['host staff', { kind: 'staff', hostId: hostA } as const, false],
+  ])(
+    'builds the view for %s, who may manage: %s',
+    (_name, access, canManage) => {
+      expect(hostDashboardResult(access, data)).toEqual({
         status: 'ok',
         view: { hostName: 'Harbor Co', sessions: [], bookings: [] },
-      },
-    );
-  });
+        canManage,
+      });
+    },
+  );
 });

@@ -5,6 +5,8 @@ import {
   UpdateSessionPriceInputSchema,
   UpdateSessionTimeInputSchema,
   checkUnbooked,
+  planTemplateSeatChange,
+  isSeatChange,
   isUpcoming,
   localDateIn,
   occurrenceOn,
@@ -17,6 +19,9 @@ import {
 //   skipped time after the gap, a repeated time at the first
 // - a stored instant reads back as the date it falls on in the session's own zone
 // - the edit inputs take HH:MM and refuse every out-of-range field
+// - a new seat cap on a template reaches the upcoming sessions that still carry the old cap, leaves
+//   a hand-set one alone, and is refused whole when it would drop a following session under its
+//   seats sold plus held
 
 const id = '00000000-0000-4000-8000-000000000001';
 const newYork = 'America/New_York';
@@ -186,5 +191,69 @@ describe('AddOneOffSessionInputSchema', () => {
     expect(
       AddOneOffSessionInputSchema.safeParse({ ...valid, ...change }).success,
     ).toBe(false);
+  });
+});
+
+describe('planTemplateSeatChange', () => {
+  const session = (
+    name: string,
+    allocation: number,
+    seatsSold = 0,
+    heldSeats = 0,
+  ) => ({ id: name, allocation, seatsSold, heldSeats });
+
+  it('moves the sessions that carry the old cap and leaves a hand-set one', () => {
+    expect(
+      planTemplateSeatChange(8, 12, [
+        session('a', 8),
+        session('edited', 10),
+        session('b', 8, 3, 2),
+      ]),
+    ).toEqual({ ok: true, followIds: ['a', 'b'] });
+  });
+
+  it('has nothing to move when no session is upcoming', () => {
+    expect(planTemplateSeatChange(8, 12, [])).toEqual({
+      ok: true,
+      followIds: [],
+    });
+  });
+
+  it.each([
+    ['exactly the seats sold and held', 5, 3, 2, true],
+    ['one under the seats sold and held', 4, 3, 2, false],
+    ['zero seats with nothing claimed', 0, 0, 0, true],
+    ['zero seats with a seat sold', 0, 1, 0, false],
+    ['zero seats with only a hold', 0, 0, 1, false],
+  ])('a new cap of %s', (_label, cap, sold, held, allowed) => {
+    expect(
+      planTemplateSeatChange(8, cap, [session('a', 8, sold, held)]).ok,
+    ).toBe(allowed);
+  });
+
+  it('refuses the whole change and names the most claimed seats', () => {
+    expect(
+      planTemplateSeatChange(8, 4, [
+        session('a', 8, 5),
+        session('b', 8, 2, 4),
+        session('c', 8, 1),
+      ]),
+    ).toEqual({ ok: false, reason: 'below_sold_and_held', booked: 6 });
+  });
+
+  it('does not count a hand-set session against the new cap', () => {
+    expect(planTemplateSeatChange(8, 4, [session('edited', 10, 7)]).ok).toBe(
+      true,
+    );
+  });
+});
+
+describe('isSeatChange', () => {
+  it.each([
+    [8, 8, false],
+    [8, 12, true],
+    [8, 0, true],
+  ])('a cap of %i to %i is a change: %s', (from, to, changed) => {
+    expect(isSeatChange(from, to)).toBe(changed);
   });
 });

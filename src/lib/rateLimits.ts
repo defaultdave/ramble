@@ -3,6 +3,7 @@ import { countLabel } from './text';
 
 export const rateLimitSurfaces = [
   'sign_in_link',
+  'host_staff_invite',
   'reserve',
   'payment_tries',
   'manage',
@@ -36,6 +37,13 @@ export const rateLimitPolicies = {
     limit: 5,
     windowSeconds: 60 * 60,
     normalizeSubject: (subject) => subject.trim().toLowerCase(),
+  },
+  // Invitations a host owner sends, per owner: each makes an account and sends an email from our
+  // domain, so the count bounds what one account can do. Twice the cap on staff, once an hour.
+  host_staff_invite: {
+    limit: 20,
+    windowSeconds: 60 * 60,
+    normalizeSubject: trimmed,
   },
   reserve: { limit: 30, windowSeconds: 10 * 60, normalizeSubject: trimmed },
   // At most 5 tries per hold. The window outlasts a hold plus its payment grace, so the count

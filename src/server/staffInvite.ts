@@ -11,10 +11,25 @@ import { requireOpsUserId } from '@/server/db/audit';
 import { grantRoleToAddress, readRoleHolder } from '@/server/db/staffRoles';
 import { sendSignInInvite } from './signInInvite';
 
-function sendStaffLink(
+export type StaffLink = {
+  /** Where the link lands after sign-in. */
+  landingPath: string;
+  keyPrefix: string;
+  failureLog: string;
+};
+
+const opsLink: StaffLink = {
+  landingPath: staffLandingPath,
+  keyPrefix: 'staff-link',
+  failureLog: 'The staff sign-in link could not be sent',
+};
+
+/** Emails one sign-in link to a staff member: ops staff by default, a host's with its own `link`. */
+export function sendStaffLink(
   actorId: string,
   userId: string,
   email: string,
+  link: StaffLink = opsLink,
 ): Promise<Exclude<InviteResult, 'not_found'>> {
   return sendSignInInvite({
     email,
@@ -22,10 +37,10 @@ function sendStaffLink(
     request: (token) => ({
       template: 'sign-in-link',
       to: email,
-      data: signInLinkData(token, appOrigin(), staffLandingPath),
-      idempotencyKey: `staff-link-${randomUUID()}`,
+      data: signInLinkData(token, appOrigin(), link.landingPath),
+      idempotencyKey: `${link.keyPrefix}-${randomUUID()}`,
     }),
-    failureLog: 'The staff sign-in link could not be sent',
+    failureLog: link.failureLog,
   });
 }
 

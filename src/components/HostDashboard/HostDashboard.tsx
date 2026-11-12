@@ -3,7 +3,7 @@ import { ButtonLink } from '@/components/Button';
 import { PageHeading } from '@/components/PageHeading';
 import { classNames } from '@/lib/classNames';
 import { soldFillStep } from '@/lib/hostDashboard';
-import { hostSessionsPath } from '@/lib/hostSessions';
+import type { HostNavLink } from '@/lib/hostStaff';
 import type {
   HostBookingRowView,
   HostDashboardView,
@@ -52,7 +52,13 @@ function BookingRow({ row }: { row: HostBookingRowView }) {
 }
 
 /** The host's home: the next sessions with seats sold against what each holds, and the latest bookings. */
-export function HostDashboard({ view }: { view: HostDashboardView }) {
+export function HostDashboard({
+  view,
+  links,
+}: {
+  view: HostDashboardView;
+  links: readonly HostNavLink[];
+}) {
   return (
     <>
       <PageHeading title={hostDashboardTitle}>
@@ -60,9 +66,13 @@ export function HostDashboard({ view }: { view: HostDashboardView }) {
         <AccountControl signedIn />
       </PageHeading>
       <div className={styles.sections}>
-        <ButtonLink href={hostSessionsPath} variant="secondary">
-          Manage sessions
-        </ButtonLink>
+        <nav aria-label="Host pages" className={styles.nav}>
+          {links.map((link) => (
+            <ButtonLink key={link.href} href={link.href} variant="secondary">
+              {link.label}
+            </ButtonLink>
+          ))}
+        </nav>
         <section aria-labelledby="host-upcoming">
           <h2 id="host-upcoming" className={styles.heading}>
             Upcoming sessions

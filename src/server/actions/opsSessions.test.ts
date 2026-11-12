@@ -182,7 +182,7 @@ describe('changeOpsAllocationAction', () => {
 });
 
 describe('pauseOpsExperienceAction', () => {
-  const values = { sessionId, fingerprint: '1:10800:0:2:0', confirm: 'on' };
+  const values = { sessionId, fingerprint: '1:10800:0:2:1:0', confirm: 'on' };
 
   it('leaves before reading the form when the caller is not ops', async () => {
     mocks.opsCallerOrLeave.mockRejectedValue(new Redirected('/ops/sessions'));
@@ -195,7 +195,9 @@ describe('pauseOpsExperienceAction', () => {
   it('redirects with the invalid notice when the box is not ticked, and pauses nothing', async () => {
     expect(
       await redirectOf(() =>
-        pauseOpsExperienceAction(form({ sessionId, fingerprint: '1:1:1:1:1' })),
+        pauseOpsExperienceAction(
+          form({ sessionId, fingerprint: '1:1:1:1:1:1' }),
+        ),
       ),
     ).toBe(`${page}?notice=invalid`);
     expect(mocks.pauseExperienceAndCancel).not.toHaveBeenCalled();
@@ -203,11 +205,23 @@ describe('pauseOpsExperienceAction', () => {
 
   it.each([
     [
-      { status: 'paused', cancelled: 2, total: 2, left: 0 },
+      {
+        status: 'paused',
+        cancelled: 2,
+        alreadyCancelled: 0,
+        total: 2,
+        left: 0,
+      },
       'notice=paused&done=2&of=2',
     ],
     [
-      { status: 'paused', cancelled: 1, total: 2, left: 1 },
+      {
+        status: 'paused',
+        cancelled: 1,
+        alreadyCancelled: 0,
+        total: 2,
+        left: 1,
+      },
       'notice=paused_some_left&done=1&of=2',
     ],
     [{ status: 'stale' }, 'notice=stale'],
@@ -220,7 +234,7 @@ describe('pauseOpsExperienceAction', () => {
     );
     expect(mocks.pauseExperienceAndCancel).toHaveBeenCalledWith(ops, {
       sessionId,
-      fingerprint: '1:10800:0:2:0',
+      fingerprint: '1:10800:0:2:1:0',
     });
   });
 

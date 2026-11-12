@@ -13,6 +13,10 @@ import {
   buildOpsSessionView,
   cancelBlocked,
   cancelGate,
+  ImpactFingerprintSchema,
+  shouldCancelTarget,
+  tallyPauseResults,
+  type PauseStep,
   pauseCancelTargets,
   PauseIncompleteError,
   pausePlanFor,
@@ -348,13 +352,17 @@ export async function changeAllocationAsOps(
  * guests have a claim on, as Ramble's own cancellation.
  *
  * Refused before anything is written when a booking cannot be refunded in full or when the impact
- * is not the one the person read. The pause and its audit row are `setExperiencePaused`'s one
- * transaction and commit first, so no new booking lands; the targets are read again after it.
- * Each cancellation is `cancelSession`, in a transaction of its own and safe to repeat, so a
- * failure part-way throws `PauseIncompleteError` with the progress, and repeating the action finds
- * the experience paused and cancels what is left. On a paused experience nothing new can be
- * booked, so a booking that cannot be refunded in full is reported and skipped, never a reason to
- * strand the other sessions. Runs in a Server Action only.
+ * is not the one the person read (both checks, and the fingerprint, apply only to the pause
+ * itself: on an experience that is already paused they are unused by design). The pause and its
+ * audit row are `setExperiencePaused`'s one transaction and commit first, so no new booking lands;
+ * the targets are read again after it.
+ *
+ * The walk after the pause is one `cancelSession` (its own transaction, each atomic and safe to
+ * repeat) per target, plus a read of the target's impact: N+1 transactions, bounded by
+ * `fanOutLimit`. Any failure after the pause commits throws `PauseIncompleteError` with the
+ * progress, and repeating the action finds the experience paused and cancels what is left. Which
+ * targets are skipped and how the answers are tallied is `src/lib/opsSessions.ts`. Runs in a Server
+ * Action only.
  */
 export async function pauseExperienceAndCancel(
   caller: Caller,
@@ -362,6 +370,7 @@ export async function pauseExperienceAndCancel(
 ): Promise<PauseOutcome> {
   requireOpsUserId(caller);
   const sessionId = WriteIdSchema.parse(input.sessionId);
+  const fingerprint = ImpactFingerprintSchema.parse(input.fingerprint);
   const [found] = await db
     .select({
       experienceId: sessions.experienceId,
@@ -381,7 +390,7 @@ export async function pauseExperienceAndCancel(
       await currentDatabaseTime(),
     );
     if (cancelBlocked(before.impact)) return { status: 'blocked' };
-    if (!impactIsCurrent(input.fingerprint, before.impact)) {
+    if (!impactIsCurrent(fingerprint, before.impact)) {
       return { status: 'stale' };
     }
     const paused = await setExperiencePaused(
@@ -393,24 +402,31 @@ export async function pauseExperienceAndCancel(
     if (paused.status !== 'paused') return { status: 'not_pausable' };
   }
 
-  const at = await currentDatabaseTime();
-  const { targets } = await readPauseImpact(db, found.experienceId, at);
-  let cancelled = 0;
-  let left = 0;
-  for (const target of targets) {
-    if (cancelBlocked(await readImpact(db, [target.id], at))) {
-      left += 1;
-      continue;
-    }
-    try {
-      const result = await cancelSession(caller, {
-        sessionId: target.id,
-        reason: 'ramble',
+  const steps: PauseStep[] = [];
+  let total = 0;
+  try {
+    const at = await currentDatabaseTime();
+    const { targets } = await readPauseImpact(db, found.experienceId, at);
+    total = targets.length;
+    for (const target of targets) {
+      if (!shouldCancelTarget(await readImpact(db, [target.id], at))) {
+        steps.push({ kind: 'skipped' });
+        continue;
+      }
+      steps.push({
+        kind: 'result',
+        result: await cancelSession(caller, {
+          sessionId: target.id,
+          reason: 'ramble',
+        }),
       });
-      if (result.status === 'cancelled') cancelled += 1;
-    } catch (error) {
-      throw new PauseIncompleteError(cancelled, targets.length, error);
     }
+  } catch (error) {
+    throw new PauseIncompleteError(
+      tallyPauseResults(steps).cancelled,
+      total,
+      error,
+    );
   }
-  return { status: 'paused', cancelled, total: targets.length, left };
+  return { status: 'paused', ...tallyPauseResults(steps) };
 }

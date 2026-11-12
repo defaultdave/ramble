@@ -44,14 +44,14 @@ setupRefundsDatabase(raise);
 // - pausing pauses the experience through the shared pause (its audit row, one transaction) and cancels each future session with guests, leaving empty and past sessions alone
 // - the pause counts only the sessions it actually cancelled
 // - an impact that changed since it was read, or a booking that cannot be refunded in full, refuses the pause before anything is written
-// - an experience that is not pausable is not paused
+// - an experience that is not pausable is not paused, and a fingerprint or session id that is malformed is refused
 // - a pause that fails part-way (one session's cancellation throws) leaves the experience paused and the rest cancelled, reports the progress, and a repeat completes the rest
 // - a repeat on a paused experience skips the blocked check, cancels what it can, and reports the blocked session as left, never stranding the others
 
 const opsUser = '5b3d7ad4-6f3c-4c2f-9d58-3a0a2f0e8a10';
 const ops = testCaller({ userId: opsUser, roles: [Role.Ops] });
 const day = 86_400_000;
-const wrong = '9:9:9:9:9';
+const wrong = '9:9:9:9:9:9';
 
 const refused: [string, () => Caller][] = [
   ['a guest', () => testCaller({ userId: randomUUID() })],
@@ -317,6 +317,7 @@ describe('pauseExperienceAndCancel', () => {
     expect(outcome).toEqual({
       status: 'paused',
       cancelled: 2,
+      alreadyCancelled: 0,
       total: 2,
       left: 0,
     });
@@ -388,6 +389,20 @@ describe('pauseExperienceAndCancel', () => {
     expect(await auditCount()).toBe(before);
   });
 
+  it.each(['', 'abc', '1:2:3', `${'9'.repeat(200)}:1:1:1:1:1`])(
+    'refuses a fingerprint that is not a fingerprint (%#) before reading anything',
+    async (fingerprint) => {
+      const session = await newSession();
+      await expect(
+        data.pauseExperienceAndCancel(ops, {
+          sessionId: session.id,
+          fingerprint,
+        }),
+      ).rejects.toThrow();
+      expect(await experienceStatus()).toBe('live');
+    },
+  );
+
   it('refuses a session id that is no id', async () => {
     await expect(
       data.pauseExperienceAndCancel(ops, {
@@ -438,7 +453,13 @@ describe('pauseExperienceAndCancel', () => {
         sessionId: first.id,
         fingerprint: wrong,
       }),
-    ).toEqual({ status: 'paused', cancelled: 2, total: 2, left: 0 });
+    ).toEqual({
+      status: 'paused',
+      cancelled: 2,
+      alreadyCancelled: 0,
+      total: 2,
+      left: 0,
+    });
 
     expect((await sessionOf(stuck.id)).status).toBe('cancelled');
     expect((await sessionOf(last.id)).status).toBe('cancelled');
@@ -459,7 +480,13 @@ describe('pauseExperienceAndCancel', () => {
         sessionId: fine.id,
         fingerprint: wrong,
       }),
-    ).toEqual({ status: 'paused', cancelled: 1, total: 2, left: 1 });
+    ).toEqual({
+      status: 'paused',
+      cancelled: 1,
+      alreadyCancelled: 0,
+      total: 2,
+      left: 1,
+    });
 
     expect((await sessionOf(fine.id)).status).toBe('cancelled');
     expect((await sessionOf(gifted.id)).status).toBe('scheduled');

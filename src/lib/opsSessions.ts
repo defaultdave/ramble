@@ -1,4 +1,6 @@
+import { z } from 'zod';
 import {
+  fanOutLimit,
   orderFanOut,
   type CancelSessionResult,
   type SessionCancelReason,
@@ -253,7 +255,11 @@ function impactFingerprint(impact: Impact): string {
   ].join(':');
 }
 
-const fingerprintPattern = /^\d{1,15}(?::\d{1,15}){5}$/;
+/** The impact a form was shown, as `impactFingerprint` wrote it: six counts and amounts joined by colons. The pattern has no nested repeat, so it is linear. */
+export const ImpactFingerprintSchema = z
+  .string()
+  .max(100)
+  .regex(/^\d{1,15}(?::\d{1,15}){5}$/);
 
 /** The bookings listed one by one; the rest are counted. */
 const impactListLimit = 50;
@@ -391,16 +397,13 @@ export type ImpactFormInput = Pick<OpsCancelInput, 'sessionId' | 'fingerprint'>;
 /** What the cancel and pause forms share: the session, the impact that was read, and the box ticked to say so. Nothing is repaired. */
 function parseImpactForm(get: FormGetter): ImpactFormInput | null {
   const sessionId = parseIdField(get('sessionId'));
-  const fingerprint = formText(get, 'fingerprint');
-  if (
-    sessionId === null ||
-    fingerprint === undefined ||
-    !fingerprintPattern.test(fingerprint) ||
-    !formHas(get, 'confirm')
-  ) {
+  const fingerprint = ImpactFingerprintSchema.safeParse(
+    formText(get, 'fingerprint'),
+  );
+  if (sessionId === null || !fingerprint.success || !formHas(get, 'confirm')) {
     return null;
   }
-  return { sessionId, fingerprint };
+  return { sessionId, fingerprint: fingerprint.data };
 }
 
 /** The cancel form: the impact form and a reason ops may give. */
@@ -626,7 +629,10 @@ export function pauseView(input: {
   impact: Impact;
 }): PauseView | null {
   const { plan, targetCount, impact } = input;
-  if (plan === 'not_pausable') return null;
+  // Nothing to pause, and on a paused experience nothing left to cancel: no panel.
+  if (plan === 'not_pausable' || (plan === 'finish' && targetCount === 0)) {
+    return null;
+  }
   const sessions = countLabel(targetCount, 'future session');
   return plan === 'pause'
     ? {
@@ -645,11 +651,59 @@ export function pauseView(input: {
       };
 }
 
-/** What pausing came to. `left` counts the sessions that could not be cancelled here (a booking blocks them); `incomplete` is a failure part-way. */
+/**
+ * What pausing came to. Of the `total` sessions it walked: `cancelled` were cancelled by this run,
+ * `alreadyCancelled` had been cancelled by someone else meanwhile (not a failure, and not this
+ * run's doing), and `left` are still scheduled (a booking blocks them, or the session was gone or
+ * over). `incomplete` is a failure part-way.
+ */
 export type PauseOutcome =
   | { status: 'not_found' | 'not_pausable' | 'blocked' | 'stale' }
-  | { status: 'paused'; cancelled: number; total: number; left: number }
+  | ({ status: 'paused' } & PauseTally)
   | { status: 'incomplete'; cancelled: number; total: number };
+
+export type PauseTally = {
+  cancelled: number;
+  alreadyCancelled: number;
+  left: number;
+  total: number;
+};
+
+/** One session of the pause walk: skipped because a booking on it cannot be refunded in full, or `cancelSession`'s answer. */
+export type PauseStep =
+  { kind: 'skipped' } | { kind: 'result'; result: CancelSessionResult };
+
+/** On a paused experience a session whose booking cannot be refunded in full is skipped and reported, never a reason to strand the others. */
+export function shouldCancelTarget(impact: Impact): boolean {
+  return !cancelBlocked(impact);
+}
+
+/**
+ * Tallies the walk, every step into exactly one count: a cancellation this run made is
+ * `cancelled`; one already made is `alreadyCancelled`; a skipped session, and any other answer
+ * (the session is over, or gone), is `left`, so the outcome never reads as complete over a
+ * session that was passed by.
+ */
+export function tallyPauseResults(steps: readonly PauseStep[]): PauseTally {
+  const tally: PauseTally = {
+    cancelled: 0,
+    alreadyCancelled: 0,
+    left: 0,
+    total: steps.length,
+  };
+  for (const step of steps) {
+    if (step.kind === 'skipped') {
+      tally.left += 1;
+    } else if (step.result.status === 'cancelled') {
+      tally.cancelled += 1;
+    } else if (step.result.status === 'already_cancelled') {
+      tally.alreadyCancelled += 1;
+    } else {
+      tally.left += 1;
+    }
+  }
+  return tally;
+}
 
 /** Thrown when a session's cancellation fails part-way through the pause: the experience is paused, and the sessions cancelled so far stay cancelled. */
 export class PauseIncompleteError extends Error {
@@ -672,6 +726,9 @@ export function pauseOutcomeHref(path: string, outcome: PauseOutcome): string {
         notice: outcome.left > 0 ? 'paused_some_left' : 'paused',
         done: String(outcome.cancelled),
         of: String(outcome.total),
+        ...(outcome.alreadyCancelled > 0
+          ? { already: String(outcome.alreadyCancelled) }
+          : {}),
       });
     case 'incomplete':
       return tableHref(path, {
@@ -684,27 +741,39 @@ export function pauseOutcomeHref(path: string, outcome: PauseOutcome): string {
   }
 }
 
-const countPattern = /^\d{1,5}$/;
+const countText = z
+  .string()
+  .regex(/^\d{1,5}$/)
+  .transform((text) => Math.min(Number(text), fanOutLimit));
 
-const parseCount = (raw: string | readonly string[] | undefined) =>
-  typeof raw === 'string' && countPattern.test(raw) ? Number(raw) : null;
+/** The counts a progress notice carries: how many sessions were cancelled, of how many, and how many were already cancelled. Digits only, clamped to what a pause can walk, and no part more than the whole. */
+const ProgressCountsSchema = z
+  .object({ done: countText, of: countText, already: countText.optional() })
+  .refine((counts) => counts.done + (counts.already ?? 0) <= counts.of);
 
 /** The notice the address names. A progress notice says how many of the sessions were cancelled when the address carries both counts. */
 export function sessionNotice(query: {
   notice?: string | readonly string[] | undefined;
   done?: string | readonly string[] | undefined;
   of?: string | readonly string[] | undefined;
+  already?: string | readonly string[] | undefined;
 }): NoticeText | null {
   const code = parseNotice(query.notice, opsSessionNoticeCodes);
   if (code === null) return null;
-  const done = parseCount(query.done);
-  const of = parseCount(query.of);
-  if (done === null || of === null || !progressCodes.some((c) => c === code)) {
+  const counts = ProgressCountsSchema.safeParse({
+    done: query.done,
+    of: query.of,
+    already: query.already,
+  });
+  if (!counts.success || !progressCodes.some((c) => c === code)) {
     return opsSessionNotices[code];
   }
+  const { done, of, already = 0 } = counts.data;
   const { tone, title } = opsSessionNotices[code];
+  const alreadyText =
+    already > 0 ? `, ${String(already)} already cancelled` : '';
   return {
     tone,
-    title: `${String(done)} of ${countLabel(of, 'session')} cancelled. ${title}`,
+    title: `${String(done)} of ${countLabel(of, 'session')} cancelled${alreadyText}. ${title}`,
   };
 }

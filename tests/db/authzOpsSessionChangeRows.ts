@@ -33,7 +33,7 @@ export function opsSessionChangeRows() {
       invoke: async (c: Caller, { sessionId }: Target) =>
         (await import('@/server/db/opsSessions')).pauseExperienceAndCancel(c, {
           sessionId,
-          fingerprint: '9:9:9:9:9',
+          fingerprint: '9:9:9:9:9:9',
         }),
       allows: sessionOps,
     },

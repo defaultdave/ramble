@@ -21,6 +21,9 @@ import {
   pausePlanFor,
   pauseView,
   sessionNotice,
+  shouldCancelTarget,
+  tallyPauseResults,
+  type PauseStep,
   parseSessionWhen,
   sessionImpact,
   sessionListDirection,
@@ -516,12 +519,12 @@ describe('audit rows', () => {
 // - the capacity change's audit row passes the audit log parser, and names the system when there is no user
 
 describe('parsePauseForm', () => {
-  const fields = { sessionId, fingerprint: '1:10800:0:2:0', confirm: 'on' };
+  const fields = { sessionId, fingerprint: '1:10800:0:2:1:0', confirm: 'on' };
 
   it('reads the id and the fingerprint, with the box ticked', () => {
     expect(parsePauseForm(form(fields))).toEqual({
       ok: true,
-      value: { sessionId, fingerprint: '1:10800:0:2:0' },
+      value: { sessionId, fingerprint: '1:10800:0:2:1:0' },
     });
   });
 
@@ -642,7 +645,7 @@ describe('pausePlanFor and pauseView', () => {
     expect(view?.impact.blockedText).toMatch(/has no payment/);
   });
 
-  it('on a paused experience offers to cancel the rest, even with a blocked booking among them, and is off with none left', () => {
+  it('on a paused experience offers to cancel the rest, even with a blocked booking among them, and shows no panel with none left', () => {
     const blocked = sessionImpact([order({ attempts: [] })], [], now);
     expect(pauseView(input({ plan: 'finish', impact: blocked }))).toMatchObject(
       {
@@ -650,9 +653,7 @@ describe('pausePlanFor and pauseView', () => {
         canPause: true,
       },
     );
-    expect(pauseView(input({ plan: 'finish', targetCount: 0 }))?.canPause).toBe(
-      false,
-    );
+    expect(pauseView(input({ plan: 'finish', targetCount: 0 }))).toBeNull();
   });
 
   it('is nothing for an experience with nothing to pause', () => {
@@ -665,11 +666,23 @@ describe('pauseOutcomeHref and sessionNotice', () => {
 
   it.each([
     [
-      { status: 'paused', cancelled: 3, total: 3, left: 0 },
+      {
+        status: 'paused',
+        cancelled: 3,
+        alreadyCancelled: 0,
+        total: 3,
+        left: 0,
+      },
       `${path}?notice=paused&done=3&of=3`,
     ],
     [
-      { status: 'paused', cancelled: 2, total: 3, left: 1 },
+      {
+        status: 'paused',
+        cancelled: 2,
+        alreadyCancelled: 0,
+        total: 3,
+        left: 1,
+      },
       `${path}?notice=paused_some_left&done=2&of=3`,
     ],
     [
@@ -749,5 +762,100 @@ describe('the capacity change audit row', () => {
         }),
       ).actorKind,
     ).toBe('system');
+  });
+});
+
+describe('tallyPauseResults and shouldCancelTarget', () => {
+  const cancelled = {
+    ordersRefunded: 1,
+    ordersVoided: 0,
+    holdsReleased: 0,
+    attemptsLeft: 0,
+  };
+  const result = (r: object) => ({ kind: 'result', result: r }) as PauseStep;
+  const steps: Record<string, PauseStep> = {
+    cancelled: result({ status: 'cancelled', ...cancelled }),
+    already: result({ status: 'already_cancelled', ...cancelled }),
+    completed: result({ status: 'completed' }),
+    gone: result({ status: 'not_found' }),
+    skipped: { kind: 'skipped' },
+  };
+
+  it.each([
+    ['cancelled', { cancelled: 1, alreadyCancelled: 0, left: 0 }],
+    ['already', { cancelled: 0, alreadyCancelled: 1, left: 0 }],
+    ['completed', { cancelled: 0, alreadyCancelled: 0, left: 1 }],
+    ['gone', { cancelled: 0, alreadyCancelled: 0, left: 1 }],
+    ['skipped', { cancelled: 0, alreadyCancelled: 0, left: 1 }],
+  ])('counts a %s step in exactly one place', (kind, counts) => {
+    expect(tallyPauseResults([steps[kind] as PauseStep])).toEqual({
+      ...counts,
+      total: 1,
+    });
+  });
+
+  it('counts every step once, so the parts add up to the whole', () => {
+    const all = Object.values(steps);
+    const tally = tallyPauseResults([...all, ...all]);
+    expect(tally).toEqual({
+      cancelled: 2,
+      alreadyCancelled: 2,
+      left: 6,
+      total: 10,
+    });
+    expect(tally.cancelled + tally.alreadyCancelled + tally.left).toBe(
+      tally.total,
+    );
+  });
+
+  it('is empty for no steps', () => {
+    expect(tallyPauseResults([])).toEqual({
+      cancelled: 0,
+      alreadyCancelled: 0,
+      left: 0,
+      total: 0,
+    });
+  });
+
+  it('skips a target whose bookings cannot be refunded in full, and cancels any other', () => {
+    expect(shouldCancelTarget(sessionImpact([order()], [], now))).toBe(true);
+    expect(
+      shouldCancelTarget(sessionImpact([order({ attempts: [] })], [], now)),
+    ).toBe(false);
+  });
+});
+
+describe('the progress notice counts', () => {
+  it('says how many were already cancelled', () => {
+    expect(
+      sessionNotice({
+        notice: 'paused_some_left',
+        done: '1',
+        of: '4',
+        already: '2',
+      })?.title,
+    ).toMatch(/^1 of 4 sessions cancelled, 2 already cancelled\. /);
+  });
+
+  it.each([
+    ['more done than the whole', { done: '5', of: '3' }],
+    [
+      'done and already adding past the whole',
+      { done: '2', of: '3', already: '2' },
+    ],
+    ['a count with a sign', { done: '-1', of: '3' }],
+    ['a count with a decimal', { done: '1.5', of: '3' }],
+    ['a count that is repeated', { done: ['1', '2'], of: '3' }],
+  ])('falls back to the plain notice for %s', (_name, counts) => {
+    expect(sessionNotice({ notice: 'pause_incomplete', ...counts })).toEqual(
+      opsSessionNotices.pause_incomplete,
+    );
+  });
+
+  it('clamps counts to the most a pause walks', () => {
+    expect(
+      sessionNotice({ notice: 'pause_incomplete', done: '99999', of: '99999' })
+        ?.title,
+    ).toMatch(/^5000 of 5000 sessions cancelled\. /);
   });
 });

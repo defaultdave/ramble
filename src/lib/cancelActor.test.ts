@@ -8,7 +8,7 @@ import {
 } from './cancelBooking';
 
 // Behaviours under test:
-// - the guest is the default actor and the order records the guest; an ops cancel is recorded as Ramble's
+// - the order records the guest for the guest actor; an ops cancel is recorded as Ramble's
 // - the cancellation's audit row names a guest by kind alone and an ops user by id, with the same details
 // - the ops audit row names the ops user and the order
 // - every row is one the audit log accepts
@@ -31,8 +31,8 @@ describe('who cancels', () => {
     expect(cancelledByFor(actor)).toBe(cancelledBy);
   });
 
-  it('audits a guest cancel by default, with no actor id', () => {
-    const entry = cancellationAuditEntry(ids);
+  it('audits a guest cancel with no actor id', () => {
+    const entry = cancellationAuditEntry(ids, guestCancelActor);
     expect(entry).toMatchObject({
       actorKind: 'guest',
       action: 'order.cancelled',
@@ -61,7 +61,7 @@ describe('who cancels', () => {
   });
 
   it.each([
-    ['a guest cancel', cancellationAuditEntry(ids)],
+    ['a guest cancel', cancellationAuditEntry(ids, guestCancelActor)],
     ['an ops cancel', cancellationAuditEntry(ids, { kind: 'ops', userId })],
     ['the ops row', opsCancelRequestedEntry(userId, ids.orderId)],
   ])('writes %s as a row the audit log accepts', (_name, entry) => {

@@ -3,6 +3,7 @@ import type { AuditEntryInput } from './audit';
 import { WriteIdSchema } from './catalog';
 import { confirmationDecision, type BookingEmailSource } from './bookingEmails';
 import {
+  CancelOrderInputSchema,
   cancelQuote,
   refundMinorFromText,
   type CancelBookingResult,
@@ -404,9 +405,9 @@ const cancelBasisLines = {
 } satisfies Record<RefundBasis, string>;
 
 /** What the cancel and refund data functions take: the booking and the refund ops was shown. */
-export const ExpectedRefundInputSchema = z.strictObject({
-  orderId: WriteIdSchema,
-  expectedRefundMinor: RefundMinorSchema,
+export const ExpectedRefundInputSchema = CancelOrderInputSchema.pick({
+  orderId: true,
+  expectedRefundMinor: true,
 });
 
 export type OpsCancelForm =

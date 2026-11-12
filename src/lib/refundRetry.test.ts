@@ -3,15 +3,15 @@ import { parseAuditEntry } from './audit';
 import {
   opsFullRefundRequest,
   refundAuditEntry,
-  retryPlan,
+  pickRetry,
 } from './refundRetry';
 
 // Behaviours under test:
 // - the whole-rest ops refund is one key for the order, naming the ops user
 // - a retry asks for the failed refund's own ticket part, never the rest of the order, under a key named for that refund
 // - it keeps the failed refund's reason when the refund path takes it, and uses the ops reason otherwise
-// - it stops for no order, an order not flagged, a gift purchase, no failed refund, and a failed refund with no ticket part
-// - it does not look at the booking's status: a confirmed booking's failed partial refund retries
+// - it stops for no order, an order not flagged, a gift purchase, and no failed refund to retry
+// - a failed refund with no ticket part, or whose retry already exists, is passed over and an older one is retried instead; when none is left it stops
 // - the audit row is valid and names the new refund by id, for a request and for a retry
 
 const orderId = '0f1e2d3c-4b5a-4697-8a9b-0c1d2e3f4a5b';
@@ -31,9 +31,21 @@ describe('opsFullRefundRequest', () => {
   });
 });
 
-describe('retryPlan', () => {
-  it("retries that refund's own ticket part under a key named for it, keeping a known reason", () => {
-    expect(retryPlan({ orderId, userId, order: flagged, failed })).toEqual({
+const idOf = (request: { key: string }) => `id-of-${request.key}`;
+const pick = (over: Partial<Parameters<typeof pickRetry>[0]> = {}) =>
+  pickRetry({
+    orderId,
+    userId,
+    order: flagged,
+    failed: [failed],
+    standingIds: new Set(),
+    refundIdOf: idOf,
+    ...over,
+  });
+
+describe('pickRetry', () => {
+  it("retries that refund's own ticket part under a name made from it, keeping a known reason", () => {
+    expect(pick()).toEqual({
       kind: 'retry',
       request: {
         orderId,
@@ -46,29 +58,56 @@ describe('retryPlan', () => {
   });
 
   it('uses the ops reason for a reason the refund path does not take', () => {
-    const plan = retryPlan({
-      orderId,
-      userId,
-      order: flagged,
-      failed: { ...failed, reason: 'gift_unredeemed' },
-    });
+    const plan = pick({ failed: [{ ...failed, reason: 'gift_unredeemed' }] });
     expect(plan.kind === 'retry' && plan.request.reason).toBe('ops_adjustment');
   });
 
   it.each([
-    ['no order', null, failed],
-    ['an order not flagged', { kind: 'booking', refundFailed: false }, failed],
-    ['a gift purchase', { kind: 'gift_purchase', refundFailed: true }, failed],
-    ['no failed refund', flagged, null],
+    ['no order', { order: null }],
     [
-      'a failed refund with no ticket part',
-      flagged,
-      { ...failed, ticketMinor: 0 },
+      'an order not flagged',
+      { order: { kind: 'booking', refundFailed: false } },
     ],
-  ] as const)('stops for %s', (_name, order, failedRefund) => {
-    expect(retryPlan({ orderId, userId, order, failed: failedRefund })).toEqual(
-      { kind: 'stop' },
-    );
+    [
+      'a gift purchase',
+      { order: { kind: 'gift_purchase', refundFailed: true } },
+    ],
+    ['no failed refund', { failed: [] }],
+  ] as const)('stops for %s', (_name, over) => {
+    expect(pick(over)).toEqual({ kind: 'stop' });
+  });
+
+  it('passes over a newest failed refund with no ticket part, so it cannot block an older valid one', () => {
+    const plan = pick({
+      failed: [
+        { id: 'newest', reason: 'goodwill', ticketMinor: 0 },
+        { id: 'older', reason: 'goodwill', ticketMinor: 2000 },
+      ],
+    });
+    expect(plan.kind === 'retry' && plan.request.key).toBe('retry:older');
+  });
+
+  it('passes over a failed refund whose retry already exists, so an older one is not stuck', () => {
+    const plan = pick({
+      failed: [
+        { id: 'newer', reason: 'goodwill', ticketMinor: 4000 },
+        { id: 'older', reason: 'goodwill', ticketMinor: 3000 },
+      ],
+      standingIds: new Set(['id-of-retry:newer']),
+    });
+    expect(plan.kind === 'retry' && plan.request).toMatchObject({
+      key: 'retry:older',
+      ticketMinor: 3000,
+    });
+  });
+
+  it('stops when every failed refund is passed over', () => {
+    expect(
+      pick({
+        failed: [{ id: 'a', reason: 'goodwill', ticketMinor: 0 }, failed],
+        standingIds: new Set(['id-of-retry:f1']),
+      }),
+    ).toEqual({ kind: 'stop' });
   });
 });
 

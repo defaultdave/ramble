@@ -2,7 +2,7 @@ import 'server-only';
 import { and, desc, eq } from 'drizzle-orm';
 import { reconcileReadLimit } from '@/lib/cancelBooking';
 import { WriteIdSchema } from '@/lib/catalog';
-import { refundAuditEntry, retryPlan } from '@/lib/refundRetry';
+import { pickRetry, refundAuditEntry } from '@/lib/refundRetry';
 import type { Caller } from '@/server/auth/caller';
 import { requireOpsUserId } from './audit';
 import { db } from './client';
@@ -56,14 +56,14 @@ export async function retryFailedRefund(
           .limit(reconcileReadLimit)
       ).map((row) => row.id),
     );
-    const retryPlanFor = (failed: (typeof failedRefunds)[number] | null) =>
-      retryPlan({ orderId: id, userId, order: order ?? null, failed });
-    const failed =
-      failedRefunds.find((candidate) => {
-        const plan = retryPlanFor(candidate);
-        return plan.kind === 'stop' || !standing.has(refundIdFor(plan.request));
-      }) ?? null;
-    const plan = retryPlanFor(failed);
+    const plan = pickRetry({
+      orderId: id,
+      userId,
+      order: order ?? null,
+      failed: failedRefunds,
+      standingIds: standing,
+      refundIdOf: refundIdFor,
+    });
     if (plan.kind === 'stop') return 'refused';
     const result = await requestAuditedRefund(tx, plan.request, (refundId) =>
       refundAuditEntry('booking.ops_refund_retried', userId, id, refundId),

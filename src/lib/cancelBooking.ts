@@ -248,7 +248,7 @@ export function cancellationAuditEntry(
     seatsReturned: number;
     giftReinstated: boolean;
   },
-  actor: CancelActor = guestCancelActor,
+  actor: CancelActor,
 ): AuditEntryInput {
   return {
     ...(actor.kind === 'ops'

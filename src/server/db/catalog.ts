@@ -120,7 +120,8 @@ export async function listHostExperiences(
   return HostExperienceSchema.array().parse(rows);
 }
 
-/** The row is read once and its host checked before it is returned, so the owner of another host learns nothing from it. No page calls it yet: /host/experiences shows every fact in its list. */
+// TODO(U-125): first caller; no unit plans a host-side experience detail or editing page, and /host/experiences shows every fact in its list
+/** The row is read once and its host checked before it is returned, so the owner of another host learns nothing from it. */
 export async function getHostExperience(
   caller: Caller,
   id: string,

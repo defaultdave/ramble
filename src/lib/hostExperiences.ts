@@ -1,9 +1,10 @@
+import { cancellationTerms } from './cancellation';
 import { priceKindLabel, type HostExperience } from './catalog';
 import {
   experienceStatusLabels,
   experienceStatusTones,
 } from './experienceEditor';
-import type { HostAccess } from './hostAccess';
+import { hostAreaResult, type HostAccess } from './hostAccess';
 import { formatPrice } from './money';
 import type { StatusTone } from './statusBadge';
 
@@ -17,21 +18,14 @@ export type HostExperienceRowView = {
   name: string;
   statusLabel: string;
   statusTone: StatusTone;
-  /** One line per price option, "Adult $85", the adult price first. */
-  prices: string[];
-  /** The tier by name and what it refunds. */
+  /** The price options in one line, "Adult $85 · Child $42.50", the adult price first. */
+  pricesLabel: string;
+  /** The tier by name and its terms, worded as the ops editor and the guest pages word them. */
   cancellation: string;
   waiver: string;
 };
 
 export type HostExperiencesView = { rows: HostExperienceRowView[] };
-
-/** The refund window of a tier in words: the one place that turns its hours into a sentence. */
-export function refundWindowLabel(hoursBefore: number): string {
-  if (hoursBefore === 0) return 'full refund until the session starts';
-  const unit = hoursBefore === 1 ? 'hour' : 'hours';
-  return `full refund up to ${String(hoursBefore)} ${unit} before`;
-}
 
 export function buildHostExperiences(
   experiences: readonly HostExperience[],
@@ -42,11 +36,16 @@ export function buildHostExperiences(
       name: experience.name,
       statusLabel: experienceStatusLabels[experience.status],
       statusTone: experienceStatusTones[experience.status],
-      prices: experience.priceOptions.map(
-        (option) =>
-          `${priceKindLabel(option.kind)} ${formatPrice(option.priceMinor)}`,
-      ),
-      cancellation: `${experience.cancellationTier.name}: ${refundWindowLabel(experience.cancellationTier.fullRefundHoursBefore)}`,
+      pricesLabel:
+        experience.priceOptions.length === 0
+          ? 'None set'
+          : experience.priceOptions
+              .map(
+                (option) =>
+                  `${priceKindLabel(option.kind)} ${formatPrice(option.priceMinor)}`,
+              )
+              .join(' · '),
+      cancellation: `${experience.cancellationTier.name}: ${cancellationTerms(experience.cancellationTier).fact}`,
       waiver: experience.waiverRequired
         ? 'Guests accept a waiver'
         : 'No waiver',
@@ -59,14 +58,13 @@ export type HostExperiencesResult =
   | { status: 'refused' }
   | { status: 'ok'; view: HostExperiencesView };
 
-/** What the page does with a request: nobody signed in is told to sign in, and anyone else who owns no host is refused. */
+/** What the page does with a request; see `hostAreaResult`. */
 export function hostExperiencesResult(
   access: HostAccess,
   experiences: readonly HostExperience[] | null,
 ): HostExperiencesResult {
-  if (access.kind === 'signed_out') return { status: 'signed_out' };
-  if (access.kind === 'not_a_host_owner' || experiences === null) {
-    return { status: 'refused' };
-  }
-  return { status: 'ok', view: buildHostExperiences(experiences) };
+  return hostAreaResult(access, experiences, (read) => ({
+    status: 'ok',
+    view: buildHostExperiences(read),
+  }));
 }

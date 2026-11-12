@@ -100,28 +100,54 @@ const FieldsSchema = z.strictObject({
   ownerEmail: optionalEmail.optional(),
 });
 
+const hostTextFields = [
+  'name',
+  'slug',
+  'description',
+  'timeZone',
+  'notificationEmail',
+  'ownerEmail',
+] as const satisfies readonly HostFormField[];
+
+/**
+ * Reads `fields` from a posted form and parses them with `schema`. A field over the raw limit is
+ * refused unread (`sized` names the fields whose size is checked), and
+ * every field the schema refuses is named, in the list's order.
+ */
+function readTextFields<
+  Field extends HostFormField,
+  Schema extends z.ZodType,
+  Sized extends HostFormField,
+>(
+  get: FormGetter,
+  fields: readonly Field[],
+  schema: Schema,
+  sized: readonly Sized[],
+):
+  | { ok: true; data: z.output<Schema> }
+  | { ok: false; fields: (Field | Sized)[] } {
+  const oversized = oversizedFields(get, sized, hostLimits.rawField);
+  if (oversized.length > 0) return { ok: false, fields: oversized };
+  const parsed = schema.safeParse(
+    Object.fromEntries(fields.map((field) => [field, formText(get, field)])),
+  );
+  return parsed.success
+    ? { ok: true, data: parsed.data }
+    : { ok: false, fields: fieldsFromIssues(parsed.error.issues, fields) };
+}
+
 function parseFields(
   get: FormGetter,
   options: { requireOwner: boolean; deriveSlug: boolean },
 ): HostFormResult<HostInput & { ownerEmail: string | null }> {
-  const oversized = oversizedFields(get, hostFormFields, hostLimits.rawField);
-  if (oversized.length > 0) return { ok: false, fields: oversized };
-
-  const parsed = FieldsSchema.safeParse({
-    name: formText(get, 'name'),
-    slug: formText(get, 'slug'),
-    description: formText(get, 'description'),
-    timeZone: formText(get, 'timeZone'),
-    notificationEmail: formText(get, 'notificationEmail'),
-    ownerEmail: formText(get, 'ownerEmail'),
-  });
+  const parsed = readTextFields(
+    get,
+    hostTextFields,
+    FieldsSchema,
+    hostFormFields,
+  );
   const failed = new Set<HostFormField>();
-  if (!parsed.success) {
-    return {
-      ok: false,
-      fields: fieldsFromIssues(parsed.error.issues, hostFormFields),
-    };
-  }
+  if (!parsed.ok) return parsed;
   const { data } = parsed;
   const slug = slugFor(
     data.name,
@@ -204,27 +230,17 @@ export function parseHostSettingsForm(
 ):
   | { ok: true; value: HostSettingsInput }
   | { ok: false; fields: HostSettingsField[] } {
-  const oversized = oversizedFields(
+  const parsed = readTextFields(
     get,
     hostSettingsFields,
-    hostLimits.rawField,
+    FieldsSchema.pick(
+      Object.fromEntries(hostSettingsFields.map((field) => [field, true])) as {
+        [Field in HostSettingsField]: true;
+      },
+    ),
+    hostSettingsFields,
   );
-  if (oversized.length > 0) return { ok: false, fields: oversized };
-  const parsed = FieldsSchema.pick({
-    name: true,
-    description: true,
-    notificationEmail: true,
-  }).safeParse({
-    name: formText(get, 'name'),
-    description: formText(get, 'description'),
-    notificationEmail: formText(get, 'notificationEmail'),
-  });
-  if (!parsed.success) {
-    return {
-      ok: false,
-      fields: fieldsFromIssues(parsed.error.issues, hostSettingsFields),
-    };
-  }
+  if (!parsed.ok) return parsed;
   const { name, description, notificationEmail } = parsed.data;
   return {
     ok: true,

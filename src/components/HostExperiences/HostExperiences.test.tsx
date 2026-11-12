@@ -36,7 +36,7 @@ describe('HostExperiences', () => {
     expect(first).toHaveTextContent('Live');
     expect(first).toHaveTextContent('Adult $65 · Child $32.50');
     expect(first).toHaveTextContent(
-      'Flexible: full refund up to 24 hours before',
+      'Flexible: Free cancellation up to 24 hours before',
     );
     expect(first).toHaveTextContent('Guests accept a waiver');
     expect(items[1]).toHaveTextContent('In review');

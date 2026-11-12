@@ -1,16 +1,17 @@
 import 'server-only';
 import { eq } from 'drizzle-orm';
-import type { CacheChange } from '@/lib/cacheTags';
 import { EntityIdSchema } from '@/lib/catalog';
-import { hostUpdatedEntry } from '@/lib/hostAudit';
+import {
+  hostSettingsChanges,
+  type HostSettingsSaveResult,
+} from '@/lib/hostSettings';
 import { changedHostSettings, type HostSettingsInput } from '@/lib/hostSetup';
 import { Role, requireRole, type Caller } from '@/server/auth/caller';
-import { requireUserId, writeAudit } from './audit';
+import { requireUserId } from './audit';
 import { db } from './client';
+import { saveHostFields } from './hostFields';
 import { withLockedHost } from './lockedExperience';
 import { experiences, hosts } from './schema';
-
-export type UpdateHostSettingsResult = 'updated' | 'unchanged' | 'not_found';
 
 /** The settings of the host the caller owns, or null when the host is gone. The caller is checked against `hostId` before anything is read. */
 export async function readHostSettings(
@@ -33,52 +34,41 @@ export async function readHostSettings(
 
 /**
  * Saves the name, about text and notice address of the host the caller owns. The host row is
- * locked, the change and its audit row are one transaction, and nothing differing writes nothing,
- * audit row included. A new name or about text is shown on the host page and on every experience
- * of the host, so those caches are invalidated after the commit; a new notice address is shown to
- * no guest. Runs in a Server Action only.
+ * locked, and the change and its audit row are one transaction (`saveHostFields`). A new name or
+ * about text invalidates the host page and the host's experiences after the commit
+ * (`hostSettingsChanges`). Runs in a Server Action only.
  */
 export async function updateHostSettings(
   caller: Caller,
   hostId: string,
   input: HostSettingsInput,
-): Promise<UpdateHostSettingsResult> {
+): Promise<HostSettingsSaveResult> {
   requireRole(caller, Role.HostOwner, { hostId });
   const userId = requireUserId(caller, Role.HostOwner);
-  return withLockedHost<UpdateHostSettingsResult>(
+  return withLockedHost<HostSettingsSaveResult>(
     hostId,
     'not_found',
     async (tx, host) => {
-      const [current] = await tx
-        .select({
-          name: hosts.name,
-          description: hosts.description,
-          notificationEmail: hosts.notificationEmail,
-        })
-        .from(hosts)
-        .where(eq(hosts.id, host.id));
-      if (!current) return { result: 'not_found', changes: [] };
-      const changed = changedHostSettings(current, input);
+      const changed = await saveHostFields(
+        tx,
+        userId,
+        host.id,
+        input,
+        (current) => changedHostSettings(current, input),
+      );
+      if (changed === null) return { result: 'not_found', changes: [] };
       if (changed.length === 0) return { result: 'unchanged', changes: [] };
-      await tx.update(hosts).set(input).where(eq(hosts.id, host.id));
-      await writeAudit(tx, hostUpdatedEntry(userId, host.id, changed));
-      const shownToGuests =
-        changed.includes('name') || changed.includes('description');
-      const changes: CacheChange[] = [];
-      if (shownToGuests) {
-        const owned = await tx
-          .select({ id: experiences.id })
-          .from(experiences)
-          .where(eq(experiences.hostId, host.id));
-        changes.push(
-          { kind: 'hostProfile' },
-          ...owned.map(({ id }): CacheChange => ({
-            kind: 'experience',
-            experienceId: id,
-          })),
-        );
-      }
-      return { result: 'updated', changes };
+      const owned = await tx
+        .select({ id: experiences.id })
+        .from(experiences)
+        .where(eq(experiences.hostId, host.id));
+      return {
+        result: 'updated',
+        changes: hostSettingsChanges(
+          changed,
+          owned.map(({ id }) => id),
+        ),
+      };
     },
   );
 }

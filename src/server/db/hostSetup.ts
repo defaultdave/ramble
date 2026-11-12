@@ -4,7 +4,6 @@ import {
   hostCreatedEntry,
   hostFormEntry,
   hostListEntry,
-  hostUpdatedEntry,
   hostViewEntry,
 } from '@/lib/hostAudit';
 import {
@@ -24,6 +23,7 @@ import { splitPage } from '@/lib/pagination';
 import type { Caller } from '@/server/auth/caller';
 import { recordAudit, requireOpsUserId, writeAudit } from './audit';
 import { db, dbRead } from './client';
+import { saveHostFields } from './hostFields';
 import { byNameThenId, pastNameCursor } from './keysetPage';
 import {
   getCurrentLegalDocument,
@@ -121,26 +121,17 @@ export async function updateHost(
   const userId = requireOpsUserId(caller);
   try {
     return await db.transaction(async (tx) => {
-      const [current] = await tx
-        .select()
-        .from(hosts)
-        .where(eq(hosts.id, hostId))
-        .for('update');
-      if (!current) return { status: 'not_found' } as const;
-      const changed = changedHostFields(
-        {
-          name: current.name,
-          slug: current.slug,
-          description: current.description,
-          timeZone: current.timeZone,
-          notificationEmail: current.notificationEmail,
-        },
+      const changed = await saveHostFields(
+        tx,
+        userId,
+        hostId,
         input,
+        (current) => changedHostFields(current, input),
       );
-      if (changed.length === 0) return { status: 'unchanged' } as const;
-      await tx.update(hosts).set(input).where(eq(hosts.id, hostId));
-      await writeAudit(tx, hostUpdatedEntry(userId, hostId, changed));
-      return { status: 'updated' } as const;
+      if (changed === null) return { status: 'not_found' } as const;
+      return {
+        status: changed.length === 0 ? 'unchanged' : 'updated',
+      } as const;
     });
   } catch (error) {
     if (isSlugTakenError(error)) return { status: 'slug_taken' };

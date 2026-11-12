@@ -56,13 +56,37 @@ export function hostDashboardResult(
   access: HostAccess,
   data: HostDashboardData | null,
 ): HostDashboardResult {
+  return hostAreaResult(
+    access,
+    data,
+    (read, who) => ({
+      status: 'ok',
+      view: buildHostDashboard(read),
+      canManage: ownedHostId(who) !== null,
+    }),
+    true,
+  );
+}
+
+/**
+ * The one decision every host page makes about a request: nobody signed in is told to sign in;
+ * anyone else who holds no host role is refused, and so is staff unless the page allows them (the
+ * dashboard does; settings and the experience list are an owner's), as is a caller whose host no
+ * longer exists (`data` null); anyone else gets what `ok` makes of it.
+ */
+export function hostAreaResult<Data, Ok extends { status: 'ok' }>(
+  access: HostAccess,
+  data: Data | null,
+  ok: (data: Data, access: HostAccess) => Ok,
+  allowStaff = false,
+): { status: 'signed_out' } | { status: 'refused' } | Ok {
   if (access.kind === 'signed_out') return { status: 'signed_out' };
-  if (access.kind === 'no_host_role' || data === null) {
+  if (
+    access.kind === 'no_host_role' ||
+    (access.kind === 'staff' && !allowStaff) ||
+    data === null
+  ) {
     return { status: 'refused' };
   }
-  return {
-    status: 'ok',
-    view: buildHostDashboard(data),
-    canManage: ownedHostId(access) !== null,
-  };
+  return ok(data, access);
 }

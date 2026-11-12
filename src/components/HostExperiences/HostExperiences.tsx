@@ -17,7 +17,7 @@ function ExperienceCard({ row }: { row: HostExperienceRowView }) {
       <StatusBadge tone={row.statusTone} label={row.statusLabel} />
       <dl className={styles.facts}>
         <dt>Prices</dt>
-        <dd>{row.prices.length === 0 ? 'None set' : row.prices.join(' · ')}</dd>
+        <dd>{row.pricesLabel}</dd>
         <dt>Cancellation</dt>
         <dd>{row.cancellation}</dd>
         <dt>Waiver</dt>

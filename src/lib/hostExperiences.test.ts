@@ -1,16 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { HostExperience } from './catalog';
-import {
-  buildHostExperiences,
-  hostExperiencesResult,
-  refundWindowLabel,
-} from './hostExperiences';
+import { buildHostExperiences, hostExperiencesResult } from './hostExperiences';
 
 // Behaviours under test, one per decision, branch, or risk:
 // - a row carries the experience's name, its status in words with the status's tone, and its waiver
 // - prices are one line per option in the order given, adult first, a whole dollar without cents
-// - the cancellation line names the tier and its refund window, with hour, hours, and the start itself worded apart
-// - an experience with no price options shows none, and a host with no experiences shows no rows
+// - the cancellation line names the tier and uses the guests' own terms: until the start, hours, and whole days
+// - an experience with no price options says none are set, and a host with no experiences shows no rows
 // - a request is signed out, refused (not an owner), or shows the rows, empty ones included
 
 const id = (n: number) =>
@@ -78,8 +74,8 @@ describe('buildHostExperiences', () => {
         name: 'Sunset kayak',
         statusLabel: 'Live',
         statusTone: 'success',
-        prices: ['Adult $65', 'Child $32.50'],
-        cancellation: 'Flexible: full refund up to 24 hours before',
+        pricesLabel: 'Adult $65 · Child $32.50',
+        cancellation: 'Flexible: Free cancellation up to 24 hours before',
         waiver: 'No waiver',
       },
     ]);
@@ -104,7 +100,7 @@ describe('buildHostExperiences', () => {
 
   it('has no prices for an experience with no options', () => {
     const [row] = buildHostExperiences([experience({ priceOptions: [] })]).rows;
-    expect(row?.prices).toEqual([]);
+    expect(row?.pricesLabel).toBe('None set');
   });
 
   it('has no rows for a host with no experiences', () => {
@@ -112,13 +108,21 @@ describe('buildHostExperiences', () => {
   });
 });
 
-describe('refundWindowLabel', () => {
+describe('the cancellation line', () => {
   it.each([
-    [0, 'full refund until the session starts'],
-    [1, 'full refund up to 1 hour before'],
-    [48, 'full refund up to 48 hours before'],
-  ])('%i hours: %s', (hours, label) => {
-    expect(refundWindowLabel(hours)).toBe(label);
+    [0, 'Flexible: Free cancellation until it starts'],
+    [24, 'Flexible: Free cancellation up to 24 hours before'],
+    [168, 'Flexible: Free cancellation up to 7 days before'],
+  ])('%i hours: %s', (hours, line) => {
+    const [row] = buildHostExperiences([
+      experience({
+        cancellationTier: {
+          ...experience().cancellationTier,
+          fullRefundHoursBefore: hours,
+        },
+      }),
+    ]).rows;
+    expect(row?.cancellation).toBe(line);
   });
 });
 
@@ -132,8 +136,14 @@ describe('hostExperiencesResult', () => {
     ],
     [
       'a signed-in person who owns no host',
-      { kind: 'not_a_host_owner' } as const,
+      { kind: 'no_host_role' } as const,
       null,
+      { status: 'refused' },
+    ],
+    [
+      'host staff, who only read sessions and guest lists',
+      { kind: 'staff', hostId: 'h1' } as const,
+      [],
       { status: 'refused' },
     ],
     [

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { hostSettingsResult } from './hostSettings';
+import {
+  hostSettingsChanges,
+  hostSettingsGate,
+  hostSettingsResult,
+  hostSettingsSaveNext,
+} from './hostSettings';
 import {
   changedHostSettings,
   hostLimits,
@@ -16,6 +21,9 @@ import {
 // - the changed settings are exactly the ones that differ, in form order
 // - a request is signed out, refused (no host, or a host that is gone), or shows the settings
 // - the save notices are the ops host form's
+// - a save is gated before the form is read: an owner goes on with their own host, nobody signed in goes to sign in, anyone else back to the page
+// - a save ends at the page: a refused form with its fields, a save or no difference with its notice, a gone host with none
+// - a new name or about text invalidates the host page and each experience of the host; a new notice address alone invalidates nothing
 
 const formOf = (fields: Record<string, unknown>) => (name: string) =>
   fields[name];
@@ -148,7 +156,13 @@ describe('hostSettingsResult', () => {
     ],
     [
       'a signed-in person who owns no host',
-      { kind: 'not_a_host_owner' } as const,
+      { kind: 'no_host_role' } as const,
+      values,
+      { status: 'refused' },
+    ],
+    [
+      'host staff, who change nothing',
+      { kind: 'staff', hostId: 'h1' } as const,
       values,
       { status: 'refused' },
     ],
@@ -176,5 +190,75 @@ describe('the save notices', () => {
     ['invalid', 'danger'],
   ])('%s is shown as %s', (code, tone) => {
     expect(hostPageNotice(code)?.tone).toBe(tone);
+  });
+});
+
+describe('hostSettingsGate', () => {
+  it.each([
+    ['an owner', { kind: 'owner', hostId: 'h1' } as const, { hostId: 'h1' }],
+    [
+      'nobody signed in',
+      { kind: 'signed_out' } as const,
+      { next: '/sign-in?next=%2Fhost%2Fsettings' },
+    ],
+    [
+      'a person who owns no host',
+      { kind: 'no_host_role' } as const,
+      { next: '/host/settings' },
+    ],
+    [
+      'host staff',
+      { kind: 'staff', hostId: 'h1' } as const,
+      { next: '/host/settings' },
+    ],
+  ])('%s', (_case, access, expected) => {
+    expect(hostSettingsGate(access)).toEqual(expected);
+  });
+});
+
+describe('hostSettingsSaveNext', () => {
+  it.each([
+    [
+      'a refused form',
+      { status: 'invalid', fields: ['name', 'notificationEmail'] } as const,
+      '/host/settings?notice=invalid&fields=name%2CnotificationEmail',
+    ],
+    ['a save', { status: 'updated' } as const, '/host/settings?notice=updated'],
+    [
+      'no difference',
+      { status: 'unchanged' } as const,
+      '/host/settings?notice=unchanged',
+    ],
+    ['a host that is gone', { status: 'not_found' } as const, '/host/settings'],
+  ])('%s', (_case, outcome, expected) => {
+    expect(hostSettingsSaveNext(outcome)).toBe(expected);
+  });
+});
+
+describe('hostSettingsChanges', () => {
+  const profile = [
+    { kind: 'hostProfile' },
+    { kind: 'experience', experienceId: 'e1' },
+    { kind: 'experience', experienceId: 'e2' },
+  ];
+
+  it.each([
+    ['a new name', ['name'] as const, profile],
+    ['a new about text', ['description'] as const, profile],
+    [
+      'all three',
+      ['name', 'description', 'notificationEmail'] as const,
+      profile,
+    ],
+    ['the notice address alone', ['notificationEmail'] as const, []],
+    ['nothing', [] as const, []],
+  ])('%s', (_case, changed, expected) => {
+    expect(hostSettingsChanges(changed, ['e1', 'e2'])).toEqual(expected);
+  });
+
+  it('still invalidates the host page for a host with no experiences', () => {
+    expect(hostSettingsChanges(['name'], [])).toEqual([
+      { kind: 'hostProfile' },
+    ]);
   });
 });

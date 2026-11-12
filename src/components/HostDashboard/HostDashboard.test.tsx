@@ -26,7 +26,7 @@ describe('HostDashboard', () => {
   });
 
   it('links to the host pages', () => {
-    render(<HostDashboard view={busy} />);
+    render(<HostDashboard view={busy} links={hostNavLinks(true)} />);
     expect(
       screen.getByRole('link', { name: 'Your experiences' }),
     ).toHaveAttribute('href', '/host/experiences');

@@ -33,6 +33,11 @@ export const opsNavLinks: readonly OpsNavLink[] = [
     summary: 'Read guests’ messages, and mark each resolved with a note.',
   },
   {
+    label: 'Review queue',
+    href: '/ops/review',
+    summary: 'Approve experiences waiting for review, or send them back.',
+  },
+  {
     label: 'Staff',
     href: '/ops/staff',
     summary: 'Invite Ramble staff and remove their access.',

@@ -145,6 +145,14 @@ export function noticeHref(
 /** What sending an invite's sign-in link comes to; `not_found` is a person or row that is gone. */
 export type InviteResult = 'sent' | 'rate_limited' | 'failed' | 'not_found';
 
+/** The notice an invite action names for a result, from the codes its page uses for each. One mapper, so no page re-decides what a refused or failed link means. */
+export function inviteNoticeFor<C extends string>(
+  result: InviteResult,
+  codes: Readonly<Record<InviteResult, C>>,
+): C {
+  return codes[result];
+}
+
 /** The notices every invite action shares, whoever is being invited. */
 export const inviteFailureNotices = {
   invite_failed: {

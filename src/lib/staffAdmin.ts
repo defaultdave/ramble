@@ -15,6 +15,8 @@ import { parseSingle } from './filters';
 import {
   formText,
   inviteFailureNotices,
+  inviteNoticeFor,
+  parseProblemFields,
   type FormGetter,
   type InviteResult,
   type NoticeText,
@@ -28,11 +30,14 @@ import { isoDateOf } from './time';
 export const staffPath = '/ops/staff';
 export const auditPath = '/ops/audit';
 
+/** The one grant staff admin gives and takes back: ops, which names no host. Admin is granted and removed from the command line only. */
+export const staffGrant = {
+  role: 'ops',
+  hostId: null,
+} as const satisfies RoleGrant;
+
 /** Staff land on the ops area after signing in with the link. */
 export const staffLandingPath = '/ops';
-
-/** The role an invite gives. Admin is granted only from the command line, where the person holds the database. */
-export const invitedRole = 'ops' as const satisfies GrantableRole;
 
 export const staffInviteField = 'email';
 
@@ -124,7 +129,10 @@ export function staffInviteNotice(
   result: InviteResult,
   afterInvite: boolean,
 ): StaffNoticeCode {
-  return (afterInvite ? grantedInviteNotices : inviteNotices)[result];
+  return inviteNoticeFor(
+    result,
+    afterInvite ? grantedInviteNotices : inviteNotices,
+  );
 }
 
 export function revokeNotice(
@@ -135,12 +143,24 @@ export function revokeNotice(
   return outcome;
 }
 
-export const staffRoleLabels: Readonly<Record<GrantableRole, string>> = {
+const staffRoleLabels: Readonly<Record<GrantableRole, string>> = {
   ops: 'Ops',
   admin: 'Admin',
   host_owner: 'Host owner',
   host_staff: 'Host staff',
 };
+
+/** The roles of one staff row as words, for the table. */
+export function staffRolesText(roles: readonly GrantableRole[]): string {
+  return roles.map((role) => staffRoleLabels[role]).join(', ');
+}
+
+/** Whether the address names the invite field as needing another look. */
+export function hasStaffInviteProblem(
+  raw: string | readonly string[] | undefined,
+): boolean {
+  return parseProblemFields(raw, [staffInviteField]).length > 0;
+}
 
 export type StaffRow = {
   userId: string;
@@ -197,6 +217,11 @@ export function parseAuditCursor(
   raw: string | readonly string[] | undefined,
 ): number {
   return parseSingle(raw, CursorSchema) ?? 0;
+}
+
+/** The cursor the audit table shows as where this page started: none on the first page. */
+export function auditCursorLabel(afterId: number): string | null {
+  return afterId === 0 ? null : String(afterId);
 }
 
 export type AuditViewRow = {

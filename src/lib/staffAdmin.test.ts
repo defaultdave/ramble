@@ -3,7 +3,9 @@ import { parseAuditEntry, type AuditRow } from './audit';
 import {
   auditDetailsLabel,
   auditViewRow,
+  auditCursorLabel,
   groupStaff,
+  hasStaffInviteProblem,
   parseAuditCursor,
   parseAuditDay,
   parseStaffEmail,
@@ -12,6 +14,7 @@ import {
   staffInviteNotice,
   staffNoticeCodes,
   staffNotices,
+  staffRolesText,
 } from './staffAdmin';
 
 // Behaviours under test:
@@ -55,6 +58,35 @@ describe('revokeRefusal', () => {
       expect(revokeRefusal(actor, target, grant)).toBe(expected);
     },
   );
+});
+
+describe('staffRolesText', () => {
+  it.each([
+    [['ops'], 'Ops'],
+    [['ops', 'admin'], 'Ops, Admin'],
+    [[], ''],
+  ] as const)('%j reads %j', (roles, expected) => {
+    expect(staffRolesText(roles)).toBe(expected);
+  });
+});
+
+describe('hasStaffInviteProblem and auditCursorLabel', () => {
+  it.each([
+    ['email', true],
+    ['email,other', true],
+    ['other', false],
+    [undefined, false],
+    [['email', 'email'], false],
+  ])('the fields %j make the invite problem %s', (raw, expected) => {
+    expect(hasStaffInviteProblem(raw)).toBe(expected);
+  });
+
+  it.each([
+    [0, null],
+    [42, '42'],
+  ])('a start after row %s is labelled %j', (afterId, expected) => {
+    expect(auditCursorLabel(afterId)).toBe(expected);
+  });
 });
 
 describe('groupStaff', () => {

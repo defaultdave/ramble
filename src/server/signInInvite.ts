@@ -34,6 +34,7 @@ export async function sendSignInInvite(
     if (!decision.allowed) return 'rate_limited';
     await recordAudit(invite.audit);
     const token = await createSignInLinkToken(invite.email);
+    // Outside the outbox, as auth.ts sends its own links: a failed send leaves the grant, the notice says so, and a resend exists.
     await sendEmail(invite.request(token));
     return 'sent';
   } catch (error) {

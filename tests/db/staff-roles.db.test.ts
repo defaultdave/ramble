@@ -270,6 +270,14 @@ describe('revoking', () => {
     ]);
   });
 
+  it('refuses a grant that does not fit its role, and writes nothing', async () => {
+    const target = await person();
+
+    await expect(
+      roles.revokeRole(ops, target.id, { role: 'host_staff', hostId: null }),
+    ).rejects.toThrow('The grant does not fit its role');
+  });
+
   it('finds nothing to remove for a person without the role, and writes nothing', async () => {
     const target = await person();
 
@@ -461,6 +469,36 @@ describe('inviting staff', () => {
     expect(await invite.resendStaffLink(ops, target.id)).toBe('sent');
 
     expect(await linkEmails('resend@example.com')).toHaveLength(1);
+  });
+
+  it('rejects when the grant cannot be written: no account, no email, no audit row', async () => {
+    const address = 'blocked-grant@example.com';
+    await client.db.execute(sql`
+      CREATE FUNCTION refuse_ops_grant() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN RAISE EXCEPTION 'grant refused for the test'; END $$`);
+    await client.db.execute(
+      sql`CREATE TRIGGER refuse_ops_grant BEFORE INSERT ON role_grants FOR EACH ROW EXECUTE FUNCTION refuse_ops_grant()`,
+    );
+    try {
+      await expect(invite.inviteStaff(ops, address)).rejects.toThrow();
+    } finally {
+      await client.db.execute(
+        sql`DROP TRIGGER refuse_ops_grant ON role_grants`,
+      );
+      await client.db.execute(sql`DROP FUNCTION refuse_ops_grant()`);
+    }
+
+    expect(await linkEmails(address)).toEqual([]);
+    expect(
+      await client.db
+        .select()
+        .from(authUsers)
+        .where(eq(authUsers.email, address)),
+    ).toEqual([]);
+    const { rows } = await client.db.execute<{ n: number }>(
+      sql`SELECT count(*)::int AS n FROM audit_log WHERE action = 'staff.link_sent' AND subject_id NOT IN (SELECT id FROM auth_users)`,
+    );
+    expect(rows[0]?.n).toBe(0);
   });
 
   it('refuses a resend past the hourly count too, since it shares the address count', async () => {

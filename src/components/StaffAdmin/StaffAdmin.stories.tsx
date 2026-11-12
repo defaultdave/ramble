@@ -40,7 +40,23 @@ const auditRows: AuditViewRow[] = [
 
 const meta = {
   title: 'Ops/StaffAdmin',
-  parameters: { layout: 'fullscreen' },
+  parameters: {
+    layout: 'fullscreen',
+    a11y: {
+      config: {
+        // Every story renders the page twice, once per color scheme, and PageHeading's header sits
+        // outside the page's main landmark.
+        rules: [
+          { id: 'duplicate-id', enabled: false },
+          { id: 'duplicate-id-aria', enabled: false },
+          { id: 'landmark-unique', enabled: false },
+          { id: 'landmark-banner-is-top-level', enabled: false },
+          { id: 'landmark-no-duplicate-banner', enabled: false },
+          { id: 'page-has-heading-one', enabled: false },
+        ],
+      },
+    },
+  },
 } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;

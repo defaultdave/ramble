@@ -11,6 +11,7 @@ import {
   formText,
   inFieldOrder,
   inviteFailureNotices,
+  inviteNoticeFor,
   oversizedFields,
   slugFor,
   type FormGetter,
@@ -472,14 +473,29 @@ export const hostNotices = {
   },
 } as const satisfies Record<HostNoticeCode, NoticeText>;
 
+const createdInviteNotices = {
+  sent: 'created',
+  rate_limited: 'rate_limited',
+  failed: 'created_invite_failed',
+  not_found: 'created_invite_failed',
+} as const satisfies Record<InviteResult, HostNoticeCode>;
+
+const resentInviteNotices = {
+  sent: 'invited',
+  rate_limited: 'rate_limited',
+  failed: 'invite_failed',
+  not_found: 'invite_failed',
+} as const satisfies Record<InviteResult, HostNoticeCode>;
+
 /** What the invite action tells the person after the host is made or the link is sent again. A host or owner that is gone is a failure to send. */
 export function inviteNotice(
   result: InviteResult,
   afterCreate: boolean,
 ): HostNoticeCode {
-  if (result === 'sent') return afterCreate ? 'created' : 'invited';
-  if (result === 'rate_limited') return 'rate_limited';
-  return afterCreate ? 'created_invite_failed' : 'invite_failed';
+  return inviteNoticeFor(
+    result,
+    afterCreate ? createdInviteNotices : resentInviteNotices,
+  );
 }
 
 const agreementNotices = {

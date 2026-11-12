@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { EmailAddressSchema, normalizeEmailAddress } from '@/lib/email/address';
 import type { InviteResult } from '@/lib/opsForm';
 import { signInLinkData } from '@/lib/signIn';
-import { invitedRole, staffLandingPath } from '@/lib/staffAdmin';
+import { staffGrant, staffLandingPath } from '@/lib/staffAdmin';
 import { staffLinkSentEntry } from '@/lib/staffAudit';
 import type { Caller } from '@/server/auth/caller';
 import { appOrigin } from '@/server/auth/forms';
@@ -15,8 +15,6 @@ import {
   readRoleHolder,
 } from '@/server/db/staffRoles';
 import { sendSignInInvite } from './signInInvite';
-
-const opsGrant = { role: invitedRole, hostId: null } as const;
 
 function sendStaffLink(
   actorId: string,
@@ -51,7 +49,7 @@ export async function inviteStaff(
   const email = EmailAddressSchema.parse(normalizeEmailAddress(rawEmail));
   const userId = await db.transaction(async (tx) => {
     const id = await ensureAuthUserIn(tx, email);
-    await grantRoleIn(tx, { kind: 'user', userId: actorId }, id, opsGrant);
+    await grantRoleIn(tx, { kind: 'user', userId: actorId }, id, staffGrant);
     return id;
   });
   return sendStaffLink(actorId, userId, email);
@@ -63,7 +61,7 @@ export async function resendStaffLink(
   userId: string,
 ): Promise<InviteResult> {
   const actorId = requireOpsUserId(caller);
-  const holder = await readRoleHolder(caller, userId, opsGrant);
+  const holder = await readRoleHolder(caller, userId, staffGrant);
   if (holder === null) return 'not_found';
   return sendStaffLink(actorId, userId, holder.email);
 }

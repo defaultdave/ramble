@@ -83,6 +83,9 @@ export async function revokeRole(
   grant: RoleGrant,
 ): Promise<RevokeRoleResult> {
   const actorId = requireOpsUserId(caller);
+  if (!isValidGrantScope(grant)) {
+    throw new Error('The grant does not fit its role');
+  }
   const refusal = revokeRefusal(actorId, userId, grant);
   if (refusal !== null) return refusal;
   return db.transaction(async (tx) => {

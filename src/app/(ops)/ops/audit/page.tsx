@@ -3,7 +3,12 @@ import { AuditView } from '@/components/StaffAdmin';
 import { OpsAccessDenied } from '@/components/OpsShell';
 import { PageHeading } from '@/components/PageHeading';
 import { holdsOpsRole } from '@/lib/opsNav';
-import { auditPath, parseAuditCursor, parseAuditDay } from '@/lib/staffAdmin';
+import {
+  auditCursorLabel,
+  auditPath,
+  parseAuditCursor,
+  parseAuditDay,
+} from '@/lib/staffAdmin';
 import { readAuditForOps } from '@/server/db/auditView';
 import { readOpsCaller } from '@/server/opsCaller';
 import { systemClock } from '@/server/ports/clock';
@@ -25,7 +30,7 @@ export default async function AuditPage({
         day={day}
         rows={page.rows}
         query={query}
-        cursor={afterId === 0 ? null : String(afterId)}
+        cursor={auditCursorLabel(afterId)}
         nextCursor={page.nextCursor}
       />
     </PageHeading>

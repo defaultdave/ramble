@@ -3,10 +3,10 @@ import { ActionNotice } from '@/components/ActionNotice';
 import { OpsAccessDenied } from '@/components/OpsShell';
 import { PageHeading } from '@/components/PageHeading';
 import { StaffView } from '@/components/StaffAdmin';
-import { noticeText, parseNotice, parseProblemFields } from '@/lib/opsForm';
+import { noticeText, parseNotice } from '@/lib/opsForm';
 import { holdsOpsRole } from '@/lib/opsNav';
 import {
-  staffInviteField,
+  hasStaffInviteProblem,
   staffNoticeCodes,
   staffNotices,
   staffPath,
@@ -39,9 +39,7 @@ export default async function StaffPage({
       <StaffView
         rows={rows}
         query={query}
-        emailProblem={
-          parseProblemFields(query.fields, [staffInviteField]).length > 0
-        }
+        emailProblem={hasStaffInviteProblem(query.fields)}
         actions={{
           invite: inviteStaffAction,
           resend: resendStaffLinkAction,

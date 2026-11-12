@@ -1,13 +1,12 @@
 import { Button } from '@/components/Button';
 import { DataTable, type DataTableColumn } from '@/components/DataTable';
-import { Input } from '@/components/Input';
-import { maxEmailAddressLength } from '@/lib/email/address';
+import { EmailField } from '@/components/EmailField';
 import {
-  invitedRole,
+  staffGrant,
+  staffRolesText,
   staffInviteField,
   staffNotices,
   staffPath,
-  staffRoleLabels,
   type StaffRow,
 } from '@/lib/staffAdmin';
 import type { TableQuery } from '@/lib/tableQuery';
@@ -31,7 +30,7 @@ function StaffActions({
   actions: StaffViewProps['actions'];
 }) {
   // Only the ops role is managed here; admin is granted and removed from the command line.
-  if (!row.roles.includes(invitedRole)) return null;
+  if (!row.roles.includes(staffGrant.role)) return null;
   return (
     <div className={styles.actions}>
       <form action={actions.resend}>
@@ -67,7 +66,7 @@ export function StaffView({
     {
       id: 'role',
       header: 'Role',
-      cell: (row) => row.roles.map((role) => staffRoleLabels[role]).join(', '),
+      cell: (row) => staffRolesText(row.roles),
     },
     {
       id: 'actions',
@@ -78,14 +77,10 @@ export function StaffView({
   return (
     <div className={styles.stack}>
       <form action={actions.invite} className={styles.form} noValidate>
-        <Input
+        <EmailField
           name={staffInviteField}
-          type="email"
           label="Email address"
           hint="Gives the ops role and emails a single-use sign-in link."
-          maxLength={maxEmailAddressLength}
-          autoComplete="off"
-          required
           {...(emailProblem ? { errorText: staffNotices.invalid.title } : {})}
         />
         <Button type="submit">Invite staff member</Button>

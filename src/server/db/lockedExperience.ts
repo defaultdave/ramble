@@ -9,7 +9,7 @@ import { auditLog, experiences, hosts } from './schema';
 
 export type LockedExperience = typeof experiences.$inferSelect;
 
-type Done<R> = { result: R; changes: CacheChange[] };
+export type Done<R> = { result: R; changes: CacheChange[] };
 
 /**
  * Whether a host is suspended: its latest suspend or unsuspend row in the audit log is a suspend.
@@ -36,7 +36,7 @@ export async function hostIsSuspended(
 }
 
 /** Runs `body` in one transaction, then invalidates the cache changes it returns after the commit, so a body that rolled back invalidates nothing. */
-async function commitThenInvalidate<R>(
+export async function commitThenInvalidate<R>(
   body: (tx: Transaction) => Promise<Done<R>>,
 ): Promise<R> {
   const done = await db.transaction(body);

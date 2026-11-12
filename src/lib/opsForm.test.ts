@@ -6,6 +6,7 @@ import {
   formHas,
   inFieldOrder,
   formText,
+  formWholeNumber,
   noticeHref,
   noticeText,
   oversizedFields,
@@ -18,6 +19,7 @@ import {
 
 // Behaviours under test, one per decision, branch or risk:
 // - posted text is trimmed, and missing, blank or non-text reads as absent
+// - a posted whole number is digits only, trimmed, and anything else reads as absent
 // - a checkbox is ticked when the form carries it at all
 // - fields over the raw limit are named, in the list's order
 // - a slug is typed or derived when asked, and a missing, over-long or empty one is refused
@@ -39,6 +41,22 @@ describe('formText', () => {
     [42, undefined],
   ])('%j reads as %j', (raw, expected) => {
     expect(formText(form({ name: raw }), 'name')).toBe(expected);
+  });
+});
+
+describe('formWholeNumber', () => {
+  it.each([
+    [' 12 ', 12],
+    ['0', 0],
+    ['1.5', undefined],
+    ['-3', undefined],
+    ['12 seats', undefined],
+    ['12345678', undefined],
+    ['', undefined],
+    [null, undefined],
+    [7, undefined],
+  ])('%j reads as %j', (raw, expected) => {
+    expect(formWholeNumber(form({ seats: raw }), 'seats')).toBe(expected);
   });
 });
 

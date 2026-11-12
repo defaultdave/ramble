@@ -63,7 +63,7 @@ describe('reviewRefusal', () => {
     'refuses either decision on an experience that is %s',
     (status) => {
       for (const decision of [approve, reject]) {
-        expect(reviewRefusal(status, decision, [described])).toEqual({
+        expect(reviewRefusal(status, decision, [described], false)).toEqual({
           status: 'not_in_review',
         });
       }
@@ -74,17 +74,30 @@ describe('reviewRefusal', () => {
     ['no photos', []],
     ['described and decorative photos', [described, decorative]],
   ])('lets an approval go ahead with %s', (_name, photos) => {
-    expect(reviewRefusal('in_review', approve, photos)).toBeNull();
+    expect(reviewRefusal('in_review', approve, photos, false)).toBeNull();
   });
 
   it('refuses an approval naming the photos with no alt text', () => {
     expect(
-      reviewRefusal('in_review', approve, [bare, described, blank]),
+      reviewRefusal('in_review', approve, [bare, described, blank], false),
     ).toEqual({ status: 'alt_missing', photoNumbers: [1, 3] });
   });
 
   it('does not hold a rejection up for the photos', () => {
-    expect(reviewRefusal('in_review', reject, [bare])).toBeNull();
+    expect(reviewRefusal('in_review', reject, [bare], false)).toBeNull();
+  });
+
+  it('refuses an approval while the host is suspended, before the photos, and still allows a rejection', () => {
+    expect(reviewRefusal('in_review', approve, [bare], true)).toEqual({
+      status: 'host_suspended',
+    });
+    expect(reviewRefusal('in_review', reject, [bare], true)).toBeNull();
+  });
+
+  it('finds an experience not in review before it finds the host suspended', () => {
+    expect(reviewRefusal('draft', approve, [], true)).toEqual({
+      status: 'not_in_review',
+    });
   });
 });
 

@@ -133,6 +133,20 @@ describe('approving', () => {
   });
 });
 
+describe('approving for a host that is suspended', () => {
+  it('goes back to the experience with that notice', async () => {
+    mocks.decideExperienceReview.mockResolvedValue({
+      status: 'host_suspended',
+    });
+
+    expect(
+      await redirectOf(() =>
+        approveExperienceAction(formOf({ experienceId: id(9) })),
+      ),
+    ).toBe(`${item}?notice=host_suspended`);
+  });
+});
+
 describe('rejecting', () => {
   it('passes on the reason posted', async () => {
     mocks.decideExperienceReview.mockResolvedValue({ status: 'rejected' });

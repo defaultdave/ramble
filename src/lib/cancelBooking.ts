@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { userActor, userOrderEntry, type AuditEntryInput } from './audit';
+import { userActor, type AuditEntryInput } from './audit';
+import { opsViewEntry } from './opsAudit';
 import { refundArrivalLine } from './bookingEmails';
 import type { CacheChange } from './cacheTags';
 import {
@@ -269,7 +270,7 @@ export function cancellationAuditEntry(
 
 /** Ops cancelled a booking: written with the cancellation, in its transaction, beside `order.cancelled`. */
 export const opsCancelRequestedEntry = (userId: string, orderId: string) =>
-  userOrderEntry(userId, 'booking.ops_cancel_requested', orderId);
+  opsViewEntry(userId, 'booking.ops_cancel_requested', 'order', orderId);
 
 export type CancelPlan =
   | {

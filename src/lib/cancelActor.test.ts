@@ -10,7 +10,7 @@ import {
 // Behaviours under test:
 // - the guest is the default actor and the order records the guest; an ops cancel is recorded as Ramble's
 // - the cancellation's audit row names a guest by kind alone and an ops user by id, with the same details
-// - the ops audit row names the ops user and the order, with no details
+// - the ops audit row names the ops user and the order
 // - every row is one the audit log accepts
 
 const ids = {
@@ -57,7 +57,6 @@ describe('who cancels', () => {
       action: 'booking.ops_cancel_requested',
       subjectKind: 'order',
       subjectId: ids.orderId,
-      details: {},
     });
   });
 

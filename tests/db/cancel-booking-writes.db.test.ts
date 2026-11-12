@@ -209,6 +209,7 @@ describe('a token that is not the one that opened this order', () => {
   const forged = async (token: Record<string, unknown>, world: CancelWorld) => {
     const { cancelBookingOrder } = await import('@/server/db/orderCancel');
     return cancelBookingOrder({
+      actor: { kind: 'guest' },
       token: {
         id: world.orderId,
         version: 1,
@@ -275,6 +276,7 @@ describe('an order that is not a booking to cancel', () => {
   const direct = async (orderId: string) => {
     const { cancelBookingOrder } = await import('@/server/db/orderCancel');
     return cancelBookingOrder({
+      actor: { kind: 'guest' },
       token: { id: orderId, version: 1, kind: 'manage' } as never,
       expectedRefundMinor: 0,
     });

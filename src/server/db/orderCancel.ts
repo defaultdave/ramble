@@ -8,7 +8,6 @@ import {
   cancelRefundReason,
   cancellationAuditEntry,
   cancelledByFor,
-  guestCancelActor,
   opsCancelRequestedEntry,
   giftReinstated,
   cancelCacheChanges,
@@ -214,8 +213,8 @@ async function cancelInTransaction(
 export async function cancelBookingOrder(input: {
   token: ResolvedManageToken;
   expectedRefundMinor: number;
-  /** Who cancels; the guest unless ops acts for Ramble, in which case the order and its audit rows name ops. */
-  actor?: CancelActor;
+  /** Who cancels: the guest by their link, or ops acting for Ramble, in which case the order and its audit rows name ops. */
+  actor: CancelActor;
 }): Promise<CancelBookingResult> {
   const parsed = CancelOrderInputSchema.parse({
     orderId: input.token.id,
@@ -227,7 +226,7 @@ export async function cancelBookingOrder(input: {
       cancelInTransaction(tx, {
         ...parsed,
         tokenKind: input.token.kind,
-        actor: input.actor ?? guestCancelActor,
+        actor: input.actor,
       }),
     ),
   );

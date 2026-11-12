@@ -63,6 +63,7 @@ setupRefundsDatabase(raise);
 // - a confirmed booking, and one whose refund failed, are refused with nothing written
 // retry
 // - a booking whose refund failed gets one new refund of that refund's own amount, the flag cleared, and one audit row in one transaction; a second try finds nothing to retry; a retry after the retry failed too asks again
+// - an older failed refund is retried once the newer one has its retry; two parallel retries ask once and refuse once
 // - a failed partial refund of a confirmed booking retries for only its amount; a second retry of the same failed refund is a no-op; a retry that would take the refunds past what the card paid is refused and writes nothing
 // - a retry the refund path refuses leaves the flag set and writes nothing; one whose audit row cannot be written leaves the flag set and no new refund
 // void links
@@ -169,6 +170,7 @@ describe('cancelling', () => {
     if (token === null) throw new Error('no token');
 
     const result = await guestCancel.cancelBookingOrder({
+      actor: { kind: 'guest' },
       token,
       expectedRefundMinor: 13_000,
     });
@@ -405,9 +407,7 @@ describe('retrying a failed refund', () => {
       .set({ refundFailed: true })
       .where(eq(schema.orders.id, world.orderId));
 
-    expect(await retry.retryFailedRefund(ops, world.orderId)).toBe(
-      'already_requested',
-    );
+    expect(await retry.retryFailedRefund(ops, world.orderId)).toBe('refused');
 
     expect(await refundsOf(world)).toHaveLength(2);
     expect((await orderOf(world)).refundFailed).toBe(true);
@@ -448,6 +448,54 @@ describe('retrying a failed refund', () => {
     expect(
       await auditRows(world.orderId, 'booking.ops_refund_retried'),
     ).toHaveLength(0);
+  });
+
+  it('retries an older failed refund once a newer one has its retry, so it is not stuck', async () => {
+    const world = await seedCancellable({ gatewayPayment: true });
+    const request = async (key: string, ticketMinor: number) => {
+      const asked = await ask(world, { reason: 'goodwill', key, ticketMinor });
+      if (asked.status !== 'requested') throw new Error('not requested');
+      return {
+        id: asked.refund.refundId,
+        amountMinor: asked.refund.amountMinor,
+      };
+    };
+    const older = await request('older', 3_000);
+    const newer = await request('newer', 4_000);
+    await handleEvent(
+      await storeEvent(refundEvent(world, newer, 'refund.failed')),
+    );
+    expect(await retry.retryFailedRefund(ops, world.orderId)).toBe('requested');
+    await handleEvent(
+      await storeEvent(refundEvent(world, older, 'refund.failed')),
+    );
+    expect((await orderOf(world)).refundFailed).toBe(true);
+
+    expect(await retry.retryFailedRefund(ops, world.orderId)).toBe('requested');
+
+    const retried = (await refundsOf(world)).filter((refund) =>
+      ['pending'].includes(refund.status),
+    );
+    expect(retried.map((refund) => refund.ticketMinor).toSorted()).toEqual([
+      3_000, 4_000,
+    ]);
+    expect((await orderOf(world)).refundFailed).toBe(false);
+  });
+
+  it('lets one of two parallel retries ask and refuses the other', async () => {
+    const world = await cancelled();
+    await failTheRefund(world);
+
+    const outcomes = await Promise.all([
+      retry.retryFailedRefund(ops, world.orderId),
+      retry.retryFailedRefund(ops, world.orderId),
+    ]);
+
+    expect(outcomes.toSorted()).toEqual(['refused', 'requested']);
+    expect(await refundsOf(world)).toHaveLength(2);
+    expect(
+      await auditRows(world.orderId, 'booking.ops_refund_retried'),
+    ).toHaveLength(1);
   });
 
   it('leaves the flag set and writes nothing when the refund path refuses the request', async () => {

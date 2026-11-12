@@ -2,13 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { parseAuditEntry } from './audit';
 import {
   opsFullRefundRequest,
-  opsRefundRequest,
   refundAuditEntry,
   retryPlan,
 } from './refundRetry';
 
 // Behaviours under test:
-// - an ops refund request names the ops user, and the whole-rest request is one key for the order
+// - the whole-rest ops refund is one key for the order, naming the ops user
 // - a retry asks for the failed refund's own ticket part, never the rest of the order, under a key named for that refund
 // - it keeps the failed refund's reason when the refund path takes it, and uses the ops reason otherwise
 // - it stops for no order, an order not flagged, a gift purchase, no failed refund, and a failed refund with no ticket part
@@ -20,26 +19,8 @@ const userId = '5b3d7ad4-6f3c-4c2f-9d58-3a0a2f0e8a10';
 const flagged = { kind: 'booking', refundFailed: true } as const;
 const failed = { id: 'f1', reason: 'guest_cancel', ticketMinor: 8500 };
 
-describe('opsRefundRequest', () => {
-  it('names the ops user as who asked', () => {
-    expect(
-      opsRefundRequest({
-        orderId,
-        userId,
-        reason: 'goodwill',
-        key: 'k',
-        ticketMinor: 5,
-      }),
-    ).toEqual({
-      orderId,
-      reason: 'goodwill',
-      key: 'k',
-      ticketMinor: 5,
-      initiatedBy: userId,
-    });
-  });
-
-  it('asks for the whole rest under the one ops key', () => {
+describe('opsFullRefundRequest', () => {
+  it('asks for the whole rest under the one ops key, naming the ops user', () => {
     expect(opsFullRefundRequest(orderId, userId)).toEqual({
       orderId,
       reason: 'ops_adjustment',

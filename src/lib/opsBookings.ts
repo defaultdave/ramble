@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { userOrderEntry, type AuditEntryInput } from './audit';
+import type { AuditEntryInput } from './audit';
 import { WriteIdSchema } from './catalog';
 import { confirmationDecision, type BookingEmailSource } from './bookingEmails';
 import {
@@ -21,7 +21,12 @@ import {
   type OrderKind,
   type OrderStatus,
 } from './orders';
-import { orderRefundReasons, planRefund, type RefundStatus } from './refunds';
+import {
+  orderRefundReasons,
+  planRefund,
+  RefundMinorSchema,
+  type RefundStatus,
+} from './refunds';
 import { statusFilter, type StatusTone } from './statusBadge';
 import { countLabel } from './text';
 import { zonedDeadlineLabel } from './zonedLabels';
@@ -398,6 +403,12 @@ const cancelBasisLines = {
   already_refunded: 'Nothing is left to refund.',
 } satisfies Record<RefundBasis, string>;
 
+/** What the cancel and refund data functions take: the booking and the refund ops was shown. */
+export const ExpectedRefundInputSchema = z.strictObject({
+  orderId: WriteIdSchema,
+  expectedRefundMinor: RefundMinorSchema,
+});
+
 export type OpsCancelForm =
   { ok: true; expectedRefundMinor: number } | { ok: false };
 
@@ -549,7 +560,7 @@ export const linksVoidedEntry = (
   orderId: string,
   tokenVersion: number,
 ) =>
-  userOrderEntry(userId, 'booking.ops_links_voided', orderId, {
+  opsViewEntry(userId, 'booking.ops_links_voided', 'order', orderId, {
     token_version: tokenVersion,
   });
 
@@ -559,7 +570,7 @@ export const confirmationResentEntry = (
   orderId: string,
   resendId: string,
 ) =>
-  userOrderEntry(userId, 'booking.ops_confirmation_resent', orderId, {
+  opsViewEntry(userId, 'booking.ops_confirmation_resent', 'order', orderId, {
     resend_id: resendId,
   });
 

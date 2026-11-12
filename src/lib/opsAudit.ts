@@ -28,14 +28,21 @@ export function opsAreaListEntry(
   };
 }
 
-/** One record behind an ops area was read by a named ops user, naming the record by its own id. */
+/** Something a named ops user read or did to one record, naming the record by its own id; details are ids, codes and amounts only. */
 export function opsViewEntry(
   userId: string,
   action: string,
   subjectKind: string,
   subjectId: string,
+  details?: Record<string, string | number | boolean | null>,
 ): AuditEntryInput {
-  return { ...userActor(userId), action, subjectKind, subjectId };
+  return {
+    ...userActor(userId),
+    action,
+    subjectKind,
+    subjectId,
+    ...(details === undefined ? {} : { details }),
+  };
 }
 
 // A signed-in person is named; a tester who got in with the shared secret and no session is a guest.

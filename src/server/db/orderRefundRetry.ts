@@ -1,8 +1,15 @@
 import 'server-only';
 import { and, desc, eq } from 'drizzle-orm';
+import { reconcileReadLimit } from '@/lib/cancelBooking';
 import { WriteIdSchema } from '@/lib/catalog';
+import {
+  RefundRequestSchema,
+  refundIdFromDigest,
+  refundRequestIdentity,
+} from '@/lib/refunds';
 import { refundAuditEntry, retryPlan } from '@/lib/refundRetry';
 import type { Caller } from '@/server/auth/caller';
+import { sha256Hex } from '@/server/hash';
 import { requireOpsUserId } from './audit';
 import { db } from './client';
 import { lockOrderById } from './locks';
@@ -35,7 +42,7 @@ export async function retryFailedRefund(
       .select({ kind: orders.kind, refundFailed: orders.refundFailed })
       .from(orders)
       .where(eq(orders.id, id));
-    const [failed] = await tx
+    const failedRefunds = await tx
       .select({
         id: refunds.id,
         reason: refunds.reason,
@@ -44,13 +51,33 @@ export async function retryFailedRefund(
       .from(refunds)
       .where(and(eq(refunds.orderId, id), eq(refunds.status, 'failed')))
       .orderBy(desc(refunds.createdAt), desc(refunds.id))
-      .limit(1);
-    const plan = retryPlan({
-      orderId: id,
-      userId,
-      order: order ?? null,
-      failed: failed ?? null,
-    });
+      .limit(reconcileReadLimit);
+    const standing = new Set(
+      (
+        await tx
+          .select({ id: refunds.id })
+          .from(refunds)
+          .where(eq(refunds.orderId, id))
+          .limit(reconcileReadLimit)
+      ).map((row) => row.id),
+    );
+    const retryPlanFor = (failed: (typeof failedRefunds)[number] | null) =>
+      retryPlan({ orderId: id, userId, order: order ?? null, failed });
+    const failed =
+      failedRefunds.find((candidate) => {
+        const plan = retryPlanFor(candidate);
+        return (
+          plan.kind === 'stop' ||
+          !standing.has(
+            refundIdFromDigest(
+              sha256Hex(
+                refundRequestIdentity(RefundRequestSchema.parse(plan.request)),
+              ),
+            ),
+          )
+        );
+      }) ?? null;
+    const plan = retryPlanFor(failed);
     if (plan.kind === 'stop') return 'refused';
     const result = await requestAuditedRefund(tx, plan.request, (refundId) =>
       refundAuditEntry('booking.ops_refund_retried', userId, id, refundId),

@@ -14,6 +14,7 @@ import {
   linksVoidedEntry,
   opsHistoryActions,
   confirmationResentEntry,
+  ExpectedRefundInputSchema,
   opsRefundVerdict,
   resendJobKind,
   type BookingFilter,
@@ -213,7 +214,8 @@ export async function cancelBookingAsOps(
   input: { orderId: string; expectedRefundMinor: number },
 ): Promise<CancelBookingResult | { status: 'try_again' }> {
   const userId = requireOpsUserId(caller);
-  const id = WriteIdSchema.parse(input.orderId);
+  const { orderId: id, expectedRefundMinor } =
+    ExpectedRefundInputSchema.parse(input);
   const [order] = await db
     .select({ version: orders.manageTokenVersion })
     .from(orders)
@@ -225,7 +227,7 @@ export async function cancelBookingAsOps(
   if (token === null) return { status: 'try_again' };
   return cancelBookingOrder({
     token,
-    expectedRefundMinor: input.expectedRefundMinor,
+    expectedRefundMinor,
     actor: { kind: 'ops', userId },
   });
 }
@@ -239,7 +241,8 @@ export async function refundBookingAsOps(
   input: { orderId: string; expectedRefundMinor: number },
 ): Promise<OpsRefundOutcome> {
   const userId = requireOpsUserId(caller);
-  const id = WriteIdSchema.parse(input.orderId);
+  const { orderId: id, expectedRefundMinor } =
+    ExpectedRefundInputSchema.parse(input);
   return db.transaction(async (tx) => {
     if (!(await lockOrderById(tx, id))) return 'not_found';
     const [order] = await tx
@@ -253,7 +256,7 @@ export async function refundBookingAsOps(
     const found = await readCancelFacts(tx, id);
     const verdict =
       order && found
-        ? opsRefundVerdict(order, found.facts, input.expectedRefundMinor)
+        ? opsRefundVerdict(order, found.facts, expectedRefundMinor)
         : 'refused';
     if (verdict !== 'go') return verdict;
     const result = await requestAuditedRefund(

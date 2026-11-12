@@ -7,6 +7,7 @@ import {
   type CancelBookingInput,
   type CancelBookingResult,
 } from '@/lib/cancelBooking';
+import { guestCancelActor } from '@/lib/cancelBooking';
 import { cancelResultPath } from '@/lib/manageBooking';
 import {
   moveInputFromForm,
@@ -54,6 +55,7 @@ export async function cancelBooking(
   const gate = await openManageToken(parsed.input.manageToken);
   if (gate.kind === 'refused') return gate.refusal;
   return cancelBookingOrder({
+    actor: guestCancelActor,
     token: gate.row,
     expectedRefundMinor: parsed.input.expectedRefundMinor,
   });

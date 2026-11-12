@@ -160,6 +160,7 @@ describe('the entry of the data layer', () => {
   ) => {
     const { cancelBookingOrder } = await import('@/server/db/orderCancel');
     return cancelBookingOrder({
+      actor: { kind: 'guest' },
       token: {
         id: '00000000-0000-4000-8000-000000000000',
         version: 1,

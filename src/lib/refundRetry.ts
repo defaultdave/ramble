@@ -1,4 +1,4 @@
-import { userOrderEntry } from './audit';
+import { opsViewEntry } from './opsAudit';
 import type { OrderKind } from './orders';
 import { orderRefundReasons, type RefundRequestInput } from './refunds';
 
@@ -11,7 +11,7 @@ const opsRefundReason =
   'ops_adjustment' as const satisfies (typeof orderRefundReasons)[number];
 
 /** A refund an ops user asks for: the key names it, so asking twice asks once. */
-export function opsRefundRequest(input: {
+function opsRefundRequest(input: {
   orderId: string;
   userId: string;
   reason: RefundRequestInput['reason'];
@@ -77,4 +77,4 @@ export const refundAuditEntry = (
   userId: string,
   orderId: string,
   refundId: string,
-) => userOrderEntry(userId, action, orderId, { refund_id: refundId });
+) => opsViewEntry(userId, action, 'order', orderId, { refund_id: refundId });

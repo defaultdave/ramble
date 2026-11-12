@@ -384,7 +384,7 @@ describe('the cache changes', () => {
       sessionCancelCacheChanges({ sessionId: id, experienceId: otherId }),
     ).toEqual([
       { kind: 'spaces', sessionId: id },
-      { kind: 'schedule', experienceId: otherId },
+      { kind: 'experience', experienceId: otherId },
     ]);
   });
 });

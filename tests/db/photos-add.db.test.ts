@@ -107,7 +107,7 @@ describe('addPhoto', () => {
       const experience = await insertExperience();
 
       await photoStore.addPhoto(
-        testCaller({ roles: [Role.Admin] }),
+        testCaller({ userId: randomUUID(), roles: [Role.Admin] }),
         newPhoto(experience.id),
         validUpload,
         storage,
@@ -121,6 +121,7 @@ describe('addPhoto', () => {
 
       await photoStore.addPhoto(
         testCaller({
+          userId: randomUUID(),
           roles: [Role.HostOwner],
           hostIds: [experience.hostId],
         }),

@@ -1,3 +1,5 @@
+import { samplePhoto } from '@/components/Photo/Photo.fixtures';
+import type { GuestPhoto } from '@/lib/photos';
 import {
   buildExperienceChoices,
   newExperienceValues,
@@ -81,7 +83,30 @@ export const savedView: ExperienceEditView = {
   hostName: 'Clay Corner',
   status: 'live',
   content: savedValues,
+  photos: [],
 };
+
+function photoOf(n: number, overrides: Partial<GuestPhoto> = {}): GuestPhoto {
+  const view = samplePhoto(n);
+  return {
+    id: id(30 + n),
+    experienceId: savedView.id,
+    position: n,
+    url: view.src,
+    width: view.width,
+    height: view.height,
+    decorative: false,
+    altText: view.alt,
+    blurDataUrl: view.blurDataUrl,
+    ...overrides,
+  };
+}
+
+/** A gallery of a described cover and a decorative second photo. */
+export const savedPhotos: GuestPhoto[] = [
+  photoOf(0),
+  photoOf(1, { decorative: true, altText: null }),
+];
 
 export const listRows: ExperienceListRow[] = [
   {

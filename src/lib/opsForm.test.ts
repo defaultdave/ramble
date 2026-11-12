@@ -159,6 +159,20 @@ describe('fieldsFromIssues', () => {
   it('names nothing for no issues', () => {
     expect(fieldsFromIssues([], fields)).toEqual([]);
   });
+
+  it('reads the name an issue stands for from the mapper a nested form gives', () => {
+    const issues = [
+      { path: ['rights', 'slug'] },
+      { path: ['rights', 'other'] },
+      { path: ['name'] },
+    ];
+
+    expect(
+      fieldsFromIssues(issues, fields, (path) =>
+        path[0] === 'rights' ? path[1] : null,
+      ),
+    ).toEqual(['slug']);
+  });
 });
 
 describe('changedFields', () => {

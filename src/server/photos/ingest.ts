@@ -11,7 +11,6 @@ import {
 import { ImageError, type ImagePort } from '@/server/ports/image';
 import { getImagePort } from '@/server/ports/image/config';
 
-// TODO(U-074b): first caller
 export class PhotoRefusedError extends Error {
   readonly code: PhotoRefusalCode;
 

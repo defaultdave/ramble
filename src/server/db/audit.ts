@@ -49,7 +49,15 @@ export async function recordAudit(entry: AuditEntryInput): Promise<void> {
  */
 export function requireOpsUserId(caller: Caller): string {
   requireRole(caller, Role.Ops, {});
-  if (caller.userId === null) throw new ForbiddenError(Role.Ops);
+  return requireUserId(caller, Role.Ops);
+}
+
+/**
+ * The id of the user behind this caller, for an audit row that names who acted, when the caller's
+ * `role` has already been checked against its row. Throws ForbiddenError for a caller with no user.
+ */
+export function requireUserId(caller: Caller, role: Role): string {
+  if (caller.userId === null) throw new ForbiddenError(role);
   return caller.userId;
 }
 

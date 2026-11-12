@@ -4,7 +4,10 @@ import { botChallengeEnvKey, botChallengeIsLive } from './src/lib/botChallenge';
 import { cacheProfiles } from './src/lib/cacheProfiles';
 import { imageConfigFor } from './src/lib/images';
 import { securityHeaders } from './src/lib/securityHeaders';
-import { publicStoreIdFromToken } from './src/lib/storage';
+import {
+  publicStoreIdFromToken,
+  serverActionBodyLimit,
+} from './src/lib/storage';
 
 // This file runs outside the app, before the validated environment module can, so it reads the two
 // variables directly. Unset, or any provider but vercel-blob, leaves no remote image host allowed.
@@ -24,6 +27,8 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   cacheLife: cacheProfiles,
   images: imageConfigFor(publicStoreId),
+  // A photo upload is a form post to a Server Action; the default limit of 1 MB would refuse it.
+  experimental: { serverActions: { bodySizeLimit: serverActionBodyLimit } },
   headers() {
     return Promise.resolve([
       { source: '/:path*', headers: [...securityHeaders] },

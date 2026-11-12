@@ -32,8 +32,10 @@ import type { HostExperience } from './catalog';
 // - the audit rows name the group that changed, carry the new money and tax, and always pass the
 //   audit log's own checks, even when every field changed
 
-const hostIds = [id(1), id(2)];
-const categoryIds = [id(3), id(4)];
+const offered = {
+  hosts: [id(1), id(2)].map((value) => ({ value, label: 'Host' })),
+  categories: [id(3), id(4)].map((value) => ({ value, label: 'Category' })),
+};
 
 describe('status labels and options', () => {
   it('offers one filter option per status, in the schema order, with its label', () => {
@@ -56,13 +58,11 @@ describe('status labels and options', () => {
 });
 
 describe('parseExperienceFilters', () => {
-  const known = { hostIds, categoryIds };
-
   it('reads a known status, host and category', () => {
     expect(
       parseExperienceFilters(
         { status: 'live', host: id(2), category: id(3) },
-        known,
+        offered,
       ),
     ).toEqual({ status: 'live', hostId: id(2), categoryId: id(3) });
   });
@@ -74,7 +74,7 @@ describe('parseExperienceFilters', () => {
     ['a category the page does not offer', { category: 'nope' }],
     ['a repeated host', { host: [id(1), id(2)] }],
   ])('reads %s as no filter', (_label, query) => {
-    expect(parseExperienceFilters(query, known)).toEqual({
+    expect(parseExperienceFilters(query, offered)).toEqual({
       status: null,
       hostId: null,
       categoryId: null,

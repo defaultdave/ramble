@@ -52,7 +52,8 @@ export async function updateExperienceAction(
   if (experienceId === null) redirect(experiencesPath);
   const here = experiencePath(experienceId);
   const parsed = parseExperienceEditForm((name) => formData.get(name));
-  if (!parsed.ok) redirect(experienceNoticeHref(here, 'invalid', parsed.fields));
+  if (!parsed.ok)
+    redirect(experienceNoticeHref(here, 'invalid', parsed.fields));
 
   const result = await updateExperience(caller, experienceId, parsed.value);
   if (result.status === 'not_found') redirect(experiencesPath);

@@ -22,6 +22,11 @@ export const opsNavLinks: readonly OpsNavLink[] = [
     href: '/ops/hosts',
     summary: 'Set up hosts, invite their owners, and record the agreement.',
   },
+  {
+    label: 'Experiences',
+    href: '/ops/experiences',
+    summary: 'Find, add and edit experiences, with their prices and rules.',
+  },
 ];
 
 /** The areas the landing page lists: every link but the landing page itself. */

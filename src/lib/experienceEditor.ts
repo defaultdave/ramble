@@ -677,15 +677,19 @@ export function buildExperienceChoices(input: {
 /** The filters the address names. A host or category the page does not offer, or a repeated name, reads as no filter. */
 export function parseExperienceFilters(
   query: TableQuery,
-  known: { hostIds: readonly string[]; categoryIds: readonly string[] },
+  offered: Pick<ExperienceChoices, 'hosts' | 'categories'>,
 ): ExperienceFilters {
   const status = parseStatusFilter(query.status, experienceStatusOptions);
   return {
     status: pickKnown(status, experienceStatuses, null),
-    hostId: pickKnown(parseSingle(query.host, z.string()), known.hostIds, null),
+    hostId: pickKnown(
+      parseSingle(query.host, z.string()),
+      offered.hosts.map((host) => host.value),
+      null,
+    ),
     categoryId: pickKnown(
       parseSingle(query.category, z.string()),
-      known.categoryIds,
+      offered.categories.map((category) => category.value),
       null,
     ),
   };

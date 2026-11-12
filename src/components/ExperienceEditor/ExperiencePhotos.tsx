@@ -21,6 +21,29 @@ import styles from './ExperienceEditor.module.css';
 
 const thumbSizes = '(min-width: 768px) 12rem, 40vw';
 
+/** The gallery as thumbnails with each photo's alt text or decorative mark, or that there are none. */
+export function ExperiencePhotoList({
+  photos,
+}: {
+  photos: readonly GuestPhoto[];
+}) {
+  if (photos.length === 0) {
+    return <p className={styles.muted}>This experience has no photos yet.</p>;
+  }
+  return (
+    <ul className={styles.list}>
+      {photos.map((photo) => (
+        <li key={photo.id} className={styles.photoRow}>
+          <div className={styles.thumb}>
+            <Photo photo={photoView(photo)} sizes={thumbSizes} />
+          </div>
+          <p className={styles.photoText}>{photoAltSummary(photo)}</p>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export type ExperiencePhotosProps = {
   experienceId: string;
   /** The gallery in order; the first is the cover. */
@@ -52,20 +75,7 @@ export function ExperiencePhotos({
         {photos.length} of {photoLimits.maxPerExperience}. The first photo is
         the cover guests see on the cards.
       </p>
-      {photos.length === 0 ? (
-        <p className={styles.muted}>This experience has no photos yet.</p>
-      ) : (
-        <ul className={styles.list}>
-          {photos.map((photo) => (
-            <li key={photo.id} className={styles.photoRow}>
-              <div className={styles.thumb}>
-                <Photo photo={photoView(photo)} sizes={thumbSizes} />
-              </div>
-              <p className={styles.photoText}>{photoAltSummary(photo)}</p>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ExperiencePhotoList photos={photos} />
       <form action={add} className={styles.form} noValidate>
         <input type="hidden" name="experienceId" value={experienceId} />
         <Input

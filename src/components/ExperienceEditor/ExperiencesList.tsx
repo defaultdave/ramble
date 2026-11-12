@@ -16,30 +16,40 @@ import type { SelectOption } from '@/lib/filters';
 import type { TableQuery } from '@/lib/tableQuery';
 import styles from './ExperienceEditor.module.css';
 
-const columns: DataTableColumn<ExperienceListRow>[] = [
-  {
-    id: 'name',
-    header: 'Experience',
-    rowHeader: true,
-    cell: (row) => (
-      <Link className={styles.cellLink} href={experiencePath(row.id)}>
-        {row.name}
-      </Link>
-    ),
-  },
-  { id: 'host', header: 'Host', cell: (row) => row.hostName },
-  { id: 'category', header: 'Category', cell: (row) => row.categoryName },
-  {
-    id: 'status',
-    header: 'Status',
-    cell: (row) => (
-      <StatusBadge
-        tone={experienceStatusTones[row.status]}
-        label={experienceStatusLabels[row.status]}
-      />
-    ),
-  },
-];
+const statusColumn: DataTableColumn<ExperienceListRow> = {
+  id: 'status',
+  header: 'Status',
+  cell: (row) => (
+    <StatusBadge
+      tone={experienceStatusTones[row.status]}
+      label={experienceStatusLabels[row.status]}
+    />
+  ),
+};
+
+/** The experience columns, each name linking where `hrefOf` says; the status column only where the rows are not all in one status. */
+export function experienceColumns(
+  hrefOf: (experienceId: string) => string,
+  withStatus: boolean,
+): DataTableColumn<ExperienceListRow>[] {
+  return [
+    {
+      id: 'name',
+      header: 'Experience',
+      rowHeader: true,
+      cell: (row) => (
+        <Link className={styles.cellLink} href={hrefOf(row.id)}>
+          {row.name}
+        </Link>
+      ),
+    },
+    { id: 'host', header: 'Host', cell: (row) => row.hostName },
+    { id: 'category', header: 'Category', cell: (row) => row.categoryName },
+    ...(withStatus ? [statusColumn] : []),
+  ];
+}
+
+const columns = experienceColumns(experiencePath, true);
 
 export type ExperiencesListProps = {
   rows: readonly ExperienceListRow[];

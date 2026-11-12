@@ -240,6 +240,16 @@ const PhotoDescriptionSchema = z.discriminatedUnion('decorative', [
   }),
 ]);
 
+/**
+ * Whether a stored photo meets the rule above, by asking the same schema that checks it going in,
+ * so the review check and the upload cannot disagree.
+ */
+export function hasPhotoDescription(
+  photo: Pick<GuestPhoto, 'decorative' | 'altText'>,
+): boolean {
+  return PhotoDescriptionSchema.safeParse(photo).success;
+}
+
 export const NewPhotoSchema = z.object({
   experienceId: EntityIdSchema,
   description: PhotoDescriptionSchema,

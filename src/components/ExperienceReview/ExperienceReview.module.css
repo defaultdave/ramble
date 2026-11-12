@@ -1,0 +1,35 @@
+.stack {
+  composes: stack from '../ExperienceEditor/ExperienceEditor.module.css';
+}
+
+.summary {
+  composes: summary from '../ExperienceEditor/ExperienceEditor.module.css';
+}
+
+.section {
+  composes: section from '../ExperienceEditor/ExperienceEditor.module.css';
+}
+
+.heading {
+  composes: heading from '../ExperienceEditor/ExperienceEditor.module.css';
+}
+
+.muted {
+  composes: muted from '../ExperienceEditor/ExperienceEditor.module.css';
+}
+
+.cellLink {
+  composes: cellLink from '../ExperienceEditor/ExperienceEditor.module.css';
+}
+
+.text {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The button fills the phone width and keeps its own from tablet up. */
+@media (min-width: 768px) {
+  .section > form > button {
+    align-self: flex-start;
+  }
+}

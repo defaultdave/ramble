@@ -171,7 +171,7 @@ export const supportTopicEnum = pgEnum('support_topic', supportTopics);
 
 /**
  * A guest's message through the contact form. It holds exactly what the form collects and no guest
- * id: the sender may not have an account or a booking. The support queue (a later unit) reads it.
+ * id: the sender may not have an account or a booking. The ops support queue reads it and resolves it with a note.
  */
 export const supportRequests = pgTable(
   'support_requests',
@@ -184,6 +184,9 @@ export const supportRequests = pgTable(
     createdAt: timestamp({ withTimezone: true })
       .notNull()
       .default(sql`clock_timestamp()`),
+    /** Null while the request is open; set with the note when ops resolve it. */
+    resolvedAt: timestamp({ withTimezone: true }),
+    resolutionNote: text(),
   },
   (table) => [
     check(
@@ -201,6 +204,10 @@ export const supportRequests = pgTable(
     check(
       'support_requests_created_at_in_range',
       isReadableDate(table.createdAt),
+    ),
+    check(
+      'support_requests_resolution_shape',
+      sql`(${table.resolvedAt} IS NULL) = (${table.resolutionNote} IS NULL) AND (${optionalText(table.resolutionNote, supportLimits.resolutionNoteMaxChars)}) AND (${table.resolvedAt} IS NULL OR ${isReadableDate(table.resolvedAt)})`,
     ),
     index('support_requests_created_at_idx').on(table.createdAt.desc()),
   ],

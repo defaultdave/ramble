@@ -7,6 +7,7 @@ import {
   opsAccessEntry,
   opsAreaIds,
   opsAreaListEntry,
+  opsViewEntry,
 } from './opsAudit';
 
 // Behaviours under test:
@@ -30,6 +31,23 @@ describe('opsAreaListEntry', () => {
       action: 'support.list_viewed',
       subjectKind: 'ops_area',
       subjectId: opsAreaIds.support,
+    });
+  });
+});
+
+describe('opsViewEntry', () => {
+  it('is a valid entry naming the ops user and the record read by its id', () => {
+    expect(
+      parseAuditEntry(
+        opsViewEntry(userId, 'session.viewed', 'session', messageId),
+      ),
+    ).toEqual({
+      actorKind: 'user',
+      actorId: userId,
+      action: 'session.viewed',
+      subjectKind: 'session',
+      subjectId: messageId,
+      details: {},
     });
   });
 });

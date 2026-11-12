@@ -43,6 +43,11 @@ export const opsNavLinks: readonly OpsNavLink[] = [
     summary: 'Invite Ramble staff and remove their access.',
   },
   {
+    label: 'Sessions',
+    href: '/ops/sessions',
+    summary: 'Find a session, see who it affects, then cancel it.',
+  },
+  {
     label: 'Audit log',
     href: '/ops/audit',
     summary: 'Read what was changed and who changed it, a day at a time.',

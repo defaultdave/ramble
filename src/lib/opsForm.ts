@@ -9,6 +9,9 @@ import { tableHref } from './tableQuery';
 /** How a form is read: a posted FormData's `get`, or a map in a test. */
 export type FormGetter = (name: string) => unknown;
 
+/** What reading a posted form comes to: the value it names, or nothing at all (a refused form changes nothing). */
+export type FormResult<T> = { ok: true; value: T } | { ok: false };
+
 /** A posted text field, trimmed; undefined when it is missing, not text, or blank. */
 export function formText(get: FormGetter, name: string): string | undefined {
   const raw = get(name);

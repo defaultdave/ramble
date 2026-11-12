@@ -18,6 +18,7 @@ import {
   isAuditAction,
   parseAuditEntry,
   type AuditRow,
+  userOrSystemActor,
 } from './audit';
 import { dedupeKeyPattern, jobLimits } from './jobs';
 import { maxObjectBytes, visibilityOfKey } from './storage';
@@ -70,6 +71,16 @@ describe('isAuditAction', () => {
     const started = performance.now();
     expect(isAuditAction('a.'.repeat(2_000_000))).toBe(false);
     expect(performance.now() - started).toBeLessThan(500);
+  });
+});
+
+describe('userOrSystemActor', () => {
+  it('names the user when there is one and the system when there is none', () => {
+    expect(userOrSystemActor('5b3d7ad4-6f3c-4c2f-9d58-3a0a2f0e8a10')).toEqual({
+      actorKind: 'user',
+      actorId: '5b3d7ad4-6f3c-4c2f-9d58-3a0a2f0e8a10',
+    });
+    expect(userOrSystemActor(null)).toEqual({ actorKind: 'system' });
   });
 });
 

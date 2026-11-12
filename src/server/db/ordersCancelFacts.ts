@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { isBookingRow, type CancelFacts } from '@/lib/cancelBooking';
 import { WriteIdSchema } from '@/lib/catalog';
 import type { Transaction } from './client';
+import { refundableOrderColumns } from './orderColumns';
 import { holds, orders, sessions } from './schema';
 
 // Apart from ./orderCancel, which enqueues jobs: the manage page reads these facts too. The page
@@ -23,22 +24,13 @@ export async function readCancelFacts(
   const id = WriteIdSchema.parse(orderId);
   const [row] = await tx
     .select({
+      ...refundableOrderColumns,
       kind: orders.kind,
-      status: orders.status,
       sessionId: orders.sessionId,
       holdId: orders.holdId,
       giftAppliedMinor: orders.giftAppliedMinor,
       freeCancelUntil: orders.freeCancelUntil,
       manageTokenVersion: orders.manageTokenVersion,
-      ticketSubtotalMinor: orders.ticketSubtotalMinor,
-      taxMinor: orders.taxMinor,
-      totalMinor: orders.totalMinor,
-      amountDueMinor: orders.amountDueMinor,
-      commissionMinor: orders.commissionMinor,
-      commissionRateBps: orders.commissionRateBps,
-      refundedTicketMinor: orders.refundedTicketMinor,
-      refundedTaxMinor: orders.refundedTaxMinor,
-      commissionReturnedMinor: orders.commissionReturnedMinor,
       sessionStartsAt: sessions.startsAt,
       seats: holds.seats,
     })

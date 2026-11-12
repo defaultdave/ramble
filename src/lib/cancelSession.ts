@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { userOrSystemActor } from './audit';
 import type { CacheChange } from './cacheTags';
 import { WriteIdSchema } from './catalog';
 import { holdStatuses, requireAtMost, requireHoldTransition } from './holds';
@@ -220,12 +221,6 @@ export function requireSessionRefund(result: RequestedFullRefund) {
   return result.refund;
 }
 
-function auditActor(initiatedBy: string | null) {
-  return initiatedBy === null
-    ? ({ actorKind: 'system' } as const)
-    : ({ actorKind: 'user', actorId: initiatedBy } as const);
-}
-
 /** The audit row of one cancelled booking: ids, codes, and amounts only. */
 export function orderCancelledAudit(input: {
   orderId: string;
@@ -237,7 +232,7 @@ export function orderCancelledAudit(input: {
   seatsReturned: number;
 }) {
   return {
-    ...auditActor(input.initiatedBy),
+    ...userOrSystemActor(input.initiatedBy),
     action: 'order.cancelled',
     subjectKind: 'order',
     subjectId: input.orderId,
@@ -261,7 +256,7 @@ export function sessionCancelledAudit(input: {
   holdsReleased: number;
 }) {
   return {
-    ...auditActor(input.initiatedBy),
+    ...userOrSystemActor(input.initiatedBy),
     action: 'session.cancelled',
     subjectKind: 'session',
     subjectId: input.sessionId,

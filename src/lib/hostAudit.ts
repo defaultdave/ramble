@@ -1,6 +1,6 @@
 import { userActor, type AuditEntryInput } from './audit';
 import type { HostEditableField } from './hostSetup';
-import { opsAreaIds, opsAreaListEntry } from './opsAudit';
+import { opsAreaIds, opsAreaListEntry, opsViewEntry } from './opsAudit';
 
 // The audit rows of host setup. An ops user does these, so the actor is always a named user.
 // Details hold ids and flags only: the audit log refuses a name or an address.
@@ -19,12 +19,7 @@ export const hostFormEntry = (userId: string): AuditEntryInput =>
 
 /** One host, with its owners' addresses, was read. */
 export function hostViewEntry(userId: string, hostId: string): AuditEntryInput {
-  return {
-    ...userActor(userId),
-    action: 'host.viewed',
-    subjectKind: 'host',
-    subjectId: hostId,
-  };
+  return opsViewEntry(userId, 'host.viewed', 'host', hostId);
 }
 
 export function hostCreatedEntry(

@@ -13,6 +13,7 @@ export const opsAreaIds = {
   support: '00000000-0000-4000-8000-0000000000a4',
   staff: '00000000-0000-4000-8000-0000000000a5',
   audit: '00000000-0000-4000-8000-0000000000a6',
+  sessions: '00000000-0000-4000-8000-0000000000a8',
 } as const;
 
 /** An ops area's list was read by a named ops user: one row, naming the area by its fixed id. */
@@ -27,6 +28,16 @@ export function opsAreaListEntry(
     subjectKind: 'ops_area',
     subjectId: areaId,
   };
+}
+
+/** One record of an ops area was read by a named ops user: the row names the record by its id. */
+export function opsViewEntry(
+  userId: string,
+  action: string,
+  subjectKind: string,
+  subjectId: string,
+): AuditEntryInput {
+  return { ...userActor(userId), action, subjectKind, subjectId };
 }
 
 // A signed-in person is named; a tester who got in with the shared secret and no session is a guest.

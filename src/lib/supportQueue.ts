@@ -6,6 +6,7 @@ import { opsAreaIds, opsAreaListEntry } from './opsAudit';
 import {
   formText,
   oversizedFields,
+  type FormResult,
   type FormGetter,
   type NoticeText,
 } from './opsForm';
@@ -106,8 +107,7 @@ export function buildSupportQueueRows(
 
 export type SupportResolveInput = { id: string; note: string };
 
-export type SupportResolveForm =
-  { ok: true; value: SupportResolveInput } | { ok: false };
+export type SupportResolveForm = FormResult<SupportResolveInput>;
 
 const resolveFields = ['id', 'note'] as const;
 

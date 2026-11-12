@@ -225,6 +225,13 @@
       "when": 1794421344323,
       "tag": "0031_host_slug_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1794450189998,
+      "tag": "0032_support_resolution",
+      "breakpoints": true
     }
   ]
 }

@@ -42,6 +42,15 @@ export function parseStatusFilter(
   );
 }
 
+/** The status the address names when it is one of `statuses`, or null (all). `options` is what the filter offers, which can be narrower than the list. */
+export function parseStatusParam<Status extends string>(
+  raw: string | readonly string[] | undefined,
+  statuses: readonly Status[],
+  options: readonly StatusFilterOption[],
+): Status | null {
+  return pickKnown(parseStatusFilter(raw, options), statuses, null);
+}
+
 function chipLabel({ label, count }: { label: string; count?: number }) {
   return count === undefined ? label : `${label} (${String(count)})`;
 }

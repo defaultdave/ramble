@@ -6,6 +6,7 @@ import {
   mailboxUnlockEntry,
   opsAccessEntry,
   opsAreaIds,
+  opsAreaListEntry,
 } from './opsAudit';
 
 // Behaviours under test:
@@ -16,6 +17,22 @@ import {
 
 const userId = '5b3d7ad4-6f3c-4c2f-9d58-3a0a2f0e8a10';
 const messageId = '0f1e2d3c-4b5a-4697-8a9b-0c1d2e3f4a5b';
+
+describe('opsAreaListEntry', () => {
+  it('is a valid entry naming the ops user and the area by its fixed id', () => {
+    expect(
+      parseAuditEntry(
+        opsAreaListEntry(userId, 'support.list_viewed', opsAreaIds.support),
+      ),
+    ).toMatchObject({
+      actorKind: 'user',
+      actorId: userId,
+      action: 'support.list_viewed',
+      subjectKind: 'ops_area',
+      subjectId: opsAreaIds.support,
+    });
+  });
+});
 
 describe('opsAccessEntry', () => {
   it('records the ops user opening the dashboard', () => {

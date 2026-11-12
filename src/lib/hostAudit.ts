@@ -1,6 +1,6 @@
 import { userActor, type AuditEntryInput } from './audit';
 import type { HostEditableField } from './hostSetup';
-import { opsAreaIds } from './opsAudit';
+import { opsAreaIds, opsAreaListEntry } from './opsAudit';
 
 // The audit rows of host setup. An ops user does these, so the actor is always a named user.
 // Details hold ids and flags only: the audit log refuses a name or an address.
@@ -10,24 +10,12 @@ const snakeCase = (field: string) =>
   field.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
 
 /** The hosts list was read. */
-export function hostListEntry(userId: string): AuditEntryInput {
-  return {
-    ...userActor(userId),
-    action: 'host.list_viewed',
-    subjectKind: 'ops_area',
-    subjectId: opsAreaIds.hosts,
-  };
-}
+export const hostListEntry = (userId: string): AuditEntryInput =>
+  opsAreaListEntry(userId, 'host.list_viewed', opsAreaIds.hosts);
 
 /** The new-host form was opened. */
-export function hostFormEntry(userId: string): AuditEntryInput {
-  return {
-    ...userActor(userId),
-    action: 'host.form_viewed',
-    subjectKind: 'ops_area',
-    subjectId: opsAreaIds.hosts,
-  };
-}
+export const hostFormEntry = (userId: string): AuditEntryInput =>
+  opsAreaListEntry(userId, 'host.form_viewed', opsAreaIds.hosts);
 
 /** One host, with its owners' addresses, was read. */
 export function hostViewEntry(userId: string, hostId: string): AuditEntryInput {

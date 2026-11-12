@@ -17,13 +17,13 @@ import { createFakeStorageAdapter } from '@/server/ports/storage/fake';
 import { personaHostSlugs } from '@/lib/seed/personas';
 import { experienceEditorRows } from './authzExperienceRows';
 import { hostSetupRows } from './authzHostRows';
+import { seedRows } from './authzSeedRows';
 import { staffRows } from './authzStaffRows';
+import { supportQueueRows } from './authzSupportRows';
 import { cancelSessionRows } from './authzSessionRows';
 import { collectionInput, doc, helpInput } from './editorialFixtures';
 import {
   client,
-  personaSeed,
-  seedNow,
   setupAuthzDatabase,
   signInEverySubject,
   subjects,
@@ -63,9 +63,6 @@ type Data = {
   photos: typeof import('@/server/db/photos');
   sessions: typeof import('@/server/db/sessions');
   settings: typeof import('@/server/db/settings');
-  seedPhotos: typeof import('@/server/db/seed/photos');
-  seedRead: typeof import('@/server/db/seed/read');
-  seedRun: typeof import('@/server/db/seed/run');
 };
 
 /** Where an action lands. A host owner is checked against the host of the row, so each place is one cell of the matrix. */
@@ -126,9 +123,6 @@ beforeAll(async () => {
     photos: await import('@/server/db/photos'),
     sessions: await import('@/server/db/sessions'),
     settings: await import('@/server/db/settings'),
-    seedPhotos: await import('@/server/db/seed/photos'),
-    seedRead: await import('@/server/db/seed/read'),
-    seedRun: await import('@/server/db/seed/run'),
   };
   people = await signInEverySubject();
   upload = await sharp({
@@ -513,34 +507,11 @@ const rows: Row[] = [
   },
   ...hostSetupRows(),
   ...staffRows(),
+  ...supportQueueRows(),
   ...experienceEditorRows(),
   ...cancelSessionRows(sessionRules, 'ownerA', staff),
   // Seed and persona writes: ops alone. These write the most, so they come last.
-  {
-    fn: 'seedPersonas',
-    invoke: (c) => personaSeed.seedPersonas(c),
-    allows: platform(...opsOnly),
-  },
-  {
-    fn: 'readSeedSnapshot',
-    invoke: (c) => data.seedRead.readSeedSnapshot(c, seedNow),
-    allows: platform(...opsOnly),
-  },
-  {
-    fn: 'readPhotoCoverageGaps',
-    invoke: (c) => data.seedPhotos.readPhotoCoverageGaps(c),
-    allows: platform(...opsOnly),
-  },
-  {
-    fn: 'seedTestPhotos',
-    invoke: (c) => data.seedPhotos.seedTestPhotos(c, storage),
-    allows: platform(...opsOnly),
-  },
-  {
-    fn: 'runSeed',
-    invoke: (c) => data.seedRun.runSeed({ caller: c, now: seedNow }),
-    allows: platform(...opsOnly),
-  },
+  ...seedRows(),
 ];
 
 async function verdictOf(

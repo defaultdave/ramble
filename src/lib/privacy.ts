@@ -216,6 +216,15 @@ export const piiColumns: readonly PiiColumn[] = [
       "Not yet anonymized: the support queue work adds a step keyed on the sender's address, because a sender need not be a guest",
   },
   {
+    table: 'support_requests',
+    column: 'resolution_note',
+    kind: 'identifier',
+    data: 'Free text an ops user wrote when resolving the request, which can repeat what the guest wrote or name them',
+    location: databaseLocation,
+    deletionPath:
+      "Not yet anonymized: the same step as the request's own message, keyed on the sender's address",
+  },
+  {
     table: 'private_requests',
     column: 'name',
     kind: 'identifier',
@@ -443,7 +452,7 @@ export const nonPiiColumns: readonly {
   ]),
   ...notPersonal('support_requests', aRandomId, ['id']),
   ...notPersonal('support_requests', aFixedList, ['topic']),
-  ...notPersonal('support_requests', aTime, ['created_at']),
+  ...notPersonal('support_requests', aTime, ['created_at', 'resolved_at']),
   ...notPersonal('private_requests', aRandomId, ['id', 'experience_id']),
   ...notPersonal(
     'private_requests',

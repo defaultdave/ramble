@@ -15,6 +15,7 @@ import {
 import { experiences } from '@/server/db/schema';
 import { createFakeStorageAdapter } from '@/server/ports/storage/fake';
 import { personaHostSlugs } from '@/lib/seed/personas';
+import { hostSetupRows } from './authzHostRows';
 import { collectionInput, doc, helpInput } from './editorialFixtures';
 import {
   client,
@@ -54,8 +55,6 @@ type Data = {
   guests: typeof import('@/server/db/guests');
   hostDashboard: typeof import('@/server/db/hostDashboard');
   hostGuestLists: typeof import('@/server/db/hostGuestLists');
-  hostInvite: typeof import('@/server/hostInvite');
-  hostSetup: typeof import('@/server/db/hostSetup');
   ledger: typeof import('@/server/db/ledger');
   legal: typeof import('@/server/db/legal');
   photos: typeof import('@/server/db/photos');
@@ -119,8 +118,6 @@ beforeAll(async () => {
     guests: await import('@/server/db/guests'),
     hostDashboard: await import('@/server/db/hostDashboard'),
     hostGuestLists: await import('@/server/db/hostGuestLists'),
-    hostInvite: await import('@/server/hostInvite'),
-    hostSetup: await import('@/server/db/hostSetup'),
     ledger: await import('@/server/db/ledger'),
     legal: await import('@/server/db/legal'),
     photos: await import('@/server/db/photos'),
@@ -511,73 +508,7 @@ const rows: Row[] = [
     invoke: (c) => data.audit.recordOpsAccess(c),
     allows: platform(...opsOnly),
   },
-  // Host setup: ops alone. A missing host answers not found to ops and is refused to everyone else.
-  {
-    fn: 'createHost',
-    invoke: (c) => {
-      const unique = randomUUID().replaceAll('-', '');
-      return data.hostSetup.createHost(c, {
-        name: `Matrix host ${unique}`,
-        slug: `matrix-${unique}`,
-        description: null,
-        timeZone: 'America/New_York',
-        notificationEmail: null,
-        ownerEmail: `owner${unique}@example.com`,
-        acceptedLegalDocumentId: null,
-      });
-    },
-    allows: platform(...opsOnly),
-  },
-  {
-    fn: 'updateHost',
-    invoke: (c, t) =>
-      data.hostSetup.updateHost(c, t.hostId, {
-        name: 'Renamed',
-        slug: 'renamed',
-        description: null,
-        timeZone: 'UTC',
-        notificationEmail: null,
-      }),
-    allows: platform(...opsOnly),
-  },
-  {
-    fn: 'readHostsForOps',
-    invoke: (c) => data.hostSetup.readHostsForOps(c, null),
-    allows: platform(...opsOnly),
-  },
-  {
-    fn: 'readHostForOps',
-    invoke: (c, t) => data.hostSetup.readHostForOps(c, t.hostId),
-    allows: platform(...opsOnly),
-  },
-  {
-    fn: 'readNewHostForm',
-    invoke: (c) => data.hostSetup.readNewHostForm(c),
-    allows: platform(...opsOnly),
-  },
-  {
-    fn: 'readHostInviteTarget',
-    invoke: (c, t) =>
-      data.hostSetup.readHostInviteTarget(c, t.hostId, randomUUID()),
-    allows: platform(...opsOnly),
-  },
-  {
-    fn: 'recordHostAcceptance',
-    invoke: (c, t) =>
-      data.legal.recordHostAcceptance(c, t.hostId, randomUUID()),
-    allows: platform(...opsOnly),
-  },
-  {
-    fn: 'readHostAcceptances',
-    invoke: (c, t) => data.legal.readHostAcceptances(c, [t.hostId]),
-    allows: platform(...opsOnly),
-  },
-  {
-    fn: 'inviteHostOwner',
-    invoke: (c, t) =>
-      data.hostInvite.inviteHostOwner(c, t.hostId, randomUUID()),
-    allows: platform(...opsOnly),
-  },
+  ...hostSetupRows(),
   // Seed and persona writes: ops alone. These write the most, so they come last.
   {
     fn: 'seedPersonas',

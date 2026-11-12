@@ -4,7 +4,9 @@ import { Input } from '@/components/Input';
 import { Select } from '@/components/Select';
 import {
   availabilityFieldProblems,
-  availabilityLimits,
+  seatsMaxLength,
+  slotsIntro,
+  startTimeHint,
   templateSourceOptions,
   weekdayChoices,
   weekdayFieldName,
@@ -49,10 +51,7 @@ export function AvailabilityView({
         <h2 className={styles.heading} id="availability-slots">
           Weekly slots
         </h2>
-        <p className={styles.muted}>
-          Start times are on the host’s clock in {timeZone}. The daily job keeps
-          every slot open twelve weeks ahead.
-        </p>
+        <p className={styles.muted}>{slotsIntro(timeZone)}</p>
         {slots.length === 0 ? (
           <p className={styles.muted}>
             This experience has no weekly slots yet.
@@ -83,7 +82,7 @@ export function AvailabilityView({
                     label={`Seats, ${slot.weekdayLabel} ${slot.timeLabel}`}
                     inputMode="numeric"
                     defaultValue={String(slot.allocation)}
-                    maxLength={String(availabilityLimits.maxSeats).length}
+                    maxLength={seatsMaxLength}
                     autoComplete="off"
                     required
                   />
@@ -118,7 +117,7 @@ export function AvailabilityView({
           <Input
             name="startTime"
             label="Start time"
-            hint={`Like 14:00, on the host’s clock in ${timeZone}.`}
+            hint={startTimeHint(timeZone)}
             autoComplete="off"
             required
             {...errorFor('startTime')}

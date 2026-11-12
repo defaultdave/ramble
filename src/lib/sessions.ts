@@ -284,6 +284,14 @@ export function checkAllocationChange(
     : { ok: true };
 }
 
+/** Whether a new seat cap differs from the slot's: the same number writes nothing, audit row included. */
+export function isSeatChange(
+  oldAllocation: number,
+  newAllocation: number,
+): boolean {
+  return oldAllocation !== newAllocation;
+}
+
 type FollowingSession = {
   id: string;
   allocation: number;

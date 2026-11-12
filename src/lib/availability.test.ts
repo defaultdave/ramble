@@ -6,6 +6,9 @@ import {
   buildAvailabilityView,
   parseAddSlotsForm,
   parseSeatsForm,
+  seatsMaxLength,
+  slotsIntro,
+  startTimeHint,
   weekdayFieldName,
   type AvailabilitySlot,
 } from './availability';
@@ -261,5 +264,18 @@ describe('the audit rows', () => {
       sessions_updated: 5,
     });
     expect(() => parseAuditEntry(entry)).not.toThrow();
+  });
+});
+
+describe('the form copy', () => {
+  it('names the host’s zone in the intro and the start time hint', () => {
+    expect(slotsIntro('America/Chicago')).toContain('America/Chicago');
+    expect(startTimeHint('America/Chicago')).toBe(
+      'Like 14:00, on the host’s clock in America/Chicago.',
+    );
+  });
+
+  it('limits a seat count to the digits of the most seats', () => {
+    expect(seatsMaxLength).toBe(4);
   });
 });

@@ -17,6 +17,9 @@ import {
   AddSlotsInputSchema,
   SessionTemplateSchema,
   UpdateTemplateAllocationInputSchema,
+  checkAllocationEditable,
+  isSeatChange,
+  isUpcoming,
   planTemplateSeatChange,
   resolveHostZone,
   rollingRange,
@@ -24,13 +27,13 @@ import {
   type UpdateTemplateAllocationInput,
 } from '@/lib/sessions';
 import { Role, requireRole, type Caller } from '@/server/auth/caller';
-import { updateTagsForChanges } from '@/server/cache/invalidate';
 import { systemClock } from '@/server/ports/clock';
 import { requireOpsUserId, writeAudit } from './audit';
 import { db } from './client';
 import { readOpenHeldSeats } from './holds';
 import { lockSessionRow } from './locks';
 import { experiences, hosts, sessionTemplates, sessions } from './schema';
+import { commitThenInvalidate, type Done } from './lockedExperience';
 import { createSessionTemplate, generateSessionsIn } from './sessions';
 import { readDatabaseTime } from './time';
 
@@ -108,6 +111,8 @@ export type AddSlotsResult =
   | { status: 'added'; slots: number; sessionsCreated: number }
   | { status: 'experience_not_found' | 'duplicate_slot' | 'invalid_time_zone' };
 
+const none = <R>(result: R): Done<R> => ({ result, changes: [] });
+
 class SlotsNotAdded extends Error {
   constructor(readonly status: 'experience_not_found' | 'duplicate_slot') {
     super(status);
@@ -131,76 +136,70 @@ export async function addWeeklySlots(
   const data = AddSlotsInputSchema.parse(input);
   const range = rollingRange(now);
 
-  const result = await db
-    .transaction(async (tx): Promise<AddSlotsResult> => {
-      const [host] = await tx
-        .select({ timeZone: hosts.timeZone })
-        .from(experiences)
-        .innerJoin(hosts, eq(hosts.id, experiences.hostId))
-        .where(eq(experiences.id, data.experienceId));
-      if (!host) return { status: 'experience_not_found' };
-      if (!resolveHostZone(host.timeZone).ok) {
-        return { status: 'invalid_time_zone' };
+  return commitThenInvalidate(async (tx): Promise<Done<AddSlotsResult>> => {
+    const [host] = await tx
+      .select({ timeZone: hosts.timeZone })
+      .from(experiences)
+      .innerJoin(hosts, eq(hosts.id, experiences.hostId))
+      .where(eq(experiences.id, data.experienceId));
+    if (!host) return none({ status: 'experience_not_found' });
+    if (!resolveHostZone(host.timeZone).ok) {
+      return none({ status: 'invalid_time_zone' });
+    }
+    let sessionsCreated = 0;
+    for (const weekday of data.weekdays) {
+      const slot = await createSessionTemplate(
+        caller,
+        {
+          experienceId: data.experienceId,
+          weekday,
+          // The slot's own parser reads HH:MM; `data.startTime` is already HH:MM:00.
+          startTime: input.startTime,
+          durationMinutes: data.durationMinutes,
+          allocation: data.allocation,
+          source: data.source,
+        },
+        tx,
+      );
+      if (!slot.ok) throw new SlotsNotAdded(slot.reason);
+      const generated = await generateSessionsIn(
+        tx,
+        caller,
+        { templateId: slot.template.id, ...range },
+        now,
+      );
+      // The slot was written a moment ago in this transaction, the zone was checked above and the
+      // range is the rolling job's, so a refusal here is a fault, not an outcome.
+      if (!generated.ok) {
+        throw new Error(`Opening a new slot was refused: ${generated.reason}`);
       }
-      let sessionsCreated = 0;
-      for (const weekday of data.weekdays) {
-        const slot = await createSessionTemplate(
-          caller,
-          {
-            experienceId: data.experienceId,
-            weekday,
-            startTime: input.startTime,
-            durationMinutes: data.durationMinutes,
-            allocation: data.allocation,
-            source: data.source,
-          },
-          tx,
-        );
-        if (!slot.ok) throw new SlotsNotAdded(slot.reason);
-        const generated = await generateSessionsIn(
-          tx,
-          caller,
-          { templateId: slot.template.id, ...range },
-          now,
-        );
-        // The slot was written a moment ago in this transaction, the zone was checked above and the
-        // range is the rolling job's, so a refusal here is a fault, not an outcome.
-        if (!generated.ok) {
-          throw new Error(
-            `Opening a new slot was refused: ${generated.reason}`,
-          );
-        }
-        sessionsCreated += generated.created.length;
-        await writeAudit(
-          tx,
-          slotAddedEntry(userId, slot.template, generated.created.length),
-        );
-      }
-      return {
+      sessionsCreated += generated.created.length;
+      await writeAudit(
+        tx,
+        slotAddedEntry(userId, slot.template, generated.created.length),
+      );
+    }
+    return {
+      result: {
         status: 'added',
         slots: data.weekdays.length,
         sessionsCreated,
-      };
-    })
-    .catch((error: unknown) => {
-      if (error instanceof SlotsNotAdded) return { status: error.status };
-      throw error;
-    });
-  // After the commit, so an add that rolled back invalidates nothing.
-  if (result.status === 'added' && result.sessionsCreated > 0) {
-    updateTagsForChanges([
-      { kind: 'experience', experienceId: data.experienceId },
-    ]);
-  }
-  return result;
+      },
+      changes:
+        sessionsCreated > 0
+          ? [{ kind: 'experience', experienceId: data.experienceId }]
+          : [],
+    };
+  }).catch((error: unknown) => {
+    if (error instanceof SlotsNotAdded) return { status: error.status };
+    throw error;
+  });
 }
 
 export type UpdateSlotSeatsResult =
   | { status: 'saved'; sessionsUpdated: number }
   | { status: 'unchanged' | 'template_not_found' }
   | { status: 'below_sold_and_held'; booked: number };
-
-type Saved = { result: UpdateSlotSeatsResult; changedSessionIds: string[] };
 
 /**
  * Sets a slot's seat cap. The upcoming scheduled sessions whose capacity still equals the old cap
@@ -219,95 +218,88 @@ export async function updateSlotSeats(
   const userId = requireOpsUserId(caller);
   const data = UpdateTemplateAllocationInputSchema.parse(input);
 
-  const saved = await db.transaction(async (tx): Promise<Saved> => {
-    const [row] = await tx
-      .select()
-      .from(sessionTemplates)
-      .where(eq(sessionTemplates.id, data.templateId))
-      .for('update');
-    if (!row) {
-      return {
-        result: { status: 'template_not_found' },
-        changedSessionIds: [],
-      };
-    }
-    const template = SessionTemplateSchema.parse(row);
-    if (template.allocation === data.allocation) {
-      return { result: { status: 'unchanged' }, changedSessionIds: [] };
-    }
-    const candidates = await tx
-      .select({ id: sessions.id })
-      .from(sessions)
-      .where(
-        and(
-          eq(sessions.templateId, template.id),
-          eq(sessions.status, 'scheduled'),
-          gt(sessions.startsAt, now),
-        ),
-      )
-      .orderBy(asc(sessions.id));
-    // Lock 2, in id order. A row is read again under its lock: a booking that confirmed, or an
-    // edit that landed, between the list above and here is seen.
-    const locked = [];
-    for (const { id } of candidates) {
-      const session = (await lockSessionRow(tx, id))?.session;
-      if (
-        session?.status === 'scheduled' &&
-        session.startsAt.getTime() > now.getTime()
-      ) {
-        locked.push(session);
+  return commitThenInvalidate(
+    async (tx): Promise<Done<UpdateSlotSeatsResult>> => {
+      const [row] = await tx
+        .select()
+        .from(sessionTemplates)
+        .where(eq(sessionTemplates.id, data.templateId))
+        .for('update');
+      if (!row) return none({ status: 'template_not_found' });
+      const template = SessionTemplateSchema.parse(row);
+      if (!isSeatChange(template.allocation, data.allocation)) {
+        return none({ status: 'unchanged' });
       }
-    }
-    const heldAt = await readDatabaseTime(tx);
-    const upcoming = [];
-    for (const session of locked) {
-      upcoming.push({
-        id: session.id,
-        allocation: session.allocation,
-        seatsSold: session.seatsSold,
-        heldSeats: await readOpenHeldSeats(tx, session.id, heldAt),
-      });
-    }
-    const plan = planTemplateSeatChange(
-      template.allocation,
-      data.allocation,
-      upcoming,
-    );
-    if (!plan.ok) {
-      return {
-        result: { status: 'below_sold_and_held', booked: plan.booked },
-        changedSessionIds: [],
-      };
-    }
-    await tx
-      .update(sessionTemplates)
-      .set({ allocation: data.allocation })
-      .where(eq(sessionTemplates.id, template.id));
-    if (plan.followIds.length > 0) {
+      const candidates = await tx
+        .select({ id: sessions.id })
+        .from(sessions)
+        .where(
+          and(
+            eq(sessions.templateId, template.id),
+            eq(sessions.status, 'scheduled'),
+            gt(sessions.startsAt, now),
+          ),
+        )
+        .orderBy(asc(sessions.id));
+      // Lock 2, in id order. A row is read again under its lock: a booking that confirmed, or an
+      // edit that landed, between the list above and here is seen.
+      const locked = [];
+      for (const { id } of candidates) {
+        const session = (await lockSessionRow(tx, id))?.session;
+        if (
+          session &&
+          checkAllocationEditable(session.status).ok &&
+          isUpcoming(session.startsAt, now)
+        ) {
+          locked.push(session);
+        }
+      }
+      const heldAt = await readDatabaseTime(tx);
+      const upcoming = [];
+      for (const session of locked) {
+        upcoming.push({
+          id: session.id,
+          allocation: session.allocation,
+          seatsSold: session.seatsSold,
+          heldSeats: await readOpenHeldSeats(tx, session.id, heldAt),
+        });
+      }
+      const plan = planTemplateSeatChange(
+        template.allocation,
+        data.allocation,
+        upcoming,
+      );
+      if (!plan.ok) {
+        return none({ status: 'below_sold_and_held', booked: plan.booked });
+      }
       await tx
-        .update(sessions)
-        .set({
-          allocation: data.allocation,
-          version: sql`${sessions.version} + 1`,
-        })
-        .where(inArray(sessions.id, plan.followIds));
-    }
-    await writeAudit(
-      tx,
-      slotSeatsChangedEntry(userId, template, {
-        from: template.allocation,
-        to: data.allocation,
-        sessionsUpdated: plan.followIds.length,
-      }),
-    );
-    return {
-      result: { status: 'saved', sessionsUpdated: plan.followIds.length },
-      changedSessionIds: plan.followIds,
-    };
-  });
-  // After the commit, so a change that rolled back invalidates nothing.
-  updateTagsForChanges(
-    saved.changedSessionIds.map((sessionId) => ({ kind: 'spaces', sessionId })),
+        .update(sessionTemplates)
+        .set({ allocation: data.allocation })
+        .where(eq(sessionTemplates.id, template.id));
+      if (plan.followIds.length > 0) {
+        await tx
+          .update(sessions)
+          .set({
+            allocation: data.allocation,
+            version: sql`${sessions.version} + 1`,
+          })
+          .where(inArray(sessions.id, plan.followIds));
+      }
+      await writeAudit(
+        tx,
+        slotSeatsChangedEntry(userId, template, {
+          from: template.allocation,
+          to: data.allocation,
+          sessionsUpdated: plan.followIds.length,
+        }),
+      );
+      return {
+        result: { status: 'saved', sessionsUpdated: plan.followIds.length },
+        changes: plan.followIds.map((sessionId) => ({
+          kind: 'spaces',
+          sessionId,
+        })),
+      };
+    },
   );
-  return saved.result;
 }

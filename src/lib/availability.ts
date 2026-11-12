@@ -59,11 +59,6 @@ const templateSourceLabels = {
 
 export const templateSourceOptions = labelledOptions(templateSourceLabels);
 
-export const availabilityLimits = {
-  maxSeats: maxAllocation,
-  maxMinutes: maxSessionMinutes,
-} as const;
-
 export const availabilityFormFields = [
   'weekdays',
   'startTime',
@@ -80,6 +75,22 @@ export const availabilityFieldProblems = {
   allocation: `Enter a whole number of seats, from 0 to ${String(maxAllocation)}.`,
   source: 'Choose whose seats these are.',
 } as const satisfies Record<AvailabilityFormField, string>;
+
+/** The schema stores a start as HH:MM:00; the input the data layer takes is the HH:MM a person types. */
+function startTimeOf(stored: string): string {
+  return stored.slice(0, 5);
+}
+
+/** The most digits a seat count can have, for the field's length limit. */
+export const seatsMaxLength = String(maxAllocation).length;
+
+export function slotsIntro(timeZone: string): string {
+  return `Start times are on the host’s clock in ${timeZone}. The daily job keeps every slot open twelve weeks ahead.`;
+}
+
+export function startTimeHint(timeZone: string): string {
+  return `Like 14:00, on the host’s clock in ${timeZone}.`;
+}
 
 export type AddSlotsForm =
   | { status: 'ready'; input: AddSlotsInput }
@@ -101,9 +112,14 @@ export function parseAddSlotsForm(
     source: formText(get, 'source'),
   };
   const parsed = AddSlotsInputSchema.safeParse(raw);
-  // The schema has accepted `raw`, so it is an `AddSlotsInput`; the db function parses it again.
   return parsed.success
-    ? { status: 'ready', input: raw as AddSlotsInput }
+    ? {
+        status: 'ready',
+        input: {
+          ...parsed.data,
+          startTime: startTimeOf(parsed.data.startTime),
+        },
+      }
     : {
         status: 'invalid',
         fields: fieldsFromIssues(parsed.error.issues, availabilityFormFields),

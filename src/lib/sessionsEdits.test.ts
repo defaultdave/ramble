@@ -6,6 +6,7 @@ import {
   UpdateSessionTimeInputSchema,
   checkUnbooked,
   planTemplateSeatChange,
+  isSeatChange,
   isUpcoming,
   localDateIn,
   occurrenceOn,
@@ -244,5 +245,15 @@ describe('planTemplateSeatChange', () => {
     expect(planTemplateSeatChange(8, 4, [session('edited', 10, 7)]).ok).toBe(
       true,
     );
+  });
+});
+
+describe('isSeatChange', () => {
+  it.each([
+    [8, 8, false],
+    [8, 12, true],
+    [8, 0, true],
+  ])('a cap of %i to %i is a change: %s', (from, to, changed) => {
+    expect(isSeatChange(from, to)).toBe(changed);
   });
 });

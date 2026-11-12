@@ -362,9 +362,9 @@ describe('limits', () => {
       .from(authUsers)
       .where(eq(authUsers.email, 'one-too-many@example.com'));
     expect(accounts).toEqual([]);
-    expect(await roles.grantHostStaff(crowdedOwner, crowded, first)).toMatchObject(
-      { outcome: 'already_held' },
-    );
+    expect(
+      await roles.grantHostStaff(crowdedOwner, crowded, first),
+    ).toMatchObject({ outcome: 'already_held' });
   });
 
   it('refuses the owner of one host granting on another, and writes nothing', async () => {

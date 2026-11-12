@@ -1,9 +1,16 @@
 import type { Metadata } from 'next';
+import { ActionNotice } from '@/components/ActionNotice';
 import { ButtonLink } from '@/components/Button';
-import { HostNotice, HostsTable } from '@/components/HostSetup';
+import { HostsTable } from '@/components/HostSetup';
 import { OpsAccessDenied } from '@/components/OpsShell';
 import { PageHeading } from '@/components/PageHeading';
-import { hostsPath, newHostPath, parseHostNotice } from '@/lib/hostSetup';
+import {
+  hostNoticeCodes,
+  hostNotices,
+  hostsPath,
+  newHostPath,
+} from '@/lib/hostSetup';
+import { noticeText, parseNotice } from '@/lib/opsForm';
 import { holdsOpsRole } from '@/lib/opsNav';
 import { parseCursor } from '@/lib/tableQuery';
 import { readHostsForOps } from '@/server/db/hostSetup';
@@ -21,7 +28,12 @@ export default async function HostsPage({
   const page = await readHostsForOps(caller, cursor);
   return (
     <PageHeading title="Hosts">
-      <HostNotice code={parseHostNotice(query.notice)} />
+      <ActionNotice
+        notice={noticeText(
+          hostNotices,
+          parseNotice(query.notice, hostNoticeCodes),
+        )}
+      />
       <p>
         <ButtonLink href={newHostPath}>Add a host</ButtonLink>
       </p>

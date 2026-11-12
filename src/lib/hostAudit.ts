@@ -1,12 +1,9 @@
-import type { AuditEntryInput } from './audit';
+import { userActor, type AuditEntryInput } from './audit';
 import type { HostEditableField } from './hostSetup';
 import { opsAreaIds } from './opsAudit';
 
 // The audit rows of host setup. An ops user does these, so the actor is always a named user.
 // Details hold ids and flags only: the audit log refuses a name or an address.
-
-const userActor = (userId: string) =>
-  ({ actorKind: 'user', actorId: userId }) as const;
 
 // The details keys are lower-case words, so a field name is written in snake case.
 const snakeCase = (field: string) =>

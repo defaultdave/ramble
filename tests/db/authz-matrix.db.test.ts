@@ -15,7 +15,9 @@ import {
 import { experiences } from '@/server/db/schema';
 import { createFakeStorageAdapter } from '@/server/ports/storage/fake';
 import { personaHostSlugs } from '@/lib/seed/personas';
+import { experienceEditorRows } from './authzExperienceRows';
 import { hostSetupRows } from './authzHostRows';
+import { cancelSessionRows } from './authzSessionRows';
 import { collectionInput, doc, helpInput } from './editorialFixtures';
 import {
   client,
@@ -49,7 +51,6 @@ setupAuthzDatabase();
 
 type Data = {
   audit: typeof import('@/server/db/audit');
-  cancelSession: typeof import('@/server/db/cancelSession');
   anonymize: typeof import('@/server/db/anonymize');
   catalog: typeof import('@/server/db/catalog');
   editorial: typeof import('@/server/db/editorial');
@@ -113,7 +114,6 @@ const platform = (...who: readonly Subject[]) => ({ platform: who });
 beforeAll(async () => {
   data = {
     audit: await import('@/server/db/audit'),
-    cancelSession: await import('@/server/db/cancelSession'),
     anonymize: await import('@/server/db/anonymize'),
     catalog: await import('@/server/db/catalog'),
     editorial: await import('@/server/db/editorial'),
@@ -511,13 +511,8 @@ const rows: Row[] = [
     allows: platform(...opsOnly),
   },
   ...hostSetupRows(),
-  // Cancelling is for good, so this row sits after every row that still needs a scheduled session.
-  {
-    fn: 'cancelSession',
-    invoke: (c, { sessionId }) =>
-      data.cancelSession.cancelSession(c, { sessionId, reason: 'host' }),
-    allows: { ...sessionRules, allocationOnHostA: ['ownerA', ...staff] },
-  },
+  ...experienceEditorRows(),
+  ...cancelSessionRows(sessionRules, 'ownerA', staff),
   // Seed and persona writes: ops alone. These write the most, so they come last.
   {
     fn: 'seedPersonas',

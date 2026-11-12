@@ -20,6 +20,7 @@ import {
 } from '@/lib/catalog';
 import { Role, requireRole, type Caller } from '@/server/auth/caller';
 import { dbRead } from './client';
+import { byNameThenId } from './keysetPage';
 import {
   categories,
   experiences,
@@ -32,8 +33,6 @@ import {
 export const guestVisible = inArray(experiences.status, [
   ...guestVisibleStatuses,
 ]);
-
-const byNameThenId = [asc(experiences.name), asc(experiences.id)];
 
 const adultFirst = [asc(priceOptions.kind)];
 
@@ -117,7 +116,7 @@ export async function listHostExperiences(
       cancellationTier: true,
       priceOptions: { orderBy: adultFirst },
     },
-    orderBy: byNameThenId,
+    orderBy: byNameThenId(experiences),
   });
   return HostExperienceSchema.array().parse(rows);
 }

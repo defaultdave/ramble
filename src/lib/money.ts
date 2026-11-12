@@ -27,3 +27,33 @@ export function formatPrice(minor: number): string {
     ? `$${dollars}`
     : `$${dollars}.${String(cents).padStart(2, '0')}`;
 }
+
+// Whole dollars are plain digits, or digits in groups of three after a first group of one to three.
+const dollarsPattern = /^(\d{1,6}|\d{1,3}(?:,\d{3})+)(?:\.(\d{1,2}))?$/;
+
+/**
+ * Dollars as typed ("85", "$12.5", "1,200.00") in cents, or undefined when it is not a price. A
+ * comma is a thousands separator in valid groups only, so "12,50" is refused, not read as 1250.
+ * Integer arithmetic only.
+ */
+export function priceMinorFromText(value: string): number | undefined {
+  const match = dollarsPattern.exec(value.trim().replace(/^\$/, ''));
+  if (!match) return undefined;
+  const [, dollars = '', cents = ''] = match;
+  return (
+    Number(dollars.replaceAll(',', '')) * CENTS_PER_DOLLAR +
+    Number(cents.padEnd(2, '0'))
+  );
+}
+
+/** A saved price as the dollars a person types, or null when there is none. */
+export function priceInputTextOrNull(minor: number | null): string | null {
+  return minor === null ? null : priceInputText(minor);
+}
+
+/** Cents as the dollars a person types: "85" for 8500, "12.50" for 1250. */
+export function priceInputText(minor: number): string {
+  const { dollars, cents } = splitMinor(minor);
+  const plain = dollars.replaceAll(',', '');
+  return cents === 0 ? plain : `${plain}.${String(cents).padStart(2, '0')}`;
+}

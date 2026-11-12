@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  wholeNumberText,
   countLabel,
   everyJsonNode,
   firstQueryValue,
@@ -121,4 +122,23 @@ describe('countLabel', () => {
   ])('says %i %s (plural %s) as "%s"', (count, one, many, label) => {
     expect(countLabel(count, one, many)).toBe(label);
   });
+});
+
+describe('wholeNumberText', () => {
+  const schema = wholeNumberText(1, 40);
+
+  it.each([
+    ['8', 8],
+    [' 40 ', 40],
+    ['1', 1],
+  ])('reads %j as %j', (text, expected) => {
+    expect(schema.parse(text)).toBe(expected);
+  });
+
+  it.each(['0', '41', '', '1.5', '-1', '1e1', '12345678', 'ten'])(
+    'refuses %j',
+    (text) => {
+      expect(schema.safeParse(text).success).toBe(false);
+    },
+  );
 });

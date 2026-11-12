@@ -15,15 +15,15 @@ import {
   hostNotices,
   hostPath,
   inviteNotice,
-  noticeHref,
   ownerCellLabel,
   parseHostCreateForm,
   parseHostEditForm,
-  parseHostIdField,
-  parseHostNotice,
-  parseProblemFields,
   type HostInput,
+  hostFieldProblems,
+  hostFormFields,
+  hostNoticeCodes,
 } from './hostSetup';
+import { noticeHref, parseNotice } from './opsForm';
 
 // Behaviours under test, one per decision, branch, or risk:
 // - the create form turns a filled form into a host and an owner: text is trimmed, a blank slug comes from the name, blank optional fields are null, addresses are lower-cased
@@ -200,19 +200,6 @@ describe('parseHostEditForm', () => {
   });
 });
 
-describe('parseHostIdField', () => {
-  it.each([
-    [
-      '0F1E2D3C-4B5A-4697-8A9B-0C1D2E3F4A5B',
-      '0f1e2d3c-4b5a-4697-8a9b-0c1d2e3f4a5b',
-    ],
-    ['nope', null],
-    [null, null],
-  ])('reads %j as %j', (raw, expected) => {
-    expect(parseHostIdField(raw)).toBe(expected);
-  });
-});
-
 describe('changedHostFields', () => {
   const before: HostInput = {
     name: 'A',
@@ -366,36 +353,19 @@ describe('labels', () => {
 });
 
 describe('notices in the address', () => {
-  it.each([
-    ['created', 'created'],
-    ['stale_agreement', 'stale_agreement'],
-    ['made-up', null],
-    ['', null],
-  ])('reads %j as %j', (raw, expected) => {
-    expect(parseHostNotice(raw)).toBe(expected);
-  });
-
-  it('reads a repeated or missing notice as none', () => {
-    expect(parseHostNotice(['created', 'updated'])).toBeNull();
-    expect(parseHostNotice(undefined)).toBeNull();
-  });
-
-  it('reads only the known fields, in form order', () => {
-    expect(parseProblemFields('ownerEmail,nope,name')).toEqual([
-      'name',
-      'ownerEmail',
-    ]);
-    expect(parseProblemFields(undefined)).toEqual([]);
-    expect(parseProblemFields(['name'])).toEqual([]);
-  });
-
-  it('builds the address an action sends the person to', () => {
-    expect(noticeHref('/ops/hosts/x', 'updated')).toBe(
-      '/ops/hosts/x?notice=updated',
+  it('names exactly the codes that have a notice', () => {
+    expect([...hostNoticeCodes].sort()).toEqual(
+      Object.keys(hostNotices).sort(),
     );
-    expect(noticeHref('/ops/hosts/new', 'invalid', ['name', 'timeZone'])).toBe(
-      '/ops/hosts/new?notice=invalid&fields=name%2CtimeZone',
+  });
+
+  it('names exactly the form fields that have a problem sentence', () => {
+    expect([...hostFormFields].sort()).toEqual(
+      Object.keys(hostFieldProblems).sort(),
     );
+  });
+
+  it('builds the address of a host', () => {
     expect(hostPath('x')).toBe('/ops/hosts/x');
   });
 });
@@ -487,7 +457,7 @@ describe('isSlugTakenError', () => {
 
 describe('the slug-taken notice', () => {
   it('is a known notice that names the slug field', () => {
-    expect(parseHostNotice('slug_taken')).toBe('slug_taken');
+    expect(parseNotice('slug_taken', hostNoticeCodes)).toBe('slug_taken');
     expect(noticeHref('/ops/hosts/new', 'slug_taken', ['slug'])).toBe(
       '/ops/hosts/new?notice=slug_taken&fields=slug',
     );

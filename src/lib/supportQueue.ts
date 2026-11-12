@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { userActor, type AuditEntryInput } from './audit';
 import { WriteIdSchema } from './catalog';
 import { defaultHostTimeZone } from './hostSetup';
+import { opsAreaIds } from './opsAudit';
 import {
   formText,
   oversizedFields,
@@ -22,9 +23,6 @@ import { zonedDeadlineLabel } from './zonedLabels';
 
 export const supportQueuePath = '/ops/support';
 export const supportQueuePageSize = 25;
-
-/** A form field longer than this is refused unread, so no rule walks an unbounded string. */
-const rawFieldMaxChars = 2000;
 
 const supportStatuses = ['open', 'resolved'] as const;
 export type SupportStatus = (typeof supportStatuses)[number];
@@ -48,8 +46,11 @@ export const supportStatusOptions = supportStatuses.map((value) => ({
 export function parseSupportStatus(
   raw: string | readonly string[] | undefined,
 ): SupportStatus | null {
-  const named = parseStatusFilter(raw, supportStatusOptions);
-  return supportStatuses.find((status) => status === named) ?? null;
+  return pickKnown(
+    parseStatusFilter(raw, supportStatusOptions),
+    supportStatuses,
+    null,
+  );
 }
 
 /** A request is open until it has a resolution time. */
@@ -121,7 +122,7 @@ const ResolveSchema = z.strictObject({
 
 /** The posted resolve form: a request id and a note that is not blank. Nothing is repaired; a refused form resolves nothing. */
 export function parseSupportResolveForm(get: FormGetter): SupportResolveForm {
-  if (oversizedFields(get, resolveFields, rawFieldMaxChars).length > 0) {
+  if (oversizedFields(get, resolveFields, supportLimits.rawField).length > 0) {
     return { ok: false };
   }
   const parsed = ResolveSchema.safeParse({
@@ -145,6 +146,7 @@ export function supportResolveOutcome(
 export const supportNoticeCodes = [
   'resolved',
   'already_resolved',
+  'not_found',
   'invalid',
 ] as const;
 export type SupportNoticeCode = (typeof supportNoticeCodes)[number];
@@ -155,14 +157,15 @@ export const supportNotices = {
     tone: 'info',
     title: 'That request was already resolved.',
   },
+  not_found: {
+    tone: 'warning',
+    title: 'That request could not be found.',
+  },
   invalid: {
     tone: 'warning',
     title: `Add a note of up to ${String(supportLimits.resolutionNoteMaxChars)} characters to resolve a request.`,
   },
 } satisfies Record<SupportNoticeCode, NoticeText>;
-
-/** The audit log names the queue by one fixed id, as it does the other ops areas; kept clear of the `opsAreaIds` range so a parallel unit's area cannot collide. */
-const supportQueueAreaId = '00000000-0000-4000-8000-0000000000b1';
 
 /** The queue was read. It shows guests' names and addresses. */
 export function supportListEntry(userId: string): AuditEntryInput {
@@ -170,7 +173,7 @@ export function supportListEntry(userId: string): AuditEntryInput {
     ...userActor(userId),
     action: 'support.list_viewed',
     subjectKind: 'ops_area',
-    subjectId: supportQueueAreaId,
+    subjectId: opsAreaIds.support,
   };
 }
 

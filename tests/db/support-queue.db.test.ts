@@ -25,11 +25,24 @@ import {
 // Behaviours under test, against the real database:
 // - every function refuses a guest, a host owner, an admin, and nobody with ForbiddenError, and writes nothing
 // - the queue lists newest first, pages by cursor so each request shows once, and records one audit row per page
+// - a read whose audit row cannot be written throws and returns no rows
 // - the status filter returns only open or only resolved requests
 // - resolving stores the note and a time, and writes one audit row naming the ops user and the request by id, with no note in it
 // - a second resolve leaves the first note and writes no second audit row, including one that waits on another resolver's lock and finds the request resolved when it gets it
 // - a missing request is not found and writes nothing
 // - the database refuses a resolution time without a note, a note without a time, a blank or long note, and a time out of range
+
+const audit = vi.hoisted(() => ({ failWith: null as Error | null }));
+vi.mock('@/server/db/audit', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/server/db/audit')>();
+  return {
+    ...original,
+    recordAudit: (entry: Parameters<typeof original.recordAudit>[0]) =>
+      audit.failWith
+        ? Promise.reject(audit.failWith)
+        : original.recordAudit(entry),
+  };
+});
 
 let fresh: FreshDatabase;
 let stopHttp: () => Promise<void>;
@@ -177,6 +190,18 @@ describe('readSupportQueue', () => {
     expect(await ids('open')).toEqual([open.id]);
     expect(await ids('resolved')).toEqual([done.id]);
     expect(await ids(null)).toHaveLength(2);
+  });
+
+  it('returns no rows when the audit row cannot be written', async () => {
+    await request();
+    audit.failWith = new Error('audit unavailable');
+    try {
+      await expect(
+        queue.readSupportQueue(ops, { status: null, cursor: null }),
+      ).rejects.toThrow('audit unavailable');
+    } finally {
+      audit.failWith = null;
+    }
   });
 
   it('shows the reason in words', async () => {

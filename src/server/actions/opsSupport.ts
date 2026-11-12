@@ -14,9 +14,5 @@ export async function resolveSupportRequestAction(
   if (!parsed.ok) redirect(noticeHref(supportQueuePath, 'invalid'));
 
   const outcome = await resolveSupportRequest(caller, parsed.value);
-  redirect(
-    outcome === 'not_found'
-      ? supportQueuePath
-      : noticeHref(supportQueuePath, outcome),
-  );
+  redirect(noticeHref(supportQueuePath, outcome));
 }

@@ -28,7 +28,7 @@ import { resolveSupportRequestAction } from './opsSupport';
 // Behaviours under test:
 // - the caller is checked first: a caller sent away reads nothing and resolves nothing
 // - a refused form redirects with the invalid notice and resolves nothing
-// - a resolved or already resolved request redirects with that notice; a missing one redirects to the bare queue
+// - a resolved, already resolved, or missing request redirects with that notice
 // - the id and note reach the data layer as parsed, with the ops caller
 
 const id = '0f1e2d3c-4b5a-4697-8a9b-0c1d2e3f4a5b';
@@ -66,7 +66,7 @@ describe('resolveSupportRequestAction', () => {
     expect(mocks.resolveSupportRequest).not.toHaveBeenCalled();
   });
 
-  it.each(['resolved', 'already_resolved'])(
+  it.each(['resolved', 'already_resolved', 'not_found'])(
     'redirects with the %s notice',
     async (outcome) => {
       mocks.resolveSupportRequest.mockResolvedValue(outcome);
@@ -81,11 +81,4 @@ describe('resolveSupportRequestAction', () => {
       });
     },
   );
-
-  it('redirects to the bare queue for a request that is not there', async () => {
-    mocks.resolveSupportRequest.mockResolvedValue('not_found');
-    await expect(
-      resolveSupportRequestAction(form({ id, note: 'Done.' })),
-    ).rejects.toMatchObject({ href: '/ops/support' });
-  });
 });

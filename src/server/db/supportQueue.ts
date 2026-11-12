@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, desc, eq, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import { splitPage } from '@/lib/pagination';
 import {
   buildSupportQueueRows,
@@ -15,6 +15,7 @@ import {
 import type { Caller } from '@/server/auth/caller';
 import { recordAudit, requireOpsUserId, writeAudit } from './audit';
 import { db, dbRead } from './client';
+import { byColumnThenId, pastKeysetCursor } from './keysetPage';
 import { supportRequests } from './schema';
 
 // For the ops role alone: each function checks it, and the read records its audit row before it returns anything.
@@ -29,12 +30,6 @@ const statusCondition = {
   resolved: isNotNull(supportRequests.resolvedAt),
 } satisfies Record<SupportStatus, SQL>;
 
-/** Newest first; the id breaks a tie so a page ends where the next begins. The cursor is the last row's id. */
-function pastCursor(cursor: string | null): SQL | undefined {
-  if (cursor === null) return undefined;
-  return sql`(${supportRequests.createdAt}, ${supportRequests.id}) < (SELECT c.created_at, c.id FROM ${supportRequests} c WHERE c.id = ${cursor})`;
-}
-
 /** One page of requests, newest first, optionally only open or only resolved ones. */
 export async function readSupportQueue(
   caller: Caller,
@@ -47,10 +42,17 @@ export async function readSupportQueue(
     .where(
       and(
         options.status === null ? undefined : statusCondition[options.status],
-        pastCursor(options.cursor),
+        pastKeysetCursor(
+          supportRequests,
+          supportRequests.createdAt,
+          'desc',
+          options.cursor,
+        ),
       ),
     )
-    .orderBy(desc(supportRequests.createdAt), desc(supportRequests.id))
+    .orderBy(
+      ...byColumnThenId(supportRequests, supportRequests.createdAt, 'desc'),
+    )
     .limit(supportQueuePageSize + 1);
   const { items, nextCursor } = splitPage(fetched, supportQueuePageSize);
   await recordAudit(supportListEntry(userId));

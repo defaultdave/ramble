@@ -10,6 +10,7 @@ export const opsAreaIds = {
   dashboard: '00000000-0000-4000-8000-0000000000a1',
   mailbox: '00000000-0000-4000-8000-0000000000a2',
   hosts: '00000000-0000-4000-8000-0000000000a3',
+  support: '00000000-0000-4000-8000-0000000000a4',
 } as const;
 
 // A signed-in person is named; a tester who got in with the shared secret and no session is a guest.

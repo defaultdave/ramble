@@ -2,7 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ActionNotice } from '@/components/ActionNotice';
-import { ExperienceEditView } from '@/components/ExperienceEditor';
+import {
+  ExperienceEditView,
+  ExperiencePauseForm,
+} from '@/components/ExperienceEditor';
 import { OpsAccessDenied } from '@/components/OpsShell';
 import { PageHeading } from '@/components/PageHeading';
 import {
@@ -10,9 +13,14 @@ import {
   experiencePath,
   experiencesPath,
 } from '@/lib/experienceEditor';
-import { parseIdField, parseProblemFields } from '@/lib/opsForm';
+import { pauseNoticeCodes, pauseNoticeFor } from '@/lib/experiencePause';
+import { parseIdField, parseNotice, parseProblemFields } from '@/lib/opsForm';
 import { holdsOpsRole } from '@/lib/opsNav';
 import { experiencePageNotice, photoFormFields } from '@/lib/photoForm';
+import {
+  pauseExperienceAction,
+  unpauseExperienceAction,
+} from '@/server/actions/experiencePause';
 import { updateExperienceAction } from '@/server/actions/experiences';
 import { addExperiencePhotoAction } from '@/server/actions/experiencePhotos';
 import {
@@ -49,7 +57,17 @@ export default async function ExperiencePage({
       <p>
         <Link href={experiencesPath}>Back to the experiences</Link>
       </p>
-      <ActionNotice notice={notice} />
+      <ActionNotice
+        notice={
+          notice ?? pauseNoticeFor(parseNotice(query.notice, pauseNoticeCodes))
+        }
+      />
+      <ExperiencePauseForm
+        experienceId={view.id}
+        status={view.status}
+        pause={pauseExperienceAction}
+        unpause={unpauseExperienceAction}
+      />
       <ExperienceEditView
         view={view}
         choices={choices}

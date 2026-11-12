@@ -1,4 +1,5 @@
 import { userActor, type AuditEntryInput } from './audit';
+import { pauseTransitions, type PauseKind } from './experiencePause';
 import type { RejectionReason } from './experienceReview';
 import type {
   ExperienceContent,
@@ -130,5 +131,30 @@ export function experienceRejectedEntry(
     subjectKind: 'experience',
     subjectId: experienceId,
     details: { from_status: 'in_review', to_status: 'draft', reason },
+  };
+}
+
+/**
+ * An experience paused or unpaused by ops, one row each. `via_host_suspension` says the row came
+ * from suspending or unsuspending the host, which is how a suspension finds the experiences it
+ * paused without a status of its own.
+ */
+export function experiencePauseEntry(
+  userId: string,
+  experienceId: string,
+  kind: PauseKind,
+  viaHostSuspension: boolean,
+): AuditEntryInput {
+  const { from, to } = pauseTransitions[kind];
+  return {
+    ...userActor(userId),
+    action: kind === 'pause' ? 'experience.paused' : 'experience.unpaused',
+    subjectKind: 'experience',
+    subjectId: experienceId,
+    details: {
+      from_status: from,
+      to_status: to,
+      via_host_suspension: viaHostSuspension,
+    },
   };
 }

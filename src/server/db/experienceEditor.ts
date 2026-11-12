@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, asc, desc, eq, inArray, like, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, like, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { CacheChange } from '@/lib/cacheTags';
 import {

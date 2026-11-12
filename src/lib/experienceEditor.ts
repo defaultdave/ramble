@@ -559,9 +559,10 @@ export type ExperienceColumns = Omit<
 export function experienceColumnsOf(
   content: ExperienceContent,
 ): ExperienceColumns {
-  const columns: Partial<ExperienceContent> = { ...content };
-  for (const field of priceFields) delete columns[field];
-  return columns as ExperienceColumns;
+  const kept = Object.entries(content).filter(
+    ([field]) => !(priceFields as readonly string[]).includes(field),
+  );
+  return Object.fromEntries(kept) as ExperienceColumns;
 }
 
 /** Whether guests can see an experience in this status, so a change to it reaches cached pages. */

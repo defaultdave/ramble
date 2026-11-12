@@ -30,7 +30,8 @@ async function decide(
         noticeHref(here, 'alt_missing', result.photoNumbers.map(String)),
       );
     case 'not_in_review':
-      redirect(noticeHref(here, 'not_in_review'));
+    case 'host_suspended':
+      redirect(noticeHref(here, result.status));
     case 'approved':
     case 'rejected':
       redirect(noticeHref(reviewPath, result.status));

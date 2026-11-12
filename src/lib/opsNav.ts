@@ -32,6 +32,11 @@ export const opsNavLinks: readonly OpsNavLink[] = [
     href: '/ops/support',
     summary: 'Read guests’ messages, and mark each resolved with a note.',
   },
+  {
+    label: 'Review queue',
+    href: '/ops/review',
+    summary: 'Approve experiences waiting for review, or send them back.',
+  },
 ];
 
 /** The areas the landing page lists: every link but the landing page itself. */

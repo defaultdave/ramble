@@ -63,12 +63,46 @@ export type OpsBookingsPage = {
   nextCursor: string | null;
 };
 
+const bookingFields = {
+  id: orders.id,
+  reference: orders.reference,
+  status: orders.status,
+  refundFailed: orders.refundFailed,
+  leadGuestName: orders.leadGuestName,
+  contactEmail: orders.contactEmail,
+  experienceName: experiences.name,
+  sessionStartsAt: sessions.startsAt,
+  timeZone: sessions.timeZone,
+  totalMinor: orders.totalMinor,
+  cancelledBy: orders.cancelledBy,
+  createdAt: orders.createdAt,
+  confirmedAt: orders.confirmedAt,
+  cancelledAt: orders.cancelledAt,
+  refundedTicketMinor: orders.refundedTicketMinor,
+  refundedTaxMinor: orders.refundedTaxMinor,
+};
+
+/** A booking with its experience and session: the one source of every booking read. */
+function selectBookings(reader: Pick<typeof db, 'select'>) {
+  return reader
+    .select(bookingFields)
+    .from(orders)
+    .innerJoin(experiences, eq(experiences.id, orders.experienceId))
+    .innerJoin(sessions, eq(sessions.id, orders.sessionId));
+}
+
 function searchCondition(search: BookingSearch): SQL | undefined {
   switch (search.kind) {
     case 'email':
       return or(
         eq(orders.contactEmail, search.email),
-        eq(guests.email, search.email),
+        inArray(
+          orders.guestId,
+          dbRead
+            .select({ id: guests.id })
+            .from(guests)
+            .where(eq(guests.email, search.email)),
+        ),
       );
     case 'reference':
       return eq(orders.reference, search.reference);
@@ -98,23 +132,7 @@ export async function readOpsBookings(
     await recordAudit(bookingsListEntry(userId));
     return { rows: [], nextCursor: null };
   }
-  const fetched = await dbRead
-    .select({
-      id: orders.id,
-      reference: orders.reference,
-      status: orders.status,
-      refundFailed: orders.refundFailed,
-      leadGuestName: orders.leadGuestName,
-      contactEmail: orders.contactEmail,
-      experienceName: experiences.name,
-      sessionStartsAt: sessions.startsAt,
-      timeZone: sessions.timeZone,
-      totalMinor: orders.totalMinor,
-    })
-    .from(orders)
-    .innerJoin(guests, eq(guests.id, orders.guestId))
-    .innerJoin(experiences, eq(experiences.id, orders.experienceId))
-    .innerJoin(sessions, eq(sessions.id, orders.sessionId))
+  const fetched = await selectBookings(dbRead)
     .where(
       and(
         eq(orders.kind, 'booking'),
@@ -141,29 +159,9 @@ export async function readOpsBooking(
   const id = WriteIdSchema.parse(orderId);
   return db.transaction(async (tx) => {
     const now = await readDatabaseTime(tx);
-    const [booking] = await tx
-      .select({
-        id: orders.id,
-        reference: orders.reference,
-        status: orders.status,
-        refundFailed: orders.refundFailed,
-        leadGuestName: orders.leadGuestName,
-        contactEmail: orders.contactEmail,
-        experienceName: experiences.name,
-        sessionStartsAt: sessions.startsAt,
-        timeZone: sessions.timeZone,
-        totalMinor: orders.totalMinor,
-        cancelledBy: orders.cancelledBy,
-        createdAt: orders.createdAt,
-        confirmedAt: orders.confirmedAt,
-        cancelledAt: orders.cancelledAt,
-        refundedTicketMinor: orders.refundedTicketMinor,
-        refundedTaxMinor: orders.refundedTaxMinor,
-      })
-      .from(orders)
-      .innerJoin(experiences, eq(experiences.id, orders.experienceId))
-      .innerJoin(sessions, eq(sessions.id, orders.sessionId))
-      .where(and(eq(orders.id, id), eq(orders.kind, 'booking')));
+    const [booking] = await selectBookings(tx).where(
+      and(eq(orders.id, id), eq(orders.kind, 'booking')),
+    );
     const found = await readCancelFacts(tx, id);
     if (!booking || !found) return null;
     await writeAudit(tx, bookingViewedEntry(userId, id));

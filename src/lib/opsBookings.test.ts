@@ -63,12 +63,10 @@ const booking: OpsBookingRecord & OpsBookingDetailRecord['booking'] = {
 
 describe('parseBookingSearch', () => {
   it.each([
-    ['no term', undefined, { kind: 'none' }],
-    ['a blank term', '  ', { kind: 'none' }],
-    ['a repeated term', ['a', 'b'], { kind: 'none' }],
+    ['no term', '', { kind: 'none' }],
     [
       'an address in any case',
-      ' Pat@Example.COM ',
+      'Pat@Example.COM',
       { kind: 'email', email: 'pat@example.com' },
     ],
     [
@@ -83,7 +81,6 @@ describe('parseBookingSearch', () => {
       'RMB-ABCI34',
       { kind: 'invalid' },
     ],
-    ['a term over the limit', 'a'.repeat(101), { kind: 'none' }],
   ])('reads %s', (_name, raw, expected) => {
     expect(parseBookingSearch(raw)).toEqual(expected);
   });

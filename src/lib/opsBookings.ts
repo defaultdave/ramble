@@ -21,9 +21,8 @@ import {
   type OrderKind,
   type OrderStatus,
 } from './orders';
-import { orderRefundReasons, planRefund } from './refunds';
+import { orderRefundReasons, planRefund, type RefundStatus } from './refunds';
 import { statusFilter, type StatusTone } from './statusBadge';
-import { parseSearchTerm } from './tableQuery';
 import { countLabel } from './text';
 import { zonedDeadlineLabel } from './zonedLabels';
 
@@ -37,8 +36,10 @@ export const opsBookingPath = (orderId: string) =>
 const bookingFilters = ['refund_failed'] as const;
 export type BookingFilter = (typeof bookingFilters)[number];
 
+const refundFailedLabel = 'Refund failed';
+
 const bookingFilter = statusFilter(bookingFilters, {
-  refund_failed: 'Refund failed',
+  refund_failed: refundFailedLabel,
 });
 export const bookingFilterOptions = bookingFilter.options;
 
@@ -52,14 +53,11 @@ export type BookingSearch =
   | { kind: 'invalid' };
 
 /**
- * The search the address names: a term with an `@` is a guest's address, anything else must be a
+ * The search a term names (already read with `parseSearchTerm`): a term with an `@` is a guest's address, anything else must be a
  * booking reference (any case). A term that is neither is `invalid` and finds nothing: it is never
  * matched loosely, so the box cannot be used to browse every guest.
  */
-export function parseBookingSearch(
-  raw: string | readonly string[] | undefined,
-): BookingSearch {
-  const term = parseSearchTerm(raw);
+export function parseBookingSearch(term: string): BookingSearch {
   if (term === '') return { kind: 'none' };
   if (term.includes('@')) {
     const email = GuestEmailSchema.safeParse(term);
@@ -134,7 +132,7 @@ export function buildOpsBookingRow(record: OpsBookingRecord): OpsBookingRow {
     reference: record.reference,
     status: record.status,
     refundFailedBadge: record.refundFailed
-      ? { tone: 'danger', label: 'Refund failed' }
+      ? { tone: 'danger', label: refundFailedLabel }
       : null,
     guestName: record.leadGuestName ?? '—',
     email: record.contactEmail,
@@ -160,7 +158,7 @@ type OpsRefundRecord = {
   id: string;
   amountMinor: number;
   reason: string;
-  status: 'pending' | 'succeeded' | 'failed' | 'gift_reinstated';
+  status: RefundStatus;
   createdAt: Date;
 };
 
@@ -295,7 +293,7 @@ const refundStatusLabels = {
   succeeded: 'Sent',
   failed: 'Failed',
   gift_reinstated: 'Gift put back',
-} satisfies Record<OpsRefundRecord['status'], string>;
+} satisfies Record<RefundStatus, string>;
 
 const cancelledByLabels = {
   guest: 'Cancelled by guest',

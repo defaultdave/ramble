@@ -509,7 +509,7 @@ const rows: Row[] = [
     invoke: (c) => data.audit.recordOpsAccess(c),
     allows: platform(...opsOnly),
   },
-  // Cancelling a session cancels it for good, so the row sits after every row that still needs a scheduled one.
+  // Cancelling is for good, so this row sits after every row that still needs a scheduled session.
   {
     fn: 'cancelSession',
     invoke: (c, t) =>
@@ -517,12 +517,7 @@ const rows: Row[] = [
         sessionId: t.sessionId,
         reason: 'host',
       }),
-    allows: {
-      hostA: ['ownerA', ...staff],
-      hostB: ['ownerB', ...staff],
-      allocationOnHostA: ['ownerA', ...staff],
-      missing: staff,
-    },
+    allows: { ...sessionRules, allocationOnHostA: ['ownerA', ...staff] },
   },
   // Seed and persona writes: ops alone. These write the most, so they come last.
   {

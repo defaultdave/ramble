@@ -5,20 +5,13 @@ import { ActionNotice } from '@/components/ActionNotice';
 import { HostDetailView, HostSuspension } from '@/components/HostSetup';
 import { OpsAccessDenied } from '@/components/OpsShell';
 import { PageHeading } from '@/components/PageHeading';
-import { pauseNoticeCodes, pauseNoticeFor } from '@/lib/experiencePause';
 import {
   hostFormFields,
-  hostNoticeCodes,
-  hostNotices,
+  hostPageNotice,
   hostPath,
   hostsPath,
 } from '@/lib/hostSetup';
-import {
-  noticeText,
-  parseIdField,
-  parseNotice,
-  parseProblemFields,
-} from '@/lib/opsForm';
+import { parseIdField, parseProblemFields } from '@/lib/opsForm';
 import { holdsOpsRole } from '@/lib/opsNav';
 import {
   suspendHostAction,
@@ -58,12 +51,7 @@ export default async function HostPage({
       <p>
         <Link href={hostsPath}>Back to the hosts</Link>
       </p>
-      <ActionNotice
-        notice={
-          noticeText(hostNotices, parseNotice(query.notice, hostNoticeCodes)) ??
-          pauseNoticeFor(parseNotice(query.notice, pauseNoticeCodes))
-        }
-      />
+      <ActionNotice notice={hostPageNotice(query.notice)} />
       <HostDetailView
         detail={detail}
         problems={parseProblemFields(query.fields, hostFormFields)}

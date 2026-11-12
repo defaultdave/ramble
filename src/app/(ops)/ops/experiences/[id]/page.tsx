@@ -13,8 +13,7 @@ import {
   experiencePath,
   experiencesPath,
 } from '@/lib/experienceEditor';
-import { pauseNoticeCodes, pauseNoticeFor } from '@/lib/experiencePause';
-import { parseIdField, parseNotice, parseProblemFields } from '@/lib/opsForm';
+import { parseIdField, parseProblemFields } from '@/lib/opsForm';
 import { holdsOpsRole } from '@/lib/opsNav';
 import { experiencePageNotice, photoFormFields } from '@/lib/photoForm';
 import {
@@ -57,11 +56,7 @@ export default async function ExperiencePage({
       <p>
         <Link href={experiencesPath}>Back to the experiences</Link>
       </p>
-      <ActionNotice
-        notice={
-          notice ?? pauseNoticeFor(parseNotice(query.notice, pauseNoticeCodes))
-        }
-      />
+      <ActionNotice notice={notice} />
       <ExperiencePauseForm
         experienceId={view.id}
         status={view.status}

@@ -335,6 +335,17 @@ export async function updateExperience(
   return saved.result;
 }
 
+/** The cache changes of an experience that stays where it is but whose visibility to guests changed: approved, paused or unpaused. */
+export async function stillListedChanges(
+  tx: Transaction,
+  experience: Pick<ExperienceContent, 'categoryId' | 'neighborhoodId'> & {
+    id: string;
+  },
+): Promise<CacheChange[]> {
+  const place = await placeSlugs(tx, experience);
+  return listingChanges(experience.id, place, place);
+}
+
 /** The slugs a listing's cache tags are built from. */
 export async function placeSlugs(
   tx: Transaction,

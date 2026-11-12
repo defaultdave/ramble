@@ -4,7 +4,7 @@ import { PageHeading } from '@/components/PageHeading';
 import { pauseNoticeFor } from '@/lib/experiencePause';
 import { HostSuspension } from './HostSuspension';
 
-// One story per state of the suspension control: live experiences to pause, experiences a suspension paused, both, neither, and the notice after a suspension, on a phone and a desktop.
+// One story per state of the suspension control: live experiences to pause, a suspended host, a host with nothing live, and the notice after a suspension, on a phone and a desktop.
 const noop = () => undefined;
 
 const meta = {
@@ -12,7 +12,7 @@ const meta = {
   component: HostSuspension,
   args: {
     hostId: '0f1e2d3c-4b5a-4697-8a9b-0c1d2e3f4a5b',
-    suspension: { liveCount: 3, suspendedCount: 0 },
+    suspension: { suspended: false, liveCount: 3, suspendedCount: 0 },
     suspend: noop,
     unsuspend: noop,
   },
@@ -50,19 +50,16 @@ export const LiveExperiencesMobile: Story = { globals: mobile };
 export const LiveExperiencesDesktop: Story = { globals: desktop };
 export const SuspendedMobile: Story = {
   globals: mobile,
-  args: { suspension: { liveCount: 0, suspendedCount: 2 } },
+  args: { suspension: { suspended: true, liveCount: 0, suspendedCount: 2 } },
 };
-export const BothMobile: Story = {
-  globals: mobile,
-  args: { suspension: { liveCount: 1, suspendedCount: 2 } },
-};
+
 export const NothingToDoDesktop: Story = {
   globals: desktop,
-  args: { suspension: { liveCount: 0, suspendedCount: 0 } },
+  args: { suspension: { suspended: false, liveCount: 0, suspendedCount: 0 } },
 };
 export const SuspendedNoticeMobile: Story = {
   globals: mobile,
-  args: { suspension: { liveCount: 0, suspendedCount: 2 } },
+  args: { suspension: { suspended: true, liveCount: 0, suspendedCount: 2 } },
   render: (args) => (
     <>
       <ActionNotice notice={pauseNoticeFor('suspended')} />

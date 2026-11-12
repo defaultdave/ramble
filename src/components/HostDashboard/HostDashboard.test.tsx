@@ -25,6 +25,17 @@ describe('HostDashboard', () => {
     ).toBeInTheDocument();
   });
 
+  it('links to the host pages', () => {
+    render(<HostDashboard view={busy} />);
+    expect(
+      screen.getByRole('link', { name: 'Your experiences' }),
+    ).toHaveAttribute('href', '/host/experiences');
+    expect(screen.getByRole('link', { name: 'Host settings' })).toHaveAttribute(
+      'href',
+      '/host/settings',
+    );
+  });
+
   it('lists upcoming sessions with seats sold against the allocation', () => {
     render(<HostDashboard view={busy} links={hostNavLinks(true)} />);
     const section = screen.getByRole('region', { name: 'Upcoming sessions' });

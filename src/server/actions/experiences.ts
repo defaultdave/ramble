@@ -8,12 +8,12 @@ import {
   parseExperienceCreateForm,
   parseExperienceEditForm,
 } from '@/lib/experienceEditor';
-import { noticeHref, parseIdField } from '@/lib/opsForm';
+import { noticeHref } from '@/lib/opsForm';
 import {
   createExperience,
   updateExperience,
 } from '@/server/db/experienceEditor';
-import { opsCallerOrLeave } from '@/server/opsAccess';
+import { experienceIdOrLeave, opsCallerOrLeave } from '@/server/opsAccess';
 
 export async function createExperienceAction(
   formData: FormData,
@@ -34,8 +34,7 @@ export async function updateExperienceAction(
   formData: FormData,
 ): Promise<void> {
   const caller = await opsCallerOrLeave(experiencesPath);
-  const experienceId = parseIdField(formData.get('experienceId'));
-  if (experienceId === null) redirect(experiencesPath);
+  const experienceId = experienceIdOrLeave(formData);
   const here = experiencePath(experienceId);
   const parsed = parseExperienceEditForm((name) => formData.get(name));
   if (!parsed.ok) redirect(noticeHref(here, 'invalid', parsed.fields));

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { id } from '../../tests/support/ids';
 import {
+  experiencePageNotice,
   parsePhotoForm,
   photoAltSummary,
   photoFormFields,
@@ -254,4 +255,32 @@ describe('copy', () => {
   ])('summarises the description of %j', (photo, expected) => {
     expect(photoAltSummary(photo)).toBe(expected);
   });
+});
+
+describe('experiencePageNotice', () => {
+  it.each([
+    ['an experience notice', 'updated', 'Experience saved.', null],
+    ['a photo notice', 'photo_added', 'Photo added.', null],
+    [
+      'a refusal, which also names the reason',
+      'photo_too_small',
+      'That photo was not added.',
+      'too_small',
+    ],
+  ])('reads %s from the address', (_name, raw, title, refusal) => {
+    const result = experiencePageNotice(raw);
+
+    expect(result.notice?.title).toBe(title);
+    expect(result.photoRefusal).toBe(refusal);
+  });
+
+  it.each([undefined, 'nonsense', ['updated', 'photo_added']])(
+    'shows nothing for %s',
+    (raw) => {
+      expect(experiencePageNotice(raw)).toEqual({
+        notice: null,
+        photoRefusal: null,
+      });
+    },
+  );
 });

@@ -63,7 +63,6 @@ function tagsFor(change: CacheChange): string[] {
         ...change.categorySlugs.map(tags.category),
       ];
     case 'schedule':
-      return [tags.experience(change.experienceId)];
     case 'photos':
       return [tags.experience(change.experienceId)];
     case 'spaces':

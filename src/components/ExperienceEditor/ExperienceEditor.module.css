@@ -74,12 +74,9 @@
 
 /* The frame holds the photo's shape so nothing moves when it loads. */
 .thumb {
-  position: relative;
-  aspect-ratio: 4 / 3;
+  composes: photo from '../GuideEntry/GuideEntry.module.css';
   max-width: 12rem;
-  overflow: hidden;
   border-radius: var(--radius-sm);
-  background: var(--color-bg-sunken);
 }
 
 .cellLink {

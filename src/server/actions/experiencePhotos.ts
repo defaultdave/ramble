@@ -2,14 +2,14 @@
 
 import { redirect } from 'next/navigation';
 import { experiencePath, experiencesPath } from '@/lib/experienceEditor';
-import { noticeHref, parseIdField } from '@/lib/opsForm';
+import { noticeHref } from '@/lib/opsForm';
 import { parsePhotoForm, photoRefusalNotice } from '@/lib/photoForm';
 import {
   ExperienceNotFoundError,
   PhotoLimitError,
   addPhoto,
 } from '@/server/db/photos';
-import { opsCallerOrLeave } from '@/server/opsAccess';
+import { experienceIdOrLeave, opsCallerOrLeave } from '@/server/opsAccess';
 import { PhotoRefusedError } from '@/server/photos/ingest';
 import { systemClock } from '@/server/ports/clock';
 import { getStorage } from '@/server/ports/storage/config';
@@ -19,8 +19,7 @@ export async function addExperiencePhotoAction(
   formData: FormData,
 ): Promise<void> {
   const caller = await opsCallerOrLeave(experiencesPath);
-  const experienceId = parseIdField(formData.get('experienceId'));
-  if (experienceId === null) redirect(experiencesPath);
+  const experienceId = experienceIdOrLeave(formData);
   const here = experiencePath(experienceId);
   const parsed = parsePhotoForm((name) => formData.get(name), experienceId);
   if (parsed.status === 'invalid') {

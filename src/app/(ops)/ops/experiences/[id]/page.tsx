@@ -7,24 +7,12 @@ import { OpsAccessDenied } from '@/components/OpsShell';
 import { PageHeading } from '@/components/PageHeading';
 import {
   experienceFormFields,
-  experienceNoticeCodes,
-  experienceNotices,
   experiencePath,
   experiencesPath,
 } from '@/lib/experienceEditor';
-import {
-  noticeText,
-  parseIdField,
-  parseNotice,
-  parseProblemFields,
-} from '@/lib/opsForm';
+import { parseIdField, parseProblemFields } from '@/lib/opsForm';
 import { holdsOpsRole } from '@/lib/opsNav';
-import {
-  photoFormFields,
-  photoNoticeCodes,
-  photoNotices,
-  photoRefusalOf,
-} from '@/lib/photoForm';
+import { experiencePageNotice, photoFormFields } from '@/lib/photoForm';
 import { updateExperienceAction } from '@/server/actions/experiences';
 import { addExperiencePhotoAction } from '@/server/actions/experiencePhotos';
 import {
@@ -54,27 +42,20 @@ export default async function ExperiencePage({
     readExperienceChoices(caller),
   ]);
   if (view === null) notFound();
-  const photoNotice = parseNotice(query.notice, photoNoticeCodes);
+  const { notice, photoRefusal } = experiencePageNotice(query.notice);
 
   return (
     <PageHeading title={view.content.name}>
       <p>
         <Link href={experiencesPath}>Back to the experiences</Link>
       </p>
-      <ActionNotice
-        notice={
-          noticeText(
-            experienceNotices,
-            parseNotice(query.notice, experienceNoticeCodes),
-          ) ?? noticeText(photoNotices, photoNotice)
-        }
-      />
+      <ActionNotice notice={notice} />
       <ExperienceEditView
         view={view}
         choices={choices}
         problems={parseProblemFields(query.fields, experienceFormFields)}
         photoProblems={parseProblemFields(query.fields, photoFormFields)}
-        photoRefusal={photoRefusalOf(photoNotice)}
+        photoRefusal={photoRefusal}
         save={updateExperienceAction}
         addPhoto={addExperiencePhotoAction}
       />

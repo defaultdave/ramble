@@ -1,8 +1,13 @@
-import { labelledOptions } from './experienceEditor';
 import {
-  fieldsFromIssues,
+  experienceNoticeCodes,
+  experienceNotices,
+  labelledOptions,
+} from './experienceEditor';
+import {
   formHas,
   formText,
+  noticeText,
+  parseNotice,
   inFieldOrder,
   oversizedFields,
   type FormGetter,
@@ -32,9 +37,6 @@ export const photoFormFields = [
   'rightsSourceUrl',
 ] as const;
 export type PhotoFormField = (typeof photoFormFields)[number];
-
-/** The largest text a photo form field may hold, so no rule walks an unbounded string. */
-const rawTextLimit = photoLimits.maxUrlLength;
 
 const photoRightsBasisLabels = {
   host_agreement: 'Covered by the host agreement',
@@ -79,7 +81,7 @@ export function parsePhotoForm(
   const oversized = oversizedFields(
     get,
     ['altText', 'rightsHolder', 'rightsLicense', 'rightsSourceUrl'],
-    rawTextLimit,
+    photoLimits.rawField,
   );
   const raw = get('photoFile');
   const file = raw instanceof File && raw.size > 0 ? raw : null;
@@ -99,11 +101,9 @@ export function parsePhotoForm(
   const failed = new Set<PhotoFormField>(oversized);
   if (file === null) failed.add('photoFile');
   if (!parsed.success) {
-    const named = parsed.error.issues.map((issue) => ({
-      path: [fieldOfIssue(issue.path) ?? ''],
-    }));
-    for (const field of fieldsFromIssues(named, photoFormFields)) {
-      failed.add(field);
+    for (const issue of parsed.error.issues) {
+      const field = fieldOfIssue(issue.path);
+      if (field !== null) failed.add(field);
     }
   }
   if (failed.size > 0 || file === null || !parsed.success) {
@@ -143,16 +143,12 @@ export function photoProblemTexts(
     : { ...photoFieldProblems, photoFile: photoRefusalMessage(refusal) };
 }
 
+const refusalNotices = photoRefusalCodes.map(photoRefusalNotice);
 export const photoNoticeCodes = [
   'photo_added',
   'photo_invalid',
   'photo_limit',
-  'photo_too_large',
-  'photo_unsupported_format',
-  'photo_too_many_pixels',
-  'photo_too_small',
-  'photo_animated',
-  'photo_corrupt',
+  ...refusalNotices,
 ] as const;
 export type PhotoNoticeCode = (typeof photoNoticeCodes)[number];
 
@@ -188,10 +184,23 @@ export const photoNotices = {
     tone: 'danger',
     title: `This experience already has ${String(photoLimits.maxPerExperience)} photos, the most it can hold.`,
   },
-  photo_too_large: refused,
-  photo_unsupported_format: refused,
-  photo_too_many_pixels: refused,
-  photo_too_small: refused,
-  photo_animated: refused,
-  photo_corrupt: refused,
+  ...(Object.fromEntries(
+    refusalNotices.map((notice) => [notice, refused]),
+  ) as Record<ReturnType<typeof photoRefusalNotice>, NoticeText>),
 } as const satisfies Record<PhotoNoticeCode, NoticeText>;
+
+/** What the experience page shows for its address: the notice of the last save or photo upload, and why a refused file was refused. */
+export function experiencePageNotice(
+  raw: string | readonly string[] | undefined,
+): {
+  notice: NoticeText | null;
+  photoRefusal: PhotoRefusalCode | null;
+} {
+  const photoNotice = parseNotice(raw, photoNoticeCodes);
+  return {
+    notice:
+      noticeText(experienceNotices, parseNotice(raw, experienceNoticeCodes)) ??
+      noticeText(photoNotices, photoNotice),
+    photoRefusal: photoRefusalOf(photoNotice),
+  };
+}

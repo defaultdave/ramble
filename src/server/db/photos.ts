@@ -26,7 +26,7 @@ import { logger } from '@/server/monitoring/logger';
 import { ingestPhoto } from '@/server/photos/ingest';
 import { storeIngestedPhoto } from '@/server/photos/store';
 import type { StoragePort } from '@/server/ports/storage';
-import { writeAudit } from './audit';
+import { requireUserId, writeAudit } from './audit';
 import { guestVisible } from './catalog';
 import { db, dbRead } from './client';
 import { experiences, photos } from './schema';
@@ -173,8 +173,7 @@ export async function addPhoto(
       break;
   }
   // Every photo is audited under the user who added it; a caller with no user is refused.
-  if (caller.userId === null) throw new ForbiddenError(Role.HostOwner);
-  const userId = caller.userId;
+  const userId = requireUserId(caller, Role.HostOwner);
 
   // A full gallery is refused before any pixel is decoded; the transaction below decides for certain.
   if (nextPhotoPosition(await takenPositions(photo.experienceId)) === null) {

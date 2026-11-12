@@ -11,6 +11,7 @@ import {
   type PhotoFormField,
 } from '@/lib/photoForm';
 import {
+  acceptedPhotoTypes,
   photoLimits,
   type GuestPhoto,
   type PhotoRefusalCode,
@@ -18,7 +19,6 @@ import {
 import { photoView } from '@/lib/photoViews';
 import styles from './ExperienceEditor.module.css';
 
-const acceptedTypes = 'image/jpeg,image/png,image/webp';
 const thumbSizes = '(min-width: 768px) 12rem, 40vw';
 
 export type ExperiencePhotosProps = {
@@ -73,17 +73,16 @@ export function ExperiencePhotos({
           name="photoFile"
           label="Photo"
           hint="A JPEG, PNG or WebP photo."
-          accept={acceptedTypes}
+          accept={acceptedPhotoTypes}
           required
           {...errorFor('photoFile')}
         />
         <Input
           name="altText"
           label="Alt text"
-          hint="What the photo shows, for someone who cannot see it."
+          hint="What the photo shows, for someone who cannot see it. Leave it empty only if the photo is decorative."
           maxLength={photoLimits.maxAltLength}
           autoComplete="off"
-          optional
           {...errorFor('altText')}
         />
         <CheckField

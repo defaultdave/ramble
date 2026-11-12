@@ -26,11 +26,18 @@ export const photoLimits = {
   maxAltLength: 300,
   maxRightsTextLength: 200,
   maxUrlLength: 2048,
+  /** A posted text field longer than this is refused unread, so no rule walks an unbounded string. */
+  rawField: 2048,
   maxBlurLength: 2048,
 } as const;
 
 const acceptedPhotoFormats = ['jpeg', 'png', 'webp'] as const;
 type AcceptedPhotoFormat = (typeof acceptedPhotoFormats)[number];
+
+/** The content types of the accepted formats, as a file input's `accept` value. */
+export const acceptedPhotoTypes = acceptedPhotoFormats
+  .map((format) => `image/${format}`)
+  .join(',');
 
 export const storedPhotoContentType = 'image/jpeg';
 

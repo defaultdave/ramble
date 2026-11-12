@@ -15,7 +15,7 @@ import {
   supportTopicLabels,
   type SupportTopic,
 } from './support';
-import { parseStatusParam, type StatusTone } from './statusBadge';
+import { statusFilter, type StatusTone } from './statusBadge';
 import { requiredText } from './text';
 import { zonedDeadlineLabel } from './zonedLabels';
 
@@ -23,7 +23,6 @@ import { zonedDeadlineLabel } from './zonedLabels';
 // and marking one resolved with a note. The database CHECKs on `support_requests` repeat the note's limit.
 
 export const supportQueuePath = '/ops/support';
-export const supportQueuePageSize = 25;
 
 const supportStatuses = ['open', 'resolved'] as const;
 export type SupportStatus = (typeof supportStatuses)[number];
@@ -38,17 +37,11 @@ export const supportStatusTones = {
   resolved: 'success',
 } satisfies Record<SupportStatus, StatusTone>;
 
-export const supportStatusOptions = supportStatuses.map((value) => ({
-  value,
-  label: supportStatusLabels[value],
-}));
+const supportFilter = statusFilter(supportStatuses, supportStatusLabels);
+export const supportStatusOptions = supportFilter.options;
 
 /** The status the address names, or null (every request) for none, a repeated one, or one the queue does not have. */
-export function parseSupportStatus(
-  raw: string | readonly string[] | undefined,
-): SupportStatus | null {
-  return parseStatusParam(raw, supportStatuses, supportStatusOptions);
-}
+export const parseSupportStatus = supportFilter.parse;
 
 /** A request is open until it has a resolution time. */
 export function supportStatusOf(row: {

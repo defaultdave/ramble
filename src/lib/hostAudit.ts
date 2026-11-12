@@ -19,9 +19,10 @@ export const hostFormEntry = (userId: string): AuditEntryInput =>
   opsAreaListEntry(userId, 'host.form_viewed', opsAreaIds.hosts);
 
 /** One host, with its owners' addresses, was read. */
-export function hostViewEntry(userId: string, hostId: string): AuditEntryInput {
-  return opsViewEntry(userId, 'host.viewed', 'host', hostId);
-}
+export const hostViewEntry = (
+  userId: string,
+  hostId: string,
+): AuditEntryInput => opsViewEntry(userId, 'host.viewed', 'host', hostId);
 
 export function hostCreatedEntry(
   userId: string,

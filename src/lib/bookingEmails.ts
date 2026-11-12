@@ -81,6 +81,11 @@ export function moveEmailKey(moveId: string): string {
   return `guest-move-confirmation:${moveId.toLowerCase()}`;
 }
 
+/** One confirmation email per ops resend: the resend's id is in the audit row, so the message log and the audit log name the same send. */
+export function resendEmailKey(resendId: string): string {
+  return `guest-confirmation-resend:${resendId.toLowerCase()}`;
+}
+
 /** One refund email per refund, whichever order it belongs to. */
 export function refundEmailKey(refundId: string): string {
   return `guest-refund:${refundId.toLowerCase()}`;

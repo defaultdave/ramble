@@ -15,6 +15,9 @@ export type TableQuery = RawSearchParams;
 
 export const SEARCH_MAX_LENGTH = 100;
 
+/** Rows on a page of an ops list, which the data layer reads one more than, to know whether there is a next page. */
+export const opsListPageSize = 25;
+
 // The browse cursor's schema (a lower-cased id), so a hand-edited cursor never reaches a uuid column.
 const CursorSchema = BrowseQuerySchema.shape.after.unwrap();
 const TextSchema = z.string();

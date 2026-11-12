@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   hostAccessFor,
+  hostAreaResult,
   hostDashboardResult,
+  hostIdToRead,
   readableHostId,
   type HostAccess,
   type HostAccessInput,
@@ -89,6 +91,51 @@ describe('readableHostId', () => {
       expect(readableHostId(access)).toBe(expected);
     },
   );
+});
+
+describe('hostIdToRead', () => {
+  it.each([
+    ['an owner', { kind: 'owner', hostId: hostA } as const, false, hostA],
+    ['an owner', { kind: 'owner', hostId: hostA } as const, true, hostA],
+    ['host staff', { kind: 'staff', hostId: hostB } as const, false, null],
+    ['host staff', { kind: 'staff', hostId: hostB } as const, true, hostB],
+    ['no host role', { kind: 'no_host_role' } as const, false, null],
+    ['no host role', { kind: 'no_host_role' } as const, true, null],
+    ['nobody signed in', { kind: 'signed_out' } as const, false, null],
+    ['nobody signed in', { kind: 'signed_out' } as const, true, null],
+  ] satisfies [string, HostAccess, boolean, string | null][])(
+    'for %s with allowStaff %s reads %s',
+    (_who, access, allowStaff, expected) => {
+      expect(hostIdToRead(access, allowStaff)).toBe(expected);
+    },
+  );
+});
+
+describe('hostAreaResult', () => {
+  const ok = (value: string) => ({ status: 'ok' as const, value });
+  const staff = { kind: 'staff', hostId: hostA } as const;
+
+  it('refuses staff unless the page allows them', () => {
+    expect(hostAreaResult(staff, 'data', ok)).toEqual({ status: 'refused' });
+    expect(hostAreaResult(staff, 'data', ok, false)).toEqual({
+      status: 'refused',
+    });
+  });
+
+  it('admits staff when the page allows them', () => {
+    expect(hostAreaResult(staff, 'data', ok, true)).toEqual({
+      status: 'ok',
+      value: 'data',
+    });
+  });
+
+  it('admits an owner either way, and refuses a gone host either way', () => {
+    const owner = { kind: 'owner', hostId: hostA } as const;
+    expect(hostAreaResult(owner, 'data', ok)).toEqual(ok('data'));
+    expect(hostAreaResult(owner, null, ok, true)).toEqual({
+      status: 'refused',
+    });
+  });
 });
 
 describe('hostDashboardResult', () => {

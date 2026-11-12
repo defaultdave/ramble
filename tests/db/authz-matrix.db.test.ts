@@ -15,9 +15,12 @@ import {
 import { experiences } from '@/server/db/schema';
 import { createFakeStorageAdapter } from '@/server/ports/storage/fake';
 import { personaHostSlugs } from '@/lib/seed/personas';
+import { editorialListRows } from './authzEditorialRows';
 import { experienceEditorRows } from './authzExperienceRows';
 import { accountBookingsRows } from './authzAccountRows';
 import { hostSetupRows } from './authzHostRows';
+import { opsBookingActionRows } from './authzBookingActionRows';
+import { opsBookingRows } from './authzBookingRows';
 import {
   hostReaderFunctions,
   hostReaders,
@@ -223,26 +226,7 @@ const sessionRules = {
 
 const rows: Row[] = [
   // Editorial, legal, settings, finance, privacy: ops or admin.
-  {
-    fn: 'listCollectionsForEditing',
-    invoke: (c) => data.editorial.listCollectionsForEditing(c),
-    allows: platform(...staff),
-  },
-  {
-    fn: 'listHomeModulesForEditing',
-    invoke: (c) => data.editorial.listHomeModulesForEditing(c),
-    allows: platform(...staff),
-  },
-  {
-    fn: 'listPageCopyForEditing',
-    invoke: (c) => data.editorial.listPageCopyForEditing(c),
-    allows: platform(...staff),
-  },
-  {
-    fn: 'listHelpArticlesForEditing',
-    invoke: (c) => data.editorial.listHelpArticlesForEditing(c),
-    allows: platform(...staff),
-  },
+  ...editorialListRows(() => data.editorial),
   {
     fn: 'saveCollection',
     invoke: (c) => data.editorial.saveCollection(c, collectionInput()),
@@ -340,12 +324,6 @@ const rows: Row[] = [
     fn: 'listHostExperiences',
     invoke: (c, t) => data.catalog.listHostExperiences(c, t.hostId),
     allows: { hostA: ['ownerA'], hostB: ['ownerB'], missing: [] },
-  },
-  {
-    fn: 'getHostExperience',
-    invoke: (c, t) => data.catalog.getHostExperience(c, t.experienceId),
-    // No `missing` cell: that one is AUTH FINDING 1 below.
-    allows: { hostA: ['ownerA'], hostB: ['ownerB'] },
   },
   {
     fn: 'readHostStatement',
@@ -520,6 +498,8 @@ const rows: Row[] = [
   ...supportQueueRows(),
   ...experienceEditorRows(),
   ...experienceReviewRows(),
+  ...opsBookingRows(),
+  ...opsBookingActionRows(),
   ...cancelSessionRows(sessionRules, 'ownerA', staff),
   // Seed and persona writes: ops alone. These write the most, so they come last.
   ...seedRows(),
@@ -695,40 +675,6 @@ describe('requireRole on its own', () => {
     if (allowed) expect(call).not.toThrow();
     else expect(call).toThrow(ForbiddenError);
   });
-});
-
-describe('a host owner asking about an experience', () => {
-  // Pins today's behaviour, so the it.fails below fails for the reason it names and not for any reason.
-  it('gets null for a missing experience and a refusal for another host’s, today', async () => {
-    expect(
-      await data.catalog.getHostExperience(people.ownerA, randomUUID()),
-    ).toBeNull();
-    await expect(
-      data.catalog.getHostExperience(people.ownerA, target.hostB.experienceId),
-    ).rejects.toBeInstanceOf(ForbiddenError);
-  });
-
-  // The photo path refuses a host owner the same way for a missing experience as for another host's, so
-  // the answer never says which ids exist. getHostExperience says null for one and refuses the other.
-  it.fails(
-    'is answered alike for a missing experience and another host’s (AUTH FINDING 1, a follow-up unit takes it)',
-    async () => {
-      const answer = async (experienceId: string) => {
-        try {
-          return await data.catalog.getHostExperience(
-            people.ownerA,
-            experienceId,
-          );
-        } catch (error) {
-          if (error instanceof ForbiddenError) return 'forbidden';
-          throw error;
-        }
-      };
-      expect(await answer(randomUUID())).toEqual(
-        await answer(target.hostB.experienceId),
-      );
-    },
-  );
 });
 
 describe('the matrix is complete', () => {

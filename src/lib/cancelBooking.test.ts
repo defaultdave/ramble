@@ -10,6 +10,7 @@ import {
   cancelRefundKey,
   cancelRefundReason,
   cancellationAuditEntry,
+  guestCancelActor,
   giftReinstated,
   isBookingRow,
   openManageGate,
@@ -390,14 +391,17 @@ describe('the rest of the cancellation', () => {
   });
 
   it('writes an audit row the audit schema accepts, with ids and amounts only', () => {
-    const entry = cancellationAuditEntry({
-      orderId: '0f6c9a52-3b8e-4f43-9a55-1a2b3c4d5e01',
-      sessionId: '7d1e2f30-4a5b-4c6d-8e7f-9a0b1c2d3e02',
-      refundMinor: 13_000,
-      refundId: '5c1e2f30-4a5b-5c6d-8e7f-9a0b1c2d3e03',
-      seatsReturned: 2,
-      giftReinstated: false,
-    });
+    const entry = cancellationAuditEntry(
+      {
+        orderId: '0f6c9a52-3b8e-4f43-9a55-1a2b3c4d5e01',
+        sessionId: '7d1e2f30-4a5b-4c6d-8e7f-9a0b1c2d3e02',
+        refundMinor: 13_000,
+        refundId: '5c1e2f30-4a5b-5c6d-8e7f-9a0b1c2d3e03',
+        seatsReturned: 2,
+        giftReinstated: false,
+      },
+      guestCancelActor,
+    );
     expect(entry).toEqual({
       actorKind: 'guest',
       action: 'order.cancelled',
@@ -416,14 +420,17 @@ describe('the rest of the cancellation', () => {
   });
 
   it('writes a null refund id when no refund was requested', () => {
-    const entry = cancellationAuditEntry({
-      orderId: '0f6c9a52-3b8e-4f43-9a55-1a2b3c4d5e01',
-      sessionId: '7d1e2f30-4a5b-4c6d-8e7f-9a0b1c2d3e02',
-      refundMinor: 0,
-      refundId: null,
-      seatsReturned: 2,
-      giftReinstated: false,
-    });
+    const entry = cancellationAuditEntry(
+      {
+        orderId: '0f6c9a52-3b8e-4f43-9a55-1a2b3c4d5e01',
+        sessionId: '7d1e2f30-4a5b-4c6d-8e7f-9a0b1c2d3e02',
+        refundMinor: 0,
+        refundId: null,
+        seatsReturned: 2,
+        giftReinstated: false,
+      },
+      guestCancelActor,
+    );
     expect(parseAuditEntry(entry).details).toMatchObject({ refund_id: null });
   });
 });

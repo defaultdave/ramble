@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { EntityIdSchema } from './catalog';
 import { formWholeNumber as wholeNumber } from './opsForm';
 import { formatPrice, priceInputTextOrNull, priceMinorFromText } from './money';
+import { countLabel } from './text';
 import {
   IsoDateSchema,
   TimeZoneSchema,
@@ -347,9 +348,6 @@ export function hostSessionProblem(
 ): HostSessionFormState {
   return { status: 'problem', message: hostSessionProblemMessages[reason] };
 }
-
-const countLabel = (count: number, noun: string) =>
-  `${String(count)} ${noun}${count === 1 ? '' : 's'}`;
 
 /** What publishing a week did, in words: sessions added, and those that were already there. */
 export function publishWeekMessage(result: {

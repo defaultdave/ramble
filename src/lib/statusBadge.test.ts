@@ -4,11 +4,13 @@ import {
   parseStatusFilter,
   parseStatusParam,
   statusBadgeTone,
+  statusFilter,
   statusFilterChips,
   type StatusFilterOption,
 } from './statusBadge';
 
 // Behaviours under test, one per decision, branch or risk:
+// - a list's status filter offers its statuses in words and reads the one the address names
 // - every status tone maps to a tone the Badge knows, not its neutral fallback
 // - an address that names no offered status means all
 // - a status param is read only when it is offered and is also one of the typed statuses
@@ -100,5 +102,28 @@ describe('statusFilterChips', () => {
       options,
     });
     expect(chips[0]?.selected).toBe(true);
+  });
+});
+
+describe('statusFilter', () => {
+  const filter = statusFilter(['open', 'done'] as const, {
+    open: 'Open',
+    done: 'Done',
+  });
+
+  it('offers each status in words, in the list order', () => {
+    expect(filter.options).toEqual([
+      { value: 'open', label: 'Open' },
+      { value: 'done', label: 'Done' },
+    ]);
+  });
+
+  it.each([
+    ['done', 'done'],
+    ['nope', null],
+    [undefined, null],
+    [['open', 'done'], null],
+  ])('reads %j as %j', (raw, expected) => {
+    expect(filter.parse(raw)).toBe(expected);
   });
 });

@@ -9,6 +9,7 @@ import { AuditExportPayloadSchema, auditExportKind } from '@/lib/audit';
 import { OpsNoticeDataSchema, opsNoticeKind } from '@/lib/email/opsNotice';
 import { MaxAttemptsSchema, jobLimits } from '@/lib/jobs';
 import { GuestMovePayloadSchema } from '@/lib/moveBooking';
+import { GuestResendPayloadSchema, resendJobKind } from '@/lib/opsBookings';
 import {
   PaidAfterLapsePayloadSchema,
   paidAfterLapseJobKind,
@@ -25,6 +26,7 @@ import {
   BookingEmailPayloadSchema,
   sendGuestConfirmation,
   sendGuestMoveConfirmation,
+  sendGuestResend,
   sendHostBookingNotice,
   sendSessionReminder,
 } from './bookingEmails';
@@ -125,6 +127,11 @@ export const jobRegistry = {
     payload: GuestMovePayloadSchema,
     maxAttempts: jobLimits.defaultMaxAttempts,
     handleIdempotent: sendGuestMoveConfirmation,
+  }),
+  [resendJobKind]: defineJob({
+    payload: GuestResendPayloadSchema,
+    maxAttempts: jobLimits.defaultMaxAttempts,
+    handleIdempotent: sendGuestResend,
   }),
   'host-booking-notice': defineJob({
     payload: BookingEmailPayloadSchema,

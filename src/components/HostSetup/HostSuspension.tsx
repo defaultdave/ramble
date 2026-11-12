@@ -1,5 +1,7 @@
 import { Button } from '@/components/Button';
 import {
+  hostSuspendedText,
+  suspensionActionLabel,
   suspensionLiveText,
   suspensionUndoText,
   type HostSuspension as Suspension,
@@ -31,10 +33,10 @@ export function HostSuspension({
       {suspended ? (
         <form action={unsuspend} className={styles.section}>
           <input type="hidden" name="hostId" value={hostId} />
-          <p className={styles.muted}>This host is suspended.</p>
+          <p className={styles.muted}>{hostSuspendedText}</p>
           <p className={styles.muted}>{suspensionUndoText(suspendedCount)}</p>
           <Button type="submit" variant="secondary">
-            Unsuspend host
+            {suspensionActionLabel('unpause')}
           </Button>
         </form>
       ) : (
@@ -42,7 +44,7 @@ export function HostSuspension({
           <input type="hidden" name="hostId" value={hostId} />
           <p className={styles.muted}>{suspensionLiveText(liveCount)}</p>
           <Button type="submit" variant="secondary">
-            Suspend host
+            {suspensionActionLabel('pause')}
           </Button>
         </form>
       )}

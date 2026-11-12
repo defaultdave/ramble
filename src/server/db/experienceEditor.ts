@@ -341,7 +341,7 @@ export async function placeChanges(
 }
 
 /** The slugs a listing's cache tags are built from. */
-export async function placeSlugs(
+async function placeSlugs(
   tx: Transaction,
   content: Pick<ExperienceContent, 'categoryId' | 'neighborhoodId'>,
 ): Promise<PlaceSlugs> {

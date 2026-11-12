@@ -48,6 +48,22 @@ export function restoredStatus(
     : (recorded ?? 'live');
 }
 
+/** The statuses an experience is moved from and to by a pause, or by an unpause back to `restored` (live when none is known). */
+export function movedStatus(
+  kind: PauseKind,
+  status: ExperienceStatus,
+  restored: PausableStatus | null,
+): { from: ExperienceStatus; to: ExperienceStatus } {
+  return kind === 'pause'
+    ? { from: status, to: pausedStatus }
+    : { from: pausedStatus, to: restored ?? 'live' };
+}
+
+/** Whether a host's latest suspend or unsuspend audit action leaves it suspended. */
+export function leavesSuspended(latestAction: string | undefined): boolean {
+  return latestAction === 'host.suspended';
+}
+
 export type PauseRefusal = {
   status: 'not_live' | 'not_paused' | 'unpause_host_suspended';
 };
@@ -99,7 +115,10 @@ const pauseNotices = {
     tone: 'success',
     title: 'Experience paused. Guests can no longer see or book it.',
   },
-  unpaused: { tone: 'success', title: 'Experience unpaused. It is live.' },
+  unpaused: {
+    tone: 'success',
+    title: 'Experience unpaused. It is restored as it was.',
+  },
   not_live: {
     tone: 'info',
     title:
@@ -120,7 +139,8 @@ const pauseNotices = {
   },
   unsuspended: {
     tone: 'success',
-    title: 'Host unsuspended. The experiences the suspension paused are live.',
+    title:
+      'Host unsuspended. The experiences the suspension paused are restored.',
   },
   nothing_to_suspend: {
     tone: 'info',
@@ -180,6 +200,14 @@ export const noSuspension: HostSuspension = {
   suspendedCount: 0,
 };
 
+/** The label of the button that suspends or unsuspends a host. */
+export function suspensionActionLabel(kind: PauseKind): string {
+  return kind === 'pause' ? 'Suspend host' : 'Unsuspend host';
+}
+
+/** What a suspended host's section says first. */
+export const hostSuspendedText = 'This host is suspended.';
+
 /** What suspending the host does, by how many experiences are live. */
 export function suspensionLiveText(liveCount: number): string {
   if (liveCount === 0) {
@@ -193,5 +221,5 @@ export function suspensionUndoText(suspendedCount: number): string {
   if (suspendedCount === 0) {
     return 'The suspension paused nothing that is still paused. Unsuspending lifts it. Anything paused by hand stays paused.';
   }
-  return `Unsuspending makes the ${countLabel(suspendedCount, 'experience')} paused by the suspension live again. Anything paused by hand stays paused.`;
+  return `Unsuspending makes the ${countLabel(suspendedCount, 'experience')} paused by the suspension back as they were. Anything paused by hand stays paused.`;
 }

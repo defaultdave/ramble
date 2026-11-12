@@ -16,6 +16,10 @@ import {
   pauseNoticeOf,
   pauseRefusal,
   restoredStatus,
+  movedStatus,
+  leavesSuspended,
+  suspensionActionLabel,
+  hostSuspendedText,
   suspensionLiveText,
   suspensionUndoText,
   type PauseNoticeCode,
@@ -35,7 +39,9 @@ import { experiencePageNotice, photoNotices } from './photoForm';
 // - a host change counts when it moves an experience or flips the suspension, even with nothing to move
 // - every notice code has a notice, and no code means no notice
 // - no pause code is also a host, experience or photo notice code, so the host and experience pages read one address unambiguously, and each page resolves a pause notice and its own
-// - the button and explainer of each action
+// - the statuses a pause and an unpause move between, and what leaves a host suspended
+// - the button and explainer of each action, and the host suspension labels
+// - the unpaused and unsuspended notices say restored, not live
 // - the sentences for the host's suspension follow the counts: none, one, many
 // - the pause audit row names the user, the statuses and whether a host suspension did it, and the audit log accepts it
 // - the host suspension audit row carries the count and no text, and the audit log accepts it
@@ -69,6 +75,28 @@ describe('the statuses a pause takes down', () => {
   ])('restores %s with a link out %s as %s', (pausedFrom, link, restored) => {
     expect(restoredStatus(pausedFrom, link)).toBe(restored);
   });
+});
+
+describe('the moves and the suspension rule', () => {
+  it.each([
+    ['pause', 'live', null, { from: 'live', to: 'paused' }],
+    ['pause', 'guide_only', 'live', { from: 'guide_only', to: 'paused' }],
+    ['unpause', 'paused', 'guide_only', { from: 'paused', to: 'guide_only' }],
+    ['unpause', 'paused', null, { from: 'paused', to: 'live' }],
+  ] as const)('%s from %s restoring %s', (kind, status, restored, expected) => {
+    expect(movedStatus(kind, status, restored)).toEqual(expected);
+  });
+
+  it.each([
+    ['host.suspended', true],
+    ['host.unsuspended', false],
+    [undefined, false],
+  ])(
+    'a latest host action of %s leaves it suspended: %s',
+    (action, expected) => {
+      expect(leavesSuspended(action)).toBe(expected);
+    },
+  );
 });
 
 describe('pauseRefusal', () => {
@@ -150,6 +178,14 @@ describe('the notices', () => {
     },
   );
 
+  it.each(['unpaused', 'unsuspended'] as const)(
+    'says %s restored, not live, since a guide entry comes back as one',
+    (code) => {
+      expect(pauseNoticeFor(code)?.title).toMatch(/restored/);
+      expect(pauseNoticeFor(code)?.title).not.toMatch(/live/);
+    },
+  );
+
   it('has none for no code', () => {
     expect(pauseNoticeFor(null)).toBeNull();
     expect(pauseNoticeOf('nonsense')).toBeNull();
@@ -175,6 +211,14 @@ describe('the notices', () => {
       'Experience saved.',
     );
     expect(pauseNoticeOf(['paused', 'unpaused'])).toBeNull();
+  });
+});
+
+describe('the host suspension text', () => {
+  it('labels the two buttons and the suspended state', () => {
+    expect(suspensionActionLabel('pause')).toBe('Suspend host');
+    expect(suspensionActionLabel('unpause')).toBe('Unsuspend host');
+    expect(hostSuspendedText).toBe('This host is suspended.');
   });
 });
 

@@ -2,6 +2,7 @@ import 'server-only';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { CacheChange } from '@/lib/cacheTags';
 import { WriteIdSchema } from '@/lib/catalog';
+import { leavesSuspended } from '@/lib/experiencePause';
 import { updateTagsForChanges } from '@/server/cache/invalidate';
 import { db, type Transaction } from './client';
 import { auditLog, experiences, hosts } from './schema';
@@ -31,7 +32,7 @@ export async function hostIsSuspended(
     )
     .orderBy(desc(auditLog.id))
     .limit(1);
-  return latest?.action === 'host.suspended';
+  return leavesSuspended(latest?.action);
 }
 
 /** Runs `body` in one transaction, then invalidates the cache changes it returns after the commit, so a body that rolled back invalidates nothing. */

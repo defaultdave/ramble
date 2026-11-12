@@ -11,6 +11,7 @@ import {
   noSuspension,
   pausableStatuses,
   pauseRefusal,
+  movedStatus,
   pausedStatus,
   restoredStatus,
   type HostSuspension,
@@ -92,10 +93,11 @@ async function moveExperiences(
 ): Promise<CacheChange[]> {
   const changes: CacheChange[] = [];
   for (const row of rows) {
-    const moved =
-      kind === 'pause'
-        ? { from: row.status, to: pausedStatus }
-        : { from: pausedStatus, to: await statusBeforePause(tx, row) };
+    const moved = movedStatus(
+      kind,
+      row.status,
+      kind === 'unpause' ? await statusBeforePause(tx, row) : null,
+    );
     await tx
       .update(experiences)
       .set({ status: moved.to })

@@ -6,9 +6,12 @@ const seededPort = 3101;
 const neonShimPort = 4444;
 
 // The main suite runs against a server with no database behind it: it needs URLs that pass
-// validation, and its specs rely on a read failing. Nothing connects to the placeholder.
+// validation, and its specs rely on a read failing fast. Nothing connects to the placeholder: port 1
+// is one nothing listens on, so a read is refused at once. Port 5432 is where CI's Postgres (and
+// the local `docker compose` one) answers, and a server that answers and refuses the login fails
+// more slowly, which let a page's 200 go out before its not-found was thrown (hosts.spec.ts).
 const databaseUrl =
-  'postgres://placeholder:placeholder@127.0.0.1:5432/placeholder';
+  'postgres://placeholder:placeholder@127.0.0.1:1/placeholder';
 
 // Set to a migrated, seeded Postgres (`pnpm e2e:db` prepares one) to also run the booking path on a
 // second server that reads it. Left unset, that spec skips and nothing else changes.

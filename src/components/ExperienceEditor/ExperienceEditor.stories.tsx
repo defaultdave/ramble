@@ -2,16 +2,19 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { ActionNotice } from '@/components/ActionNotice';
 import { PageHeading } from '@/components/PageHeading';
 import { experienceNotices } from '@/lib/experienceEditor';
+import { photoNotices } from '@/lib/photoForm';
 import {
   blankValues,
   choices,
   listRows,
   nextCursorId,
   savedValues,
+  savedPhotos,
   savedView,
 } from './ExperienceEditor.fixtures';
 import { ExperienceEditView } from './ExperienceEditView';
 import { ExperienceForm } from './ExperienceForm';
+import { ExperiencePhotos } from './ExperiencePhotos';
 import { ExperiencesList } from './ExperiencesList';
 
 // One story per state of the experience editor: the list and its filters, the create form, the
@@ -110,13 +113,23 @@ export const CreateWithProblems: Story = {
 export const EditMobile: Story = {
   globals: mobile,
   render: () => (
-    <ExperienceEditView view={savedView} choices={choices} save={noop} />
+    <ExperienceEditView
+      view={savedView}
+      choices={choices}
+      save={noop}
+      addPhoto={noop}
+    />
   ),
 };
 export const EditDesktop: Story = {
   globals: desktop,
   render: () => (
-    <ExperienceEditView view={savedView} choices={choices} save={noop} />
+    <ExperienceEditView
+      view={savedView}
+      choices={choices}
+      save={noop}
+      addPhoto={noop}
+    />
   ),
 };
 export const EditWithProblems: Story = {
@@ -127,6 +140,7 @@ export const EditWithProblems: Story = {
       choices={choices}
       problems={['slug', 'minAge', 'weatherPolicy', 'childPrice']}
       save={noop}
+      addPhoto={noop}
     />
   ),
 };
@@ -142,8 +156,86 @@ export const EditGuideOnly: Story = {
       choices={choices}
       problems={['linkOutUrl']}
       save={noop}
+      addPhoto={noop}
     />
   ),
+};
+
+const withPhotos = { ...savedView, photos: savedPhotos };
+
+export const PhotosMobile: Story = {
+  globals: mobile,
+  render: () => (
+    <ExperiencePhotos
+      experienceId={savedView.id}
+      photos={savedPhotos}
+      add={noop}
+    />
+  ),
+};
+export const PhotosDesktop: Story = {
+  globals: desktop,
+  render: () => (
+    <ExperiencePhotos
+      experienceId={savedView.id}
+      photos={savedPhotos}
+      add={noop}
+    />
+  ),
+};
+export const PhotosNone: Story = {
+  globals: mobile,
+  render: () => (
+    <ExperiencePhotos experienceId={savedView.id} photos={[]} add={noop} />
+  ),
+};
+export const PhotosRefused: Story = {
+  globals: mobile,
+  render: () => (
+    <>
+      <ActionNotice notice={photoNotices.photo_too_small} />
+      <ExperiencePhotos
+        experienceId={savedView.id}
+        photos={savedPhotos}
+        problems={['photoFile']}
+        refusal="too_small"
+        add={noop}
+      />
+    </>
+  ),
+};
+export const PhotosNeedAnotherLook: Story = {
+  globals: mobile,
+  render: () => (
+    <>
+      <ActionNotice notice={photoNotices.photo_invalid} />
+      <ExperiencePhotos
+        experienceId={savedView.id}
+        photos={[]}
+        problems={['altText', 'rightsLicense', 'rightsSourceUrl']}
+        add={noop}
+      />
+    </>
+  ),
+};
+export const EditWithPhotos: Story = {
+  globals: desktop,
+  render: () => (
+    <ExperienceEditView
+      view={withPhotos}
+      choices={choices}
+      save={noop}
+      addPhoto={noop}
+    />
+  ),
+};
+export const NoticePhotoAdded: Story = {
+  globals: mobile,
+  render: () => <ActionNotice notice={photoNotices.photo_added} />,
+};
+export const NoticePhotoLimit: Story = {
+  globals: mobile,
+  render: () => <ActionNotice notice={photoNotices.photo_limit} />,
 };
 
 export const NoticeCreated: Story = {

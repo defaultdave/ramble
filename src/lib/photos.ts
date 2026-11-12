@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { EntityIdSchema, httpUrlPattern } from './catalog';
 import { coverLookupLimit } from './idLookup';
-import { maxObjectBytes } from './storage';
+import { allowedContentTypes, maxObjectBytes, mebibyte } from './storage';
 
 /**
  * Every bound on a photo in one place. The input bounds are checked before any pixel is decoded;
@@ -19,18 +19,25 @@ export const photoLimits = {
   maxPixels: 50_000_000,
   /** The stored copy fits inside this square; `next/image` makes every served size from it. */
   storedEdge: 2400,
-  maxStoredBytes: 5 * 1024 * 1024,
+  maxStoredBytes: 5 * mebibyte,
   maxPerExperience: 20,
   /** The experiences one batch read of cover photos looks up: the cards the home page draws. */
   maxCoverLookups: coverLookupLimit,
   maxAltLength: 300,
   maxRightsTextLength: 200,
   maxUrlLength: 2048,
+  /** A posted text field longer than this is refused unread, so no rule walks an unbounded string. */
+  rawField: 2048,
   maxBlurLength: 2048,
 } as const;
 
-const acceptedPhotoFormats = ['jpeg', 'png', 'webp'] as const;
-type AcceptedPhotoFormat = (typeof acceptedPhotoFormats)[number];
+/** The formats a photo may arrive in: the image types the public store accepts, by their short name. */
+const acceptedPhotoFormats: readonly string[] = allowedContentTypes.public.map(
+  (type) => type.replace('image/', ''),
+);
+
+/** The content types of the accepted formats, as a file input's `accept` value. */
+export const acceptedPhotoTypes = allowedContentTypes.public.join(',');
 
 export const storedPhotoContentType = 'image/jpeg';
 
@@ -44,7 +51,6 @@ export const photoRefusalCodes = [
 ] as const;
 export type PhotoRefusalCode = (typeof photoRefusalCodes)[number];
 
-const mebibyte = 1024 * 1024;
 const pixels = (count: number) => count.toLocaleString('en-US');
 
 const refusalCopy: Record<PhotoRefusalCode, string> = {
@@ -88,8 +94,8 @@ export type ImageHeader = {
   pages: number | undefined;
 };
 
-function isAcceptedFormat(format: string): format is AcceptedPhotoFormat {
-  return (acceptedPhotoFormats as readonly string[]).includes(format);
+function isAcceptedFormat(format: string): boolean {
+  return acceptedPhotoFormats.includes(format);
 }
 
 /** The check on what the decoder reports from the file header, before any pixel is read. */

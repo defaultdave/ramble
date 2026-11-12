@@ -42,8 +42,8 @@ describe('tagsForChanges for one change', () => {
       ],
     ],
     [
-      'a schedule change reaches the experience page only',
-      { kind: 'schedule', experienceId: 'e1' },
+      "a change to an experience's sessions or photos reaches the experience page only",
+      { kind: 'experience', experienceId: 'e1' },
       ['experience:e1'],
     ],
     [

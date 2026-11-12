@@ -35,6 +35,7 @@ import {
 } from '@/lib/experienceEditor';
 import { isGuestVisible } from '@/lib/catalog';
 import { isPublishedWaiver } from '@/lib/legal';
+import { GuestPhotoSchema } from '@/lib/photos';
 import { splitPage } from '@/lib/pagination';
 import { updateTagsForChanges } from '@/server/cache/invalidate';
 import { Role, requireRole, type Caller } from '@/server/auth/caller';
@@ -43,6 +44,7 @@ import { listCategories, listNeighborhoods } from './catalog';
 import { byNameThenId, pastNameCursor } from './keysetPage';
 import { db, dbRead, type Transaction } from './client';
 import { getPublishedLegalDocument } from './legal';
+import { galleryWith } from './photos';
 import { listCancellationTiers } from './policies';
 import {
   categories,
@@ -150,7 +152,7 @@ export async function readExperienceChoices(
   });
 }
 
-/** One experience in any status, with its host's name, or null for an id that is no experience. */
+/** One experience in any status, with its host's name and its gallery, or null for an id that is no experience. */
 export async function readExperienceForOps(
   caller: Caller,
   experienceId: string,
@@ -164,12 +166,14 @@ export async function readExperienceForOps(
       host: true,
       cancellationTier: true,
       priceOptions: { orderBy: [asc(priceOptions.kind)] },
+      photos: galleryWith,
     },
   });
   if (!row) return null;
   return buildExperienceEditView(
     HostExperienceSchema.parse(row),
     row.host.name,
+    GuestPhotoSchema.array().parse(row.photos),
   );
 }
 

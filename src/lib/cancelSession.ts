@@ -281,7 +281,7 @@ export function sessionCancelCacheChanges(ids: {
 }): CacheChange[] {
   return [
     { kind: 'spaces', sessionId: ids.sessionId },
-    { kind: 'schedule', experienceId: ids.experienceId },
+    { kind: 'experience', experienceId: ids.experienceId },
   ];
 }
 

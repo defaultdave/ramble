@@ -29,6 +29,7 @@ import {
   type NoticeText,
 } from './opsForm';
 import { pickKnown } from './pickKnown';
+import type { GuestPhoto } from './photos';
 import { maxSessionMinutes } from './sessions';
 import {
   parseStatusFilter,
@@ -564,11 +565,14 @@ export type ExperienceEditView = {
   hostName: string;
   status: ExperienceStatus;
   content: ExperienceContent;
+  /** The gallery in order; the first is the cover. */
+  photos: readonly GuestPhoto[];
 };
 
 export function buildExperienceEditView(
   experience: HostExperience,
   hostName: string,
+  photos: readonly GuestPhoto[],
 ): ExperienceEditView {
   return {
     id: experience.id,
@@ -576,6 +580,7 @@ export function buildExperienceEditView(
     hostName,
     status: experience.status,
     content: experienceContentOf(experience, experience.priceOptions),
+    photos,
   };
 }
 

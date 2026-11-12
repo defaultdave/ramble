@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import sharp from 'sharp';
 import { afterAll, beforeAll, vi } from 'vitest';
@@ -14,6 +15,14 @@ import {
   serveNeonHttp,
   type FreshDatabase,
 } from './harness';
+
+/** A photo added to a visible experience publishes its tag, which only a Server Action may do. */
+const hoisted = vi.hoisted(() => ({ updateTag: vi.fn() }));
+export const updateTag = hoisted.updateTag;
+vi.mock('next/cache', () => ({
+  updateTag: hoisted.updateTag,
+  revalidateTag: vi.fn(),
+}));
 
 let fresh: FreshDatabase;
 let stopHttp: () => Promise<void>;
@@ -66,7 +75,9 @@ export async function insertExperience(
   });
 }
 
-export const ops = testCaller({ roles: [Role.Ops] });
+/** An audit row names a real user id, so every caller that adds a photo has one. */
+export const opsUserId = randomUUID();
+export const ops = testCaller({ userId: opsUserId, roles: [Role.Ops] });
 export const alt = { decorative: false, altText: 'A potter shaping a bowl' };
 const rights = { basis: 'ramble_owned' };
 

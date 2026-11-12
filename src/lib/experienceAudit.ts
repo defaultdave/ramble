@@ -77,3 +77,28 @@ export function experienceUpdatedEntry(
     details,
   };
 }
+
+/** A photo added to an experience: the photo's id, where it sits, whether it is decorative, and the basis of the rights to it. No alt text or credit, which are sentences. */
+export function photoAddedEntry(
+  userId: string,
+  experienceId: string,
+  photo: {
+    photoId: string;
+    position: number;
+    decorative: boolean;
+    rightsBasis: string;
+  },
+): AuditEntryInput {
+  return {
+    ...userActor(userId),
+    action: 'experience.photo_added',
+    subjectKind: 'experience',
+    subjectId: experienceId,
+    details: {
+      photo_id: photo.photoId,
+      position: photo.position,
+      decorative: photo.decorative,
+      rights_basis: photo.rightsBasis,
+    },
+  };
+}

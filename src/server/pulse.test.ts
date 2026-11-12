@@ -391,8 +391,8 @@ describe('a good pulse', () => {
     const now = vi.mocked(extendSessionHorizon).mock.calls[0]?.[0];
     expect(Math.abs((now?.getTime() ?? 0) - realNowMs())).toBeLessThan(5000);
     expect(revalidateTagsForChanges).toHaveBeenCalledExactlyOnceWith([
-      { kind: 'schedule', experienceId: 'exp-1' },
-      { kind: 'schedule', experienceId: 'exp-2' },
+      { kind: 'experience', experienceId: 'exp-1' },
+      { kind: 'experience', experienceId: 'exp-2' },
     ]);
   });
 
@@ -410,7 +410,7 @@ describe('a good pulse', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ sessionsCreated: 4 });
     expect(revalidateTagsForChanges).toHaveBeenCalledExactlyOnceWith([
-      { kind: 'schedule', experienceId: 'exp-1' },
+      { kind: 'experience', experienceId: 'exp-1' },
     ]);
     expect(raise).toHaveBeenCalledExactlyOnceWith(
       'session-horizon-failed',

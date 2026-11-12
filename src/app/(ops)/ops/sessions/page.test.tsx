@@ -18,6 +18,8 @@ vi.mock('@/server/db/opsSessions', () => ({
 }));
 vi.mock('@/server/actions/opsSessions', () => ({
   cancelOpsSessionAction: vi.fn(),
+  changeOpsAllocationAction: vi.fn(),
+  pauseOpsExperienceAction: vi.fn(),
 }));
 
 import { OpsAccessDenied } from '@/components/OpsShell';

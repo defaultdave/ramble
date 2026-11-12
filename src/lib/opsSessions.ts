@@ -3,13 +3,18 @@ import {
   type CancelSessionResult,
   type SessionCancelReason,
 } from './cancelSession';
-import { hostSessionProblemMessages } from './hostSessions';
+import { pauseActionFor } from './experiencePause';
+import {
+  hostSessionFormValues,
+  hostSessionProblemMessages,
+} from './hostSessions';
 import { isOpenHold, openHeldSeats, type HoldTimes } from './holds';
 import { formatMoney } from './money';
 import {
   formHas,
   formText,
   parseIdField,
+  parseNotice,
   type FormGetter,
   type FormResult,
   type NoticeText,
@@ -18,10 +23,13 @@ import { refundableAttempt, planRefund, type RefundableOrder } from './refunds';
 import {
   isUpcoming,
   sessionStatusLabels,
+  UpdateSessionAllocationInputSchema,
+  type UpdateSessionAllocationInput,
   type sessionStatuses,
 } from './sessions';
 import { parseStatusParam, type StatusTone } from './statusBadge';
 import { countLabel } from './text';
+import { tableHref } from './tableQuery';
 import { zonedDeadlineLabel } from './zonedLabels';
 
 // Ops session management (PRD-28, PRD-33, PRD-51): finding sessions, the guest impact of a
@@ -295,6 +303,7 @@ export type SessionDetailRecord = {
   seatsSold: number;
   heldSeats: number;
   status: SessionStatus;
+  version: number;
 };
 
 /** A session that has started, or starts now, is over for cancelling. */
@@ -317,6 +326,14 @@ export type OpsSessionView = {
   seatsLabel: string;
   /** The session can be cancelled: not started, and no booking blocks it. */
   canCancel: boolean;
+  /** A scheduled session that has not started: the only kind whose capacity is changed. */
+  canEditCapacity: boolean;
+  capacity: number;
+  /** The lowest capacity the server accepts: the seats sold plus the seats held. */
+  minCapacity: number;
+  capacityHint: string;
+  /** The version the editor read, posted back so a second edit cannot overwrite a first unseen. */
+  version: number;
 };
 
 export function buildOpsSessionView(
@@ -325,6 +342,9 @@ export function buildOpsSessionView(
   impact: Impact,
 ): OpsSessionView {
   const whenLabel = zonedDeadlineLabel(record.startsAt, record.timeZone);
+  const open =
+    record.status === 'scheduled' && cancelGate(record, now) === 'ok';
+  const minCapacity = record.seatsSold + record.heldSeats;
   return {
     id: record.id,
     title: `${record.experienceName}, ${whenLabel}`,
@@ -335,10 +355,12 @@ export function buildOpsSessionView(
     statusLabel: sessionStatusLabels[record.status],
     statusTone: sessionStatusTones[record.status],
     seatsLabel: `${String(record.seatsSold)} sold, ${String(record.heldSeats)} held, ${String(record.allocation)} capacity`,
-    canCancel:
-      record.status === 'scheduled' &&
-      cancelGate(record, now) === 'ok' &&
-      !cancelBlocked(impact),
+    canCancel: open && !cancelBlocked(impact),
+    canEditCapacity: open,
+    capacity: record.allocation,
+    minCapacity,
+    capacityHint: `At least ${String(minCapacity)}, the seats sold and held.`,
+    version: record.version,
   };
 }
 
@@ -360,21 +382,46 @@ export type OpsCancelInput = {
   fingerprint: string;
 };
 
-/** The cancel form: a session, a reason, the impact that was read, and the box ticked to say so. Nothing is repaired. */
-export function parseCancelForm(get: FormGetter): FormResult<OpsCancelInput> {
+export type ImpactFormInput = Pick<OpsCancelInput, 'sessionId' | 'fingerprint'>;
+
+/** What the cancel and pause forms share: the session, the impact that was read, and the box ticked to say so. Nothing is repaired. */
+function parseImpactForm(get: FormGetter): ImpactFormInput | null {
   const sessionId = parseIdField(get('sessionId'));
-  const reason = opsCancelReasons.find((r) => r === formText(get, 'reason'));
   const fingerprint = formText(get, 'fingerprint');
   if (
     sessionId === null ||
-    reason === undefined ||
     fingerprint === undefined ||
     !fingerprintPattern.test(fingerprint) ||
     !formHas(get, 'confirm')
   ) {
-    return { ok: false };
+    return null;
   }
-  return { ok: true, value: { sessionId, reason, fingerprint } };
+  return { sessionId, fingerprint };
+}
+
+/** The cancel form: the impact form and a reason ops may give. */
+export function parseCancelForm(get: FormGetter): FormResult<OpsCancelInput> {
+  const impact = parseImpactForm(get);
+  const reason = opsCancelReasons.find((r) => r === formText(get, 'reason'));
+  return impact === null || reason === undefined
+    ? { ok: false }
+    : { ok: true, value: { ...impact, reason } };
+}
+
+/** The pause form: the impact form alone. */
+export function parsePauseForm(get: FormGetter): FormResult<ImpactFormInput> {
+  const impact = parseImpactForm(get);
+  return impact === null ? { ok: false } : { ok: true, value: impact };
+}
+
+/** The capacity form, read the way the host's is. */
+export function parseAllocationForm(
+  get: FormGetter,
+): FormResult<UpdateSessionAllocationInput> {
+  const parsed = UpdateSessionAllocationInputSchema.safeParse(
+    hostSessionFormValues.capacity(get),
+  );
+  return parsed.success ? { ok: true, value: parsed.data } : { ok: false };
 }
 
 export const opsSessionNoticeCodes = [
@@ -386,6 +433,14 @@ export const opsSessionNoticeCodes = [
   'blocked',
   'stale',
   'in_the_past',
+  'allocation_saved',
+  'version_conflict',
+  'not_scheduled',
+  'below_sold_and_held',
+  'paused',
+  'paused_some_left',
+  'pause_incomplete',
+  'not_pausable',
   'invalid',
 ] as const;
 export type OpsSessionNoticeCode = (typeof opsSessionNoticeCodes)[number];
@@ -427,6 +482,39 @@ export const opsSessionNotices = {
     tone: 'warning',
     title: hostSessionProblemMessages.in_the_past,
   },
+  allocation_saved: { tone: 'success', title: 'Capacity saved.' },
+  version_conflict: {
+    tone: 'warning',
+    title: hostSessionProblemMessages.version_conflict,
+  },
+  not_scheduled: {
+    tone: 'warning',
+    title: hostSessionProblemMessages.not_scheduled,
+  },
+  below_sold_and_held: {
+    tone: 'warning',
+    title: hostSessionProblemMessages.below_sold_and_held,
+  },
+  paused: {
+    tone: 'success',
+    title:
+      'Experience paused. Its future booked sessions are cancelled and refunded.',
+  },
+  paused_some_left: {
+    tone: 'warning',
+    title:
+      'Experience paused. Some sessions could not be cancelled here; the page names them.',
+  },
+  pause_incomplete: {
+    tone: 'danger',
+    title:
+      'Experience paused, but something went wrong on our side before every session was cancelled. Use the button to cancel the rest.',
+  },
+  not_pausable: {
+    tone: 'warning',
+    title:
+      'Only an experience guests can see, or one already paused, is paused here.',
+  },
   invalid: { tone: 'danger', title: 'Some details need another look.' },
 } as const satisfies Record<OpsSessionNoticeCode, NoticeText>;
 
@@ -461,4 +549,158 @@ function cancelNotice(result: CancelSessionResult): OpsSessionNoticeCode {
     case 'not_found':
       return 'not_found';
   }
+}
+
+const allocationRefusalNotices = {
+  session_not_found: 'not_found',
+  not_scheduled: 'not_scheduled',
+  version_conflict: 'version_conflict',
+  in_the_past: 'in_the_past',
+  below_sold_and_held: 'below_sold_and_held',
+} as const satisfies Record<string, OpsSessionNoticeCode>;
+
+/** The notice a capacity change's result names. */
+export function allocationNotice(
+  result:
+    { ok: true } | { ok: false; reason: keyof typeof allocationRefusalNotices },
+): OpsSessionNoticeCode {
+  return result.ok
+    ? 'allocation_saved'
+    : allocationRefusalNotices[result.reason];
+}
+
+type SessionStub = {
+  id: string;
+  startsAt: Date;
+  status: SessionStatus;
+  seatsSold: number;
+  heldSeats: number;
+};
+
+/** A future scheduled session guests have a claim on (seats sold, or seats held mid-booking) is one the pause cancels. */
+export function pauseCancelTargets<T extends SessionStub>(
+  sessions: readonly T[],
+  now: Date,
+): T[] {
+  return sessions.filter(
+    (session) =>
+      session.status === 'scheduled' &&
+      isUpcoming(session.startsAt, now) &&
+      (session.seatsSold > 0 || session.heldSeats > 0),
+  );
+}
+
+export type PausePlan = 'pause' | 'finish' | 'not_pausable';
+
+/** An experience guests can see is paused; a paused one is walked again (a repeat after a failure finishes the cancelling); any other has nothing to pause. */
+export function pausePlanFor(
+  status: Parameters<typeof pauseActionFor>[0],
+): PausePlan {
+  switch (pauseActionFor(status)) {
+    case 'pause':
+      return 'pause';
+    case 'unpause':
+      return 'finish';
+    case null:
+      return 'not_pausable';
+  }
+}
+
+export type PauseView = {
+  explainer: string;
+  sessionsLabel: string;
+  buttonLabel: string;
+  impact: ImpactView;
+  canPause: boolean;
+};
+
+/** What the pause section says and offers, or null when the experience has nothing to pause. */
+export function pauseView(input: {
+  experienceName: string;
+  plan: PausePlan;
+  targetCount: number;
+  impact: Impact;
+}): PauseView | null {
+  const { plan, targetCount, impact } = input;
+  if (plan === 'not_pausable') return null;
+  const sessions = countLabel(targetCount, 'future session');
+  return plan === 'pause'
+    ? {
+        explainer: `Hides ${input.experienceName} from guests, then cancels its future sessions that have guests and refunds their bookings.`,
+        sessionsLabel: `${sessions} with guests on them would be cancelled.`,
+        buttonLabel: 'Pause experience and cancel its sessions',
+        impact: impactView(impact),
+        canPause: !cancelBlocked(impact),
+      }
+    : {
+        explainer: `${input.experienceName} is paused. Some of its future sessions with guests are still scheduled.`,
+        sessionsLabel: `${sessions} with guests on them still to cancel.`,
+        buttonLabel: 'Cancel the remaining sessions',
+        impact: impactView(impact),
+        canPause: targetCount > 0,
+      };
+}
+
+/** What pausing came to. `left` counts the sessions that could not be cancelled here (a booking blocks them); `incomplete` is a failure part-way. */
+export type PauseOutcome =
+  | { status: 'not_found' | 'not_pausable' | 'blocked' | 'stale' }
+  | { status: 'paused'; cancelled: number; total: number; left: number }
+  | { status: 'incomplete'; cancelled: number; total: number };
+
+/** Thrown when a session's cancellation fails part-way through the pause: the experience is paused, and the sessions cancelled so far stay cancelled. */
+export class PauseIncompleteError extends Error {
+  constructor(
+    readonly cancelled: number,
+    readonly total: number,
+    cause: unknown,
+  ) {
+    super('The pause stopped before every session was cancelled', { cause });
+  }
+}
+
+const progressCodes = ['paused_some_left', 'pause_incomplete'] as const;
+
+/** Where the pause sends the person: the session's page, with the notice, and for a progress notice the counts. */
+export function pauseOutcomeHref(path: string, outcome: PauseOutcome): string {
+  switch (outcome.status) {
+    case 'paused':
+      return tableHref(path, {
+        notice: outcome.left > 0 ? 'paused_some_left' : 'paused',
+        done: String(outcome.cancelled),
+        of: String(outcome.total),
+      });
+    case 'incomplete':
+      return tableHref(path, {
+        notice: 'pause_incomplete',
+        done: String(outcome.cancelled),
+        of: String(outcome.total),
+      });
+    default:
+      return tableHref(path, { notice: outcome.status });
+  }
+}
+
+const countPattern = /^\d{1,5}$/;
+
+const parseCount = (raw: string | readonly string[] | undefined) =>
+  typeof raw === 'string' && countPattern.test(raw) ? Number(raw) : null;
+
+/** The notice the address names. A progress notice says how many of the sessions were cancelled when the address carries both counts. */
+export function sessionNotice(query: {
+  notice?: string | readonly string[] | undefined;
+  done?: string | readonly string[] | undefined;
+  of?: string | readonly string[] | undefined;
+}): NoticeText | null {
+  const code = parseNotice(query.notice, opsSessionNoticeCodes);
+  if (code === null) return null;
+  const done = parseCount(query.done);
+  const of = parseCount(query.of);
+  if (done === null || of === null || !progressCodes.some((c) => c === code)) {
+    return opsSessionNotices[code];
+  }
+  const { tone, title } = opsSessionNotices[code];
+  return {
+    tone,
+    title: `${String(done)} of ${countLabel(of, 'session')} cancelled. ${title}`,
+  };
 }

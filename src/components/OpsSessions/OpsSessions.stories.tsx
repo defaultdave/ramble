@@ -2,10 +2,13 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { PageHeading } from '@/components/PageHeading';
 import {
   blockedImpact,
+  blockedPause,
   blockedSession,
   bookedImpact,
+  bookedPause,
   cancelledSession,
   emptyImpact,
+  finishPause,
   openSession,
   sessionRows,
 } from './OpsSessions.fixtures';
@@ -44,7 +47,8 @@ const meta = {
   args: {
     session: openSession,
     impact: bookedImpact,
-    actions: { cancel: noop },
+    pause: bookedPause,
+    actions: { cancel: noop, allocation: noop, pause: noop },
   },
 } satisfies Meta<typeof SessionDetail>;
 
@@ -54,15 +58,23 @@ type Story = StoryObj<typeof meta>;
 export const OpenWithGuests: Story = {};
 
 export const OpenWithNoGuests: Story = {
-  args: { impact: emptyImpact },
+  args: { impact: emptyImpact, pause: null },
 };
 
 export const Cancelled: Story = {
-  args: { session: cancelledSession, impact: emptyImpact },
+  args: { session: cancelledSession, impact: emptyImpact, pause: null },
 };
 
 export const BlockedBookings: Story = {
-  args: { session: blockedSession, impact: blockedImpact },
+  args: {
+    session: blockedSession,
+    impact: blockedImpact,
+    pause: blockedPause,
+  },
+};
+
+export const PausedWithSessionsLeft: Story = {
+  args: { pause: finishPause },
 };
 
 const listArgs = {

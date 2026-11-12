@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   cancelSessionAsOps: vi.fn(),
+  changeAllocationAsOps: vi.fn(),
+  pauseExperienceAndCancel: vi.fn(),
   opsCallerOrLeave: vi.fn(),
+  logError: vi.fn(),
 }));
 
 class Redirected extends Error {
@@ -22,9 +25,19 @@ vi.mock('@/server/opsAccess', async (importOriginal) => ({
 }));
 vi.mock('@/server/db/opsSessions', () => ({
   cancelSessionAsOps: mocks.cancelSessionAsOps,
+  changeAllocationAsOps: mocks.changeAllocationAsOps,
+  pauseExperienceAndCancel: mocks.pauseExperienceAndCancel,
+}));
+vi.mock('@/server/monitoring/logger', () => ({
+  logger: { error: mocks.logError },
 }));
 
-import { cancelOpsSessionAction } from './opsSessions';
+import { PauseIncompleteError } from '@/lib/opsSessions';
+import {
+  cancelOpsSessionAction,
+  changeOpsAllocationAction,
+  pauseOpsExperienceAction,
+} from './opsSessions';
 
 // Behaviours under test:
 // - the caller is checked first: a caller sent away reads nothing and changes nothing
@@ -32,6 +45,8 @@ import { cancelOpsSessionAction } from './opsSessions';
 // - a refused form redirects to the session with the invalid notice and changes nothing
 // - each outcome redirects to the session with the notice it names
 // - the parsed input, fingerprint included, reaches the data layer with the ops caller
+// - a capacity result redirects with the notice it names, and a refused capacity form changes nothing
+// - a pause outcome redirects with its notice and counts; a pause that stops part-way is told with how far it got and logs the error kind only; any other failure is not swallowed
 
 const sessionId = '0f1e2d3c-4b5a-4697-8a9b-0c1d2e3f4a5b';
 const page = `/ops/sessions/${sessionId}`;
@@ -126,5 +141,107 @@ describe('cancelOpsSessionAction', () => {
       reason: 'weather',
       fingerprint: '1:10800:0:2:0',
     });
+  });
+});
+
+describe('changeOpsAllocationAction', () => {
+  const values = { sessionId, allocation: '9', expectedVersion: '2' };
+
+  it('leaves before reading the form when the caller is not ops', async () => {
+    mocks.opsCallerOrLeave.mockRejectedValue(new Redirected('/ops/sessions'));
+    await expect(changeOpsAllocationAction(form(values))).rejects.toMatchObject(
+      { href: '/ops/sessions' },
+    );
+    expect(mocks.changeAllocationAsOps).not.toHaveBeenCalled();
+  });
+
+  it('redirects with the invalid notice for a capacity that is no number, and changes nothing', async () => {
+    expect(
+      await redirectOf(() =>
+        changeOpsAllocationAction(form({ ...values, allocation: 'many' })),
+      ),
+    ).toBe(`${page}?notice=invalid`);
+    expect(mocks.changeAllocationAsOps).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ ok: true }, 'allocation_saved'],
+    [{ ok: false, reason: 'below_sold_and_held' }, 'below_sold_and_held'],
+    [{ ok: false, reason: 'version_conflict' }, 'version_conflict'],
+  ])('names the notice for result %#', async (result, notice) => {
+    mocks.changeAllocationAsOps.mockResolvedValue(result);
+    expect(
+      await redirectOf(() => changeOpsAllocationAction(form(values))),
+    ).toBe(`${page}?notice=${notice}`);
+    expect(mocks.changeAllocationAsOps).toHaveBeenCalledWith(ops, {
+      sessionId,
+      allocation: 9,
+      expectedVersion: 2,
+    });
+  });
+});
+
+describe('pauseOpsExperienceAction', () => {
+  const values = { sessionId, fingerprint: '1:10800:0:2:0', confirm: 'on' };
+
+  it('leaves before reading the form when the caller is not ops', async () => {
+    mocks.opsCallerOrLeave.mockRejectedValue(new Redirected('/ops/sessions'));
+    await expect(pauseOpsExperienceAction(form(values))).rejects.toMatchObject({
+      href: '/ops/sessions',
+    });
+    expect(mocks.pauseExperienceAndCancel).not.toHaveBeenCalled();
+  });
+
+  it('redirects with the invalid notice when the box is not ticked, and pauses nothing', async () => {
+    expect(
+      await redirectOf(() =>
+        pauseOpsExperienceAction(form({ sessionId, fingerprint: '1:1:1:1:1' })),
+      ),
+    ).toBe(`${page}?notice=invalid`);
+    expect(mocks.pauseExperienceAndCancel).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      { status: 'paused', cancelled: 2, total: 2, left: 0 },
+      'notice=paused&done=2&of=2',
+    ],
+    [
+      { status: 'paused', cancelled: 1, total: 2, left: 1 },
+      'notice=paused_some_left&done=1&of=2',
+    ],
+    [{ status: 'stale' }, 'notice=stale'],
+    [{ status: 'blocked' }, 'notice=blocked'],
+    [{ status: 'not_pausable' }, 'notice=not_pausable'],
+  ])('sends outcome %# on with its notice', async (outcome, query) => {
+    mocks.pauseExperienceAndCancel.mockResolvedValue(outcome);
+    expect(await redirectOf(() => pauseOpsExperienceAction(form(values)))).toBe(
+      `${page}?${query}`,
+    );
+    expect(mocks.pauseExperienceAndCancel).toHaveBeenCalledWith(ops, {
+      sessionId,
+      fingerprint: '1:10800:0:2:0',
+    });
+  });
+
+  it('tells a pause that stopped part-way how far it got, and logs the kind of the error and nothing else', async () => {
+    mocks.pauseExperienceAndCancel.mockRejectedValue(
+      new PauseIncompleteError(1, 3, new RangeError('secret query text')),
+    );
+    expect(await redirectOf(() => pauseOpsExperienceAction(form(values)))).toBe(
+      `${page}?notice=pause_incomplete&done=1&of=3`,
+    );
+    expect(mocks.logError).toHaveBeenCalledWith(
+      'pausing an experience stopped part-way',
+      { errorKind: 'RangeError', cancelled: 1, total: 3 },
+    );
+  });
+
+  it('does not swallow any other failure', async () => {
+    mocks.pauseExperienceAndCancel.mockRejectedValue(new Error('boom'));
+    await expect(pauseOpsExperienceAction(form(values))).rejects.toThrow(
+      'boom',
+    );
+    expect(mocks.logError).not.toHaveBeenCalled();
   });
 });

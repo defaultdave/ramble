@@ -2,6 +2,7 @@ import {
   buildOpsSessionRows,
   buildOpsSessionView,
   impactView,
+  pauseView,
   sessionImpact,
   type ImpactOrder,
 } from '@/lib/opsSessions';
@@ -63,6 +64,7 @@ const sessionRecord = {
   seatsSold: 5,
   heldSeats: 2,
   status: 'scheduled',
+  version: 3,
 } as const;
 
 const heldSeat = {
@@ -99,3 +101,22 @@ export const cancelledSession = buildOpsSessionView(
   empty,
 );
 export const blockedSession = buildOpsSessionView(sessionRecord, now, blocked);
+
+export const bookedPause = pauseView({
+  experienceName: 'Harbor sunrise kayak',
+  plan: 'pause',
+  targetCount: 3,
+  impact: booked,
+});
+export const blockedPause = pauseView({
+  experienceName: 'Harbor sunrise kayak',
+  plan: 'pause',
+  targetCount: 1,
+  impact: blocked,
+});
+export const finishPause = pauseView({
+  experienceName: 'Harbor sunrise kayak',
+  plan: 'finish',
+  targetCount: 2,
+  impact: booked,
+});

@@ -4,14 +4,14 @@ import { ActionNotice } from '@/components/ActionNotice';
 import { OpsAccessDenied } from '@/components/OpsShell';
 import { SessionDetail } from '@/components/OpsSessions';
 import { PageHeading } from '@/components/PageHeading';
-import { noticeText, parseIdField, parseNotice } from '@/lib/opsForm';
+import { parseIdField } from '@/lib/opsForm';
 import { holdsOpsRole } from '@/lib/opsNav';
+import { opsSessionPath, sessionNotice } from '@/lib/opsSessions';
 import {
-  opsSessionNoticeCodes,
-  opsSessionNotices,
-  opsSessionPath,
-} from '@/lib/opsSessions';
-import { cancelOpsSessionAction } from '@/server/actions/opsSessions';
+  cancelOpsSessionAction,
+  changeOpsAllocationAction,
+  pauseOpsExperienceAction,
+} from '@/server/actions/opsSessions';
 import { readOpsSession } from '@/server/db/opsSessions';
 import { readOpsCaller } from '@/server/opsCaller';
 
@@ -35,16 +35,16 @@ export default async function SessionPage({
   if (detail === null) notFound();
   return (
     <PageHeading title={detail.session.title}>
-      <ActionNotice
-        notice={noticeText(
-          opsSessionNotices,
-          parseNotice(query.notice, opsSessionNoticeCodes),
-        )}
-      />
+      <ActionNotice notice={sessionNotice(query)} />
       <SessionDetail
         session={detail.session}
         impact={detail.impact}
-        actions={{ cancel: cancelOpsSessionAction }}
+        pause={detail.pause}
+        actions={{
+          cancel: cancelOpsSessionAction,
+          allocation: changeOpsAllocationAction,
+          pause: pauseOpsExperienceAction,
+        }}
       />
     </PageHeading>
   );

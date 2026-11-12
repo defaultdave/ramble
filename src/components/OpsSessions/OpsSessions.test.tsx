@@ -3,10 +3,13 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   blockedImpact,
+  blockedPause,
   blockedSession,
   bookedImpact,
+  bookedPause,
   cancelledSession,
   emptyImpact,
+  finishPause,
   openSession,
   sessionRows,
 } from './OpsSessions.fixtures';
@@ -19,6 +22,8 @@ import { SessionsList } from './SessionsList';
 // - the impact is shown before the cancel form, with each booking and its amount
 // - the cancel form carries the session and the impact it was shown for, and a reason without the host's
 // - the cancel button is off for a session that cannot be cancelled, and a blocking booking is named in words
+// - the capacity form carries the version, takes no less than sold plus held, and is off for a session that is not open
+// - the pause form carries the impact it was shown for and says what it cancels; it is off while a booking blocks it, relabelled to finish the cancelling on a paused experience, and absent when there is nothing to pause
 
 const noop = () => undefined;
 
@@ -42,7 +47,8 @@ function renderDetail(
     <SessionDetail
       session={openSession}
       impact={bookedImpact}
-      actions={{ cancel: noop }}
+      pause={bookedPause}
+      actions={{ cancel: noop, allocation: noop, pause: noop }}
       {...props}
     />,
   );
@@ -83,9 +89,9 @@ describe('SessionDetail', () => {
   it('shows the impact, with each booking and its amount, before the form', () => {
     const { container } = renderDetail();
     expect(
-      screen.getByText(/2 bookings refunded in full, \$367\.20 in all/),
+      screen.getAllByText(/2 bookings refunded in full, \$367\.20 in all/)[0],
     ).toBeInTheDocument();
-    expect(screen.getByText('RMB-4F7K2Q')).toBeInTheDocument();
+    expect(screen.getAllByText('RMB-4F7K2Q')[0]).toBeInTheDocument();
     const impact = screen.getByRole('heading', { name: 'Who this affects' });
     expect(
       impact.compareDocumentPosition(container.querySelector('form') as Node) &
@@ -133,5 +139,69 @@ describe('SessionDetail', () => {
     expect(
       screen.getByText(/RMB-2B8C5D has no payment to send the money back to/),
     ).toBeInTheDocument();
+  });
+});
+
+describe('SessionDetail, the capacity form', () => {
+  it('carries the version, sets its lowest number, and says it', () => {
+    const { container } = renderDetail();
+    expect(
+      container.querySelector('input[name="expectedVersion"]'),
+    ).toHaveValue('3');
+    const capacity = screen.getByLabelText('Capacity');
+    expect(capacity).toHaveAttribute('min', '7');
+    expect(capacity).toHaveValue(12);
+    expect(
+      screen.getByText('At least 7, the seats sold and held.'),
+    ).toBeInTheDocument();
+  });
+
+  it('turns the save off for a session that is not open', () => {
+    renderDetail({ session: cancelledSession, impact: emptyImpact });
+    expect(
+      screen.getByRole('button', { name: 'Save capacity' }),
+    ).toBeDisabled();
+  });
+});
+
+describe('SessionDetail, the pause form', () => {
+  const pauseButton = (name: string) => screen.getByRole('button', { name });
+
+  it('says what it cancels and carries the impact it was shown for', () => {
+    const { container } = renderDetail();
+    expect(
+      screen.getByText(
+        /3 future sessions with guests on them would be cancelled/,
+      ),
+    ).toBeInTheDocument();
+    const forms = container.querySelectorAll('form');
+    expect(forms[2]?.querySelector('input[name="fingerprint"]')).toHaveValue(
+      bookedPause?.impact.fingerprint,
+    );
+    expect(
+      pauseButton('Pause experience and cancel its sessions'),
+    ).toBeEnabled();
+  });
+
+  it('is off while a booking blocks it', () => {
+    renderDetail({ pause: blockedPause });
+    expect(
+      pauseButton('Pause experience and cancel its sessions'),
+    ).toBeDisabled();
+  });
+
+  it('offers to cancel the remaining sessions once the experience is paused', () => {
+    renderDetail({ pause: finishPause });
+    expect(pauseButton('Cancel the remaining sessions')).toBeEnabled();
+    expect(
+      screen.getByText(/is paused\. Some of its future/),
+    ).toBeInTheDocument();
+  });
+
+  it('is absent when the experience has nothing to pause', () => {
+    renderDetail({ pause: null });
+    expect(
+      screen.queryByRole('heading', { name: 'Pause this experience' }),
+    ).toBeNull();
   });
 });

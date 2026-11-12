@@ -36,7 +36,7 @@ export type PhotoFormField = (typeof photoFormFields)[number];
 /** The largest text a photo form field may hold, so no rule walks an unbounded string. */
 const rawTextLimit = photoLimits.maxUrlLength;
 
-export const photoRightsBasisLabels = {
+const photoRightsBasisLabels = {
   host_agreement: 'Covered by the host agreement',
   ramble_owned: 'Shot or owned by Ramble',
   licensed: 'Licensed stock photo',
@@ -124,7 +124,7 @@ export function photoAltSummary(
     : `Alt text: ${photo.altText ?? ''}`;
 }
 
-export const photoFieldProblems = {
+const photoFieldProblems = {
   photoFile: 'Choose a photo to upload.',
   altText: `Describe the photo in up to ${String(photoLimits.maxAltLength)} characters, or mark it decorative.`,
   rightsBasis: 'Choose where the rights to this photo come from.',

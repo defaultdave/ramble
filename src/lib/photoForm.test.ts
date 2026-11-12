@@ -3,14 +3,13 @@ import { id } from '../../tests/support/ids';
 import {
   parsePhotoForm,
   photoAltSummary,
-  photoFieldProblems,
   photoFormFields,
   photoNoticeCodes,
   photoNotices,
   photoProblemTexts,
   photoRefusalNotice,
   photoRefusalOf,
-  photoRightsBasisLabels,
+  photoRightsBasisOptions,
 } from './photoForm';
 import {
   photoLimits,
@@ -222,8 +221,8 @@ describe('refusal notices', () => {
     const texts = photoProblemTexts('too_small');
 
     expect(texts.photoFile).toBe(photoRefusalMessage('too_small'));
-    expect(texts.altText).toBe(photoFieldProblems.altText);
-    expect(photoProblemTexts(null)).toBe(photoFieldProblems);
+    expect(texts.altText).toBe(photoProblemTexts(null).altText);
+    expect(photoProblemTexts(null).photoFile).toBe('Choose a photo to upload.');
   });
 });
 
@@ -236,13 +235,16 @@ describe('copy', () => {
 
   it('has a sentence for every form field', () => {
     expect([...photoFormFields].sort()).toEqual(
-      Object.keys(photoFieldProblems).sort(),
+      Object.keys(photoProblemTexts(null)).sort(),
     );
   });
 
   it('labels every rights basis', () => {
-    expect([...photoRightsBases].sort()).toEqual(
-      Object.keys(photoRightsBasisLabels).sort(),
+    expect(photoRightsBasisOptions.map((option) => option.value)).toEqual([
+      ...photoRightsBases,
+    ]);
+    expect(photoRightsBasisOptions.every((option) => option.label !== '')).toBe(
+      true,
     );
   });
 

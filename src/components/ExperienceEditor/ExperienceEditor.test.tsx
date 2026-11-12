@@ -6,6 +6,7 @@ import {
   choices,
   listRows,
   nextCursorId,
+  savedPhotos,
   savedValues,
   savedView,
 } from './ExperienceEditor.fixtures';
@@ -21,6 +22,7 @@ import { ExperiencesList } from './ExperiencesList';
 // - a guide-only entry's link is required; any other status leaves it optional
 // - the cancellation tier choices carry their refund terms
 // - the edit view shows the status in words and the host, and its form saves through the action it is given
+// - the edit view shows the photos and the form that adds one
 // - the list links each experience, shows host, category and status in words, filters by address and pages by link
 // - a list with no rows says so
 
@@ -161,6 +163,21 @@ describe('ExperienceEditView', () => {
     expect(screen.getByText('Live')).toBeInTheDocument();
     expect(screen.getByText('Host: Clay Corner')).toBeInTheDocument();
     expect(screen.getByLabelText('Name')).toHaveValue('Wheel throwing night');
+  });
+
+  it('shows the photos with the form that adds one', () => {
+    render(
+      <ExperienceEditView
+        view={{ ...savedView, photos: savedPhotos }}
+        choices={choices}
+        save={noop}
+        addPhoto={noop}
+      />,
+    );
+
+    const photos = within(screen.getByRole('region', { name: 'Photos' }));
+    expect(photos.getAllByRole('listitem')).toHaveLength(savedPhotos.length);
+    expect(photos.getByRole('button', { name: 'Add photo' })).toBeVisible();
   });
 
   it('requires the link for a guide-only entry', () => {

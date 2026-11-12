@@ -27,6 +27,7 @@ describe('the modules that guard on the host owner role', () => {
       'src/server/db/cancelSession.ts',
       'src/server/db/catalog.ts',
       'src/server/db/hostGuestLists.ts',
+      'src/server/db/hostSettings.ts',
       'src/server/db/ledger.ts',
       'src/server/db/photos.ts',
       'src/server/db/sessions.ts',

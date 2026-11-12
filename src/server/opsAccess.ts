@@ -1,5 +1,6 @@
 import 'server-only';
 import { redirect } from 'next/navigation';
+import { parseIdField } from '@/lib/opsForm';
 import { holdsOpsRole } from '@/lib/opsNav';
 import type { Caller } from '@/server/auth/caller';
 import { readOpsCaller } from './opsCaller';
@@ -13,4 +14,15 @@ export async function opsCallerOrLeave(leaveTo: string): Promise<Caller> {
   const caller = await readOpsCaller();
   if (!holdsOpsRole(caller.roles)) redirect(leaveTo);
   return caller;
+}
+
+/** The id a posted form carries in `field`, or the page `leaveTo` for a form that carries none. */
+export function idOrLeave(
+  formData: FormData,
+  field: string,
+  leaveTo: string,
+): string {
+  const id = parseIdField(formData.get(field));
+  if (id === null) redirect(leaveTo);
+  return id;
 }

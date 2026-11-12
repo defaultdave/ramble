@@ -4,6 +4,7 @@ import { parseAuditEntry } from './audit';
 import {
   experienceCreatedEntry,
   experienceUpdatedEntry,
+  photoAddedEntry,
 } from './experienceAudit';
 import {
   buildExperienceChoices,
@@ -20,6 +21,7 @@ import {
   type ExperienceContent,
 } from './experienceEditor';
 import type { HostExperience } from './catalog';
+import type { GuestPhoto } from './photos';
 
 // Behaviours under test, one per decision, branch or risk:
 // - every status has a label and a filter option, and the editor's paths hold the id
@@ -148,12 +150,17 @@ describe('buildExperienceEditView', () => {
       },
     } as unknown as HostExperience;
 
-    expect(buildExperienceEditView(experience, 'Clay Corner')).toMatchObject({
+    const photos = [{ id: id(12), position: 0 }] as unknown as GuestPhoto[];
+
+    expect(
+      buildExperienceEditView(experience, 'Clay Corner', photos),
+    ).toMatchObject({
       id: id(10),
       hostId: id(1),
       hostName: 'Clay Corner',
       status: 'live',
       content: { adultPriceMinor: 8500, childPriceMinor: null },
+      photos,
     });
   });
 });
@@ -201,6 +208,27 @@ describe('the experience audit rows', () => {
       subjectId: id(2),
       details: { host_id: id(3) },
     });
+  });
+
+  it('records an added photo by ids and flags, which the audit log accepts', () => {
+    const entry = photoAddedEntry(id(1), id(2), {
+      photoId: id(4),
+      position: 2,
+      decorative: false,
+      rightsBasis: 'licensed',
+    });
+
+    expect(entry).toMatchObject({
+      action: 'experience.photo_added',
+      subjectId: id(2),
+      details: {
+        photo_id: id(4),
+        position: 2,
+        decorative: false,
+        rights_basis: 'licensed',
+      },
+    });
+    expect(() => parseAuditEntry(entry)).not.toThrow();
   });
 
   it('reports a text change as its group alone, with no value', () => {

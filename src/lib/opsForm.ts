@@ -31,14 +31,19 @@ export function inFieldOrder<F extends string>(
   return fields.filter((field) => failed.has(field));
 }
 
-/** The fields a schema's issues name, each once, in the list's order. An issue on a name outside the list is not a form field and is left out. */
+/**
+ * The fields a schema's issues name, each once, in the list's order. An issue on a name outside the
+ * list is not a form field and is left out. A form whose schema nests its fields says which name an
+ * issue's path stands for with `nameOf`; by default it is the path's first key.
+ */
 export function fieldsFromIssues<F extends string>(
   issues: readonly { path: readonly PropertyKey[] }[],
   fields: readonly F[],
+  nameOf: (path: readonly PropertyKey[]) => unknown = (path) => path[0],
 ): F[] {
   const named = new Set<F>();
   for (const issue of issues) {
-    const field = pickKnown(String(issue.path[0]), fields, null);
+    const field = pickKnown(String(nameOf(issue.path)), fields, null);
     if (field !== null) named.add(field);
   }
   return inFieldOrder(fields, named);

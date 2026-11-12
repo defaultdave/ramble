@@ -129,7 +129,7 @@ async function extendSessions(now: Date): Promise<number> {
     if (result.experienceIds.length > 0) {
       revalidateTagsForChanges(
         result.experienceIds.map((experienceId) => ({
-          kind: 'schedule',
+          kind: 'experience',
           experienceId,
         })),
       );

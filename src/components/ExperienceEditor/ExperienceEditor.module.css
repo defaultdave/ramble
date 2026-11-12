@@ -52,6 +52,40 @@
   max-width: 40rem;
 }
 
+.section {
+  composes: section from '../HostSetup/HostSetup.module.css';
+}
+
+.heading {
+  composes: heading from '../HostSetup/HostSetup.module.css';
+}
+
+.list {
+  composes: list from '../HostSetup/HostSetup.module.css';
+}
+
+.photoRow {
+  composes: row from '../HostSetup/HostSetup.module.css';
+}
+
+.photoText {
+  composes: muted;
+}
+
+/* The frame holds the photo's shape so nothing moves when it loads. */
+.thumb {
+  composes: photo from '../GuideEntry/GuideEntry.module.css';
+  max-width: 12rem;
+  border-radius: var(--radius-sm);
+}
+
+/* The guide frame turns 16:9 from tablet up; a thumbnail stays 4:3. Two classes, so this wins whichever module's CSS loads last. */
+@media (min-width: 768px) {
+  .photoRow .thumb {
+    aspect-ratio: 4 / 3;
+  }
+}
+
 .cellLink {
   composes: cellLink from '../HostSetup/HostSetup.module.css';
 }

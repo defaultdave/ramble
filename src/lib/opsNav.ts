@@ -47,6 +47,12 @@ export const opsNavLinks: readonly OpsNavLink[] = [
     href: '/ops/audit',
     summary: 'Read what was changed and who changed it, a day at a time.',
   },
+  {
+    label: 'Bookings',
+    href: '/ops/bookings',
+    summary:
+      'Find a booking by reference or guest email, and see its refunds and history.',
+  },
 ];
 
 /** The areas the landing page lists: every link but the landing page itself. */

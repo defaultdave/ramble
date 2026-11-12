@@ -14,13 +14,13 @@ import {
   changedHostFields,
   hostSaveOutcome,
   hostAgreementDoc,
-  hostsPageSize,
   type HostCreateInput,
   type HostDetail,
   type HostInput,
   type HostListRow,
 } from '@/lib/hostSetup';
 import { splitPage } from '@/lib/pagination';
+import { opsListPageSize } from '@/lib/tableQuery';
 import { Role, type Caller } from '@/server/auth/caller';
 import { recordAudit, requireOpsUserId, writeAudit } from './audit';
 import { db, dbRead } from './client';
@@ -157,8 +157,8 @@ export async function readHostsForOps(
     .from(hosts)
     .where(pastNameCursor(hosts, cursor))
     .orderBy(...byNameThenId(hosts))
-    .limit(hostsPageSize + 1);
-  const { items, nextCursor } = splitPage(fetched, hostsPageSize);
+    .limit(opsListPageSize + 1);
+  const { items, nextCursor } = splitPage(fetched, opsListPageSize);
   const ids = items.map((host) => host.id);
 
   const [owners, acceptances, agreement] = await Promise.all([

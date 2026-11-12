@@ -51,6 +51,23 @@ export function parseStatusParam<Status extends string>(
   return pickKnown(parseStatusFilter(raw, options), statuses, null);
 }
 
+/**
+ * A list's status filter from its statuses and their words: the options its filter bar offers and
+ * the parser that reads the one the address names (null, every row, for none, a repeated one, or one
+ * the list does not have).
+ */
+export function statusFilter<Status extends string>(
+  statuses: readonly Status[],
+  labels: Readonly<Record<Status, string>>,
+) {
+  const options = statuses.map((value) => ({ value, label: labels[value] }));
+  return {
+    options,
+    parse: (raw: string | readonly string[] | undefined): Status | null =>
+      parseStatusParam(raw, statuses, options),
+  };
+}
+
 function chipLabel({ label, count }: { label: string; count?: number }) {
   return count === undefined ? label : `${label} (${String(count)})`;
 }

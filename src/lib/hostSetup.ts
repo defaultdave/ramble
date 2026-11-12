@@ -39,8 +39,6 @@ export const hostLimits = {
 /** The legal document a host accepts at onboarding; its content-rights terms are part of it. */
 export const hostAgreementDoc = 'host-agreement';
 
-export const hostsPageSize = 25;
-
 export const hostsPath = '/ops/hosts';
 export const newHostPath = '/ops/hosts/new';
 

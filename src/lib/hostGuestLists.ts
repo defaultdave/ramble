@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { countLabel } from './text';
 import { EntityIdSchema } from './catalog';
 import type { HostAccess } from './hostAccess';
 import {
@@ -139,18 +140,15 @@ export type HostGuestListView = {
   rows: readonly HostGuestRowView[];
 };
 
-const plural = (count: number, one: string, many: string) =>
-  `${String(count)} ${count === 1 ? one : many}`;
-
 function summaryFor(count: number, term: string): string {
   if (term === '') {
     return count === 0
       ? 'No bookings yet'
-      : `Latest ${plural(count, 'booking', 'bookings')}`;
+      : `Latest ${countLabel(count, 'booking')}`;
   }
   const quoted = `“${term}”`;
   if (count === 0) return `No bookings match ${quoted}`;
-  return `${plural(count, 'booking', 'bookings')} ${count === 1 ? 'matches' : 'match'} ${quoted}`;
+  return `${countLabel(count, 'booking')} ${count === 1 ? 'matches' : 'match'} ${quoted}`;
 }
 
 /** The rows the bookings page draws, never more than the limit, whatever the data layer returns. */
@@ -226,7 +224,7 @@ export function buildHostGuestList(data: HostGuestListData): HostGuestListView {
     hostName: session.hostName,
     experienceName: session.experienceName,
     whenLabel: whenLabel(session.startsAt, session.timeZone),
-    totalLabel: `${seatsLabel(seats)} across ${plural(data.bookings.length, 'booking', 'bookings')}`,
+    totalLabel: `${seatsLabel(seats)} across ${countLabel(data.bookings.length, 'booking')}`,
     rows:
       data.scope === 'owner'
         ? data.bookings.map((b) => guestRowView(session, b, b))

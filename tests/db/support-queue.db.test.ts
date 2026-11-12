@@ -10,7 +10,7 @@ import {
   vi,
 } from 'vitest';
 import { supportLimits } from '@/lib/support';
-import { supportQueuePageSize } from '@/lib/supportQueue';
+import { opsListPageSize as supportQueuePageSize } from '@/lib/tableQuery';
 import { ForbiddenError, Role, type Caller } from '@/server/auth/caller';
 import { testCaller } from '@/server/auth/test-caller';
 import { supportRequests } from '@/server/db/schema';

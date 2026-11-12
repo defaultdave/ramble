@@ -33,6 +33,7 @@ describe('opsLandingLinks', () => {
       '/ops/experiences',
       '/ops/support',
       '/ops/review',
+      '/ops/bookings',
     ]);
   });
 });

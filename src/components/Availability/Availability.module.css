@@ -1,0 +1,67 @@
+.stack {
+  composes: stack from '../HostSetup/HostSetup.module.css';
+}
+
+.section {
+  composes: section from '../HostSetup/HostSetup.module.css';
+}
+
+.heading {
+  composes: heading from '../HostSetup/HostSetup.module.css';
+}
+
+.list {
+  composes: list from '../HostSetup/HostSetup.module.css';
+}
+
+.row {
+  composes: row from '../HostSetup/HostSetup.module.css';
+}
+
+.muted {
+  composes: muted from '../HostSetup/HostSetup.module.css';
+}
+
+.form {
+  composes: form from '../HostSetup/HostSetup.module.css';
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+
+.legend {
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  font-size: var(--font-size-label);
+  line-height: var(--font-line-height-label);
+  font-weight: var(--font-weight-semibold);
+}
+
+.slotTitle {
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+}
+
+.seatsForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .seatsForm {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+
+  .form > button {
+    align-self: flex-start;
+  }
+}

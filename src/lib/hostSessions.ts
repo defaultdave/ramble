@@ -1,8 +1,8 @@
 import { CalendarDateTime, toZoned } from '@internationalized/date';
 import { z } from 'zod';
 import { EntityIdSchema } from './catalog';
+import { formWholeNumber as wholeNumber } from './opsForm';
 import { formatPrice, priceInputTextOrNull, priceMinorFromText } from './money';
-import { wholeNumberPattern } from './text';
 import {
   IsoDateSchema,
   TimeZoneSchema,
@@ -249,12 +249,6 @@ type Get = (field: string) => unknown;
 function text(get: Get, field: string): string {
   const value = get(field);
   return typeof value === 'string' ? value.trim() : '';
-}
-
-/** A whole number typed in a field, or undefined for anything else, so the schema names the field. */
-function wholeNumber(get: Get, field: string): number | undefined {
-  const value = text(get, field);
-  return wholeNumberPattern.test(value) ? Number(value) : undefined;
 }
 
 /** The values of the session forms as the schemas expect them: a field that is not a number is left undefined. */

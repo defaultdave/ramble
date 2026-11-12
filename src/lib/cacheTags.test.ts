@@ -47,6 +47,11 @@ describe('tagsForChanges for one change', () => {
       ['experience:e1'],
     ],
     [
+      'a new photo reaches the experience tag its cover is cached under',
+      { kind: 'photos', experienceId: 'e1' },
+      ['experience:e1'],
+    ],
+    [
       'a booking change reaches one session and nothing else',
       { kind: 'spaces', sessionId: 's1' },
       ['session:s1'],

@@ -110,13 +110,23 @@ export const CreateWithProblems: Story = {
 export const EditMobile: Story = {
   globals: mobile,
   render: () => (
-    <ExperienceEditView view={savedView} choices={choices} save={noop} />
+    <ExperienceEditView
+      view={savedView}
+      choices={choices}
+      save={noop}
+      addPhoto={noop}
+    />
   ),
 };
 export const EditDesktop: Story = {
   globals: desktop,
   render: () => (
-    <ExperienceEditView view={savedView} choices={choices} save={noop} />
+    <ExperienceEditView
+      view={savedView}
+      choices={choices}
+      save={noop}
+      addPhoto={noop}
+    />
   ),
 };
 export const EditWithProblems: Story = {
@@ -127,6 +137,7 @@ export const EditWithProblems: Story = {
       choices={choices}
       problems={['slug', 'minAge', 'weatherPolicy', 'childPrice']}
       save={noop}
+      addPhoto={noop}
     />
   ),
 };
@@ -142,6 +153,7 @@ export const EditGuideOnly: Story = {
       choices={choices}
       problems={['linkOutUrl']}
       save={noop}
+      addPhoto={noop}
     />
   ),
 };

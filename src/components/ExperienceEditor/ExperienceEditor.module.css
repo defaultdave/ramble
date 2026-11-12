@@ -52,6 +52,36 @@
   max-width: 40rem;
 }
 
+.section {
+  composes: section from '../HostSetup/HostSetup.module.css';
+}
+
+.heading {
+  composes: heading from '../HostSetup/HostSetup.module.css';
+}
+
+.list {
+  composes: list from '../HostSetup/HostSetup.module.css';
+}
+
+.photoRow {
+  composes: row from '../HostSetup/HostSetup.module.css';
+}
+
+.photoText {
+  composes: muted;
+}
+
+/* The frame holds the photo's shape so nothing moves when it loads. */
+.thumb {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  max-width: 12rem;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-sunken);
+}
+
 .cellLink {
   composes: cellLink from '../HostSetup/HostSetup.module.css';
 }

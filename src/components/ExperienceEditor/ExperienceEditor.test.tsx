@@ -150,7 +150,12 @@ describe('ExperienceForm, editing', () => {
 describe('ExperienceEditView', () => {
   it('shows the status in words and the host, above the form', () => {
     render(
-      <ExperienceEditView view={savedView} choices={choices} save={noop} />,
+      <ExperienceEditView
+        view={savedView}
+        choices={choices}
+        save={noop}
+        addPhoto={noop}
+      />,
     );
 
     expect(screen.getByText('Live')).toBeInTheDocument();
@@ -164,6 +169,7 @@ describe('ExperienceEditView', () => {
         view={{ ...savedView, status: 'guide_only' }}
         choices={choices}
         save={noop}
+        addPhoto={noop}
       />,
     );
 

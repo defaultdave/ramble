@@ -2,7 +2,8 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 import { and, asc, eq, getTableColumns, inArray, sql } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
-import { EntityIdSchema } from '@/lib/catalog';
+import { EntityIdSchema, isGuestVisible } from '@/lib/catalog';
+import { photoAddedEntry } from '@/lib/experienceAudit';
 import { CoverLookupSchema, photoView, type PhotoView } from '@/lib/photoViews';
 import {
   GuestPhotoSchema,
@@ -20,15 +21,16 @@ import {
   requireRole,
   type Caller,
 } from '@/server/auth/caller';
+import { updateTagsForChanges } from '@/server/cache/invalidate';
 import { logger } from '@/server/monitoring/logger';
 import { ingestPhoto } from '@/server/photos/ingest';
 import { storeIngestedPhoto } from '@/server/photos/store';
 import type { StoragePort } from '@/server/ports/storage';
+import { writeAudit } from './audit';
 import { guestVisible } from './catalog';
 import { db, dbRead } from './client';
 import { experiences, photos } from './schema';
 
-// TODO(U-074b): first caller
 export class ExperienceNotFoundError extends Error {
   constructor() {
     super('No experience with that ID');
@@ -36,7 +38,6 @@ export class ExperienceNotFoundError extends Error {
   }
 }
 
-// TODO(U-074b): first caller
 export class PhotoLimitError extends Error {
   constructor() {
     super('The experience already holds the most photos it can');
@@ -68,6 +69,12 @@ export const coverWith = {
   ) as Record<keyof GuestPhoto, true>,
   orderBy: coverOrder,
   limit: 1,
+};
+
+/** Every photo of an experience in gallery order, as a relational `with` entry: the cover's columns, up to the most an experience holds. */
+export const galleryWith = {
+  ...coverWith,
+  limit: photoLimits.maxPerExperience,
 };
 
 /**
@@ -124,13 +131,14 @@ function attachSuppressed(primary: unknown, suppressed: PhotoCleanupError) {
   });
 }
 
-// TODO(U-074b): first caller
 /**
  * Checks, re-encodes, stores, and records one photo, as the last in the experience's gallery. The
  * upload is bounded before it is decoded (`ingestPhoto`), the stored copy carries no location data,
  * and alt text or the decorative flag plus the rights record are required. The file is stored first and the
- * row second, in a transaction that holds the experience row so two uploads cannot take one position;
- * if the row cannot be written the file is removed again.
+ * row second, in a transaction that holds the experience row so two uploads cannot take one position
+ * and that also holds the audit row; if the row cannot be written the file is removed again. After
+ * the commit, a photo added to an experience guests can see invalidates its cache tag, so this
+ * runs in a Server Action only.
  */
 export async function addPhoto(
   caller: Caller,
@@ -144,7 +152,11 @@ export async function addPhoto(
   const actor = photoActorFor(caller.roles);
   if (!actor) throw new ForbiddenError(Role.HostOwner);
   const [experience] = await db
-    .select({ id: experiences.id, hostId: experiences.hostId })
+    .select({
+      id: experiences.id,
+      hostId: experiences.hostId,
+      status: experiences.status,
+    })
     .from(experiences)
     .where(eq(experiences.id, photo.experienceId));
   const access = photoAccessFor(actor, experience?.hostId ?? null);
@@ -160,6 +172,9 @@ export async function addPhoto(
       requireRole(caller, Role.HostOwner, { hostId: access.hostId });
       break;
   }
+  // Every photo is audited under the user who added it; a caller with no user is refused.
+  if (caller.userId === null) throw new ForbiddenError(Role.HostOwner);
+  const userId = caller.userId;
 
   // A full gallery is refused before any pixel is decoded; the transaction below decides for certain.
   if (nextPhotoPosition(await takenPositions(photo.experienceId)) === null) {
@@ -206,6 +221,15 @@ export async function addPhoto(
         })
         .returning(photoColumns);
       if (!inserted) throw new Error('The photo row was not returned');
+      await writeAudit(
+        tx,
+        photoAddedEntry(userId, photo.experienceId, {
+          photoId: id,
+          position,
+          decorative: photo.description.decorative,
+          rightsBasis: photo.rights.basis,
+        }),
+      );
       return inserted;
     });
   } catch (error) {
@@ -222,6 +246,11 @@ export async function addPhoto(
     throw error;
   }
   // Outside the try: the row is stored by now, so a failure here must not delete the file it points at.
+  if (experience && isGuestVisible(experience.status)) {
+    updateTagsForChanges([
+      { kind: 'photos', experienceId: photo.experienceId },
+    ]);
+  }
   return GuestPhotoSchema.parse(row);
 }
 

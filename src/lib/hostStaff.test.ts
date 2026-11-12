@@ -60,9 +60,11 @@ describe('hostStaffResult', () => {
 });
 
 describe('hostNavLinks', () => {
-  it('links an owner to the sessions to manage and the staff page', () => {
+  it('links an owner to the sessions, their experiences, settings and the staff page', () => {
     expect(hostNavLinks(true)).toEqual([
       { label: 'Manage sessions', href: '/host/sessions' },
+      { label: 'Your experiences', href: '/host/experiences' },
+      { label: 'Host settings', href: '/host/settings' },
       { label: 'Staff', href: '/host/staff' },
     ]);
   });

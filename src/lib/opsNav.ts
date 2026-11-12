@@ -17,6 +17,11 @@ export const opsNavLinks: readonly OpsNavLink[] = [
     summary:
       'Read the email captured on this deployment, including sign-in links.',
   },
+  {
+    label: 'Hosts',
+    href: '/ops/hosts',
+    summary: 'Set up hosts, invite their owners, and record the agreement.',
+  },
 ];
 
 /** The areas the landing page lists: every link but the landing page itself. */

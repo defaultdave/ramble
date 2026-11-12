@@ -1,7 +1,14 @@
 import 'server-only';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { EntityIdSchema } from '@/lib/catalog';
 import { editorialLimits } from '@/lib/editorial';
+import { hostAgreementAcceptedEntry } from '@/lib/hostAudit';
+import {
+  decideHostAcceptance,
+  hostAgreementDoc,
+  type HostAcceptanceOutcome,
+  type HostAcceptanceRecord,
+} from '@/lib/hostSetup';
 import { isHoldOfDevice } from '@/lib/holds';
 import {
   OrderAcceptancesInputSchema,
@@ -17,15 +24,20 @@ import {
   type LegalDraftEdit,
   type LegalDraftInput,
 } from '@/lib/legal';
-import type { Caller } from '@/server/auth/caller';
+import { requireRole, Role, type Caller } from '@/server/auth/caller';
 import { updateTagsForChanges } from '@/server/cache/invalidate';
 import type { Device } from '@/server/device';
 import { db, dbRead, type Transaction } from './client';
+import { requireOpsUserId, writeAudit } from './audit';
 import { lockFor } from './locks';
-import { holds, legalAcceptances, legalDocuments, orders } from './schema';
+import {
+  holds,
+  hosts,
+  legalAcceptances,
+  legalDocuments,
+  orders,
+} from './schema';
 import { requireStaff } from './staff';
-
-// TODO(U-074a): record the host agreement acceptance at onboarding.
 
 /** The highest published version of a document. Null when the key is malformed or nothing is published. */
 export async function getCurrentLegalDocument(
@@ -248,4 +260,111 @@ export async function recordOrderAcceptances(
     .onConflictDoNothing()
     .returning({ id: legalAcceptances.id });
   return { status: 'recorded', recorded: rows.length };
+}
+
+/** The highest published host agreement, read in the caller's transaction so the decision and the write see one version. */
+async function currentHostAgreementIn(tx: Transaction) {
+  const [row] = await tx
+    .select({ id: legalDocuments.id, version: legalDocuments.version })
+    .from(legalDocuments)
+    .where(
+      and(
+        eq(legalDocuments.doc, hostAgreementDoc),
+        eq(legalDocuments.status, 'published'),
+      ),
+    )
+    .orderBy(desc(legalDocuments.version))
+    .limit(1);
+  return row ?? null;
+}
+
+/**
+ * Records, for ops, that a host accepted the agreement version they were shown (agreement and
+ * content rights are one document), inside the caller's open transaction. Only the current
+ * version can be accepted: a version published since is `stale`, and accepting the current one
+ * again is `already_accepted`; neither writes. The audit row is written with the acceptance.
+ */
+export async function recordHostAcceptanceIn(
+  tx: Transaction,
+  caller: Caller,
+  hostId: string,
+  submittedId: string | null,
+): Promise<HostAcceptanceOutcome> {
+  const userId = requireOpsUserId(caller);
+  const current = await currentHostAgreementIn(tx);
+  const accepted = await tx
+    .select({ legalDocumentId: legalAcceptances.legalDocumentId })
+    .from(legalAcceptances)
+    .where(
+      and(
+        eq(legalAcceptances.subjectKind, 'host'),
+        eq(legalAcceptances.subjectId, hostId),
+      ),
+    )
+    .limit(editorialLimits.listed);
+  const outcome = decideHostAcceptance({
+    currentId: current?.id ?? null,
+    submittedId,
+    acceptedIds: accepted.map((row) => row.legalDocumentId),
+  });
+  if (outcome !== 'recorded' || current === null) return outcome;
+  const rows = await tx
+    .insert(legalAcceptances)
+    .values({
+      legalDocumentId: current.id,
+      subjectKind: 'host',
+      subjectId: hostId,
+    })
+    .onConflictDoNothing()
+    .returning({ id: legalAcceptances.id });
+  // A second tab that accepted between the read and the write wins; the unique index says so.
+  if (rows.length === 0) return 'already_accepted';
+  await writeAudit(tx, hostAgreementAcceptedEntry(userId, hostId, current.id));
+  return 'recorded';
+}
+
+/** Ops records the acceptance for a host on its own. `not_found` for an id that is no host. */
+export async function recordHostAcceptance(
+  caller: Caller,
+  hostId: string,
+  submittedId: string | null,
+): Promise<HostAcceptanceOutcome | 'not_found'> {
+  requireRole(caller, Role.Ops, {});
+  return db.transaction(async (tx) => {
+    const [host] = await tx
+      .select({ id: hosts.id })
+      .from(hosts)
+      .where(eq(hosts.id, hostId));
+    if (!host) return 'not_found';
+    return recordHostAcceptanceIn(tx, caller, hostId, submittedId);
+  });
+}
+
+/** The acceptances recorded for these hosts, newest first, with the version each was against. At most the listed limit per call. */
+export async function readHostAcceptances(
+  caller: Caller,
+  hostIds: readonly string[],
+): Promise<(HostAcceptanceRecord & { hostId: string })[]> {
+  requireRole(caller, Role.Ops, {});
+  if (hostIds.length === 0) return [];
+  return dbRead
+    .select({
+      hostId: legalAcceptances.subjectId,
+      legalDocumentId: legalAcceptances.legalDocumentId,
+      version: legalDocuments.version,
+      acceptedAt: legalAcceptances.acceptedAt,
+    })
+    .from(legalAcceptances)
+    .innerJoin(
+      legalDocuments,
+      eq(legalDocuments.id, legalAcceptances.legalDocumentId),
+    )
+    .where(
+      and(
+        eq(legalAcceptances.subjectKind, 'host'),
+        inArray(legalAcceptances.subjectId, [...hostIds]),
+      ),
+    )
+    .orderBy(desc(legalAcceptances.acceptedAt), desc(legalAcceptances.id))
+    .limit(editorialLimits.listed);
 }

@@ -10,6 +10,7 @@ import {
   bookingSubjects,
   confirmationAttachments,
 } from './bookingTemplates';
+import { HostInviteDataSchema, hostInviteSubject } from './hostInvite';
 import { IdempotencyKeySchema, type EmailAttachment } from './message';
 import { OpsNoticeDataSchema, opsNoticeSubject } from './opsNotice';
 
@@ -28,6 +29,7 @@ const templateSchemas = {
   'booking-refund': BookingRefundDataSchema,
   'paid-after-lapse': PaidAfterLapseDataSchema,
   'ops-notice': OpsNoticeDataSchema,
+  'host-invite': HostInviteDataSchema,
   'sign-in-link': z.object({
     url: z.url({ protocol: /^https?$/ }).max(2048),
     expiresInMinutes: z.int().min(1).max(60),
@@ -54,6 +56,7 @@ const subjects: {
   'booking-refund': bookingSubjects.bookingRefund,
   'paid-after-lapse': bookingSubjects.paidAfterLapse,
   'ops-notice': opsNoticeSubject,
+  'host-invite': hostInviteSubject,
   'sign-in-link': () => 'Your Ramble sign-in link',
 };
 
@@ -71,6 +74,7 @@ const attachments: {
   'booking-refund': () => [],
   'paid-after-lapse': () => [],
   'ops-notice': () => [],
+  'host-invite': () => [],
   'sign-in-link': () => [],
 };
 

@@ -185,7 +185,7 @@ describe('categories and neighborhoods', () => {
 });
 
 describe('slug history', () => {
-  // Category and neighborhood slugs are unique while live; experience and host slugs repeat.
+  // Category and neighborhood slugs are unique while live; experience slugs repeat. Hosts are unique too but listed here.
   const uniqueKinds = [
     {
       kind: 'category',
@@ -274,6 +274,7 @@ describe('slug history', () => {
   });
 
   describe.each(repeatingKinds)('$kind', ({ kind, insert, rename }) => {
+    const sharing = kind === 'host' ? it.skip : it; // host slugs are unique, so none are shared
     it('resolves a retired slug to its entity', async () => {
       const old = unique('old');
       const id = await insert(old);
@@ -286,7 +287,7 @@ describe('slug history', () => {
       });
     });
 
-    it('keeps each entity’s own history when two retire the same slug', async () => {
+    sharing('keeps each entity’s own history for a shared slug', async () => {
       const shared = unique('shared');
       const first = await insert(shared);
       const second = await insert(shared);
@@ -329,7 +330,7 @@ describe('slug history', () => {
       });
     });
 
-    it('drops a retired slug only when the same entity takes it back', async () => {
+    sharing('keeps another’s retired slug on a take-back', async () => {
       const shared = unique('shared');
       const first = await insert(shared);
       const second = await insert(shared);

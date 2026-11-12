@@ -51,7 +51,7 @@ export function parseSort(
   };
 }
 
-/** TODO(U-073): first caller. The one cursor the address names; absent, repeated, or not a row id is null, so the read starts at the first page. */
+/** The one cursor the address names; absent, repeated, or not a row id is null, so the read starts at the first page. */
 export function parseCursor(
   raw: string | readonly string[] | undefined,
 ): string | null {

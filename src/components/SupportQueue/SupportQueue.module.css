@@ -1,0 +1,32 @@
+.stack {
+  composes: stack from '../HostSetup/HostSetup.module.css';
+}
+
+.muted {
+  composes: muted from '../HostSetup/HostSetup.module.css';
+}
+
+.stacked {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  overflow-wrap: anywhere;
+}
+
+.message {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.resolveForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 14rem;
+}
+
+@media (min-width: 768px) {
+  .resolveForm > button {
+    align-self: flex-start;
+  }
+}

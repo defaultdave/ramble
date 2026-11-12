@@ -1,22 +1,47 @@
 import 'server-only';
-import { asc, sql, type SQL } from 'drizzle-orm';
+import { asc, desc, sql, type SQL } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 
-// The ordering the ops lists page by: name, then id, so the order is total and a page ends where
-// the next begins. The cursor is the id of the last row shown.
+// The orderings the ops lists page by: one column, then id, so the order is total and a page ends
+// where the next begins. The cursor is the id of the last row shown.
 
-type NamedTable = PgTable & { name: PgColumn; id: PgColumn };
+type KeyedTable = PgTable & { id: PgColumn };
+type NamedTable = KeyedTable & { name: PgColumn };
 
-/** The `ORDER BY` of a list paged by name. */
-export function byNameThenId(table: NamedTable) {
-  return [asc(table.name), asc(table.id)];
+export type KeysetDirection = 'asc' | 'desc';
+
+/** The `ORDER BY` of a list paged by `column` in `direction`, ties broken by id in the same direction. */
+export function byColumnThenId(
+  table: KeyedTable,
+  column: PgColumn,
+  direction: KeysetDirection,
+) {
+  const order = direction === 'asc' ? asc : desc;
+  return [order(column), order(table.id)];
 }
 
 /** Every row past the cursor in that order, or no condition for the first page. */
+export function pastKeysetCursor(
+  table: KeyedTable,
+  column: PgColumn,
+  direction: KeysetDirection,
+  cursor: string | null,
+): SQL | undefined {
+  if (cursor === null) return undefined;
+  const past = direction === 'asc' ? sql`>` : sql`<`;
+  // The subquery's own table shadows the outer one, so its qualified columns read the cursor's row.
+  return sql`(${column}, ${table.id}) ${past} (SELECT ${column}, ${table.id} FROM ${table} WHERE ${table.id} = ${cursor})`;
+}
+
+/** The `ORDER BY` of a list paged by name. */
+export function byNameThenId(table: NamedTable) {
+  return byColumnThenId(table, table.name, 'asc');
+}
+
+/** Every row past the cursor in name order, or no condition for the first page. */
 export function pastNameCursor(
   table: NamedTable,
   cursor: string | null,
 ): SQL | undefined {
-  if (cursor === null) return undefined;
-  return sql`(${table.name}, ${table.id}) > (SELECT c.name, c.id FROM ${table} c WHERE c.id = ${cursor})`;
+  return pastKeysetCursor(table, table.name, 'asc', cursor);
 }

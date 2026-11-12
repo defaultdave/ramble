@@ -30,6 +30,10 @@ export const supportTopicLabels = {
 export const supportLimits = {
   nameMaxChars: 120,
   messageMaxChars: 2000,
+  /** The note ops write when marking a request resolved. */
+  resolutionNoteMaxChars: 500,
+  /** A resolve-form field longer than this is refused unread, so no rule walks an unbounded string. */
+  rawField: 2000,
 } as const;
 
 /** The form's field names, which are also the keys of the field errors. */

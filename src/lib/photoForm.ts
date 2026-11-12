@@ -3,6 +3,7 @@ import {
   experienceNotices,
   labelledOptions,
 } from './experienceEditor';
+import { pauseNoticeOf } from './experiencePause';
 import {
   formHas,
   fieldsFromIssues,
@@ -193,7 +194,7 @@ export const photoNotices = {
   ) as Record<ReturnType<typeof photoRefusalNotice>, NoticeText>),
 } as const satisfies Record<PhotoNoticeCode, NoticeText>;
 
-/** What the experience page shows for its address: the notice of the last save or photo upload, and why a refused file was refused. */
+/** What the experience page shows for its address: the notice of the last save, photo upload, pause or unpause, and why a refused file was refused. */
 export function experiencePageNotice(
   raw: string | readonly string[] | undefined,
 ): {
@@ -204,7 +205,8 @@ export function experiencePageNotice(
   return {
     notice:
       noticeText(experienceNotices, parseNotice(raw, experienceNoticeCodes)) ??
-      noticeText(photoNotices, photoNotice),
+      noticeText(photoNotices, photoNotice) ??
+      pauseNoticeOf(raw),
     photoRefusal: photoRefusalOf(photoNotice),
   };
 }

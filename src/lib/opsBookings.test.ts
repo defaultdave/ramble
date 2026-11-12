@@ -6,7 +6,7 @@ import {
   bookingsListEntry,
   bookingViewedEntry,
   buildOpsBookingDetail,
-  buildOpsBookingRows,
+  buildOpsBookingRow,
   cancelNoticeCode,
   confirmationResentEntry,
   linksVoidedEntry,
@@ -29,7 +29,9 @@ import {
 // Behaviours under test:
 // - the search reads an address (any case) or a booking reference (any case) and refuses every other term; it never matches loosely
 // - the filter reads only the refund-failed queue
-// - a row shows the session on its own clock, the total in dollars, and a dash for a missing name
+// - a row shows the session on its own clock, the total in dollars, a dash for a missing name, and a flag when its refund failed
+// - each canceller is worded
+// - a count of bookings is singular for one
 // - an ops refund goes only for a cancelled booking with no failed refund to retry instead
 // - the detail offers cancel with the refund the tier gives, refund, retry, and resend only when each can go
 // - the history lists the order's own dates and what ops did, oldest first, and leaves out reads
@@ -114,15 +116,43 @@ describe('parseBookingFilter', () => {
   });
 });
 
-describe('buildOpsBookingRows', () => {
+describe('buildOpsBookingRow', () => {
   it('shows the session on its own clock, the total in dollars, and a dash for a missing name', () => {
-    const [row] = buildOpsBookingRows([{ ...booking, leadGuestName: null }]);
-    expect(row).toMatchObject({
+    expect(
+      buildOpsBookingRow({ ...booking, leadGuestName: null }),
+    ).toMatchObject({
       guestName: '—',
       totalLabel: '$108.00',
       whenLabel: 'Sat, Nov 14 · 2:00 PM EST',
       href: `/ops/bookings/${orderId}`,
+      refundFailedBadge: null,
     });
+  });
+
+  it('flags a booking whose refund failed', () => {
+    expect(
+      buildOpsBookingRow({ ...booking, refundFailed: true }).refundFailedBadge,
+    ).toEqual({ tone: 'danger', label: 'Refund failed' });
+  });
+});
+
+describe('who cancelled', () => {
+  it.each([
+    ['guest', 'Cancelled by guest'],
+    ['host', 'Cancelled by host'],
+    ['weather', 'Cancelled for weather'],
+    ['ramble', 'Cancelled by Ramble'],
+    [null, 'Cancelled'],
+  ] as const)('words %s as %s', (cancelledBy, label) => {
+    const detail = detailOf({
+      booking: {
+        ...booking,
+        status: 'cancelled',
+        cancelledBy,
+        cancelledAt: new Date('2026-11-10T16:00:00Z'),
+      },
+    });
+    expect(detail.events.at(-1)?.label).toBe(label);
   });
 });
 

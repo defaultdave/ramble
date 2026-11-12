@@ -7,6 +7,7 @@ import {
   opsAccessEntry,
   opsAreaIds,
   opsAreaListEntry,
+  opsViewEntry,
 } from './opsAudit';
 
 // Behaviours under test:
@@ -91,6 +92,21 @@ describe('mailboxUnlockEntry', () => {
       subjectKind: 'mailbox',
       subjectId: opsAreaIds.mailbox,
       details: { via: 'secret' },
+    });
+  });
+});
+
+describe('opsViewEntry', () => {
+  it('names the ops user, the kind of record, and its id, with no details', () => {
+    expect(
+      parseAuditEntry(opsViewEntry(userId, 'host.viewed', 'host', userId)),
+    ).toEqual({
+      actorKind: 'user',
+      actorId: userId,
+      action: 'host.viewed',
+      subjectKind: 'host',
+      subjectId: userId,
+      details: {},
     });
   });
 });

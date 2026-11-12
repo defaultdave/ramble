@@ -83,9 +83,9 @@ export function OpsBookingsList({
             tone={orderStatusTones[row.status]}
             label={orderStatusLabels[row.status]}
           />
-          {row.refundFailed ? (
+          {row.refundFailedBadge === null ? null : (
             <>
-              <StatusBadge tone="danger" label="Refund failed" />
+              <StatusBadge {...row.refundFailedBadge} />
               <form action={retryRefund}>
                 <input type="hidden" name="orderId" value={row.id} />
                 <Button type="submit" variant="secondary">
@@ -93,7 +93,7 @@ export function OpsBookingsList({
                 </Button>
               </form>
             </>
-          ) : null}
+          )}
         </span>
       ),
     },

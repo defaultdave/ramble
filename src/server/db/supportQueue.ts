@@ -1,10 +1,10 @@
 import 'server-only';
 import { and, eq, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import { splitPage } from '@/lib/pagination';
+import { opsListPageSize } from '@/lib/tableQuery';
 import {
   buildSupportQueueRows,
   supportListEntry,
-  supportQueuePageSize,
   supportResolvedEntry,
   supportResolveOutcome,
   type SupportResolveInput,
@@ -53,8 +53,8 @@ export async function readSupportQueue(
     .orderBy(
       ...byColumnThenId(supportRequests, supportRequests.createdAt, 'desc'),
     )
-    .limit(supportQueuePageSize + 1);
-  const { items, nextCursor } = splitPage(fetched, supportQueuePageSize);
+    .limit(opsListPageSize + 1);
+  const { items, nextCursor } = splitPage(fetched, opsListPageSize);
   await recordAudit(supportListEntry(userId));
   return { rows: buildSupportQueueRows(items), nextCursor };
 }

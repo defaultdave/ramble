@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   afterAll,
   beforeAll,
@@ -146,6 +146,49 @@ describe('reading the bookings', () => {
     );
     expect(await ids('second@example.com')).toEqual([second.orderId]);
     expect(await ids(await contactOf(stranger))).toContain(stranger.orderId);
+    expect(await ids(guestEmail)).not.toContain(stranger.orderId);
+  });
+
+  it('pages past the first 25 with one next cursor, and a tie in the creation time shows every booking once', async () => {
+    for (let n = 0; n < 26; n += 1) await seedCancellable();
+    await client.db
+      .update(schema.orders)
+      .set({ createdAt: new Date('2026-11-01T12:00:00Z') });
+    const read = (cursor: string | null) =>
+      data.readOpsBookings(ops, {
+        search: { kind: 'none' },
+        filter: null,
+        cursor,
+      });
+
+    const first = await read(null);
+    expect(first.rows).toHaveLength(25);
+    expect(first.nextCursor).toBe(first.rows.at(-1)?.id);
+
+    const all = [...first.rows];
+    for (
+      let cursor = first.nextCursor;
+      cursor !== null;
+      cursor = (await read(cursor)).nextCursor
+    ) {
+      all.push(...(await read(cursor)).rows);
+    }
+    const [counted] = await client.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.orders)
+      .where(eq(schema.orders.kind, 'booking'));
+    expect(all).toHaveLength(counted?.count ?? 0);
+    expect(new Set(all.map((row) => row.id)).size).toBe(all.length);
+  });
+
+  it('refuses a cursor that is not an id before it reaches the query', async () => {
+    await expect(
+      data.readOpsBookings(ops, {
+        search: { kind: 'none' },
+        filter: null,
+        cursor: 'not-an-id',
+      }),
+    ).rejects.toThrow();
   });
 
   it('finds nothing for a term that is neither, and still records the read', async () => {
@@ -177,7 +220,9 @@ describe('reading the bookings', () => {
     });
     expect(queue.rows.map((row) => row.id)).toContain(flagged.orderId);
     expect(queue.rows.map((row) => row.id)).not.toContain(other.orderId);
-    expect(queue.rows.every((row) => row.refundFailed)).toBe(true);
+    expect(queue.rows.every((row) => row.refundFailedBadge !== null)).toBe(
+      true,
+    );
 
     const all = await data.readOpsBookings(ops, {
       search: { kind: 'none' },
@@ -191,7 +236,9 @@ describe('reading the bookings', () => {
       cursor: first?.id ?? null,
     });
     expect(next.rows.map((row) => row.id)).not.toContain(first?.id);
-    expect(next.rows).toHaveLength(all.rows.length - 1);
+    expect(
+      next.rows.slice(0, all.rows.length - 1).map((row) => row.id),
+    ).toEqual(all.rows.slice(1).map((row) => row.id));
   });
 
   it('shows a booking with its refunds, and records the read', async () => {

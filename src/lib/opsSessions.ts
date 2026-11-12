@@ -3,6 +3,7 @@ import {
   type CancelSessionResult,
   type SessionCancelReason,
 } from './cancelSession';
+import { WriteIdSchema } from './catalog';
 import { hostSessionProblemMessages } from './hostSessions';
 import { isOpenHold, openHeldSeats, type HoldTimes } from './holds';
 import { formatMoney } from './money';
@@ -31,6 +32,12 @@ import { zonedDeadlineLabel } from './zonedLabels';
 
 export const opsSessionsPath = '/ops/sessions';
 export const opsSessionsPageSize = 25;
+
+/** The list cursor an address carries, lower-cased; none, or one that is no id (a hand-edited address), starts again from the first page. */
+export function cursorFrom(raw: string | null | undefined): string | null {
+  const parsed = WriteIdSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
 
 export function opsSessionPath(sessionId: string): string {
   return `${opsSessionsPath}/${sessionId}`;

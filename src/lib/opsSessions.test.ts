@@ -6,6 +6,7 @@ import {
   cancelBlocked,
   cancelGate,
   cancelOutcomeNotice,
+  cursorFrom,
   impactIsCurrent,
   impactOrders,
   impactView,
@@ -23,6 +24,7 @@ import {
 import { sessionsListEntry, sessionViewedEntry } from './sessionAudit';
 
 // Behaviours under test, one per decision, branch, or risk:
+// - a list cursor is kept when it is an id and is otherwise the first page
 // - the filter reads one known value; none, a repeated one, or an unknown one is every session
 // - upcoming sessions list soonest first, the rest latest first
 // - a row shows the start in the session's own zone, the seats, and the status in words
@@ -72,6 +74,22 @@ const hold = (over: Record<string, unknown> = {}) => ({
 
 const form = (fields: Record<string, unknown>) => (name: string) =>
   fields[name] ?? null;
+
+describe('cursorFrom', () => {
+  it('keeps a valid id, lower-cased', () => {
+    expect(cursorFrom(sessionId)).toBe(sessionId);
+    expect(cursorFrom(sessionId.toUpperCase())).toBe(sessionId);
+  });
+
+  it.each([
+    ['text that is no id', 'not-an-id'],
+    ['an empty string', ''],
+    ['none', null],
+    ['undefined', undefined],
+  ])('starts again from the first page for %s', (_name, raw) => {
+    expect(cursorFrom(raw)).toBeNull();
+  });
+});
 
 describe('parseSessionWhen and sessionListDirection', () => {
   it.each([

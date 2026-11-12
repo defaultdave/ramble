@@ -9,7 +9,7 @@ import {
   PhotoLimitError,
   addPhoto,
 } from '@/server/db/photos';
-import { experienceIdOrLeave, opsCallerOrLeave } from '@/server/opsAccess';
+import { idOrLeave, opsCallerOrLeave } from '@/server/opsAccess';
 import { PhotoRefusedError } from '@/server/photos/ingest';
 import { systemClock } from '@/server/ports/clock';
 import { getStorage } from '@/server/ports/storage/config';
@@ -19,7 +19,7 @@ export async function addExperiencePhotoAction(
   formData: FormData,
 ): Promise<void> {
   const caller = await opsCallerOrLeave(experiencesPath);
-  const experienceId = experienceIdOrLeave(formData);
+  const experienceId = idOrLeave(formData, 'experienceId', experiencesPath);
   const here = experiencePath(experienceId);
   const parsed = parsePhotoForm((name) => formData.get(name), experienceId);
   if (parsed.status === 'invalid') {

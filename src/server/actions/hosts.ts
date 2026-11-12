@@ -14,13 +14,10 @@ import { noticeHref, parseIdField } from '@/lib/opsForm';
 import { createHost, updateHost } from '@/server/db/hostSetup';
 import { recordHostAcceptance } from '@/server/db/legal';
 import { inviteHostOwner } from '@/server/hostInvite';
-import { opsCallerOrLeave } from '@/server/opsAccess';
+import { idOrLeave, opsCallerOrLeave } from '@/server/opsAccess';
 
-function hostIdOrLeave(formData: FormData): string {
-  const hostId = parseIdField(formData.get('hostId'));
-  if (hostId === null) redirect(hostsPath);
-  return hostId;
-}
+const hostIdOrLeave = (formData: FormData) =>
+  idOrLeave(formData, 'hostId', hostsPath);
 
 export async function createHostAction(formData: FormData): Promise<void> {
   const caller = await opsCallerOrLeave(hostsPath);

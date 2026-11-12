@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { EntityIdSchema, httpUrlPattern } from './catalog';
 import { coverLookupLimit } from './idLookup';
-import { maxObjectBytes } from './storage';
+import { allowedContentTypes, maxObjectBytes } from './storage';
 
 /**
  * Every bound on a photo in one place. The input bounds are checked before any pixel is decoded;
@@ -35,9 +35,7 @@ const acceptedPhotoFormats = ['jpeg', 'png', 'webp'] as const;
 type AcceptedPhotoFormat = (typeof acceptedPhotoFormats)[number];
 
 /** The content types of the accepted formats, as a file input's `accept` value. */
-export const acceptedPhotoTypes = acceptedPhotoFormats
-  .map((format) => `image/${format}`)
-  .join(',');
+export const acceptedPhotoTypes = allowedContentTypes.public.join(',');
 
 export const storedPhotoContentType = 'image/jpeg';
 

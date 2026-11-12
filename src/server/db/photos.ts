@@ -160,6 +160,7 @@ export async function addPhoto(
     .from(experiences)
     .where(eq(experiences.id, photo.experienceId));
   const access = photoAccessFor(actor, experience?.hostId ?? null);
+  let checkedRole: Role;
   switch (access.outcome) {
     case 'experience_missing':
       throw new ExperienceNotFoundError();
@@ -167,13 +168,15 @@ export async function addPhoto(
       throw new ForbiddenError(Role.HostOwner);
     case 'staff':
       requireRole(caller, access.role, {});
+      checkedRole = access.role;
       break;
     case 'host_owner':
       requireRole(caller, Role.HostOwner, { hostId: access.hostId });
+      checkedRole = Role.HostOwner;
       break;
   }
   // Every photo is audited under the user who added it; a caller with no user is refused.
-  const userId = requireUserId(caller, Role.HostOwner);
+  const userId = requireUserId(caller, checkedRole);
 
   // A full gallery is refused before any pixel is decoded; the transaction below decides for certain.
   if (nextPhotoPosition(await takenPositions(photo.experienceId)) === null) {

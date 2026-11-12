@@ -79,6 +79,13 @@
   border-radius: var(--radius-sm);
 }
 
+/* The guide frame turns 16:9 from tablet up; a thumbnail stays 4:3. Two classes, so this wins whichever module's CSS loads last. */
+@media (min-width: 768px) {
+  .photoRow .thumb {
+    aspect-ratio: 4 / 3;
+  }
+}
+
 .cellLink {
   composes: cellLink from '../HostSetup/HostSetup.module.css';
 }

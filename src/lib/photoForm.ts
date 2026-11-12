@@ -5,6 +5,7 @@ import {
 } from './experienceEditor';
 import {
   formHas,
+  fieldsFromIssues,
   formText,
   noticeText,
   parseNotice,
@@ -23,6 +24,7 @@ import {
   type GuestPhoto,
   type PhotoRefusalCode,
 } from './photos';
+import { pickKnown } from './pickKnown';
 
 // The photo upload on the ops experience page: reading the posted form, the sentences for a
 // refused field, and the notices the action sends back. One photo is posted at a time, with its own
@@ -53,15 +55,14 @@ const rightsFields = {
   sourceUrl: 'rightsSourceUrl',
 } as const;
 
-function isRightsKey(key: unknown): key is keyof typeof rightsFields {
-  return typeof key === 'string' && key in rightsFields;
-}
+const rightsKeys = Object.keys(rightsFields) as (keyof typeof rightsFields)[];
 
 /** The form field a rule on a photo's input belongs to: alt text for anything about the description, and a rights field by its name. */
 function fieldOfIssue(path: readonly PropertyKey[]): PhotoFormField | null {
   if (path[0] === 'description') return 'altText';
   if (path[0] !== 'rights') return null;
-  return isRightsKey(path[1]) ? rightsFields[path[1]] : 'rightsBasis';
+  const key = pickKnown(String(path[1]), rightsKeys, null);
+  return key === null ? 'rightsBasis' : rightsFields[key];
 }
 
 export type PhotoFormResult =
@@ -101,9 +102,12 @@ export function parsePhotoForm(
   const failed = new Set<PhotoFormField>(oversized);
   if (file === null) failed.add('photoFile');
   if (!parsed.success) {
-    for (const issue of parsed.error.issues) {
-      const field = fieldOfIssue(issue.path);
-      if (field !== null) failed.add(field);
+    for (const field of fieldsFromIssues(
+      parsed.error.issues,
+      photoFormFields,
+      fieldOfIssue,
+    )) {
+      failed.add(field);
     }
   }
   if (failed.size > 0 || file === null || !parsed.success) {

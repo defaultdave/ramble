@@ -13,7 +13,7 @@ import {
   createExperience,
   updateExperience,
 } from '@/server/db/experienceEditor';
-import { experienceIdOrLeave, opsCallerOrLeave } from '@/server/opsAccess';
+import { idOrLeave, opsCallerOrLeave } from '@/server/opsAccess';
 
 export async function createExperienceAction(
   formData: FormData,
@@ -34,7 +34,7 @@ export async function updateExperienceAction(
   formData: FormData,
 ): Promise<void> {
   const caller = await opsCallerOrLeave(experiencesPath);
-  const experienceId = experienceIdOrLeave(formData);
+  const experienceId = idOrLeave(formData, 'experienceId', experiencesPath);
   const here = experiencePath(experienceId);
   const parsed = parseExperienceEditForm((name) => formData.get(name));
   if (!parsed.ok) redirect(noticeHref(here, 'invalid', parsed.fields));

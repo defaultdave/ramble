@@ -1,6 +1,8 @@
 import type { HostAccess } from './hostAccess';
 import { ownedHostId } from './hostAccess';
+import { hostExperiencesPath } from './hostExperiences';
 import { hostSessionsPath } from './hostSessions';
+import { hostSettingsPath } from './hostSettings';
 import type { InviteResult, NoticeText } from './opsForm';
 import type { RoleGrant } from './roleGrants';
 import {
@@ -66,11 +68,13 @@ export function hostInviteNotice(
 
 export type HostNavLink = { label: string; href: string };
 
-/** The host area's links: an owner manages the sessions and the staff; staff only look at the sessions. */
+/** The host area's links: an owner manages the sessions, the staff and the host's own settings and sees its experiences; staff only look at the sessions. */
 export function hostNavLinks(canManage: boolean): HostNavLink[] {
   return canManage
     ? [
         { label: 'Manage sessions', href: hostSessionsPath },
+        { label: 'Your experiences', href: hostExperiencesPath },
+        { label: 'Host settings', href: hostSettingsPath },
         { label: 'Staff', href: hostStaffPath },
       ]
     : [{ label: 'Sessions', href: hostSessionsPath }];

@@ -23,25 +23,15 @@
 }
 
 .form {
-  composes: form from '../HostSetup/HostSetup.module.css';
+  composes: form from '../ExperienceEditor/ExperienceEditor.module.css';
 }
 
 .group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  margin: 0;
-  padding: 0;
-  border: 0;
-  min-inline-size: 0;
+  composes: group from '../ExperienceEditor/ExperienceEditor.module.css';
 }
 
 .legend {
-  margin: 0 0 var(--space-2);
-  padding: 0;
-  font-size: var(--font-size-label);
-  line-height: var(--font-line-height-label);
-  font-weight: var(--font-weight-semibold);
+  composes: legend from '../ExperienceEditor/ExperienceEditor.module.css';
 }
 
 .slotTitle {
@@ -59,9 +49,5 @@
   .seatsForm {
     flex-direction: row;
     align-items: flex-end;
-  }
-
-  .form > button {
-    align-self: flex-start;
   }
 }

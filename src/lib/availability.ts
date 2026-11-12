@@ -1,4 +1,8 @@
-import { experiencePath, labelledOptions } from './experienceEditor';
+import {
+  experienceNotices,
+  experiencePath,
+  labelledOptions,
+} from './experienceEditor';
 import {
   fieldsFromIssues,
   formHas,
@@ -147,7 +151,7 @@ export const availabilityNotices = {
     tone: 'info',
     title: 'The seats were already that number, so nothing was saved.',
   },
-  invalid: { tone: 'danger', title: 'Some details need another look.' },
+  invalid: experienceNotices.invalid,
   duplicate_slot: {
     tone: 'danger',
     title:

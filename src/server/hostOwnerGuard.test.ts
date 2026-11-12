@@ -3,10 +3,10 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { listFiles, root, src } from '../../tests/support/importGraph';
 
-// Behaviours under test: a server module that guards on the host owner role has a fixed set of
-// files, so a new host write function in a file nobody listed here fails this test, and whoever
-// adds the file also adds its rows to the authorization matrix (tests/db/authz-matrix.db.test.ts),
-// whose coverage check then holds every function in it to a row.
+// Behaviours under test: the server files that guard on the host owner role are a fixed list, so a
+// new file that does fails this test and its author must add it here. This only pins the list; the
+// authorization matrix's own coverage check (tests/db/authz-matrix.db.test.ts) is what holds each
+// Caller-taking function in those files to a row.
 
 const server = path.join(src, 'server');
 

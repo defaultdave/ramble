@@ -334,11 +334,12 @@ describe('limits', () => {
   it('refuses a grant past the cap and writes nothing', async () => {
     const crowded = await host();
     const crowdedOwner = testCaller(ownerOf(crowded));
+    const first = `crowd${String(next())}@example.com`;
     for (let n = 0; n < maxHostStaff; n += 1) {
       const result = await roles.grantHostStaff(
         crowdedOwner,
         crowded,
-        `crowd${String(next())}@example.com`,
+        n === 0 ? first : `crowd${String(next())}@example.com`,
       );
       expect(result).not.toBe('cap_reached');
     }
@@ -361,6 +362,9 @@ describe('limits', () => {
       .from(authUsers)
       .where(eq(authUsers.email, 'one-too-many@example.com'));
     expect(accounts).toEqual([]);
+    expect(await roles.grantHostStaff(crowdedOwner, crowded, first)).toMatchObject(
+      { outcome: 'already_held' },
+    );
   });
 
   it('refuses the owner of one host granting on another, and writes nothing', async () => {

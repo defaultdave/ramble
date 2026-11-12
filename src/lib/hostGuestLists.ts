@@ -149,6 +149,28 @@ export function buildHostBookingList(
 }
 
 /** What the booking holds about ages: the children's, or the booker's confirmation that all attendees are of age. */
+/**
+ * What a caller's guest list carries of the children and their guardian. The host's owner sees
+ * them; read-only staff see the booking and the booker's contacts, never the children's ages or
+ * the guardian, which come back null.
+ */
+export function redactMinors<
+  T extends {
+    childrenAges: readonly number[] | null;
+    guardianName: string | null;
+    guardianContact: string | null;
+  },
+>(booking: T, isOwner: boolean): T {
+  return isOwner
+    ? booking
+    : {
+        ...booking,
+        childrenAges: null,
+        guardianName: null,
+        guardianContact: null,
+      };
+}
+
 export function agesLabel(
   childrenAges: readonly number[] | null,
   ageConfirmed: boolean | null,

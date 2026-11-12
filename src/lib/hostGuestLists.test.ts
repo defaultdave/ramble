@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   agesLabel,
+  redactMinors,
   buildHostBookingList,
   buildHostGuestList,
   HostBookingSearchSchema,
@@ -71,6 +72,30 @@ const guestBooking = (
   contactEmail: 'ada@example.com',
   contactPhone: null,
   ...over,
+});
+
+describe('redactMinors', () => {
+  const held = {
+    leadGuestName: 'Ada Lovelace',
+    contactEmail: 'ada@example.com',
+    childrenAges: [8, 11],
+    guardianName: 'Ada Lovelace',
+    guardianContact: 'ada@example.com',
+  };
+
+  it('leaves an owner’s booking as it is', () => {
+    expect(redactMinors(held, true)).toEqual(held);
+  });
+
+  it('withholds the children’s ages and the guardian from staff, and nothing else', () => {
+    expect(redactMinors(held, false)).toEqual({
+      leadGuestName: 'Ada Lovelace',
+      contactEmail: 'ada@example.com',
+      childrenAges: null,
+      guardianName: null,
+      guardianContact: null,
+    });
+  });
 });
 
 describe('agesLabel', () => {

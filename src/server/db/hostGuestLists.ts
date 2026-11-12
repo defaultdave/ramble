@@ -6,6 +6,7 @@ import {
   HostBookingListRowSchema,
   HostBookingSearchSchema,
   HostGuestListBookingSchema,
+  redactMinors,
   HostGuestListSessionSchema,
   hostBookingListLimit,
   type HostBookingListData,
@@ -85,7 +86,7 @@ export async function readHostBookings(
  * The guest list of one session of the host: its confirmed bookings, by lead guest's name. Null
  * when the session is missing or belongs to another host, so the two read alike. A cancelled
  * booking is not a guest on the day and is left out. Refused to everyone but the host's owner and
- * staff; staff read it without the children's ages and the guardian, which come back null.
+ * staff; staff read it with `redactMinors` applied.
  */
 export async function readHostGuestList(
   caller: Caller,
@@ -95,7 +96,7 @@ export async function readHostGuestList(
   const id = EntityIdSchema.parse(hostId);
   const sid = EntityIdSchema.parse(sessionId);
   requireAnyRole(caller, hostReaderRoles, { hostId: id });
-  const seesMinors = holdsRole(caller, Role.HostOwner, { hostId: id });
+  const isOwner = holdsRole(caller, Role.HostOwner, { hostId: id });
 
   const [session] = await db
     .select({
@@ -119,9 +120,9 @@ export async function readHostGuestList(
       leadGuestName: orders.leadGuestName,
       seats: seatsOf,
       ageConfirmed: orders.ageConfirmed,
-      childrenAges: seesMinors ? orders.childrenAges : sql<null>`null`,
-      guardianName: seesMinors ? orders.guardianName : sql<null>`null`,
-      guardianContact: seesMinors ? orders.guardianContact : sql<null>`null`,
+      childrenAges: orders.childrenAges,
+      guardianName: orders.guardianName,
+      guardianContact: orders.guardianContact,
       waiverAccepted: sql<boolean>`${orders.waiverDocumentId} is not null`,
       contactEmail: orders.contactEmail,
       contactPhone: orders.contactPhone,
@@ -139,6 +140,8 @@ export async function readHostGuestList(
 
   return {
     session: HostGuestListSessionSchema.parse(session),
-    bookings: HostGuestListBookingSchema.array().parse(bookings),
+    bookings: HostGuestListBookingSchema.array()
+      .parse(bookings)
+      .map((booking) => redactMinors(booking, isOwner)),
   };
 }

@@ -1,18 +1,18 @@
 import { Button } from '@/components/Button';
 import { DataTable, type DataTableColumn } from '@/components/DataTable';
 import { EmailField } from '@/components/EmailField';
+import { errorProps } from '@/lib/opsForm';
 import type { GrantableRole } from '@/lib/roleGrants';
 import {
   isManagedStaffRow,
-  staffInviteProblems,
-  staffRolesText,
   staffGrant,
   staffInviteField,
-  type StaffInviteField,
+  staffInviteProblems,
   staffPath,
+  staffRolesText,
+  type StaffInviteField,
   type StaffRow,
 } from '@/lib/staffAdmin';
-import { errorProps } from '@/lib/opsForm';
 import type { TableQuery } from '@/lib/tableQuery';
 import styles from './StaffAdmin.module.css';
 

@@ -1,14 +1,17 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { HostForm, HostNotice } from '@/components/HostSetup';
+import { ActionNotice } from '@/components/ActionNotice';
+import { HostForm } from '@/components/HostSetup';
 import { OpsAccessDenied } from '@/components/OpsShell';
 import { PageHeading } from '@/components/PageHeading';
 import {
+  hostFormFields,
+  hostNoticeCodes,
+  hostNotices,
   hostsPath,
   newHostPath,
-  parseHostNotice,
-  parseProblemFields,
 } from '@/lib/hostSetup';
+import { noticeText, parseNotice, parseProblemFields } from '@/lib/opsForm';
 import { holdsOpsRole } from '@/lib/opsNav';
 import { createHostAction } from '@/server/actions/hosts';
 import { readNewHostForm } from '@/server/db/hostSetup';
@@ -30,10 +33,15 @@ export default async function NewHostPage({
       <p>
         <Link href={hostsPath}>Back to the hosts</Link>
       </p>
-      <HostNotice code={parseHostNotice(query.notice)} />
+      <ActionNotice
+        notice={noticeText(
+          hostNotices,
+          parseNotice(query.notice, hostNoticeCodes),
+        )}
+      />
       <HostForm
         action={createHostAction}
-        problems={parseProblemFields(query.fields)}
+        problems={parseProblemFields(query.fields, hostFormFields)}
         agreement={agreement}
       />
     </PageHeading>

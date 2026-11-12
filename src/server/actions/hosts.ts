@@ -7,11 +7,10 @@ import {
   hostsPath,
   inviteNotice,
   newHostPath,
-  noticeHref,
   parseHostCreateForm,
   parseHostEditForm,
-  parseHostIdField,
 } from '@/lib/hostSetup';
+import { noticeHref, parseIdField } from '@/lib/opsForm';
 import { holdsOpsRole } from '@/lib/opsNav';
 import type { Caller } from '@/server/auth/caller';
 import { createHost, updateHost } from '@/server/db/hostSetup';
@@ -29,7 +28,7 @@ async function opsCallerOrLeave(): Promise<Caller> {
 }
 
 function hostIdOrLeave(formData: FormData): string {
-  const hostId = parseHostIdField(formData.get('hostId'));
+  const hostId = parseIdField(formData.get('hostId'));
   if (hostId === null) redirect(hostsPath);
   return hostId;
 }
@@ -77,7 +76,7 @@ export async function acceptHostAgreementAction(
   const outcome = await recordHostAcceptance(
     caller,
     hostId,
-    parseHostIdField(formData.get('legalDocumentId')),
+    parseIdField(formData.get('legalDocumentId')),
   );
   if (outcome === 'not_found') redirect(hostsPath);
   redirect(noticeHref(hostPath(hostId), agreementNotice(outcome)));
@@ -88,7 +87,7 @@ export async function resendHostInviteAction(
 ): Promise<void> {
   const caller = await opsCallerOrLeave();
   const hostId = hostIdOrLeave(formData);
-  const ownerUserId = parseHostIdField(formData.get('ownerUserId'));
+  const ownerUserId = parseIdField(formData.get('ownerUserId'));
   if (ownerUserId === null) redirect(hostPath(hostId));
   const invite = await inviteHostOwner(caller, hostId, ownerUserId);
   redirect(noticeHref(hostPath(hostId), inviteNotice(invite, false)));

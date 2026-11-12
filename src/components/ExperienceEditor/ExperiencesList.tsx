@@ -9,10 +9,10 @@ import {
   experienceStatusLabels,
   experienceStatusOptions,
   experienceStatusTones,
-  type Choice,
   type ExperienceFilters,
   type ExperienceListRow,
 } from '@/lib/experienceEditor';
+import type { SelectOption } from '@/lib/filters';
 import type { TableQuery } from '@/lib/tableQuery';
 import styles from './ExperienceEditor.module.css';
 
@@ -45,8 +45,8 @@ export type ExperiencesListProps = {
   rows: readonly ExperienceListRow[];
   query: TableQuery;
   filters: ExperienceFilters;
-  hosts: readonly Choice[];
-  categories: readonly Choice[];
+  hosts: readonly SelectOption[];
+  categories: readonly SelectOption[];
   cursor: string | null;
   nextCursor: string | null;
 };

@@ -2,14 +2,13 @@
 
 import { redirect } from 'next/navigation';
 import {
-  experienceNoticeHref,
   experiencePath,
   experiencesPath,
   newExperiencePath,
   parseExperienceCreateForm,
   parseExperienceEditForm,
-  parseExperienceIdField,
 } from '@/lib/experienceEditor';
+import { noticeHref, parseIdField } from '@/lib/opsForm';
 import { holdsOpsRole } from '@/lib/opsNav';
 import type { Caller } from '@/server/auth/caller';
 import {
@@ -33,32 +32,29 @@ export async function createExperienceAction(
   const caller = await opsCallerOrLeave();
   const parsed = parseExperienceCreateForm((name) => formData.get(name));
   if (!parsed.ok) {
-    redirect(experienceNoticeHref(newExperiencePath, 'invalid', parsed.fields));
+    redirect(noticeHref(newExperiencePath, 'invalid', parsed.fields));
   }
   const created = await createExperience(caller, parsed.value);
   if (created.status === 'reference_missing') {
-    redirect(experienceNoticeHref(newExperiencePath, 'reference_missing'));
+    redirect(noticeHref(newExperiencePath, 'reference_missing'));
   }
-  redirect(
-    experienceNoticeHref(experiencePath(created.experienceId), 'created'),
-  );
+  redirect(noticeHref(experiencePath(created.experienceId), 'created'));
 }
 
 export async function updateExperienceAction(
   formData: FormData,
 ): Promise<void> {
   const caller = await opsCallerOrLeave();
-  const experienceId = parseExperienceIdField(formData.get('experienceId'));
+  const experienceId = parseIdField(formData.get('experienceId'));
   if (experienceId === null) redirect(experiencesPath);
   const here = experiencePath(experienceId);
   const parsed = parseExperienceEditForm((name) => formData.get(name));
-  if (!parsed.ok)
-    redirect(experienceNoticeHref(here, 'invalid', parsed.fields));
+  if (!parsed.ok) redirect(noticeHref(here, 'invalid', parsed.fields));
 
   const result = await updateExperience(caller, experienceId, parsed.value);
   if (result.status === 'not_found') redirect(experiencesPath);
   if (result.status === 'invalid') {
-    redirect(experienceNoticeHref(here, 'invalid', result.fields));
+    redirect(noticeHref(here, 'invalid', result.fields));
   }
-  redirect(experienceNoticeHref(here, result.status));
+  redirect(noticeHref(here, result.status));
 }

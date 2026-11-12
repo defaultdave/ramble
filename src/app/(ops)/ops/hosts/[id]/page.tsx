@@ -1,16 +1,23 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { HostDetailView, HostNotice } from '@/components/HostSetup';
+import { ActionNotice } from '@/components/ActionNotice';
+import { HostDetailView } from '@/components/HostSetup';
 import { OpsAccessDenied } from '@/components/OpsShell';
 import { PageHeading } from '@/components/PageHeading';
 import {
+  hostFormFields,
+  hostNoticeCodes,
+  hostNotices,
   hostPath,
   hostsPath,
-  parseHostIdField,
-  parseHostNotice,
-  parseProblemFields,
 } from '@/lib/hostSetup';
+import {
+  noticeText,
+  parseIdField,
+  parseNotice,
+  parseProblemFields,
+} from '@/lib/opsForm';
 import { holdsOpsRole } from '@/lib/opsNav';
 import {
   acceptHostAgreementAction,
@@ -35,7 +42,7 @@ export default async function HostPage({
     return <OpsAccessDenied next={hostPath(id)} />;
   }
 
-  const hostId = parseHostIdField(id);
+  const hostId = parseIdField(id);
   const detail = hostId === null ? null : await readHostForOps(caller, hostId);
   if (detail === null) notFound();
 
@@ -44,10 +51,15 @@ export default async function HostPage({
       <p>
         <Link href={hostsPath}>Back to the hosts</Link>
       </p>
-      <HostNotice code={parseHostNotice(query.notice)} />
+      <ActionNotice
+        notice={noticeText(
+          hostNotices,
+          parseNotice(query.notice, hostNoticeCodes),
+        )}
+      />
       <HostDetailView
         detail={detail}
-        problems={parseProblemFields(query.fields)}
+        problems={parseProblemFields(query.fields, hostFormFields)}
         actions={{
           save: updateHostAction,
           accept: acceptHostAgreementAction,

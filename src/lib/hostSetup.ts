@@ -1,11 +1,17 @@
 import { z } from 'zod';
-import type { AlertTone } from './alertTone';
-import { SlugSchema, WriteIdSchema, slugify } from './catalog';
+import { SlugSchema, WriteIdSchema } from './catalog';
 import {
   EmailAddressSchema,
   maxEmailAddressLength,
   normalizeEmailAddress,
 } from './email/address';
+import {
+  formText,
+  oversizedFields,
+  slugFor,
+  type FormGetter,
+  type NoticeText,
+} from './opsForm';
 import { pickKnown } from './pickKnown';
 import { isKnownTimeZone, maxTimeZoneLength, TimeZoneSchema } from './sessions';
 import { requiredText } from './text';
@@ -43,7 +49,7 @@ const hostEditableFields = [
 ] as const;
 export type HostEditableField = (typeof hostEditableFields)[number];
 
-const hostFormFields = [
+export const hostFormFields = [
   ...hostEditableFields,
   'ownerEmail',
   'acceptLegalDocumentId',
@@ -67,15 +73,6 @@ export type HostCreateInput = HostInput & {
 export type HostFormResult<T> =
   { ok: true; value: T } | { ok: false; fields: HostFormField[] };
 
-type FormGetter = (name: string) => unknown;
-
-function textOf(get: FormGetter, name: string): string | undefined {
-  const raw = get(name);
-  if (typeof raw !== 'string') return undefined;
-  const trimmed = raw.trim();
-  return trimmed === '' ? undefined : trimmed;
-}
-
 const optionalEmail = z
   .string()
   .max(maxEmailAddressLength)
@@ -95,33 +92,20 @@ const FieldsSchema = z.strictObject({
   ownerEmail: optionalEmail.optional(),
 });
 
-/** A slug is typed or comes from the name, never repaired after the fact: a name that leaves none, or one too long, is refused. */
-function slugFor(
-  name: string,
-  typed: string | undefined,
-  derive: boolean,
-): string | null {
-  const slug = typed ?? (derive ? slugify(name) : '');
-  return slug !== '' && slug.length <= hostLimits.slug ? slug : null;
-}
-
 function parseFields(
   get: FormGetter,
   options: { requireOwner: boolean; deriveSlug: boolean },
 ): HostFormResult<HostInput & { ownerEmail: string | null }> {
-  const oversized = hostFormFields.filter((field) => {
-    const raw = get(field);
-    return typeof raw === 'string' && raw.length > hostLimits.rawField;
-  });
+  const oversized = oversizedFields(get, hostFormFields, hostLimits.rawField);
   if (oversized.length > 0) return { ok: false, fields: oversized };
 
   const parsed = FieldsSchema.safeParse({
-    name: textOf(get, 'name'),
-    slug: textOf(get, 'slug'),
-    description: textOf(get, 'description'),
-    timeZone: textOf(get, 'timeZone'),
-    notificationEmail: textOf(get, 'notificationEmail'),
-    ownerEmail: textOf(get, 'ownerEmail'),
+    name: formText(get, 'name'),
+    slug: formText(get, 'slug'),
+    description: formText(get, 'description'),
+    timeZone: formText(get, 'timeZone'),
+    notificationEmail: formText(get, 'notificationEmail'),
+    ownerEmail: formText(get, 'ownerEmail'),
   });
   const failed = new Set<HostFormField>();
   if (!parsed.success) {
@@ -132,7 +116,12 @@ function parseFields(
     return { ok: false, fields: hostFormFields.filter((f) => failed.has(f)) };
   }
   const { data } = parsed;
-  const slug = slugFor(data.name, data.slug, options.deriveSlug);
+  const slug = slugFor(
+    data.name,
+    data.slug,
+    options.deriveSlug,
+    hostLimits.slug,
+  );
   if (slug !== null) failed.delete('slug');
   else failed.add('slug');
   if (options.requireOwner && data.ownerEmail === undefined) {
@@ -191,12 +180,6 @@ export function parseHostEditForm(get: FormGetter): HostFormResult<HostInput> {
     ok: true,
     value: { name, slug, description, timeZone, notificationEmail },
   };
-}
-
-/** The id a form carries for the host it edits, or null when it is not an id. */
-export function parseHostIdField(raw: unknown): string | null {
-  const parsed = WriteIdSchema.safeParse(raw);
-  return parsed.success ? parsed.data : null;
 }
 
 /** Which editable fields differ, in form order. Nothing differing means nothing is written. */
@@ -430,7 +413,7 @@ export const hostFieldProblems = {
     'The agreement version could not be read. Reload the form and try again.',
 } as const satisfies Record<HostFormField, string>;
 
-const noticeCodes = [
+export const hostNoticeCodes = [
   'created',
   'created_invite_failed',
   'updated',
@@ -445,7 +428,7 @@ const noticeCodes = [
   'invalid',
   'slug_taken',
 ] as const;
-export type HostNoticeCode = (typeof noticeCodes)[number];
+export type HostNoticeCode = (typeof hostNoticeCodes)[number];
 
 export const hostNotices = {
   created: {
@@ -491,33 +474,7 @@ export const hostNotices = {
     title:
       'Another host already uses that address name. Choose a different one.',
   },
-} as const satisfies Record<HostNoticeCode, { tone: AlertTone; title: string }>;
-
-/** The notice a page address names, or null for none or an unknown one. */
-export function parseHostNotice(
-  raw: string | readonly string[] | undefined,
-): HostNoticeCode | null {
-  return typeof raw === 'string' ? pickKnown(raw, noticeCodes, null) : null;
-}
-
-/** The fields an address names as needing another look, in form order, and only known ones. */
-export function parseProblemFields(
-  raw: string | readonly string[] | undefined,
-): HostFormField[] {
-  const named = typeof raw === 'string' ? raw.split(',') : [];
-  return hostFormFields.filter((field) => named.includes(field));
-}
-
-/** Where an action sends the person next: a path, a notice, and for a refused form the fields to look at. */
-export function noticeHref(
-  path: string,
-  notice: HostNoticeCode,
-  fields: readonly HostFormField[] = [],
-): string {
-  const params = new URLSearchParams({ notice });
-  if (fields.length > 0) params.set('fields', fields.join(','));
-  return `${path}?${params.toString()}`;
-}
+} as const satisfies Record<HostNoticeCode, NoticeText>;
 
 /** What the invite action tells the person after the host is made or the link is sent again. A host or owner that is gone is a failure to send. */
 export function inviteNotice(

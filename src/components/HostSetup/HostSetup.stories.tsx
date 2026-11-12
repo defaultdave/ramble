@@ -1,13 +1,14 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { ActionNotice } from '@/components/ActionNotice';
 import { PageHeading } from '@/components/PageHeading';
 import {
   buildHostDetail,
+  hostNotices,
   type HostDetail,
   type HostListRow,
 } from '@/lib/hostSetup';
 import { HostDetailView } from './HostDetailView';
 import { HostForm } from './HostForm';
-import { HostNotice } from './HostNotice';
 import { HostsTable } from './HostsTable';
 
 // One story per state of host setup: the list, each form state, the detail by agreement standing, and the notices, on a phone and a desktop.
@@ -212,17 +213,17 @@ export const DetailNoOwner: Story = {
 
 export const NoticeCreated: Story = {
   globals: mobile,
-  render: () => <HostNotice code="created" />,
+  render: () => <ActionNotice notice={hostNotices.created} />,
 };
 export const NoticeInviteFailed: Story = {
   globals: mobile,
-  render: () => <HostNotice code="created_invite_failed" />,
+  render: () => <ActionNotice notice={hostNotices.created_invite_failed} />,
 };
 export const NoticeStaleAgreement: Story = {
   globals: mobile,
-  render: () => <HostNotice code="stale_agreement" />,
+  render: () => <ActionNotice notice={hostNotices.stale_agreement} />,
 };
 export const NoticeRateLimited: Story = {
   globals: mobile,
-  render: () => <HostNotice code="rate_limited" />,
+  render: () => <ActionNotice notice={hostNotices.rate_limited} />,
 };

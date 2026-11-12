@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { ActionNotice } from '@/components/ActionNotice';
 import { PageHeading } from '@/components/PageHeading';
+import { experienceNotices } from '@/lib/experienceEditor';
 import {
   blankValues,
   choices,
@@ -10,7 +12,6 @@ import {
 } from './ExperienceEditor.fixtures';
 import { ExperienceEditView } from './ExperienceEditView';
 import { ExperienceForm } from './ExperienceForm';
-import { ExperienceNotice } from './ExperienceNotice';
 import { ExperiencesList } from './ExperiencesList';
 
 // One story per state of the experience editor: the list and its filters, the create form, the
@@ -147,17 +148,17 @@ export const EditGuideOnly: Story = {
 
 export const NoticeCreated: Story = {
   globals: mobile,
-  render: () => <ExperienceNotice code="created" />,
+  render: () => <ActionNotice notice={experienceNotices.created} />,
 };
 export const NoticeUnchanged: Story = {
   globals: mobile,
-  render: () => <ExperienceNotice code="unchanged" />,
+  render: () => <ActionNotice notice={experienceNotices.unchanged} />,
 };
 export const NoticeInvalid: Story = {
   globals: mobile,
-  render: () => <ExperienceNotice code="invalid" />,
+  render: () => <ActionNotice notice={experienceNotices.invalid} />,
 };
 export const NoticeReferenceMissing: Story = {
   globals: mobile,
-  render: () => <ExperienceNotice code="reference_missing" />,
+  render: () => <ActionNotice notice={experienceNotices.reference_missing} />,
 };

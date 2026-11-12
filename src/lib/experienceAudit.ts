@@ -1,4 +1,4 @@
-import type { AuditEntryInput } from './audit';
+import { userActor, type AuditEntryInput } from './audit';
 import type {
   ExperienceContent,
   ExperienceContentField,
@@ -34,9 +34,6 @@ const changeGroups = {
   childPriceMinor: 'prices',
   childUsesSpace: 'prices',
 } as const satisfies Record<ExperienceContentField, string>;
-
-const userActor = (userId: string) =>
-  ({ actorKind: 'user', actorId: userId }) as const;
 
 export function experienceCreatedEntry(
   userId: string,

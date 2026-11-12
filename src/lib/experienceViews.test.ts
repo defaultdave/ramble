@@ -9,15 +9,14 @@ import {
   buildExperienceChoices,
   buildExperienceEditView,
   experienceFieldProblems,
-  experienceNoticeHref,
+  experienceFormFields,
+  experienceNoticeCodes,
   experienceNotices,
   experiencePath,
   experienceStatusLabels,
   experienceStatusOptions,
   newExperienceValues,
   parseExperienceFilters,
-  parseExperienceNotice,
-  parseProblemFields,
   type ExperienceContent,
 } from './experienceEditor';
 import type { HostExperience } from './catalog';
@@ -27,7 +26,7 @@ import type { HostExperience } from './catalog';
 // - the filters read from the address: a known status, host and category, and nothing else
 // - the choices carry names, and a tier shows its refund terms
 // - a saved experience becomes the editor's view with its host's name
-// - a notice, the fields it names and the href an action redirects to round-trip, and an unknown one is null
+// - every notice code and form field has its text
 // - every form field has a problem sentence, every notice a tone
 // - the audit rows name the group that changed, carry the new money and tax, and always pass the
 //   audit log's own checks, even when every field changed
@@ -160,32 +159,15 @@ describe('buildExperienceEditView', () => {
 });
 
 describe('notices', () => {
-  it('reads a known notice and refuses an unknown one or a repeated one', () => {
-    expect(parseExperienceNotice('updated')).toBe('updated');
-    expect(parseExperienceNotice('exploded')).toBeNull();
-    expect(parseExperienceNotice(['updated', 'created'])).toBeNull();
-    expect(parseExperienceNotice(undefined)).toBeNull();
+  it('names exactly the codes that have a notice', () => {
+    expect([...experienceNoticeCodes].sort()).toEqual(
+      Object.keys(experienceNotices).sort(),
+    );
   });
 
-  it('reads only known fields, in form order', () => {
-    expect(parseProblemFields('slug,name,bogus')).toEqual(['name', 'slug']);
-    expect(parseProblemFields(undefined)).toEqual([]);
-  });
-
-  it('builds an address that reads back, and leaves out an empty field list', () => {
-    const href = experienceNoticeHref('/ops/experiences/x', 'invalid', [
-      'name',
-      'adultPrice',
-    ]);
-
-    const params = new URL(href, 'https://ramble.test').searchParams;
-    expect(params.get('notice')).toBe('invalid');
-    expect(parseProblemFields(params.get('fields') ?? undefined)).toEqual([
-      'name',
-      'adultPrice',
-    ]);
-    expect(experienceNoticeHref('/ops/experiences', 'created')).toBe(
-      '/ops/experiences?notice=created',
+  it('names exactly the form fields that have a problem sentence', () => {
+    expect([...experienceFormFields].sort()).toEqual(
+      Object.keys(experienceFieldProblems).sort(),
     );
   });
 

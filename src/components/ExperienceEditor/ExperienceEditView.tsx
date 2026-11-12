@@ -1,6 +1,7 @@
 import { StatusBadge } from '@/components/StatusBadge';
 import {
   experienceStatusLabels,
+  linksOut,
   experienceStatusTones,
   type ExperienceChoices,
   type ExperienceEditView as EditView,
@@ -37,7 +38,7 @@ export function ExperienceEditView({
         values={view.content}
         choices={choices}
         experienceId={view.id}
-        guideOnly={view.status === 'guide_only'}
+        guideOnly={linksOut(view.status)}
         problems={problems}
       />
     </div>

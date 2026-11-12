@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import type { AlertTone } from './alertTone';
 import type { CacheChange } from './cacheTags';
 import { cancellationTerms } from './cancellation';
 import {
@@ -8,7 +7,6 @@ import {
   experienceStatuses,
   guestVisibleStatuses,
   HttpUrlSchema,
-  slugify,
   SlugSchema,
   taxTreatments,
   weatherPolicies,
@@ -18,8 +16,16 @@ import {
   type HostExperience,
   type Neighborhood,
 } from './catalog';
-import { parseSingle } from './filters';
+import { parseSingle, type SelectOption } from './filters';
 import { formatMoney } from './money';
+import {
+  formHas,
+  formText,
+  oversizedFields,
+  slugFor,
+  type FormGetter,
+  type NoticeText,
+} from './opsForm';
 import { pickKnown } from './pickKnown';
 import { maxSessionMinutes } from './sessions';
 import {
@@ -27,7 +33,7 @@ import {
   type StatusFilterOption,
   type StatusTone,
 } from './statusBadge';
-import { tableHref, type TableQuery } from './tableQuery';
+import type { TableQuery } from './tableQuery';
 import { requiredText } from './text';
 
 // The experience editor for ops: every content field and the two price options of an experience.
@@ -119,7 +125,7 @@ export type ExperienceContentField = keyof ExperienceContent;
 export type ExperienceCreateInput = ExperienceContent & { hostId: string };
 
 /** Every name the form posts: the content fields, with the two prices under their own names. */
-const experienceFormFields = [
+export const experienceFormFields = [
   'hostId',
   'name',
   'slug',
@@ -150,15 +156,6 @@ export type ExperienceFormField = (typeof experienceFormFields)[number];
 
 export type ExperienceFormResult<T> =
   { ok: true; value: T } | { ok: false; fields: ExperienceFormField[] };
-
-type FormGetter = (name: string) => unknown;
-
-function textOf(get: FormGetter, name: string): string | undefined {
-  const raw = get(name);
-  if (typeof raw !== 'string') return undefined;
-  const trimmed = raw.trim();
-  return trimmed === '' ? undefined : trimmed;
-}
 
 const CENTS_PER_DOLLAR = 100;
 const priceText = /^\$?(\d{1,5})(?:\.(\d{1,2}))?$/;
@@ -250,16 +247,6 @@ function inFormOrder(failed: ReadonlySet<ExperienceFormField>) {
   return experienceFormFields.filter((field) => failed.has(field));
 }
 
-/** A slug is typed or comes from the name, never repaired after the fact: a name that leaves none, or one too long, is refused. */
-function slugFor(
-  name: string,
-  typed: string | undefined,
-  derive: boolean,
-): string | null {
-  const slug = typed ?? (derive ? slugify(name) : '');
-  return slug !== '' && slug.length <= experienceLimits.slug ? slug : null;
-}
-
 type ParseOptions = { creating: boolean };
 
 /**
@@ -272,14 +259,17 @@ function parseFields(
   get: FormGetter,
   options: ParseOptions,
 ): ExperienceFormResult<{ content: ExperienceContent; hostId: string | null }> {
-  const oversized = experienceFormFields.filter((field) => {
-    const raw = get(field);
-    return typeof raw === 'string' && raw.length > experienceLimits.rawField;
-  });
+  const oversized = oversizedFields(
+    get,
+    experienceFormFields,
+    experienceLimits.rawField,
+  );
   if (oversized.length > 0) return { ok: false, fields: oversized };
 
   const parsed = FieldsSchema.safeParse(
-    Object.fromEntries(textFields.map((field) => [field, textOf(get, field)])),
+    Object.fromEntries(
+      textFields.map((field) => [field, formText(get, field)]),
+    ),
   );
   const failed = new Set<ExperienceFormField>();
   if (!parsed.success) {
@@ -291,17 +281,22 @@ function parseFields(
       );
       if (field !== null) failed.add(field);
     }
-    if (options.creating && textOf(get, 'hostId') === undefined) {
+    if (options.creating && formText(get, 'hostId') === undefined) {
       failed.add('hostId');
     }
     return { ok: false, fields: inFormOrder(failed) };
   }
   const { data } = parsed;
-  const slug = slugFor(data.name, data.slug, options.creating);
+  const slug = slugFor(
+    data.name,
+    data.slug,
+    options.creating,
+    experienceLimits.slug,
+  );
   if (slug === null) failed.add('slug');
   if (options.creating && data.hostId === undefined) failed.add('hostId');
 
-  const waiverRequired = has(get, 'waiverRequired');
+  const waiverRequired = formHas(get, 'waiverRequired');
   if (waiverRequired && data.waiverDocumentId === undefined) {
     failed.add('waiverDocumentId');
   }
@@ -322,7 +317,7 @@ function parseFields(
     categoryId: data.categoryId,
     neighborhoodId: data.neighborhoodId,
     cancellationTierId: data.cancellationTierId,
-    outdoor: has(get, 'outdoor'),
+    outdoor: formHas(get, 'outdoor'),
     weatherPolicy: data.weatherPolicy ?? null,
     weatherDecisionHours:
       data.weatherPolicy === 'decided_before_start'
@@ -338,19 +333,13 @@ function parseFields(
     affiliateUrl: data.affiliateUrl ?? null,
     adultPriceMinor: data.adultPrice ?? null,
     childPriceMinor: data.childPrice ?? null,
-    childUsesSpace: has(get, 'childUsesSpace'),
+    childUsesSpace: formHas(get, 'childUsesSpace'),
   };
   // A guide-only entry's link is checked again where the status is known (`experienceRuleFailures`).
   for (const field of experienceRuleFailures(content, 'draft'))
     failed.add(field);
   if (failed.size > 0) return { ok: false, fields: inFormOrder(failed) };
   return { ok: true, value: { content, hostId: data.hostId ?? null } };
-}
-
-/** A checkbox is ticked when the form carries it with any value. */
-function has(get: FormGetter, name: string): boolean {
-  const raw = get(name);
-  return raw !== null && raw !== undefined;
 }
 
 /** The create form: it names the host the experience belongs to, and a blank slug comes from the name. */
@@ -370,12 +359,6 @@ export function parseExperienceEditForm(
   const fields = parseFields(get, { creating: false });
   if (!fields.ok) return fields;
   return { ok: true, value: fields.value.content };
-}
-
-/** The id a form carries for the experience it edits, or null when it is not an id. */
-export function parseExperienceIdField(raw: unknown): string | null {
-  const parsed = WriteIdSchema.safeParse(raw);
-  return parsed.success ? parsed.data : null;
 }
 
 /** The form fields the catalog's rules fault for this status. The form is read before the status is known, so the save checks again. */
@@ -565,6 +548,11 @@ export function experienceColumnsOf(
   return Object.fromEntries(kept) as ExperienceColumns;
 }
 
+/** A guide-only entry links out, so its link is required. */
+export function linksOut(status: ExperienceStatus): boolean {
+  return status === 'guide_only';
+}
+
 /** Whether guests can see an experience in this status, so a change to it reaches cached pages. */
 export function isGuestVisible(status: ExperienceStatus): boolean {
   return (guestVisibleStatuses as readonly string[]).includes(status);
@@ -630,17 +618,15 @@ export type ExperienceFilters = {
   categoryId: string | null;
 };
 
-export type Choice = { value: string; label: string };
-
 /** The choices a form offers, labelled. The cancellation tiers are shared reference data, read and never edited. */
 export type ExperienceChoices = {
-  hosts: Choice[];
-  categories: Choice[];
-  neighborhoods: Choice[];
-  cancellationTiers: Choice[];
+  hosts: SelectOption[];
+  categories: SelectOption[];
+  neighborhoods: SelectOption[];
+  cancellationTiers: SelectOption[];
   /** The tier a new experience starts on; empty when the reference data holds none. */
   defaultCancellationTierId: string;
-  waivers: Choice[];
+  waivers: SelectOption[];
 };
 
 type WaiverVersion = { id: string; title: string; version: number };
@@ -725,14 +711,14 @@ export const experienceFieldProblems = {
   childUsesSpace: 'Choose whether a child takes a space.',
 } as const satisfies Record<ExperienceFormField, string>;
 
-const noticeCodes = [
+export const experienceNoticeCodes = [
   'created',
   'updated',
   'unchanged',
   'invalid',
   'reference_missing',
 ] as const;
-export type ExperienceNoticeCode = (typeof noticeCodes)[number];
+export type ExperienceNoticeCode = (typeof experienceNoticeCodes)[number];
 
 export const experienceNotices = {
   created: {
@@ -750,34 +736,7 @@ export const experienceNotices = {
     title:
       'A host, category, neighborhood, tier or waiver on the form is no longer there. Reload the form and try again.',
   },
-} as const satisfies Record<
-  ExperienceNoticeCode,
-  { tone: AlertTone; title: string }
->;
-
-/** The notice an address names, or null for none or an unknown one. */
-export function parseExperienceNotice(
-  raw: string | readonly string[] | undefined,
-): ExperienceNoticeCode | null {
-  return typeof raw === 'string' ? pickKnown(raw, noticeCodes, null) : null;
-}
-
-/** The fields an address names as needing another look, in form order, and only known ones. */
-export function parseProblemFields(
-  raw: string | readonly string[] | undefined,
-): ExperienceFormField[] {
-  const named = typeof raw === 'string' ? raw.split(',') : [];
-  return experienceFormFields.filter((field) => named.includes(field));
-}
-
-/** Where an action sends the person next: a path, a notice, and for a refused form the fields to look at. */
-export function experienceNoticeHref(
-  path: string,
-  notice: ExperienceNoticeCode,
-  fields: readonly ExperienceFormField[] = [],
-): string {
-  return tableHref(path, { notice, fields: fields.join(',') });
-}
+} as const satisfies Record<ExperienceNoticeCode, NoticeText>;
 
 export const ageRuleLabels = {
   all_ages: 'All ages',
@@ -800,7 +759,7 @@ export const taxTreatmentLabels = {
 /** A select's options from a label map, in the map's order. */
 export function labelledOptions(
   labels: Readonly<Record<string, string>>,
-): Choice[] {
+): SelectOption[] {
   return Object.entries(labels).map(([value, label]) => ({ value, label }));
 }
 

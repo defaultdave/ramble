@@ -8,14 +8,12 @@ import {
 } from '@/lib/hostSetup';
 import { HostDetailView } from './HostDetailView';
 import { HostForm } from './HostForm';
-import { HostNotice } from './HostNotice';
 import { HostsTable } from './HostsTable';
 
 // Behaviours under test:
 // - the create form asks for the owner and offers the agreement box for the version it is given, and says so when there is none
 // - the edit form is prefilled, carries the host id, has no owner field, and no agreement box
 // - a field the last try refused shows its problem text and is marked invalid
-// - the notice shows the one line for its code, and nothing for none
 // - the list links each host, shows the owner and the agreement standing in words, and pages by link
 // - the detail lists each owner with a resend button that carries the host and the owner, and shows what was accepted
 // - the acceptance form carries the current version and is hidden once it is accepted or when there is none
@@ -129,22 +127,6 @@ describe('HostForm', () => {
       'aria-invalid',
       'true',
     );
-  });
-});
-
-describe('HostNotice', () => {
-  it('shows the line for its code', () => {
-    render(<HostNotice code="stale_agreement" />);
-
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'A newer agreement was published while you were looking. Review it and try again.',
-    );
-  });
-
-  it('shows nothing for no code', () => {
-    const { container } = render(<HostNotice code={null} />);
-
-    expect(container).toBeEmptyDOMElement();
   });
 });
 

@@ -8,7 +8,6 @@ import {
   newExperienceValues,
   parseExperienceCreateForm,
   parseExperienceEditForm,
-  parseExperienceIdField,
   parsePriceMinor,
   priceInputValue,
   type ExperienceFormField,
@@ -292,18 +291,6 @@ describe('parseExperienceEditForm', () => {
 
     expect(result.ok).toBe(true);
     expect(result.ok && 'hostId' in result.value).toBe(false);
-  });
-});
-
-describe('parseExperienceIdField', () => {
-  it.each([
-    [id(1), id(1)],
-    [id(1).toUpperCase(), id(1)],
-    ['nope', null],
-    [null, null],
-    [42, null],
-  ])('%j is %j', (raw, parsed) => {
-    expect(parseExperienceIdField(raw)).toBe(parsed);
   });
 });
 

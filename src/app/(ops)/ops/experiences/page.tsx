@@ -1,17 +1,17 @@
 import type { Metadata } from 'next';
+import { ActionNotice } from '@/components/ActionNotice';
 import { ButtonLink } from '@/components/Button';
-import {
-  ExperienceNotice,
-  ExperiencesList,
-} from '@/components/ExperienceEditor';
+import { ExperiencesList } from '@/components/ExperienceEditor';
 import { OpsAccessDenied } from '@/components/OpsShell';
 import { PageHeading } from '@/components/PageHeading';
 import {
+  experienceNoticeCodes,
+  experienceNotices,
   experiencesPath,
   newExperiencePath,
   parseExperienceFilters,
-  parseExperienceNotice,
 } from '@/lib/experienceEditor';
+import { noticeText, parseNotice } from '@/lib/opsForm';
 import { holdsOpsRole } from '@/lib/opsNav';
 import { parseCursor } from '@/lib/tableQuery';
 import {
@@ -36,7 +36,12 @@ export default async function ExperiencesPage({
   const page = await readExperiencesForOps(caller, filters, cursor);
   return (
     <PageHeading title="Experiences">
-      <ExperienceNotice code={parseExperienceNotice(query.notice)} />
+      <ActionNotice
+        notice={noticeText(
+          experienceNotices,
+          parseNotice(query.notice, experienceNoticeCodes),
+        )}
+      />
       <p>
         <ButtonLink href={newExperiencePath}>Add an experience</ButtonLink>
       </p>

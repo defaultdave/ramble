@@ -11,7 +11,6 @@ import {
 } from './ExperienceEditor.fixtures';
 import { ExperienceEditView } from './ExperienceEditView';
 import { ExperienceForm } from './ExperienceForm';
-import { ExperienceNotice } from './ExperienceNotice';
 import { ExperiencesList } from './ExperiencesList';
 
 // Behaviours under test:
@@ -21,7 +20,6 @@ import { ExperiencesList } from './ExperiencesList';
 // - a field the last try refused shows its problem text and is marked invalid, a ticked-box problem as an alert
 // - a guide-only entry's link is required; any other status leaves it optional
 // - the cancellation tier choices carry their refund terms
-// - the notice shows the one line for its code, and nothing for none
 // - the edit view shows the status in words and the host, and its form saves through the action it is given
 // - the list links each experience, shows host, category and status in words, filters by address and pages by link
 // - a list with no rows says so
@@ -146,28 +144,6 @@ describe('ExperienceForm, editing', () => {
         name: 'Strict: Free cancellation up to 7 days before',
       }),
     ).toBeInTheDocument();
-  });
-});
-
-describe('ExperienceNotice', () => {
-  it('shows the line for its code', () => {
-    render(<ExperienceNotice code="updated" />);
-
-    expect(screen.getByRole('status')).toHaveTextContent('Experience saved.');
-  });
-
-  it('shows nothing for no code', () => {
-    const { container } = render(<ExperienceNotice code={null} />);
-
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it('shows a refusal as an alert', () => {
-    render(<ExperienceNotice code="invalid" />);
-
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Some details need another look.',
-    );
   });
 });
 

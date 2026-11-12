@@ -1,18 +1,18 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import {
-  ExperienceForm,
-  ExperienceNotice,
-} from '@/components/ExperienceEditor';
+import { ActionNotice } from '@/components/ActionNotice';
+import { ExperienceForm } from '@/components/ExperienceEditor';
 import { OpsAccessDenied } from '@/components/OpsShell';
 import { PageHeading } from '@/components/PageHeading';
 import {
+  experienceFormFields,
+  experienceNoticeCodes,
+  experienceNotices,
   experiencesPath,
   newExperiencePath,
   newExperienceValues,
-  parseExperienceNotice,
-  parseProblemFields,
 } from '@/lib/experienceEditor';
+import { noticeText, parseNotice, parseProblemFields } from '@/lib/opsForm';
 import { holdsOpsRole } from '@/lib/opsNav';
 import { createExperienceAction } from '@/server/actions/experiences';
 import { readExperienceChoices } from '@/server/db/experienceEditor';
@@ -37,7 +37,12 @@ export default async function NewExperiencePage({
       <p>
         It starts as a draft. The host does not see it until it is reviewed.
       </p>
-      <ExperienceNotice code={parseExperienceNotice(query.notice)} />
+      <ActionNotice
+        notice={noticeText(
+          experienceNotices,
+          parseNotice(query.notice, experienceNoticeCodes),
+        )}
+      />
       <ExperienceForm
         action={createExperienceAction}
         values={newExperienceValues({
@@ -46,7 +51,7 @@ export default async function NewExperiencePage({
           cancellationTierId: choices.defaultCancellationTierId,
         })}
         choices={choices}
-        problems={parseProblemFields(query.fields)}
+        problems={parseProblemFields(query.fields, experienceFormFields)}
       />
     </PageHeading>
   );

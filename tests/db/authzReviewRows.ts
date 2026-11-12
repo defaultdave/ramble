@@ -1,4 +1,5 @@
 import type { Caller } from '@/server/auth/caller';
+import { availabilityRows } from './authzAvailabilityRows';
 import { experiencePauseRows } from './authzPauseRows';
 
 // The experience-review row of the authorization matrix, kept apart so the matrix file stays under
@@ -12,6 +13,7 @@ const opsOnly = { platform: ['ops'] } as const;
 /** The module loads when a row runs, not when the rows are built: it reads DATABASE_URL, which the matrix's beforeAll sets. */
 export function experienceReviewRows() {
   return [
+    ...availabilityRows(),
     {
       fn: 'decideExperienceReview',
       invoke: async (c, t) =>

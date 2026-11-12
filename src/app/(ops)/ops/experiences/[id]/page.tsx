@@ -8,6 +8,7 @@ import {
 } from '@/components/ExperienceEditor';
 import { OpsAccessDenied } from '@/components/OpsShell';
 import { PageHeading } from '@/components/PageHeading';
+import { availabilityPath } from '@/lib/availability';
 import {
   experienceFormFields,
   experiencePath,
@@ -55,6 +56,8 @@ export default async function ExperiencePage({
     <PageHeading title={view.content.name}>
       <p>
         <Link href={experiencesPath}>Back to the experiences</Link>
+        {' · '}
+        <Link href={availabilityPath(view.id)}>Weekly slots and seats</Link>
       </p>
       <ActionNotice notice={notice} />
       <ExperiencePauseForm

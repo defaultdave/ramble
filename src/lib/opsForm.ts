@@ -2,6 +2,7 @@ import type { AlertTone } from './alertTone';
 import { slugify, WriteIdSchema } from './catalog';
 import { pickKnown } from './pickKnown';
 import { tableHref } from './tableQuery';
+import { wholeNumberPattern } from './text';
 
 // What the ops forms share: reading a posted form, and the redirect-with-a-notice that every ops
 // action ends in. Each form passes its own field list or notice codes.
@@ -18,6 +19,17 @@ export function formText(get: FormGetter, name: string): string | undefined {
   if (typeof raw !== 'string') return undefined;
   const trimmed = raw.trim();
   return trimmed === '' ? undefined : trimmed;
+}
+
+/** A posted whole number, digits only, or undefined for anything else, so a schema names the field instead of a parser throwing. */
+export function formWholeNumber(
+  get: FormGetter,
+  name: string,
+): number | undefined {
+  const text = formText(get, name);
+  return text !== undefined && wholeNumberPattern.test(text)
+    ? Number(text)
+    : undefined;
 }
 
 /** A checkbox is ticked when the form carries it with any value. */

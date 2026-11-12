@@ -102,10 +102,12 @@ const WallTimeInputSchema = z
 
 const AllocationSchema = z.int().min(0).max(maxAllocation);
 
+/** 0 is Sunday. */
+const WeekdaySchema = z.int().min(0).max(6);
+
 export const SessionTemplateInputSchema = z.object({
   experienceId: EntityIdSchema,
-  /** 0 is Sunday. */
-  weekday: z.int().min(0).max(6),
+  weekday: WeekdaySchema,
   /** HH:MM in the host's time zone. */
   startTime: WallTimeInputSchema,
   durationMinutes: z.int().min(1).max(maxSessionMinutes),
@@ -113,6 +115,26 @@ export const SessionTemplateInputSchema = z.object({
   source: z.enum(templateSources),
 });
 export type SessionTemplateInput = z.input<typeof SessionTemplateInputSchema>;
+
+/** One start time, length, seat cap and source set up on several weekdays at once: one template per weekday. */
+export const AddSlotsInputSchema = SessionTemplateInputSchema.omit({
+  weekday: true,
+}).extend({
+  weekdays: z
+    .array(WeekdaySchema)
+    .min(1)
+    .max(7)
+    .refine((days) => new Set(days).size === days.length),
+});
+export type AddSlotsInput = z.input<typeof AddSlotsInputSchema>;
+
+export const UpdateTemplateAllocationInputSchema = z.object({
+  templateId: EntityIdSchema,
+  allocation: AllocationSchema,
+});
+export type UpdateTemplateAllocationInput = z.input<
+  typeof UpdateTemplateAllocationInputSchema
+>;
 
 export const SessionTemplateSchema = z.object({
   id: EntityIdSchema,
@@ -266,6 +288,59 @@ export function checkAllocationChange(
   return allocation < seatsSold + heldSeats
     ? { ok: false, reason: 'below_sold_and_held', seatsSold, heldSeats }
     : { ok: true };
+}
+
+/** Whether a new seat cap differs from the slot's: the same number writes nothing, audit row included. */
+export function isSeatChange(
+  oldAllocation: number,
+  newAllocation: number,
+): boolean {
+  return oldAllocation !== newAllocation;
+}
+
+type FollowingSession = {
+  id: string;
+  allocation: number;
+  seatsSold: number;
+  heldSeats: number;
+};
+
+export type TemplateSeatPlan =
+  | { ok: true; followIds: string[] }
+  | { ok: false; reason: 'below_sold_and_held'; booked: number };
+
+/**
+ * What a new seat cap on a template does to its upcoming sessions. A session whose capacity still
+ * equals the template's old cap follows the template; one with another number was set by hand and
+ * keeps it. The change is refused, whole, when it would put any following session under the seats
+ * sold plus held (PRD-41), and `booked` is the most seats one of them has claimed.
+ */
+export function planTemplateSeatChange(
+  oldAllocation: number,
+  newAllocation: number,
+  upcoming: readonly FollowingSession[],
+): TemplateSeatPlan {
+  const following = upcoming.filter(
+    (session) => session.allocation === oldAllocation,
+  );
+  const refused = following.filter(
+    (session) =>
+      !checkAllocationChange(
+        session.seatsSold,
+        session.heldSeats,
+        newAllocation,
+      ).ok,
+  );
+  if (refused.length > 0) {
+    return {
+      ok: false,
+      reason: 'below_sold_and_held',
+      booked: Math.max(
+        ...refused.map((session) => session.seatsSold + session.heldSeats),
+      ),
+    };
+  }
+  return { ok: true, followIds: following.map((session) => session.id) };
 }
 
 export type EditableCheck =

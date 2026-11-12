@@ -1,6 +1,7 @@
 import { userActor, type AuditEntryInput } from './audit';
 import type { PauseKind } from './experiencePause';
 import type { RejectionReason } from './experienceReview';
+import type { SessionTemplate } from './sessions';
 import type {
   ExperienceContent,
   ExperienceContentField,
@@ -156,6 +157,61 @@ export function experiencePauseEntry(
       from_status: moved.from,
       to_status: moved.to,
       via_host_suspension: viaHostSuspension,
+    },
+  };
+}
+
+/**
+ * A weekly slot added to an experience, with what it was set up as and how many sessions it opened
+ * at once. The start time is the host's wall clock, as the template stores it.
+ */
+export function slotAddedEntry(
+  userId: string,
+  template: Pick<
+    SessionTemplate,
+    | 'id'
+    | 'experienceId'
+    | 'weekday'
+    | 'startTime'
+    | 'durationMinutes'
+    | 'allocation'
+    | 'source'
+  >,
+  sessionsCreated: number,
+): AuditEntryInput {
+  return {
+    ...userActor(userId),
+    action: 'session_template.created',
+    subjectKind: 'session_template',
+    subjectId: template.id,
+    details: {
+      experience_id: template.experienceId,
+      weekday: template.weekday,
+      start_time: template.startTime,
+      duration_minutes: template.durationMinutes,
+      allocation: template.allocation,
+      source: template.source,
+      sessions_created: sessionsCreated,
+    },
+  };
+}
+
+/** A slot's seat cap changed, and how many upcoming sessions followed it. */
+export function slotSeatsChangedEntry(
+  userId: string,
+  template: { id: string; experienceId: string },
+  change: { from: number; to: number; sessionsUpdated: number },
+): AuditEntryInput {
+  return {
+    ...userActor(userId),
+    action: 'session_template.seats_changed',
+    subjectKind: 'session_template',
+    subjectId: template.id,
+    details: {
+      experience_id: template.experienceId,
+      from_allocation: change.from,
+      to_allocation: change.to,
+      sessions_updated: change.sessionsUpdated,
     },
   };
 }

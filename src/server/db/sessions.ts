@@ -95,17 +95,18 @@ export type CreateSessionTemplateResult =
   | { ok: true; template: SessionTemplate }
   | { ok: false; reason: 'experience_not_found' | 'duplicate_slot' };
 
-// TODO(U-074c): first caller
 /**
  * Adds a weekly slot to an experience. An allocation template is set up by ops; a Ramble template
  * by the experience's host owner or ops. The slot (weekday and start time) is unique per experience.
+ * `executor` is a transaction when the slot is one of several changes that stand or fall together.
  */
 export async function createSessionTemplate(
   caller: Caller,
   input: SessionTemplateInput,
+  executor: Executor = db,
 ): Promise<CreateSessionTemplateResult> {
   const data = SessionTemplateInputSchema.parse(input);
-  const [experience] = await db
+  const [experience] = await executor
     .select({ hostId: experiences.hostId })
     .from(experiences)
     .where(eq(experiences.id, data.experienceId));
@@ -114,7 +115,7 @@ export async function createSessionTemplate(
     return { ok: false, reason: 'experience_not_found' };
   }
   requireSessionEditor(caller, experience.hostId, data.source);
-  const [row] = await db
+  const [row] = await executor
     .insert(sessionTemplates)
     .values(data)
     .onConflictDoNothing({
@@ -163,7 +164,7 @@ export async function generateSessions(
 /** Where a generation reads and writes: the pool, or a transaction that wants several templates done together. */
 type Executor = Pick<Transaction, 'select' | 'insert'>;
 
-async function generateSessionsIn(
+export async function generateSessionsIn(
   executor: Executor,
   caller: Caller,
   input: GenerateSessionsInput,

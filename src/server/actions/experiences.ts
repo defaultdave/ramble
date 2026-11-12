@@ -9,27 +9,16 @@ import {
   parseExperienceEditForm,
 } from '@/lib/experienceEditor';
 import { noticeHref, parseIdField } from '@/lib/opsForm';
-import { holdsOpsRole } from '@/lib/opsNav';
-import type { Caller } from '@/server/auth/caller';
 import {
   createExperience,
   updateExperience,
 } from '@/server/db/experienceEditor';
-import { readOpsCaller } from '@/server/opsCaller';
-
-// Each action sends the person on with `redirect`, which works by throwing, so none is wrapped in
-// a try. The ops list page shows the refusal to anyone without the role, so that is where a
-// caller without it is sent, and nothing about the request is said.
-async function opsCallerOrLeave(): Promise<Caller> {
-  const caller = await readOpsCaller();
-  if (!holdsOpsRole(caller.roles)) redirect(experiencesPath);
-  return caller;
-}
+import { opsCallerOrLeave } from '@/server/opsAccess';
 
 export async function createExperienceAction(
   formData: FormData,
 ): Promise<void> {
-  const caller = await opsCallerOrLeave();
+  const caller = await opsCallerOrLeave(experiencesPath);
   const parsed = parseExperienceCreateForm((name) => formData.get(name));
   if (!parsed.ok) {
     redirect(noticeHref(newExperiencePath, 'invalid', parsed.fields));
@@ -44,7 +33,7 @@ export async function createExperienceAction(
 export async function updateExperienceAction(
   formData: FormData,
 ): Promise<void> {
-  const caller = await opsCallerOrLeave();
+  const caller = await opsCallerOrLeave(experiencesPath);
   const experienceId = parseIdField(formData.get('experienceId'));
   if (experienceId === null) redirect(experiencesPath);
   const here = experiencePath(experienceId);

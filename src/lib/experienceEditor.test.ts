@@ -62,7 +62,7 @@ describe('prices in the form', () => {
     expect(priced(text)).toBe(minor);
   });
 
-  it.each(['100000', '12.505', '-1', '1e3', 'free'])(
+  it.each(['100000', '12.505', '-1', '1e3', 'free', '12,50', '1,25'])(
     'refuses %j as the adult price',
     (text) => {
       expect(priced(text)).toEqual(['adultPrice']);

@@ -6,6 +6,7 @@ import {
   normalizeEmailAddress,
 } from './email/address';
 import {
+  changedFields,
   fieldsFromIssues,
   formText,
   inFieldOrder,
@@ -187,7 +188,7 @@ export function changedHostFields(
   before: HostInput,
   after: HostInput,
 ): HostEditableField[] {
-  return hostEditableFields.filter((field) => before[field] !== after[field]);
+  return changedFields(hostEditableFields, before, after);
 }
 
 export type HostAcceptanceOutcome =

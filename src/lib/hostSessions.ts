@@ -1,7 +1,8 @@
 import { CalendarDateTime, toZoned } from '@internationalized/date';
 import { z } from 'zod';
 import { EntityIdSchema } from './catalog';
-import { formatPrice, priceInputText, priceMinorFromText } from './money';
+import { formatPrice, priceInputTextOrNull, priceMinorFromText } from './money';
+import { wholeNumberPattern } from './text';
 import {
   IsoDateSchema,
   TimeZoneSchema,
@@ -181,10 +182,7 @@ function rowView(session: HostWeekSession, now: Date): HostWeekRowView {
       (session.endsAt.getTime() - session.startsAt.getTime()) / msPerMinute,
     ),
     allocation: session.allocation,
-    adultPrice:
-      session.adultPriceMinor === null
-        ? null
-        : priceInputText(session.adultPriceMinor),
+    adultPrice: priceInputTextOrNull(session.adultPriceMinor),
     editable,
     movable: editable && session.seatsSold === 0,
   };
@@ -252,8 +250,6 @@ function text(get: Get, field: string): string {
   const value = get(field);
   return typeof value === 'string' ? value.trim() : '';
 }
-
-const wholeNumberPattern = /^\d{1,7}$/;
 
 /** A whole number typed in a field, or undefined for anything else, so the schema names the field. */
 function wholeNumber(get: Get, field: string): number | undefined {

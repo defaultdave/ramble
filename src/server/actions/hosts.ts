@@ -11,21 +11,10 @@ import {
   parseHostEditForm,
 } from '@/lib/hostSetup';
 import { noticeHref, parseIdField } from '@/lib/opsForm';
-import { holdsOpsRole } from '@/lib/opsNav';
-import type { Caller } from '@/server/auth/caller';
 import { createHost, updateHost } from '@/server/db/hostSetup';
 import { recordHostAcceptance } from '@/server/db/legal';
 import { inviteHostOwner } from '@/server/hostInvite';
-import { readOpsCaller } from '@/server/opsCaller';
-
-// Each action sends the person on with `redirect`, which works by throwing, so none is wrapped in
-// a try. The ops list page shows the refusal to anyone without the role, so that is where a
-// caller without it is sent, and nothing about the request is said.
-async function opsCallerOrLeave(): Promise<Caller> {
-  const caller = await readOpsCaller();
-  if (!holdsOpsRole(caller.roles)) redirect(hostsPath);
-  return caller;
-}
+import { opsCallerOrLeave } from '@/server/opsAccess';
 
 function hostIdOrLeave(formData: FormData): string {
   const hostId = parseIdField(formData.get('hostId'));
@@ -34,7 +23,7 @@ function hostIdOrLeave(formData: FormData): string {
 }
 
 export async function createHostAction(formData: FormData): Promise<void> {
-  const caller = await opsCallerOrLeave();
+  const caller = await opsCallerOrLeave(hostsPath);
   const parsed = parseHostCreateForm((name) => formData.get(name));
   if (!parsed.ok) redirect(noticeHref(newHostPath, 'invalid', parsed.fields));
 
@@ -54,7 +43,7 @@ export async function createHostAction(formData: FormData): Promise<void> {
 }
 
 export async function updateHostAction(formData: FormData): Promise<void> {
-  const caller = await opsCallerOrLeave();
+  const caller = await opsCallerOrLeave(hostsPath);
   const hostId = hostIdOrLeave(formData);
   const parsed = parseHostEditForm((name) => formData.get(name));
   if (!parsed.ok) {
@@ -71,7 +60,7 @@ export async function updateHostAction(formData: FormData): Promise<void> {
 export async function acceptHostAgreementAction(
   formData: FormData,
 ): Promise<void> {
-  const caller = await opsCallerOrLeave();
+  const caller = await opsCallerOrLeave(hostsPath);
   const hostId = hostIdOrLeave(formData);
   const outcome = await recordHostAcceptance(
     caller,
@@ -85,7 +74,7 @@ export async function acceptHostAgreementAction(
 export async function resendHostInviteAction(
   formData: FormData,
 ): Promise<void> {
-  const caller = await opsCallerOrLeave();
+  const caller = await opsCallerOrLeave(hostsPath);
   const hostId = hostIdOrLeave(formData);
   const ownerUserId = parseIdField(formData.get('ownerUserId'));
   if (ownerUserId === null) redirect(hostPath(hostId));

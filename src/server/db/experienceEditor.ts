@@ -40,7 +40,9 @@ import { updateTagsForChanges } from '@/server/cache/invalidate';
 import { Role, requireRole, type Caller } from '@/server/auth/caller';
 import { requireOpsUserId, writeAudit } from './audit';
 import { listCategories, listNeighborhoods } from './catalog';
+import { byNameThenId, pastNameCursor } from './keysetPage';
 import { db, dbRead, type Transaction } from './client';
+import { getPublishedLegalDocument } from './legal';
 import { listCancellationTiers } from './policies';
 import {
   categories,
@@ -99,12 +101,10 @@ export async function readExperiencesForOps(
         parsed.categoryId === null
           ? undefined
           : eq(experiences.categoryId, parsed.categoryId),
-        parsedCursor === null
-          ? undefined
-          : sql`(${experiences.name}, ${experiences.id}) > (SELECT e.name, e.id FROM experiences e WHERE e.id = ${parsedCursor})`,
+        pastNameCursor(experiences, parsedCursor),
       ),
     )
-    .orderBy(asc(experiences.name), asc(experiences.id))
+    .orderBy(...byNameThenId(experiences))
     .limit(experiencesPageSize + 1);
   const { items, nextCursor } = splitPage(fetched, experiencesPageSize);
   return { rows: items, nextCursor };
@@ -211,11 +211,8 @@ async function referencesExist(
     if (!(await found(check))) return false;
   }
   if (refs.waiverDocumentId === null) return true;
-  const [waiver] = await tx
-    .select({ doc: legalDocuments.doc, status: legalDocuments.status })
-    .from(legalDocuments)
-    .where(eq(legalDocuments.id, refs.waiverDocumentId));
-  return waiver !== undefined && isPublishedWaiver(waiver);
+  const waiver = await getPublishedLegalDocument(refs.waiverDocumentId, tx);
+  return waiver !== null && isPublishedWaiver(waiver);
 }
 
 async function writePriceOptions(

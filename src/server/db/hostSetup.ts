@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import {
   hostCreatedEntry,
   hostFormEntry,
@@ -24,6 +24,7 @@ import { splitPage } from '@/lib/pagination';
 import { requireRole, Role, type Caller } from '@/server/auth/caller';
 import { recordAudit, requireOpsUserId, writeAudit } from './audit';
 import { db, dbRead } from './client';
+import { byNameThenId, pastNameCursor } from './keysetPage';
 import {
   getCurrentLegalDocument,
   readHostAcceptances,
@@ -170,12 +171,8 @@ export async function readHostsForOps(
       timeZone: hosts.timeZone,
     })
     .from(hosts)
-    .where(
-      cursor === null
-        ? undefined
-        : sql`(${hosts.name}, ${hosts.id}) > (SELECT h.name, h.id FROM hosts h WHERE h.id = ${cursor})`,
-    )
-    .orderBy(asc(hosts.name), asc(hosts.id))
+    .where(pastNameCursor(hosts, cursor))
+    .orderBy(...byNameThenId(hosts))
     .limit(hostsPageSize + 1);
   const { items, nextCursor } = splitPage(fetched, hostsPageSize);
   const ids = items.map((host) => host.id);

@@ -11,6 +11,7 @@ import {
   type HostInput,
 } from '@/lib/hostSetup';
 import { maxEmailAddressLength } from '@/lib/email/address';
+import { errorProps } from '@/lib/opsForm';
 import { maxTimeZoneLength } from '@/lib/sessions';
 import styles from './HostSetup.module.css';
 
@@ -35,7 +36,7 @@ export function HostForm({
 }: HostFormProps) {
   const creating = values === undefined;
   const errorFor = (field: HostFormField) =>
-    problems.includes(field) ? { errorText: hostFieldProblems[field] } : {};
+    errorProps(problems, hostFieldProblems, field);
   return (
     <form action={action} className={styles.form} noValidate>
       {values ? <input type="hidden" name="hostId" value={values.id} /> : null}

@@ -11,7 +11,10 @@ import {
   weekStartOf,
   type HostWeekSession,
 } from './hostSessions';
-import { UpdateSessionAllocationInputSchema } from './sessions';
+import {
+  UpdateSessionAllocationInputSchema,
+  UpdateSessionPriceInputSchema,
+} from './sessions';
 
 // Behaviours under test, one per decision, branch or risk:
 // - a week runs Monday to Sunday, and any date in it names it (Sunday belongs to the week before the next Monday)
@@ -244,6 +247,17 @@ describe('form values and refusals', () => {
       errors: { allocation: containing('whole number') },
     });
   });
+
+  it.each(['12,50', '1,25', 'free'])(
+    'names the price field for %j, never reading a comma as a decimal',
+    (price) => {
+      const parsed = UpdateSessionPriceInputSchema.safeParse(
+        hostSessionFormValues.price(get({ sessionId: id(1), price })),
+      );
+      if (parsed.success) throw new Error('expected a refusal');
+      expect(hostSessionInvalid(parsed.error).status).toBe('invalid');
+    },
+  );
 
   it('calls a bad session id or version a stale form, not a field', () => {
     const parsed = UpdateSessionAllocationInputSchema.safeParse(

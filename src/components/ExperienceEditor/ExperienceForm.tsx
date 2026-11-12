@@ -17,6 +17,7 @@ import {
   type ExperienceContent,
   type ExperienceFormField,
 } from '@/lib/experienceEditor';
+import { errorProps, problemText } from '@/lib/opsForm';
 import styles from './ExperienceEditor.module.css';
 
 type FormAction = (formData: FormData) => void | Promise<void>;
@@ -53,12 +54,10 @@ export function ExperienceForm({
   problems = [],
 }: ExperienceFormProps) {
   const creating = experienceId === undefined;
-  const problemText = (field: ExperienceFormField) =>
-    problems.includes(field) ? experienceFieldProblems[field] : undefined;
-  const errorFor = (field: ExperienceFormField) => {
-    const errorText = problemText(field);
-    return errorText === undefined ? {} : { errorText };
-  };
+  const problemOf = (field: ExperienceFormField) =>
+    problemText(problems, experienceFieldProblems, field);
+  const errorFor = (field: ExperienceFormField) =>
+    errorProps(problems, experienceFieldProblems, field);
   return (
     <form action={action} className={styles.form} noValidate>
       {experienceId ? (
@@ -191,7 +190,7 @@ export function ExperienceForm({
           name="childUsesSpace"
           label="A child takes a space in the session."
           defaultChecked={values.childUsesSpace}
-          problem={problemText('childUsesSpace')}
+          problem={problemOf('childUsesSpace')}
         />
       </Group>
       <Group legend="Rules">
@@ -239,7 +238,7 @@ export function ExperienceForm({
           name="outdoor"
           label="This experience is outdoors."
           defaultChecked={values.outdoor}
-          problem={problemText('outdoor')}
+          problem={problemOf('outdoor')}
         />
         <Select
           name="weatherPolicy"
@@ -273,7 +272,7 @@ export function ExperienceForm({
           name="waiverRequired"
           label="Guests accept a waiver at checkout."
           defaultChecked={values.waiverRequired}
-          problem={problemText('waiverRequired')}
+          problem={problemOf('waiverRequired')}
         />
         <Select
           name="waiverDocumentId"

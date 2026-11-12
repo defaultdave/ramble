@@ -16,8 +16,9 @@ import {
   type Neighborhood,
 } from './catalog';
 import { parseSingle, type SelectOption } from './filters';
-import { priceInputText, priceMinorFromText } from './money';
+import { priceInputTextOrNull, priceMinorFromText } from './money';
 import {
+  changedFields,
   fieldsFromIssues,
   formHas,
   formText,
@@ -35,7 +36,7 @@ import {
   type StatusTone,
 } from './statusBadge';
 import type { TableQuery } from './tableQuery';
-import { requiredText } from './text';
+import { requiredText, wholeNumberText } from './text';
 
 // The experience editor for ops: every content field and the two price options of an experience.
 // Status is not edited here (the review queue and pause own it), and the cancellation tier is
@@ -160,7 +161,7 @@ export type ExperienceFormResult<T> =
 
 /** A price field as the form shows it for editing, empty for none. */
 export function priceFieldValue(minor: number | null): string {
-  return minor === null ? '' : priceInputText(minor);
+  return priceInputTextOrNull(minor) ?? '';
 }
 
 const PriceSchema = z.string().transform((text, ctx) => {
@@ -172,13 +173,6 @@ const PriceSchema = z.string().transform((text, ctx) => {
   return minor;
 });
 
-const IntegerFieldSchema = (max: number, min = 0) =>
-  z
-    .string()
-    .regex(/^\d{1,6}$/)
-    .transform(Number)
-    .pipe(z.int().min(min).max(max));
-
 const FieldsSchema = z.strictObject({
   hostId: WriteIdSchema.optional(),
   name: requiredText(experienceLimits.name),
@@ -189,18 +183,18 @@ const FieldsSchema = z.strictObject({
   accessibilityNotes: requiredText(
     experienceLimits.accessibilityNotes,
   ).optional(),
-  durationMinutes: IntegerFieldSchema(maxSessionMinutes, 1).optional(),
+  durationMinutes: wholeNumberText(1, maxSessionMinutes).optional(),
   categoryId: WriteIdSchema,
   neighborhoodId: WriteIdSchema,
   cancellationTierId: WriteIdSchema,
   weatherPolicy: z.enum(weatherPolicies).optional(),
-  weatherDecisionHours: IntegerFieldSchema(
-    experienceLimits.weatherDecisionHours,
+  weatherDecisionHours: wholeNumberText(
     1,
+    experienceLimits.weatherDecisionHours,
   ).optional(),
   ageRule: z.enum(ageRules),
-  minAge: IntegerFieldSchema(experienceLimits.maxAge).optional(),
-  maxAge: IntegerFieldSchema(experienceLimits.maxAge).optional(),
+  minAge: wholeNumberText(0, experienceLimits.maxAge).optional(),
+  maxAge: wholeNumberText(0, experienceLimits.maxAge).optional(),
   taxTreatment: z.enum(taxTreatments),
   waiverDocumentId: WriteIdSchema.optional(),
   linkOutUrl: HttpUrlSchema.max(experienceLimits.url).optional(),
@@ -392,7 +386,7 @@ export function changedExperienceFields(
   before: ExperienceContent,
   after: ExperienceContent,
 ): ExperienceContentField[] {
-  return contentFields.filter((field) => before[field] !== after[field]);
+  return changedFields(contentFields, before, after);
 }
 
 type PriceOptionFields = {

@@ -44,6 +44,34 @@ export function fieldsFromIssues<F extends string>(
   return inFieldOrder(fields, named);
 }
 
+/** Which of `fields` differ between two values, in the list's order. Nothing differing means nothing is written. */
+export function changedFields<F extends string>(
+  fields: readonly F[],
+  before: Readonly<Record<F, unknown>>,
+  after: Readonly<Record<F, unknown>>,
+): F[] {
+  return fields.filter((field) => before[field] !== after[field]);
+}
+
+/** The sentence for a field the last try refused, or undefined when it was not refused. */
+export function problemText<F extends string>(
+  problems: readonly F[],
+  texts: Readonly<Record<F, string>>,
+  field: F,
+): string | undefined {
+  return problems.includes(field) ? texts[field] : undefined;
+}
+
+/** The props a form control takes for a refused field, to spread: its error text, or nothing. */
+export function errorProps<F extends string>(
+  problems: readonly F[],
+  texts: Readonly<Record<F, string>>,
+  field: F,
+): { errorText: string } | { errorText?: never } {
+  const errorText = problemText(problems, texts, field);
+  return errorText === undefined ? {} : { errorText };
+}
+
 /** The fields whose posted text is over the limit, so no rule walks an unbounded string. */
 export function oversizedFields<F extends string>(
   get: FormGetter,

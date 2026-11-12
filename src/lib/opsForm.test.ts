@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  changedFields,
+  errorProps,
   fieldsFromIssues,
   formHas,
   inFieldOrder,
@@ -10,6 +12,7 @@ import {
   parseIdField,
   parseNotice,
   parseProblemFields,
+  problemText,
   slugFor,
 } from './opsForm';
 
@@ -155,5 +158,29 @@ describe('fieldsFromIssues', () => {
 
   it('names nothing for no issues', () => {
     expect(fieldsFromIssues([], fields)).toEqual([]);
+  });
+});
+
+describe('changedFields', () => {
+  it('lists the differing fields in the list order, and none for equal values', () => {
+    const before = { a: 1, b: 'x', c: null };
+
+    expect(
+      changedFields(['c', 'b', 'a'], before, { a: 2, b: 'x', c: 0 }),
+    ).toEqual(['c', 'a']);
+    expect(changedFields(['a', 'b', 'c'], before, { ...before })).toEqual([]);
+  });
+});
+
+describe('problemText and errorProps', () => {
+  const texts = { name: 'Enter a name.', slug: 'Enter a slug.' } as const;
+
+  it('gives the sentence of a refused field and nothing for another', () => {
+    expect(problemText(['name'], texts, 'name')).toBe('Enter a name.');
+    expect(problemText(['name'], texts, 'slug')).toBeUndefined();
+    expect(errorProps(['name'], texts, 'name')).toEqual({
+      errorText: 'Enter a name.',
+    });
+    expect(errorProps(['name'], texts, 'slug')).toEqual({});
   });
 });

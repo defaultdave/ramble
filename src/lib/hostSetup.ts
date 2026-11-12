@@ -100,15 +100,6 @@ const FieldsSchema = z.strictObject({
   ownerEmail: optionalEmail.optional(),
 });
 
-const hostTextFields = [
-  'name',
-  'slug',
-  'description',
-  'timeZone',
-  'notificationEmail',
-  'ownerEmail',
-] as const satisfies readonly HostFormField[];
-
 /**
  * Reads `fields` from a posted form and parses them with `schema`. A field over the raw limit is
  * refused unread (`sized` names the fields whose size is checked), and
@@ -142,7 +133,7 @@ function parseFields(
 ): HostFormResult<HostInput & { ownerEmail: string | null }> {
   const parsed = readTextFields(
     get,
-    hostTextFields,
+    [...hostEditableFields, 'ownerEmail'] as const,
     FieldsSchema,
     hostFormFields,
   );
@@ -233,11 +224,11 @@ export function parseHostSettingsForm(
   const parsed = readTextFields(
     get,
     hostSettingsFields,
-    FieldsSchema.pick(
-      Object.fromEntries(hostSettingsFields.map((field) => [field, true])) as {
-        [Field in HostSettingsField]: true;
-      },
-    ),
+    FieldsSchema.pick({
+      name: true,
+      description: true,
+      notificationEmail: true,
+    }),
     hostSettingsFields,
   );
   if (!parsed.ok) return parsed;
@@ -258,6 +249,13 @@ export function changedHostSettings(
   after: HostSettingsInput,
 ): HostSettingsField[] {
   return changedFields(hostSettingsFields, before, after);
+}
+
+/** What a save came to: nothing differing is `unchanged`, anything else `updated`. */
+export function hostSaveOutcome(
+  changed: readonly unknown[],
+): 'updated' | 'unchanged' {
+  return changed.length === 0 ? 'unchanged' : 'updated';
 }
 
 /** Which editable fields differ, in form order. Nothing differing means nothing is written. */

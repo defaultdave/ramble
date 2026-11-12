@@ -1,9 +1,5 @@
 import 'server-only';
-import {
-  hostAccessFor,
-  readableHostId,
-  type HostAccess,
-} from '@/lib/hostAccess';
+import { hostAccessFor, hostIdToRead, type HostAccess } from '@/lib/hostAccess';
 import { getCaller, type Caller } from '@/server/auth/caller';
 
 /**
@@ -20,11 +16,7 @@ export async function loadForHostArea<Data, Result>(
 ): Promise<Result> {
   const caller = await getCaller();
   const access = hostAccessFor(caller);
-  const hostId = allowStaff
-    ? readableHostId(access)
-    : access.kind === 'owner'
-      ? access.hostId
-      : null;
+  const hostId = hostIdToRead(access, allowStaff);
   const data = hostId === null ? null : await read(caller, hostId);
   return decide(access, data);
 }

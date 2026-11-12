@@ -12,6 +12,7 @@ import {
   agreementRefusal,
   isSlugTakenError,
   changedHostFields,
+  hostSaveOutcome,
   hostAgreementDoc,
   hostsPageSize,
   type HostCreateInput,
@@ -20,7 +21,7 @@ import {
   type HostListRow,
 } from '@/lib/hostSetup';
 import { splitPage } from '@/lib/pagination';
-import type { Caller } from '@/server/auth/caller';
+import { Role, type Caller } from '@/server/auth/caller';
 import { recordAudit, requireOpsUserId, writeAudit } from './audit';
 import { db, dbRead } from './client';
 import { saveHostFields } from './hostFields';
@@ -118,20 +119,19 @@ export async function updateHost(
   hostId: string,
   input: HostInput,
 ): Promise<UpdateHostResult> {
-  const userId = requireOpsUserId(caller);
+  requireOpsUserId(caller);
   try {
     return await db.transaction(async (tx) => {
       const changed = await saveHostFields(
         tx,
-        userId,
+        caller,
+        Role.Ops,
         hostId,
         input,
         (current) => changedHostFields(current, input),
       );
       if (changed === null) return { status: 'not_found' } as const;
-      return {
-        status: changed.length === 0 ? 'unchanged' : 'updated',
-      } as const;
+      return { status: hostSaveOutcome(changed) } as const;
     });
   } catch (error) {
     if (isSlugTakenError(error)) return { status: 'slug_taken' };

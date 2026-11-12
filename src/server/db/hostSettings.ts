@@ -5,9 +5,12 @@ import {
   hostSettingsChanges,
   type HostSettingsSaveResult,
 } from '@/lib/hostSettings';
-import { changedHostSettings, type HostSettingsInput } from '@/lib/hostSetup';
+import {
+  changedHostSettings,
+  hostSaveOutcome,
+  type HostSettingsInput,
+} from '@/lib/hostSetup';
 import { Role, requireRole, type Caller } from '@/server/auth/caller';
-import { requireUserId } from './audit';
 import { db } from './client';
 import { saveHostFields } from './hostFields';
 import { withLockedHost } from './lockedExperience';
@@ -43,27 +46,29 @@ export async function updateHostSettings(
   hostId: string,
   input: HostSettingsInput,
 ): Promise<HostSettingsSaveResult> {
-  requireRole(caller, Role.HostOwner, { hostId });
-  const userId = requireUserId(caller, Role.HostOwner);
+  const id = EntityIdSchema.parse(hostId);
+  requireRole(caller, Role.HostOwner, { hostId: id });
   return withLockedHost<HostSettingsSaveResult>(
-    hostId,
+    id,
     'not_found',
     async (tx, host) => {
       const changed = await saveHostFields(
         tx,
-        userId,
+        caller,
+        Role.HostOwner,
         host.id,
         input,
         (current) => changedHostSettings(current, input),
       );
       if (changed === null) return { result: 'not_found', changes: [] };
-      if (changed.length === 0) return { result: 'unchanged', changes: [] };
+      const result = hostSaveOutcome(changed);
+      if (result === 'unchanged') return { result, changes: [] };
       const owned = await tx
         .select({ id: experiences.id })
         .from(experiences)
         .where(eq(experiences.hostId, host.id));
       return {
-        result: 'updated',
+        result,
         changes: hostSettingsChanges(
           changed,
           owned.map(({ id }) => id),

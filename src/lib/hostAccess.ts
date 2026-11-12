@@ -22,6 +22,14 @@ export function readableHostId(access: HostAccess): string | null {
     : null;
 }
 
+/** The host a page reads for a caller: an owner's, and staff's too when the page allows staff; null for anyone else, so nothing is read for them. */
+export function hostIdToRead(
+  access: HostAccess,
+  allowStaff: boolean,
+): string | null {
+  return allowStaff ? readableHostId(access) : ownedHostId(access);
+}
+
 /** The host a caller owns, which only an owner may manage (sessions, staff); null for staff and everyone else. */
 export function ownedHostId(access: HostAccess): string | null {
   return access.kind === 'owner' ? access.hostId : null;

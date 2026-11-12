@@ -72,12 +72,18 @@ describe('updateHostSettingsAction', () => {
     expect(mocks.updateHostSettings).not.toHaveBeenCalled();
   });
 
-  it('sends a person who owns no host back to the page and saves nothing', async () => {
-    mocks.getCaller.mockResolvedValue({
-      userId: id(3),
-      roles: ['guest'],
-      hostIds: [],
-    });
+  it.each([
+    ['a guest', { roles: ['guest'], hostIds: [], hostGrants: [] }],
+    [
+      'host staff, who change nothing',
+      {
+        roles: ['host_staff'],
+        hostIds: [id(2)],
+        hostGrants: [{ role: 'host_staff', hostId: id(2) }],
+      },
+    ],
+  ])('sends %s back to the page and saves nothing', async (_who, caller) => {
+    mocks.getCaller.mockResolvedValue({ userId: id(3), ...caller });
     const href = await redirectOf(() =>
       updateHostSettingsAction(formOf(valid)),
     );

@@ -368,19 +368,16 @@ describe('slug history', () => {
 describe('host reads', () => {
   let ownerHostId: string;
   let otherHostId: string;
-  let draftId: string;
 
   beforeAll(async () => {
     ownerHostId = (await insertHost()).id;
     otherHostId = (await insertHost()).id;
     const ids = await parents(ownerHostId);
-    draftId = (
-      await insertExperience(ids, {
-        name: 'BBA draft',
-        status: 'draft',
-        taxTreatment: 'taxable',
-      })
-    ).id;
+    await insertExperience(ids, {
+      name: 'BBA draft',
+      status: 'draft',
+      taxTreatment: 'taxable',
+    });
     await insertExperience(ids, { name: 'BBB paused', status: 'paused' });
     await insertExperience(await parents(otherHostId), { name: 'BBC other' });
   });
@@ -402,15 +399,6 @@ describe('host reads', () => {
     });
   });
 
-  it('returns one of the owner’s experiences whatever its status', async () => {
-    const found = await catalog.getHostExperience(
-      ownerOf(ownerHostId),
-      draftId,
-    );
-
-    expect(found).toMatchObject({ id: draftId, status: 'draft' });
-  });
-
   it.each([
     ['the owner of another host', () => ownerOf(otherHostId)],
     ['the anonymous caller', () => anonymousCaller],
@@ -420,22 +408,10 @@ describe('host reads', () => {
       'host staff',
       () => testCaller({ roles: [Role.HostStaff], hostIds: [ownerHostId] }),
     ],
-  ])('refuses %s on both reads', async (_name, getCaller) => {
+  ])('refuses %s', async (_name, getCaller) => {
     await expect(
       catalog.listHostExperiences(getCaller(), ownerHostId),
     ).rejects.toThrow(ForbiddenError);
-    await expect(
-      catalog.getHostExperience(getCaller(), draftId),
-    ).rejects.toThrow(ForbiddenError);
-  });
-
-  it.each([
-    ['a malformed ID', 'not-a-uuid'],
-    ['an unknown ID', '00000000-0000-4000-8000-000000000000'],
-  ])('returns null for %s', async (_name, id) => {
-    expect(
-      await catalog.getHostExperience(ownerOf(ownerHostId), id),
-    ).toBeNull();
   });
 
   it('lists nothing for a malformed host ID', async () => {

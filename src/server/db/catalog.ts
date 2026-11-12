@@ -119,23 +119,3 @@ export async function listHostExperiences(
   });
   return HostExperienceSchema.array().parse(rows);
 }
-
-// TODO(U-125): first caller; no unit plans a host-side experience detail or editing page, and /host/experiences shows every fact in its list
-/** The row is read once and its host checked before it is returned, so the owner of another host learns nothing from it. */
-export async function getHostExperience(
-  caller: Caller,
-  id: string,
-): Promise<HostExperience | null> {
-  const parsedId = EntityIdSchema.safeParse(id);
-  if (!parsedId.success) return null;
-  const row = await dbRead.query.experiences.findFirst({
-    where: eq(experiences.id, parsedId.data),
-    with: {
-      cancellationTier: true,
-      priceOptions: { orderBy: adultFirst },
-    },
-  });
-  if (!row) return null;
-  requireRole(caller, Role.HostOwner, { hostId: row.hostId });
-  return HostExperienceSchema.parse(row);
-}

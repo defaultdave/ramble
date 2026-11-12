@@ -21,7 +21,7 @@ import {
   type HostListRow,
 } from '@/lib/hostSetup';
 import { splitPage } from '@/lib/pagination';
-import { requireRole, Role, type Caller } from '@/server/auth/caller';
+import type { Caller } from '@/server/auth/caller';
 import { recordAudit, requireOpsUserId, writeAudit } from './audit';
 import { db, dbRead } from './client';
 import { byNameThenId, pastNameCursor } from './keysetPage';
@@ -243,7 +243,6 @@ export async function readHostInviteTarget(
     role: 'host_owner',
     hostId,
   });
-  return holder?.hostName == null
-    ? null
-    : { hostName: holder.hostName, email: holder.email };
+  if (holder === null || holder.hostName === null) return null;
+  return { hostName: holder.hostName, email: holder.email };
 }

@@ -555,7 +555,7 @@ describe('the audit viewer', () => {
       [...all.map((row) => Number(row.id))].sort((a, b) => a - b),
     );
     expect(all.every((row) => row.action === 'seed.row')).toBe(true);
-    expect(all[0]?.time).toBe('00:00:00 UTC');
+    expect(all[0]?.time).toBe('Jan 5, 2026, 12:00 AM UTC');
     expect(
       await auditRows(
         sql`action = 'audit.viewed' AND details->>'day' = ${day}`,

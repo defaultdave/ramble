@@ -573,8 +573,12 @@ describe('host staff', () => {
         (row.allows[place] ?? []).some((who) => who.startsWith('staff')),
       )
       .map(({ row }) => row.fn);
+    // By name only: readAccountBookings admits every signed-in persona, staff included, because it
+    // reads the caller's own bookings and nobody else's. That is ownership, not a host role, and
+    // tests/db/account-bookings.db.test.ts proves a host staff reader sees only their own.
+    const ownBookingReads = ['readAccountBookings'];
     expect([...new Set(admitting)].sort()).toEqual(
-      [...hostReaderFunctions].sort(),
+      [...hostReaderFunctions, ...ownBookingReads].sort(),
     );
   });
 });

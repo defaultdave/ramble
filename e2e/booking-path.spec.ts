@@ -58,6 +58,10 @@ test('a guest browses, holds, pays on the fake gateway, and sees a confirmed ord
     'I accept the waiver for everyone in my party',
   );
   if (await waiver.count()) await waiver.check();
+  // Most of the catalog has an age rule, and checkout holds on Continue until it is confirmed.
+  // Every wording of that confirmation opens with "Everyone".
+  const ageConfirmation = page.getByLabel(/^Everyone /);
+  if (await ageConfirmation.count()) await ageConfirmation.check();
   await page
     .getByLabel("I accept Ramble's terms and the cancellation terms below")
     .check();

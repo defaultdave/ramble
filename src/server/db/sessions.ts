@@ -48,6 +48,8 @@ import { errorKind } from '@/lib/errorKind';
 import {
   ForbiddenError,
   Role,
+  hostReaderRoles,
+  requireAnyRole,
   requireRole,
   type Caller,
 } from '@/server/auth/caller';
@@ -713,7 +715,7 @@ export async function readHostWeek(
   now: Date,
 ): Promise<HostWeekData | null> {
   const id = EntityIdSchema.parse(hostId);
-  requireRole(caller, Role.HostOwner, { hostId: id });
+  requireAnyRole(caller, hostReaderRoles, { hostId: id });
   const [host] = await db
     .select({ name: hosts.name, timeZone: hosts.timeZone })
     .from(hosts)

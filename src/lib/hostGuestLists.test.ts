@@ -4,6 +4,7 @@ import {
   buildHostBookingList,
   buildHostGuestList,
   HostBookingSearchSchema,
+  HostGuestListBookingSchema,
   hostBookingListLimit,
   hostBookingListResult,
   hostGuestListHref,
@@ -12,11 +13,13 @@ import {
   waiverLabel,
   type HostBookingListRow,
   type HostGuestListData,
+  type HostGuestListOwnerBooking,
 } from './hostGuestLists';
 
 // Behaviours under test, one per decision, branch or risk:
 // - ages read as the children's ages, else the booker's confirmation, else "no age details"
 // - the waiver reads accepted, not accepted (asked for and missing), or not required
+// - a staff guest list has no children's ages or guardian fields at all, and keeps the contacts; an owner's shows them
 // - a guest row carries party, ages, waiver, and email; the phone and guardian only when the booking holds them
 // - the guest list totals seats and bookings, with the singular for one
 // - a booking row links to its session's guest list and reads its status and time on the session's own clock
@@ -42,9 +45,10 @@ const bookingRow = (n: number, over: Partial<HostBookingListRow> = {}) => ({
 });
 
 const guestData = (
-  bookings: HostGuestListData['bookings'],
+  bookings: readonly HostGuestListOwnerBooking[],
   waiverRequired = true,
 ): HostGuestListData => ({
+  scope: 'owner',
   session: {
     hostName: 'Harbor Kayak Co',
     id: id(100),
@@ -56,9 +60,7 @@ const guestData = (
   bookings,
 });
 
-const guestBooking = (
-  over: Partial<HostGuestListData['bookings'][number]> = {},
-) => ({
+const guestBooking = (over: Partial<HostGuestListOwnerBooking> = {}) => ({
   id: id(1),
   reference: 'RMB-AAAA01',
   leadGuestName: 'Ada Lovelace',
@@ -83,6 +85,47 @@ describe('agesLabel', () => {
     [null, null, 'No age details'],
   ] as const)('reads %j and %j as "%s"', (ages, confirmed, label) => {
     expect(agesLabel(ages, confirmed)).toBe(label);
+  });
+});
+
+describe('a staff guest list', () => {
+  it('has no guardian or ages, whatever the booking holds, and keeps the contacts', () => {
+    const owner = guestData([
+      guestBooking({
+        childrenAges: [8, 11],
+        guardianName: 'Ada Lovelace',
+        guardianContact: 'ada@example.com',
+        ageConfirmed: null,
+        contactPhone: '+1 555 0100',
+      }),
+    ]);
+    const staff = {
+      ...owner,
+      scope: 'staff' as const,
+      bookings: HostGuestListBookingSchema.array().parse(owner.bookings),
+    };
+
+    const keys = Object.keys(staff.bookings[0] ?? {});
+    expect(keys).not.toContain('childrenAges');
+    expect(keys).not.toContain('guardianName');
+    expect(keys).not.toContain('guardianContact');
+    const row = buildHostGuestList(staff).rows[0];
+    expect(row?.agesLabel).toBe('No age details');
+    expect(row?.contacts.map((c) => c.label)).toEqual(['Email', 'Phone']);
+  });
+
+  it('shows an owner the children and the guardian', () => {
+    const row = buildHostGuestList(
+      guestData([
+        guestBooking({
+          childrenAges: [8, 11],
+          guardianName: 'Ada Lovelace',
+          guardianContact: 'ada@example.com',
+        }),
+      ]),
+    ).rows[0];
+    expect(row?.agesLabel).toBe('Children aged 8, 11');
+    expect(row?.contacts.map((c) => c.label)).toContain('Guardian');
   });
 });
 
@@ -235,11 +278,11 @@ describe('the results', () => {
   });
 
   it('refuses a signed-in non-owner even when data is handed over', () => {
+    expect(hostBookingListResult({ kind: 'no_host_role' }, data, '')).toEqual({
+      status: 'refused',
+    });
     expect(
-      hostBookingListResult({ kind: 'not_a_host_owner' }, data, ''),
-    ).toEqual({ status: 'refused' });
-    expect(
-      hostGuestListResult({ kind: 'not_a_host_owner' }, guestData([])),
+      hostGuestListResult({ kind: 'no_host_role' }, guestData([])),
     ).toEqual({ status: 'refused' });
   });
 
@@ -250,10 +293,13 @@ describe('the results', () => {
     expect(hostGuestListResult(owner, null)).toEqual({ status: 'refused' });
   });
 
-  it('gives an owner the view', () => {
-    const list = hostBookingListResult(owner, data, 'ada');
+  it.each([
+    ['an owner', owner],
+    ['host staff', { kind: 'staff', hostId: id(9) } as const],
+  ])('gives %s the view', (_name, access) => {
+    const list = hostBookingListResult(access, data, 'ada');
     expect(list.status === 'ok' && list.view.term).toBe('ada');
-    const guests = hostGuestListResult(owner, guestData([]));
+    const guests = hostGuestListResult(access, guestData([]));
     expect(guests.status === 'ok' && guests.view.hostName).toBe(
       'Harbor Kayak Co',
     );

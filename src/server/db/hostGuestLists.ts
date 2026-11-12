@@ -5,20 +5,29 @@ import {
   HostBookingListRowSchema,
   HostBookingSearchSchema,
   HostGuestListBookingSchema,
+  HostGuestListOwnerBookingSchema,
   HostGuestListSessionSchema,
   hostBookingListLimit,
   type HostBookingListData,
   type HostGuestListData,
 } from '@/lib/hostGuestLists';
 import { containsPattern } from '@/lib/pages/help';
-import { Role, requireRole, type Caller } from '@/server/auth/caller';
+import {
+  holdsRole,
+  hostReaderRoles,
+  requireAnyRole,
+  Role,
+  type Caller,
+} from '@/server/auth/caller';
 import { liveBookings, selectBookings } from './bookingRows';
 import { db } from './client';
 import { experiences, hosts, orderItems, orders, sessions } from './schema';
 
 // Guest personal data (names, emails, phones, children's ages, guardians) leaves here only for the
 // host that owns the booking (PRD-73). The caller is checked against `hostId` before anything is
-// read, and every query is cut to that host.
+// read, and every query is cut to that host. Read-only host staff get the booking facts and the
+// booker's contact details, never the children's ages or the guardian: their query does not select
+// those columns and their data type has no such fields; they are the host owner's.
 
 const seatsOf = sql<number>`coalesce((
   select sum(${orderItems.quantity})::int from ${orderItems}
@@ -26,9 +35,10 @@ const seatsOf = sql<number>`coalesce((
 ), 0)`;
 
 /**
- * A host owner's bookings, latest first, confirmed and cancelled, optionally those whose reference
- * or lead guest's name contains `term` (any case, the term matched literally). The owner of another
- * host, host staff, a guest, ops, admin, and nobody signed in are refused.
+ * A host's bookings, latest first, confirmed and cancelled, optionally those whose reference
+ * or lead guest's name contains `term` (any case, the term matched literally). The host's owner and
+ * staff read them; the owner or staff of another host, a guest, ops, admin, and nobody signed in
+ * are refused.
  */
 export async function readHostBookings(
   caller: Caller,
@@ -37,7 +47,7 @@ export async function readHostBookings(
 ): Promise<HostBookingListData> {
   const id = EntityIdSchema.parse(hostId);
   const search = HostBookingSearchSchema.parse(term);
-  requireRole(caller, Role.HostOwner, { hostId: id });
+  requireAnyRole(caller, hostReaderRoles, { hostId: id });
 
   const pattern = containsPattern(search);
   const rows = await selectBookings({
@@ -65,7 +75,8 @@ export async function readHostBookings(
 /**
  * The guest list of one session of the host: its confirmed bookings, by lead guest's name. Null
  * when the session is missing or belongs to another host, so the two read alike. A cancelled
- * booking is not a guest on the day and is left out. Refused to everyone but the host's owner.
+ * booking is not a guest on the day and is left out. Refused to everyone but the host's owner and
+ * staff; staff read it in a shape that has no children's ages or guardian at all.
  */
 export async function readHostGuestList(
   caller: Caller,
@@ -74,7 +85,8 @@ export async function readHostGuestList(
 ): Promise<HostGuestListData | null> {
   const id = EntityIdSchema.parse(hostId);
   const sid = EntityIdSchema.parse(sessionId);
-  requireRole(caller, Role.HostOwner, { hostId: id });
+  requireAnyRole(caller, hostReaderRoles, { hostId: id });
+  const isOwner = holdsRole(caller, Role.HostOwner, { hostId: id });
 
   const [session] = await db
     .select({
@@ -91,33 +103,54 @@ export async function readHostGuestList(
     .where(and(eq(sessions.id, sid), eq(experiences.hostId, id)));
   if (!session) return null;
 
-  const bookings = await db
-    .select({
-      id: orders.id,
-      reference: orders.reference,
-      leadGuestName: orders.leadGuestName,
-      seats: seatsOf,
-      ageConfirmed: orders.ageConfirmed,
-      childrenAges: orders.childrenAges,
-      guardianName: orders.guardianName,
-      guardianContact: orders.guardianContact,
-      waiverAccepted: sql<boolean>`${orders.waiverDocumentId} is not null`,
-      contactEmail: orders.contactEmail,
-      contactPhone: orders.contactPhone,
-    })
-    .from(orders)
-    .where(
-      and(
-        eq(orders.sessionId, sid),
-        eq(orders.hostId, id),
-        eq(orders.kind, 'booking'),
-        eq(orders.status, 'confirmed'),
-      ),
-    )
-    .orderBy(orders.leadGuestName, orders.id);
+  const guestColumns = {
+    id: orders.id,
+    reference: orders.reference,
+    leadGuestName: orders.leadGuestName,
+    seats: seatsOf,
+    ageConfirmed: orders.ageConfirmed,
+    waiverAccepted: sql<boolean>`${orders.waiverDocumentId} is not null`,
+    contactEmail: orders.contactEmail,
+    contactPhone: orders.contactPhone,
+  };
+  // The minors' columns are chosen only for the host's owner: a staff read never selects them.
+  const ownerColumns = {
+    ...guestColumns,
+    childrenAges: orders.childrenAges,
+    guardianName: orders.guardianName,
+    guardianContact: orders.guardianContact,
+  };
+  const confirmedBookings = (
+    columns: typeof ownerColumns | typeof guestColumns,
+  ) =>
+    db
+      .select(columns)
+      .from(orders)
+      .where(
+        and(
+          eq(orders.sessionId, sid),
+          eq(orders.hostId, id),
+          eq(orders.kind, 'booking'),
+          eq(orders.status, 'confirmed'),
+        ),
+      )
+      .orderBy(orders.leadGuestName, orders.id);
 
+  const parsedSession = HostGuestListSessionSchema.parse(session);
+  if (!isOwner) {
+    return {
+      scope: 'staff',
+      session: parsedSession,
+      bookings: HostGuestListBookingSchema.array().parse(
+        await confirmedBookings(guestColumns),
+      ),
+    };
+  }
   return {
-    session: HostGuestListSessionSchema.parse(session),
-    bookings: HostGuestListBookingSchema.array().parse(bookings),
+    scope: 'owner',
+    session: parsedSession,
+    bookings: HostGuestListOwnerBookingSchema.array().parse(
+      await confirmedBookings(ownerColumns),
+    ),
   };
 }

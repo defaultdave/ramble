@@ -27,7 +27,8 @@ const actions = {
 /**
  * The week comes from the address (`?week=`, any date in it); the host never does. Like the
  * dashboard, the page checks the caller itself: nobody signed in goes to sign in and comes back,
- * and anyone signed in who owns no host sees the area's not-found page.
+ * and anyone signed in with no host role sees the area's not-found page. Staff see the week without
+ * the forms.
  */
 export default async function HostSessionsPage({
   searchParams,

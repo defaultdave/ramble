@@ -526,6 +526,9 @@ describe('the curated seed', () => {
     expect((await legalReads.getCurrentLegalDocument('terms'))?.title).toBe(
       'Terms of service',
     );
+    expect(
+      (await legalReads.getCurrentLegalDocument('host-agreement'))?.version,
+    ).toBe(1);
   });
 
   it('leaves the settings row, and the tax rate the settings migration seeds, alone', async () => {

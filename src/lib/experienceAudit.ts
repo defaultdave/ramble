@@ -1,4 +1,5 @@
 import { userActor, type AuditEntryInput } from './audit';
+import type { RejectionReason } from './experienceReview';
 import type {
   ExperienceContent,
   ExperienceContentField,
@@ -100,5 +101,34 @@ export function photoAddedEntry(
       decorative: photo.decorative,
       rights_basis: photo.rightsBasis,
     },
+  };
+}
+
+/** An experience in review approved to live. */
+export function experienceApprovedEntry(
+  userId: string,
+  experienceId: string,
+): AuditEntryInput {
+  return {
+    ...userActor(userId),
+    action: 'experience.approved',
+    subjectKind: 'experience',
+    subjectId: experienceId,
+    details: { from_status: 'in_review', to_status: 'live' },
+  };
+}
+
+/** An experience in review sent back to draft, with the reason's code. */
+export function experienceRejectedEntry(
+  userId: string,
+  experienceId: string,
+  reason: RejectionReason,
+): AuditEntryInput {
+  return {
+    ...userActor(userId),
+    action: 'experience.rejected',
+    subjectKind: 'experience',
+    subjectId: experienceId,
+    details: { from_status: 'in_review', to_status: 'draft', reason },
   };
 }

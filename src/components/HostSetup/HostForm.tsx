@@ -2,7 +2,6 @@ import { Button } from '@/components/Button';
 import { CheckField } from '@/components/CheckField';
 import { EmailField } from '@/components/EmailField';
 import { Input } from '@/components/Input';
-import { Textarea } from '@/components/Textarea';
 import {
   agreementTickLabel,
   defaultHostTimeZone,
@@ -11,9 +10,13 @@ import {
   type HostFormField,
   type HostInput,
 } from '@/lib/hostSetup';
-import { maxEmailAddressLength } from '@/lib/email/address';
 import { errorProps } from '@/lib/opsForm';
 import { maxTimeZoneLength } from '@/lib/sessions';
+import {
+  HostDescriptionField,
+  HostNameField,
+  HostNoticeEmailField,
+} from './HostProfileFields';
 import styles from './HostSetup.module.css';
 
 type FormAction = (formData: FormData) => void | Promise<void>;
@@ -41,15 +44,7 @@ export function HostForm({
   return (
     <form action={action} className={styles.form} noValidate>
       {values ? <input type="hidden" name="hostId" value={values.id} /> : null}
-      <Input
-        name="name"
-        label="Host name"
-        defaultValue={values?.name}
-        maxLength={hostLimits.name}
-        autoComplete="off"
-        required
-        {...errorFor('name')}
-      />
+      <HostNameField defaultValue={values?.name} problems={problems} />
       <Input
         name="slug"
         label="Address name"
@@ -65,14 +60,11 @@ export function HostForm({
         required={!creating}
         {...errorFor('slug')}
       />
-      <Textarea
-        name="description"
+      <HostDescriptionField
+        defaultValue={values?.description}
+        problems={problems}
         label="Description"
         hint="Shown on the host page."
-        defaultValue={values?.description ?? undefined}
-        maxLength={hostLimits.description}
-        optional
-        {...errorFor('description')}
       />
       <Input
         name="timeZone"
@@ -84,16 +76,9 @@ export function HostForm({
         required
         {...errorFor('timeZone')}
       />
-      <Input
-        name="notificationEmail"
-        type="email"
-        label="Booking notice address"
-        hint="Where booking and cancellation emails go. Not shown to guests."
-        defaultValue={values?.notificationEmail ?? undefined}
-        maxLength={maxEmailAddressLength}
-        autoComplete="off"
-        optional
-        {...errorFor('notificationEmail')}
+      <HostNoticeEmailField
+        defaultValue={values?.notificationEmail}
+        problems={problems}
       />
       {creating ? (
         <>

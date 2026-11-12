@@ -100,28 +100,45 @@ const FieldsSchema = z.strictObject({
   ownerEmail: optionalEmail.optional(),
 });
 
+/**
+ * Reads `fields` from a posted form and parses them with `schema`. A field over the raw limit is
+ * refused unread (`sized` names the fields whose size is checked), and
+ * every field the schema refuses is named, in the list's order.
+ */
+function readTextFields<
+  Field extends HostFormField,
+  Schema extends z.ZodType,
+  Sized extends HostFormField,
+>(
+  get: FormGetter,
+  fields: readonly Field[],
+  schema: Schema,
+  sized: readonly Sized[],
+):
+  | { ok: true; data: z.output<Schema> }
+  | { ok: false; fields: (Field | Sized)[] } {
+  const oversized = oversizedFields(get, sized, hostLimits.rawField);
+  if (oversized.length > 0) return { ok: false, fields: oversized };
+  const parsed = schema.safeParse(
+    Object.fromEntries(fields.map((field) => [field, formText(get, field)])),
+  );
+  return parsed.success
+    ? { ok: true, data: parsed.data }
+    : { ok: false, fields: fieldsFromIssues(parsed.error.issues, fields) };
+}
+
 function parseFields(
   get: FormGetter,
   options: { requireOwner: boolean; deriveSlug: boolean },
 ): HostFormResult<HostInput & { ownerEmail: string | null }> {
-  const oversized = oversizedFields(get, hostFormFields, hostLimits.rawField);
-  if (oversized.length > 0) return { ok: false, fields: oversized };
-
-  const parsed = FieldsSchema.safeParse({
-    name: formText(get, 'name'),
-    slug: formText(get, 'slug'),
-    description: formText(get, 'description'),
-    timeZone: formText(get, 'timeZone'),
-    notificationEmail: formText(get, 'notificationEmail'),
-    ownerEmail: formText(get, 'ownerEmail'),
-  });
+  const parsed = readTextFields(
+    get,
+    [...hostEditableFields, 'ownerEmail'] as const,
+    FieldsSchema,
+    hostFormFields,
+  );
   const failed = new Set<HostFormField>();
-  if (!parsed.success) {
-    return {
-      ok: false,
-      fields: fieldsFromIssues(parsed.error.issues, hostFormFields),
-    };
-  }
+  if (!parsed.ok) return parsed;
   const { data } = parsed;
   const slug = slugFor(
     data.name,
@@ -187,6 +204,58 @@ export function parseHostEditForm(get: FormGetter): HostFormResult<HostInput> {
     ok: true,
     value: { name, slug, description, timeZone, notificationEmail },
   };
+}
+
+/** What a host owner edits on their own host: the name and about text guests see, and where booking emails go. The slug and time zone stay with ops. */
+export const hostSettingsFields = [
+  'name',
+  'description',
+  'notificationEmail',
+] as const satisfies readonly HostEditableField[];
+export type HostSettingsField = (typeof hostSettingsFields)[number];
+export type HostSettingsInput = Pick<HostInput, HostSettingsField>;
+
+/** The settings form, read with the ops form's own limits and parsers. A field it refuses is named, and nothing posted beyond its three fields is read. */
+export function parseHostSettingsForm(
+  get: FormGetter,
+):
+  | { ok: true; value: HostSettingsInput }
+  | { ok: false; fields: HostSettingsField[] } {
+  const parsed = readTextFields(
+    get,
+    hostSettingsFields,
+    FieldsSchema.pick({
+      name: true,
+      description: true,
+      notificationEmail: true,
+    }),
+    hostSettingsFields,
+  );
+  if (!parsed.ok) return parsed;
+  const { name, description, notificationEmail } = parsed.data;
+  return {
+    ok: true,
+    value: {
+      name,
+      description: description ?? null,
+      notificationEmail: notificationEmail ?? null,
+    },
+  };
+}
+
+/** Which settings differ, in form order. Nothing differing means nothing is written. */
+export function changedHostSettings(
+  before: HostSettingsInput,
+  after: HostSettingsInput,
+): HostSettingsField[] {
+  return changedFields(hostSettingsFields, before, after);
+}
+
+/** What a save came to: nothing differing is `unchanged`, anything else `updated`. */
+export function hostSaveOutcome(
+  changed: readonly unknown[],
+): 'updated' | 'unchanged' {
+  return changed.length === 0 ? 'unchanged' : 'updated';
 }
 
 /** Which editable fields differ, in form order. Nothing differing means nothing is written. */

@@ -1,5 +1,6 @@
 import type { Caller } from '@/server/auth/caller';
 import { availabilityRows } from './authzAvailabilityRows';
+import { hostSettingsRows } from './authzHostSettingsRows';
 import { experiencePauseRows } from './authzPauseRows';
 
 // The experience-review row of the authorization matrix, kept apart so the matrix file stays under
@@ -24,11 +25,12 @@ export function experienceReviewRows() {
         ),
       allows: opsOnly,
     },
-    // The matrix file is at its size limit, so the pause rows ride with the review rows.
+    // The matrix file is at its size limit, so the pause and host settings rows ride with the review rows.
     ...experiencePauseRows(),
+    ...hostSettingsRows(),
   ] satisfies {
     fn: string;
     invoke: (caller: Caller, target: Target) => Promise<unknown>;
-    allows: { platform: readonly string[] };
+    allows: Partial<Record<string, readonly string[]>>;
   }[];
 }

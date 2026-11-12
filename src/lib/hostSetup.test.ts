@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  hostSaveOutcome,
   agreementRecordPrompt,
   agreementTickLabel,
   acceptanceRecordLabel,
@@ -517,5 +518,15 @@ describe('agreement wording', () => {
     expect(agreementRecordPrompt(agreement)).toBe(
       'Record that this host accepted the current Host agreement, version 3, which includes the content-rights terms.',
     );
+  });
+});
+
+describe('hostSaveOutcome', () => {
+  it.each([
+    [[], 'unchanged'],
+    [['name'], 'updated'],
+    [['name', 'description'], 'updated'],
+  ])('%j is %s', (changed, expected) => {
+    expect(hostSaveOutcome(changed)).toBe(expected);
   });
 });

@@ -341,12 +341,6 @@ const rows: Row[] = [
     allows: { hostA: ['ownerA'], hostB: ['ownerB'], missing: [] },
   },
   {
-    fn: 'getHostExperience',
-    invoke: (c, t) => data.catalog.getHostExperience(c, t.experienceId),
-    // No `missing` cell: that one is AUTH FINDING 1 below.
-    allows: { hostA: ['ownerA'], hostB: ['ownerB'] },
-  },
-  {
     fn: 'readHostStatement',
     invoke: (c, t) => data.ledger.readHostStatement(c, t.hostId, window),
     allows: { hostA: ['ownerA'], hostB: ['ownerB'], missing: [] },
@@ -693,40 +687,6 @@ describe('requireRole on its own', () => {
     if (allowed) expect(call).not.toThrow();
     else expect(call).toThrow(ForbiddenError);
   });
-});
-
-describe('a host owner asking about an experience', () => {
-  // Pins today's behaviour, so the it.fails below fails for the reason it names and not for any reason.
-  it('gets null for a missing experience and a refusal for another host’s, today', async () => {
-    expect(
-      await data.catalog.getHostExperience(people.ownerA, randomUUID()),
-    ).toBeNull();
-    await expect(
-      data.catalog.getHostExperience(people.ownerA, target.hostB.experienceId),
-    ).rejects.toBeInstanceOf(ForbiddenError);
-  });
-
-  // The photo path refuses a host owner the same way for a missing experience as for another host's, so
-  // the answer never says which ids exist. getHostExperience says null for one and refuses the other.
-  it.fails(
-    'is answered alike for a missing experience and another host’s (AUTH FINDING 1, a follow-up unit takes it)',
-    async () => {
-      const answer = async (experienceId: string) => {
-        try {
-          return await data.catalog.getHostExperience(
-            people.ownerA,
-            experienceId,
-          );
-        } catch (error) {
-          if (error instanceof ForbiddenError) return 'forbidden';
-          throw error;
-        }
-      };
-      expect(await answer(randomUUID())).toEqual(
-        await answer(target.hostB.experienceId),
-      );
-    },
-  );
 });
 
 describe('the matrix is complete', () => {

@@ -101,7 +101,6 @@ export async function findRetiredSlug(
   return row ? RetiredSlugSchema.parse(row) : null;
 }
 
-// TODO(U-074b): first caller
 /** Every experience of the host in any status, for the host's owner. A malformed host ID lists nothing. */
 export async function listHostExperiences(
   caller: Caller,
@@ -119,24 +118,4 @@ export async function listHostExperiences(
     orderBy: byNameThenId(experiences),
   });
   return HostExperienceSchema.array().parse(rows);
-}
-
-// TODO(U-074b): first caller
-/** The row is read once and its host checked before it is returned, so the owner of another host learns nothing from it. */
-export async function getHostExperience(
-  caller: Caller,
-  id: string,
-): Promise<HostExperience | null> {
-  const parsedId = EntityIdSchema.safeParse(id);
-  if (!parsedId.success) return null;
-  const row = await dbRead.query.experiences.findFirst({
-    where: eq(experiences.id, parsedId.data),
-    with: {
-      cancellationTier: true,
-      priceOptions: { orderBy: adultFirst },
-    },
-  });
-  if (!row) return null;
-  requireRole(caller, Role.HostOwner, { hostId: row.hostId });
-  return HostExperienceSchema.parse(row);
 }

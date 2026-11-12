@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Button } from '@/components/Button';
 import { DataTable, type DataTableColumn } from '@/components/DataTable';
 import { SearchField } from '@/components/SearchField';
 import { StatusBadge, StatusFilterBar } from '@/components/StatusBadge';
@@ -12,6 +13,8 @@ import {
 import type { TableQuery } from '@/lib/tableQuery';
 import styles from './OpsBookings.module.css';
 
+type FormAction = (formData: FormData) => void | Promise<void>;
+
 export type OpsBookingsListProps = {
   rows: readonly OpsBookingRow[];
   query: TableQuery;
@@ -21,9 +24,10 @@ export type OpsBookingsListProps = {
   summary: string;
   cursor: string | null;
   nextCursor: string | null;
+  retryRefund: FormAction;
 };
 
-/** Bookings newest first, found by reference or guest email, with the refund-failed queue as a filter. Search, filter, and paging are links and a GET form, so it all works with no script. */
+/** Bookings newest first, found by reference or guest email, with the refund-failed queue as a filter. Search, filter, and paging are links and a GET form and retry is a plain form, so it all works with no script. */
 export function OpsBookingsList({
   rows,
   query,
@@ -31,6 +35,7 @@ export function OpsBookingsList({
   summary,
   cursor,
   nextCursor,
+  retryRefund,
 }: OpsBookingsListProps) {
   const columns: DataTableColumn<OpsBookingRow>[] = [
     {
@@ -79,7 +84,15 @@ export function OpsBookingsList({
             label={orderStatusLabels[row.status]}
           />
           {row.refundFailed ? (
-            <StatusBadge tone="danger" label="Refund failed" />
+            <>
+              <StatusBadge tone="danger" label="Refund failed" />
+              <form action={retryRefund}>
+                <input type="hidden" name="orderId" value={row.id} />
+                <Button type="submit" variant="secondary">
+                  Retry refund
+                </Button>
+              </form>
+            </>
           ) : null}
         </span>
       ),

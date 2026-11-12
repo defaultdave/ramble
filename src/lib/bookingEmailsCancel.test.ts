@@ -9,6 +9,7 @@ import {
   hostNoticeDecision,
   refundEmailDecision,
   refundEmailKey,
+  resendEmailKey,
 } from './bookingEmails';
 
 // Behaviours under test, one per decision, branch, or risk:
@@ -57,6 +58,15 @@ describe('the keys', () => {
 
   it('names the refund email by the refund, in lower case', () => {
     expect(refundEmailKey(id)).toBe(`guest-refund:${id.toLowerCase()}`);
+  });
+
+  it('names an ops resend by its own id, apart from the order key, in lower case', () => {
+    expect(resendEmailKey(id)).toBe(
+      `guest-confirmation-resend:${id.toLowerCase()}`,
+    );
+    expect(resendEmailKey(id)).not.toBe(
+      bookingEmailKey('guest-confirmation', id),
+    );
   });
 });
 

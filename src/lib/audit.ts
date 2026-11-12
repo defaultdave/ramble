@@ -90,6 +90,20 @@ const DetailsSchema = z
 export const userActor = (userId: string) =>
   ({ actorKind: 'user', actorId: userId }) as const;
 
+/** A row for something a named, signed-in user did to one order: ids, codes, and amounts only. */
+export const userOrderEntry = (
+  userId: string,
+  action: string,
+  orderId: string,
+  details: Record<string, string | number | boolean | null> = {},
+) => ({
+  ...userActor(userId),
+  action,
+  subjectKind: 'order',
+  subjectId: orderId,
+  details,
+});
+
 /** Whether the actor kind and the actor id agree: a signed-in user is named, a guest or the system is not. */
 export function actorMatchesKind(
   kind: AuditActorKind,

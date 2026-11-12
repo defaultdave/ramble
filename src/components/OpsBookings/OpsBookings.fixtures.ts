@@ -26,6 +26,10 @@ export const failedRefundRow: OpsBookingRow = {
 
 export const confirmedDetail: OpsBookingDetail = {
   row: confirmedRow,
+  cancel: { refundMinor: 10800, basis: 'full' },
+  canRefund: false,
+  canRetryRefund: false,
+  canResend: true,
   refundedLabel: '$0.00',
   refunds: [],
   events: [
@@ -36,6 +40,10 @@ export const confirmedDetail: OpsBookingDetail = {
 
 export const failedRefundDetail: OpsBookingDetail = {
   row: failedRefundRow,
+  cancel: null,
+  canRefund: false,
+  canRetryRefund: true,
+  canResend: false,
   refundedLabel: '$0.00',
   refunds: [
     {
@@ -50,4 +58,11 @@ export const failedRefundDetail: OpsBookingDetail = {
     { label: 'Booking placed', whenLabel: 'Tue, Nov 10, 10:00 AM EST' },
     { label: 'Cancelled by guest', whenLabel: 'Tue, Nov 10, 11:00 AM EST' },
   ],
+};
+
+export const cancelledDetail: OpsBookingDetail = {
+  ...failedRefundDetail,
+  canRefund: true,
+  canRetryRefund: false,
+  refunds: [],
 };

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { userActor, userOrderEntry, type AuditEntryInput } from './audit';
 import { refundArrivalLine } from './bookingEmails';
 import type { CacheChange } from './cacheTags';
 import {
@@ -224,30 +225,51 @@ export function refundEtaLine(refundMinor: number): string | null {
   return refundMinor > 0 ? refundArrivalLine : null;
 }
 
-/** The audit row of a cancellation: ids, codes, and amounts only. */
-export function cancellationAuditEntry(input: {
-  orderId: string;
-  sessionId: string;
-  refundMinor: number;
-  refundId: string | null;
-  seatsReturned: number;
-  giftReinstated: boolean;
-}) {
+/** Who cancels: the guest by their manage link (the default), or an ops user acting for Ramble. */
+export type CancelActor = { kind: 'guest' } | { kind: 'ops'; userId: string };
+
+export const guestCancelActor: CancelActor = { kind: 'guest' };
+
+/** What the order records as the canceller: an ops cancel is Ramble's. */
+export function cancelledByFor(
+  actor: CancelActor,
+): (typeof orderCancelledBys)[number] {
+  return actor.kind === 'ops' ? 'ramble' : 'guest';
+}
+
+/** The audit row of a cancellation: ids, codes, and amounts only, naming the ops user when ops cancelled. */
+export function cancellationAuditEntry(
+  input: {
+    orderId: string;
+    sessionId: string;
+    refundMinor: number;
+    refundId: string | null;
+    seatsReturned: number;
+    giftReinstated: boolean;
+  },
+  actor: CancelActor = guestCancelActor,
+): AuditEntryInput {
   return {
-    actorKind: 'guest',
+    ...(actor.kind === 'ops'
+      ? userActor(actor.userId)
+      : ({ actorKind: 'guest' } as const)),
     action: 'order.cancelled',
     subjectKind: 'order',
     subjectId: input.orderId,
     details: {
-      cancelled_by: 'guest',
+      cancelled_by: cancelledByFor(actor),
       session_id: input.sessionId,
       refund_minor: input.refundMinor,
       refund_id: input.refundId,
       seats_returned: input.seatsReturned,
       gift_reinstated: input.giftReinstated,
     },
-  } as const;
+  };
 }
+
+/** Ops cancelled a booking: written with the cancellation, in its transaction, beside `order.cancelled`. */
+export const opsCancelRequestedEntry = (userId: string, orderId: string) =>
+  userOrderEntry(userId, 'booking.ops_cancel_requested', orderId);
 
 export type CancelPlan =
   | {
@@ -391,6 +413,13 @@ export function parseCancelInput(
 /** What a form refund that is not digits becomes: below zero, so the schema refuses it. */
 const invalidRefundMinor = -1;
 
+/** The refund a form carried, in minor units: digits only, so anything else is below zero and the schema refuses it. */
+export function refundMinorFromText(raw: unknown): number {
+  return typeof raw === 'string' && /^\d{1,10}$/.test(raw)
+    ? Number(raw)
+    : invalidRefundMinor;
+}
+
 /** The form's two fields as the action's input; the refund travels as digits and is parsed strictly. */
 export function cancelInputFromForm(fields: {
   manageToken: unknown;
@@ -399,11 +428,7 @@ export function cancelInputFromForm(fields: {
   const { manageToken, expectedRefundMinor } = fields;
   return {
     manageToken: typeof manageToken === 'string' ? manageToken : '',
-    expectedRefundMinor:
-      typeof expectedRefundMinor === 'string' &&
-      /^\d{1,10}$/.test(expectedRefundMinor)
-        ? Number(expectedRefundMinor)
-        : invalidRefundMinor,
+    expectedRefundMinor: refundMinorFromText(expectedRefundMinor),
   };
 }
 

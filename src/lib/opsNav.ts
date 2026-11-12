@@ -27,6 +27,16 @@ export const opsNavLinks: readonly OpsNavLink[] = [
     href: '/ops/experiences',
     summary: 'Find, add and edit experiences, with their prices and rules.',
   },
+  {
+    label: 'Staff',
+    href: '/ops/staff',
+    summary: 'Invite Ramble staff and remove their access.',
+  },
+  {
+    label: 'Audit log',
+    href: '/ops/audit',
+    summary: 'Read what was changed and who changed it, a day at a time.',
+  },
 ];
 
 /** The areas the landing page lists: every link but the landing page itself. */

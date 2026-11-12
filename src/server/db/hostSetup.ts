@@ -31,6 +31,7 @@ import {
   recordHostAcceptanceIn,
 } from './legal';
 import { authUsers, hosts, roleGrants } from './schema';
+import { ensureAuthUserIn } from './staffRoles';
 
 // Everything here is for the ops role: each function checks it, and each read records its audit
 // row before it returns anything.
@@ -76,20 +77,12 @@ export async function createHost(
         .returning({ id: hosts.id });
       if (!host) throw new Error('The host write returned no row');
 
-      await tx
-        .insert(authUsers)
-        .values({ email: input.ownerEmail, emailVerified: true })
-        .onConflictDoNothing();
-      const [owner] = await tx
-        .select({ id: authUsers.id })
-        .from(authUsers)
-        .where(eq(authUsers.email, input.ownerEmail));
-      if (!owner) throw new Error('The owner account was not found');
+      const ownerId = await ensureAuthUserIn(tx, input.ownerEmail);
       await tx
         .insert(roleGrants)
-        .values({ userId: owner.id, role: 'host_owner', hostId: host.id })
+        .values({ userId: ownerId, role: 'host_owner', hostId: host.id })
         .onConflictDoNothing();
-      await writeAudit(tx, hostCreatedEntry(userId, host.id, owner.id));
+      await writeAudit(tx, hostCreatedEntry(userId, host.id, ownerId));
 
       if (input.acceptedLegalDocumentId !== null) {
         const outcome = await recordHostAcceptanceIn(
@@ -104,7 +97,7 @@ export async function createHost(
       return {
         status: 'created' as const,
         hostId: host.id,
-        ownerUserId: owner.id,
+        ownerUserId: ownerId,
       };
     });
   } catch (error) {

@@ -31,6 +31,8 @@ describe('opsLandingLinks', () => {
       '/ops/mailbox',
       '/ops/hosts',
       '/ops/experiences',
+      '/ops/staff',
+      '/ops/audit',
     ]);
   });
 });

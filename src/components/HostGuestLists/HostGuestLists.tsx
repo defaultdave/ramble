@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { BookingListRow } from '@/components/BookingListRow';
 import { PageHeading } from '@/components/PageHeading';
 import { SearchField } from '@/components/SearchField';
 import { hostBookingsPath } from '@/lib/hostGuestLists';
@@ -12,18 +12,15 @@ export const hostBookingsTitle = 'Bookings';
 
 function BookingRow({ row }: { row: HostBookingListItemView }) {
   return (
-    <li className={styles.row}>
-      <p className={styles.primary}>{row.guestName}</p>
-      <p className={styles.secondary}>
-        {row.experienceName} · {row.whenLabel}
-      </p>
-      <p className={styles.secondary}>
-        {row.seatsLabel} · {row.statusLabel} · {row.reference}
-      </p>
-      <Link href={row.guestListHref} className={styles.link}>
-        Guest list for this session
-      </Link>
-    </li>
+    <BookingListRow
+      title={row.guestName}
+      details={[
+        `${row.experienceName} · ${row.whenLabel}`,
+        `${row.seatsLabel} · ${row.statusLabel} · ${row.reference}`,
+      ]}
+      href={row.guestListHref}
+      linkLabel="Guest list for this session"
+    />
   );
 }
 

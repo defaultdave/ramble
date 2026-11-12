@@ -31,7 +31,7 @@ describe('AccountContent', () => {
   it('shows a signed-in guest their bookings', async () => {
     vi.mocked(loadAccountBookings).mockResolvedValue({
       status: 'ok',
-      view: { upcoming: [], past: [] },
+      view: { upcoming: [], past: [], empty: true },
     });
 
     render(await AccountContent());

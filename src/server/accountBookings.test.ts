@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AccountBookingData } from '@/lib/accountBookings';
+import { accountBookingData as row } from '@/lib/accountBookings.fixtures';
 import { managePath } from '@/lib/routes';
 import { Role, anonymousCaller, getCaller } from '@/server/auth/caller';
 import { testCaller } from '@/server/auth/test-caller';
 import { readAccountBookings } from '@/server/db/accountBookings';
 import { capabilityToken } from '@/server/tokens';
+import { id } from '../../tests/support/ids';
 import { loadAccountBookings } from './accountBookings';
 
 vi.mock('@/server/auth/caller', async (importOriginal) => ({
@@ -20,23 +21,6 @@ vi.mock('@/server/db/accountBookings', () => ({
 // - a signed-in caller's bookings are read as that caller
 // - each booking's manage link is the `manage` token at that order's own version, rebuilt per row, not the order or gift kind and not version 1
 // - the clock decides what is still ahead: a confirmed booking after now is upcoming, one before it is past
-
-const id = (n: number) =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
-
-const row = (
-  n: number,
-  startsAt: string,
-  manageTokenVersion: number,
-): AccountBookingData => ({
-  id: id(n),
-  reference: `RMB-00000${String(n)}`,
-  experienceName: 'Sunset kayak',
-  sessionStartsAt: new Date(startsAt),
-  timeZone: 'America/New_York',
-  status: 'confirmed',
-  manageTokenVersion,
-});
 
 beforeEach(() => {
   vi.mocked(getCaller).mockReset();
@@ -70,7 +54,7 @@ describe('loadAccountBookings', () => {
 
     expect(await loadAccountBookings()).toEqual({
       status: 'ok',
-      view: { upcoming: [], past: [] },
+      view: { upcoming: [], past: [], empty: true },
     });
     expect(readAccountBookings).toHaveBeenCalledWith(caller);
   });

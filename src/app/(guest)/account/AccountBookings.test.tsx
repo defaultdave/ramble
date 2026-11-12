@@ -31,6 +31,7 @@ describe('AccountBookings', () => {
         view={{
           upcoming: [booking(1)],
           past: [booking(2, { statusLabel: 'Cancelled' })],
+          empty: false,
         }}
       />,
     );
@@ -49,7 +50,7 @@ describe('AccountBookings', () => {
     render(
       <AccountBookings
         title="My bookings"
-        view={{ upcoming: [booking(1), booking(2)], past: [] }}
+        view={{ upcoming: [booking(1), booking(2)], past: [], empty: false }}
       />,
     );
     expect(
@@ -64,7 +65,7 @@ describe('AccountBookings', () => {
     render(
       <AccountBookings
         title="My bookings"
-        view={{ upcoming: [], past: [booking(1)] }}
+        view={{ upcoming: [], past: [booking(1)], empty: false }}
       />,
     );
     expect(screen.queryByRole('region', { name: 'Upcoming' })).toBeNull();
@@ -73,7 +74,10 @@ describe('AccountBookings', () => {
 
   it('says there are no bookings and offers to browse', () => {
     render(
-      <AccountBookings title="My bookings" view={{ upcoming: [], past: [] }} />,
+      <AccountBookings
+        title="My bookings"
+        view={{ upcoming: [], past: [], empty: true }}
+      />,
     );
     expect(screen.getByText(/no bookings yet/i)).toBeInTheDocument();
     expect(

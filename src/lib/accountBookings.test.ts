@@ -4,31 +4,26 @@ import {
   buildAccountBookings,
   type AccountBookingRow,
 } from './accountBookings';
+import { accountBookingData } from './accountBookings.fixtures';
+import { id } from '../../tests/support/ids';
 
 // Behaviours under test, one per decision, branch or risk:
 // - a confirmed booking whose session has not started is upcoming, soonest first
 // - a confirmed booking whose session has started is past, as is a cancelled one even if its session is ahead; past is latest first
 // - a session starting exactly now is still upcoming
 // - a row reads the experience, the session's own day and clock, the status in words, the reference, and the manage link built from its token
-// - nothing handed over gives two empty lists
+// - nothing handed over gives two empty lists and says the account is empty; any booking at all does not
 // - the data layer's row refuses an id, time zone, or status it should not carry
 
 const now = new Date('2026-11-10T12:00:00Z');
 const token = 'a'.repeat(43);
-const id = (n: number) =>
-  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
-
 const row = (
   n: number,
   startsAt: string,
   overrides: Partial<AccountBookingRow> = {},
 ): AccountBookingRow => ({
-  id: id(n),
-  reference: `RMB-00000${String(n)}`,
-  experienceName: 'Sunset kayak',
-  sessionStartsAt: new Date(startsAt),
-  timeZone: 'America/New_York',
-  status: 'confirmed',
+  // The data layer's row carries a version the page replaces with the token; the builder ignores it.
+  ...accountBookingData(n, startsAt),
   manageToken: token,
   ...overrides,
 });
@@ -77,20 +72,16 @@ describe('buildAccountBookings', () => {
   });
 
   it('gives two empty lists for no bookings', () => {
-    expect(buildAccountBookings([], now)).toEqual({ upcoming: [], past: [] });
+    expect(buildAccountBookings([], now)).toEqual({
+      upcoming: [],
+      past: [],
+      empty: true,
+    });
   });
 });
 
 describe('AccountBookingRowSchema', () => {
-  const valid = {
-    id: id(1),
-    reference: 'RMB-000001',
-    experienceName: 'Sunset kayak',
-    sessionStartsAt: now,
-    timeZone: 'America/New_York',
-    status: 'confirmed',
-    manageTokenVersion: 1,
-  };
+  const valid = accountBookingData(1, '2026-11-10T12:00:00Z');
 
   it('accepts a row the data layer reads', () => {
     expect(AccountBookingRowSchema.safeParse(valid).success).toBe(true);

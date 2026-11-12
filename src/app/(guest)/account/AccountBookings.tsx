@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { BookingListRow } from '@/components/BookingListRow';
 import { PageHeading } from '@/components/PageHeading';
 import type {
   AccountBookingView,
@@ -6,22 +7,6 @@ import type {
 } from '@/lib/accountBookings';
 import { browsePath } from '@/lib/paths';
 import styles from './AccountBookings.module.css';
-
-function BookingRow({ booking }: { booking: AccountBookingView }) {
-  return (
-    <li className={styles.row}>
-      <p className={styles.primary}>{booking.experienceName}</p>
-      <p className={styles.secondary}>{booking.whenLabel}</p>
-      <p className={styles.secondary}>
-        {booking.statusLabel} · {booking.reference}
-      </p>
-      <Link href={booking.manageHref} className={styles.link}>
-        Manage booking{' '}
-        <span className={styles.visuallyHidden}>{booking.reference}</span>
-      </Link>
-    </li>
-  );
-}
 
 function BookingGroup({
   heading,
@@ -38,7 +23,17 @@ function BookingGroup({
       </h2>
       <ul className={styles.list}>
         {bookings.map((booking) => (
-          <BookingRow key={booking.id} booking={booking} />
+          <BookingListRow
+            key={booking.id}
+            title={booking.experienceName}
+            details={[
+              booking.whenLabel,
+              `${booking.statusLabel} · ${booking.reference}`,
+            ]}
+            href={booking.manageHref}
+            linkLabel="Manage booking"
+            linkHint={booking.reference}
+          />
         ))}
       </ul>
     </section>
@@ -53,12 +48,11 @@ export function AccountBookings({
   title: string;
   view: AccountBookingsView;
 }) {
-  const empty = view.upcoming.length === 0 && view.past.length === 0;
   return (
     <>
       <PageHeading title={title} />
       <div className={styles.body}>
-        {empty ? (
+        {view.empty ? (
           <p>
             You have no bookings yet.{' '}
             <Link href={browsePath}>Find something to do</Link>

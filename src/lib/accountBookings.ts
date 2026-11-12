@@ -36,6 +36,8 @@ export type AccountBookingView = {
 export type AccountBookingsView = {
   upcoming: readonly AccountBookingView[];
   past: readonly AccountBookingView[];
+  /** No booking at all, upcoming or past. */
+  empty: boolean;
 };
 
 function bookingView(row: AccountBookingRow): AccountBookingView {
@@ -69,6 +71,7 @@ export function buildAccountBookings(
       .filter((row) => !isUpcoming(row))
       .sort((a, b) => byStart(b, a))
       .map(bookingView),
+    empty: rows.length === 0,
   };
 }
 

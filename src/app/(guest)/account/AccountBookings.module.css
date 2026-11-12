@@ -1,30 +1,10 @@
-/* The same list as the host's bookings page, under the host dashboard's section heading. */
+/* The same page frame and list as the host's bookings page, under the host dashboard's section heading. */
 .body {
   composes: body from '../../../components/HostGuestLists/HostGuestLists.module.css';
 }
 
 .list {
   composes: list from '../../../components/HostGuestLists/HostGuestLists.module.css';
-}
-
-.row {
-  composes: row from '../../../components/HostGuestLists/HostGuestLists.module.css';
-}
-
-.primary {
-  composes: primary from '../../../components/HostGuestLists/HostGuestLists.module.css';
-}
-
-.secondary {
-  composes: secondary from '../../../components/HostGuestLists/HostGuestLists.module.css';
-}
-
-.link {
-  composes: link from '../../../components/HostGuestLists/HostGuestLists.module.css';
-}
-
-.visuallyHidden {
-  composes: visuallyHidden from '../../../styles/visually-hidden.module.css';
 }
 
 .heading {

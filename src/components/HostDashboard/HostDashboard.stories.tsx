@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { hostNavLinks } from '@/lib/hostStaff';
 import { HostDashboard } from './HostDashboard';
 import { busy, empty } from './HostDashboard.fixtures';
 
@@ -6,7 +7,7 @@ import { busy, empty } from './HostDashboard.fixtures';
 const meta = {
   title: 'Host/HostDashboard',
   component: HostDashboard,
-  args: { view: busy },
+  args: { view: busy, links: hostNavLinks(true) },
   parameters: {
     a11y: {
       config: {

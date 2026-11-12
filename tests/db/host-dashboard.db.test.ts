@@ -22,7 +22,7 @@ import {
 // Behaviours under test, one per decision, branch or risk:
 // - an owner reads their own host's name, next scheduled sessions with seats sold, and latest bookings
 // - the owner of host A cannot read host B: refused, and nothing of B is in A's read
-// - host staff, a guest, ops, admin, and nobody signed in are refused (ops and admin have no host to read as)
+// - host staff of another host, a guest, ops, admin, and nobody signed in are refused; host staff of the host read it (ops and admin have no host to read as)
 // - sessions are the scheduled ones from now on, soonest first, within the limit; past, cancelled, and other hosts' are left out
 // - bookings are confirmed and cancelled orders of kind booking, latest first, with seats counted from the lines that use a space
 // - a host that does not exist reads as null for its owner grant
@@ -153,13 +153,27 @@ describe('readHostDashboard', () => {
     ['ops', testCaller({ roles: [Role.Ops] })],
     ['admin', testCaller({ roles: [Role.Admin] })],
     [
-      'host staff of the host',
-      testCaller({ roles: [Role.HostStaff], hostIds: [parents.hostId] }),
+      'host staff of another host',
+      testCaller({
+        roles: [Role.HostStaff],
+        hostIds: ['00000000-0000-4000-8000-0000000000ff'],
+      }),
     ],
   ])('refuses %s', async (_name, caller) => {
     await expect(
       reads.readHostDashboard(caller, parents.hostId, now),
     ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it('lets host staff of the host read it', async () => {
+    const staff = testCaller({
+      roles: [Role.HostStaff],
+      hostIds: [parents.hostId],
+    });
+
+    const data = await reads.readHostDashboard(staff, parents.hostId, now);
+
+    expect(data?.hostName).toBe('Host');
   });
 
   it('lists scheduled sessions from now, soonest first, and leaves out past and cancelled ones', async () => {

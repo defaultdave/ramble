@@ -19,6 +19,7 @@ const row = (overrides: Partial<HostWeekRowView>): HostWeekRowView => ({
 
 export const week: HostWeekView = {
   hostName: 'Harbor Kayak Co',
+  canEdit: true,
   weekStart: '2026-11-09',
   weekLabel: 'Mon, Nov 9 to Sun, Nov 15',
   timeZone: 'America/New_York',

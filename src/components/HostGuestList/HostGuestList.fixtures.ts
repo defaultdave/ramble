@@ -16,6 +16,7 @@ const session = {
 };
 
 export const busy: HostGuestListView = buildHostGuestList({
+  scope: 'owner',
   session,
   bookings: [
     {
@@ -48,6 +49,7 @@ export const busy: HostGuestListView = buildHostGuestList({
 });
 
 export const empty: HostGuestListView = buildHostGuestList({
+  scope: 'owner',
   session,
   bookings: [],
 });

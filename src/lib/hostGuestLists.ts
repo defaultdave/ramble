@@ -64,22 +64,43 @@ export const HostGuestListBookingSchema = z.object({
   seats: z.int().min(0),
   /** True when the booker confirmed every attendee is of age; null when the experience asks no such thing. */
   ageConfirmed: z.boolean().nullable(),
-  childrenAges: z.array(z.int().min(0)).nullable(),
-  guardianName: z.string().nullable(),
-  guardianContact: z.string().nullable(),
   waiverAccepted: z.boolean(),
   contactEmail: z.string().min(1),
   contactPhone: z.string().nullable(),
 });
 
+/** The children's ages and the guardian: the host's owner's to see, never read-only staff's. */
+const HostGuestListMinorsSchema = z.object({
+  childrenAges: z.array(z.int().min(0)).nullable(),
+  guardianName: z.string().nullable(),
+  guardianContact: z.string().nullable(),
+});
+
+export const HostGuestListOwnerBookingSchema =
+  HostGuestListBookingSchema.extend(HostGuestListMinorsSchema.shape);
+
 export type HostBookingListData = {
   bookings: readonly HostBookingListRow[];
 };
 
-export type HostGuestListData = {
-  session: z.infer<typeof HostGuestListSessionSchema>;
-  bookings: readonly z.infer<typeof HostGuestListBookingSchema>[];
-};
+type HostGuestListBooking = z.infer<typeof HostGuestListBookingSchema>;
+export type HostGuestListOwnerBooking = z.infer<
+  typeof HostGuestListOwnerBookingSchema
+>;
+type HostGuestListSession = z.infer<typeof HostGuestListSessionSchema>;
+
+/** Two shapes, so a read-only staff page cannot reference what it was never given: only the owner's has the minors' fields. */
+export type HostGuestListData =
+  | {
+      scope: 'owner';
+      session: HostGuestListSession;
+      bookings: readonly HostGuestListOwnerBooking[];
+    }
+  | {
+      scope: 'staff';
+      session: HostGuestListSession;
+      bookings: readonly HostGuestListBooking[];
+    };
 
 export type HostBookingListItemView = {
   id: string;
@@ -168,6 +189,36 @@ export function waiverLabel(required: boolean, accepted: boolean): string {
   return required ? 'Not accepted' : 'Not required';
 }
 
+function guestRowView(
+  session: HostGuestListSession,
+  b: HostGuestListBooking,
+  minors: z.infer<typeof HostGuestListMinorsSchema> | null,
+): HostGuestRowView {
+  const contacts = [{ label: 'Email', value: b.contactEmail }];
+  if (b.contactPhone !== null) {
+    contacts.push({ label: 'Phone', value: b.contactPhone });
+  }
+  if (
+    minors !== null &&
+    minors.guardianName !== null &&
+    minors.guardianContact !== null
+  ) {
+    contacts.push({
+      label: 'Guardian',
+      value: `${minors.guardianName}, ${minors.guardianContact}`,
+    });
+  }
+  return {
+    id: b.id,
+    reference: b.reference,
+    guestName: b.leadGuestName,
+    seatsLabel: seatsLabel(b.seats),
+    agesLabel: agesLabel(minors?.childrenAges ?? null, b.ageConfirmed),
+    waiverLabel: waiverLabel(session.waiverRequired, b.waiverAccepted),
+    contacts,
+  };
+}
+
 export function buildHostGuestList(data: HostGuestListData): HostGuestListView {
   const { session } = data;
   const seats = data.bookings.reduce((sum, b) => sum + b.seats, 0);
@@ -176,27 +227,10 @@ export function buildHostGuestList(data: HostGuestListData): HostGuestListView {
     experienceName: session.experienceName,
     whenLabel: whenLabel(session.startsAt, session.timeZone),
     totalLabel: `${seatsLabel(seats)} across ${plural(data.bookings.length, 'booking', 'bookings')}`,
-    rows: data.bookings.map((b) => {
-      const contacts = [{ label: 'Email', value: b.contactEmail }];
-      if (b.contactPhone !== null) {
-        contacts.push({ label: 'Phone', value: b.contactPhone });
-      }
-      if (b.guardianName !== null && b.guardianContact !== null) {
-        contacts.push({
-          label: 'Guardian',
-          value: `${b.guardianName}, ${b.guardianContact}`,
-        });
-      }
-      return {
-        id: b.id,
-        reference: b.reference,
-        guestName: b.leadGuestName,
-        seatsLabel: seatsLabel(b.seats),
-        agesLabel: agesLabel(b.childrenAges, b.ageConfirmed),
-        waiverLabel: waiverLabel(session.waiverRequired, b.waiverAccepted),
-        contacts,
-      };
-    }),
+    rows:
+      data.scope === 'owner'
+        ? data.bookings.map((b) => guestRowView(session, b, b))
+        : data.bookings.map((b) => guestRowView(session, b, null)),
   };
 }
 
@@ -210,14 +244,14 @@ export type HostGuestListResult =
   | { status: 'refused' }
   | { status: 'ok'; view: HostGuestListView };
 
-/** Nobody signed in signs in; a signed-in non-owner is refused, as is an owner whose host (`data` null) is gone. */
+/** Nobody signed in signs in; a signed-in caller with no host role is refused, as is one whose host (`data` null) is gone. */
 export function hostBookingListResult(
   access: HostAccess,
   data: HostBookingListData | null,
   term: string,
 ): HostBookingListResult {
   if (access.kind === 'signed_out') return { status: 'signed_out' };
-  if (access.kind === 'not_a_host_owner' || data === null) {
+  if (access.kind === 'no_host_role' || data === null) {
     return { status: 'refused' };
   }
   return { status: 'ok', view: buildHostBookingList(data, term) };
@@ -229,7 +263,7 @@ export function hostGuestListResult(
   data: HostGuestListData | null,
 ): HostGuestListResult {
   if (access.kind === 'signed_out') return { status: 'signed_out' };
-  if (access.kind === 'not_a_host_owner' || data === null) {
+  if (access.kind === 'no_host_role' || data === null) {
     return { status: 'refused' };
   }
   return { status: 'ok', view: buildHostGuestList(data) };

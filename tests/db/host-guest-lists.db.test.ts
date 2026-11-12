@@ -28,14 +28,15 @@ import {
 // - a session of another host reads as null, as does a missing one, and none of the other host's guests are in the owner's read
 // - the owner of another host asking for this host is refused
 // - a booking the host's experience asks a waiver for reads required, and an accepted one reads accepted
-// - nobody signed in, a guest, ops, admin, and host staff are refused; an id that is no uuid is refused before the database is asked
+// - host staff of the host read the list with contacts and booking facts, but with no children's ages and no guardian (the fields are absent, not null); the owner still sees them; host staff of another host are refused
+// - nobody signed in, a guest, ops, admin, and host staff of another host are refused; an id that is no uuid is refused before the database is asked
 // bookings list and search
 // - the list is the host's confirmed and cancelled bookings, latest first, never another host's, never one still being paid for
 // - search finds a booking by part of its reference or of the lead guest's name, in any case, and only among the host's own
 // - search takes % and _ literally, and an empty or blank term lists everything
 // - a term over the cap is refused before the database is asked
 // - the list stops at the limit
-// - nobody signed in, a guest, ops, admin, host staff, and the owner of another host are refused
+// - host staff of the host read the list; nobody signed in, a guest, ops, admin, host staff of another host, and the owner of another host are refused
 
 let reads: typeof import('@/server/db/hostGuestLists');
 const other = { ...parents };
@@ -52,8 +53,8 @@ const notOwners: [string, () => Caller][] = [
   ['ops', () => testCaller({ roles: [Role.Ops] })],
   ['admin', () => testCaller({ roles: [Role.Admin] })],
   [
-    'host staff of the host',
-    () => testCaller({ roles: [Role.HostStaff], hostIds: [parents.hostId] }),
+    'host staff of another host',
+    () => testCaller({ roles: [Role.HostStaff], hostIds: [other.hostId] }),
   ],
 ];
 
@@ -227,6 +228,40 @@ describe('readHostGuestList', () => {
     expect(theirs?.bookings.map((b) => b.leadGuestName)).toEqual([
       'Zelda Other-Host',
     ]);
+  });
+
+  it('gives host staff the booking and contacts, without the children’s ages or the guardian', async () => {
+    const session = await sessionOf(parents, 12);
+    await booking(parents, {
+      session_id: session.id,
+      lead_guest_name: 'Ada Lovelace',
+      contact_email: 'ada@example.com',
+      contact_phone: '+1 555 0100',
+      children_ages: [8, 11],
+      guardian_name: 'Ada Lovelace',
+      guardian_contact: 'ada@example.com',
+    });
+    const staff = testCaller({
+      roles: [Role.HostStaff],
+      hostIds: [parents.hostId],
+    });
+
+    const data = await reads.readHostGuestList(
+      staff,
+      parents.hostId,
+      session.id,
+    );
+
+    expect(data?.scope).toBe('staff');
+    expect(data?.bookings[0]).toMatchObject({
+      leadGuestName: 'Ada Lovelace',
+      contactEmail: 'ada@example.com',
+      contactPhone: '+1 555 0100',
+    });
+    const keys = Object.keys(data?.bookings[0] ?? {});
+    expect(keys).not.toContain('childrenAges');
+    expect(keys).not.toContain('guardianName');
+    expect(keys).not.toContain('guardianContact');
   });
 
   it('refuses the owner of another host asking for this host', async () => {
@@ -412,6 +447,17 @@ describe('readHostBookings', () => {
     await expect(
       reads.readHostBookings(caller(), parents.hostId, ''),
     ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it('lets host staff of the host list the bookings', async () => {
+    const staff = testCaller({
+      roles: [Role.HostStaff],
+      hostIds: [parents.hostId],
+    });
+
+    const data = await reads.readHostBookings(staff, parents.hostId, '');
+
+    expect(data.bookings.length).toBeGreaterThan(0);
   });
 
   it('stops at the limit', async () => {

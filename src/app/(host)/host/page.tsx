@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { HostDashboard, hostDashboardTitle } from '@/components/HostDashboard';
+import { hostNavLinks } from '@/lib/hostStaff';
 import { signInHref } from '@/lib/signIn';
 import { loadHostDashboard } from '@/server/hostDashboard';
 
@@ -15,5 +16,7 @@ export default async function HostDashboardPage() {
   const result = await loadHostDashboard();
   if (result.status === 'signed_out') redirect(signInHref('/host'));
   if (result.status === 'refused') notFound();
-  return <HostDashboard view={result.view} />;
+  return (
+    <HostDashboard view={result.view} links={hostNavLinks(result.canManage)} />
+  );
 }

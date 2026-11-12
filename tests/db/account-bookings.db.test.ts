@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { accountBookingLimit } from '@/lib/accountBookings';
-import { anonymousCaller, ForbiddenError } from '@/server/auth/caller';
+import { anonymousCaller, ForbiddenError, Role } from '@/server/auth/caller';
 import { testCaller } from '@/server/auth/test-caller';
 import { guests } from '@/server/db/schema';
 import { insertSession } from './holdFixtures';
@@ -107,6 +107,24 @@ describe('readAccountBookings', () => {
     expect(
       (await reads.readAccountBookings(alan, now)).map((r) => r.id),
     ).toEqual([alans]);
+  });
+
+  it('gives host staff only their own bookings, never a guest’s on their host', async () => {
+    const staffGuestId = await guestAt('staffer@example.com');
+    const otherId = await guestAt('customer@example.com');
+    const signed = await signedIn('staffer@example.com');
+    const staff = testCaller({
+      userId: signed.userId,
+      roles: [Role.Guest, Role.HostStaff],
+      hostIds: [parents.hostId],
+    });
+    const own = await booking(staffGuestId, 9);
+    const customers = await booking(otherId, 10);
+
+    const ids = (await reads.readAccountBookings(staff, now)).map((r) => r.id);
+
+    expect(ids).toEqual([own]);
+    expect(ids).not.toContain(customers);
   });
 
   it('reads nothing for an email the sign-in has not verified', async () => {

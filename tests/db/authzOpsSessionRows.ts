@@ -1,4 +1,5 @@
 import type { Caller } from '@/server/auth/caller';
+import { opsSessionChangeRows } from './authzOpsSessionChangeRows';
 
 // The ops session-management rows of the authorization matrix. Every function is ops alone: admin
 // and a host owner, the owner of the session's own host included, are refused. Each row acts on
@@ -45,5 +46,6 @@ export function opsSessionRows() {
         }),
       allows: sessionOps,
     },
+    ...opsSessionChangeRows(),
   ];
 }

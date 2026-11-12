@@ -159,9 +159,12 @@ export function staffRolesText(roles: readonly GrantableRole[]): string {
   return roles.map((role) => staffRoleLabels[role]).join(', ');
 }
 
-/** Whether a row of the staff table is one ops can manage here: it holds ops. Admin is not managed here. */
-export function isManagedStaffRow(row: Pick<StaffRow, 'roles'>): boolean {
-  return row.roles.includes(staffGrant.role);
+/** Whether a row of the staff table is one this page can manage: it holds the page's role (ops for ops staff admin). Admin is not managed here. */
+export function isManagedStaffRow(
+  row: Pick<StaffRow, 'roles'>,
+  role: GrantableRole = staffGrant.role,
+): boolean {
+  return row.roles.includes(role);
 }
 
 /** The invite fields the address names as needing another look. */

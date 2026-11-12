@@ -61,6 +61,7 @@ const week = (sessions: HostWeekSession[], weekStart = '2026-11-09') =>
       sessions,
     },
     now,
+    true,
   );
 
 describe('weekStartOf', () => {

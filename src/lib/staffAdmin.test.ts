@@ -81,6 +81,14 @@ describe('staff row and address helpers', () => {
     expect(isManagedStaffRow({ roles })).toBe(expected);
   });
 
+  it('manages the role the page names, and no other', () => {
+    expect(isManagedStaffRow({ roles: ['host_staff'] }, 'host_staff')).toBe(
+      true,
+    );
+    expect(isManagedStaffRow({ roles: ['host_staff'] })).toBe(false);
+    expect(isManagedStaffRow({ roles: ['ops'] }, 'host_staff')).toBe(false);
+  });
+
   it.each([
     ['email', ['email']],
     ['email,other', ['email']],

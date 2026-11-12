@@ -20,6 +20,11 @@ import { experienceEditorRows } from './authzExperienceRows';
 import { accountBookingsRows } from './authzAccountRows';
 import { hostSetupRows } from './authzHostRows';
 import { opsBookingRows } from './authzBookingRows';
+import {
+  hostReaderFunctions,
+  hostReaders,
+  hostStaffRows,
+} from './authzHostStaffRows';
 import { seedRows } from './authzSeedRows';
 import { staffRows } from './authzStaffRows';
 import { supportQueueRows } from './authzSupportRows';
@@ -39,7 +44,9 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 // Behaviours under test, against the real database, with every caller made by a real sign-in by
 // link as a seeded persona. One row per guarded function and resource, and each row names who gets
 // through; every other subject must be refused with a ForbiddenError, and a subject listed must not be:
-// - nobody signed in, a guest, host staff, and the other host's owner are refused where a host owner or staff is required
+// - nobody signed in, a guest, and the owner or staff of the other host are refused everywhere a
+//   host owner or staff member is required; host staff of a host read its dashboard, week and
+//   guest lists and are refused every other function, including every write and staff management
 // - platform actions (editorial, legal, settings, finance, privacy, seed) admit ops and admin, or ops
 //   alone where the function says so, and no host role
 // - host-owner-only actions admit the owner of that host only: not ops, not admin, not the other owner
@@ -331,13 +338,13 @@ const rows: Row[] = [
     fn: 'readHostDashboard',
     invoke: (c, t) =>
       data.hostDashboard.readHostDashboard(c, t.hostId, new Date()),
-    allows: { hostA: ['ownerA'], hostB: ['ownerB'], missing: [] },
+    allows: hostReaders,
   },
   {
     fn: 'readHostWeek',
     invoke: (c, t) =>
       data.sessions.readHostWeek(c, t.hostId, undefined, new Date()),
-    allows: { hostA: ['ownerA'], hostB: ['ownerB'], missing: [] },
+    allows: hostReaders,
   },
   {
     fn: 'publishWeek',
@@ -353,13 +360,13 @@ const rows: Row[] = [
   {
     fn: 'readHostBookings',
     invoke: (c, t) => data.hostGuestLists.readHostBookings(c, t.hostId, ''),
-    allows: { hostA: ['ownerA'], hostB: ['ownerB'], missing: [] },
+    allows: hostReaders,
   },
   {
     fn: 'readHostGuestList',
     invoke: (c, t) =>
       data.hostGuestLists.readHostGuestList(c, t.hostId, t.sessionId),
-    allows: { hostA: ['ownerA'], hostB: ['ownerB'], missing: [] },
+    allows: hostReaders,
   },
   // The owner of the host, or staff.
   {
@@ -490,6 +497,7 @@ const rows: Row[] = [
   ...accountBookingsRows(),
   ...hostSetupRows(),
   ...staffRows(),
+  ...hostStaffRows(),
   ...supportQueueRows(),
   ...experienceEditorRows(),
   ...experienceReviewRows(),
@@ -540,6 +548,23 @@ describe('the authorization matrix', () => {
     },
     120_000,
   );
+});
+
+describe('host staff', () => {
+  it('are admitted by the host read functions and by no other function', () => {
+    const admitting = cells
+      .filter(({ row, place }) =>
+        (row.allows[place] ?? []).some((who) => who.startsWith('staff')),
+      )
+      .map(({ row }) => row.fn);
+    // By name only: readAccountBookings admits every signed-in persona, staff included, because it
+    // reads the caller's own bookings and nobody else's. That is ownership, not a host role, and
+    // tests/db/account-bookings.db.test.ts proves a host staff reader sees only their own.
+    const ownBookingReads = ['readAccountBookings'];
+    expect([...new Set(admitting)].sort()).toEqual(
+      [...hostReaderFunctions, ...ownBookingReads].sort(),
+    );
+  });
 });
 
 describe('requireRole on its own', () => {
@@ -696,6 +721,8 @@ describe('the matrix is complete', () => {
     'requireStaff',
     'requireOpsUserId',
     'requireUserId',
+    // A pure predicate behind requireRole; guards nothing.
+    'holdsRole',
   ]);
   /** The mailbox opens to the ops role or, off production, to the shared secret, so its access rule is not a role row; src/server/ports/email/mailbox.test.ts and tests/db/email-mailbox.db.test.ts cover every combination. */
   const mailboxGate = ['unlockMailbox', 'loadMailbox', 'loadMailboxMessage'];

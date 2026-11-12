@@ -9,6 +9,8 @@ on:
 permissions:
   contents: read
   pull-requests: read
+  # Lets the review-event run re-run this head's failed push-time run, whose stale failure would block the merge.
+  actions: write
 jobs:
   human-read:
     name: human-read
@@ -28,3 +30,13 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: bun scripts/merge-desk/human-read.ts
+      - name: Re-run the push-time check now that this head is approved
+        if: github.event_name == 'pull_request_review' && success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          gh run list --repo "$GITHUB_REPOSITORY" --workflow human-read.yml --commit "$HEAD_SHA" \
+            --event pull_request_target --json databaseId,conclusion \
+            --jq '.[] | select(.conclusion == "failure") | .databaseId' |
+          while read -r id; do gh run rerun "$id" --repo "$GITHUB_REPOSITORY" --failed; done

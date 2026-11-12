@@ -202,15 +202,13 @@ describe('buildHostBookingList', () => {
     );
     expect(view.rows[0]).toMatchObject({
       guestName: 'Ada Lovelace',
-      whenLabel: 'Sun, Nov 15 · 4:00 PM EST',
-      seatsLabel: '2 seats',
-      statusLabel: 'Confirmed',
+      details: [
+        'Sunset kayak · Sun, Nov 15 · 4:00 PM EST',
+        '2 seats · Confirmed · RMB-AAAA01',
+      ],
       guestListHref: hostGuestListHref(id(100)),
     });
-    expect(view.rows[1]).toMatchObject({
-      seatsLabel: '1 seat',
-      statusLabel: 'Cancelled',
-    });
+    expect(view.rows[1]?.details[1]).toMatch(/^1 seat · Cancelled · RMB-/);
     expect(view.summary).toBe('Latest 2 bookings');
   });
 

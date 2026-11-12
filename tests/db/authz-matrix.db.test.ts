@@ -16,6 +16,7 @@ import { experiences } from '@/server/db/schema';
 import { createFakeStorageAdapter } from '@/server/ports/storage/fake';
 import { personaHostSlugs } from '@/lib/seed/personas';
 import { experienceEditorRows } from './authzExperienceRows';
+import { accountBookingsRows } from './authzAccountRows';
 import { hostSetupRows } from './authzHostRows';
 import {
   hostReaderFunctions,
@@ -50,10 +51,8 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 // - session and photo actions admit the owner of the host, and ops and admin on any host; a template
 //   or session sourced from an allocation is staff only, so its own host's owner is refused
 // - a missing row is refused to everyone but staff, so the answer does not say which ids exist
-// - requireRole on its own: a guest owns only the row whose owner is them; a host role needs the
-//   host it was granted; a role is not satisfied by a different role
-// - coverage: every function in src/server that takes a Caller is a row here, or is named below as a
-//   guard itself, so a new guarded function fails this file until it is added
+// - requireRole on its own: a guest owns only their row; a host role needs its host; one role never satisfies another
+// - coverage: every function in src/server that takes a Caller is a row here or a named guard, so a new one fails until added
 
 setupAuthzDatabase();
 
@@ -512,6 +511,7 @@ const rows: Row[] = [
     invoke: (c) => data.audit.recordOpsAccess(c),
     allows: platform(...opsOnly),
   },
+  ...accountBookingsRows(),
   ...hostSetupRows(),
   ...staffRows(),
   ...hostStaffRows(),

@@ -30,16 +30,20 @@ export function parseSessionId(raw: string): string | null {
   return parsed.success ? parsed.data.toLowerCase() : null;
 }
 
-export const HostBookingListRowSchema = z.object({
+/** What every list of bookings reads of one: the order, its experience and session, and its status. */
+export const BookingListRowSchema = z.object({
   id: EntityIdSchema,
   reference: z.string().min(1),
-  leadGuestName: z.string().min(1),
   experienceName: z.string().min(1),
-  sessionId: EntityIdSchema,
   sessionStartsAt: z.date(),
   timeZone: TimeZoneSchema,
-  seats: z.int().min(0),
   status: z.enum(hostDashboardBookingStatuses),
+});
+
+export const HostBookingListRowSchema = BookingListRowSchema.extend({
+  leadGuestName: z.string().min(1),
+  sessionId: EntityIdSchema,
+  seats: z.int().min(0),
 });
 export type HostBookingListRow = z.infer<typeof HostBookingListRowSchema>;
 
@@ -81,10 +85,8 @@ export type HostBookingListItemView = {
   id: string;
   reference: string;
   guestName: string;
-  experienceName: string;
-  whenLabel: string;
-  seatsLabel: string;
-  statusLabel: string;
+  /** "Sunset kayak · Sun, Nov 15 · 4:00 PM EST" and "3 seats · Confirmed · RMB-K7QX2M". */
+  details: readonly string[];
   guestListHref: string;
 };
 
@@ -139,10 +141,10 @@ export function buildHostBookingList(
     id: b.id,
     reference: b.reference,
     guestName: b.leadGuestName,
-    experienceName: b.experienceName,
-    whenLabel: whenLabel(b.sessionStartsAt, b.timeZone),
-    seatsLabel: seatsLabel(b.seats),
-    statusLabel: bookingStatusLabels[b.status],
+    details: [
+      `${b.experienceName} · ${whenLabel(b.sessionStartsAt, b.timeZone)}`,
+      `${seatsLabel(b.seats)} · ${bookingStatusLabels[b.status]} · ${b.reference}`,
+    ],
     guestListHref: hostGuestListHref(b.sessionId),
   }));
   return { term, summary: summaryFor(rows.length, term), rows };

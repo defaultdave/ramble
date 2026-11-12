@@ -1,0 +1,12 @@
+/* The same page frame and list as the host's bookings page, under the host dashboard's section heading. */
+.body {
+  composes: body from '../../../components/HostGuestLists/HostGuestLists.module.css';
+}
+
+.list {
+  composes: list from '../../../components/HostGuestLists/HostGuestLists.module.css';
+}
+
+.heading {
+  composes: heading from '../../../components/HostDashboard/HostDashboard.module.css';
+}

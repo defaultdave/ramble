@@ -186,7 +186,7 @@ const experienceFields = z.object({
   createdAt: z.date(),
 });
 
-type RuleFields = Pick<
+export type ExperienceRuleFields = Pick<
   z.infer<typeof experienceFields>,
   | 'status'
   | 'outdoor'
@@ -198,9 +198,12 @@ type RuleFields = Pick<
   | 'linkOutUrl'
 >;
 
-type RuleIssue = { path: keyof RuleFields; message: string };
+export type ExperienceRuleIssue = {
+  path: keyof ExperienceRuleFields;
+  message: string;
+};
 
-function ageRuleIssues(value: RuleFields): RuleIssue[] {
+function ageRuleIssues(value: ExperienceRuleFields): ExperienceRuleIssue[] {
   const { ageRule, minAge, maxAge } = value;
   switch (ageRule) {
     case 'all_ages':
@@ -232,9 +235,9 @@ function ageRuleIssues(value: RuleFields): RuleIssue[] {
   }
 }
 
-function weatherIssues(value: RuleFields): RuleIssue[] {
+function weatherIssues(value: ExperienceRuleFields): ExperienceRuleIssue[] {
   const { outdoor, weatherPolicy, weatherDecisionHours } = value;
-  const issues: RuleIssue[] = [];
+  const issues: ExperienceRuleIssue[] = [];
   if (outdoor && weatherPolicy === null) {
     issues.push({
       path: 'weatherPolicy',
@@ -254,22 +257,28 @@ function weatherIssues(value: RuleFields): RuleIssue[] {
   return issues;
 }
 
-function guideOnlyIssues(value: RuleFields): RuleIssue[] {
+function guideOnlyIssues(value: ExperienceRuleFields): ExperienceRuleIssue[] {
   return value.status === 'guide_only' && value.linkOutUrl === null
     ? [{ path: 'linkOutUrl', message: 'A guide-only entry links out' }]
     : [];
 }
 
 /** Rules that tie fields together. The database CHECKs on `experiences` state the same rules. */
-function checkExperienceRules(value: RuleFields, ctx: z.RefinementCtx) {
-  addRuleIssues(
-    [
-      ...ageRuleIssues(value),
-      ...weatherIssues(value),
-      ...guideOnlyIssues(value),
-    ],
-    ctx,
-  );
+export function experienceRuleIssues(
+  value: ExperienceRuleFields,
+): ExperienceRuleIssue[] {
+  return [
+    ...ageRuleIssues(value),
+    ...weatherIssues(value),
+    ...guideOnlyIssues(value),
+  ];
+}
+
+function checkExperienceRules(
+  value: ExperienceRuleFields,
+  ctx: z.RefinementCtx,
+) {
+  addRuleIssues(experienceRuleIssues(value), ctx);
 }
 
 /**

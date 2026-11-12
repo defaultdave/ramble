@@ -2,8 +2,7 @@ import { z } from 'zod';
 import { userActor, type AuditEntryInput } from './audit';
 import { WriteIdSchema } from './catalog';
 import { defaultHostTimeZone } from './hostSetup';
-import { opsAreaIds } from './opsAudit';
-import { pickKnown } from './pickKnown';
+import { opsAreaIds, opsAreaListEntry } from './opsAudit';
 import {
   formText,
   oversizedFields,
@@ -15,7 +14,7 @@ import {
   supportTopicLabels,
   type SupportTopic,
 } from './support';
-import { parseStatusFilter, type StatusTone } from './statusBadge';
+import { parseStatusParam, type StatusTone } from './statusBadge';
 import { requiredText } from './text';
 import { zonedDeadlineLabel } from './zonedLabels';
 
@@ -47,11 +46,7 @@ export const supportStatusOptions = supportStatuses.map((value) => ({
 export function parseSupportStatus(
   raw: string | readonly string[] | undefined,
 ): SupportStatus | null {
-  return pickKnown(
-    parseStatusFilter(raw, supportStatusOptions),
-    supportStatuses,
-    null,
-  );
+  return parseStatusParam(raw, supportStatuses, supportStatusOptions);
 }
 
 /** A request is open until it has a resolution time. */
@@ -169,14 +164,8 @@ export const supportNotices = {
 } satisfies Record<SupportNoticeCode, NoticeText>;
 
 /** The queue was read. It shows guests' names and addresses. */
-export function supportListEntry(userId: string): AuditEntryInput {
-  return {
-    ...userActor(userId),
-    action: 'support.list_viewed',
-    subjectKind: 'ops_area',
-    subjectId: opsAreaIds.support,
-  };
-}
+export const supportListEntry = (userId: string): AuditEntryInput =>
+  opsAreaListEntry(userId, 'support.list_viewed', opsAreaIds.support);
 
 /** A request was resolved. The note is not written: the audit log holds ids, never text. */
 export function supportResolvedEntry(

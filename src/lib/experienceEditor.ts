@@ -32,7 +32,7 @@ import { pickKnown } from './pickKnown';
 import type { GuestPhoto } from './photos';
 import { maxSessionMinutes } from './sessions';
 import {
-  parseStatusFilter,
+  parseStatusParam,
   type StatusFilterOption,
   type StatusTone,
 } from './statusBadge';
@@ -646,9 +646,12 @@ export function parseExperienceFilters(
   query: TableQuery,
   offered: Pick<ExperienceChoices, 'hosts' | 'categories'>,
 ): ExperienceFilters {
-  const status = parseStatusFilter(query.status, experienceStatusOptions);
   return {
-    status: pickKnown(status, experienceStatuses, null),
+    status: parseStatusParam(
+      query.status,
+      experienceStatuses,
+      experienceStatusOptions,
+    ),
     hostId: pickKnown(
       parseSingle(query.host, z.string()),
       offered.hosts.map((host) => host.value),

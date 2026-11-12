@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { resolveBadgeTone } from './badge';
 import {
   parseStatusFilter,
+  parseStatusParam,
   statusBadgeTone,
   statusFilterChips,
   type StatusFilterOption,
@@ -10,6 +11,7 @@ import {
 // Behaviours under test, one per decision, branch or risk:
 // - every status tone maps to a tone the Badge knows, not its neutral fallback
 // - an address that names no offered status means all
+// - a status param is read only when it is offered and is also one of the typed statuses
 // - the chips are All plus each option, one selected, each from the first page with the rest of the address kept
 // - a count shows in the label only when given
 
@@ -34,6 +36,23 @@ describe('parseStatusFilter', () => {
     [['failed'], 'failed'],
   ])('reads %j as %j', (raw, expected) => {
     expect(parseStatusFilter(raw, options)).toBe(expected);
+  });
+});
+
+describe('parseStatusParam', () => {
+  const statuses = ['failed', 'paid'] as const;
+  it.each([
+    ['failed', 'failed'],
+    ['paid', 'paid'],
+    ['refunded', null],
+    [['failed', 'paid'], null],
+    [undefined, null],
+  ])('reads %j as %j', (raw, expected) => {
+    expect(parseStatusParam(raw, statuses, options)).toBe(expected);
+  });
+
+  it('refuses an offered option that is not one of the statuses', () => {
+    expect(parseStatusParam('paid', ['failed'], options)).toBeNull();
   });
 });
 

@@ -237,11 +237,11 @@ describe('the results', () => {
   });
 
   it('refuses a signed-in non-owner even when data is handed over', () => {
+    expect(hostBookingListResult({ kind: 'no_host_role' }, data, '')).toEqual({
+      status: 'refused',
+    });
     expect(
-      hostBookingListResult({ kind: 'not_a_host_owner' }, data, ''),
-    ).toEqual({ status: 'refused' });
-    expect(
-      hostGuestListResult({ kind: 'not_a_host_owner' }, guestData([])),
+      hostGuestListResult({ kind: 'no_host_role' }, guestData([])),
     ).toEqual({ status: 'refused' });
   });
 
@@ -252,10 +252,13 @@ describe('the results', () => {
     expect(hostGuestListResult(owner, null)).toEqual({ status: 'refused' });
   });
 
-  it('gives an owner the view', () => {
-    const list = hostBookingListResult(owner, data, 'ada');
+  it.each([
+    ['an owner', owner],
+    ['host staff', { kind: 'staff', hostId: id(9) } as const],
+  ])('gives %s the view', (_name, access) => {
+    const list = hostBookingListResult(access, data, 'ada');
     expect(list.status === 'ok' && list.view.term).toBe('ada');
-    const guests = hostGuestListResult(owner, guestData([]));
+    const guests = hostGuestListResult(access, guestData([]));
     expect(guests.status === 'ok' && guests.view.hostName).toBe(
       'Harbor Kayak Co',
     );

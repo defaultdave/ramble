@@ -8,14 +8,18 @@ import {
   hostDashboardLimits,
   type HostDashboardData,
 } from '@/lib/hostDashboard';
-import { Role, requireRole, type Caller } from '@/server/auth/caller';
+import {
+  hostReaderRoles,
+  requireAnyRole,
+  type Caller,
+} from '@/server/auth/caller';
 import { db } from './client';
 import { experiences, hosts, orderItems, orders, sessions } from './schema';
 
 /**
- * What a host owner's dashboard shows, for the host they own: their next scheduled sessions with
+ * What a host's dashboard shows, for the host an owner or staff member acts for: their next scheduled sessions with
  * seats sold, and their latest bookings. The caller is checked against `hostId` before anything is
- * read, so the owner of another host, host staff, a guest, and nobody signed in are all refused,
+ * read, so the owner or staff of another host, a guest, and nobody signed in are all refused,
  * and every query below is cut to that host. Null when no such host exists.
  */
 export async function readHostDashboard(
@@ -24,7 +28,7 @@ export async function readHostDashboard(
   now: Date,
 ): Promise<HostDashboardData | null> {
   const id = EntityIdSchema.parse(hostId);
-  requireRole(caller, Role.HostOwner, { hostId: id });
+  requireAnyRole(caller, hostReaderRoles, { hostId: id });
 
   const [[host], upcoming, recent] = await Promise.all([
     db.select({ name: hosts.name }).from(hosts).where(eq(hosts.id, id)),

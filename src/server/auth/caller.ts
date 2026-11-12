@@ -101,17 +101,22 @@ export function requireRole(
   }
 }
 
+/** The roles that may read a host's dashboard, sessions and guest lists; only the owner changes them. */
+export const hostReaderRoles = [Role.HostOwner, Role.HostStaff] as const;
+
 /**
- * `requireRole` for an action more than one role may take: the first role in `roles` the caller
- * holds is checked against the resource, and a caller who holds none is refused as the first.
+ * `requireRole` for an action more than one role may take: it passes when any role in `roles` the
+ * caller holds fits the resource, so owner of one host and staff of another reads either. Otherwise
+ * the caller is refused as the first role they hold, or the first listed when they hold none.
  */
 export function requireAnyRole(
   caller: Caller,
   roles: readonly [Role, ...Role[]],
   resource: Resource,
 ): void {
-  const held = roles.find((role) => caller.roles.includes(role));
-  requireRole(caller, held ?? roles[0], resource);
+  const held = roles.filter((role) => caller.roles.includes(role));
+  if (held.some((role) => ownsResource(caller, role, resource))) return;
+  requireRole(caller, held[0] ?? roles[0], resource);
 }
 
 function ownsResource(caller: Caller, role: Role, resource: Resource) {

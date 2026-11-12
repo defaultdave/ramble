@@ -15,5 +15,5 @@ export default async function HostDashboardPage() {
   const result = await loadHostDashboard();
   if (result.status === 'signed_out') redirect(signInHref('/host'));
   if (result.status === 'refused') notFound();
-  return <HostDashboard view={result.view} />;
+  return <HostDashboard view={result.view} canManage={result.canManage} />;
 }

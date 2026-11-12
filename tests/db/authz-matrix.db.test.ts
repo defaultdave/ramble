@@ -17,6 +17,11 @@ import { createFakeStorageAdapter } from '@/server/ports/storage/fake';
 import { personaHostSlugs } from '@/lib/seed/personas';
 import { experienceEditorRows } from './authzExperienceRows';
 import { hostSetupRows } from './authzHostRows';
+import {
+  hostReaderFunctions,
+  hostReaders,
+  hostStaffRows,
+} from './authzHostStaffRows';
 import { seedRows } from './authzSeedRows';
 import { staffRows } from './authzStaffRows';
 import { supportQueueRows } from './authzSupportRows';
@@ -36,8 +41,9 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 // Behaviours under test, against the real database, with every caller made by a real sign-in by
 // link as a seeded persona. One row per guarded function and resource, and each row names who gets
 // through; every other subject must be refused with a ForbiddenError, and a subject listed must not be:
-// - nobody signed in, a guest, host staff, and the owner of the other host are refused everywhere a
-//   host owner or staff member is required; host staff are granted nothing by any function yet
+// - nobody signed in, a guest, and the owner or staff of the other host are refused everywhere a
+//   host owner or staff member is required; host staff of a host read its dashboard, week and
+//   guest lists and are refused every other function, including every write and staff management
 // - platform actions (editorial, legal, settings, finance, privacy, seed) admit ops and admin, or ops
 //   alone where the function says so, and no host role
 // - host-owner-only actions admit the owner of that host only: not ops, not admin, not the other owner
@@ -350,13 +356,13 @@ const rows: Row[] = [
     fn: 'readHostDashboard',
     invoke: (c, t) =>
       data.hostDashboard.readHostDashboard(c, t.hostId, new Date()),
-    allows: { hostA: ['ownerA'], hostB: ['ownerB'], missing: [] },
+    allows: hostReaders,
   },
   {
     fn: 'readHostWeek',
     invoke: (c, t) =>
       data.sessions.readHostWeek(c, t.hostId, undefined, new Date()),
-    allows: { hostA: ['ownerA'], hostB: ['ownerB'], missing: [] },
+    allows: hostReaders,
   },
   {
     fn: 'publishWeek',
@@ -372,13 +378,13 @@ const rows: Row[] = [
   {
     fn: 'readHostBookings',
     invoke: (c, t) => data.hostGuestLists.readHostBookings(c, t.hostId, ''),
-    allows: { hostA: ['ownerA'], hostB: ['ownerB'], missing: [] },
+    allows: hostReaders,
   },
   {
     fn: 'readHostGuestList',
     invoke: (c, t) =>
       data.hostGuestLists.readHostGuestList(c, t.hostId, t.sessionId),
-    allows: { hostA: ['ownerA'], hostB: ['ownerB'], missing: [] },
+    allows: hostReaders,
   },
   // The owner of the host, or staff.
   {
@@ -508,6 +514,7 @@ const rows: Row[] = [
   },
   ...hostSetupRows(),
   ...staffRows(),
+  ...hostStaffRows(),
   ...supportQueueRows(),
   ...experienceEditorRows(),
   ...experienceReviewRows(),
@@ -557,6 +564,19 @@ describe('the authorization matrix', () => {
     },
     120_000,
   );
+});
+
+describe('host staff', () => {
+  it('are admitted by the host read functions and by no other function', () => {
+    const admitting = cells
+      .filter(({ row, place }) =>
+        (row.allows[place] ?? []).some((who) => who.startsWith('staff')),
+      )
+      .map(({ row }) => row.fn);
+    expect([...new Set(admitting)].sort()).toEqual(
+      [...hostReaderFunctions].sort(),
+    );
+  });
 });
 
 describe('requireRole on its own', () => {

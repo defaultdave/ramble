@@ -12,7 +12,11 @@ import {
   type HostGuestListData,
 } from '@/lib/hostGuestLists';
 import { containsPattern } from '@/lib/pages/help';
-import { Role, requireRole, type Caller } from '@/server/auth/caller';
+import {
+  hostReaderRoles,
+  requireAnyRole,
+  type Caller,
+} from '@/server/auth/caller';
 import { db } from './client';
 import { experiences, hosts, orderItems, orders, sessions } from './schema';
 
@@ -26,9 +30,10 @@ const seatsOf = sql<number>`coalesce((
 ), 0)`;
 
 /**
- * A host owner's bookings, latest first, confirmed and cancelled, optionally those whose reference
- * or lead guest's name contains `term` (any case, the term matched literally). The owner of another
- * host, host staff, a guest, ops, admin, and nobody signed in are refused.
+ * A host's bookings, latest first, confirmed and cancelled, optionally those whose reference
+ * or lead guest's name contains `term` (any case, the term matched literally). The host's owner and
+ * staff read them; the owner or staff of another host, a guest, ops, admin, and nobody signed in
+ * are refused.
  */
 export async function readHostBookings(
   caller: Caller,
@@ -37,7 +42,7 @@ export async function readHostBookings(
 ): Promise<HostBookingListData> {
   const id = EntityIdSchema.parse(hostId);
   const search = HostBookingSearchSchema.parse(term);
-  requireRole(caller, Role.HostOwner, { hostId: id });
+  requireAnyRole(caller, hostReaderRoles, { hostId: id });
 
   const pattern = containsPattern(search);
   const rows = await db
@@ -76,7 +81,7 @@ export async function readHostBookings(
 /**
  * The guest list of one session of the host: its confirmed bookings, by lead guest's name. Null
  * when the session is missing or belongs to another host, so the two read alike. A cancelled
- * booking is not a guest on the day and is left out. Refused to everyone but the host's owner.
+ * booking is not a guest on the day and is left out. Refused to everyone but the host's owner and staff.
  */
 export async function readHostGuestList(
   caller: Caller,
@@ -85,7 +90,7 @@ export async function readHostGuestList(
 ): Promise<HostGuestListData | null> {
   const id = EntityIdSchema.parse(hostId);
   const sid = EntityIdSchema.parse(sessionId);
-  requireRole(caller, Role.HostOwner, { hostId: id });
+  requireAnyRole(caller, hostReaderRoles, { hostId: id });
 
   const [session] = await db
     .select({

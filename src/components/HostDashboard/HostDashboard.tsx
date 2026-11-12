@@ -4,6 +4,7 @@ import { PageHeading } from '@/components/PageHeading';
 import { classNames } from '@/lib/classNames';
 import { soldFillStep } from '@/lib/hostDashboard';
 import { hostSessionsPath } from '@/lib/hostSessions';
+import { hostStaffPath } from '@/lib/hostStaff';
 import type {
   HostBookingRowView,
   HostDashboardView,
@@ -52,7 +53,14 @@ function BookingRow({ row }: { row: HostBookingRowView }) {
 }
 
 /** The host's home: the next sessions with seats sold against what each holds, and the latest bookings. */
-export function HostDashboard({ view }: { view: HostDashboardView }) {
+export function HostDashboard({
+  view,
+  canManage,
+}: {
+  view: HostDashboardView;
+  /** An owner manages sessions and staff; read-only staff only look. */
+  canManage?: boolean;
+}) {
   return (
     <>
       <PageHeading title={hostDashboardTitle}>
@@ -60,9 +68,16 @@ export function HostDashboard({ view }: { view: HostDashboardView }) {
         <AccountControl signedIn />
       </PageHeading>
       <div className={styles.sections}>
-        <ButtonLink href={hostSessionsPath} variant="secondary">
-          Manage sessions
-        </ButtonLink>
+        <nav aria-label="Host pages" className={styles.nav}>
+          <ButtonLink href={hostSessionsPath} variant="secondary">
+            {canManage ? 'Manage sessions' : 'Sessions'}
+          </ButtonLink>
+          {canManage ? (
+            <ButtonLink href={hostStaffPath} variant="secondary">
+              Staff
+            </ButtonLink>
+          ) : null}
+        </nav>
         <section aria-labelledby="host-upcoming">
           <h2 id="host-upcoming" className={styles.heading}>
             Upcoming sessions

@@ -208,14 +208,14 @@ export type HostGuestListResult =
   | { status: 'refused' }
   | { status: 'ok'; view: HostGuestListView };
 
-/** Nobody signed in signs in; a signed-in non-owner is refused, as is an owner whose host (`data` null) is gone. */
+/** Nobody signed in signs in; a signed-in caller with no host role is refused, as is one whose host (`data` null) is gone. */
 export function hostBookingListResult(
   access: HostAccess,
   data: HostBookingListData | null,
   term: string,
 ): HostBookingListResult {
   if (access.kind === 'signed_out') return { status: 'signed_out' };
-  if (access.kind === 'not_a_host_owner' || data === null) {
+  if (access.kind === 'no_host_role' || data === null) {
     return { status: 'refused' };
   }
   return { status: 'ok', view: buildHostBookingList(data, term) };
@@ -227,7 +227,7 @@ export function hostGuestListResult(
   data: HostGuestListData | null,
 ): HostGuestListResult {
   if (access.kind === 'signed_out') return { status: 'signed_out' };
-  if (access.kind === 'not_a_host_owner' || data === null) {
+  if (access.kind === 'no_host_role' || data === null) {
     return { status: 'refused' };
   }
   return { status: 'ok', view: buildHostGuestList(data) };

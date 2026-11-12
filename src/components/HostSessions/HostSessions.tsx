@@ -17,7 +17,7 @@ function SessionRow({
   actions,
 }: {
   row: HostWeekRowView;
-  actions: HostSessionActions;
+  actions: HostSessionActions | null;
 }) {
   return (
     <li className={styles.row}>
@@ -29,18 +29,23 @@ function SessionRow({
         {row.soldLabel}
         {row.priceLabel ? ` · ${row.priceLabel}` : ''}
       </p>
-      {row.editable ? <EditSessionForms row={row} actions={actions} /> : null}
+      {row.editable && actions ? (
+        <EditSessionForms row={row} actions={actions} />
+      ) : null}
     </li>
   );
 }
 
-/** The host's week: sessions by day with what may change on each, publishing the week from the weekly slots, and one-off dates. */
+/**
+ * The host's week: sessions by day with what may change on each, publishing the week from the weekly
+ * slots, and one-off dates. With no `actions` (read-only staff) it shows the days and nothing to change.
+ */
 export function HostSessions({
   view,
   actions,
 }: {
   view: HostWeekView;
-  actions: HostSessionActions;
+  actions: HostSessionActions | null;
 }) {
   return (
     <>
@@ -68,18 +73,20 @@ export function HostSessions({
           ) : null}
         </nav>
         <p className={styles.secondary}>Times are in {view.timeZone}.</p>
-        <section>
-          <h2 className={styles.heading}>Publish this week</h2>
-          <p className={styles.secondary}>
-            Sessions from your weekly slots are bookable as soon as they exist.
-            Publishing adds any that are missing this week and leaves edited or
-            cancelled ones as they are.
-          </p>
-          <PublishWeekForm
-            weekStart={view.weekStart}
-            action={actions.publishWeek}
-          />
-        </section>
+        {actions ? (
+          <section>
+            <h2 className={styles.heading}>Publish this week</h2>
+            <p className={styles.secondary}>
+              Sessions from your weekly slots are bookable as soon as they
+              exist. Publishing adds any that are missing this week and leaves
+              edited or cancelled ones as they are.
+            </p>
+            <PublishWeekForm
+              weekStart={view.weekStart}
+              action={actions.publishWeek}
+            />
+          </section>
+        ) : null}
         <section>
           <h2 className={styles.heading}>Sessions</h2>
           {view.days.length === 0 ? (
@@ -97,14 +104,16 @@ export function HostSessions({
             ))
           )}
         </section>
-        <section>
-          <h2 className={styles.heading}>Add a one-off session</h2>
-          {view.experiences.length === 0 ? (
-            <p className={styles.empty}>You have no experiences yet.</p>
-          ) : (
-            <AddOneOffForm view={view} action={actions.addOneOff} />
-          )}
-        </section>
+        {actions ? (
+          <section>
+            <h2 className={styles.heading}>Add a one-off session</h2>
+            {view.experiences.length === 0 ? (
+              <p className={styles.empty}>You have no experiences yet.</p>
+            ) : (
+              <AddOneOffForm view={view} action={actions.addOneOff} />
+            )}
+          </section>
+        ) : null}
       </div>
     </>
   );

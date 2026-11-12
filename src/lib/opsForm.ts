@@ -145,6 +145,12 @@ export function noticeHref(
   return tableHref(path, { notice, fields: fields.join(',') });
 }
 
+/** The notice every refused ops form names, whichever form it was. */
+export const invalidFormNotice = {
+  tone: 'danger',
+  title: 'Some details need another look.',
+} as const satisfies NoticeText;
+
 /** What sending an invite's sign-in link comes to; `not_found` is a person or row that is gone. */
 export type InviteResult = 'sent' | 'rate_limited' | 'failed' | 'not_found';
 

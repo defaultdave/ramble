@@ -51,7 +51,7 @@ setupRefundsDatabase(raise);
 const opsUser = '5b3d7ad4-6f3c-4c2f-9d58-3a0a2f0e8a10';
 const ops = testCaller({ userId: opsUser, roles: [Role.Ops] });
 const day = 86_400_000;
-const zeros = '0:0:0:0:0';
+const wrong = '9:9:9:9:9';
 
 const refused: [string, () => Caller][] = [
   ['a guest', () => testCaller({ userId: randomUUID() })],
@@ -161,7 +161,7 @@ describe('access', () => {
           data.cancelSessionAsOps(who, {
             sessionId: session.id,
             reason: 'ramble',
-            fingerprint: zeros,
+            fingerprint: wrong,
           }),
       ];
       for (const attempt of attempts) {
@@ -372,7 +372,7 @@ describe('cancelSessionAsOps', () => {
       await data.cancelSessionAsOps(ops, {
         sessionId: session.id,
         reason: 'ramble',
-        fingerprint: zeros,
+        fingerprint: wrong,
       }),
     ).toEqual({ kind: 'ended' });
 
@@ -385,7 +385,7 @@ describe('cancelSessionAsOps', () => {
       await data.cancelSessionAsOps(ops, {
         sessionId: randomUUID(),
         reason: 'ramble',
-        fingerprint: zeros,
+        fingerprint: wrong,
       }),
     ).toEqual({ kind: 'done', result: { status: 'not_found' } });
   });
@@ -412,7 +412,7 @@ describe('cancelSessionAsOps', () => {
       await data.cancelSessionAsOps(ops, {
         sessionId: session.id,
         reason: 'ramble',
-        fingerprint: zeros,
+        fingerprint: wrong,
       }),
     ).toEqual({ kind: 'blocked' });
 

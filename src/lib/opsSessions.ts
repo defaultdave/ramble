@@ -12,6 +12,7 @@ import { isOpenHold, openHeldSeats, type HoldTimes } from './holds';
 import { formatMoney } from './money';
 import {
   formHas,
+  invalidFormNotice,
   formText,
   parseIdField,
   parseNotice,
@@ -515,7 +516,7 @@ export const opsSessionNotices = {
     title:
       'Only an experience guests can see, or one already paused, is paused here.',
   },
-  invalid: { tone: 'danger', title: 'Some details need another look.' },
+  invalid: invalidFormNotice,
 } as const satisfies Record<OpsSessionNoticeCode, NoticeText>;
 
 /** What asking to cancel came to: refused before anything was written, or handed to `cancelSession`. */

@@ -133,7 +133,7 @@ export async function createSessionTemplate(
 export type GenerateSessionsResult =
   | {
       ok: true;
-      /** For `tagsForChanges([{ kind: 'schedule', experienceId }])` in the calling action or job. */
+      /** For `tagsForChanges([{ kind: 'experience', experienceId }])` in the calling action or job. */
       experienceId: string;
       created: Session[];
       alreadyExisted: number;
@@ -398,7 +398,7 @@ async function changeUnbookedSession(
   );
   if (result.ok) {
     updateTagsForChanges([
-      { kind: 'schedule', experienceId: result.session.experienceId },
+      { kind: 'experience', experienceId: result.session.experienceId },
       { kind: 'spaces', sessionId: result.session.id },
     ]);
   }
@@ -515,7 +515,7 @@ export async function updateSessionPrice(
   );
   if (result.ok) {
     updateTagsForChanges([
-      { kind: 'schedule', experienceId: found.experienceId },
+      { kind: 'experience', experienceId: found.experienceId },
     ]);
   }
   return result;
@@ -579,7 +579,9 @@ export async function addOneOffSession(
       source: 'ramble',
     })
     .returning();
-  updateTagsForChanges([{ kind: 'schedule', experienceId: data.experienceId }]);
+  updateTagsForChanges([
+    { kind: 'experience', experienceId: data.experienceId },
+  ]);
   return { ok: true, session: SessionSchema.parse(inserted) };
 }
 
@@ -671,7 +673,10 @@ export async function publishWeek(
   }
   // After the commit, so a week that rolled back invalidates nothing.
   updateTagsForChanges(
-    published.grown.map((experienceId) => ({ kind: 'schedule', experienceId })),
+    published.grown.map((experienceId) => ({
+      kind: 'experience',
+      experienceId,
+    })),
   );
   return {
     ok: true,

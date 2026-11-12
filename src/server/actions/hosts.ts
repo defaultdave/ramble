@@ -73,8 +73,7 @@ export async function resendHostInviteAction(
 ): Promise<void> {
   const caller = await opsCallerOrLeave(hostsPath);
   const hostId = hostIdOrLeave(formData);
-  const ownerUserId = parseIdField(formData.get('ownerUserId'));
-  if (ownerUserId === null) redirect(hostPath(hostId));
+  const ownerUserId = idOrLeave(formData, 'ownerUserId', hostPath(hostId));
   const invite = await inviteHostOwner(caller, hostId, ownerUserId);
   redirect(noticeHref(hostPath(hostId), inviteNotice(invite, false)));
 }

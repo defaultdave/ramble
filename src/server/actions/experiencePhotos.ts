@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { experiencePath, experiencesPath } from '@/lib/experienceEditor';
 import { noticeHref } from '@/lib/opsForm';
 import { parsePhotoForm, photoRefusalNotice } from '@/lib/photoForm';
+import type { PhotoRefusalCode } from '@/lib/photos';
 import {
   ExperienceNotFoundError,
   PhotoLimitError,
@@ -13,6 +14,11 @@ import { idOrLeave, opsCallerOrLeave } from '@/server/opsAccess';
 import { PhotoRefusedError } from '@/server/photos/ingest';
 import { systemClock } from '@/server/ports/clock';
 import { getStorage } from '@/server/ports/storage/config';
+
+/** Back to the experience, with the file field saying why the photo was refused. */
+function refusedHref(here: string, code: PhotoRefusalCode): string {
+  return noticeHref(here, photoRefusalNotice(code), ['photoFile']);
+}
 
 /** Adds one photo, with its alt text and rights, to the experience the form names. The file is read only once its size is within the limit. */
 export async function addExperiencePhotoAction(
@@ -26,7 +32,7 @@ export async function addExperiencePhotoAction(
     redirect(noticeHref(here, 'photo_invalid', parsed.fields));
   }
   if (parsed.status === 'refused') {
-    redirect(noticeHref(here, photoRefusalNotice(parsed.code), ['photoFile']));
+    redirect(refusedHref(here, parsed.code));
   }
 
   try {
@@ -42,7 +48,7 @@ export async function addExperiencePhotoAction(
       redirect(noticeHref(here, 'photo_limit'));
     }
     if (error instanceof PhotoRefusedError) {
-      redirect(noticeHref(here, photoRefusalNotice(error.code), ['photoFile']));
+      redirect(refusedHref(here, error.code));
     }
     throw error;
   }

@@ -70,11 +70,13 @@ export const allowedContentTypes = {
   audit: ['application/x-ndjson'],
 } as const satisfies Record<StorageVisibility, readonly string[]>;
 
+export const mebibyte = 1024 * 1024;
+
 /** The one 10 MiB bound: no stored object, and no uploaded photo, is larger. */
-export const maxObjectBytes = 10 * 1024 * 1024;
+export const maxObjectBytes = 10 * mebibyte;
 
 /** The body a Server Action accepts: the largest upload plus a mebibyte for the form's other fields, so a file over the bound is refused by its size and not cut off by the framework. */
-export const serverActionBodyLimit = maxObjectBytes + 1024 * 1024;
+export const serverActionBodyLimit = maxObjectBytes + mebibyte;
 
 /** A link to a private object lives for minutes, never days. */
 export const defaultSignedUrlSeconds = 300;

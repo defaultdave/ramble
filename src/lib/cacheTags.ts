@@ -37,10 +37,8 @@ export type CacheChange =
       categorySlugs: readonly string[];
       neighborhoodSlug: string;
     }
-  /** Sessions of an experience were added, moved, or cancelled. */
-  | { kind: 'schedule'; experienceId: string }
-  /** A photo was added to an experience, so its cover may have changed. */
-  | { kind: 'photos'; experienceId: string }
+  /** An experience's sessions or photos changed. */
+  | { kind: 'experience'; experienceId: string }
   /** A hold, booking, or release changed the spaces left in one session. */
   | { kind: 'spaces'; sessionId: string }
   | { kind: 'homeModules' }
@@ -62,8 +60,7 @@ function tagsFor(change: CacheChange): string[] {
         tags.neighborhood(change.neighborhoodSlug),
         ...change.categorySlugs.map(tags.category),
       ];
-    case 'schedule':
-    case 'photos':
+    case 'experience':
       return [tags.experience(change.experienceId)];
     case 'spaces':
       return [tags.session(change.sessionId)];

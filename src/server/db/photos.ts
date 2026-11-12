@@ -250,7 +250,7 @@ export async function addPhoto(
   // Outside the try: the row is stored by now, so a failure here must not delete the file it points at.
   if (experience && isGuestVisible(experience.status)) {
     updateTagsForChanges([
-      { kind: 'photos', experienceId: photo.experienceId },
+      { kind: 'experience', experienceId: photo.experienceId },
     ]);
   }
   return GuestPhotoSchema.parse(row);

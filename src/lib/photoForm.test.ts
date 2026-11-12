@@ -5,11 +5,9 @@ import {
   parsePhotoForm,
   photoAltSummary,
   photoFormFields,
-  photoNoticeCodes,
   photoNotices,
   photoProblemTexts,
   photoRefusalNotice,
-  photoRefusalOf,
   photoRightsBasisOptions,
 } from './photoForm';
 import {
@@ -206,15 +204,17 @@ describe('refusal notices', () => {
   it.each(photoRefusalCodes)('maps %s to a notice and back', (code) => {
     const notice = photoRefusalNotice(code);
 
-    expect(photoNoticeCodes).toContain(notice);
-    expect(photoRefusalOf(notice)).toBe(code);
+    const page = experiencePageNotice(notice);
+
+    expect(page.photoRefusal).toBe(code);
+    expect(page.notice?.tone).toBe('danger');
     expect(photoNotices[notice].tone).toBe('danger');
   });
 
-  it.each([null, 'photo_added', 'photo_invalid', 'photo_limit'] as const)(
+  it.each(['photo_added', 'photo_invalid', 'photo_limit'] as const)(
     'maps %s to no refusal',
     (notice) => {
-      expect(photoRefusalOf(notice)).toBeNull();
+      expect(experiencePageNotice(notice).photoRefusal).toBeNull();
     },
   );
 
@@ -228,12 +228,6 @@ describe('refusal notices', () => {
 });
 
 describe('copy', () => {
-  it('names exactly the notice codes that have a notice', () => {
-    expect([...photoNoticeCodes].sort()).toEqual(
-      Object.keys(photoNotices).sort(),
-    );
-  });
-
   it('has a sentence for every form field', () => {
     expect([...photoFormFields].sort()).toEqual(
       Object.keys(photoProblemTexts(null)).sort(),

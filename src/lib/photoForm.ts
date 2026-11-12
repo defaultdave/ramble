@@ -148,7 +148,7 @@ export function photoProblemTexts(
 }
 
 const refusalNotices = photoRefusalCodes.map(photoRefusalNotice);
-export const photoNoticeCodes = [
+const photoNoticeCodes = [
   'photo_added',
   'photo_invalid',
   'photo_limit',
@@ -164,7 +164,7 @@ export function photoRefusalNotice(
 }
 
 /** The refusal a notice stands for, or null for any other notice. */
-export function photoRefusalOf(
+function photoRefusalOf(
   notice: PhotoNoticeCode | null,
 ): PhotoRefusalCode | null {
   return (

@@ -221,5 +221,5 @@ export function suspensionUndoText(suspendedCount: number): string {
   if (suspendedCount === 0) {
     return 'The suspension paused nothing that is still paused. Unsuspending lifts it. Anything paused by hand stays paused.';
   }
-  return `Unsuspending makes the ${countLabel(suspendedCount, 'experience')} paused by the suspension back as they were. Anything paused by hand stays paused.`;
+  return `Unsuspending restores the ${countLabel(suspendedCount, 'experience')} this suspension paused. Anything paused by hand stays paused.`;
 }

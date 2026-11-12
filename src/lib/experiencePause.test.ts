@@ -243,10 +243,11 @@ describe('the suspension sentences', () => {
 
   it.each([
     [0, /paused nothing that is still paused/],
-    [1, /the 1 experience paused by the suspension/],
-    [3, /the 3 experiences paused by the suspension/],
+    [1, /restores the 1 experience this suspension paused/],
+    [3, /restores the 3 experiences this suspension paused/],
   ])('say what unsuspending does with %s paused', (count, expected) => {
     expect(suspensionUndoText(count)).toMatch(expected);
+    expect(suspensionUndoText(count)).not.toMatch(/live/);
   });
 });
 

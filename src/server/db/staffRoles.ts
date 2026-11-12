@@ -1,8 +1,8 @@
 import 'server-only';
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, type SQL } from 'drizzle-orm';
 import { isValidGrantScope, type RoleGrant } from '@/lib/roleGrants';
 import {
-  grantRefusal,
+  groupStaff,
   revokeRefusal,
   staffReadLimit,
   type RevokeRefusal,
@@ -25,8 +25,6 @@ import { authUsers, hosts, roleGrants } from './schema';
 // already authorized the action.
 
 export type GrantOutcome = 'granted' | 'already_held';
-export type GrantRoleResult =
-  GrantOutcome | 'user_not_found' | 'host_not_found' | 'admin_role';
 export type RevokeRoleResult = 'revoked' | 'not_found' | RevokeRefusal;
 
 /**
@@ -73,33 +71,10 @@ export async function grantRoleIn(
   return 'granted';
 }
 
-/**
- * Ops gives an existing person a role. Admin is refused here, a missing person or host is named,
- * and a role already held is a no-op.
- */
-export async function grantRole(
-  caller: Caller,
-  userId: string,
-  grant: RoleGrant,
-): Promise<GrantRoleResult> {
-  const actorId = requireOpsUserId(caller);
-  if (grantRefusal(grant) !== null) return 'admin_role';
-  return db.transaction(async (tx) => {
-    const [user] = await tx
-      .select({ id: authUsers.id })
-      .from(authUsers)
-      .where(eq(authUsers.id, userId));
-    if (!user) return 'user_not_found';
-    if (grant.hostId !== null) {
-      const [host] = await tx
-        .select({ id: hosts.id })
-        .from(hosts)
-        .where(eq(hosts.id, grant.hostId));
-      if (!host) return 'host_not_found';
-    }
-    return grantRoleIn(tx, { kind: 'user', userId: actorId }, userId, grant);
-  });
-}
+const hostMatches = (grant: RoleGrant): SQL =>
+  grant.hostId === null
+    ? isNull(roleGrants.hostId)
+    : eq(roleGrants.hostId, grant.hostId);
 
 /** Ops takes a role back, with its audit row. Nobody removes their own access, and admin is removed from the command line. */
 export async function revokeRole(
@@ -117,9 +92,7 @@ export async function revokeRole(
         and(
           eq(roleGrants.userId, userId),
           eq(roleGrants.role, grant.role),
-          grant.hostId === null
-            ? isNull(roleGrants.hostId)
-            : eq(roleGrants.hostId, grant.hostId),
+          hostMatches(grant),
         ),
       )
       .returning({ id: roleGrants.id });
@@ -129,10 +102,10 @@ export async function revokeRole(
   });
 }
 
-/** Everyone who holds ops or admin, oldest grant first. Audited before it returns. */
+/** Everyone who holds ops or admin, one row each, oldest grant first. Audited before it returns. */
 export async function readStaffForOps(caller: Caller): Promise<StaffRow[]> {
   const actorId = requireOpsUserId(caller);
-  const rows = await dbRead
+  const grants = await dbRead
     .select({
       userId: authUsers.id,
       email: authUsers.email,
@@ -144,19 +117,30 @@ export async function readStaffForOps(caller: Caller): Promise<StaffRow[]> {
     .orderBy(asc(roleGrants.createdAt), asc(roleGrants.id))
     .limit(staffReadLimit);
   await recordAudit(staffListedEntry(actorId));
-  return rows;
+  return groupStaff(grants);
 }
 
-/** The address a sign-in link for this staff member goes to, or null when the person does not hold ops. */
-export async function readStaffInviteTarget(
+/**
+ * The address of a person who holds exactly this role, and the name of the host when the role is
+ * scoped to one, or null when they do not hold it. Ops only: it is where an invite's link is sent.
+ */
+export async function readRoleHolder(
   caller: Caller,
   userId: string,
-): Promise<{ email: string } | null> {
+  grant: RoleGrant,
+): Promise<{ email: string; hostName: string | null } | null> {
   requireRole(caller, Role.Ops, {});
   const [row] = await db
-    .select({ email: authUsers.email })
+    .select({ email: authUsers.email, hostName: hosts.name })
     .from(roleGrants)
     .innerJoin(authUsers, eq(authUsers.id, roleGrants.userId))
-    .where(and(eq(roleGrants.userId, userId), eq(roleGrants.role, 'ops')));
+    .leftJoin(hosts, eq(hosts.id, roleGrants.hostId))
+    .where(
+      and(
+        eq(roleGrants.userId, userId),
+        eq(roleGrants.role, grant.role),
+        hostMatches(grant),
+      ),
+    );
   return row ?? null;
 }

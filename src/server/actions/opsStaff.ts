@@ -21,7 +21,10 @@ export async function inviteStaffAction(formData: FormData): Promise<void> {
     redirect(noticeHref(staffPath, 'invalid', [staffInviteField]));
   }
   redirect(
-    noticeHref(staffPath, staffInviteNotice(await inviteStaff(caller, email))),
+    noticeHref(
+      staffPath,
+      staffInviteNotice(await inviteStaff(caller, email), true),
+    ),
   );
 }
 
@@ -32,7 +35,7 @@ export async function resendStaffLinkAction(formData: FormData): Promise<void> {
   redirect(
     noticeHref(
       staffPath,
-      staffInviteNotice(await resendStaffLink(caller, userId)),
+      staffInviteNotice(await resendStaffLink(caller, userId), false),
     ),
   );
 }

@@ -1,7 +1,6 @@
 import { z } from 'zod';
-import { signInLinkTtlSeconds } from '../auth';
 import { hostLimits } from '../hostSetup';
-import { signInConfirmUrl, signInPath } from '../signIn';
+import { signInLinkData, signInPath } from '../signIn';
 import { oneLineClipped } from '../text';
 
 // The email that tells a new host owner they have been set up and carries their first sign-in link.
@@ -34,8 +33,7 @@ export function hostInviteData(
 ): HostInviteData {
   return {
     hostName,
-    url: signInConfirmUrl(appOrigin, token, hostInviteLandingPath),
+    ...signInLinkData(token, appOrigin, hostInviteLandingPath),
     signInUrl: new URL(signInPath, appOrigin).toString(),
-    expiresInMinutes: signInLinkTtlSeconds / 60,
   };
 }

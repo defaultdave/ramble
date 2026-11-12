@@ -1,28 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import type { AuditRow } from './audit';
+import { parseAuditEntry, type AuditRow } from './audit';
 import {
   auditDetailsLabel,
   auditViewRow,
-  grantRefusal,
+  groupStaff,
   parseAuditCursor,
   parseAuditDay,
   parseStaffEmail,
   revokeNotice,
   revokeRefusal,
   staffInviteNotice,
-  staffLinkData,
   staffNoticeCodes,
   staffNotices,
 } from './staffAdmin';
 
 // Behaviours under test:
 // - the invite form's address is trimmed and lower-cased; blank, too long, or not an address is refused
-// - ops may not give or take back admin; nobody takes back their own access; any other grant may go
-// - the invite email links to the confirm page, lands on /ops, and says how long the link lives
+// - ops may not take back admin; nobody takes back their own access; any other grant may go
+// - a person holding ops and admin is one staff row
 // - every outcome of an invite or a revoke has a notice
 // - the audit day is the one named, or today in UTC for a missing, repeated, or impossible one
 // - the audit cursor is digits that fit a safe integer, else the start of the day
-// - an audit row shows its UTC time, actor, subject and details without a name or an address
+// - an audit row shows its UTC time, actor, subject and details; a detail that is not an id or a code is withheld, and the audit log refuses to store one
 
 const userId = '1a1e2d3c-4b5a-4697-8a9b-0c1d2e3f4a5b';
 const otherId = '2b2e2d3c-4b5a-4697-8a9b-0c1d2e3f4a5b';
@@ -44,15 +43,7 @@ describe('parseStaffEmail', () => {
   });
 });
 
-describe('grantRefusal and revokeRefusal', () => {
-  it.each([
-    ['ops', null],
-    ['host_staff', null],
-    ['admin', 'admin_role'],
-  ] as const)('giving %s is %j', (role, expected) => {
-    expect(grantRefusal({ role, hostId: null })).toBe(expected);
-  });
-
+describe('revokeRefusal', () => {
   it.each([
     [userId, otherId, opsGrant, null],
     [userId, userId, opsGrant, 'self'],
@@ -66,31 +57,36 @@ describe('grantRefusal and revokeRefusal', () => {
   );
 });
 
-describe('staffLinkData', () => {
-  it('points at the confirm page, lands on the ops area, and states the lifetime', () => {
-    const data = staffLinkData(
-      'abcdefghijklmnopqrstuvwxyzABCDEF',
-      'https://ramble.test',
-    );
-    const url = new URL(data.url);
-    expect(url.origin).toBe('https://ramble.test');
-    expect(url.searchParams.get('token')).toBe(
-      'abcdefghijklmnopqrstuvwxyzABCDEF',
-    );
-    expect(url.searchParams.get('next')).toBe('/ops');
-    expect(data.expiresInMinutes).toBeGreaterThan(0);
+describe('groupStaff', () => {
+  it('lists each person once with every role, in the order first met', () => {
+    expect(
+      groupStaff([
+        { userId, email: 'a@example.com', role: 'ops' },
+        { userId: otherId, email: 'b@example.com', role: 'admin' },
+        { userId, email: 'a@example.com', role: 'admin' },
+      ]),
+    ).toEqual([
+      { userId, email: 'a@example.com', roles: ['ops', 'admin'] },
+      { userId: otherId, email: 'b@example.com', roles: ['admin'] },
+    ]);
   });
 });
 
 describe('notices', () => {
   it.each([
-    ['sent', 'invited'],
-    ['rate_limited', 'rate_limited'],
-    ['failed', 'invite_failed'],
-    ['not_found', 'not_found'],
-  ] as const)('an invite that is %s says %s', (result, code) => {
-    expect(staffInviteNotice(result)).toBe(code);
-  });
+    ['sent', false, 'invited'],
+    ['rate_limited', false, 'rate_limited'],
+    ['failed', false, 'invite_failed'],
+    ['not_found', false, 'not_found'],
+    ['sent', true, 'invited'],
+    ['rate_limited', true, 'granted_rate_limited'],
+    ['failed', true, 'granted_invite_failed'],
+  ] as const)(
+    'a link that is %s (after a fresh invite: %s) says %s',
+    (result, afterInvite, code) => {
+      expect(staffInviteNotice(result, afterInvite)).toBe(code);
+    },
+  );
 
   it.each([
     ['revoked', 'revoked'],
@@ -151,10 +147,10 @@ describe('the audit viewer row', () => {
     ...overrides,
   });
 
-  it('shows the time in UTC, the actor and subject by id, and the details', () => {
+  it('shows the time in UTC to the minute, the actor and subject by id, and the details', () => {
     expect(auditViewRow(row())).toEqual({
       id: '7',
-      time: '09:05:03 UTC',
+      time: 'Nov 11, 2026, 9:05 AM UTC',
       actor: `user ${userId}`,
       action: 'role.granted',
       subject: `auth_user ${otherId}`,
@@ -176,7 +172,23 @@ describe('the audit viewer row', () => {
       { role: 'host_staff', host_id: otherId, flag: true, n: 3, gone: null },
       `role: host_staff, host_id: ${otherId}, flag: true, n: 3, gone: null`,
     ],
+    [
+      { note: 'a name@example.com', fine: 'ok_1' },
+      'note: [withheld], fine: ok_1',
+    ],
   ])('details %j read %s', (details, expected) => {
     expect(auditDetailsLabel(details)).toBe(expected);
+  });
+
+  it('is backed by the audit log refusing free text in a detail', () => {
+    expect(() =>
+      parseAuditEntry({
+        actorKind: 'system',
+        action: 'a.b',
+        subjectKind: 'k',
+        subjectId: otherId,
+        details: { note: 'a name@example.com' },
+      }),
+    ).toThrow();
   });
 });

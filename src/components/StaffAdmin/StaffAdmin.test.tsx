@@ -8,6 +8,7 @@ import { StaffView } from './StaffView';
 // Behaviours under test:
 // - the staff view has an invite form with one required email field, and shows the refusal text on the field when the last try was refused
 // - an ops row offers a sign-in link and a removal button that each carry the person's id; an admin row offers neither
+// - a person holding ops and admin is one row with the ops buttons
 // - no staff shows the empty state
 // - the audit view asks for a day with a date field set to the day shown, and lists each row's time, actor, action, subject and details
 // - a full audit page links to the next page, and an empty day says nothing was recorded
@@ -17,8 +18,8 @@ const actions = { invite: noop, resend: noop, revoke: noop };
 const ownerId = '1a1e2d3c-4b5a-4697-8a9b-0c1d2e3f4a5b';
 const adminId = '2b2e2d3c-4b5a-4697-8a9b-0c1d2e3f4a5b';
 const staff: StaffRow[] = [
-  { userId: ownerId, email: 'ops@example.com', role: 'ops' },
-  { userId: adminId, email: 'admin@example.com', role: 'admin' },
+  { userId: ownerId, email: 'ops@example.com', roles: ['ops'] },
+  { userId: adminId, email: 'admin@example.com', roles: ['admin'] },
 ];
 
 describe('StaffView', () => {
@@ -76,6 +77,34 @@ describe('StaffView', () => {
     ).toHaveLength(2);
     expect(within(adminRow).queryByRole('button')).toBeNull();
     expect(within(adminRow).getByText('Admin')).toBeInTheDocument();
+  });
+
+  it('lists a person holding ops and admin once, with the ops buttons on their one row', () => {
+    render(
+      <StaffView
+        rows={[
+          {
+            userId: ownerId,
+            email: 'both@example.com',
+            roles: ['ops', 'admin'],
+          },
+        ]}
+        query={{}}
+        emailProblem={false}
+        actions={actions}
+      />,
+    );
+
+    const rows = screen.getAllByRole('row', { name: /both@example.com/ });
+    expect(rows).toHaveLength(1);
+    expect(
+      within(rows[0] as HTMLElement).getByText('Ops, Admin'),
+    ).toBeInTheDocument();
+    expect(
+      within(rows[0] as HTMLElement).getByRole('button', {
+        name: 'Remove access',
+      }),
+    ).toBeInTheDocument();
   });
 
   it('shows an empty state with no staff', () => {

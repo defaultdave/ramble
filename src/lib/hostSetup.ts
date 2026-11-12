@@ -10,9 +10,11 @@ import {
   fieldsFromIssues,
   formText,
   inFieldOrder,
+  inviteFailureNotices,
   oversizedFields,
   slugFor,
   type FormGetter,
+  type InviteResult,
   type NoticeText,
 } from './opsForm';
 import { isKnownTimeZone, maxTimeZoneLength, TimeZoneSchema } from './sessions';
@@ -452,14 +454,7 @@ export const hostNotices = {
     title: 'This host has already accepted the current agreement.',
   },
   invited: { tone: 'success', title: 'Sign-in link sent to the owner.' },
-  invite_failed: {
-    tone: 'danger',
-    title: 'The sign-in link could not be sent. Try again in a moment.',
-  },
-  rate_limited: {
-    tone: 'warning',
-    title: 'Too many sign-in links went to this address. Try again later.',
-  },
+  ...inviteFailureNotices,
   stale_agreement: {
     tone: 'warning',
     title:
@@ -479,7 +474,7 @@ export const hostNotices = {
 
 /** What the invite action tells the person after the host is made or the link is sent again. A host or owner that is gone is a failure to send. */
 export function inviteNotice(
-  result: 'sent' | 'rate_limited' | 'failed' | 'not_found',
+  result: InviteResult,
   afterCreate: boolean,
 ): HostNoticeCode {
   if (result === 'sent') return afterCreate ? 'created' : 'invited';

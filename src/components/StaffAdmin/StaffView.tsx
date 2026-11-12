@@ -31,7 +31,7 @@ function StaffActions({
   actions: StaffViewProps['actions'];
 }) {
   // Only the ops role is managed here; admin is granted and removed from the command line.
-  if (row.role !== invitedRole) return null;
+  if (!row.roles.includes(invitedRole)) return null;
   return (
     <div className={styles.actions}>
       <form action={actions.resend}>
@@ -64,7 +64,11 @@ export function StaffView({
       rowHeader: true,
       cell: (row) => row.email,
     },
-    { id: 'role', header: 'Role', cell: (row) => staffRoleLabels[row.role] },
+    {
+      id: 'role',
+      header: 'Role',
+      cell: (row) => row.roles.map((role) => staffRoleLabels[role]).join(', '),
+    },
     {
       id: 'actions',
       header: 'Actions',
@@ -90,7 +94,7 @@ export function StaffView({
         caption="Staff"
         columns={columns}
         rows={rows}
-        rowId={(row) => `${row.userId}-${row.role}`}
+        rowId={(row) => row.userId}
         path={staffPath}
         query={query}
         sort={{ column: 'email', direction: 'asc' }}

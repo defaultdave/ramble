@@ -1,13 +1,25 @@
-import { signInLinkTtlSeconds } from './auth';
-import { ExportDaySchema, type AuditRow, type ExportDay } from './audit';
+import { z } from 'zod';
+import {
+  auditPatterns,
+  ExportDaySchema,
+  type AuditRow,
+  type ExportDay,
+} from './audit';
 import {
   EmailAddressSchema,
   maxEmailAddressLength,
   normalizeEmailAddress,
 } from './email/address';
-import { formText, type FormGetter, type NoticeText } from './opsForm';
+import { formatMailboxTimestamp } from './email/message';
+import { parseSingle } from './filters';
+import {
+  formText,
+  inviteFailureNotices,
+  type FormGetter,
+  type InviteResult,
+  type NoticeText,
+} from './opsForm';
 import type { GrantableRole, RoleGrant } from './roleGrants';
-import { signInConfirmUrl } from './signIn';
 import { isoDateOf } from './time';
 
 // What the staff and audit pages decide: who may be invited, which grants may be taken back, what
@@ -17,15 +29,13 @@ export const staffPath = '/ops/staff';
 export const auditPath = '/ops/audit';
 
 /** Staff land on the ops area after signing in with the link. */
-const staffLandingPath = '/ops';
+export const staffLandingPath = '/ops';
 
 /** The role an invite gives. Admin is granted only from the command line, where the person holds the database. */
 export const invitedRole = 'ops' as const satisfies GrantableRole;
 
 export const staffInviteField = 'email';
 
-export type StaffInviteResult =
-  'sent' | 'rate_limited' | 'failed' | 'not_found';
 export type RevokeRefusal = 'self' | 'admin_role';
 
 /** An address typed in the invite form, or null when it is missing, too long, or not an address. The length is checked first, so no rule walks an unbounded string. */
@@ -34,11 +44,6 @@ export function parseStaffEmail(get: FormGetter): string | null {
   if (typed === undefined || typed.length > maxEmailAddressLength) return null;
   const parsed = EmailAddressSchema.safeParse(normalizeEmailAddress(typed));
   return parsed.success ? parsed.data : null;
-}
-
-/** Whether ops may give this role. Admin is granted from the command line only, so ops cannot make admins. */
-export function grantRefusal(grant: RoleGrant): 'admin_role' | null {
-  return grant.role === 'admin' ? 'admin_role' : null;
 }
 
 /**
@@ -55,16 +60,10 @@ export function revokeRefusal(
   return null;
 }
 
-/** The data of the sign-in email a new staff member gets: the same link every sign-in uses, landing on the ops area. */
-export function staffLinkData(token: string, appOrigin: string) {
-  return {
-    url: signInConfirmUrl(appOrigin, token, staffLandingPath),
-    expiresInMinutes: signInLinkTtlSeconds / 60,
-  };
-}
-
 export const staffNoticeCodes = [
   'invited',
+  'granted_rate_limited',
+  'granted_invite_failed',
   'invite_failed',
   'rate_limited',
   'invalid',
@@ -80,14 +79,17 @@ export const staffNotices = {
     tone: 'success',
     title: 'Staff access granted. A sign-in link is on its way.',
   },
-  invite_failed: {
-    tone: 'danger',
-    title: 'The sign-in link could not be sent. Try again in a moment.',
-  },
-  rate_limited: {
+  granted_rate_limited: {
     tone: 'warning',
-    title: 'Too many sign-in links went to this address. Try again later.',
+    title:
+      'Staff access granted, but too many sign-in links went to this address. Send the link again later.',
   },
+  granted_invite_failed: {
+    tone: 'warning',
+    title:
+      'Staff access granted, but the sign-in link could not be sent. Send it again below.',
+  },
+  ...inviteFailureNotices,
   invalid: {
     tone: 'danger',
     title: 'Enter the staff member’s email address, like name@example.com.',
@@ -109,10 +111,20 @@ const inviteNotices = {
   rate_limited: 'rate_limited',
   failed: 'invite_failed',
   not_found: 'not_found',
-} as const satisfies Record<StaffInviteResult, StaffNoticeCode>;
+} as const satisfies Record<InviteResult, StaffNoticeCode>;
 
-export function staffInviteNotice(result: StaffInviteResult): StaffNoticeCode {
-  return inviteNotices[result];
+const grantedInviteNotices = {
+  ...inviteNotices,
+  rate_limited: 'granted_rate_limited',
+  failed: 'granted_invite_failed',
+} as const satisfies Record<InviteResult, StaffNoticeCode>;
+
+/** What the person is told after a link was tried. After a fresh invite the grant already stands, so a refused link says so. */
+export function staffInviteNotice(
+  result: InviteResult,
+  afterInvite: boolean,
+): StaffNoticeCode {
+  return (afterInvite ? grantedInviteNotices : inviteNotices)[result];
 }
 
 export function revokeNotice(
@@ -133,8 +145,29 @@ export const staffRoleLabels: Readonly<Record<GrantableRole, string>> = {
 export type StaffRow = {
   userId: string;
   email: string;
-  role: GrantableRole;
+  roles: readonly GrantableRole[];
 };
+
+/** One row per person from one row per grant, in the order each person is first met, so someone holding ops and admin is listed once. */
+export function groupStaff(
+  grants: readonly { userId: string; email: string; role: GrantableRole }[],
+): StaffRow[] {
+  const people = new Map<
+    string,
+    { userId: string; email: string; roles: GrantableRole[] }
+  >();
+  for (const grant of grants) {
+    const person = people.get(grant.userId);
+    if (person) person.roles.push(grant.role);
+    else
+      people.set(grant.userId, {
+        userId: grant.userId,
+        email: grant.email,
+        roles: [grant.role],
+      });
+  }
+  return [...people.values()];
+}
 
 /** The most staff rows one read returns; a team has a handful. */
 export const staffReadLimit = 200;
@@ -153,14 +186,17 @@ export function parseAuditDay(
   return parsed?.success ? parsed.data : isoDateOf(now);
 }
 
-const maxCursorDigits = 15;
+const CursorSchema = z
+  .string()
+  .max(15)
+  .regex(/^[0-9]+$/)
+  .transform(Number);
 
 /** The row id the address says to continue after, or 0 for the start of the day. Digits only, short enough to be a safe integer. */
 export function parseAuditCursor(
   raw: string | readonly string[] | undefined,
 ): number {
-  if (typeof raw !== 'string' || raw.length > maxCursorDigits) return 0;
-  return /^[0-9]+$/.test(raw) ? Number(raw) : 0;
+  return parseSingle(raw, CursorSchema) ?? 0;
 }
 
 export type AuditViewRow = {
@@ -172,11 +208,19 @@ export type AuditViewRow = {
   details: string;
 };
 
-/** Details as `key: value` pairs; a row with none shows a dash. Values are ids and codes, never names or addresses. */
+const detailValue = new RegExp(auditPatterns.detailValue);
+const withheld = '[withheld]';
+
+/**
+ * Details as `key: value` pairs; a row with none shows a dash. The audit log refuses a name or an
+ * address in a detail, and a string that is not an id or a code is withheld here too, so the
+ * viewer cannot show free text whatever wrote the row.
+ */
 export function auditDetailsLabel(details: unknown): string {
   if (typeof details !== 'object' || details === null) return '—';
   const pairs = Object.entries(details).map(
-    ([key, value]) => `${key}: ${String(value)}`,
+    ([key, value]) =>
+      `${key}: ${typeof value === 'string' && !detailValue.test(value) ? withheld : String(value)}`,
   );
   return pairs.length === 0 ? '—' : pairs.join(', ');
 }
@@ -185,7 +229,7 @@ export function auditDetailsLabel(details: unknown): string {
 export function auditViewRow(row: AuditRow): AuditViewRow {
   return {
     id: String(row.id),
-    time: `${row.recordedAt.toISOString().slice(11, 19)} UTC`,
+    time: formatMailboxTimestamp(row.recordedAt),
     actor:
       row.actorId === null ? row.actorKind : `${row.actorKind} ${row.actorId}`,
     action: row.action,

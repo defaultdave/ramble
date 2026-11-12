@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { auditLimits } from '@/lib/audit';
+import type { RoleGrant } from '@/lib/roleGrants';
 import { auditPageSize } from '@/lib/staffAdmin';
 import { ForbiddenError, Role, type Caller } from '@/server/auth/caller';
 import { testCaller } from '@/server/auth/test-caller';
@@ -35,13 +36,13 @@ vi.mock('@/server/monitoring/logger', () => ({
 // Granting:
 // - a grant writes one row and one audit row naming the actor and the role; a second grant of the same role writes nothing
 // - the grant command's system actor is recorded as the system; a grant that does not fit its role throws and writes nothing
-// - ops grants a host role on an existing host (the contract the host staff unit calls); a missing person or host is named; admin is refused
+// - a host role is granted on an existing host (the contract the host staff unit calls)
 // Revoking:
 // - a revoke removes the row, writes one audit row, and leaves the person's other roles; one that finds no row is not_found and writes nothing
 // - nobody revokes their own ops grant, and ops cannot revoke admin; neither writes anything
 // - a person who lost ops has no ops role the next time their grants are read
 // Reading:
-// - the staff list holds ops and admin holders only and records one audit row
+// - the staff list holds ops and admin holders only, one row per person, and records one audit row
 // Inviting (fake mailer):
 // - a new address gets an account marked verified, the ops role, one sign-in email, and audit rows for the grant and the link; the link signs them in once as ops
 // - an address that already holds ops gets another link and no second grant; a person who is not ops is not found by a resend and nothing is sent
@@ -142,6 +143,12 @@ const grantRows = (userId: string) =>
 
 const opsGrant = { role: 'ops', hostId: null } as const;
 
+/** The contract other units call: a role given in a transaction by an ops user. */
+const grant = (userId: string, role: RoleGrant) =>
+  client.db.transaction((tx) =>
+    roles.grantRoleIn(tx, { kind: 'user', userId: opsUser }, userId, role),
+  );
+
 describe('access', () => {
   it.each(refused)(
     '%s is refused by every function, and nothing is written',
@@ -149,10 +156,9 @@ describe('access', () => {
       const target = await person();
       const before = await auditRows();
       const calls = [
-        () => roles.grantRole(caller, target.id, opsGrant),
         () => roles.revokeRole(caller, target.id, opsGrant),
         () => roles.readStaffForOps(caller),
-        () => roles.readStaffInviteTarget(caller, target.id),
+        () => roles.readRoleHolder(caller, target.id, opsGrant),
         () => view.readAuditForOps(caller, '2026-01-05', 0),
         () => invite.inviteStaff(caller, 'someone@example.com'),
         () => invite.resendStaffLink(caller, target.id),
@@ -170,10 +176,8 @@ describe('granting', () => {
   it('writes the grant and one audit row, and a repeat writes nothing', async () => {
     const target = await person();
 
-    expect(await roles.grantRole(ops, target.id, opsGrant)).toBe('granted');
-    expect(await roles.grantRole(ops, target.id, opsGrant)).toBe(
-      'already_held',
-    );
+    expect(await grant(target.id, opsGrant)).toBe('granted');
+    expect(await grant(target.id, opsGrant)).toBe('already_held');
 
     expect(await grantRows(target.id)).toMatchObject([
       { role: 'ops', hostId: null },
@@ -226,36 +230,16 @@ describe('granting', () => {
     expect(await auditRows(sql`subject_id = ${target.id}`)).toEqual([]);
   });
 
-  it('gives a host role on an existing host, and names a missing person or host', async () => {
+  it('gives a host role on an existing host, the contract the host staff unit calls', async () => {
     const target = await person();
     const hostId = await host();
     const staff = { role: 'host_staff', hostId } as const;
 
-    expect(await roles.grantRole(ops, target.id, staff)).toBe('granted');
+    expect(await grant(target.id, staff)).toBe('granted');
     expect(await grants.readRoleGrants(target.id)).toEqual([staff]);
     expect(await auditRows(sql`subject_id = ${target.id}`)).toMatchObject([
       { details: { role: 'host_staff', host_id: hostId } },
     ]);
-
-    expect(await roles.grantRole(ops, randomUUID(), opsGrant)).toBe(
-      'user_not_found',
-    );
-    expect(
-      await roles.grantRole(ops, target.id, {
-        role: 'host_staff',
-        hostId: randomUUID(),
-      }),
-    ).toBe('host_not_found');
-  });
-
-  it('does not let ops make an admin', async () => {
-    const target = await person();
-
-    expect(
-      await roles.grantRole(ops, target.id, { role: 'admin', hostId: null }),
-    ).toBe('admin_role');
-
-    expect(await grantRows(target.id)).toEqual([]);
   });
 });
 
@@ -263,8 +247,8 @@ describe('revoking', () => {
   it('removes the role and writes one audit row, leaving the other roles', async () => {
     const target = await person();
     const hostId = await host();
-    await roles.grantRole(ops, target.id, opsGrant);
-    await roles.grantRole(ops, target.id, { role: 'host_staff', hostId });
+    await grant(target.id, opsGrant);
+    await grant(target.id, { role: 'host_staff', hostId });
 
     expect(await roles.revokeRole(ops, target.id, opsGrant)).toBe('revoked');
 
@@ -297,7 +281,7 @@ describe('revoking', () => {
   it('refuses a revoke of your own ops grant and of admin, and writes nothing', async () => {
     const self = await person();
     const admin = await person();
-    await roles.grantRole(ops, self.id, opsGrant);
+    await grant(self.id, opsGrant);
     await client.db.transaction((tx) =>
       roles.grantRoleIn(tx, { kind: 'system' }, admin.id, {
         role: 'admin',
@@ -322,7 +306,7 @@ describe('revoking', () => {
 
   it('takes effect on the next read of the person’s grants', async () => {
     const target = await person();
-    await roles.grantRole(ops, target.id, opsGrant);
+    await grant(target.id, opsGrant);
     expect(
       session.callerFromGrants(
         target.id,
@@ -342,12 +326,13 @@ describe('revoking', () => {
 });
 
 describe('reading the staff', () => {
-  it('lists ops and admin holders only, and records the read', async () => {
+  it('lists ops and admin holders only, one row per person, and records the read', async () => {
     const staff = await person('lister-ops@example.com');
     const owner = await person('lister-owner@example.com');
     const hostId = await host();
-    await roles.grantRole(ops, staff.id, opsGrant);
-    await roles.grantRole(ops, owner.id, { role: 'host_owner', hostId });
+    await grant(staff.id, opsGrant);
+    await grant(staff.id, { role: 'admin', hostId: null });
+    await grant(owner.id, { role: 'host_owner', hostId });
     const before = await auditRows(sql`action = 'staff.list_viewed'`);
 
     const rows = await roles.readStaffForOps(ops);
@@ -355,11 +340,13 @@ describe('reading the staff', () => {
     expect(rows).toContainEqual({
       userId: staff.id,
       email: 'lister-ops@example.com',
-      role: 'ops',
+      roles: ['ops', 'admin'],
     });
     expect(rows.map((row) => row.userId)).not.toContain(owner.id);
     expect(
-      rows.every((row) => row.role === 'ops' || row.role === 'admin'),
+      rows.every((row) =>
+        row.roles.every((role) => role === 'ops' || role === 'admin'),
+      ),
     ).toBe(true);
     expect(await auditRows(sql`action = 'staff.list_viewed'`)).toHaveLength(
       before.length + 1,
@@ -469,11 +456,24 @@ describe('inviting staff', () => {
 
   it('resends to a staff member', async () => {
     const target = await person('resend@example.com');
-    await roles.grantRole(ops, target.id, opsGrant);
+    await grant(target.id, opsGrant);
 
     expect(await invite.resendStaffLink(ops, target.id)).toBe('sent');
 
     expect(await linkEmails('resend@example.com')).toHaveLength(1);
+  });
+
+  it('refuses a resend past the hourly count too, since it shares the address count', async () => {
+    const target = await person('resend-busy@example.com');
+    await grant(target.id, opsGrant);
+
+    const results: string[] = [];
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      results.push(await invite.resendStaffLink(ops, target.id));
+    }
+
+    expect(results.at(-1)).toBe('rate_limited');
+    expect(await linkEmails('resend-busy@example.com')).toHaveLength(5);
   });
 
   it('refuses the sixth link in an hour to one address and sends nothing more', async () => {

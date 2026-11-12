@@ -12,15 +12,6 @@ const nobody = '00000000-0000-4000-8000-00000000dead';
 export function staffRows() {
   return [
     {
-      fn: 'grantRole',
-      invoke: async (c) =>
-        (await import('@/server/db/staffRoles')).grantRole(c, nobody, {
-          role: 'ops',
-          hostId: null,
-        }),
-      allows: opsOnly,
-    },
-    {
       fn: 'revokeRole',
       invoke: async (c) =>
         (await import('@/server/db/staffRoles')).revokeRole(c, nobody, {
@@ -36,12 +27,12 @@ export function staffRows() {
       allows: opsOnly,
     },
     {
-      fn: 'readStaffInviteTarget',
+      fn: 'readRoleHolder',
       invoke: async (c) =>
-        (await import('@/server/db/staffRoles')).readStaffInviteTarget(
-          c,
-          nobody,
-        ),
+        (await import('@/server/db/staffRoles')).readRoleHolder(c, nobody, {
+          role: 'ops',
+          hostId: null,
+        }),
       allows: opsOnly,
     },
     {

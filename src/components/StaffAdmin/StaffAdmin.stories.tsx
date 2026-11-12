@@ -11,12 +11,12 @@ const staff: StaffRow[] = [
   {
     userId: '1a1e2d3c-4b5a-4697-8a9b-0c1d2e3f4a5b',
     email: 'ops@ramble.example',
-    role: 'ops',
+    roles: ['ops'],
   },
   {
     userId: '2b2e2d3c-4b5a-4697-8a9b-0c1d2e3f4a5b',
     email: 'admin@ramble.example',
-    role: 'admin',
+    roles: ['admin'],
   },
 ];
 const auditRows: AuditViewRow[] = [

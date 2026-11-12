@@ -136,3 +136,18 @@ export function noticeHref(
 ): string {
   return tableHref(path, { notice, fields: fields.join(',') });
 }
+
+/** What sending an invite's sign-in link comes to; `not_found` is a person or row that is gone. */
+export type InviteResult = 'sent' | 'rate_limited' | 'failed' | 'not_found';
+
+/** The notices every invite action shares, whoever is being invited. */
+export const inviteFailureNotices = {
+  invite_failed: {
+    tone: 'danger',
+    title: 'The sign-in link could not be sent. Try again in a moment.',
+  },
+  rate_limited: {
+    tone: 'warning',
+    title: 'Too many sign-in links went to this address. Try again later.',
+  },
+} as const satisfies Record<string, NoticeText>;

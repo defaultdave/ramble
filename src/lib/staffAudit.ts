@@ -1,4 +1,5 @@
 import { userActor, type AuditEntryInput, type ExportDay } from './audit';
+import { opsAreaIds } from './opsAudit';
 import type { GrantableRole, RoleGrant } from './roleGrants';
 
 // The audit rows of staff and roles admin. A grant is written by a named ops user, or by the grant
@@ -6,12 +7,6 @@ import type { GrantableRole, RoleGrant } from './roleGrants';
 
 /** Who made a change: a signed-in ops user, or the command line that bootstraps the first account. */
 export type RoleActor = { kind: 'user'; userId: string } | { kind: 'system' };
-
-/** The areas have no row of their own, so each gets one fixed id, as in opsAudit. */
-const staffAreaIds = {
-  staff: '00000000-0000-4000-8000-0000000000b1',
-  audit: '00000000-0000-4000-8000-0000000000b2',
-} as const;
 
 function actorFields(actor: RoleActor) {
   return actor.kind === 'user'
@@ -71,7 +66,7 @@ export function staffListedEntry(actorUserId: string): AuditEntryInput {
     ...userActor(actorUserId),
     action: 'staff.list_viewed',
     subjectKind: 'ops_area',
-    subjectId: staffAreaIds.staff,
+    subjectId: opsAreaIds.staff,
   };
 }
 
@@ -84,7 +79,7 @@ export function auditViewedEntry(
     ...userActor(actorUserId),
     action: 'audit.viewed',
     subjectKind: 'ops_area',
-    subjectId: staffAreaIds.audit,
+    subjectId: opsAreaIds.audit,
     details: { day },
   };
 }

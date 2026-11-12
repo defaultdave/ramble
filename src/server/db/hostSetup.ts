@@ -31,7 +31,7 @@ import {
   recordHostAcceptanceIn,
 } from './legal';
 import { authUsers, hosts, roleGrants } from './schema';
-import { ensureAuthUserIn } from './staffRoles';
+import { ensureAuthUserIn, readRoleHolder } from './staffRoles';
 
 // Everything here is for the ops role: each function checks it, and each read records its audit
 // row before it returns anything.
@@ -239,18 +239,11 @@ export async function readHostInviteTarget(
   hostId: string,
   ownerUserId: string,
 ): Promise<{ hostName: string; email: string } | null> {
-  requireRole(caller, Role.Ops, {});
-  const [row] = await db
-    .select({ hostName: hosts.name, email: authUsers.email })
-    .from(roleGrants)
-    .innerJoin(hosts, eq(hosts.id, roleGrants.hostId))
-    .innerJoin(authUsers, eq(authUsers.id, roleGrants.userId))
-    .where(
-      and(
-        eq(roleGrants.hostId, hostId),
-        eq(roleGrants.userId, ownerUserId),
-        eq(roleGrants.role, 'host_owner'),
-      ),
-    );
-  return row ?? null;
+  const holder = await readRoleHolder(caller, ownerUserId, {
+    role: 'host_owner',
+    hostId,
+  });
+  return holder?.hostName == null
+    ? null
+    : { hostName: holder.hostName, email: holder.email };
 }

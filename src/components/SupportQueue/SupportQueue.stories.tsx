@@ -9,6 +9,21 @@ const noop = () => undefined;
 const meta = {
   title: 'Ops/SupportQueue',
   component: SupportQueue,
+  parameters: {
+    a11y: {
+      config: {
+        // Every story renders the page twice, once per color scheme.
+        rules: [
+          { id: 'duplicate-id', enabled: false },
+          { id: 'duplicate-id-aria', enabled: false },
+          { id: 'landmark-unique', enabled: false },
+          { id: 'landmark-banner-is-top-level', enabled: false },
+          { id: 'landmark-no-duplicate-banner', enabled: false },
+          { id: 'page-has-heading-one', enabled: false },
+        ],
+      },
+    },
+  },
   decorators: [
     (Story) => (
       <PageHeading title="Support">

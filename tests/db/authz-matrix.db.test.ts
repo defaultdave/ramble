@@ -514,11 +514,8 @@ const rows: Row[] = [
   // Cancelling is for good, so this row sits after every row that still needs a scheduled session.
   {
     fn: 'cancelSession',
-    invoke: (c, t) =>
-      data.cancelSession.cancelSession(c, {
-        sessionId: t.sessionId,
-        reason: 'host',
-      }),
+    invoke: (c, { sessionId }) =>
+      data.cancelSession.cancelSession(c, { sessionId, reason: 'host' }),
     allows: { ...sessionRules, allocationOnHostA: ['ownerA', ...staff] },
   },
   // Seed and persona writes: ops alone. These write the most, so they come last.
@@ -740,7 +737,12 @@ describe('a host owner asking about an experience', () => {
 
 describe('the matrix is complete', () => {
   /** Functions that take a Caller and are the guard or its parts, not guarded functions. */
-  const guards = new Set(['requireRole', 'requireAnyRole', 'requireStaff', 'requireOpsUserId']);
+  const guards = new Set([
+    'requireRole',
+    'requireAnyRole',
+    'requireStaff',
+    'requireOpsUserId',
+  ]);
   /** The mailbox opens to the ops role or, off production, to the shared secret, so its access rule is not a role row; src/server/ports/email/mailbox.test.ts and tests/db/email-mailbox.db.test.ts cover every combination. */
   const mailboxGate = ['unlockMailbox', 'loadMailbox', 'loadMailboxMessage'];
 

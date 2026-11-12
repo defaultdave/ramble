@@ -13,6 +13,7 @@ export const opsAreaIds = {
   support: '00000000-0000-4000-8000-0000000000a4',
   staff: '00000000-0000-4000-8000-0000000000a5',
   audit: '00000000-0000-4000-8000-0000000000a6',
+  bookings: '00000000-0000-4000-8000-0000000000a7',
   sessions: '00000000-0000-4000-8000-0000000000a8',
 } as const;
 
@@ -30,14 +31,21 @@ export function opsAreaListEntry(
   };
 }
 
-/** One record of an ops area was read by a named ops user: the row names the record by its id. */
+/** Something a named ops user read or did to one record, naming the record by its own id; details are ids, codes and amounts only. */
 export function opsViewEntry(
   userId: string,
   action: string,
   subjectKind: string,
   subjectId: string,
+  details?: Record<string, string | number | boolean | null>,
 ): AuditEntryInput {
-  return { ...userActor(userId), action, subjectKind, subjectId };
+  return {
+    ...userActor(userId),
+    action,
+    subjectKind,
+    subjectId,
+    ...(details === undefined ? {} : { details }),
+  };
 }
 
 // A signed-in person is named; a tester who got in with the shared secret and no session is a guest.

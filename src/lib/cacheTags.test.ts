@@ -79,6 +79,11 @@ describe('tagsForChanges for one change', () => {
       ['legal:terms'],
     ],
     ['settings', { kind: 'settings' }, ['settings']],
+    [
+      "a host's name or about text reaches the host page through the catalog tag",
+      { kind: 'hostProfile' },
+      ['catalog'],
+    ],
   ])('%s', (_name, change, expected) => {
     expect(tagsForChanges([change])).toEqual(expected);
   });

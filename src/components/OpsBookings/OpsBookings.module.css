@@ -1,0 +1,77 @@
+.stack {
+  composes: stack from '../HostSetup/HostSetup.module.css';
+}
+
+.section {
+  composes: section from '../HostSetup/HostSetup.module.css';
+}
+
+.heading {
+  composes: heading from '../HostSetup/HostSetup.module.css';
+}
+
+.list {
+  composes: list from '../HostSetup/HostSetup.module.css';
+}
+
+.row {
+  composes: row from '../HostSetup/HostSetup.module.css';
+}
+
+.muted {
+  composes: muted from '../HostSetup/HostSetup.module.css';
+}
+
+.cellLink {
+  composes: cellLink from '../HostSetup/HostSetup.module.css';
+}
+
+.stacked {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  overflow-wrap: anywhere;
+}
+
+.wrap {
+  overflow-wrap: anywhere;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-1);
+  margin: 0;
+  max-width: 32rem;
+}
+
+.facts dt {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-body-s);
+}
+
+.facts dd {
+  margin: 0 0 var(--space-3);
+}
+
+.actionForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .facts {
+    grid-template-columns: 14rem 1fr;
+    column-gap: var(--space-4);
+  }
+
+  .facts dd {
+    margin: 0;
+  }
+
+  .actionForm > button {
+    align-self: flex-start;
+  }
+}

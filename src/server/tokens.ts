@@ -113,7 +113,7 @@ export async function resolveManageToken(
     : ({ ...row, kind: 'manage' } as ResolvedManageToken);
 }
 
-// TODO(U-077): first caller, "void earlier links"; U-113 follows for gifts.
+// TODO(U-113): first caller of the `gift` kind, re-addressing a gift.
 /**
  * Raises the row's token version by one and, in the same UPDATE, rewrites the stored hash to the
  * new token. For `manage` and `order` the row is the order, and the new manage token voids the

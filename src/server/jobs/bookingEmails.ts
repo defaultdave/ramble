@@ -8,11 +8,13 @@ import {
   hostBookingNoticeData,
   hostNoticeDecision,
   moveEmailKey,
+  resendEmailKey,
   reminderDecision,
   sessionReminderData,
 } from '@/lib/bookingEmails';
 import { WriteIdSchema } from '@/lib/catalog';
 import type { GuestMovePayloadSchema } from '@/lib/moveBooking';
+import type { GuestResendPayloadSchema } from '@/lib/opsBookings';
 import type { Transaction } from '@/server/db/client';
 import {
   readBookingEmailOrder,
@@ -20,6 +22,7 @@ import {
 } from '@/server/db/bookingEmails';
 import { env } from '@/server/env';
 import { logger } from '@/server/monitoring/logger';
+import type { EmailRequest } from '@/lib/email/templates';
 import type { Clock } from '@/server/ports/clock';
 import { sendEmail } from '@/server/ports/email';
 import { secureEqual } from '@/server/hash';
@@ -82,6 +85,22 @@ function liveManageToken(order: BookingEmailOrder): string {
   return token;
 }
 
+/** The guest-confirmation email (with its `.ics`) for an order, its link rebuilt at the order's current version, to the address on the order. */
+export function guestConfirmationRequest(
+  order: BookingEmailOrder,
+  idempotencyKey: string,
+): Extract<EmailRequest, { template: 'guest-confirmation' }> {
+  return {
+    template: 'guest-confirmation',
+    to: order.contactEmail,
+    data: guestConfirmationData(order.source, {
+      appUrl: env.APP_URL,
+      manageToken: liveManageToken(order),
+    }),
+    idempotencyKey,
+  };
+}
+
 export async function sendGuestConfirmation({
   tx,
   payload,
@@ -92,15 +111,12 @@ export async function sendGuestConfirmation({
     logger.info('booking email skipped', { jobId, reason: 'cancelled' });
     return;
   }
-  await sendEmail({
-    template: 'guest-confirmation',
-    to: order.contactEmail,
-    data: guestConfirmationData(order.source, {
-      appUrl: env.APP_URL,
-      manageToken: liveManageToken(order),
-    }),
-    idempotencyKey: bookingEmailKey('guest-confirmation', payload.orderId),
-  });
+  await sendEmail(
+    guestConfirmationRequest(
+      order,
+      bookingEmailKey('guest-confirmation', payload.orderId),
+    ),
+  );
 }
 
 /**
@@ -130,6 +146,30 @@ export async function sendGuestMoveConfirmation({
     }),
     idempotencyKey: moveEmailKey(payload.moveId),
   });
+}
+
+/**
+ * The confirmation an ops resend queued: the booking as it now stands, with a link rebuilt from the
+ * order's version, to the address on the order, under the resend's own key. A booking cancelled since
+ * is skipped, as for the first confirmation.
+ */
+export async function sendGuestResend({
+  tx,
+  payload,
+  jobId,
+}: {
+  tx: Transaction;
+  payload: z.output<typeof GuestResendPayloadSchema>;
+  jobId: string;
+}): Promise<void> {
+  const { order, decision } = await loadOrder(tx, payload.orderId);
+  if (decision === 'skip') {
+    logger.info('booking email skipped', { jobId, reason: 'cancelled' });
+    return;
+  }
+  await sendEmail(
+    guestConfirmationRequest(order, resendEmailKey(payload.resendId)),
+  );
 }
 
 export async function sendHostBookingNotice({

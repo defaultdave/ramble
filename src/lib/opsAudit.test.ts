@@ -112,3 +112,18 @@ describe('mailboxUnlockEntry', () => {
     });
   });
 });
+
+describe('opsViewEntry', () => {
+  it('names the ops user, the kind of record, and its id, with no details', () => {
+    expect(
+      parseAuditEntry(opsViewEntry(userId, 'host.viewed', 'host', userId)),
+    ).toEqual({
+      actorKind: 'user',
+      actorId: userId,
+      action: 'host.viewed',
+      subjectKind: 'host',
+      subjectId: userId,
+      details: {},
+    });
+  });
+});

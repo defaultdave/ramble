@@ -4,7 +4,6 @@ import {
   hostCreatedEntry,
   hostFormEntry,
   hostListEntry,
-  hostUpdatedEntry,
   hostViewEntry,
 } from '@/lib/hostAudit';
 import {
@@ -13,17 +12,19 @@ import {
   agreementRefusal,
   isSlugTakenError,
   changedHostFields,
+  hostSaveOutcome,
   hostAgreementDoc,
-  hostsPageSize,
   type HostCreateInput,
   type HostDetail,
   type HostInput,
   type HostListRow,
 } from '@/lib/hostSetup';
 import { splitPage } from '@/lib/pagination';
-import type { Caller } from '@/server/auth/caller';
+import { opsListPageSize } from '@/lib/tableQuery';
+import { Role, type Caller } from '@/server/auth/caller';
 import { recordAudit, requireOpsUserId, writeAudit } from './audit';
 import { db, dbRead } from './client';
+import { saveHostFields } from './hostFields';
 import { byNameThenId, pastNameCursor } from './keysetPage';
 import {
   getCurrentLegalDocument,
@@ -118,29 +119,19 @@ export async function updateHost(
   hostId: string,
   input: HostInput,
 ): Promise<UpdateHostResult> {
-  const userId = requireOpsUserId(caller);
+  requireOpsUserId(caller);
   try {
     return await db.transaction(async (tx) => {
-      const [current] = await tx
-        .select()
-        .from(hosts)
-        .where(eq(hosts.id, hostId))
-        .for('update');
-      if (!current) return { status: 'not_found' } as const;
-      const changed = changedHostFields(
-        {
-          name: current.name,
-          slug: current.slug,
-          description: current.description,
-          timeZone: current.timeZone,
-          notificationEmail: current.notificationEmail,
-        },
+      const changed = await saveHostFields(
+        tx,
+        caller,
+        Role.Ops,
+        hostId,
         input,
+        (current) => changedHostFields(current, input),
       );
-      if (changed.length === 0) return { status: 'unchanged' } as const;
-      await tx.update(hosts).set(input).where(eq(hosts.id, hostId));
-      await writeAudit(tx, hostUpdatedEntry(userId, hostId, changed));
-      return { status: 'updated' } as const;
+      if (changed === null) return { status: 'not_found' } as const;
+      return { status: hostSaveOutcome(changed) } as const;
     });
   } catch (error) {
     if (isSlugTakenError(error)) return { status: 'slug_taken' };
@@ -166,8 +157,8 @@ export async function readHostsForOps(
     .from(hosts)
     .where(pastNameCursor(hosts, cursor))
     .orderBy(...byNameThenId(hosts))
-    .limit(hostsPageSize + 1);
-  const { items, nextCursor } = splitPage(fetched, hostsPageSize);
+    .limit(opsListPageSize + 1);
+  const { items, nextCursor } = splitPage(fetched, opsListPageSize);
   const ids = items.map((host) => host.id);
 
   const [owners, acceptances, agreement] = await Promise.all([

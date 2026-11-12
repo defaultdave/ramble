@@ -14,10 +14,7 @@ function BookingRow({ row }: { row: HostBookingListItemView }) {
   return (
     <BookingListRow
       title={row.guestName}
-      details={[
-        `${row.experienceName} · ${row.whenLabel}`,
-        `${row.seatsLabel} · ${row.statusLabel} · ${row.reference}`,
-      ]}
+      details={row.details}
       href={row.guestListHref}
       linkLabel="Guest list for this session"
     />

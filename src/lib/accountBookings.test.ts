@@ -65,8 +65,7 @@ describe('buildAccountBookings', () => {
       id: id(1),
       reference: 'RMB-000001',
       experienceName: 'Sunset kayak',
-      whenLabel: 'Sat, Nov 14 · 2:00 PM EST',
-      statusLabel: 'Cancelled',
+      details: ['Sat, Nov 14 · 2:00 PM EST', 'Cancelled · RMB-000001'],
       manageHref: `/manage/${token}`,
     });
   });

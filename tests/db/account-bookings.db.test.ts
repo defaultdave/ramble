@@ -16,13 +16,13 @@ import {
 } from './orderFixtures';
 
 // Behaviours under test, one per decision, branch or risk:
-// - a signed-in guest with a verified email reads the confirmed and cancelled bookings made at that address, latest session first, each with its manage token version
+// - a signed-in guest with a verified email reads the confirmed and cancelled bookings made at that address, upcoming first, each with its manage token version
 // - guest scope: another guest's bookings are never in the read, whoever asks, in either direction
 // - an email the sign-in has not verified reads nothing, though bookings exist at the address
 // - an address no guest booked with reads an empty list
 // - an order still being paid for and a void one are not listed
 // - a gift purchase is not listed; a mixed-case address cannot be stored on either side, so the join needs no folding
-// - the list stops at the limit and keeps the latest sessions
+// - the list stops at the limit and never drops an upcoming booking for a past one; the past follow the upcoming, latest session first
 // - nobody signed in, and a verified person with bookings but no guest role, are refused before the database is asked
 
 let reads: typeof import('@/server/db/accountBookings');
@@ -71,7 +71,7 @@ async function booking(
 }
 
 describe('readAccountBookings', () => {
-  it('reads a verified guest’s confirmed and cancelled bookings, latest session first', async () => {
+  it('reads a verified guest’s confirmed and cancelled bookings, upcoming first', async () => {
     const guestId = await guestAt('ada@example.com');
     const caller = await signedIn('ada@example.com');
     const soon = await booking(guestId, 5);
@@ -82,9 +82,9 @@ describe('readAccountBookings', () => {
       cancelled_by: 'guest',
     });
 
-    const rows = await reads.readAccountBookings(caller);
+    const rows = await reads.readAccountBookings(caller, now);
 
-    expect(rows.map((row) => row.id)).toEqual([furthest, soon, cancelled]);
+    expect(rows.map((row) => row.id)).toEqual([soon, furthest, cancelled]);
     expect(rows[0]).toMatchObject({
       experienceName: 'Experience',
       status: 'confirmed',
@@ -101,12 +101,12 @@ describe('readAccountBookings', () => {
     const graces = await booking(graceId, 7);
     const alans = await booking(alanId, 8);
 
-    expect((await reads.readAccountBookings(grace)).map((r) => r.id)).toEqual([
-      graces,
-    ]);
-    expect((await reads.readAccountBookings(alan)).map((r) => r.id)).toEqual([
-      alans,
-    ]);
+    expect(
+      (await reads.readAccountBookings(grace, now)).map((r) => r.id),
+    ).toEqual([graces]);
+    expect(
+      (await reads.readAccountBookings(alan, now)).map((r) => r.id),
+    ).toEqual([alans]);
   });
 
   it('reads nothing for an email the sign-in has not verified', async () => {
@@ -114,13 +114,13 @@ describe('readAccountBookings', () => {
     await booking(guestId, 9);
     const caller = await signedIn('unverified@example.com', false);
 
-    expect(await reads.readAccountBookings(caller)).toEqual([]);
+    expect(await reads.readAccountBookings(caller, now)).toEqual([]);
   });
 
   it('reads an empty list for an address no guest booked with', async () => {
     const caller = await signedIn('never-booked@example.com');
 
-    expect(await reads.readAccountBookings(caller)).toEqual([]);
+    expect(await reads.readAccountBookings(caller, now)).toEqual([]);
   });
 
   it('leaves out an order still being paid for and a void one', async () => {
@@ -133,7 +133,7 @@ describe('readAccountBookings', () => {
     });
     await booking(guestId, 13, { status: 'void', confirmed_at: null });
 
-    const rows = await reads.readAccountBookings(caller);
+    const rows = await reads.readAccountBookings(caller, now);
 
     expect(rows.map((row) => row.id)).toEqual([kept]);
   });
@@ -151,7 +151,7 @@ describe('readAccountBookings', () => {
       }),
     );
 
-    const rows = await reads.readAccountBookings(caller);
+    const rows = await reads.readAccountBookings(caller, now);
 
     expect(rows.map((row) => row.id)).toEqual([kept]);
   });
@@ -161,24 +161,47 @@ describe('readAccountBookings', () => {
     await expect(signedIn('Case@Example.com')).rejects.toThrow();
   });
 
-  it('stops at the limit and keeps the latest sessions', async () => {
+  it('stops at the limit, keeping every upcoming booking, soonest first, before any past one', async () => {
     const guestId = await guestAt('many@example.com');
     const caller = await signedIn('many@example.com');
-    const ids: string[] = [];
+    const past = [await booking(guestId, -1), await booking(guestId, -2)];
+    const upcoming: string[] = [];
     for (let hours = 1; hours <= accountBookingLimit + 1; hours += 1) {
-      ids.push(await booking(guestId, hours));
+      upcoming.push(await booking(guestId, hours));
     }
 
-    const rows = await reads.readAccountBookings(caller);
+    const ids = (await reads.readAccountBookings(caller, now)).map((r) => r.id);
 
-    expect(rows).toHaveLength(accountBookingLimit);
-    expect(rows[0]?.id).toBe(ids.at(-1));
-    expect(rows.map((row) => row.id)).not.toContain(ids[0]);
+    expect(ids).toEqual(upcoming.slice(0, accountBookingLimit));
+    expect(ids).not.toContain(upcoming[accountBookingLimit]);
+    expect(ids).not.toContain(past[0]);
+  });
+
+  it('lists the past after the upcoming, latest first, when the cap is not reached', async () => {
+    const guestId = await guestAt('mixed@example.com');
+    const caller = await signedIn('mixed@example.com');
+    const older = await booking(guestId, -50);
+    const recent = await booking(guestId, -2);
+    const cancelledAhead = await booking(guestId, 20, {
+      status: 'cancelled',
+      cancelled_at: later,
+      cancelled_by: 'guest',
+    });
+    const next = await booking(guestId, 3);
+
+    const rows = await reads.readAccountBookings(caller, now);
+
+    expect(rows.map((r) => r.id)).toEqual([
+      next,
+      cancelledAhead,
+      recent,
+      older,
+    ]);
   });
 
   it('refuses nobody signed in before reading', async () => {
     await expect(
-      reads.readAccountBookings(anonymousCaller),
+      reads.readAccountBookings(anonymousCaller, now),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
@@ -188,7 +211,7 @@ describe('readAccountBookings', () => {
     await booking(guestId, 17);
 
     await expect(
-      reads.readAccountBookings({ ...caller, roles: [] }),
+      reads.readAccountBookings({ ...caller, roles: [] }, now),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 });

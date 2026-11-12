@@ -11,7 +11,10 @@ export function accountBookingsRows() {
     {
       fn: 'readAccountBookings',
       invoke: async (c: Caller) =>
-        (await import('@/server/db/accountBookings')).readAccountBookings(c),
+        (await import('@/server/db/accountBookings')).readAccountBookings(
+          c,
+          new Date(),
+        ),
       allows: { platform: personaKeys },
     },
   ];

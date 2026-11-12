@@ -26,10 +26,7 @@ function BookingGroup({
           <BookingListRow
             key={booking.id}
             title={booking.experienceName}
-            details={[
-              booking.whenLabel,
-              `${booking.statusLabel} · ${booking.reference}`,
-            ]}
+            details={booking.details}
             href={booking.manageHref}
             linkLabel="Manage booking"
             linkHint={booking.reference}

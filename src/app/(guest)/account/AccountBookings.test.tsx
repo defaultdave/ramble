@@ -17,8 +17,7 @@ const booking = (
   id: String(n),
   reference: `RMB-00000${String(n)}`,
   experienceName: 'Sunset kayak',
-  whenLabel: 'Sat, Nov 14 · 2:00 PM EST',
-  statusLabel: 'Confirmed',
+  details: ['Sat, Nov 14 · 2:00 PM EST', `Confirmed · RMB-00000${String(n)}`],
   manageHref: `/manage/token${String(n)}`,
   ...overrides,
 });
@@ -30,7 +29,11 @@ describe('AccountBookings', () => {
         title="My bookings"
         view={{
           upcoming: [booking(1)],
-          past: [booking(2, { statusLabel: 'Cancelled' })],
+          past: [
+            booking(2, {
+              details: ['Sat, Nov 14 · 2:00 PM EST', 'Cancelled · RMB-000002'],
+            }),
+          ],
           empty: false,
         }}
       />,

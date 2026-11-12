@@ -7,7 +7,7 @@ import { managePath } from './routes';
 // what is still ahead and what is behind them. Each links to the manage page, which is where a
 // booking is changed or cancelled.
 
-/** The most bookings the page reads; a guest has a handful, and a larger result is cut, latest first. */
+/** The most bookings the page reads; a guest has a handful, and a larger result is cut: upcoming bookings are kept first, soonest first, then past ones, latest first. */
 export const accountBookingLimit = 100;
 
 export const AccountBookingRowSchema = BookingListRowSchema.extend({
@@ -27,9 +27,8 @@ export type AccountBookingView = {
   id: string;
   reference: string;
   experienceName: string;
-  /** "Sat, Nov 14 · 2:00 PM EST", on the session's own calendar and clock. */
-  whenLabel: string;
-  statusLabel: string;
+  /** "Sat, Nov 14 · 2:00 PM EST" on the session's own calendar and clock, then "Confirmed · RMB-K7QX2M". */
+  details: readonly string[];
   manageHref: string;
 };
 
@@ -45,8 +44,10 @@ function bookingView(row: AccountBookingRow): AccountBookingView {
     id: row.id,
     reference: row.reference,
     experienceName: row.experienceName,
-    whenLabel: whenLabel(row.sessionStartsAt, row.timeZone),
-    statusLabel: bookingStatusLabels[row.status],
+    details: [
+      whenLabel(row.sessionStartsAt, row.timeZone),
+      `${bookingStatusLabels[row.status]} · ${row.reference}`,
+    ],
     manageHref: managePath(row.manageToken),
   };
 }

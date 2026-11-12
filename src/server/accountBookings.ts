@@ -16,13 +16,14 @@ import { capabilityToken } from '@/server/tokens';
 export async function loadAccountBookings(): Promise<AccountBookingsResult> {
   const caller = await getCaller();
   if (caller.userId === null) return { status: 'signed_out' };
-  const rows = await readAccountBookings(caller);
+  const now = systemClock.now();
+  const rows = await readAccountBookings(caller, now);
   const view = buildAccountBookings(
     rows.map(({ manageTokenVersion, ...row }) => ({
       ...row,
       manageToken: capabilityToken('manage', row.id, manageTokenVersion),
     })),
-    systemClock.now(),
+    now,
   );
   return { status: 'ok', view };
 }

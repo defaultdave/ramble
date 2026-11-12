@@ -21,8 +21,8 @@ export function BookingListRow({
   return (
     <li className={styles.row}>
       <p className={styles.primary}>{title}</p>
-      {details.map((line) => (
-        <p key={line} className={styles.secondary}>
+      {details.map((line, index) => (
+        <p key={`${String(index)}-${line}`} className={styles.secondary}>
           {line}
         </p>
       ))}

@@ -85,10 +85,8 @@ export type HostBookingListItemView = {
   id: string;
   reference: string;
   guestName: string;
-  experienceName: string;
-  whenLabel: string;
-  seatsLabel: string;
-  statusLabel: string;
+  /** "Sunset kayak · Sun, Nov 15 · 4:00 PM EST" and "3 seats · Confirmed · RMB-K7QX2M". */
+  details: readonly string[];
   guestListHref: string;
 };
 
@@ -143,10 +141,10 @@ export function buildHostBookingList(
     id: b.id,
     reference: b.reference,
     guestName: b.leadGuestName,
-    experienceName: b.experienceName,
-    whenLabel: whenLabel(b.sessionStartsAt, b.timeZone),
-    seatsLabel: seatsLabel(b.seats),
-    statusLabel: bookingStatusLabels[b.status],
+    details: [
+      `${b.experienceName} · ${whenLabel(b.sessionStartsAt, b.timeZone)}`,
+      `${seatsLabel(b.seats)} · ${bookingStatusLabels[b.status]} · ${b.reference}`,
+    ],
     guestListHref: hostGuestListHref(b.sessionId),
   }));
   return { term, summary: summaryFor(rows.length, term), rows };

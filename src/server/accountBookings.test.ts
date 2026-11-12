@@ -56,7 +56,10 @@ describe('loadAccountBookings', () => {
       status: 'ok',
       view: { upcoming: [], past: [], empty: true },
     });
-    expect(readAccountBookings).toHaveBeenCalledWith(caller);
+    expect(readAccountBookings).toHaveBeenCalledWith(
+      caller,
+      new Date('2026-11-10T12:00:00Z'),
+    );
   });
 
   it('links each booking with the manage token at its own version', async () => {

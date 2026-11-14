@@ -35,6 +35,40 @@ describe('opsAreaListEntry', () => {
   });
 });
 
+describe('opsViewEntry', () => {
+  it('is a valid entry naming the ops user and the record read by its id', () => {
+    expect(
+      parseAuditEntry(
+        opsViewEntry(userId, 'session.viewed', 'session', messageId),
+      ),
+    ).toEqual({
+      actorKind: 'user',
+      actorId: userId,
+      action: 'session.viewed',
+      subjectKind: 'session',
+      subjectId: messageId,
+      details: {},
+    });
+  });
+
+  it('carries the details it is given', () => {
+    expect(
+      parseAuditEntry(
+        opsViewEntry(userId, 'session.viewed', 'session', messageId, {
+          refunded_cents: 1200,
+        }),
+      ),
+    ).toEqual({
+      actorKind: 'user',
+      actorId: userId,
+      action: 'session.viewed',
+      subjectKind: 'session',
+      subjectId: messageId,
+      details: { refunded_cents: 1200 },
+    });
+  });
+});
+
 describe('opsAccessEntry', () => {
   it('records the ops user opening the dashboard', () => {
     expect(parseAuditEntry(opsAccessEntry(userId))).toEqual({
@@ -92,21 +126,6 @@ describe('mailboxUnlockEntry', () => {
       subjectKind: 'mailbox',
       subjectId: opsAreaIds.mailbox,
       details: { via: 'secret' },
-    });
-  });
-});
-
-describe('opsViewEntry', () => {
-  it('names the ops user, the kind of record, and its id, with no details', () => {
-    expect(
-      parseAuditEntry(opsViewEntry(userId, 'host.viewed', 'host', userId)),
-    ).toEqual({
-      actorKind: 'user',
-      actorId: userId,
-      action: 'host.viewed',
-      subjectKind: 'host',
-      subjectId: userId,
-      details: {},
     });
   });
 });

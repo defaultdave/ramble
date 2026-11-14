@@ -18,6 +18,12 @@ export const sessionStatuses = ['scheduled', 'cancelled', 'completed'] as const;
 
 export const sessionCancelReasons = ['host', 'weather', 'ramble'] as const;
 
+export const sessionStatusLabels = {
+  scheduled: 'Scheduled',
+  cancelled: 'Cancelled',
+  completed: 'Completed',
+} as const satisfies Record<(typeof sessionStatuses)[number], string>;
+
 export const maxAllocation = 1000;
 export const maxSessionMinutes = 1440;
 /** The longest span one generation call covers, so a call writes at most 53 rows per template. */

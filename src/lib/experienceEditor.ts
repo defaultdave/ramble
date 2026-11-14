@@ -23,6 +23,7 @@ import {
   formHas,
   formText,
   inFieldOrder,
+  invalidFormNotice,
   oversizedFields,
   slugFor,
   type FormGetter,
@@ -713,7 +714,7 @@ export const experienceNotices = {
     tone: 'info',
     title: 'Nothing was different, so nothing was saved.',
   },
-  invalid: { tone: 'danger', title: 'Some details need another look.' },
+  invalid: invalidFormNotice,
   reference_missing: {
     tone: 'danger',
     title:

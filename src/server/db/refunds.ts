@@ -36,6 +36,7 @@ import { writeAudit } from './audit';
 import { db, type Transaction } from './client';
 import { postEntries } from './ledger';
 import { lockOrderById } from './locks';
+import { refundableOrderColumns } from './orderColumns';
 import { orders, paymentAttempts, refunds } from './schema';
 import { readDatabaseTime } from './time';
 
@@ -115,17 +116,8 @@ export async function requestRefund(
   const [order] = locked
     ? await tx
         .select({
-          status: orders.status,
+          ...refundableOrderColumns,
           hostId: orders.hostId,
-          ticketSubtotalMinor: orders.ticketSubtotalMinor,
-          taxMinor: orders.taxMinor,
-          totalMinor: orders.totalMinor,
-          amountDueMinor: orders.amountDueMinor,
-          commissionMinor: orders.commissionMinor,
-          commissionRateBps: orders.commissionRateBps,
-          refundedTicketMinor: orders.refundedTicketMinor,
-          refundedTaxMinor: orders.refundedTaxMinor,
-          commissionReturnedMinor: orders.commissionReturnedMinor,
         })
         .from(orders)
         .where(eq(orders.id, request.orderId))
@@ -337,17 +329,8 @@ export async function applyRefundEvent(
 
   const [order] = await tx
     .select({
+      ...refundableOrderColumns,
       hostId: orders.hostId,
-      status: orders.status,
-      ticketSubtotalMinor: orders.ticketSubtotalMinor,
-      taxMinor: orders.taxMinor,
-      totalMinor: orders.totalMinor,
-      amountDueMinor: orders.amountDueMinor,
-      commissionMinor: orders.commissionMinor,
-      commissionRateBps: orders.commissionRateBps,
-      refundedTicketMinor: orders.refundedTicketMinor,
-      refundedTaxMinor: orders.refundedTaxMinor,
-      commissionReturnedMinor: orders.commissionReturnedMinor,
     })
     .from(orders)
     .where(eq(orders.id, orderId));

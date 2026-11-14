@@ -1,4 +1,9 @@
-import { userActor, type AuditEntryInput, type ExportDay } from './audit';
+import {
+  userActor,
+  userOrSystemActor,
+  type AuditEntryInput,
+  type ExportDay,
+} from './audit';
 import { opsAreaIds } from './opsAudit';
 import type { GrantableRole, RoleGrant } from './roleGrants';
 
@@ -9,9 +14,7 @@ import type { GrantableRole, RoleGrant } from './roleGrants';
 export type RoleActor = { kind: 'user'; userId: string } | { kind: 'system' };
 
 function actorFields(actor: RoleActor) {
-  return actor.kind === 'user'
-    ? userActor(actor.userId)
-    : ({ actorKind: 'system' } as const);
+  return userOrSystemActor(actor.kind === 'user' ? actor.userId : null);
 }
 
 function grantDetails(grant: { role: GrantableRole; hostId: string | null }) {

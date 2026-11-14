@@ -11,6 +11,7 @@ import {
   isUpcoming,
   localDateIn,
   sessionStatuses,
+  sessionStatusLabels,
 } from './sessions';
 import { dateChipLabel, msPerDay, msPerMinute } from './time';
 import { zonedTimeLabel } from './zonedLabels';
@@ -152,12 +153,6 @@ export type HostWeekView = {
   experiences: readonly { id: string; name: string }[];
 };
 
-const statusLabels = {
-  scheduled: 'Scheduled',
-  cancelled: 'Cancelled',
-  completed: 'Completed',
-} as const satisfies Record<HostWeekSession['status'], string>;
-
 const wallClock = (instant: Date, timeZone: string) =>
   new Intl.DateTimeFormat('en-GB', {
     timeZone,
@@ -174,7 +169,7 @@ function rowView(session: HostWeekSession, now: Date): HostWeekRowView {
     experienceName: session.experienceName,
     timeLabel: zonedTimeLabel(session.startsAt, session.timeZone),
     soldLabel: `${String(session.seatsSold)} of ${String(session.allocation)} seats sold`,
-    statusLabel: statusLabels[session.status],
+    statusLabel: sessionStatusLabels[session.status],
     priceLabel:
       session.adultPriceMinor === null
         ? null
@@ -328,7 +323,8 @@ export type HostSessionProblem =
   | 'invalid_time_zone'
   | 'no_such_price';
 
-const problemMessages = {
+/** The sentence for each refusal of a session change; ops shows the same words. */
+export const hostSessionProblemMessages = {
   session_not_found: 'That session is no longer there. Reload the page.',
   not_scheduled: 'Only a scheduled session can be changed.',
   version_conflict:
@@ -350,7 +346,7 @@ const problemMessages = {
 export function hostSessionProblem(
   reason: HostSessionProblem,
 ): HostSessionFormState {
-  return { status: 'problem', message: problemMessages[reason] };
+  return { status: 'problem', message: hostSessionProblemMessages[reason] };
 }
 
 /** What publishing a week did, in words: sessions added, and those that were already there. */

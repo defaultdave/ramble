@@ -90,6 +90,10 @@ const DetailsSchema = z
 export const userActor = (userId: string) =>
   ({ actorKind: 'user', actorId: userId }) as const;
 
+/** The actor of a row for a change a user may have made: the user when there is one, the system otherwise. */
+export const userOrSystemActor = (userId: string | null) =>
+  userId === null ? ({ actorKind: 'system' } as const) : userActor(userId);
+
 /** Whether the actor kind and the actor id agree: a signed-in user is named, a guest or the system is not. */
 export function actorMatchesKind(
   kind: AuditActorKind,

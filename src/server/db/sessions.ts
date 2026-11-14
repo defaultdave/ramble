@@ -54,6 +54,8 @@ import {
   type Caller,
 } from '@/server/auth/caller';
 import { updateTagsForChanges } from '@/server/cache/invalidate';
+import { sessionAllocationChangedEntry } from '@/lib/sessionAudit';
+import { writeAudit } from './audit';
 import { db, type Transaction } from './client';
 import { readOpenHeldSeats } from './holds';
 import { lockSessionRow } from './locks';
@@ -263,6 +265,7 @@ export type UpdateSessionAllocationResult =
  * `seats_sold` stays the backstop under it. A saved edit invalidates the session's spaces-left tag,
  * so this runs in a Server Action only.
  * `expectedVersion` is the version the editor read; a different one means another edit came first.
+ * The audit row is written in the same transaction, so a capacity is never changed unrecorded.
  * A session that has started (its start is not after `now`) is left as it is.
  */
 export async function updateSessionAllocation(
@@ -317,6 +320,15 @@ export async function updateSessionAllocation(
         })
         .where(eq(sessions.id, current.id))
         .returning();
+      await writeAudit(
+        tx,
+        sessionAllocationChangedEntry({
+          userId: caller.userId,
+          sessionId: current.id,
+          from: current.allocation,
+          to: data.allocation,
+        }),
+      );
       return { ok: true, session: SessionSchema.parse(updated) };
     },
   );

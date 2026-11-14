@@ -10,6 +10,9 @@ import { wholeNumberPattern } from './text';
 /** How a form is read: a posted FormData's `get`, or a map in a test. */
 export type FormGetter = (name: string) => unknown;
 
+/** What reading a posted form comes to: the value it names, or nothing at all (a refused form changes nothing). */
+export type FormResult<T> = { ok: true; value: T } | { ok: false };
+
 /** A posted text field, trimmed; undefined when it is missing, not text, or blank. */
 export function formText(get: FormGetter, name: string): string | undefined {
   const raw = get(name);
@@ -153,6 +156,12 @@ export function noticeHref(
 ): string {
   return tableHref(path, { notice, fields: fields.join(',') });
 }
+
+/** The notice every refused ops form names, whichever form it was. */
+export const invalidFormNotice = {
+  tone: 'danger',
+  title: 'Some details need another look.',
+} as const satisfies NoticeText;
 
 /** What sending an invite's sign-in link comes to; `not_found` is a person or row that is gone. */
 export type InviteResult = 'sent' | 'rate_limited' | 'failed' | 'not_found';

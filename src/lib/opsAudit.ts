@@ -14,6 +14,7 @@ export const opsAreaIds = {
   staff: '00000000-0000-4000-8000-0000000000a5',
   audit: '00000000-0000-4000-8000-0000000000a6',
   bookings: '00000000-0000-4000-8000-0000000000a7',
+  sessions: '00000000-0000-4000-8000-0000000000a8',
 } as const;
 
 /** An ops area's list was read by a named ops user: one row, naming the area by its fixed id. */

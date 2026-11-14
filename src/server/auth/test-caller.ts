@@ -2,7 +2,7 @@ import 'server-only';
 import { pairEveryHostRole } from '@/lib/roleGrants';
 import { Role, type Caller } from './caller';
 
-export const TEST_USER_ID = 'user-test';
+export const TEST_USER_ID = '00000000-0000-4000-8000-0000000000e1';
 export const TEST_HOST_ID = 'host-test';
 
 /** A signed-in guest on no host, for unit and database tests. */

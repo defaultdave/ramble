@@ -12,6 +12,7 @@ import {
   formText,
   inFieldOrder,
   inviteFailureNotices,
+  invalidFormNotice,
   inviteNoticeFor,
   noticeText,
   oversizedFields,
@@ -535,7 +536,7 @@ export const hostNotices = {
     tone: 'warning',
     title: 'There is no published host agreement to accept yet.',
   },
-  invalid: { tone: 'danger', title: 'Some details need another look.' },
+  invalid: invalidFormNotice,
   slug_taken: {
     tone: 'danger',
     title:

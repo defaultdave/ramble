@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect } from 'storybook/test';
 import { cardPhotoSizes } from '@/components/Card';
 import { Photo } from '@/components/Photo';
 import { samplePhoto } from './Photo.fixtures';
@@ -24,4 +25,15 @@ export const Default: Story = {};
 export const Preload: Story = { args: { preload: true } };
 export const Decorative: Story = {
   args: { photo: samplePhoto(1, { alt: '' }) },
+};
+
+export const Underlay: Story = {
+  args: { underlaySizes: cardPhotoSizes.vertical, sizes: '100vw' },
+  play: async ({ canvasElement }) => {
+    const light = canvasElement.querySelector('[data-scheme="light"]');
+    const layers = light?.querySelectorAll('img') ?? [];
+    await expect(layers).toHaveLength(2);
+    await expect(layers[0]).toHaveAttribute('alt', '');
+    await expect(layers[1]).toHaveAttribute('alt', 'Photo 1');
+  },
 };

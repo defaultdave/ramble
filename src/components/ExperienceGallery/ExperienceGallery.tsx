@@ -1,4 +1,5 @@
 import { ImageOff } from 'lucide-react';
+import { cardPhotoSizes } from '@/components/Card';
 import { Photo } from '@/components/Photo';
 import type { GalleryView } from '@/lib/pages/experience';
 import styles from './ExperienceGallery.module.css';
@@ -28,7 +29,8 @@ function Placeholder() {
  * the tablet width, the lead beside two more, and the rest behind "See all". Every photo is drawn
  * once; the stylesheet decides which show, and "See all" is a bare disclosure the list reacts to.
  * Every photo holds its space before it loads, and only the lead is fetched ahead of the rest. The
- * photos and "See all" need no script.
+ * lead also shows the card's width of itself first, which a guest who came from a card already has.
+ * The photos and "See all" need no script.
  */
 export function ExperienceGallery({ title, gallery }: ExperienceGalleryProps) {
   if (gallery.layout === 'none') {
@@ -49,6 +51,7 @@ export function ExperienceGallery({ title, gallery }: ExperienceGalleryProps) {
                 photo={photo}
                 sizes={isLead ? leadSizes : sideSizes}
                 preload={isLead}
+                underlaySizes={isLead ? cardPhotoSizes.vertical : undefined}
               />
               {counter ? (
                 <span className={styles.counter}>{counter}</span>

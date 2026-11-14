@@ -2958,3 +2958,45 @@ units:
     tokens: null
     status: todo
     note: "Added 2026-11-10 by the MVP re-plan (NEW-8 in ramble-pm drafts/mvp-replan-2026-11-10.md; DECISIONS, delta log); PM estimate, not panelled"
+  - id: U-129
+    title: "Image underlay spike: the cached card photo under the gallery lead"
+    section: experience
+    slice: "Page"
+    priority: Should
+    prd: [68]
+    scope: "Photo gets an optional underlay that draws the card's srcset and sizes under the gallery lead, so a card click shows a cached sharp photo while the large one loads; lead only. Measures cold and warm loads on a phone and a desktop against a production baseline with real Blob photos. Out: side photos, guide cover, sizes fixes IMG-1 to IMG-5, getImageProps (JS-4)"
+    depends_on: []
+    spike: true
+    mode: both
+    phase: P5
+    complexity: 2
+    uncertainty: 3
+    execution: agent-fan-out
+    review: standard
+    estimate_days: { o: 0.5, m: 1, p: 2 }
+    actual_days: null
+    dave_minutes: null
+    tokens: null
+    status: todo
+    note: "Added 2026-11-14 from the image audit (IMG-I in ramble-pm audits/images-2026-11-14.md; DECISIONS 2026-11-14); PM estimate, not panelled"
+  - id: U-128
+    title: "Text dictionary, phase 0: scaffold, lint, contract test"
+    section: platform
+    slice: "Copy"
+    priority: Should
+    prd: []
+    scope: "src/lib/copy/ with common, meta and format; copy lint rules (warn level, per-folder errors); a client-island import rule; the copy contract test; a per-route client JS baseline. Out: moving any page, island, email or form copy (phases 1 to 4)"
+    depends_on: []
+    spike: false
+    mode: both
+    phase: P5
+    complexity: 1
+    uncertainty: 1
+    execution: agent-fan-out
+    review: standard
+    estimate_days: { o: 0.5, m: 0.75, p: 1.25 }
+    actual_days: null
+    dave_minutes: null
+    tokens: null
+    status: todo
+    note: "Added 2026-11-14 (text dictionary, ramble-pm drafts/dictionary-design-2026-11.md; DECISIONS 2026-11-14); PM estimate, not panelled"

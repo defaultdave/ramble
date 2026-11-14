@@ -17,6 +17,7 @@ import { errorKind } from '@/lib/errorKind';
 import { db } from '@/server/db/client';
 import {
   claimDueJobs,
+  claimJobById,
   countDueJobs,
   lockJobForRun,
   markJobFailed,
@@ -100,6 +101,24 @@ async function recordFailure(
   });
   if (outcome === 'dead') raiseDead(job.kind, job.id);
   return outcome;
+}
+
+/**
+ * Runs one named job now, however far off its `runAfter` is, for a tester. It is claimed and run
+ * exactly as a drain would run it, so a failure is recorded and retried the same way. `not_runnable`
+ * is a job that does not exist, is finished, or is held by a run in progress; a job that had spent
+ * its attempts is dead-lettered without running, as a drain would.
+ */
+export async function runJobById(
+  id: string,
+  clock: Clock,
+  registry: JobRegistry = jobRegistry,
+): Promise<RunOutcome | 'not_runnable'> {
+  const { claimed, abandoned } = await claimJobById(id, clock.now());
+  for (const job of abandoned) raiseDead(job.kind, job.id);
+  const [job] = claimed;
+  if (job) return runJob(job, clock, registry);
+  return abandoned.length > 0 ? 'dead' : 'not_runnable';
 }
 
 /**

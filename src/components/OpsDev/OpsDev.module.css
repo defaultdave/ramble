@@ -1,0 +1,41 @@
+.stack {
+  composes: stack from '../HostSetup/HostSetup.module.css';
+}
+
+.form {
+  composes: form from '../HostSetup/HostSetup.module.css';
+}
+
+.section {
+  composes: section from '../HostSetup/HostSetup.module.css';
+}
+
+.heading {
+  composes: heading from '../HostSetup/HostSetup.module.css';
+}
+
+.muted {
+  composes: muted from '../HostSetup/HostSetup.module.css';
+}
+
+.buttons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.amount {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+@media (min-width: 40rem) {
+  .buttons {
+    flex-direction: row;
+  }
+
+  .amount {
+    grid-template-columns: 1fr 1fr;
+  }
+}

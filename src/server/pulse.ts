@@ -5,7 +5,6 @@ import { errorKind } from '@/lib/errorKind';
 import { cleanupMayContinue } from '@/lib/holds';
 import { bearerToken } from '@/lib/http';
 import {
-  chooseClock,
   decidePulse,
   heartbeatDue,
   type DrainReport,
@@ -22,6 +21,7 @@ import {
   extendSessionHorizon,
   type ExtendHorizonResult,
 } from '@/server/db/sessions';
+import { chooseDemoClock } from '@/server/demoClock';
 import { env } from '@/server/env';
 import { scheduleAuditExports } from '@/server/jobs/auditSchedule';
 import { drainJobs } from '@/server/jobs/drain';
@@ -31,7 +31,7 @@ import { fixedClock, systemClock } from '@/server/ports/clock';
 import { consumeRateLimit } from '@/server/ports/rate-limit';
 import { secureEqual } from '@/server/hash';
 
-type PulseCounts = DrainReport & {
+export type PulseCounts = DrainReport & {
   purged: number;
   holdsReleased: number;
   holdsScrubbed: number;
@@ -160,8 +160,9 @@ async function extendSessions(now: Date): Promise<number> {
 /**
  * Every entry the pulse runs, in order. The later units' entries join this list:
  * TODO(U-097): synthetic booking and timing checks; TODO(U-098): hourly dump trigger.
+ * The route and the test console both run it; the caller has already decided `asOf` is allowed.
  */
-async function runPulse(
+export async function runPulse(
   asOf: Date | undefined,
   heartbeat: boolean,
 ): Promise<PulseCounts> {
@@ -221,11 +222,7 @@ async function handlePulse(request: Request): Promise<PulseResult> {
 
   const body = parsePulseBody(text);
   if (!body.ok) return { status: 400 };
-  const clock = chooseClock({
-    asOf: body.asOf,
-    demoClock: env.DEMO_CLOCK,
-    realNow: systemClock.now(),
-  });
+  const clock = chooseDemoClock(body.asOf);
   if (!clock.ok) return { status: 400 };
 
   const run = decidePulse({ ...gates, asOf: clock.asOf });

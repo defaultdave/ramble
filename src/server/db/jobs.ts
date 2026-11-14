@@ -72,56 +72,95 @@ export async function claimDueJobs(
       .orderBy(asc(jobs.runAfter), asc(jobs.createdAt))
       .limit(limit)
       .for('update', { skipLocked: true });
-
-    const { toClaim, toAbandon } = partitionClaims(candidates, now);
-
-    const lockedUntil = lockExpiry(now);
-    const claimed =
-      toClaim.length === 0
-        ? []
-        : await tx
-            .update(jobs)
-            .set({
-              status: 'running',
-              attempts: sql`${jobs.attempts} + 1`,
-              lockedUntil,
-            })
-            .where(
-              inArray(
-                jobs.id,
-                toClaim.map((row) => row.id),
-              ),
-            )
-            .returning({
-              id: jobs.id,
-              kind: jobs.kind,
-              payload: jobs.payload,
-              attempts: jobs.attempts,
-              maxAttempts: jobs.maxAttempts,
-            });
-
-    if (toAbandon.length > 0) {
-      await tx
-        .update(jobs)
-        .set({
-          status: 'dead',
-          lockedUntil: null,
-          finishedAt: now,
-          lastError: abandonedMessage,
-        })
-        .where(
-          inArray(
-            jobs.id,
-            toAbandon.map((row) => row.id),
-          ),
-        );
-    }
-
-    return {
-      claimed: claimed.map((row) => ({ ...row, lockedUntil })),
-      abandoned: toAbandon.map(({ id, kind }) => ({ id, kind })),
-    };
+    return claimCandidates(tx, candidates, now);
   });
+}
+
+/**
+ * The claim for one named job, for a tester running it by hand: a waiting job is taken whenever its
+ * `runAfter` falls, and a running one only once its lock has lapsed. A job another drain holds, or
+ * that is finished, comes back as neither claimed nor abandoned.
+ */
+export async function claimJobById(
+  id: string,
+  now: Date,
+): Promise<{ claimed: ClaimedJob[]; abandoned: AbandonedJob[] }> {
+  return db.transaction(async (tx) => {
+    const candidates = await tx
+      .select()
+      .from(jobs)
+      .where(
+        and(
+          eq(jobs.id, id),
+          or(
+            eq(jobs.status, 'pending'),
+            and(eq(jobs.status, 'running'), lte(jobs.lockedUntil, now)),
+          ),
+        ),
+      )
+      .for('update', { skipLocked: true });
+    // A hand run is the tester's call, so a job not yet due is judged due, and nothing else changes.
+    const due = candidates.map((row) => ({
+      ...row,
+      runAfter: row.runAfter > now ? now : row.runAfter,
+    }));
+    return claimCandidates(tx, due, now);
+  });
+}
+
+async function claimCandidates(
+  tx: Transaction,
+  candidates: (typeof jobs.$inferSelect)[],
+  now: Date,
+): Promise<{ claimed: ClaimedJob[]; abandoned: AbandonedJob[] }> {
+  const { toClaim, toAbandon } = partitionClaims(candidates, now);
+
+  const lockedUntil = lockExpiry(now);
+  const claimed =
+    toClaim.length === 0
+      ? []
+      : await tx
+          .update(jobs)
+          .set({
+            status: 'running',
+            attempts: sql`${jobs.attempts} + 1`,
+            lockedUntil,
+          })
+          .where(
+            inArray(
+              jobs.id,
+              toClaim.map((row) => row.id),
+            ),
+          )
+          .returning({
+            id: jobs.id,
+            kind: jobs.kind,
+            payload: jobs.payload,
+            attempts: jobs.attempts,
+            maxAttempts: jobs.maxAttempts,
+          });
+
+  if (toAbandon.length > 0) {
+    await tx
+      .update(jobs)
+      .set({
+        status: 'dead',
+        lockedUntil: null,
+        finishedAt: now,
+        lastError: abandonedMessage,
+      })
+      .where(
+        inArray(
+          jobs.id,
+          toAbandon.map((row) => row.id),
+        ),
+      );
+  }
+
+  return {
+    claimed: claimed.map((row) => ({ ...row, lockedUntil })),
+    abandoned: toAbandon.map(({ id, kind }) => ({ id, kind })),
+  };
 }
 
 /** Reads a job under its row lock, waiting for any other holder. */

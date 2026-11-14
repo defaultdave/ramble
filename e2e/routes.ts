@@ -45,6 +45,7 @@ export const routes: readonly RouteRow[] = [
   },
   { path: '/ops', group: 'ops', heading: 'Operations', noindex: true },
   { path: '/ops/mailbox', group: 'ops', heading: 'Dev mailbox', noindex: true },
+  { path: '/ops/dev', group: 'ops', heading: 'Test console', noindex: true },
 ];
 
 export const unknownPaths: Record<RouteGroup, string> = {

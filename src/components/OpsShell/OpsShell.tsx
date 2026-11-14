@@ -40,9 +40,16 @@ export function OpsLanding({ areas }: { areas: readonly OpsNavLink[] }) {
 }
 
 /** What anyone without the ops role sees, whether signed out or signed in as someone else. */
-export function OpsAccessDenied({ next }: { next: string }) {
+export function OpsAccessDenied({
+  next,
+  title = 'Operations',
+}: {
+  next: string;
+  /** The page's own heading, for a page whose title is not the area's. */
+  title?: string;
+}) {
   return (
-    <PageHeading title="Operations">
+    <PageHeading title={title}>
       <p>
         This area is for the Ramble team. Sign in with a team account to
         continue.

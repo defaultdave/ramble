@@ -2979,3 +2979,24 @@ units:
     tokens: null
     status: todo
     note: "Added 2026-11-14 from the image audit (IMG-I in ramble-pm audits/images-2026-11-14.md; DECISIONS 2026-11-14); PM estimate, not panelled"
+  - id: U-128
+    title: "Text dictionary, phase 0: scaffold, lint, contract test"
+    section: platform
+    slice: "Copy"
+    priority: Should
+    prd: []
+    scope: "src/lib/copy/ with common, meta and format; copy lint rules (warn level, per-folder errors); a client-island import rule; the copy contract test; a per-route client JS baseline. Out: moving any page, island, email or form copy (phases 1 to 4)"
+    depends_on: []
+    spike: false
+    mode: both
+    phase: P5
+    complexity: 1
+    uncertainty: 1
+    execution: agent-fan-out
+    review: standard
+    estimate_days: { o: 0.5, m: 0.75, p: 1.25 }
+    actual_days: null
+    dave_minutes: null
+    tokens: null
+    status: todo
+    note: "Added 2026-11-14 (text dictionary, ramble-pm drafts/dictionary-design-2026-11.md; DECISIONS 2026-11-14); PM estimate, not panelled"

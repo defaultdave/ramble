@@ -16,6 +16,7 @@ vi.mock('@/server/db/opsJobs', () => ({
 vi.mock('@/server/testClock', () => ({ readTestClock: mocks.readTestClock }));
 vi.mock('@/server/actions/opsDev', () => ({
   drainOpsJobsAction: vi.fn(),
+  resetDemoDataAction: vi.fn(),
   runOpsJobAction: vi.fn(),
   runOpsPulseAction: vi.fn(),
   setOpsClockAction: vi.fn(),

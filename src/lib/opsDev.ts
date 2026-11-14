@@ -159,6 +159,9 @@ export const opsDevNoticeCodes = [
   'clock_reset',
   'clock_off',
   'clock_out_of_range',
+  'reset_done',
+  'reset_unconfirmed',
+  'reset_failed',
 ] as const;
 export type OpsDevNoticeCode = (typeof opsDevNoticeCodes)[number];
 
@@ -196,6 +199,20 @@ export const opsDevNotices = {
   clock_out_of_range: {
     tone: 'warning',
     title: 'That time is more than 400 days from now. Pick a nearer one.',
+  },
+  reset_done: {
+    tone: 'success',
+    title:
+      'The demo data was reset: tester orders, holds, gifts, messages and jobs are gone and the seed is back.',
+  },
+  reset_unconfirmed: {
+    tone: 'warning',
+    title: 'Nothing was reset. Type the confirmation word exactly to go ahead.',
+  },
+  reset_failed: {
+    tone: 'danger',
+    title:
+      'The reset did not finish. Check the console and run it again; the seed is safe to rerun.',
   },
 } as const satisfies Record<OpsDevNoticeCode, NoticeText>;
 

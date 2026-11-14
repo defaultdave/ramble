@@ -11,9 +11,16 @@ import { OpsDevConsole } from './OpsDevConsole';
 // - with the demo clock on, the clock can be set, moved on and reset; with it off, only reset, and the page says why
 // - the clock line says whether runs use the real time or the test time
 // - an empty list says so
+// - the reset is a form with a typed confirmation that is required, and says what goes and what stays
 
 const noop = () => undefined;
-const actions = { runJob: noop, drain: noop, pulse: noop, setClock: noop };
+const actions = {
+  runJob: noop,
+  drain: noop,
+  pulse: noop,
+  setClock: noop,
+  reset: noop,
+};
 
 function renderConsole(props: {
   rows?: Parameters<typeof OpsDevConsole>[0]['rows'];
@@ -83,6 +90,19 @@ describe('OpsDevConsole', () => {
     expect(screen.getByText(/demo clock is switched off/)).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Back to the real time' }),
+    ).toBeInTheDocument();
+  });
+
+  it('has a reset form whose confirmation must be typed', () => {
+    renderConsole({});
+    const confirm = screen.getByLabelText('Type RESET to confirm');
+    expect(confirm).toBeRequired();
+    expect(confirm).toHaveAttribute('name', 'confirm');
+    expect(
+      screen.getByRole('button', { name: 'Reset demo data' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/The catalogue, hosts, people/),
     ).toBeInTheDocument();
   });
 

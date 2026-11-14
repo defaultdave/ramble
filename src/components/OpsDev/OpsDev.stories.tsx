@@ -34,7 +34,13 @@ const consoleProps = {
   query: {},
   testTimeLabel: null,
   demoClockOn: true,
-  actions: { runJob: noop, drain: noop, pulse: noop, setClock: noop },
+  actions: {
+    runJob: noop,
+    drain: noop,
+    pulse: noop,
+    setClock: noop,
+    reset: noop,
+  },
 };
 
 export const RealTime: Story = {

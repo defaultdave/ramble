@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { countLabel } from './text';
+import { count } from './copy/format';
 
 export const rateLimitSurfaces = [
   'sign_in_link',
@@ -136,7 +136,7 @@ export function normalizeSubject(
 
 /** "1 minute" or "3 minutes": how a wait is said wherever a limit tells a guest to try again. */
 export function waitMinutesLabel(minutes: number): string {
-  return countLabel(minutes, 'minute');
+  return count(minutes, 'minute');
 }
 
 const secondsPerMinute = 60;

@@ -1,4 +1,4 @@
-import { andList } from './andList';
+import { andList } from './copy/format';
 import {
   labelledOptions,
   type ExperienceContent,

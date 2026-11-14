@@ -4,6 +4,7 @@ import { GuestShell } from '@/components/GuestShell';
 import { AccountControl } from '@/components/Header/AccountControl';
 import { VercelMeasurement } from '@/server/analytics/VercelMeasurement';
 import { SentryBrowserScript } from '@/server/monitoring/SentryBrowserScript';
+import { siteMetadata } from '@/lib/copy/meta';
 import '@/styles/base.css';
 import '@/styles/tokens.css';
 import '@/styles/forced-colors.css';
@@ -12,8 +13,7 @@ import { GuestBanner } from './GuestBanner';
 import { HeaderAccount } from './HeaderAccount';
 
 export const metadata: Metadata = {
-  title: { default: 'Ramble', template: '%s | Ramble' },
-  description: 'A marketplace for things worth doing.',
+  ...siteMetadata,
 };
 
 export default function GuestLayout({ children }: { children: ReactNode }) {

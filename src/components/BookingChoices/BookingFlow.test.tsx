@@ -23,7 +23,7 @@ import {
 } from '@/lib/bookingDraft.fixtures';
 import type { ReserveResult } from '@/lib/holds';
 import { formatMoney, formatPrice } from '@/lib/money';
-import { guestsLabel } from '@/lib/orderSummary';
+import { guestsLabel } from '@/lib/copy/format';
 import { fromPriceLabel } from '@/lib/pricing';
 
 // Behaviours under test, one per decision, branch or risk:

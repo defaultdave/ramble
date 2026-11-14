@@ -8,6 +8,7 @@ import {
   boundaryConfigs,
   withTypeImportsAllowed,
 } from './eslint.config.boundaries.mjs';
+import { copyConfigs } from './eslint.config.copy.mjs';
 import { ticketCommentsConfig } from './eslint.config.ticket-comments.mjs';
 
 export default defineConfig([
@@ -41,6 +42,7 @@ export default defineConfig([
     files: ['**/*.mjs'],
   },
   ...boundaryConfigs,
+  ...copyConfigs,
   ticketCommentsConfig,
   {
     name: 'ramble/no-inline-disables-of-boundaries',
@@ -51,6 +53,7 @@ export default defineConfig([
         'import/no-restricted-paths',
         'no-restricted-imports',
         'no-restricted-syntax',
+        'ramble-copy/client-copy-imports',
       ],
     },
   },

@@ -1,4 +1,4 @@
-import { brandName } from './brand';
+import { commonCopy } from '../copy/common';
 import {
   accessibilityPath,
   browsePath,
@@ -15,31 +15,31 @@ type SiteLinkGroup = { title: string; links: SiteLink[] };
 /** The footer's groups, which load no catalog schema, so a client module can show the footer. Only pages that exist are linked; every address is distinct, since the footer keys its links by address. */
 export const footerGroups: SiteLinkGroup[] = [
   {
-    title: 'Explore',
+    title: commonCopy.footer.groups.explore,
     links: [
-      { label: 'Gift guide', href: giftGuidePath },
-      { label: 'Ramble Picks', href: homePicksHref },
-      { label: 'Things to do', href: browsePath },
+      { label: commonCopy.footer.links.giftGuide, href: giftGuidePath },
+      { label: commonCopy.footer.links.ramblePicks, href: homePicksHref },
+      { label: commonCopy.footer.links.thingsToDo, href: browsePath },
     ],
   },
   {
-    title: 'Help',
+    title: commonCopy.footer.groups.help,
     links: [
-      { label: 'Help center', href: helpPath },
-      { label: 'Contact us', href: contactPath },
-      { label: 'Accessibility', href: accessibilityPath },
+      { label: commonCopy.footer.links.helpCenter, href: helpPath },
+      { label: commonCopy.footer.links.contact, href: contactPath },
+      { label: commonCopy.footer.links.accessibility, href: accessibilityPath },
     ],
   },
   {
-    title: 'Ramble',
+    title: commonCopy.footer.groups.brand,
     links: [
-      { label: 'Terms', href: legalPath('terms') },
-      { label: 'Privacy', href: legalPath('privacy') },
+      { label: commonCopy.footer.links.terms, href: legalPath('terms') },
+      { label: commonCopy.footer.links.privacy, href: legalPath('privacy') },
     ],
   },
 ];
 
 export const footerChrome = {
-  tagline: 'The friend who always knows what to do in New York.',
-  copyright: `© 2026 ${brandName}. Made in Brooklyn.`,
+  tagline: commonCopy.footer.tagline,
+  copyright: commonCopy.footer.copyright,
 } as const;

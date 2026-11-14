@@ -2,24 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   bookingMeta,
   giftMeta,
-  guestsLabel,
   orderSummaryAmounts,
   type TaxTreatment,
 } from './orderSummary';
-
-describe('guestsLabel', () => {
-  it.each([
-    [1, '1 guest'],
-    [2, '2 guests'],
-    [6, '6 guests'],
-  ])('labels %i guests', (count, label) => {
-    expect(guestsLabel(count)).toBe(label);
-  });
-
-  it.each([0, -1, 1.5, Number.NaN])('throws on %s', (count) => {
-    expect(() => guestsLabel(count)).toThrow(RangeError);
-  });
-});
 
 describe('meta lines', () => {
   it('joins the booking date, time, and party', () => {

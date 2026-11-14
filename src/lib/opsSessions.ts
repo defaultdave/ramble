@@ -32,7 +32,7 @@ import {
   type sessionStatuses,
 } from './sessions';
 import { parseStatusParam, type StatusTone } from './statusBadge';
-import { countLabel } from './text';
+import { count } from './copy/format';
 import { tableHref } from './tableQuery';
 import { zonedDeadlineLabel } from './zonedLabels';
 
@@ -281,9 +281,9 @@ export type ImpactView = {
 export function impactView(impact: Impact): ImpactView {
   const total = refundTotalMinor(impact);
   const parts = [
-    `${countLabel(impact.refunds.length, 'booking')} refunded in full, ${formatMoney(total)} in all`,
-    `${countLabel(impact.unpaidCount, 'unpaid order')} voided`,
-    `${countLabel(impact.openHolds, 'hold')} released`,
+    `${count(impact.refunds.length, 'booking')} refunded in full, ${formatMoney(total)} in all`,
+    `${count(impact.unpaidCount, 'unpaid order')} voided`,
+    `${count(impact.openHolds, 'hold')} released`,
   ];
   const shown = impact.refunds.slice(0, impactListLimit);
   const more = impact.refunds.length - shown.length;
@@ -639,7 +639,7 @@ export function pauseView(input: {
   if (plan === 'not_pausable' || (plan === 'finish' && targetCount === 0)) {
     return null;
   }
-  const sessions = countLabel(targetCount, 'future session');
+  const sessions = count(targetCount, 'future session');
   return plan === 'pause'
     ? {
         explainer: `Hides ${input.experienceName} from guests, then cancels its future sessions that have guests and refunds their bookings.`,
@@ -783,6 +783,6 @@ export function sessionNotice(query: {
     already > 0 ? `, ${String(already)} already cancelled` : '';
   return {
     tone,
-    title: `${String(done)} of ${countLabel(of, 'session')} cancelled${alreadyText}. ${title}`,
+    title: `${String(done)} of ${count(of, 'session')} cancelled${alreadyText}. ${title}`,
   };
 }

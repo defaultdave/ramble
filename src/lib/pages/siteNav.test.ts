@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { commonCopy } from '../copy/common';
+import { count } from '../copy/format';
 import { parseFilters } from '../filters';
 import { searchHref, siteChrome } from './siteNav';
 
@@ -8,7 +10,9 @@ import { searchHref, siteChrome } from './siteNav';
 
 describe('the header search', () => {
   it('says anywhere, any day, and two guests', () => {
-    expect(siteChrome.searchLabel).toBe('Anywhere · Any day · 2 guests');
+    expect(siteChrome.searchLabel).toBe(
+      commonCopy.nav.searchLabel(count(2, 'guest')),
+    );
   });
 
   it('links to browse with two guests, and browse reads two guests from it', () => {

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { siteMetadata } from '@/lib/copy/meta';
 import '@/styles/base.css';
 import '@/styles/tokens.css';
 import '@/styles/forced-colors.css';
@@ -7,8 +8,7 @@ import { fontVariables } from '../fonts';
 import { RenderPerRequest } from '../renderPerRequest';
 
 export const metadata: Metadata = {
-  title: { default: 'Ramble', template: '%s | Ramble' },
-  description: 'A marketplace for things worth doing.',
+  ...siteMetadata,
   robots: { index: false },
 };
 

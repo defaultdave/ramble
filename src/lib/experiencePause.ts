@@ -1,6 +1,6 @@
 import type { ExperienceStatus } from './experienceEditor';
 import { noticeText, parseNotice, type NoticeText } from './opsForm';
-import { countLabel } from './text';
+import { count } from './copy/format';
 
 // Pausing an experience takes it off every guest page without losing it; unpausing puts it back
 // in the status it was paused from. Ops pauses one experience, or suspends a host, which pauses
@@ -213,7 +213,7 @@ export function suspensionLiveText(liveCount: number): string {
   if (liveCount === 0) {
     return 'Guests can see none of this host experiences. Suspending it records the suspension, so nothing of its can go public until it is lifted.';
   }
-  return `Suspending pauses ${countLabel(liveCount, 'experience')} that guests can see. Guests stop seeing and booking ${liveCount === 1 ? 'it' : 'them'}, and nothing of the host's can go public until the suspension is lifted. Existing bookings stay.`;
+  return `Suspending pauses ${count(liveCount, 'experience')} that guests can see. Guests stop seeing and booking ${liveCount === 1 ? 'it' : 'them'}, and nothing of the host's can go public until the suspension is lifted. Existing bookings stay.`;
 }
 
 /** What unsuspending the host does, by how many experiences the suspension paused. */
@@ -221,5 +221,5 @@ export function suspensionUndoText(suspendedCount: number): string {
   if (suspendedCount === 0) {
     return 'The suspension paused nothing that is still paused. Unsuspending lifts it. Anything paused by hand stays paused.';
   }
-  return `Unsuspending restores the ${countLabel(suspendedCount, 'experience')} this suspension paused. Anything paused by hand stays paused.`;
+  return `Unsuspending restores the ${count(suspendedCount, 'experience')} this suspension paused. Anything paused by hand stays paused.`;
 }

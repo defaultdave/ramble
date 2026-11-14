@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StartPaymentResult } from '@/lib/checkout';
 import { holdTimerText } from '@/lib/holdTimer';
 import { formatMoney, formatPrice } from '@/lib/money';
-import { guestsLabel } from '@/lib/orderSummary';
+import { guestsLabel } from '@/lib/copy/format';
 import type { ReholdResult } from '@/lib/pages/checkoutFlow';
 import type { CheckoutView } from '@/lib/pages/checkoutPage';
 import { CheckoutPage, type CheckoutActions } from './CheckoutPage';

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { EntityIdSchema } from './catalog';
 import { formWholeNumber as wholeNumber } from './opsForm';
 import { formatPrice, priceInputTextOrNull, priceMinorFromText } from './money';
-import { countLabel } from './text';
+import { count } from './copy/format';
 import {
   IsoDateSchema,
   TimeZoneSchema,
@@ -362,13 +362,13 @@ export function publishWeekMessage(result: {
   const added =
     result.created === 0
       ? 'No new sessions were needed'
-      : `${countLabel(result.created, 'session')} added`;
+      : `${count(result.created, 'session')} added`;
   const rest = [
     result.alreadyExisted > 0
-      ? `${countLabel(result.alreadyExisted, 'session')} already published`
+      ? `${count(result.alreadyExisted, 'session')} already published`
       : null,
     result.inThePast > 0
-      ? `${countLabel(result.inThePast, 'date')} already past`
+      ? `${count(result.inThePast, 'date')} already past`
       : null,
   ].filter((part) => part !== null);
   return `${[added, ...rest].join('; ')}.`;

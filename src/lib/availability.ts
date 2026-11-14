@@ -21,7 +21,7 @@ import {
   type SessionTemplate,
   type UpdateTemplateAllocationInput,
 } from './sessions';
-import { countLabel } from './text';
+import { count } from './copy/format';
 
 // Availability setup on the ops experience page: the weekly slots and the seats each one sells, as
 // ops reads and posts them. A slot is a template (a weekday, a start time on the host's wall clock,
@@ -223,7 +223,7 @@ export type AvailabilitySlotView = {
 function upcomingLabel(slot: AvailabilitySlot): string {
   return slot.upcoming === 0 || slot.lastDate === null
     ? 'No upcoming sessions yet'
-    : `${countLabel(slot.upcoming, 'session')} open, through ${slot.lastDate}`;
+    : `${count(slot.upcoming, 'session')} open, through ${slot.lastDate}`;
 }
 
 /** The slots in week order, Monday first, then by start time. */
@@ -242,7 +242,7 @@ export function buildAvailabilityView(data: AvailabilityData): {
       id: slot.id,
       weekdayLabel: weekdayLabels.get(slot.weekday) ?? '',
       timeLabel: slot.startTime.slice(0, 5),
-      durationLabel: countLabel(slot.durationMinutes, 'minute'),
+      durationLabel: count(slot.durationMinutes, 'minute'),
       sourceLabel: templateSourceLabels[slot.source],
       allocation: slot.allocation,
       upcomingLabel: upcomingLabel(slot),

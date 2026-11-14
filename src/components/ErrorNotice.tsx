@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Button } from '@/components/Button';
 import { PageHeading } from '@/components/PageHeading';
+import { commonCopy } from '@/lib/copy/common';
 
 type ErrorNoticeProps = { onRetry: () => void };
 
@@ -10,10 +11,10 @@ export function ErrorNotice({ onRetry }: ErrorNoticeProps) {
   useEffect(() => heading.current?.focus(), []);
 
   return (
-    <PageHeading title="Something went wrong on our side" headingRef={heading}>
-      <p>This page did not load. Try again in a moment.</p>
+    <PageHeading title={commonCopy.error.title} headingRef={heading}>
+      <p>{commonCopy.error.body}</p>
       <Button type="button" variant="secondary" onClick={onRetry}>
-        Try again
+        {commonCopy.actions.tryAgain}
       </Button>
     </PageHeading>
   );

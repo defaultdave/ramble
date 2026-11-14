@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { andList } from '../andList';
 import {
   toExperienceCard,
   type CardExperience,
@@ -13,7 +12,7 @@ import {
   type BrowseFilters,
   type BrowseQuery,
 } from '../filters';
-import { guestsLabel } from '../orderSummary';
+import { andList, guestsLabel } from '../copy/format';
 import { browsePath } from '../routes';
 import { IsoDateSchema, TimeZoneSchema, isKnownTimeZone } from '../sessions';
 import { calendarDateFormat, dateChipLabel } from '../time';

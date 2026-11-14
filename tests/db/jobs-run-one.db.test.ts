@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  allRows,
   clockModule,
   drainModule,
   handled,
   insertRaw,
+  jobsDb,
   onlyRow,
   raise,
   setupJobsDatabase,
@@ -21,6 +23,7 @@ vi.mock('@/server/monitoring/logger', () => ({
 // - a waiting job runs once and succeeds even when its run_after is far in the future
 // - a job that fails goes back to pending with a backoff, and one on its last attempt is dead and raises an alert
 // - a job that is finished, dead, running under a live lock, or unknown is not runnable and nothing runs
+// - claimJobById itself claims and abandons nothing, and changes no row, for a running job under a live lock, a succeeded job and a dead job
 // - a running job whose lock has lapsed is taken again; one with no attempts left is dead without running
 
 setupJobsDatabase();
@@ -101,5 +104,31 @@ describe('runJobById', () => {
     expect(await runOne(id)).toBe('dead');
     expect(handled).toHaveLength(0);
     expect(raise).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('claimJobById', () => {
+  it.each([
+    [
+      'a running job under a live lock',
+      { status: 'running', attempts: 1, lockedUntil: '2030-01-01T00:05:00Z' },
+    ],
+    [
+      'a succeeded job',
+      { status: 'succeeded', finishedAt: '2026-01-01T00:00:00Z' },
+    ],
+    [
+      'a dead job',
+      { status: 'dead', attempts: 3, finishedAt: '2026-01-01T00:00:00Z' },
+    ],
+  ])('leaves %s alone', async (_name, row) => {
+    const id = await insertRaw(row);
+    const before = await allRows();
+
+    expect(await jobsDb.claimJobById(id, new Date(now))).toEqual({
+      claimed: [],
+      abandoned: [],
+    });
+    expect(await allRows()).toEqual(before);
   });
 });

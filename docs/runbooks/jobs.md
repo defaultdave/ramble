@@ -57,6 +57,14 @@ When a guest taps Pay in the fake card form, the order does not wait for the pul
 
 Query `jobs` where `status = 'dead'`: `last_error` holds the error kind and a redacted message, never the payload. To retry one, set `status = 'pending'`, `attempts = 0`, `finished_at = NULL`, `run_after = now()` in one UPDATE (the table's CHECKs refuse a half-edited row).
 
+## Test console (`/ops/dev`)
+
+For a testing deployment where nothing runs the pulse by itself. Ops and admin only, and refused on a production deployment (`VERCEL_ENV=production`) in the page and in every action. It lists the 50 newest jobs (status, attempts, due time, last error), runs one waiting job by hand, drains the queue, and triggers the pulse (no heartbeat). Each run uses the same drain and pulse code as `/api/pulse`.
+
+The test clock is the cookie `ramble_dev_clock` (the tester's own browser, `/ops/dev` only, 8 hours): set a time, or move it on by hours or days, and the console's runs treat it as `asOf`, so reminders, review invites and gift sends come due. It needs `DEMO_CLOCK=on` and the same 400-day window as the pulse route; with `DEMO_CLOCK` off a stored time makes every run refuse until the clock is reset. Hold lapse is judged at database time and is not moved by it.
+
+Running one job takes a waiting job whatever its due time. A test clock moved past a running job's lock lets run-one take a job a real drain is running, the same as a pulse `asOf` does (see above): the real drain's re-check then finds the claim gone and the job is `lost` to it, at the cost of an attempt. Use it when nothing is mid-run.
+
 ## Settings (Dave, after merge)
 
 Add `PULSE_SECRET` (32+ characters) to the Vercel project and as the GitHub Actions secret `PULSE_SECRET`; land the pulse workflow (`.github/workflows/pulse.yml`, on branch `unit/U-005-pulse-workflow`); optionally create a Better Stack heartbeat and set `BETTERSTACK_HEARTBEAT_URL`.

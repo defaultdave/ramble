@@ -5,6 +5,7 @@ import { Input } from '@/components/Input';
 import { Select } from '@/components/Select';
 import { StatusBadge } from '@/components/StatusBadge';
 import { clockUnits, opsDevPath, type OpsJobRow } from '@/lib/opsDev';
+import { resetConfirmPhrase } from '@/lib/seed/resetTarget';
 import type { TableQuery } from '@/lib/tableQuery';
 import styles from './OpsDev.module.css';
 
@@ -15,6 +16,7 @@ export type OpsDevActions = {
   drain: FormAction;
   pulse: FormAction;
   setClock: FormAction;
+  reset: FormAction;
 };
 
 export type OpsDevConsoleProps = {
@@ -145,6 +147,28 @@ export function OpsDevConsole({
           <HiddenFields fields={[['intent', 'reset']]} />
           <Button type="submit" variant="ghost">
             Back to the real time
+          </Button>
+        </form>
+      </section>
+
+      <section className={styles.section} aria-labelledby="reset-heading">
+        <h2 id="reset-heading" className={styles.heading}>
+          Reset demo data
+        </h2>
+        <p className={styles.muted}>
+          Deletes every order, payment, ledger entry, hold, gift, message and
+          job that testers made, then reruns the seed. The catalogue, hosts,
+          people and sign-ins stay. This cannot be undone.
+        </p>
+        <form action={actions.reset} className={styles.form}>
+          <Input
+            name="confirm"
+            label={`Type ${resetConfirmPhrase} to confirm`}
+            autoComplete="off"
+            required
+          />
+          <Button type="submit" variant="secondary">
+            Reset demo data
           </Button>
         </form>
       </section>

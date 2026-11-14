@@ -65,6 +65,12 @@ The test clock is the cookie `ramble_dev_clock` (the tester's own browser, `/ops
 
 Running one job takes a waiting job whatever its due time. A test clock moved past a running job's lock lets run-one take a job a real drain is running, the same as a pulse `asOf` does (see above): the real drain's re-check then finds the claim gone and the job is `lost` to it, at the cost of an attempt. Use it when nothing is mid-run.
 
+### Reset demo data
+
+The console's last form, and `pnpm db:reset --confirm=RESET`, empty what testers made and rerun the seed. Both need the word `RESET` typed exactly (the form's field is required and the action ignores anything else). Both are refused on a production deployment (`VERCEL_ENV=production`) and on the `production-demo` seed target, and the refusal is in `resetDemoData` itself, so neither caller can skip it. The command also applies the seed's own target check (`SEED_TARGET`, `SEED_HOST`, no production-looking host).
+
+It wipes, in one transaction: orders and their lines, payment attempts, refunds, transfers, provider events, ledger entries, holds and their lines, gifts and their lines, messages, email suppressions and jobs. It keeps the catalogue, hosts, people, sign-ins, sessions, consents, support and private requests, rate limits, the audit log and the fake gateway's stored payments. Every session's seats sold goes to 0 and the seed puts back the seats its coverage sessions carry. The ledger refuses an emptying even by its owner, so the reset lifts the `ledger_entries_keep_table` trigger for that one statement and puts it back in the same transaction; the database role must own the table. If the seed rerun fails after the wipe, run it again (`pnpm db:seed`): it is safe to repeat.
+
 ## Settings (Dave, after merge)
 
 Add `PULSE_SECRET` (32+ characters) to the Vercel project and as the GitHub Actions secret `PULSE_SECRET`; land the pulse workflow (`.github/workflows/pulse.yml`, on branch `unit/U-005-pulse-workflow`); optionally create a Better Stack heartbeat and set `BETTERSTACK_HEARTBEAT_URL`.

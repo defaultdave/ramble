@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   runPulse: vi.fn(),
   readTestClock: vi.fn(),
   writeTestClock: vi.fn(),
+  resetDemoData: vi.fn(),
 }));
 
 class Redirected extends Error {
@@ -34,6 +35,9 @@ vi.mock('@/server/jobs/drain', () => ({
   runJobById: mocks.runJobById,
   drainJobs: mocks.drainJobs,
 }));
+vi.mock('@/server/db/seed/reset', () => ({
+  resetDemoData: mocks.resetDemoData,
+}));
 vi.mock('@/server/pulse', () => ({ runPulse: mocks.runPulse }));
 vi.mock('@/server/testClock', () => ({
   readTestClock: mocks.readTestClock,
@@ -42,6 +46,7 @@ vi.mock('@/server/testClock', () => ({
 
 import {
   drainOpsJobsAction,
+  resetDemoDataAction,
   runOpsJobAction,
   runOpsPulseAction,
   setOpsClockAction,
@@ -53,6 +58,7 @@ import {
 // - run one job: a form with no job id goes back to the page; the job runs on the real clock, or on the test clock when one is set; each outcome has its notice
 // - drain and pulse run on the real clock, or on the test clock as `asOf`; a pulse sends no heartbeat; both report their counts in the address
 // - a test clock is refused with its notice, and nothing runs, when DEMO_CLOCK is off or the time is out of the 400-day window
+// - reset demo data: refused like the rest on production and for a caller without the role; without the typed word exactly it does nothing; with it, it resets on the real time and ends on its notice, or on the failed notice when the reset throws
 // - set, advance and reset write the test clock; advance starts from the stored time; a bad form, or a set the deployment will not run at, writes nothing
 
 const id = '0f1e2d3c-4b5a-4697-8a9b-0c1d2e3f4a5b';
@@ -94,6 +100,7 @@ const actions = [
   ['drain', () => drainOpsJobsAction()],
   ['pulse', () => runOpsPulseAction()],
   ['clock', () => setOpsClockAction(form({ intent: 'reset' }))],
+  ['reset demo data', () => resetDemoDataAction(form({ confirm: 'RESET' }))],
 ] as const;
 
 function expectNothingDone() {
@@ -101,6 +108,7 @@ function expectNothingDone() {
   expect(mocks.drainJobs).not.toHaveBeenCalled();
   expect(mocks.runPulse).not.toHaveBeenCalled();
   expect(mocks.writeTestClock).not.toHaveBeenCalled();
+  expect(mocks.resetDemoData).not.toHaveBeenCalled();
 }
 
 beforeEach(() => {
@@ -318,5 +326,51 @@ describe('setOpsClockAction', () => {
       await hrefOf(() => setOpsClockAction(form({ intent: 'set', at: 'x' }))),
     ).toBe('/ops/dev?notice=invalid');
     expect(mocks.writeTestClock).not.toHaveBeenCalled();
+  });
+});
+
+describe('resetDemoDataAction', () => {
+  beforeEach(() => {
+    mocks.resetDemoData.mockResolvedValue({});
+  });
+
+  it.each([
+    ['no word at all', form()],
+    ['an empty word', form({ confirm: '' })],
+    ['the word in lower case', form({ confirm: 'reset' })],
+    ['another word', form({ confirm: 'yes' })],
+    ['the word and more', form({ confirm: 'RESET now' })],
+  ])('does nothing with %s', async (_what, data) => {
+    expect(await hrefOf(() => resetDemoDataAction(data))).toBe(
+      '/ops/dev?notice=reset_unconfirmed',
+    );
+    expect(mocks.resetDemoData).not.toHaveBeenCalled();
+  });
+
+  it('resets on the real time when the word is typed, spaces around it allowed', async () => {
+    expect(
+      await hrefOf(() => resetDemoDataAction(form({ confirm: ' RESET ' }))),
+    ).toBe('/ops/dev?notice=reset_done');
+    const [options] = mocks.resetDemoData.mock.calls[0] as [{ now: Date }];
+    expect(Math.abs(options.now.getTime() - realNow())).toBeLessThan(5000);
+  });
+
+  it('lets admin reset too', async () => {
+    mocks.readOpsCaller.mockResolvedValue(admin);
+    expect(
+      await hrefOf(() => resetDemoDataAction(form({ confirm: 'RESET' }))),
+    ).toBe('/ops/dev?notice=reset_done');
+  });
+
+  it('ends on the failed notice when the reset throws, and leaks nothing of the error', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mocks.resetDemoData.mockRejectedValue(
+      new Error('postgres://user:secret@host/db refused'),
+    );
+    expect(
+      await hrefOf(() => resetDemoDataAction(form({ confirm: 'RESET' }))),
+    ).toBe('/ops/dev?notice=reset_failed');
+    expect(JSON.stringify(log.mock.calls)).not.toContain('secret');
+    log.mockRestore();
   });
 });

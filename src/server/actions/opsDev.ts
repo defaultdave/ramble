@@ -13,8 +13,10 @@ import {
   runNoticeHref,
   type OpsDevNoticeCode,
 } from '@/lib/opsDev';
+import { isResetConfirmed } from '@/lib/seed/resetTarget';
 import { chooseDemoClock } from '@/server/demoClock';
 import { env } from '@/server/env';
+import { resetDemoData } from '@/server/db/seed/reset';
 import { drainJobs, runJobById } from '@/server/jobs/drain';
 import { callerOrLeave, idOrLeave } from '@/server/opsAccess';
 import { readOpsCaller } from '@/server/opsCaller';
@@ -102,4 +104,23 @@ export async function setOpsClockAction(formData: FormData): Promise<void> {
   if (!choice.ok) redirect(noticeHref(opsDevPath, clockRefusalNotice(choice)));
   await writeTestClock(next);
   redirect(noticeHref(opsDevPath, 'clock_set'));
+}
+
+export async function resetDemoDataAction(formData: FormData): Promise<void> {
+  await guardOrLeave();
+  const typed = formData.get('confirm');
+  if (typeof typed !== 'string' || !isResetConfirmed(typed)) {
+    redirect(noticeHref(opsDevPath, 'reset_unconfirmed'));
+  }
+  let done = false;
+  try {
+    await resetDemoData({ now: systemClock.now() });
+    done = true;
+  } catch (error) {
+    // The message can carry a connection detail, so only its kind goes to the log.
+    console.error(
+      `Demo data reset failed: ${error instanceof Error ? error.name : 'unknown'}`,
+    );
+  }
+  redirect(noticeHref(opsDevPath, done ? 'reset_done' : 'reset_failed'));
 }

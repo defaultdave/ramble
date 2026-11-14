@@ -15,6 +15,7 @@ import {
 import { noticeText, parseNotice } from '@/lib/opsForm';
 import {
   drainOpsJobsAction,
+  resetDemoDataAction,
   runOpsJobAction,
   runOpsPulseAction,
   setOpsClockAction,
@@ -65,6 +66,7 @@ export default async function OpsDevPage({
           drain: drainOpsJobsAction,
           pulse: runOpsPulseAction,
           setClock: setOpsClockAction,
+          reset: resetDemoDataAction,
         }}
       />
     </PageHeading>

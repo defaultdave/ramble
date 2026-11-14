@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import type { RunOutcome } from '@/lib/jobs';
+import { errorKind } from '@/lib/errorKind';
 import { noticeHref } from '@/lib/opsForm';
 import {
   devConsoleOpen,
@@ -19,6 +20,7 @@ import { env } from '@/server/env';
 import { resetDemoData } from '@/server/db/seed/reset';
 import { drainJobs, runJobById } from '@/server/jobs/drain';
 import { callerOrLeave, idOrLeave } from '@/server/opsAccess';
+import { logger } from '@/server/monitoring/logger';
 import { readOpsCaller } from '@/server/opsCaller';
 import { fixedClock, systemClock, type Clock } from '@/server/ports/clock';
 import { runPulse } from '@/server/pulse';
@@ -118,9 +120,7 @@ export async function resetDemoDataAction(formData: FormData): Promise<void> {
     done = true;
   } catch (error) {
     // The message can carry a connection detail, so only its kind goes to the log.
-    console.error(
-      `Demo data reset failed: ${error instanceof Error ? error.name : 'unknown'}`,
-    );
+    logger.error('demo data reset failed', { errorKind: errorKind(error) });
   }
   redirect(noticeHref(opsDevPath, done ? 'reset_done' : 'reset_failed'));
 }

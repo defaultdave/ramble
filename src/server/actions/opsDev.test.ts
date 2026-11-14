@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   readTestClock: vi.fn(),
   writeTestClock: vi.fn(),
   resetDemoData: vi.fn(),
+  logError: vi.fn(),
 }));
 
 class Redirected extends Error {
@@ -37,6 +38,9 @@ vi.mock('@/server/jobs/drain', () => ({
 }));
 vi.mock('@/server/db/seed/reset', () => ({
   resetDemoData: mocks.resetDemoData,
+}));
+vi.mock('@/server/monitoring/logger', () => ({
+  logger: { error: mocks.logError },
 }));
 vi.mock('@/server/pulse', () => ({ runPulse: mocks.runPulse }));
 vi.mock('@/server/testClock', () => ({
@@ -363,14 +367,15 @@ describe('resetDemoDataAction', () => {
   });
 
   it('ends on the failed notice when the reset throws, and leaks nothing of the error', async () => {
-    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     mocks.resetDemoData.mockRejectedValue(
       new Error('postgres://user:secret@host/db refused'),
     );
     expect(
       await hrefOf(() => resetDemoDataAction(form({ confirm: 'RESET' }))),
     ).toBe('/ops/dev?notice=reset_failed');
-    expect(JSON.stringify(log.mock.calls)).not.toContain('secret');
-    log.mockRestore();
+    expect(mocks.logError).toHaveBeenCalledWith('demo data reset failed', {
+      errorKind: 'Error',
+    });
+    expect(JSON.stringify(mocks.logError.mock.calls)).not.toContain('secret');
   });
 });

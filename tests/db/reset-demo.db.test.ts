@@ -183,7 +183,7 @@ describe('resetDemoData', () => {
     expect([...seatsAfterReset.values()].reduce((a, b) => a + b, 0)).toBe(
       [...seatsAfterSeed.values()].reduce((a, b) => a + b, 0),
     );
-    expect(report.curated).toBeDefined();
+    expect(report.curated.experiences).toBeGreaterThan(0);
   });
 
   it('puts the ledger guard back: the ledger still refuses to be emptied', async () => {

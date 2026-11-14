@@ -1,4 +1,3 @@
-import { andList } from './andList';
 import {
   ageChips,
   browseParamNames,
@@ -9,7 +8,7 @@ import {
   settingChips,
   type BrowseFilters,
 } from './filters';
-import { guestsLabel } from './orderSummary';
+import { andList, guestsLabel } from './copy/format';
 import type { SessionWindow } from './sessionWindow';
 import { dateChipLabel } from './time';
 

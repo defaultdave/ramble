@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { EntityIdSchema, SlugSchema } from './catalog';
 import { holdLimits, PartySizeSchema } from './holds';
-import { guestsLabel } from './orderSummary';
+import { guestsLabel } from './copy/format';
 import { hrefWithQuery } from './queryHref';
 import { browsePath } from './routes';
 import { IsoDateSchema } from './sessions';

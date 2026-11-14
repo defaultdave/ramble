@@ -9,11 +9,8 @@ import type {
 import { durationLabel } from './duration';
 import { googleCalendarUrl, type CalendarEvent } from './ics';
 import { formatMoney } from './money';
-import {
-  orderSummaryAmounts,
-  guestsLabel,
-  type TaxTreatment,
-} from './orderSummary';
+import { guestsLabel } from './copy/format';
+import { orderSummaryAmounts, type TaxTreatment } from './orderSummary';
 import { isCapabilityTokenShape } from './capabilityTokens';
 import type { orderCancelledBys, OrderStatus } from './orders';
 import { browsePath, managePath } from './routes';

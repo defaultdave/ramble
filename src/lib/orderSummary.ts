@@ -1,5 +1,5 @@
 import type { taxTreatments } from './catalog';
-import { isSafeIntegerInRange } from './integers';
+import { guestsLabel } from './copy/format';
 import { formatMoney } from './money';
 import { MAX_LINES } from './pricing';
 
@@ -12,15 +12,6 @@ export type OrderSummaryAmounts = {
   tax: { label: string; amount: string } | null;
   total: string;
 };
-
-export function guestsLabel(count: number): string {
-  if (!isSafeIntegerInRange(count, 1)) {
-    throw new RangeError(
-      `Guests must be a positive integer, got ${String(count)}`,
-    );
-  }
-  return count === 1 ? '1 guest' : `${String(count)} guests`;
-}
 
 export function bookingMeta(details: {
   dateLabel: string;

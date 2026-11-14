@@ -29,7 +29,7 @@ import {
   type RefundStatus,
 } from './refunds';
 import { statusFilter, type StatusTone } from './statusBadge';
-import { countLabel } from './text';
+import { count } from './copy/format';
 import { zonedDeadlineLabel } from './zonedLabels';
 
 // The ops bookings area (PRD-51, lite cut): finding a booking, what ops may do to it, and what each
@@ -78,12 +78,12 @@ export function parseBookingSearch(term: string): BookingSearch {
 }
 
 /** What the list says under the search box, so a search that found nothing is told apart from a bad term. */
-export function searchSummary(search: BookingSearch, count: number): string {
+export function searchSummary(search: BookingSearch, matches: number): string {
   if (search.kind === 'invalid') {
     return 'Search by a booking reference such as RMB-ABC234, or by a guest’s full email address.';
   }
   if (search.kind === 'none') return '';
-  const found = countLabel(count, 'booking');
+  const found = count(matches, 'booking');
   return `${found} for ${search.kind === 'email' ? search.email : search.reference}.`;
 }
 

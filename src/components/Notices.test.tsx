@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { commonCopy } from '@/lib/copy/common';
 import { moduleClass } from '../../tests/support/moduleClass';
 import buttonStyles from './Button/Button.module.css';
 import { ErrorNotice } from './ErrorNotice';
@@ -15,11 +16,11 @@ describe('NotFoundNotice', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: "We can't find that page",
+        name: commonCopy.notFound.title,
       }),
     ).toBeInTheDocument();
     const home = screen.getByRole('link', {
-      name: 'Go to the Ramble home page',
+      name: commonCopy.notFound.homeLink,
     });
     expect(home).toHaveAttribute('href', '/');
     expect(home).toHaveClass(moduleClass(buttonStyles.primary));
@@ -34,10 +35,12 @@ describe('ErrorNotice', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'Something went wrong on our side',
+        name: commonCopy.error.title,
       }),
     ).toBeInTheDocument();
-    const retry = screen.getByRole('button', { name: 'Try again' });
+    const retry = screen.getByRole('button', {
+      name: commonCopy.actions.tryAgain,
+    });
     expect(retry).toHaveClass(moduleClass(buttonStyles.secondary));
     await userEvent.click(retry);
     expect(onRetry).toHaveBeenCalledTimes(1);

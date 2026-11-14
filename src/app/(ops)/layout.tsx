@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense, type ReactNode } from 'react';
 import { SiteShell } from '@/components/SiteShell';
+import { siteMetadata } from '@/lib/copy/meta';
 import '@/styles/base.css';
 import '@/styles/tokens.css';
 import '@/styles/forced-colors.css';
@@ -9,8 +10,7 @@ import { OpsAreaNav } from './OpsAreaNav';
 import { RenderPerRequest } from '../renderPerRequest';
 
 export const metadata: Metadata = {
-  title: { default: 'Ramble', template: '%s | Ramble' },
-  description: 'A marketplace for things worth doing.',
+  ...siteMetadata,
   robots: { index: false },
 };
 

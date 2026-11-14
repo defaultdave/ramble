@@ -3,14 +3,13 @@ import {
   type BookingNotice,
   type ReserveEffect,
 } from './bookingOutcome';
-import { countLabel } from './text';
+import { count, guestsLabel } from './copy/format';
 import type {
   ReserveResult,
   ReserveSpacesInput,
   SessionSummary,
 } from './holds';
 import { formatPrice } from './money';
-import { guestsLabel } from './orderSummary';
 import { lines, type PricedOption } from './pricing';
 import { spacesStatus } from './spaces';
 import { calendarDateFormat } from './time';
@@ -156,13 +155,13 @@ function trimmedNotice(
   { adults, children }: Seats,
 ): BookingNotice {
   const party = [
-    countLabel(adults, 'adult'),
-    ...(children > 0 ? [countLabel(children, 'child', 'children')] : []),
+    count(adults, 'adult'),
+    ...(children > 0 ? [count(children, 'child', 'children')] : []),
   ].join(' and ');
   return {
     tone: 'info',
     title: 'We changed your party',
-    body: `That time has ${countLabel(cap, 'space')} left, so your party is now ${party}.`,
+    body: `That time has ${count(cap, 'space')} left, so your party is now ${party}.`,
     similar: false,
   };
 }
@@ -540,7 +539,7 @@ function summaryOf(
   const label =
     children === 0 && adult
       ? `${formatPrice(adult.priceMinor)} × ${guestsLabel(adults)}`
-      : `${countLabel(adults, 'adult')}, ${countLabel(children, 'child', 'children')}`;
+      : `${count(adults, 'adult')}, ${count(children, 'child', 'children')}`;
   return {
     when: `${session.dayLabel} · ${session.timeLabel}`,
     guests: adults + children,

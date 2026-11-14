@@ -2,25 +2,3 @@
   object-fit: cover;
   object-position: 50% 50%;
 }
-
-/* With an underlay the main photo is hidden until it has loaded, so what shows meanwhile is the underlay. */
-.main {
-  opacity: 0;
-}
-
-.main[data-loaded='true'] {
-  opacity: 1;
-}
-
-/* Without scripting nothing reports the load, so the main photo shows as it arrives. */
-@media (scripting: none) {
-  .main {
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .main {
-    transition: opacity 250ms ease-out;
-  }
-}

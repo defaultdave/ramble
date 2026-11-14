@@ -1,7 +1,6 @@
 import Image from 'next/image';
 import type { PhotoView } from '@/lib/photoViews';
 import styles from './Photo.module.css';
-import { PhotoWithUnderlay } from './PhotoWithUnderlay';
 
 export type PhotoProps = {
   photo: PhotoView;
@@ -15,7 +14,7 @@ export type PhotoProps = {
   /**
    * The `sizes` of another view that draws this same photo, usually the card that led here. The
    * photo is drawn again beneath, asking for the width that view asked for, so it comes from cache
-   * and shows at once while the full photo loads and fades in over it.
+   * and shows through the full photo, which has no placeholder, until its own pixels paint.
    */
   underlaySizes?: string | undefined;
 };
@@ -30,28 +29,33 @@ export function Photo({
   preload = false,
   underlaySizes,
 }: PhotoProps) {
-  if (underlaySizes) {
-    return (
-      <PhotoWithUnderlay
-        photo={photo}
-        sizes={sizes}
-        underlaySizes={underlaySizes}
-        preload={preload}
-      />
-    );
-  }
-
   return (
-    <Image
-      className={styles.photo}
-      src={photo.src}
-      alt={photo.alt}
-      fill
-      sizes={sizes}
-      preload={preload}
-      fetchPriority={preload ? 'high' : undefined}
-      placeholder="blur"
-      blurDataURL={photo.blurDataUrl}
-    />
+    <>
+      {underlaySizes ? (
+        <Image
+          className={styles.photo}
+          src={photo.src}
+          alt=""
+          aria-hidden="true"
+          fill
+          sizes={underlaySizes}
+          loading="eager"
+          placeholder="blur"
+          blurDataURL={photo.blurDataUrl}
+        />
+      ) : null}
+      <Image
+        className={styles.photo}
+        src={photo.src}
+        alt={photo.alt}
+        fill
+        sizes={sizes}
+        preload={preload}
+        fetchPriority={preload ? 'high' : undefined}
+        {...(underlaySizes
+          ? {}
+          : { placeholder: 'blur', blurDataURL: photo.blurDataUrl })}
+      />
+    </>
   );
 }

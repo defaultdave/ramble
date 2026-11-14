@@ -7,6 +7,7 @@ import {
   restoreWidths,
   stubResizeObserver,
 } from '../../../tests/support/resizeObserver';
+import { cardPhotoSizes } from '@/components/Card';
 import { galleryView } from '@/lib/pages/experience';
 import type { PhotoView } from '@/lib/photoViews';
 import { ExperienceGallery } from './ExperienceGallery';
@@ -16,6 +17,7 @@ import { ExperienceGallery } from './ExperienceGallery';
 // - the photos are in the order given, each named by its alt text, inside a group named for the experience that a keyboard can reach before any measuring
 // - once measured, a strip that does not overflow is neither a group nor a tab stop, and one that does keeps both, and the change follows the layout
 // - only the lead photo is the preload photo
+// - only the lead photo is drawn again beneath itself at the card's width, so it can show what the card already fetched
 // - with more than one photo each says where it is in the set; a single photo says nothing
 // - up to three photos need no "See all"; more offer it, with the count
 // - every photo is drawn once, whatever the count, so "See all" holds no copies
@@ -24,7 +26,12 @@ import { ExperienceGallery } from './ExperienceGallery';
 vi.mock('next/image', () => ({
   default: (props: ImageProps) => (
     // eslint-disable-next-line @next/next/no-img-element -- a stand-in that reports the props it received
-    <img alt={props.alt} src="data:," data-preload={String(props.preload)} />
+    <img
+      alt={props.alt}
+      src="data:,"
+      data-preload={String(props.preload)}
+      data-sizes={props.sizes}
+    />
   ),
 }));
 
@@ -96,6 +103,16 @@ describe('ExperienceGallery', () => {
         .getAllByRole('img')
         .map((image) => image.getAttribute('data-preload')),
     ).toEqual(['true', 'false', 'false']);
+  });
+
+  it("draws the lead again beneath itself at the card's width, and no other photo", () => {
+    gallery(3);
+    const underlays = Array.from(document.querySelectorAll('img[alt=""]'));
+    expect(underlays).toHaveLength(1);
+    expect(underlays[0]).toHaveAttribute('data-sizes', cardPhotoSizes.vertical);
+    expect(underlays[0]?.nextElementSibling?.getAttribute('data-preload')).toBe(
+      'true',
+    );
   });
 
   it('says where each photo is in the set', () => {

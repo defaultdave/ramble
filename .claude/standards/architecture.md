@@ -98,3 +98,5 @@ Test files (`*.test.*`, `*.spec.*`, `e2e/**`) are read only to answer rules B7 a
 2. **Server Actions live in `src/server/actions/`,** so client islands have one permitted import into `src/server/`.
 
 Both are logged in `DECISIONS.md` and `delta-log.md` in the `ramble-pm` repo.
+
+3. **Interface copy lives in `src/lib/copy/`** (Dave, 2026-11-14; the text dictionary design, `drafts/dictionary-design-2026-11.md` in the `ramble-pm` repo). Every user-facing string goes there, split by area, and components, pages, view builders and emails read it from there. A client island takes its copy as props from its server parent, or imports only its own area file, never the folder index or another area; `no-restricted-imports` enforces this. Database content and developer-facing text (Zod invariants, `new Error`, logs) stay where they are. Once a folder is migrated, a literal string in it is a finding.

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  containsPattern,
   wholeNumberText,
   everyJsonNode,
   firstNameOr,
@@ -178,5 +179,17 @@ describe('firstNameOr', () => {
     const first = firstNameOr(`${'a'.repeat(50)} Surname`, 'A guest', 10);
     expect(Array.from(first)).toHaveLength(10);
     expect(first.endsWith('…')).toBe(true);
+  });
+});
+
+describe('containsPattern', () => {
+  it.each([
+    ['a plain word', 'cancel', '%cancel%'],
+    ['a percent sign', '100%', '%100\\%%'],
+    ['an underscore', 'a_b', '%a\\_b%'],
+    ['a backslash', 'a\\b', '%a\\\\b%'],
+    ['every wildcard at once', '%_\\', '%\\%\\_\\\\%'],
+  ])('escapes %s', (_name, term, pattern) => {
+    expect(containsPattern(term)).toBe(pattern);
   });
 });

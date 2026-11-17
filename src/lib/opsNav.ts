@@ -28,6 +28,11 @@ export const opsNavLinks: readonly OpsNavLink[] = [
     summary: 'Find, add and edit experiences, with their prices and rules.',
   },
   {
+    label: 'Editorial',
+    href: '/ops/editorial',
+    summary: 'Write help articles, then save them as drafts or publish them.',
+  },
+  {
     label: 'Support',
     href: '/ops/support',
     summary: 'Read guests’ messages, and mark each resolved with a note.',

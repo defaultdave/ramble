@@ -58,6 +58,8 @@ import {
   type HomeGiftGuide,
   type HomePick,
 } from '@/lib/pages/home';
+import { entryAuditAction, entryAuditEntry } from '@/lib/editorialAdmin';
+import { writeAudit } from './audit';
 import { guestVisible } from './catalog';
 import { db, dbRead } from './client';
 import {
@@ -361,7 +363,6 @@ export async function listPageCopyForEditing(
   ];
 }
 
-// TODO(U-076c): first caller
 export async function listHelpArticlesForEditing(
   caller: Caller,
 ): Promise<HelpArticle[]> {
@@ -376,6 +377,20 @@ export async function listHelpArticlesForEditing(
     )
     .limit(editorialLimits.listed);
   return HelpArticleSchema.array().parse(rows);
+}
+
+/** One article with its draft or published body, for the editor; null when there is none. */
+export async function getHelpArticleForEditing(
+  caller: Caller,
+  id: string,
+): Promise<HelpArticle | null> {
+  requireStaff(caller);
+  const [row] = await dbRead
+    .select()
+    .from(helpArticles)
+    .where(eq(helpArticles.id, id))
+    .limit(1);
+  return row ? HelpArticleSchema.parse(row) : null;
 }
 
 // ---- Staff writes ----
@@ -647,8 +662,7 @@ export type SaveHelpArticleResult =
   | { status: 'not_found' }
   | { status: 'slug_taken' };
 
-// TODO(U-076c): first caller
-/** Creates an article (no `id`) or replaces one. */
+/** Creates an article (no `id`) or replaces one, and writes an audit row in the same transaction for a signed-in caller. */
 export async function saveHelpArticle(
   caller: Caller,
   input: HelpArticleInput,
@@ -697,6 +711,17 @@ export async function saveHelpArticle(
           .returning()
       : await tx.insert(helpArticles).values(values).returning();
     if (!row) throw new Error('The help article write returned no row');
+    // The seed saves articles as no one, and each run would add rows to a log the reset keeps.
+    if (caller.userId !== null) {
+      await writeAudit(
+        tx,
+        entryAuditEntry(
+          caller.userId,
+          entryAuditAction(before?.status, parsed.status),
+          row.id,
+        ),
+      );
+    }
 
     const change: CacheChange = { kind: 'helpArticles' };
     return {

@@ -1,7 +1,7 @@
 import { dashboardTiles, type OpsDashboardCounts } from '@/lib/opsDashboard';
 import type { AuditViewRow } from '@/lib/staffAdmin';
 
-export const busyCounts: OpsDashboardCounts = {
+const busyCounts: OpsDashboardCounts = {
   inReview: 3,
   refundFailed: 1,
   openSupport: 12,
@@ -9,7 +9,7 @@ export const busyCounts: OpsDashboardCounts = {
   sessionsToday: 5,
 };
 
-export const quietCounts: OpsDashboardCounts = {
+const quietCounts: OpsDashboardCounts = {
   inReview: 0,
   refundFailed: 0,
   openSupport: 0,

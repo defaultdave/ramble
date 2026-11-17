@@ -1,5 +1,5 @@
 import type { HostAccess } from './hostAccess';
-import { ownedHostId } from './hostAccess';
+import { hostAreaResult } from './hostAccess';
 import { hostExperiencesPath } from './hostExperiences';
 import { hostSessionsPath } from './hostSessions';
 import { hostSettingsPath } from './hostSettings';
@@ -103,9 +103,5 @@ export function hostStaffResult(
   access: HostAccess,
   rows: readonly StaffRow[] | null,
 ): HostStaffResult {
-  if (access.kind === 'signed_out') return { status: 'signed_out' };
-  if (ownedHostId(access) === null || rows === null) {
-    return { status: 'refused' };
-  }
-  return { status: 'ok', rows };
+  return hostAreaResult(access, rows, (read) => ({ status: 'ok', rows: read }));
 }

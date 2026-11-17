@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { opsNoticeLimits, type OpsNoticeData } from '@/lib/email/opsNotice';
-import { readTextFields } from '@/lib/formFields';
+import {
+  fieldErrorsFrom,
+  readTextFields,
+  type GuardedFormState,
+} from '@/lib/formFields';
 import { formatMoney } from '@/lib/money';
 import { EmailFieldSchema, supportLimits } from '@/lib/support';
 import {
@@ -112,17 +116,10 @@ export const emptyPrivateSessionValues: PrivateSessionFormValues = {
   message: '',
 };
 
-export type PrivateSessionFormState =
-  | { status: 'idle' }
-  | { status: 'sent' }
-  | {
-      status: 'invalid';
-      values: PrivateSessionFormValues;
-      errors: PrivateSessionFieldErrors;
-    }
-  | { status: 'rate_limited'; values: PrivateSessionFormValues }
-  | { status: 'expired'; values: PrivateSessionFormValues }
-  | { status: 'failed'; values: PrivateSessionFormValues };
+export type PrivateSessionFormState = GuardedFormState<
+  PrivateSessionFormValues,
+  PrivateSessionFieldErrors
+>;
 
 /** The schema keys the form's fields by their stored names; the form calls `budgetMinor` "budget". */
 const fieldOfKey = {
@@ -145,22 +142,11 @@ export function readPrivateSessionValues(
   );
 }
 
-const isSchemaKey = (key: unknown): key is keyof typeof fieldOfKey =>
-  typeof key === 'string' && Object.hasOwn(fieldOfKey, key);
-
 /** One message per field the schema refused, in the words the form shows. */
 export function privateSessionFieldErrors(
   error: z.ZodError,
 ): PrivateSessionFieldErrors {
-  const errors: PrivateSessionFieldErrors = {};
-  for (const issue of error.issues) {
-    const key = issue.path[0];
-    if (isSchemaKey(key)) {
-      const field = fieldOfKey[key];
-      errors[field] ??= privateSessionFieldMessages[field];
-    }
-  }
-  return errors;
+  return fieldErrorsFrom(error, fieldOfKey, privateSessionFieldMessages);
 }
 
 /** The notice ops gets: the request in labelled fields, with the optional message left out when there is none. */

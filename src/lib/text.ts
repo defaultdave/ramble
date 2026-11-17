@@ -126,8 +126,30 @@ export const nameClip = {
   /** In a subject, where a long name pushes the rest off the line. */
   subject: 70,
   person: 120,
+  /** Where only the first name of a person shows, such as a review's author. */
+  firstName: 40,
   experience: 200,
 } as const;
+
+/** A name as one line of at most `clip` characters, or `standIn` when the name is missing or blank. */
+export function nameOr(
+  name: string | null,
+  standIn: string,
+  clip: number,
+): string {
+  const clipped = oneLineClipped(name ?? '', clip);
+  return clipped === '' ? standIn : clipped;
+}
+
+/** The first word of a name, cut to one line of at most `clip` characters, or `standIn` when the name is missing or blank. */
+export function firstNameOr(
+  name: string | null,
+  standIn: string,
+  clip: number,
+): string {
+  const [first = ''] = (name ?? '').split(/\s+/).filter(Boolean);
+  return nameOr(first, standIn, clip);
+}
 
 /** The size of a string in UTF-8 bytes, which is what a cookie, a job payload, or a column limit counts. */
 export function utf8Bytes(text: string): number {

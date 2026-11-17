@@ -31,6 +31,7 @@ import {
   CardExperienceSchema,
   CardPriceOptionSchema,
   withPriceOptions,
+  withRatings,
   type CardExperience,
 } from '@/lib/experienceCards';
 import {
@@ -45,6 +46,7 @@ import { upcomingWindow, type SessionWindow } from '@/lib/sessionWindow';
 import { guestVisible } from './catalog';
 import { dbRead } from './client';
 import { coverImage, coverSelection, guestCoverOf } from './photos';
+import { readRatings } from './reviewsRead';
 import {
   categories,
   experiences,
@@ -192,24 +194,22 @@ async function attachPriceOptions(
   rows: readonly ExperienceRow[],
 ): Promise<CardExperience[]> {
   if (rows.length === 0) return [];
-  const prices = PriceRowsSchema.parse(
-    await dbRead
+  const ids = rows.map((row) => row.id);
+  const [prices, ratings] = await Promise.all([
+    dbRead
       .select({
         experienceId: priceOptions.experienceId,
         priceMinor: priceOptions.priceMinor,
         usesSpace: priceOptions.usesSpace,
       })
       .from(priceOptions)
-      .where(
-        inArray(
-          priceOptions.experienceId,
-          rows.map((row) => row.id),
-        ),
-      ),
-  );
-  return withPriceOptions(rows, prices).map((row) =>
-    CardExperienceSchema.parse(row),
-  );
+      .where(inArray(priceOptions.experienceId, ids)),
+    readRatings(ids),
+  ]);
+  return withRatings(
+    withPriceOptions(rows, PriceRowsSchema.parse(prices)),
+    ratings,
+  ).map((row) => CardExperienceSchema.parse(row));
 }
 
 /** The experience an `after` id names, if a guest can see it. Its columns are in the page order, which `pastCursor` compares them by. */

@@ -37,7 +37,7 @@ export type CacheChange =
       categorySlugs: readonly string[];
       neighborhoodSlug: string;
     }
-  /** An experience's sessions or photos changed. */
+  /** An experience's sessions, photos, or reviews changed. */
   | { kind: 'experience'; experienceId: string }
   /** A hold, booking, or release changed the spaces left in one session. */
   | { kind: 'spaces'; sessionId: string }

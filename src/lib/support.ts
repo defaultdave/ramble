@@ -4,7 +4,12 @@ import {
   maxEmailAddressLength,
   normalizeEmailAddress,
 } from '@/lib/email/address';
-import { readTextFields } from '@/lib/formFields';
+import type { OpsNoticeData } from '@/lib/email/opsNotice';
+import {
+  fieldErrorsFrom,
+  readTextFields,
+  type GuardedFormState,
+} from '@/lib/formFields';
 import { requiredText } from '@/lib/text';
 
 export const supportTopics = [
@@ -77,17 +82,10 @@ export const emptySupportValues: SupportFormValues = {
   message: '',
 };
 
-export type SupportFormState =
-  | { status: 'idle' }
-  | { status: 'sent' }
-  | {
-      status: 'invalid';
-      values: SupportFormValues;
-      errors: SupportFieldErrors;
-    }
-  | { status: 'rate_limited'; values: SupportFormValues }
-  | { status: 'expired'; values: SupportFormValues }
-  | { status: 'failed'; values: SupportFormValues };
+export type SupportFormState = GuardedFormState<
+  SupportFormValues,
+  SupportFieldErrors
+>;
 
 /** Reads the form's text fields; see `readTextFields`. */
 export function readSupportValues(
@@ -96,15 +94,32 @@ export function readSupportValues(
   return readTextFields(supportFields, get, supportLimits.messageMaxChars * 2);
 }
 
-const isSupportField = (key: unknown): key is SupportField =>
-  (supportFields as readonly unknown[]).includes(key);
+const fieldOfKey = {
+  name: 'name',
+  email: 'email',
+  topic: 'topic',
+  message: 'message',
+} as const satisfies Record<string, SupportField>;
 
 /** One message per field the schema refused, in the words the form shows. */
 export function supportFieldErrors(error: z.ZodError): SupportFieldErrors {
-  const errors: SupportFieldErrors = {};
-  for (const issue of error.issues) {
-    const field = issue.path[0];
-    if (isSupportField(field)) errors[field] ??= supportFieldMessages[field];
-  }
-  return errors;
+  return fieldErrorsFrom(error, fieldOfKey, supportFieldMessages);
+}
+
+/** The notice ops gets for a contact request: the request in labelled fields. */
+export function supportRequestNotice(
+  request: SupportRequestInput,
+  stored: { id: string; createdAt: Date },
+): OpsNoticeData {
+  return {
+    subject: `Contact form: ${supportTopicLabels[request.topic]}`,
+    fields: [
+      { label: 'Name', value: request.name },
+      { label: 'Email', value: request.email },
+      { label: 'Topic', value: supportTopicLabels[request.topic] },
+      { label: 'Message', value: request.message },
+      { label: 'Request ID', value: stored.id },
+      { label: 'Received', value: stored.createdAt.toISOString() },
+    ],
+  };
 }

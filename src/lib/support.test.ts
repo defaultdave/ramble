@@ -5,12 +5,14 @@ import {
   supportFieldErrors,
   supportFieldMessages,
   supportLimits,
+  supportRequestNotice,
 } from './support';
 
 // Behaviours under test, one per decision, branch or risk:
 // - a valid request parses, with the name and message trimmed and the address trimmed and lower-cased
 // - each field the form refuses is refused: blank or over-long text, a character Postgres cannot store, a bad address, an unknown topic
 // - a refusal is reported once per field, in the form's words, whatever the number of issues
+// - the ops notice carries the topic in its subject and the labelled fields, with the received time as ISO text
 // - reading the form takes text fields only; a file or a missing field reads as empty
 
 const valid = {
@@ -103,5 +105,28 @@ describe('readSupportValues', () => {
         message: supportFieldMessages.message,
       });
     }
+  });
+});
+
+describe('supportRequestNotice', () => {
+  it('labels the request and subjects it by topic', () => {
+    const request = SupportRequestSchema.parse(valid);
+
+    expect(
+      supportRequestNotice(request, {
+        id: 'req-1',
+        createdAt: new Date('2026-11-10T12:00:00Z'),
+      }),
+    ).toEqual({
+      subject: 'Contact form: A booking',
+      fields: [
+        { label: 'Name', value: 'Pat Smith' },
+        { label: 'Email', value: 'pat@example.com' },
+        { label: 'Topic', value: 'A booking' },
+        { label: 'Message', value: 'Where do we meet?' },
+        { label: 'Request ID', value: 'req-1' },
+        { label: 'Received', value: '2026-11-10T12:00:00.000Z' },
+      ],
+    });
   });
 });

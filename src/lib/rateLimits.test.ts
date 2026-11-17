@@ -32,11 +32,11 @@ describe('rateLimitPolicies', () => {
     },
   );
 
-  it("keeps the client sign-in count below the address count, so one client cannot spend an address's", () => {
+  it("keeps the address sign-in count above twice the client count, so one client straddling its window cannot spend an address's", () => {
     expect(rateLimitPolicies.sign_in_link_client.limit).toBe(10);
-    expect(rateLimitPolicies.sign_in_link.limit).toBe(20);
-    expect(rateLimitPolicies.sign_in_link_client.limit).toBeLessThan(
-      rateLimitPolicies.sign_in_link.limit,
+    expect(rateLimitPolicies.sign_in_link.limit).toBe(25);
+    expect(rateLimitPolicies.sign_in_link.limit).toBeGreaterThan(
+      2 * rateLimitPolicies.sign_in_link_client.limit,
     );
   });
 

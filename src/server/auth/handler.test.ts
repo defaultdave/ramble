@@ -18,7 +18,7 @@ vi.mock('@/server/monitoring/logger', () => ({
 // - a sign-in link request is counted against its client address, then its lower-cased address, before Better Auth sees it
 // - the 11th request from one client is refused with Retry-After, and the client limit spans addresses
 // - another client can still ask for an address one client has used up its own limit on
-// - one client at its limit leaves the address's count unspent, so another client is still allowed
+// - one client at its limit, even straddling its own window, leaves the address's count unspent, so another client is still allowed
 // - a request the client count refuses never spends the address's count
 // - a request with no usable forwarded address shares one 'unknown' client count
 // - a refused count is a 429 with Retry-After, and Better Auth never sees the request
@@ -135,7 +135,7 @@ describe('a sign-in link request', () => {
 
 describe('the client count', () => {
   const clientLimit = 10;
-  const emailLimit = 20;
+  const emailLimit = 25;
   const spent = new Map<string, number>();
   const spend = (surface: string, subject: string) => {
     const key = `${surface}:${subject}`;
@@ -188,6 +188,21 @@ describe('the client count', () => {
     }
 
     expect(spent.get('sign_in_link:guest@example.com')).toBe(clientLimit);
+  });
+
+  it('leaves the address some of its count for a client that straddles its own window', async () => {
+    for (let i = 0; i < clientLimit; i += 1) {
+      await from('203.0.113.7', 'guest@example.com');
+    }
+    for (const key of [...spent.keys()]) {
+      if (key.startsWith('sign_in_link_client:')) spent.delete(key);
+    }
+    for (let i = 0; i < clientLimit; i += 1) {
+      await from('203.0.113.7', 'guest@example.com');
+    }
+
+    expect(spent.get('sign_in_link:guest@example.com')).toBe(2 * clientLimit);
+    expect((await from('198.51.100.2', 'guest@example.com')).status).toBe(200);
   });
 
   it('shares one count among requests with no usable forwarded address', async () => {

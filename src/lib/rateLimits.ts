@@ -34,15 +34,16 @@ const trimmed = (subject: string) => subject.trim();
 // here, without a migration.
 export const rateLimitPolicies = {
   // Per destination address, so it bounds the mail sent to one address. Anyone can spend this
-  // count for an address they do not own, so it sits above `sign_in_link_client`: one client
-  // cannot spend all of it, and a guest who mistypes and retries stays well inside it.
+  // count for an address they do not own, so it sits above twice `sign_in_link_client`: the
+  // windows are fixed, so one client can straddle the end of its own window and send up to twice
+  // its limit inside one address window, and that must still leave the address some of its count.
   sign_in_link: {
-    limit: 20,
+    limit: 25,
     windowSeconds: 60 * 60,
     normalizeSubject: (subject) => subject.trim().toLowerCase(),
   },
-  // Per client address, across every destination. It is below the `sign_in_link` count, so one
-  // client alone can never use up an address's count and lock its owner out.
+  // Per client address, across every destination. Twice this is below the `sign_in_link` count,
+  // so one client alone cannot use up an address's count and lock its owner out.
   sign_in_link_client: {
     limit: 10,
     windowSeconds: 60 * 60,

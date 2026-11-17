@@ -52,7 +52,7 @@ vi.mock('@/server/monitoring/logger', () => ({
 // Inviting the owner (real Better Auth, the fake mailer):
 // - the email goes to the owner's address from the grant, carries a confirm link for a token stored only as a keyed hash, and an audit row is written
 // - the link works once: it signs the owner in as host owner of this host, and a second use is refused
-// - a person who is not this host's owner is not_found and nothing is sent; the 21st link in an hour to one address is rate_limited and sends nothing
+// - a person who is not this host's owner is not_found and nothing is sent; the 26th link in an hour to one address is rate_limited and sends nothing
 // - a failing mailer is `failed`, logs only the error kind, and the audit row already exists
 
 let fresh: FreshDatabase;
@@ -737,21 +737,21 @@ describe('inviting the owner', () => {
     ).toEqual([]);
   });
 
-  it('refuses the 21st link in an hour to one address and sends nothing more', async () => {
+  it('refuses the 26th link in an hour to one address and sends nothing more', async () => {
     const { hostId, ownerUserId } = await created({
       ownerEmail: 'busy@example.com',
     });
 
     const results: string[] = [];
-    for (let attempt = 0; attempt < 21; attempt += 1) {
+    for (let attempt = 0; attempt < 26; attempt += 1) {
       results.push(await invite.inviteHostOwner(ops, hostId, ownerUserId));
     }
 
     expect(results).toEqual([
-      ...Array.from({ length: 20 }, () => 'sent'),
+      ...Array.from({ length: 25 }, () => 'sent'),
       'rate_limited',
     ]);
-    expect(await inviteEmails('busy@example.com')).toHaveLength(20);
+    expect(await inviteEmails('busy@example.com')).toHaveLength(25);
   });
 
   it('reports a failing mailer as failed, leaves its audit row, and logs only the error kind', async () => {

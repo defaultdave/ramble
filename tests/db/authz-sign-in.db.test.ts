@@ -18,7 +18,7 @@ import {
 // - a session past its idle deadline is anonymous; so is one past 8 hours however busy; the deadline never passes the ceiling
 // - getCaller reads grants: guest only with none; host roles with their hosts; ops and admin with none; requireRole accepts and refuses them unchanged
 // - role_grants: a host role needs a host, ops and admin refuse one, a grant is unique per person, role, and host (a null host counts), and leaves with its person
-// - the 21st request in an hour for one address is 429 with Retry-After and sends nothing; spellings of one address share the count; another address is unaffected
+// - the 26th request in an hour for one address is 429 with Retry-After and sends nothing; spellings of one address share the count; another address is unaffected
 // - a malformed request is 400 and not counted
 // - the database refuses an address Zod would refuse
 
@@ -542,11 +542,11 @@ describe('role_grants constraints', () => {
 });
 
 describe('the sign-in rate limit', () => {
-  it('refuses the 21st request for an address in an hour with Retry-After and sends nothing; spellings share the count, another address does not', async () => {
+  it('refuses the 26th request for an address in an hour with Retry-After and sends nothing; spellings share the count, another address does not', async () => {
     const address = newEmail();
     const spellings = [address, address.toUpperCase(), ` ${address}`.trim()];
 
-    for (let i = 0; i < 20; i += 1) {
+    for (let i = 0; i < 25; i += 1) {
       const spelling = spellings[i % spellings.length] ?? address;
       expect((await askForLink({ email: spelling })).status).toBe(200);
     }
@@ -556,12 +556,12 @@ describe('the sign-in rate limit', () => {
     const wait = Number(refused.headers.get('retry-after'));
     expect(wait).toBeGreaterThan(3500);
     expect(wait).toBeLessThanOrEqual(3600);
-    expect(await emailsTo(address)).toHaveLength(20);
+    expect(await emailsTo(address)).toHaveLength(25);
     expect((await askForLink({ email: newEmail() })).status).toBe(200);
     const { rows } = await client.db.execute(
       sql`SELECT count FROM rate_limits WHERE key = ${`sign_in_link:${hash.sha256Hex(address)}`}`,
     );
-    expect(rows).toEqual([{ count: 21 }]);
+    expect(rows).toEqual([{ count: 26 }]);
   });
 
   it('refuses the 11th request from one client for any address, without spending the address count, while another client still gets a link', async () => {

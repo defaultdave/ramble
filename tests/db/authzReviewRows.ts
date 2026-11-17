@@ -2,8 +2,9 @@ import type { Caller } from '@/server/auth/caller';
 import { availabilityRows } from './authzAvailabilityRows';
 import { hostSettingsRows } from './authzHostSettingsRows';
 import { experiencePauseRows } from './authzPauseRows';
+import { reviewModerationRows } from './authzReviewModerationRows';
 
-// The experience-review row of the authorization matrix, kept apart so the matrix file stays under
+// The experience-review row (and the pause, host settings and review-moderation rows) of the authorization matrix, kept apart so the matrix file stays under
 // the size limit. The function is ops alone. The target is an experience that does not exist, so an
 // ops caller is let through the guard and finds nothing to decide, and every other subject is refused.
 
@@ -28,6 +29,7 @@ export function experienceReviewRows() {
     // The matrix file is at its size limit, so the pause and host settings rows ride with the review rows.
     ...experiencePauseRows(),
     ...hostSettingsRows(),
+    ...reviewModerationRows(),
   ] satisfies {
     fn: string;
     invoke: (caller: Caller, target: Target) => Promise<unknown>;

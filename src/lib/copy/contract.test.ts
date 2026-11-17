@@ -3,6 +3,7 @@ import { subjectFor, type EmailRequest } from '../email/templates';
 import { declineNotice, refusedNotice } from '../fakePayment';
 import { demoLabel } from '../pages/legal';
 import { commonCopy } from './common';
+import { reviewModerationCopy } from './reviewModeration';
 import { reviewCopy } from './review';
 import { signInCopy } from './signIn';
 
@@ -11,6 +12,7 @@ import { signInCopy } from './signIn';
 // this file and not a side effect of editing the dictionary.
 //
 // Behaviours under test, one per string:
+// - the guest reviews page's name, and the notice that says a hidden review is gone from guests' view
 // - the legal pages are labelled as demo text
 // - every email template's subject line, as a mail client shows it
 // - the payment-failure message a guest reads after a declined card, and after a refused payment
@@ -30,6 +32,15 @@ const booked = {
   experienceName: 'Pottery wheel night',
   dayLabel: 'Saturday, November 14, 2026',
 };
+
+describe('the guest reviews page', () => {
+  it('names itself and says what hiding does', () => {
+    expect(reviewModerationCopy.title).toBe('Guest reviews');
+    expect(reviewModerationCopy.notices.hidden).toBe(
+      'Review hidden. Guests no longer see it.',
+    );
+  });
+});
 
 describe('the legal demo label', () => {
   it('says demo text', () => {

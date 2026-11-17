@@ -1,0 +1,23 @@
+.stack {
+  composes: stack from '../HostSetup/HostSetup.module.css';
+}
+
+.body {
+  display: block;
+  min-width: 16rem;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.actionForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 14rem;
+}
+
+@media (min-width: 768px) {
+  .actionForm > button {
+    align-self: flex-start;
+  }
+}

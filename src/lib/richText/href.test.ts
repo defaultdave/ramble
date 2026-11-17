@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isWebUrl, safeLinkHref } from './href';
+import { isWebUrl, linkPanelStart, safeLinkHref } from './href';
 
 describe('safeLinkHref', () => {
   it.each([
@@ -58,5 +58,15 @@ describe('isWebUrl', () => {
     ['#top', false],
   ])('%s is %s', (href, expected) => {
     expect(isWebUrl(href)).toBe(expected);
+  });
+});
+
+describe('linkPanelStart', () => {
+  it.each([
+    ['the address of the link under the cursor', { href: '/help' }, '/help'],
+    ['blank when there is no link', {}, ''],
+    ['blank for an address that is not text', { href: 3 }, ''],
+  ])('is %s', (_name, attributes, expected) => {
+    expect(linkPanelStart(attributes)).toBe(expected);
   });
 });

@@ -29,6 +29,10 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 // - the audit row names the user and the article and holds no words from it
 // - publishing and unpublishing clear the help tags, and saving a draft clears nothing
 // - an empty body is stored as a draft
+// - a save from a stale tab keeps the stored status and position, so it cannot unpublish
+// - a save that would leave a published article with no text is refused
+// - a malformed id reads as nothing
+// - headings, lists and bold text survive a save and a reload
 
 let fresh: FreshDatabase;
 let stopHttp: () => Promise<void>;
@@ -178,5 +182,127 @@ describe('publishing', () => {
       created.value.id,
     );
     expect(found?.body.content).toEqual([]);
+  });
+});
+
+describe('saving with an intent', () => {
+  it('keeps the stored status and position when a stale tab saves its draft', async () => {
+    const created = await saved(
+      editorial.saveHelpArticle(ops, helpInput({ position: 4 })),
+    );
+    const edit = (status: 'draft' | 'published', position: number) => ({
+      ...helpInput({ slug: created.value.slug, status, position }),
+      id: created.value.id,
+    });
+    await saved(
+      editorial.saveHelpArticle(ops, edit('published', 4), 'publish'),
+    );
+
+    const stale = await saved(
+      editorial.saveHelpArticle(
+        ops,
+        { ...edit('draft', 0), title: 'Edited in the old tab' },
+        'save',
+      ),
+    );
+
+    expect(stale.value).toMatchObject({
+      status: 'published',
+      position: 4,
+      title: 'Edited in the old tab',
+    });
+    const rows = await auditFor(created.value.id);
+    expect(rows.at(-1)?.action).toBe('help_article.saved');
+  });
+
+  it('unpublishes only on the unpublish intent', async () => {
+    const created = await saved(
+      editorial.saveHelpArticle(ops, helpInput({ status: 'published' })),
+    );
+    const back = await saved(
+      editorial.saveHelpArticle(
+        ops,
+        {
+          ...helpInput({ slug: created.value.slug, status: 'published' }),
+          id: created.value.id,
+        },
+        'unpublish',
+      ),
+    );
+    expect(back.value.status).toBe('draft');
+  });
+
+  it('refuses a save that leaves a published article without text', async () => {
+    const created = await saved(
+      editorial.saveHelpArticle(ops, helpInput({ status: 'published' })),
+    );
+    const result = await editorial.saveHelpArticle(
+      ops,
+      {
+        ...helpInput({
+          slug: created.value.slug,
+          status: 'draft',
+          body: { type: 'doc', content: [] } as never,
+        }),
+        id: created.value.id,
+      },
+      'save',
+    );
+    expect(result.status).toBe('empty_body');
+    const found = await editorial.getHelpArticleForEditing(
+      ops,
+      created.value.id,
+    );
+    expect(found?.status).toBe('published');
+  });
+});
+
+describe('reading with a malformed id', () => {
+  it('is nothing, not a database error', async () => {
+    expect(await editorial.getHelpArticleForEditing(ops, 'nope')).toBeNull();
+  });
+});
+
+describe('what the editor stores', () => {
+  it('returns headings, lists and bold text as saved', async () => {
+    const body = {
+      type: 'doc',
+      content: [
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Refunds' }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'Plain ' },
+            { type: 'text', text: 'bold words', marks: [{ type: 'bold' }] },
+          ],
+        },
+        {
+          type: 'orderedList',
+          content: [
+            {
+              type: 'listItem',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'One' }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const created = await saved(
+      editorial.saveHelpArticle(ops, helpInput({ body: body as never })),
+    );
+    const found = await editorial.getHelpArticleForEditing(
+      ops,
+      created.value.id,
+    );
+    expect(found?.body).toEqual(body);
   });
 });

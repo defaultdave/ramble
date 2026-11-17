@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  auditFor,
   buildEntryRows,
+  entryRedirect,
+  parseBody,
+  saveLabel,
+  toggleIntent,
   entryAuditAction,
   entryAuditEntry,
   entryPath,
@@ -17,6 +22,11 @@ import { parseAuditEntry } from './audit';
 // - a form with a blank slug takes it from the title, and a refused form names its fields
 // - a form with no known intent, a broken body, or an oversized field changes nothing
 // - the notice names what the click did
+// - a blank address keeps the stored one on an existing article and is made from the title for a new one
+// - a body that is not JSON is passed on as text for the schema to refuse, never swallowed
+// - the editor's heading, list and bold text reach the saved input whole
+// - each outcome of a save has one destination, and the list shows the missing-article notice
+// - the seed (no user) writes no audit row, a person writes one
 // - the audit action says what happened to the article, and its row holds ids, never words
 // - a row shows the status and the time the way the other ops lists do
 
@@ -200,5 +210,142 @@ describe('buildEntryRows and entryPath', () => {
     expect(row).toMatchObject({ id, slug: 'cancel', status: 'published' });
     expect(row?.updatedLabel).toContain('10:00');
     expect(entryPath(id)).toBe(`/ops/editorial/${id}`);
+  });
+});
+
+describe('parseBody', () => {
+  it.each([
+    ['nothing', undefined, undefined],
+    ['JSON', '{"a":1}', { a: 1 }],
+    ['text that is not JSON, as it is', '{oops', '{oops'],
+  ])('reads %s', (_name, raw, expected) => {
+    expect(parseBody(raw)).toEqual(expected);
+  });
+});
+
+describe('a blank address', () => {
+  it('keeps the stored address of an existing article', () => {
+    expect(
+      parseEntryForm(
+        form({ ...base, id, slug: '', currentSlug: 'cancel-a-trip' }),
+      ),
+    ).toMatchObject({ ok: true, value: { input: { slug: 'cancel-a-trip' } } });
+  });
+
+  it('is made from the title for a new article, whatever the form carries', () => {
+    expect(
+      parseEntryForm(form({ ...base, slug: '', currentSlug: 'cancel-a-trip' })),
+    ).toMatchObject({ value: { input: { slug: 'how-to-cancel' } } });
+  });
+
+  it('gives way to a typed address', () => {
+    expect(
+      parseEntryForm(
+        form({ ...base, id, slug: 'new-one', currentSlug: 'old' }),
+      ),
+    ).toMatchObject({ value: { input: { slug: 'new-one' } } });
+  });
+});
+
+describe('what the editor writes', () => {
+  it('reaches the saved input whole: heading, bulleted list and bold text', () => {
+    const typed = {
+      type: 'doc',
+      content: [
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Refunds' }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'Plain ' },
+            { type: 'text', text: 'bold words', marks: [{ type: 'bold' }] },
+          ],
+        },
+        {
+          type: 'bulletList',
+          content: [
+            {
+              type: 'listItem',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'One' }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const parsed = parseEntryForm(
+      form({ ...base, body: JSON.stringify(typed) }),
+    );
+    expect(parsed).toMatchObject({ ok: true });
+    if (parsed.ok) expect(parsed.value.input.body).toEqual(typed);
+  });
+});
+
+describe('entryRedirect', () => {
+  it.each([
+    [
+      null,
+      { status: 'invalid', fields: ['title'] },
+      '/ops/editorial/new?notice=invalid&fields=title',
+    ],
+    [
+      id,
+      { status: 'invalid', fields: [] },
+      `/ops/editorial/${id}?notice=invalid`,
+    ],
+    [
+      null,
+      { status: 'slug_taken' },
+      '/ops/editorial/new?notice=slug_taken&fields=slug',
+    ],
+    [
+      id,
+      { status: 'empty_body' },
+      `/ops/editorial/${id}?notice=invalid&fields=body`,
+    ],
+    [id, { status: 'not_found' }, '/ops/editorial?notice=not_found'],
+    [
+      null,
+      { status: 'saved', id, intent: 'publish' },
+      `/ops/editorial/${id}?notice=published`,
+    ],
+    [
+      id,
+      { status: 'saved', id, intent: 'save' },
+      `/ops/editorial/${id}?notice=saved`,
+    ],
+  ] as const)('%s with %j goes to %s', (postedId, outcome, href) => {
+    expect(entryRedirect(postedId, outcome)).toBe(href);
+  });
+});
+
+describe('auditFor', () => {
+  it('writes no row for the seed, which saves as no one', () => {
+    expect(auditFor(null, undefined, 'published', id)).toBeNull();
+  });
+
+  it('names the user and what the save did', () => {
+    expect(auditFor('u1', 'published', 'draft', id)).toMatchObject({
+      action: 'help_article.unpublished',
+      subjectId: id,
+    });
+  });
+});
+
+describe('the form buttons', () => {
+  it.each([
+    [undefined, 'Save draft', 'publish'],
+    ['draft', 'Save draft', 'publish'],
+    ['published', 'Save changes', 'unpublish'],
+  ] as const)('on a %s entry: %s and %s', (status, label, intent) => {
+    expect(saveLabel(status)).toBe(label);
+    expect(toggleIntent(status)).toBe(intent);
   });
 });

@@ -3,7 +3,12 @@ import { Input } from '@/components/Input';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { Textarea } from '@/components/Textarea';
 import { editorialLimits, type HelpArticle } from '@/lib/editorial';
-import { entryFieldProblems, type EntryFormField } from '@/lib/editorialAdmin';
+import {
+  entryFieldProblems,
+  saveLabel,
+  toggleIntent,
+  type EntryFormField,
+} from '@/lib/editorialAdmin';
 import { errorProps } from '@/lib/opsForm';
 import type { RichTextDoc } from '@/lib/richText/format';
 import styles from './EditorialAdmin.module.css';
@@ -24,12 +29,15 @@ const emptyBody: RichTextDoc = { type: 'doc', content: [] };
  * article down. The form posts to the action; only the body editor needs script.
  */
 export function EntryForm({ entry, problems, save }: EntryFormProps) {
-  const published = entry?.status === 'published';
+  const intent = toggleIntent(entry?.status);
   return (
     <form action={save} className={styles.form}>
       {entry ? <input type="hidden" name="id" value={entry.id} /> : null}
       <input type="hidden" name="status" value={entry?.status ?? 'draft'} />
       <input type="hidden" name="position" value={entry?.position ?? 0} />
+      {entry ? (
+        <input type="hidden" name="currentSlug" value={entry.slug} />
+      ) : null}
       <Input
         name="title"
         label="Title"
@@ -42,7 +50,7 @@ export function EntryForm({ entry, problems, save }: EntryFormProps) {
       <Input
         name="slug"
         label="Address"
-        hint="The last part of the page address. Leave it blank to make it from the title."
+        hint="The last part of the page address. Leave it blank to keep the current one, or to make it from the title for a new article."
         defaultValue={entry?.slug ?? ''}
         maxLength={editorialLimits.slug}
         autoComplete="off"
@@ -66,15 +74,10 @@ export function EntryForm({ entry, problems, save }: EntryFormProps) {
       />
       <div className={styles.actions}>
         <Button type="submit" name="intent" value="save">
-          {published ? 'Save changes' : 'Save draft'}
+          {saveLabel(entry?.status)}
         </Button>
-        <Button
-          type="submit"
-          name="intent"
-          value={published ? 'unpublish' : 'publish'}
-          variant="secondary"
-        >
-          {published ? 'Unpublish' : 'Publish'}
+        <Button type="submit" name="intent" value={intent} variant="secondary">
+          {intent === 'unpublish' ? 'Unpublish' : 'Publish'}
         </Button>
       </div>
     </form>

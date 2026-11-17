@@ -605,7 +605,6 @@ function sanitizeBlocks(
   flushLooseInline();
 }
 
-// TODO(U-076a): first caller, through `richTextSchema` in the editor's save action.
 /**
  * Narrows any value to the rich-text format and reports what it had to change. Never
  * throws. Unknown nodes and marks are dropped (their text stays), headings are clamped to

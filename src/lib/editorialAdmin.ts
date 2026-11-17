@@ -10,6 +10,7 @@ import { defaultHostTimeZone } from './hostSetup';
 import {
   fieldsFromIssues,
   formText,
+  noticeHref,
   oversizedFields,
   parseIdField,
   type FormGetter,
@@ -69,18 +70,21 @@ export type EntryForm =
 
 const rawFieldLimit = 1000;
 
-function parseBody(raw: string | undefined): unknown {
+/** The posted body as JSON; text that is not JSON goes on as it is, so the schema refuses it and names the field. */
+export function parseBody(raw: string | undefined): unknown {
   if (raw === undefined) return undefined;
   try {
     return JSON.parse(raw);
   } catch {
-    return undefined;
+    return raw;
   }
 }
 
 /**
- * The posted entry form. A blank slug is made from the title, a form carries the status and
- * position the entry has now, and a refused form names the fields to look at and changes nothing.
+ * The posted entry form. A blank slug keeps the address the entry has, or is made from the title
+ * for a new one. The status and position a form carries are only what it was opened with: the
+ * save settles them against the stored row (`saveHelpArticle`). A refused form names the fields
+ * to look at and changes nothing.
  */
 export function parseEntryForm(get: FormGetter): EntryForm {
   const textFields = ['title', 'slug', 'summary'] as const;
@@ -99,10 +103,14 @@ export function parseEntryForm(get: FormGetter): EntryForm {
   if (intent === null) return { ok: false, fields: [] };
   const current = pickKnown(formText(get, 'status'), publishStatuses, 'draft');
   const title = formText(get, 'title');
-  const slug = formText(get, 'slug') ?? slugify(title ?? '');
+  const id = parseIdField(get('id')) ?? undefined;
+  const slug =
+    formText(get, 'slug') ??
+    (id === undefined ? undefined : formText(get, 'currentSlug')) ??
+    slugify(title ?? '');
 
   const parsed = HelpArticleInputSchema.safeParse({
-    id: parseIdField(get('id')) ?? undefined,
+    id,
     slug,
     title,
     summary: formText(get, 'summary') ?? null,
@@ -130,6 +138,34 @@ export const entryNoticeCodes = [
   'not_found',
   'invalid',
 ] as const;
+/** What the action did with a posted form, for `entryRedirect`. */
+export type EntryOutcome =
+  | { status: 'invalid'; fields: readonly EntryFormField[] }
+  | { status: 'saved'; id: string; intent: EntryIntent }
+  | { status: 'slug_taken' }
+  | { status: 'empty_body' }
+  | { status: 'not_found' };
+
+/** Where each outcome sends the editor: the edit page with what the click did, the form it came from with the fields to look at, or the list for an article that is gone. */
+export function entryRedirect(
+  postedId: string | null,
+  outcome: EntryOutcome,
+): string {
+  const here = postedId === null ? newEntryPath : entryPath(postedId);
+  switch (outcome.status) {
+    case 'invalid':
+      return noticeHref(here, 'invalid', outcome.fields);
+    case 'slug_taken':
+      return noticeHref(here, 'slug_taken', ['slug']);
+    case 'empty_body':
+      return noticeHref(here, 'invalid', ['body']);
+    case 'not_found':
+      return noticeHref(editorialPath, 'not_found');
+    case 'saved':
+      return noticeHref(entryPath(outcome.id), savedNotice(outcome.intent));
+  }
+}
+
 export type EntryNoticeCode = (typeof entryNoticeCodes)[number];
 
 export const entryNotices = {
@@ -188,6 +224,17 @@ export function entryAuditAction(
   return 'help_article.saved';
 }
 
+/** The audit row for a save by this caller, or none: the seed saves articles as no one, and each run would add rows to a log the reset keeps. */
+export function auditFor(
+  userId: string | null,
+  before: PublishStatus | undefined,
+  after: PublishStatus,
+  articleId: string,
+): AuditEntryInput | null {
+  if (userId === null) return null;
+  return entryAuditEntry(userId, entryAuditAction(before, after), articleId);
+}
+
 /** One row per save. The text is not written: the audit log holds ids and codes, never words. */
 export function entryAuditEntry(
   userId: string,
@@ -200,4 +247,18 @@ export function entryAuditEntry(
     subjectKind: 'help_article',
     subjectId: articleId,
   };
+}
+
+// ---- Small decisions the form components share ----
+
+/** The label of the save button: a published article keeps its status, so the save is plain "Save changes". */
+export function saveLabel(status: PublishStatus | undefined): string {
+  return status === 'published' ? 'Save changes' : 'Save draft';
+}
+
+/** The intent of the second button: take a published article down, or publish a draft. */
+export function toggleIntent(
+  status: PublishStatus | undefined,
+): Extract<EntryIntent, 'publish' | 'unpublish'> {
+  return status === 'published' ? 'unpublish' : 'publish';
 }

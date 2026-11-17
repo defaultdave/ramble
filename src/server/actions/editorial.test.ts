@@ -89,6 +89,7 @@ describe('saveEntryAction', () => {
       expect(mocks.saveHelpArticle).toHaveBeenCalledWith(
         ops,
         expect.objectContaining({ id, status, slug: 'how-to-cancel' }),
+        intent,
       );
     },
   );
@@ -100,10 +101,19 @@ describe('saveEntryAction', () => {
     });
   });
 
-  it('sends a missing entry to the list', async () => {
+  it('sends a missing entry to the list with its notice', async () => {
     mocks.saveHelpArticle.mockResolvedValue({ status: 'not_found' });
     await expect(
       saveEntryAction(form({ ...fields, id })),
-    ).rejects.toMatchObject({ href: '/ops/editorial' });
+    ).rejects.toMatchObject({ href: '/ops/editorial?notice=not_found' });
+  });
+
+  it('sends a body left empty on a published entry back to the form', async () => {
+    mocks.saveHelpArticle.mockResolvedValue({ status: 'empty_body' });
+    await expect(
+      saveEntryAction(form({ ...fields, id })),
+    ).rejects.toMatchObject({
+      href: `/ops/editorial/${id}?notice=invalid&fields=body`,
+    });
   });
 });

@@ -2,10 +2,10 @@
 
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { useId, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
-import { safeLinkHref } from '@/lib/richText/href';
+import { linkPanelStart, safeLinkHref } from '@/lib/richText/href';
 import { sanitizeRichText } from '@/lib/richText/sanitize';
 import type { RichTextDoc } from '@/lib/richText/format';
 import styles from './RichTextEditor.module.css';
@@ -35,6 +35,8 @@ export function RichTextEditor({
 }: RichTextEditorProps) {
   const labelId = useId();
   const errorId = useId();
+  const linkErrorId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
   const [value, setValue] = useState(() =>
     JSON.stringify(sanitizeRichText(initial)),
   );
@@ -63,7 +65,9 @@ export function RichTextEditor({
         role: 'textbox',
         'aria-multiline': 'true',
         'aria-labelledby': labelId,
-        ...(errorText ? { 'aria-describedby': errorId } : {}),
+        ...(errorText
+          ? { 'aria-describedby': errorId, 'aria-invalid': 'true' }
+          : {}),
       },
     },
     onUpdate: ({ editor: updated }) => {
@@ -85,14 +89,16 @@ export function RichTextEditor({
     }),
   });
 
+  const panelOpen = linkHref !== null;
+  // Opening the panel puts the keyboard in its address field.
+  useEffect(() => {
+    if (panelOpen) panelRef.current?.querySelector('input')?.focus();
+  }, [panelOpen]);
+
   function openLink() {
     if (!editor) return;
     setLinkError(false);
-    setLinkHref(
-      typeof editor.getAttributes('link').href === 'string'
-        ? (editor.getAttributes('link').href as string)
-        : '',
-    );
+    setLinkHref(linkPanelStart(editor.getAttributes('link')));
   }
 
   function applyLink() {
@@ -104,6 +110,12 @@ export function RichTextEditor({
     }
     editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
     setLinkHref(null);
+  }
+
+  // The panel unmounts with focus inside it, so focus goes back to the text being edited.
+  function cancelLink() {
+    setLinkHref(null);
+    editor?.commands.focus();
   }
 
   function removeLink() {
@@ -131,7 +143,7 @@ export function RichTextEditor({
     },
     {
       label: 'Link',
-      pressed: active?.link,
+      expanded: panelOpen,
       run: openLink,
     },
     {
@@ -166,13 +178,16 @@ export function RichTextEditor({
       <span className={styles.label} id={labelId}>
         {label}
       </span>
-      <div className={styles.toolbar} role="toolbar" aria-label="Formatting">
+      {/* A labelled group, not role="toolbar": every button is a Tab stop, with no arrow-key roving a toolbar promises. */}
+      <div className={styles.toolbar} role="group" aria-label="Formatting">
         {tools.map((tool) => (
           <Button
             key={tool.label}
             type="button"
             variant="secondary"
-            aria-pressed={tool.pressed ?? false}
+            {...(tool.expanded === undefined
+              ? { 'aria-pressed': tool.pressed ?? false }
+              : { 'aria-expanded': tool.expanded })}
             disabled={!editor}
             onClick={tool.run}
           >
@@ -181,7 +196,7 @@ export function RichTextEditor({
         ))}
       </div>
       {linkHref === null ? null : (
-        <div className={styles.link}>
+        <div className={styles.link} ref={panelRef}>
           <Input
             label="Link address"
             type="text"
@@ -193,8 +208,15 @@ export function RichTextEditor({
               setLinkError(false);
             }}
             onKeyDown={linkKeyDown}
-            {...(linkError ? { errorText: linkProblem } : {})}
+            {...(linkError
+              ? { 'aria-invalid': true, 'aria-describedby': linkErrorId }
+              : {})}
           />
+          {linkError ? (
+            <p className={styles.error} id={linkErrorId} role="alert">
+              {linkProblem}
+            </p>
+          ) : null}
           <div className={styles.linkActions}>
             <Button type="button" onClick={applyLink}>
               Apply link
@@ -202,13 +224,7 @@ export function RichTextEditor({
             <Button type="button" variant="secondary" onClick={removeLink}>
               Remove link
             </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                setLinkHref(null);
-              }}
-            >
+            <Button type="button" variant="ghost" onClick={cancelLink}>
               Cancel
             </Button>
           </div>
@@ -227,7 +243,7 @@ export function RichTextEditor({
         )}
       </div>
       {errorText ? (
-        <p className={styles.error} id={errorId}>
+        <p className={styles.error} id={errorId} role="alert">
           {errorText}
         </p>
       ) : null}

@@ -665,7 +665,7 @@ flowchart TD
 | EntryForm | server | [src/components/EditorialAdmin/EntryForm.tsx](../../components/EditorialAdmin/EntryForm.tsx) | Title, address, summary, body. Save and publish, or save and unpublish, are two submit buttons on one form. |
 | RichTextEditor | client | [src/components/RichTextEditor/RichTextEditor.tsx](../../components/RichTextEditor/RichTextEditor.tsx) | Tiptap on the format in `src/lib/richText`. Writes the sanitized document into a hidden field. Imported only here, so no guest page loads Tiptap. |
 | Button | client | [src/components/Button/Button.tsx](../../components/Button/Button.tsx) | Every submit button. |
-| saveEntryAction | action | [src/server/actions/editorial.ts](../../server/actions/editorial.ts) | `saveHelpArticle`: one audit row in the same transaction (created, saved, published or unpublished; ids only), then `updateTag` for what guests could see before and after. |
+| saveEntryAction | action | [src/server/actions/editorial.ts](../../server/actions/editorial.ts) | `saveHelpArticle`: one audit row in the same transaction (created, saved, published or unpublished; ids only), then `updateTag` for what guests could see before and after. A save keeps the stored status and position (a stale tab cannot unpublish), and a missing article returns to the list with a notice. |
 
 ## Arrival order
 
@@ -713,7 +713,7 @@ Ops pages hold no cache of their own. Their changes reach the guest side through
 | Cancel a session (`cancelOpsSessionAction`, and each step of `pauseOpsExperienceAction`) | `session:id` and `experience:id` | After one stale response, through `revalidateTag` with `max` |
 | Pause from the session page (`pauseOpsExperienceAction`, the pause itself) | The listing tags, as the pause above | At once, through `updateTag` |
 | Cancel a booking (`cancelBookingAction`) | `session:id`, only if it was cancelled | After one stale response, through `revalidateTag` with `max` |
-| Save, publish or unpublish a help article (`saveEntryAction`) | Only when guests could see the article before or after: `help-articles` and the article's own tag. Saving a draft that stays a draft clears nothing | At once, through `updateTag` |
+| Save, publish or unpublish a help article (`saveEntryAction`) | Only when guests could see the article before or after: `help-articles` only (there is no per-article tag). Saving a draft that stays a draft clears nothing | At once, through `updateTag` |
 | Reject a review, create an experience (`rejectExperienceAction`, `createExperienceAction`) | Nothing, because the experience is never guest-visible | Not applicable |
 | Edit a host, accept the agreement, invites (`updateHostAction`, `acceptHostAgreementAction`, `resendHostInviteAction`, `createHostAction`) | Nothing | A host name or about edit shows when the `catalog` profile runs out |
 | Refund, retry, resend, void links (`refundBookingAction`, `retryRefundAction`, `resendConfirmationAction`, `voidLinksAction`) | Nothing | Not applicable |

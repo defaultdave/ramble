@@ -35,3 +35,8 @@ export function safeLinkHref(value: unknown): string | null {
 export function isWebUrl(href: string): boolean {
   return /^https?:/i.test(href);
 }
+
+/** The text a link panel opens with: the address of the link under the cursor, or blank. */
+export function linkPanelStart(attributes: { href?: unknown }): string {
+  return typeof attributes.href === 'string' ? attributes.href : '';
+}

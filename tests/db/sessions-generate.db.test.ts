@@ -3,8 +3,10 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { anonymousCaller, ForbiddenError } from '@/server/auth/caller';
 import { hosts, sessions } from '@/server/db/schema';
 import {
+  backendPid,
   createFreshDatabase,
   serveNeonHttp,
+  waitUntilBlocked,
   type FreshDatabase,
 } from './harness';
 import {
@@ -21,7 +23,8 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 // - generation lists the weekday's dates in the host's zone with the template's allocation and
 //   source, holds the wall time across a clock change, and records the zone it used
 // - generation is idempotent: a rerun, an overlapping range, two runs at once, and a changed host
-//   zone create no duplicate; an edited or cancelled session is not rebuilt
+//   zone create no duplicate; an edited or cancelled session is not rebuilt, even by a run that starts
+//   while the edit is still uncommitted: the run waits for the edit and leaves what it wrote
 // - generation skips dates that start at or before now, and reports a bad host zone, a missing
 //   template, and a refused caller without writing
 
@@ -226,6 +229,41 @@ describe('generateSessions', () => {
     expect(stored[1]).toMatchObject({
       status: 'cancelled',
       cancelReason: 'host',
+    });
+  });
+
+  it('waits for a capacity edit still in flight, then leaves the edited session as the edit wrote it', async () => {
+    const { experience, owner } = await setup();
+    const template = await createTemplate(experience.id, {}, owner);
+    const input = { templateId: template.id, ...range };
+    await sessionData.generateSessions(owner, input, earlyNow);
+    const [edited] = await sessionsOf(template.id);
+    if (!edited) throw new Error('expected a session');
+    const editing = await client.db.$client.connect();
+    try {
+      await editing.query('BEGIN');
+      await editing.query(
+        'UPDATE sessions SET allocation = 3, version = version + 1 WHERE id = $1',
+        [edited.id],
+      );
+      const pending = sessionData.generateSessions(owner, input, earlyNow);
+      await waitUntilBlocked(client.db.$client, {
+        blockedBy: await backendPid(editing),
+      });
+      await editing.query('COMMIT');
+
+      await expect(pending).resolves.toMatchObject({
+        ok: true,
+        created: [],
+        alreadyExisted: 4,
+      });
+    } finally {
+      editing.release();
+    }
+    expect((await sessionsOf(template.id))[0]).toMatchObject({
+      id: edited.id,
+      allocation: 3,
+      version: 2,
     });
   });
 

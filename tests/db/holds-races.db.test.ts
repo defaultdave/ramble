@@ -37,7 +37,8 @@ vi.mock('@/server/db/client', async () =>
 //   re-check is removed)
 // - the device lock comes before the session lock: while a second connection holds the device lock,
 //   the reserve waits and a third connection can still take the session row with NOWAIT
-// - a capacity edit and a release re-check what they read once they hold the locks
+// - a capacity edit and a release re-check what they read once they hold the locks, and a capacity edit
+//   that waited stops counting a paying hold whose deadline lapsed meanwhile
 // - a hold's created_at and updated_at come from a time read after the lock wait
 // - reserve, release, and capacity edit on one session in parallel, 50 rounds: no deadlock, no error, and
 
@@ -269,6 +270,35 @@ describe('a capacity edit and a release that waited for the session lock', () =>
       seatsSold: 0,
       heldSeats: 3,
     });
+  });
+
+  it('stop counting a paying hold whose deadline lapsed meanwhile', async () => {
+    const bookable = await seedBookable(client.db, { allocation: 8 });
+    await insertHold(client.db, bookable.session.id, {
+      deviceKey: hash('e'),
+      ipHash: hash('f'),
+      seats: 3,
+      status: 'paying',
+      createdAt: sql`now() - interval '30 minutes'`,
+      payingUntil: sql`now() + interval '1 hour'`,
+    });
+
+    const answer = await raceAgainstOpenTransaction(
+      async (tx) => {
+        await lockSession(tx, bookable.session.id);
+        await tx.execute(
+          sql`UPDATE holds SET paying_until = now() - interval '1 minute' WHERE session_id = ${bookable.session.id}`,
+        );
+      },
+      () =>
+        sessionData.updateSessionAllocation(ops, {
+          sessionId: bookable.session.id,
+          allocation: 2,
+          expectedVersion: 1,
+        }),
+    );
+
+    expect(answer).toMatchObject({ ok: true, session: { allocation: 2 } });
   });
 
   it('see a hold that moved to paying meanwhile, and refuse to release it', async () => {

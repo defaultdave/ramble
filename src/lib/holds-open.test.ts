@@ -13,7 +13,8 @@ import {
   unbookableSession,
 } from './holds';
 import { maxAllocation } from './sessions';
-import { at, later, active } from './holds.fixtures';
+import { active } from './holds.fixtures';
+import { at, msFrom } from './testClock';
 
 // Behaviours under test, one per decision, branch or risk:
 // - isOpenHold: active before its deadline, paying before its deadline, a deadline equal to `at` is
@@ -28,30 +29,30 @@ import { at, later, active } from './holds.fixtures';
 
 describe('isOpenHold', () => {
   it.each([
-    ['active before its deadline', active(later(1)), true],
+    ['active before its deadline', active(msFrom(1)), true],
     ['active at its deadline', active(at), false],
-    ['active after its deadline', active(later(-1)), false],
+    ['active after its deadline', active(msFrom(-1)), false],
     [
       'paying before paying_until, though expires_at has passed',
-      { status: 'paying', expiresAt: later(-60_000), payingUntil: later(1) },
+      { status: 'paying', expiresAt: msFrom(-60_000), payingUntil: msFrom(1) },
       true,
     ],
     [
       'paying at paying_until',
-      { status: 'paying', expiresAt: later(-60_000), payingUntil: at },
+      { status: 'paying', expiresAt: msFrom(-60_000), payingUntil: at },
       false,
     ],
     [
       'paying with no deadline',
-      { status: 'paying', expiresAt: later(60_000), payingUntil: null },
+      { status: 'paying', expiresAt: msFrom(60_000), payingUntil: null },
       false,
     ],
     [
       'converted',
       {
         status: 'converted',
-        expiresAt: later(60_000),
-        payingUntil: later(60_000),
+        expiresAt: msFrom(60_000),
+        payingUntil: msFrom(60_000),
       },
       false,
     ],
@@ -59,8 +60,8 @@ describe('isOpenHold', () => {
       'released',
       {
         status: 'released',
-        expiresAt: later(60_000),
-        payingUntil: later(60_000),
+        expiresAt: msFrom(60_000),
+        payingUntil: msFrom(60_000),
       },
       false,
     ],
@@ -71,16 +72,21 @@ describe('isOpenHold', () => {
 
 describe('spacesLeft and openHeldSeats', () => {
   const holds = [
-    { ...active(later(1)), seats: 2 },
+    { ...active(msFrom(1)), seats: 2 },
     { ...active(at), seats: 5 },
-    { status: 'paying', expiresAt: later(-1), payingUntil: later(1), seats: 3 },
     {
       status: 'paying',
-      expiresAt: later(-1),
-      payingUntil: later(-1),
+      expiresAt: msFrom(-1),
+      payingUntil: msFrom(1),
+      seats: 3,
+    },
+    {
+      status: 'paying',
+      expiresAt: msFrom(-1),
+      payingUntil: msFrom(-1),
       seats: 4,
     },
-    { status: 'released', expiresAt: later(1), payingUntil: null, seats: 1 },
+    { status: 'released', expiresAt: msFrom(1), payingUntil: null, seats: 1 },
   ] as const;
 
   it('counts the seats of open holds only', () => {
@@ -202,7 +208,7 @@ describe('reserveRefusal', () => {
   const open = {
     experienceStatus: 'live',
     sessionStatus: 'scheduled',
-    startsAt: later(1),
+    startsAt: msFrom(1),
   } as const;
 
   it('lets a scheduled session of a live experience that starts later through', () => {
@@ -227,13 +233,13 @@ describe('reserveRefusal', () => {
 
       expect(reserveRefusal({ ...open, sessionStatus }, at)).toEqual(expected);
       expect(
-        reserveRefusal({ ...open, sessionStatus, startsAt: later(-1) }, at),
+        reserveRefusal({ ...open, sessionStatus, startsAt: msFrom(-1) }, at),
       ).toEqual(expected);
     },
   );
 
   it.each([0, -1])('answers a start %s ms from now as past', (offset) => {
-    expect(reserveRefusal({ ...open, startsAt: later(offset) }, at)).toEqual({
+    expect(reserveRefusal({ ...open, startsAt: msFrom(offset) }, at)).toEqual({
       status: 'unavailable',
       reason: 'past',
     });

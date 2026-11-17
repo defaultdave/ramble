@@ -9,6 +9,7 @@ import {
   refundPathReasons,
   type ConfirmDecisionInput,
 } from './confirmOrder';
+import { at, minutesFrom } from './testClock';
 
 // Behaviours under test, one per decision, branch, or risk:
 // - an order already confirmed is left alone, whatever the payment says
@@ -19,9 +20,6 @@ import {
 // - a payment mismatch is the reason that raises an alert
 // - the seat-count CHECK is told apart from any other refusal, through the wrapping query error
 // - the fake gateway's money is simulated, Stripe's is not
-
-const at = new Date('2026-11-01T12:00:00Z');
-const minute = 60_000;
 
 function input(
   change: {
@@ -56,8 +54,8 @@ function input(
             hold: {
               status: 'paying',
               seats: 2,
-              expiresAt: new Date(at.getTime() - 20 * minute),
-              payingUntil: new Date(at.getTime() + 5 * minute),
+              expiresAt: minutesFrom(-20),
+              payingUntil: minutesFrom(5),
               ...change.hold,
             },
             openHeldSeats: change.openHeldSeats ?? 2,
@@ -128,7 +126,7 @@ describe('confirmDecision', () => {
   );
 
   it('confirms an active hold before its expiry and a paying hold before its deadline', () => {
-    const future = new Date(at.getTime() + minute);
+    const future = minutesFrom(1);
     expect(
       confirmDecision(
         input({

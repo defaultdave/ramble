@@ -8,9 +8,6 @@ export const holdId = '3f2504e0-4f89-41d3-9a0c-0305e82c3301';
 export const termsId = '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d';
 export const waiverId = '1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed';
 export const sessionId = '6ba7b810-9dad-41d1-80b4-00c04fd430c8';
-export const at = new Date('2026-11-01T12:00:00.000Z');
-export const minutes = (count: number) =>
-  new Date(at.getTime() + count * 60_000);
 
 export const validInput: StartPaymentInput = {
   holdId,

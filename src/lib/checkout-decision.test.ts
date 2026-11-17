@@ -7,7 +7,8 @@ import {
   type DecisionState,
 } from './checkout';
 import { maxFailedTries, paymentLimits } from './payments';
-import { holdId, sessionId, at, minutes, attempt } from './checkout.fixtures';
+import { holdId, sessionId, attempt } from './checkout.fixtures';
+import { at, minutesFrom } from './testClock';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the decision, in order: unknown hold (missing, another device's, a gift hold, moved session, cancelled
@@ -22,7 +23,7 @@ const baseHold = {
   purpose: 'booking' as const,
   status: 'active' as const,
   seats: 2,
-  expiresAt: minutes(5),
+  expiresAt: minutesFrom(5),
   payingUntil: null,
 };
 
@@ -33,7 +34,7 @@ const baseState = (change: Partial<DecisionState> = {}): DecisionState => ({
   subject: {
     experienceStatus: 'live',
     sessionStatus: 'scheduled',
-    startsAt: minutes(60 * 24),
+    startsAt: minutesFrom(60 * 24),
   },
   order: null,
   latestAttempt: null,
@@ -163,7 +164,7 @@ describe('the decision', () => {
     expect(
       startPaymentDecision(
         baseState({
-          hold: { ...baseHold, status: 'paying', payingUntil: minutes(-1) },
+          hold: { ...baseHold, status: 'paying', payingUntil: minutesFrom(-1) },
           order: { status: 'pending_payment' },
           latestAttempt: attempt({ providerPaymentId: 'pay_1' }),
         }),
@@ -184,7 +185,7 @@ describe('the decision', () => {
 
   it.each([
     ['a cancelled session', { sessionStatus: 'cancelled' as const }],
-    ['a session that has started', { startsAt: minutes(-1) }],
+    ['a session that has started', { startsAt: minutesFrom(-1) }],
     [
       'an experience that is no longer live',
       { experienceStatus: 'paused' as const },
@@ -196,7 +197,7 @@ describe('the decision', () => {
           subject: {
             experienceStatus: 'live',
             sessionStatus: 'scheduled',
-            startsAt: minutes(60),
+            startsAt: minutesFrom(60),
             ...subject,
           },
         }),
@@ -207,7 +208,7 @@ describe('the decision', () => {
   it.each([
     [
       'an active hold past its expiry',
-      { status: 'active' as const, expiresAt: minutes(-1) },
+      { status: 'active' as const, expiresAt: minutesFrom(-1) },
     ],
     [
       'an active hold expiring now',
@@ -217,8 +218,8 @@ describe('the decision', () => {
       'a paying hold past its deadline',
       {
         status: 'paying' as const,
-        expiresAt: minutes(-9),
-        payingUntil: minutes(-1),
+        expiresAt: minutesFrom(-9),
+        payingUntil: minutesFrom(-1),
       },
     ],
     ['a released hold', { status: 'released' as const }],
@@ -240,8 +241,8 @@ describe('the decision', () => {
           hold: {
             ...baseHold,
             status: 'paying',
-            expiresAt: minutes(-3),
-            payingUntil: minutes(2),
+            expiresAt: minutesFrom(-3),
+            payingUntil: minutesFrom(2),
           },
         }),
       ).kind,

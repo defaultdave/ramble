@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { at } from '@/lib/testClock';
 import { testDevice } from '../../../tests/deviceFixture';
 
 const mocks = vi.hoisted(() => ({
@@ -58,9 +59,7 @@ beforeEach(() => {
   mocks.checkBot.mockResolvedValue('human');
   mocks.consumeRateLimit.mockResolvedValue({ allowed: true, remaining: 29 });
   mocks.reserveSpacesRow.mockResolvedValue(held);
-  mocks.currentDatabaseTime.mockResolvedValue(
-    new Date('2026-11-01T12:00:00.000Z'),
-  );
+  mocks.currentDatabaseTime.mockResolvedValue(at);
 });
 
 describe('the reserve action', () => {

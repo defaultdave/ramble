@@ -11,7 +11,8 @@ import {
   pickAlternatives,
   type HoldTimes,
 } from './holds';
-import { at, later, active, uuid, otherUuid } from './holds.fixtures';
+import { active, uuid, otherUuid } from './holds.fixtures';
+import { at, msFrom } from './testClock';
 
 // Behaviours under test, one per decision, branch or risk:
 // - decideRelease: missing, another device's, another session's, and converted answer alike; paying is
@@ -32,7 +33,7 @@ describe('results', () => {
       },
     ];
     const result = heldResult(
-      { id: uuid, expiresAt: later(600_000) },
+      { id: uuid, expiresAt: msFrom(600_000) },
       { totalMinor: 10_888, lines },
     );
 
@@ -145,7 +146,7 @@ describe('alternatives', () => {
   const day = 86_400_000;
   const candidate = (id: string, startsInMs: number, overrides = {}) => ({
     id,
-    startsAt: later(startsInMs),
+    startsAt: msFrom(startsInMs),
     timeZone: 'America/New_York',
     allocation: 10,
     seatsSold: 0,
@@ -156,7 +157,10 @@ describe('alternatives', () => {
     summaries.map((s) => s.sessionId);
 
   it('spans from `at` to 14 days later', () => {
-    expect(alternativeWindow(at)).toEqual({ from: at, until: later(14 * day) });
+    expect(alternativeWindow(at)).toEqual({
+      from: at,
+      until: msFrom(14 * day),
+    });
   });
 
   it('offers scheduled dates in the window with room for the party, soonest first', () => {
@@ -189,7 +193,7 @@ describe('alternatives', () => {
     const picked = pickAlternatives(
       [candidate('a', day), candidate('b', 2 * day)],
       [
-        { ...active(later(1)), seats: 9, sessionId: 'a' },
+        { ...active(msFrom(1)), seats: 9, sessionId: 'a' },
         { ...active(at), seats: 9, sessionId: 'b' },
       ],
       2,

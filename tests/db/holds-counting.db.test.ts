@@ -10,6 +10,7 @@ import {
 } from 'vitest';
 import { openHeldSeats, type HoldTimes } from '@/lib/holds';
 import { maxAllocation } from '@/lib/sessions';
+import { at } from '@/lib/testClock';
 import { holds, settings } from '@/server/db/schema';
 import type { Device } from '@/server/device';
 import {
@@ -153,7 +154,6 @@ describe('which holds count', () => {
 });
 
 describe('the SQL pre-filter and isOpenHold', () => {
-  const at = new Date('2026-11-01T12:00:00.000Z');
   const createdAt = new Date('2026-11-01T11:55:00.000Z');
 
   async function seedAgreement() {

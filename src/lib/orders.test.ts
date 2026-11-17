@@ -14,6 +14,7 @@ import {
   type Order,
   type OrderStatus,
 } from './orders';
+import { at } from './testClock';
 import { isTerminal } from './transitions';
 import { id } from '../../tests/support/ids';
 
@@ -26,7 +27,7 @@ import { id } from '../../tests/support/ids';
 // - OrderItemSchema: bounds on quantity and price, and the line total
 
 const holdId = id(10);
-const created = new Date('2026-11-01T12:00:00Z');
+const created = at;
 const later = new Date('2026-11-01T12:05:00Z');
 
 const booking: Order = {

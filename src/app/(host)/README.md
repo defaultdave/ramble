@@ -370,7 +370,7 @@ Host pages read the database every time, so their own pages need no clearing. Th
 | Notice email saved | none | Never shown to a guest. |
 | Staff invited, resent or revoked | none | Nothing guest-side. |
 
-Tag names are in [cacheTags.ts](../../lib/cacheTags.ts). The settings changes come from `hostSettingsChanges()` in [hostSettings.ts](../../lib/hostSettings.ts), applied by `withLockedHost` once its transaction commits.
+Tag names are in [cacheTags.ts](../../lib/cacheTags.ts). The settings changes come from `hostProfileChanges()` in [hostSetup.ts](../../lib/hostSetup.ts), which the ops host edit uses too,, applied by `withLockedHost` once its transaction commits.
 
 ## Worth knowing
 

@@ -78,6 +78,42 @@ export function moveEmailKey(moveId: string): string {
   return `guest-move-confirmation:${moveId.toLowerCase()}`;
 }
 
+/** The reminder job a move queues when the booking has no waiting one: its own key, so the first reminder's key does not swallow it. */
+export function reminderMoveJobKey(moveId: string): string {
+  return `session-reminder-move:${moveId.toLowerCase()}`;
+}
+
+/**
+ * The provider's idempotency key for a reminder. A reminder re-timed or queued by a move carries
+ * that move's id, so one already sent for the old date does not swallow the one for the new date;
+ * a reminder with no move id keeps the order's key.
+ */
+export function sessionReminderEmailKey(
+  orderId: string,
+  moveId?: string,
+): string {
+  const base = bookingEmailKey('session-reminder', orderId);
+  return moveId === undefined ? base : `${base}:${moveId.toLowerCase()}`;
+}
+
+export type ReminderAfterMove =
+  { kind: 'none' } | { kind: 'retime' | 'enqueue'; runAfter: Date };
+
+/**
+ * What a move does to the guest's reminder. A waiting reminder is re-timed in place; with none
+ * waiting (already sent, finished, dead, running, or never queued) a fresh one is queued; a new
+ * session that has already started needs neither.
+ */
+export function reminderAfterMove(input: {
+  startsAt: Date;
+  now: Date;
+  hasPendingReminder: boolean;
+}): ReminderAfterMove {
+  const runAfter = reminderRunAt(input.startsAt, input.now);
+  if (runAfter === null) return { kind: 'none' };
+  return { kind: input.hasPendingReminder ? 'retime' : 'enqueue', runAfter };
+}
+
 /** One confirmation email per ops resend: the resend's id is in the audit row, so the message log and the audit log name the same send. */
 export function resendEmailKey(resendId: string): string {
   return `guest-confirmation-resend:${resendId.toLowerCase()}`;

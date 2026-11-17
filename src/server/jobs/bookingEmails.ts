@@ -11,6 +11,7 @@ import {
   resendEmailKey,
   reminderDecision,
   sessionReminderData,
+  sessionReminderEmailKey,
 } from '@/lib/bookingEmails';
 import { WriteIdSchema } from '@/lib/catalog';
 import type { GuestMovePayloadSchema } from '@/lib/moveBooking';
@@ -38,6 +39,17 @@ export const BookingEmailPayloadSchema = z.strictObject({
   orderId: WriteIdSchema,
 });
 export type BookingEmailPayload = z.output<typeof BookingEmailPayloadSchema>;
+
+/** The reminder's payload: the order, and the move that re-timed or queued it (absent for the reminder queued at confirm). */
+export const SessionReminderPayloadSchema = BookingEmailPayloadSchema.extend({
+  moveId: z
+    .uuid()
+    .transform((id) => id.toLowerCase())
+    .optional(),
+});
+export type SessionReminderPayload = z.output<
+  typeof SessionReminderPayloadSchema
+>;
 
 type Context = { tx: Transaction; payload: BookingEmailPayload; jobId: string };
 
@@ -204,7 +216,12 @@ export async function sendSessionReminder({
   payload,
   jobId,
   clock,
-}: Context & { clock: Clock }): Promise<void> {
+}: {
+  tx: Transaction;
+  payload: SessionReminderPayload;
+  jobId: string;
+  clock: Clock;
+}): Promise<void> {
   const order = await readBookingEmailOrder(tx, payload.orderId);
   if (!order) throw new BookingEmailError('there is no such booking');
   const decision = reminderDecision(order.source, clock.now());
@@ -222,6 +239,6 @@ export async function sendSessionReminder({
       appUrl: env.APP_URL,
       manageToken: liveManageToken(order),
     }),
-    idempotencyKey: bookingEmailKey('session-reminder', payload.orderId),
+    idempotencyKey: sessionReminderEmailKey(payload.orderId, payload.moveId),
   });
 }

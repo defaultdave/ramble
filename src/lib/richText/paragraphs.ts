@@ -22,3 +22,8 @@ export const emptyDoc: RichTextDoc = { type: 'doc', content: [] };
 export function editorStartContent(doc: RichTextDoc): RichTextDoc | '' {
   return hasContent(doc) ? doc : '';
 }
+
+/** The document, or none when it is edited down to nothing: a stored document is never an empty one. */
+export function docOrNull(doc: RichTextDoc | null): RichTextDoc | null {
+  return hasContent(doc) ? doc : null;
+}

@@ -391,3 +391,13 @@ export function isSingleCollection(
 ): boolean {
   return kind === 'gift_guide';
 }
+
+/** The Picks among some collections, in the order given: the gift guide has no editor in the ops areas. */
+export function picksOf<C extends { kind: string }>(
+  collections: readonly C[],
+): (C & { kind: 'pick' })[] {
+  return collections.filter(
+    (collection): collection is C & { kind: 'pick' } =>
+      collection.kind === 'pick',
+  );
+}

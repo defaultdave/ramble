@@ -9,10 +9,12 @@ import {
 import { defaultHostTimeZone } from './hostSetup';
 import {
   fieldsFromIssues,
+  formJson,
   formText,
   invalidFormNotice,
   noticeHref,
   oversizedFields,
+  rawFormFieldLimit,
   parseIdField,
   slugFor,
   slugProblemStart,
@@ -48,7 +50,7 @@ const entryIntents = ['save', 'publish', 'unpublish'] as const;
 export type EntryIntent = (typeof entryIntents)[number];
 
 /** The status a form leaves an entry in: saving keeps it where it is, the other two move it. */
-function statusAfter(
+export function statusAfter(
   intent: EntryIntent,
   current: PublishStatus,
 ): PublishStatus {
@@ -110,18 +112,6 @@ export type EntryForm =
   | { ok: true; value: { input: HelpArticleInput; intent: EntryIntent } }
   | { ok: false; fields: EntryFormField[] };
 
-const rawFieldLimit = 1000;
-
-/** The posted body as JSON; text that is not JSON goes on as it is, so the schema refuses it and names the field. */
-function parseBody(raw: string | undefined): unknown {
-  if (raw === undefined) return undefined;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return raw;
-  }
-}
-
 /**
  * The posted entry form. A blank slug keeps the address the entry has, or is made from the title
  * for a new one. The status and position a form carries are only what it was opened with: the
@@ -131,7 +121,7 @@ function parseBody(raw: string | undefined): unknown {
 export function parseEntryForm(get: FormGetter): EntryForm {
   const textFields = ['title', 'slug', 'summary'] as const;
   const oversized = [
-    ...oversizedFields(get, textFields, rawFieldLimit),
+    ...oversizedFields(get, textFields, rawFormFieldLimit),
     ...oversizedFields(get, ['body'], editorialLimits.richTextStoredBytes),
   ];
   if (oversized.length > 0) {
@@ -166,7 +156,7 @@ export function parseEntryForm(get: FormGetter): EntryForm {
     summary: formText(get, 'summary') ?? null,
     position: Number(formText(get, 'position') ?? newEntry.position),
     status: statusAfter(intent, current),
-    body: parseBody(formText(get, 'body')),
+    body: formJson(get, 'body'),
   });
   if (!parsed.success) {
     return {

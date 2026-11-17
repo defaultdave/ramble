@@ -1,5 +1,6 @@
 import { reportAxeViolations } from './axe';
 import { expect, test } from './fixtures';
+import { notFoundHeading } from './routes';
 
 // The one path every other spec stops short of: browse, pick a time, hold, pay on the fake gateway,
 // and land on a confirmed order. It needs the seeded database `pnpm e2e:db` prepares, so it runs
@@ -81,3 +82,21 @@ test('a guest browses, holds, pays on the fake gateway, and sees a confirmed ord
   await expect(page.getByText(/Confirmation RMB-[A-Z0-9]+/)).toBeVisible();
   await reportAxeViolations(page, testInfo, 'confirmation');
 });
+
+// A miss is read with the `uncached` profile, which the shell cannot hold; unknown addresses
+// alternated between the page and Next's error document on repeat requests. Needs a database
+// that answers, which the main suite's server lacks, so it lives with the seeded one.
+for (const path of ['/hosts/no-such-host', '/picks/no-such-pick']) {
+  test(`${path} is the same not-found on every request`, async ({ page }) => {
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const response = await page.goto(path);
+
+      expect(response?.status(), `request ${String(attempt + 1)}`).toBeLessThan(
+        500,
+      );
+      await expect(
+        page.getByRole('heading', { level: 1, name: notFoundHeading }),
+      ).toBeVisible();
+    }
+  });
+}

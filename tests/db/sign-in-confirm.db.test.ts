@@ -51,7 +51,8 @@ async function emailedLink(address: string, next = '/account') {
     { status: 'idle' },
     form({ email: address, next }),
   );
-  expect(state.status).toBe('sent');
+  // Email is in sink mode here, so a guest is shown the link too; the same link is in the mailbox.
+  expect(['sent', 'link']).toContain(state.status);
   const { rows } = await client.db.execute<{ html: string }>(
     sql`SELECT html FROM messages WHERE recipient = ${address} AND template = 'sign-in-link' ORDER BY created_at DESC, id DESC LIMIT 1`,
   );

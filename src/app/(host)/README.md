@@ -96,6 +96,7 @@ flowchart TD
     LW["loadHostWeek and readHostWeek"]:::server
     HS["HostSessions"]:::server
     AC["AccountControl"]:::server
+    SRH["SessionResultHost"]:::client
     WN["week nav<br/>ButtonLink x 3"]:::server
     PWF["PublishWeekForm"]:::client
     PWA["publishWeekAction"]:::action
@@ -108,14 +109,15 @@ flowchart TD
     SP -.-> LW
     SP --> HS
     HS --> AC
-    HS --> WN
-    HS --> PWF
+    HS --> SRH
+    SRH --> WN
+    SRH --> PWF
     PWF -.-> PWA
-    HS --> SR
+    SRH --> SR
     SR --> ESF
     SR --> CL
     ESF -.-> EA
-    HS --> AOF
+    SRH --> AOF
     AOF -.-> AOA
     classDef server fill:#e8edf8,stroke:#3b5bab,color:#1b1f27
     classDef cached fill:#e2f3f0,stroke:#0f7a6c,color:#1b1f27
@@ -129,6 +131,7 @@ flowchart TD
 | HostSessionsPage | server | [sessions/page.tsx](./host/sessions/page.tsx) | Reads `?week=`. Owner or staff. Passes the six actions to the view as one prop. |
 | loadHostWeek, readHostWeek | server read | [hostSessions.ts](../../server/hostSessions.ts), [sessions.ts](../../server/db/sessions.ts) | Per request. Repeats the gate by hand instead of using `loadForHostArea`. `buildHostWeek` sets `canEdit` for an owner only. |
 | HostSessions | server | [HostSessions.tsx](../../components/HostSessions/HostSessions.tsx) | Heading, week nav, then the days and rows. |
+| SessionResultHost | client | [HostSessionForms.tsx](../../components/HostSessions/HostSessionForms.tsx) | Wraps the sections. Holds the success notice of a cancelled session, whose own form unmounts when the row stops being editable, and focuses it. Uses Alert. |
 | AccountControl | server | [AccountControl.tsx](../../components/Header/AccountControl.tsx) | Same sign out control as the dashboard. |
 | week nav, ButtonLink x 3 | server | [ButtonLink.tsx](../../components/Button/ButtonLink.tsx) | Previous, current and next week links. |
 | PublishWeekForm | client | [HostSessionForms.tsx](../../components/HostSessions/HostSessionForms.tsx) | Owner only. A `useActionState` form built on the shared `ActionForm`. |

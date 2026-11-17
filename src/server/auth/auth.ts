@@ -1,5 +1,4 @@
 import 'server-only';
-import { randomUUID } from 'node:crypto';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { magicLink } from 'better-auth/plugins/magic-link';
@@ -10,7 +9,6 @@ import {
   sessionMaxAgeSeconds,
   signInLinkTtlSeconds,
 } from '@/lib/auth';
-import { signInLinkData } from '@/lib/signIn';
 import { db } from '@/server/db/client';
 import {
   authAccounts,
@@ -20,7 +18,7 @@ import {
 } from '@/server/db/schema';
 import { appUrlConfigured, env } from '@/server/env';
 import { systemClock } from '@/server/ports/clock';
-import { sendEmail } from '@/server/ports/email';
+import { sendSignInLinkEmail } from './signInLinkEmail';
 import { hashSignInToken } from './signInToken';
 
 function createAuth() {
@@ -81,16 +79,12 @@ function createAuth() {
           // The emailed address is a Ramble page that asks for a click, not Better Auth's verify
           // address: a mail scanner that fetches every link would otherwise use the link up.
           const verify = new URL(url);
-          await sendEmail({
-            template: 'sign-in-link',
-            to: email,
-            data: signInLinkData(
-              token,
-              verify.origin,
-              verify.searchParams.get('callbackURL'),
-            ),
-            idempotencyKey: `sign-in-link-${randomUUID()}`,
-          });
+          await sendSignInLinkEmail(
+            email,
+            token,
+            verify.origin,
+            verify.searchParams.get('callbackURL'),
+          );
         },
       }),
     ],

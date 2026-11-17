@@ -3,19 +3,28 @@
 import { errorKind } from '@/lib/errorKind';
 import { SignInLinkRequestSchema } from '@/lib/auth';
 import {
+  onScreenHrefFromBody,
   safeNextPath,
   signInLinkApiPath,
   signInStateFor,
   type SignInFormState,
 } from '@/lib/signIn';
-import { handleAuthRequest } from '@/server/auth/handler';
+import { handleSignInFormRequest } from '@/server/auth/handler';
 import { env } from '@/server/env';
 import { logger } from '@/server/monitoring/logger';
 
+// A 200 whose body is not JSON is not an answer this handler gives; the error reaches the catch in
+// `requestSignInLink`, which logs it and reports a failure.
+async function onScreenHrefOf(response: Response): Promise<string | null> {
+  if (response.status !== 200) return null;
+  return onScreenHrefFromBody(await response.json());
+}
+
 /**
  * The sign-in form. It asks for a link through the same handler the API address uses, so the
- * `sign_in_link` count applies and a known and an unknown address get the same answer. Nothing
- * here logs the address.
+ * `sign_in_link` count applies and a known and an unknown address get the same answer. While email
+ * is in sink mode, an address with no role grant gets the link back to show on the page. Nothing
+ * here logs the address or the link.
  */
 export async function requestSignInLink(
   _previous: SignInFormState,
@@ -28,7 +37,7 @@ export async function requestSignInLink(
 
   const origin = new URL(env.APP_URL).origin;
   try {
-    const response = await handleAuthRequest(
+    const response = await handleSignInFormRequest(
       new Request(new URL(signInLinkApiPath, origin), {
         method: 'POST',
         headers: { 'content-type': 'application/json', origin },
@@ -42,6 +51,7 @@ export async function requestSignInLink(
       parsed.data.email,
       response.status,
       response.headers.get('retry-after'),
+      await onScreenHrefOf(response),
     );
   } catch (error) {
     logger.error('The sign-in link could not be requested', {

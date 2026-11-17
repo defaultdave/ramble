@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addDays,
   buildHostWeek,
+  hostCancelPath,
   hostSessionFormValues,
   hostSessionInvalid,
   hostSessionProblem,
@@ -22,7 +23,8 @@ import {
 // - a week's bounds are midnight to midnight in the host's zone, so a DST week is not 168 hours
 // - the previous and next links stop at the limits, and "this week" shows only off this week
 // - rows are grouped by the day in the session's own zone and say what may change: capacity until it starts,
-//   time and cancel only with no seats sold, nothing once cancelled or started
+//   time and cancel only with no seats sold, nothing once cancelled or started; a booked, upcoming session
+//   links to its own cancel page, and nothing else does
 // - a price is typed in dollars and kept in cents without a float; anything else is not a price
 // - a form's refusal names its fields; a bad id or version is a stale form
 // - publishing says what was added, what was already there, and what was past
@@ -188,24 +190,37 @@ describe('buildHostWeek rows', () => {
       adultPrice: '85',
       editable: true,
       movable: true,
+      cancelHref: null,
     });
   });
 
   it.each([
-    ['unbooked and upcoming', {}, true, true],
-    ['with a seat sold', { seatsSold: 1 }, true, false],
-    ['cancelled', { status: 'cancelled' as const }, false, false],
-    ['completed', { status: 'completed' as const }, false, false],
+    ['unbooked and upcoming', {}, true, true, null],
+    ['with a seat sold', { seatsSold: 1 }, true, false, hostCancelPath(id(1))],
+    ['cancelled', { status: 'cancelled' as const }, false, false, null],
+    [
+      'cancelled with seats sold',
+      { status: 'cancelled' as const, seatsSold: 2 },
+      false,
+      false,
+      null,
+    ],
+    ['completed', { status: 'completed' as const }, false, false, null],
     [
       'already started',
-      { startsAt: new Date('2026-11-10T19:00:00.000Z') },
+      { startsAt: new Date('2026-11-10T19:00:00.000Z'), seatsSold: 2 },
       false,
       false,
+      null,
     ],
-  ])('a session %s', (_label, overrides, editable, movable) => {
+  ])('a session %s', (_label, overrides, editable, movable, cancelHref) => {
     const view = week([session(overrides)]);
     const row = view.days.flatMap((day) => day.sessions)[0];
-    expect([row?.editable, row?.movable]).toEqual([editable, movable]);
+    expect([row?.editable, row?.movable, row?.cancelHref]).toEqual([
+      editable,
+      movable,
+      cancelHref,
+    ]);
   });
 
   it('has no price form for an experience without an adult price', () => {

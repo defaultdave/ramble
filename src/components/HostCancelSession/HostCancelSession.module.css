@@ -1,0 +1,77 @@
+/* Lines up under PageHeading: the same column, gutter, and type. */
+.sections {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, var(--size-content-max));
+  justify-content: center;
+  gap: var(--space-8);
+  padding: 0 var(--size-gutter) var(--space-8);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  color: var(--color-text-primary);
+}
+
+.facts {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.facts dt {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-body-s);
+}
+
+.facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.heading {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-heading-m);
+  line-height: var(--font-line-height-heading-m);
+  font-weight: var(--font-weight-semibold);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-block: var(--space-3);
+  border-block-end: 1px solid var(--color-border-default);
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 28rem;
+}
+
+@media (min-width: 768px) {
+  .facts {
+    grid-template-columns: max-content 1fr;
+    column-gap: var(--space-6);
+  }
+
+  .form > button {
+    align-self: flex-start;
+  }
+}

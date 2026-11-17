@@ -21,6 +21,11 @@ import { zonedTimeLabel } from './zonedLabels';
 
 export const hostSessionsPath = '/host/sessions';
 
+/** The page where a host reads who a cancellation affects and confirms it. */
+export function hostCancelPath(sessionId: string): string {
+  return `${hostSessionsPath}/${sessionId}/cancel`;
+}
+
 const daysInWeek = 7;
 /** How far back a host can look: eight weeks. */
 const weeksBack = 8;
@@ -129,6 +134,8 @@ export type HostWeekRowView = {
   editable: boolean;
   /** The same, with no seat sold: its time may change and it may be cancelled. The server also refuses while a guest holds seats mid-payment. */
   movable: boolean;
+  /** Where a host cancels a session guests have booked, after reading who it affects; null when the row offers no such cancellation. */
+  cancelHref: string | null;
 };
 
 type HostWeekDayView = {
@@ -183,6 +190,8 @@ function rowView(session: HostWeekSession, now: Date): HostWeekRowView {
     adultPrice: priceInputTextOrNull(session.adultPriceMinor),
     editable,
     movable: editable && session.seatsSold === 0,
+    cancelHref:
+      editable && session.seatsSold > 0 ? hostCancelPath(session.id) : null,
   };
 }
 

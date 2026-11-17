@@ -25,7 +25,8 @@ export type SupportQueuePage = {
   nextCursor: string | null;
 };
 
-const statusCondition = {
+/** What "open" and "resolved" mean for a support request: the queue filters by it and the ops landing counts by it. */
+export const supportStatusCondition = {
   open: isNull(supportRequests.resolvedAt),
   resolved: isNotNull(supportRequests.resolvedAt),
 } satisfies Record<SupportStatus, SQL>;
@@ -41,7 +42,9 @@ export async function readSupportQueue(
     .from(supportRequests)
     .where(
       and(
-        options.status === null ? undefined : statusCondition[options.status],
+        options.status === null
+          ? undefined
+          : supportStatusCondition[options.status],
         pastKeysetCursor(
           supportRequests,
           supportRequests.createdAt,

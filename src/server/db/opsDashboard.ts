@@ -1,12 +1,19 @@
 import 'server-only';
-import { and, count, eq, gte, isNull, lt } from 'drizzle-orm';
+import { and, count, desc, eq, gte, lt } from 'drizzle-orm';
 import { auditViewRow, type AuditViewRow } from '@/lib/staffAdmin';
 import { venueTimeZone } from '@/lib/venue';
 import { zonedDayWindow } from '@/lib/zonedDay';
 import { Role, requireRole, type Caller } from '@/server/auth/caller';
-import { readLatestAuditRows } from './audit';
 import { dbRead } from './client';
-import { experiences, orders, sessions, supportRequests } from './schema';
+import { refundFailedCondition } from './opsBookings';
+import {
+  auditLog,
+  experiences,
+  orders,
+  sessions,
+  supportRequests,
+} from './schema';
+import { supportStatusCondition } from './supportQueue';
 import { currentDatabaseTime } from './time';
 
 // The numbers on the ops landing, for the ops role alone. Each function checks it before it reads.
@@ -33,7 +40,7 @@ export async function countRefundFailedBookings(
   const [row] = await dbRead
     .select({ total: count() })
     .from(orders)
-    .where(and(eq(orders.kind, 'booking'), eq(orders.refundFailed, true)));
+    .where(and(eq(orders.kind, 'booking'), refundFailedCondition));
   return row?.total ?? 0;
 }
 
@@ -45,7 +52,7 @@ export async function countOpenSupportRequests(
   const [row] = await dbRead
     .select({ total: count() })
     .from(supportRequests)
-    .where(isNull(supportRequests.resolvedAt));
+    .where(supportStatusCondition.open);
   return row?.total ?? 0;
 }
 
@@ -72,5 +79,10 @@ export async function readRecentAuditForOps(
   limit: number,
 ): Promise<AuditViewRow[]> {
   requireRole(caller, Role.Ops, {});
-  return (await readLatestAuditRows(limit)).map(auditViewRow);
+  const rows = await dbRead
+    .select()
+    .from(auditLog)
+    .orderBy(desc(auditLog.id))
+    .limit(limit);
+  return rows.map(auditViewRow);
 }

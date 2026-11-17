@@ -5,7 +5,6 @@ import {
   parseReviewHideForm,
   parseReviewStatus,
   parseReviewUnhideForm,
-  reviewFirstName,
   reviewHiddenEntry,
   reviewHideReasons,
   reviewModerationChanged,
@@ -118,22 +117,6 @@ describe('parseReviewUnhideForm', () => {
   });
 });
 
-describe('reviewFirstName', () => {
-  it.each([
-    ['Pat Smith', 'Pat'],
-    ['  Sam   Lee ', 'Sam'],
-    ['Cher', 'Cher'],
-    [null, 'A guest'],
-    ['   ', 'A guest'],
-  ])('shows %j as %s', (name, expected) => {
-    expect(reviewFirstName(name)).toBe(expected);
-  });
-
-  it('cuts a very long name', () => {
-    expect(reviewFirstName('x'.repeat(500)).length).toBeLessThan(200);
-  });
-});
-
 describe('buildReviewModerationRows', () => {
   it('shows the first name, the rating in words, and the time in New York', () => {
     const [row] = buildReviewModerationRows([
@@ -156,6 +139,35 @@ describe('buildReviewModerationRows', () => {
       status: 'hidden',
       writtenLabel: 'Mon, Nov 9, 10:30 AM EST',
     });
+  });
+});
+
+describe('buildReviewModerationRows first name', () => {
+  const firstNameOf = (guestName: string | null) =>
+    buildReviewModerationRows([
+      {
+        id,
+        experienceName: 'Pottery wheel night',
+        rating: 4,
+        body: 'Lovely.',
+        guestName,
+        status: 'visible',
+        createdAt: new Date('2026-11-09T15:30:00Z'),
+      },
+    ])[0]?.firstName;
+
+  it.each([
+    ['Pat Smith', 'Pat'],
+    ['  Sam   Lee ', 'Sam'],
+    ['Cher', 'Cher'],
+    [null, 'A guest'],
+    ['   ', 'A guest'],
+  ])('shows %j as %s', (name, expected) => {
+    expect(firstNameOf(name)).toBe(expected);
+  });
+
+  it('cuts a very long name', () => {
+    expect(firstNameOf('x'.repeat(500))).toHaveLength(40);
   });
 });
 

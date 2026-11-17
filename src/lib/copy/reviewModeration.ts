@@ -20,7 +20,6 @@ export const reviewModerationCopy = {
   statusLabels: { visible: 'Visible', hidden: 'Hidden' },
   ratingText: (rating: number, max: number) =>
     `${String(rating)} out of ${String(max)}`,
-  guestStandIn: 'A guest',
   hideReasonLabel: (name: string) => `Reason for hiding the review by ${name}`,
   hideReasonPlaceholder: 'Choose a reason',
   hideReasons: {

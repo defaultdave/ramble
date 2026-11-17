@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { userActor, type AuditEntryInput } from './audit';
 import { WriteIdSchema } from './catalog';
+import { reviewCopy } from './copy/review';
 import { reviewModerationCopy } from './copy/reviewModeration';
 import { defaultHostTimeZone } from './hostSetup';
 import {
@@ -10,9 +11,10 @@ import {
   type FormResult,
   type NoticeText,
 } from './opsForm';
+import type { ReviewRow } from './reviewList';
 import { reviewLimits, reviewStatuses } from './reviews';
 import { statusFilter, type StatusTone } from './statusBadge';
-import { nameClip, oneLineClipped } from './text';
+import { firstNameOr, nameClip } from './text';
 import { zonedDeadlineLabel } from './zonedLabels';
 
 // Ops hiding a review from guests and showing it again (PRD-32). A hidden review stays in the table;
@@ -51,14 +53,9 @@ export const reviewHideReasonOptions = reviewHideReasons.map((value) => ({
   label: reviewModerationCopy.hideReasons[value],
 }));
 
-export type ReviewModerationRecord = {
-  id: string;
+export type ReviewModerationRecord = ReviewRow & {
   experienceName: string;
-  rating: number;
-  body: string;
-  guestName: string | null;
   status: ReviewStatus;
-  createdAt: Date;
 };
 
 export type ReviewModerationRow = {
@@ -70,13 +67,6 @@ export type ReviewModerationRow = {
   status: ReviewStatus;
   writtenLabel: string;
 };
-
-/** The first word of the booker's name, which is all a guest page shows of them, or a stand-in. */
-export function reviewFirstName(name: string | null): string {
-  const [first = ''] = (name ?? '').split(/\s+/).filter(Boolean);
-  const clipped = oneLineClipped(first, nameClip.person);
-  return clipped === '' ? reviewModerationCopy.guestStandIn : clipped;
-}
 
 /** The reviews as the table shows them: the first name only, and the time in New York. */
 export function buildReviewModerationRows(
@@ -90,7 +80,11 @@ export function buildReviewModerationRows(
       reviewLimits.maxRating,
     ),
     body: record.body,
-    firstName: reviewFirstName(record.guestName),
+    firstName: firstNameOr(
+      record.guestName,
+      reviewCopy.display.anonymousGuest,
+      nameClip.firstName,
+    ),
     status: record.status,
     writtenLabel: zonedDeadlineLabel(record.createdAt, defaultHostTimeZone),
   }));

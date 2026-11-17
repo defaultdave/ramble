@@ -47,7 +47,7 @@ export function OpsDashboard({ tiles, recentAudit }: OpsDashboardProps) {
               <li key={row.id} className={styles.auditRow}>
                 <span className={styles.action}>{row.action}</span>
                 <span className={styles.detail}>
-                  {row.actor}, {row.time}
+                  {opsDashboardCopy.audit.actorAndTime(row.actor, row.time)}
                 </span>
               </li>
             ))}

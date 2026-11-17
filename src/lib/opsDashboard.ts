@@ -5,6 +5,7 @@ import { opsBookingsPath } from './opsBookings';
 import { opsRequestsPath } from './opsRequests';
 import { opsSessionsPath } from './opsSessions';
 import { supportQueuePath } from './supportQueue';
+import { changedParamHref } from './tableQuery';
 
 /** How many of the latest audit rows the landing shows. */
 export const recentAuditLimit = 5;
@@ -52,13 +53,13 @@ const tiles: readonly {
   },
   {
     id: 'refundFailed',
-    href: `${opsBookingsPath}?status=refund_failed`,
+    href: changedParamHref(opsBookingsPath, {}, 'status', 'refund_failed'),
     copy: opsDashboardCopy.tiles.refundFailed,
     actionable: true,
   },
   {
     id: 'openSupport',
-    href: `${supportQueuePath}?status=open`,
+    href: changedParamHref(supportQueuePath, {}, 'status', 'open'),
     copy: opsDashboardCopy.tiles.support,
     actionable: true,
   },

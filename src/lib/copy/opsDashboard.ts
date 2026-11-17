@@ -44,5 +44,6 @@ export const opsDashboardCopy = {
     heading: 'Recent activity',
     link: 'Open the audit log',
     empty: 'Nothing has been recorded yet.',
+    actorAndTime: (actor: string, time: string) => `${actor}, ${time}`,
   },
 } as const;

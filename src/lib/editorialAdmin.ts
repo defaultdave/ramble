@@ -113,7 +113,7 @@ export type EntryForm =
 const rawFieldLimit = 1000;
 
 /** The posted body as JSON; text that is not JSON goes on as it is, so the schema refuses it and names the field. */
-export function parseBody(raw: string | undefined): unknown {
+function parseBody(raw: string | undefined): unknown {
   if (raw === undefined) return undefined;
   try {
     return JSON.parse(raw);
@@ -185,6 +185,21 @@ export const entryNoticeCodes = [
   'not_found',
   'invalid',
 ] as const;
+/** What the save returned, as far as the redirect needs it: the data layer's result fits this shape. */
+export type EntrySaveResult =
+  | { status: 'saved'; value: { id: string } }
+  | { status: 'slug_taken' | 'empty_body' | 'not_found' };
+
+/** The outcome of a save for `entryRedirect`: a saved article carries its id and the button that saved it. */
+export function entryOutcomeFor(
+  result: EntrySaveResult,
+  intent: EntryIntent,
+): EntryOutcome {
+  return result.status === 'saved'
+    ? { status: 'saved', id: result.value.id, intent }
+    : { status: result.status };
+}
+
 /** What the action did with a posted form, for `entryRedirect`. */
 export type EntryOutcome =
   | { status: 'invalid'; fields: readonly EntryFormField[] }

@@ -4,7 +4,7 @@ import {
   buildEntryRows,
   entryBody,
   entryRedirect,
-  parseBody,
+  entryOutcomeFor,
   saveLabel,
   toggleIntent,
   entryPath,
@@ -266,13 +266,27 @@ describe('buildEntryRows and entryPath', () => {
   });
 });
 
-describe('parseBody', () => {
+describe('a form with no body field', () => {
+  it('is refused, naming the body', () => {
+    expect(parseEntryForm(form({ intent: 'save', title: 'T' }))).toEqual({
+      ok: false,
+      fields: ['body'],
+    });
+  });
+});
+
+describe('entryOutcomeFor', () => {
   it.each([
-    ['nothing', undefined, undefined],
-    ['JSON', '{"a":1}', { a: 1 }],
-    ['text that is not JSON, as it is', '{oops', '{oops'],
-  ])('reads %s', (_name, raw, expected) => {
-    expect(parseBody(raw)).toEqual(expected);
+    [
+      { status: 'saved', value: { id } },
+      'publish',
+      { status: 'saved', id, intent: 'publish' },
+    ],
+    [{ status: 'slug_taken' }, 'save', { status: 'slug_taken' }],
+    [{ status: 'empty_body' }, 'publish', { status: 'empty_body' }],
+    [{ status: 'not_found' }, 'unpublish', { status: 'not_found' }],
+  ] as const)('turns %j with %s into %j', (result, intent, expected) => {
+    expect(entryOutcomeFor(result, intent)).toEqual(expected);
   });
 });
 

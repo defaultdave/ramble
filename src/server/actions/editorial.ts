@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import {
   editorialPath,
+  entryOutcomeFor,
   entryRedirect,
   parseEntryForm,
 } from '@/lib/editorialAdmin';
@@ -26,12 +27,5 @@ export async function saveEntryAction(formData: FormData): Promise<void> {
 
   const { input, intent } = parsed.value;
   const result = await saveHelpArticle(caller, input, intent);
-  redirect(
-    entryRedirect(
-      postedId,
-      result.status === 'saved'
-        ? { status: 'saved', id: result.value.id, intent }
-        : result,
-    ),
-  );
+  redirect(entryRedirect(postedId, entryOutcomeFor(result, intent)));
 }

@@ -1,0 +1,23 @@
+.muted {
+  composes: muted from '../HostSetup/HostSetup.module.css';
+}
+
+.stacked {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  overflow-wrap: anywhere;
+}
+
+.message {
+  overflow-wrap: anywhere;
+}
+
+.message summary {
+  cursor: pointer;
+}
+
+.full {
+  margin: var(--space-2) 0 0;
+  white-space: pre-line;
+}

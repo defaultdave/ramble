@@ -1,3 +1,6 @@
+import { opsRequestsCopy } from '@/lib/copy/opsRequests';
+import { opsRequestsPath } from './opsRequests';
+
 export type OpsNavLink = {
   label: string;
   href: string;
@@ -31,6 +34,11 @@ export const opsNavLinks: readonly OpsNavLink[] = [
     label: 'Support',
     href: '/ops/support',
     summary: 'Read guests’ messages, and mark each resolved with a note.',
+  },
+  {
+    label: opsRequestsCopy.nav.label,
+    href: opsRequestsPath,
+    summary: opsRequestsCopy.nav.summary,
   },
   {
     label: 'Review queue',

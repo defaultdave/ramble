@@ -1,8 +1,18 @@
 import 'server-only';
 import { and, eq } from 'drizzle-orm';
+import {
+  buildOpsRequestRows,
+  requestsListEntry,
+  type OpsRequestRow,
+} from '@/lib/opsRequests';
+import { splitPage } from '@/lib/pagination';
 import type { PrivateRequestInput } from '@/lib/privateSession';
+import { opsListPageSize } from '@/lib/tableQuery';
+import type { Caller } from '@/server/auth/caller';
+import { recordAudit, requireOpsUserId } from './audit';
 import { guestVisible } from './catalog';
-import type { Transaction } from './client';
+import { dbRead, type Transaction } from './client';
+import { byColumnThenId, pastKeysetCursor } from './keysetPage';
 import { experiences, privateRequests } from './schema';
 
 /**
@@ -38,4 +48,49 @@ export async function insertPrivateRequest(
     });
   if (!row) throw new Error('The private request was not written');
   return { ...row, experienceName: experience.name };
+}
+
+export type OpsRequestsPage = {
+  rows: OpsRequestRow[];
+  nextCursor: string | null;
+};
+
+/**
+ * One page of private requests for the ops role alone, newest first, each with its experience's
+ * name. The read records its audit row before it returns anything.
+ */
+export async function readOpsPrivateRequests(
+  caller: Caller,
+  options: { cursor: string | null },
+): Promise<OpsRequestsPage> {
+  const userId = requireOpsUserId(caller);
+  const fetched = await dbRead
+    .select({
+      id: privateRequests.id,
+      experienceName: experiences.name,
+      requestedDate: privateRequests.requestedDate,
+      groupSize: privateRequests.groupSize,
+      budgetMinor: privateRequests.budgetMinor,
+      name: privateRequests.name,
+      email: privateRequests.email,
+      message: privateRequests.message,
+      createdAt: privateRequests.createdAt,
+    })
+    .from(privateRequests)
+    .innerJoin(experiences, eq(experiences.id, privateRequests.experienceId))
+    .where(
+      pastKeysetCursor(
+        privateRequests,
+        privateRequests.createdAt,
+        'desc',
+        options.cursor,
+      ),
+    )
+    .orderBy(
+      ...byColumnThenId(privateRequests, privateRequests.createdAt, 'desc'),
+    )
+    .limit(opsListPageSize + 1);
+  const { items, nextCursor } = splitPage(fetched, opsListPageSize);
+  await recordAudit(requestsListEntry(userId));
+  return { rows: buildOpsRequestRows(items), nextCursor };
 }

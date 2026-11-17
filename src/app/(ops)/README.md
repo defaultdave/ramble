@@ -1,6 +1,6 @@
 # Ops area page map
 
-`/ops`, `/ops/mailbox`, `/ops/mailbox/[id]`, `/ops/dev`, `/ops/hosts`, `/ops/hosts/new`, `/ops/hosts/[id]`, `/ops/experiences`, `/ops/experiences/new`, `/ops/experiences/[id]`, `/ops/experiences/[id]/availability`, `/ops/review`, `/ops/review/[id]`, `/ops/sessions`, `/ops/sessions/[sessionId]`, `/ops/bookings`, `/ops/bookings/[id]`, `/ops/staff`, `/ops/support`, `/ops/audit`, and any other address under `/ops`
+`/ops`, `/ops/mailbox`, `/ops/mailbox/[id]`, `/ops/dev`, `/ops/hosts`, `/ops/hosts/new`, `/ops/hosts/[id]`, `/ops/experiences`, `/ops/experiences/new`, `/ops/experiences/[id]`, `/ops/experiences/[id]/availability`, `/ops/review`, `/ops/review/[id]`, `/ops/sessions`, `/ops/sessions/[sessionId]`, `/ops/bookings`, `/ops/bookings/[id]`, `/ops/staff`, `/ops/support`, `/ops/requests`, `/ops/audit`, and any other address under `/ops`
 
 Read from main at 2db68ea (2026-11-15). A PR that changes this tree (a component, a Suspense or client boundary, a cache tag, an action) updates this file in the same PR.
 
@@ -88,7 +88,7 @@ Named once here. The page trees below list only what is particular to them.
 ### Audit logging
 
 - Writes: each change writes its audit row with `writeAudit(tx)` in the same transaction, so the row exists exactly when the change does. A change that differs by nothing writes neither.
-- Reads: sensitive reads are recorded with `recordAudit` before they return. These are the ops home, hosts (list, one, new form), sessions (list, one), bookings (list, one), staff, support, audit view, and mailbox (list, message, unlock).
+- Reads: sensitive reads are recorded with `recordAudit` before they return. These are the ops home, hosts (list, one, new form), sessions (list, one), bookings (list, one), staff, support, private requests, audit view, and mailbox (list, message, unlock).
 - Not recorded: experiences, review, availability, host suspension state, and the whole test console, including the demo data reset.
 
 ### Tools
@@ -558,6 +558,10 @@ flowchart TD
     dt2["DataTable"]:::server
     btn2["Button<br/>client submit buttons"]:::client
     rsr["resolveSupportRequestAction"]:::action
+    rq["PrivateRequestsPage<br/>/ops/requests"]:::server
+    rrq["readOpsPrivateRequests"]:::server
+    pq["PrivateRequestsQueue"]:::server
+    dt4["DataTable"]:::server
     au["AuditPage<br/>/ops/audit"]:::server
     pad["parseAuditDay and parseAuditCursor"]:::server
     rau["readAuditForOps"]:::server
@@ -578,6 +582,9 @@ flowchart TD
     sq --> dt2
     sq --> btn2
     btn2 -.-> rsr
+    rq -.-> rrq
+    rq --> pq
+    pq --> dt4
     au --> pad
     au -.-> rau
     au --> av
@@ -608,6 +615,10 @@ flowchart TD
 | DataTable | server | [src/components/DataTable/DataTable.tsx](../../components/DataTable/DataTable.tsx) | Sort links and a Next link; the cursor is in the address. |
 | Button | client | [src/components/Button/Button.tsx](../../components/Button/Button.tsx) | Every submit button. The file is `'use client'`, but the forms post to the action without it. |
 | resolveSupportRequestAction | action | [src/server/actions/opsSupport.ts](../../server/actions/opsSupport.ts) | `resolveSupportRequest`: marks it resolved with the note, audit row in the same transaction. |
+| PrivateRequestsPage | server | [src/app/(ops)/ops/requests/page.tsx](ops/requests/page.tsx) | Gate, then guests' private session requests, newest first. Read-only: a request has no status, so there is no filter. |
+| readOpsPrivateRequests | server (DB read) | [src/server/db/privateRequests.ts](../../server/db/privateRequests.ts) | Called with the cursor; joins the experience's name. Audited: `requests list`. |
+| PrivateRequestsQueue | server | [src/components/PrivateRequestsQueue/PrivateRequestsQueue.tsx](../../components/PrivateRequestsQueue/PrivateRequestsQueue.tsx) | The table: experience, requested day, group, budget, sender, message (cut to a line, the whole text behind a disclosure), received time. |
+| DataTable | server | [src/components/DataTable/DataTable.tsx](../../components/DataTable/DataTable.tsx) | Sort links and a Next link; the cursor is in the address. |
 | AuditPage | server | [src/app/(ops)/ops/audit/page.tsx](ops/audit/page.tsx) | Gate, then one day of the log, paged by id. |
 | parseAuditDay and parseAuditCursor | server (pure lib) | [src/lib/staffAdmin.ts](../../lib/staffAdmin.ts) | The day defaults to today by `systemClock`. |
 | readAuditForOps | server (DB read) | [src/server/db/auditView.ts](../../server/db/auditView.ts) | Audited: reading the log writes `audit viewed` for that day. |

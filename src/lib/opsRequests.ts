@@ -3,7 +3,7 @@ import { type AuditEntryInput } from './audit';
 import { defaultHostTimeZone } from './hostSetup';
 import { formatPrice } from './money';
 import { opsAreaIds, opsAreaListEntry } from './opsAudit';
-import { oneLineClipped } from './text';
+import { clipOneLine } from './text';
 import { zonedDayLabel, zonedDeadlineLabel } from './zonedLabels';
 
 // The ops view of guests' private session requests (PRD-35): read-only, newest first. A request has
@@ -52,10 +52,10 @@ export function requestMessageView(
 ): OpsRequestMessage | null {
   const whole = message?.trim() ?? '';
   if (whole === '') return null;
-  const preview = oneLineClipped(whole, requestMessagePreviewChars);
-  const cut =
-    Array.from(whole.split(/\s+/).join(' ')).length >
-    requestMessagePreviewChars;
+  const { text: preview, cut } = clipOneLine(
+    whole,
+    requestMessagePreviewChars,
+  );
   return { preview, full: cut ? whole : null };
 }
 

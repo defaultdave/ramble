@@ -1,6 +1,7 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, vi } from 'vitest';
+import { at, minutesFrom } from '@/lib/testClock';
 import { createFreshDatabase, type FreshDatabase } from './harness';
 import { createOrderParents } from './orderParents';
 
@@ -95,9 +96,9 @@ export function reference() {
   return `RMB-${Array.from({ length: 6 }, () => crockford[randomInt(crockford.length)]).join('')}`;
 }
 
-export const created = '2026-11-01T12:00:00Z';
-export const later = '2026-11-01T12:05:00Z';
-export const earlier = '2026-11-01T11:00:00Z';
+export const created = at.toISOString();
+export const later = minutesFrom(5).toISOString();
+export const earlier = minutesFrom(-60).toISOString();
 
 export function orderRow(over: Row = {}): Row {
   const holdId = randomUUID();

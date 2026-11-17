@@ -28,6 +28,7 @@ import {
   tallyOutcome,
   type DrainReport,
 } from './jobs';
+import { at } from './testClock';
 
 // Behaviours under test, one per decision, branch, or risk:
 // - an enqueue input needs a kebab kind within 64 characters, a dedupe key of safe characters within 200, and a readable runAfter
@@ -46,7 +47,7 @@ import {
 // - a bearer header is read only in the exact form; the pulse body is empty or exactly { asOf }
 // - a manual time needs DEMO_CLOCK on and must be within 400 days of now, either side
 
-const now = new Date('2026-11-01T12:00:00.000Z');
+const now = at;
 const jobId = '3f1c2d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f';
 
 describe('EnqueueInputSchema', () => {

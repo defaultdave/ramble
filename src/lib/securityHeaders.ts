@@ -13,6 +13,7 @@ export const dynamicRoutePrefixes = [
   '/gifts/checkout',
   '/manage',
   '/orders',
+  '/review',
   '/host',
   '/ops',
 ] as const;

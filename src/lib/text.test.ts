@@ -7,6 +7,7 @@ import {
   notBlankPattern,
   oneLineClipped,
   requiredText,
+  utf8Bytes,
 } from './text';
 
 // Behaviours under test, one per decision, branch or risk.
@@ -128,4 +129,16 @@ describe('wholeNumberText', () => {
       expect(schema.safeParse(text).success).toBe(false);
     },
   );
+});
+
+describe('utf8Bytes', () => {
+  it.each([
+    ['', 0],
+    ['abc', 3],
+    ['é', 2],
+    ['€', 3],
+    ['😀', 4],
+  ])('counts %j as %i bytes', (text, bytes) => {
+    expect(utf8Bytes(text)).toBe(bytes);
+  });
 });

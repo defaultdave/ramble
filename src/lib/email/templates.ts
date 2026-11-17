@@ -9,10 +9,12 @@ import {
   SessionReminderDataSchema,
   bookingSubjects,
   confirmationAttachments,
+  link,
 } from './bookingTemplates';
 import { HostInviteDataSchema, hostInviteSubject } from './hostInvite';
 import { IdempotencyKeySchema, type EmailAttachment } from './message';
 import { OpsNoticeDataSchema, opsNoticeSubject } from './opsNotice';
+import { ReviewInviteDataSchema, reviewInviteSubject } from './reviewInvite';
 
 /**
  * Every template's data shape, subject line, and attachments. The markup for each lives in
@@ -30,8 +32,9 @@ const templateSchemas = {
   'paid-after-lapse': PaidAfterLapseDataSchema,
   'ops-notice': OpsNoticeDataSchema,
   'host-invite': HostInviteDataSchema,
+  'review-invite': ReviewInviteDataSchema,
   'sign-in-link': z.object({
-    url: z.url({ protocol: /^https?$/ }).max(2048),
+    url: link,
     expiresInMinutes: z.int().min(1).max(60),
   }),
 } as const;
@@ -57,6 +60,7 @@ const subjects: {
   'paid-after-lapse': bookingSubjects.paidAfterLapse,
   'ops-notice': opsNoticeSubject,
   'host-invite': hostInviteSubject,
+  'review-invite': reviewInviteSubject,
   'sign-in-link': () => 'Your Ramble sign-in link',
 };
 
@@ -75,6 +79,7 @@ const attachments: {
   'paid-after-lapse': () => [],
   'ops-notice': () => [],
   'host-invite': () => [],
+  'review-invite': () => [],
   'sign-in-link': () => [],
 };
 

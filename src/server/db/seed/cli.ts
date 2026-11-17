@@ -9,6 +9,8 @@ import {
   photoCoverageLine,
   photosLine,
   refusalLine,
+  reviewsLine,
+  seedsPastBookings,
   seedsPersonas,
   startLine,
   type SeedExit,
@@ -21,6 +23,7 @@ import { db } from '@/server/db/client';
 import { seedCaller } from './caller';
 import { readPhotoCoverageGaps, seedTestPhotos } from './photos';
 import { seedPersonas } from './personas';
+import { seedReviews } from './reviews';
 import { readSeedSnapshot } from './read';
 import { runSeed } from './run';
 
@@ -79,6 +82,10 @@ export async function runSeedCommand(command: SeedCommand): Promise<number> {
       scale: args.scale,
       log: write,
     });
+    if (seedsPastBookings(verdict.target)) {
+      const past = await seedReviews(seedCaller, command.now);
+      write(reviewsLine(past.bookings, past.reviews));
+    }
     if (seedsPersonas(verdict.target)) {
       write(personasLine(await seedPersonas(seedCaller)));
     }

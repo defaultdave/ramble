@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   readTestClock: vi.fn(),
   writeTestClock: vi.fn(),
   resetDemoData: vi.fn(),
+  queueReviewInviteNow: vi.fn(),
   logError: vi.fn(),
 }));
 
@@ -43,6 +44,9 @@ vi.mock('@/server/monitoring/logger', () => ({
   logger: { error: mocks.logError },
 }));
 vi.mock('@/server/pulse', () => ({ runPulse: mocks.runPulse }));
+vi.mock('@/server/jobs/reviewInviteSchedule', () => ({
+  queueReviewInviteNow: mocks.queueReviewInviteNow,
+}));
 vi.mock('@/server/testClock', () => ({
   readTestClock: mocks.readTestClock,
   writeTestClock: mocks.writeTestClock,
@@ -53,6 +57,7 @@ import {
   resetDemoDataAction,
   runOpsJobAction,
   runOpsPulseAction,
+  sendReviewInviteAction,
   setOpsClockAction,
 } from './opsDev';
 
@@ -63,6 +68,7 @@ import {
 // - drain and pulse run on the real clock, or on the test clock as `asOf`; a pulse sends no heartbeat; both report their counts in the address
 // - a test clock is refused with its notice, and nothing runs, when DEMO_CLOCK is off or the time is out of the 400-day window
 // - reset demo data: refused like the rest on production and for a caller without the role; without the typed word exactly it does nothing; with it, it resets on the real time and ends on its notice, or on the failed notice when the reset throws
+// - send a review invite now: refused like the rest on production and for a caller without the role; a form with no booking id goes back to the page; the booking is queued as the caller, and its notice says queued or not invitable
 // - set, advance and reset write the test clock; advance starts from the stored time; a bad form, or a set the deployment will not run at, writes nothing
 
 const id = '0f1e2d3c-4b5a-4697-8a9b-0c1d2e3f4a5b';
@@ -105,6 +111,7 @@ const actions = [
   ['pulse', () => runOpsPulseAction()],
   ['clock', () => setOpsClockAction(form({ intent: 'reset' }))],
   ['reset demo data', () => resetDemoDataAction(form({ confirm: 'RESET' }))],
+  ['send a review invite', () => sendReviewInviteAction(form({ orderId: id }))],
 ] as const;
 
 function expectNothingDone() {
@@ -113,6 +120,7 @@ function expectNothingDone() {
   expect(mocks.runPulse).not.toHaveBeenCalled();
   expect(mocks.writeTestClock).not.toHaveBeenCalled();
   expect(mocks.resetDemoData).not.toHaveBeenCalled();
+  expect(mocks.queueReviewInviteNow).not.toHaveBeenCalled();
 }
 
 beforeEach(() => {
@@ -122,6 +130,7 @@ beforeEach(() => {
   mocks.readOpsCaller.mockResolvedValue(ops);
   mocks.readTestClock.mockResolvedValue(undefined);
   mocks.runJobById.mockResolvedValue('succeeded');
+  mocks.queueReviewInviteNow.mockResolvedValue('queued');
   mocks.drainJobs.mockResolvedValue(counts);
   mocks.runPulse.mockResolvedValue({
     ...counts,
@@ -159,6 +168,32 @@ describe('who may use the console', () => {
       'notice=drained',
     );
     expect(mocks.drainJobs).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('sendReviewInviteAction', () => {
+  it('goes back to the page for a form with no booking id, and queues nothing', async () => {
+    expect(await hrefOf(() => sendReviewInviteAction(form()))).toBe('/ops/dev');
+    expect(mocks.queueReviewInviteNow).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['queued', 'invite_queued'],
+    ['not_eligible', 'invite_not_eligible'],
+  ])('a booking that comes back %s ends on %s', async (outcome, notice) => {
+    mocks.queueReviewInviteNow.mockResolvedValue(outcome);
+    expect(
+      await hrefOf(() => sendReviewInviteAction(form({ orderId: id }))),
+    ).toBe(`/ops/dev?notice=${notice}`);
+  });
+
+  it('queues the chosen booking as the caller', async () => {
+    mocks.readOpsCaller.mockResolvedValue(admin);
+    await hrefOf(() => sendReviewInviteAction(form({ orderId: id })));
+    expect(mocks.queueReviewInviteNow).toHaveBeenCalledExactlyOnceWith(
+      admin,
+      id,
+    );
   });
 });
 

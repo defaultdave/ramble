@@ -3,8 +3,12 @@ import {
   buildOpsJobRow,
   devConsoleOpen,
   holdsDevConsoleRole,
+  inviteNoticeFor,
+  invitableOrderOptions,
   nextClockInstant,
   parseClockForm,
+  opsDevNoticeCodes,
+  opsDevNotices,
   parseStoredClock,
   reportCounts,
   reportLine,
@@ -20,6 +24,8 @@ import {
 // - advancing moves the test time on, or the real time when none is set; reset clears it
 // - a stored test time that is not a time reads as none
 // - a job row says its status in words, its attempts as "n of max", and is runnable only while waiting
+// - queueing an invite answers with the queued notice, or with the not-invitable one
+// - the console offers each invitable booking by id, with its reference, experience and end time in UTC, and every notice code has a notice
 // - a run's address carries whole-number counts only, and the line it shows is built from those and no other text
 
 const form = (fields: Record<string, string>) => (name: string) =>
@@ -148,6 +154,58 @@ describe('utcLabel', () => {
       '2026-11-20 08:05 UTC',
     );
   });
+});
+
+describe('invitableOrderOptions', () => {
+  it('offers each booking by its id, labelled with reference, experience and end time in UTC, in the order given', () => {
+    expect(
+      invitableOrderOptions([
+        {
+          orderId: 'a0000000-0000-4000-8000-000000000001',
+          reference: 'RMB-7K3M9Q',
+          experienceName: 'Sunset kayak',
+          endsAt: new Date('2026-11-10T23:00:00Z'),
+        },
+        {
+          orderId: 'a0000000-0000-4000-8000-000000000002',
+          reference: 'RMB-2H4J6N',
+          experienceName: 'Wheel throwing',
+          endsAt: new Date('2026-11-08T21:30:00Z'),
+        },
+      ]),
+    ).toEqual([
+      {
+        value: 'a0000000-0000-4000-8000-000000000001',
+        label: 'RMB-7K3M9Q · Sunset kayak · ended 2026-11-10 23:00 UTC',
+      },
+      {
+        value: 'a0000000-0000-4000-8000-000000000002',
+        label: 'RMB-2H4J6N · Wheel throwing · ended 2026-11-08 21:30 UTC',
+      },
+    ]);
+  });
+
+  it('offers nothing when there is nothing to offer', () => {
+    expect(invitableOrderOptions([])).toEqual([]);
+  });
+});
+
+describe('inviteNoticeFor', () => {
+  it.each([
+    ['queued', 'invite_queued'],
+    ['not_eligible', 'invite_not_eligible'],
+  ] as const)('answers %s with the %s notice', (queued, code) => {
+    expect(inviteNoticeFor(queued)).toBe(code);
+  });
+});
+
+describe('the console notices', () => {
+  it.each(opsDevNoticeCodes)(
+    'has a notice with a tone and a title for %s',
+    (code) => {
+      expect(opsDevNotices[code].title.length).toBeGreaterThan(0);
+    },
+  );
 });
 
 describe('buildOpsJobRow', () => {

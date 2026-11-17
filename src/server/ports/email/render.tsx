@@ -18,6 +18,7 @@ import { HostBookingNotice } from './templates/HostBookingNotice';
 import { HostInvite } from './templates/HostInvite';
 import { OpsNotice } from './templates/OpsNotice';
 import { PaidAfterLapse } from './templates/PaidAfterLapse';
+import { ReviewInvite } from './templates/ReviewInvite';
 import { SessionReminder } from './templates/SessionReminder';
 import { SignInLink } from './templates/SignInLink';
 
@@ -58,6 +59,9 @@ const markup: Markup = {
   'ops-notice': (data, helpUrl) => <OpsNotice data={data} helpUrl={helpUrl} />,
   'host-invite': (data, helpUrl) => (
     <HostInvite data={data} helpUrl={helpUrl} />
+  ),
+  'review-invite': (data, helpUrl) => (
+    <ReviewInvite data={data} helpUrl={helpUrl} />
   ),
   'sign-in-link': (data, helpUrl) => (
     <SignInLink data={data} helpUrl={helpUrl} />

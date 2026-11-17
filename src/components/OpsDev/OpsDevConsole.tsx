@@ -4,7 +4,13 @@ import { HiddenFields } from '@/components/HiddenFields';
 import { Input } from '@/components/Input';
 import { Select } from '@/components/Select';
 import { StatusBadge } from '@/components/StatusBadge';
-import { clockUnits, opsDevPath, type OpsJobRow } from '@/lib/opsDev';
+import { opsDevCopy } from '@/lib/copy/opsDev';
+import {
+  clockUnits,
+  opsDevPath,
+  type InvitableOrderOption,
+  type OpsJobRow,
+} from '@/lib/opsDev';
 import { resetConfirmPhrase } from '@/lib/seed/resetTarget';
 import type { TableQuery } from '@/lib/tableQuery';
 import styles from './OpsDev.module.css';
@@ -17,10 +23,13 @@ export type OpsDevActions = {
   pulse: FormAction;
   setClock: FormAction;
   reset: FormAction;
+  sendReviewInvite: FormAction;
 };
 
 export type OpsDevConsoleProps = {
   rows: readonly OpsJobRow[];
+  /** Bookings a review invite can be sent for now, newest first. */
+  invitableOrders: readonly InvitableOrderOption[];
   query: TableQuery;
   /** The test time now in words, or null when runs use the real time. */
   testTimeLabel: string | null;
@@ -29,11 +38,13 @@ export type OpsDevConsoleProps = {
   actions: OpsDevActions;
 };
 
+const invites = opsDevCopy.invites;
 const unitOptions = clockUnits.map((unit) => ({ value: unit, label: unit }));
 
 /** The jobs and the three things a tester does to them on a deployment nothing runs by itself: run one, drain the queue, pulse. Every control is a plain form, so it works with no script. */
 export function OpsDevConsole({
   rows,
+  invitableOrders,
   query,
   testTimeLabel,
   demoClockOn,
@@ -60,7 +71,14 @@ export function OpsDevConsole({
         row.runnable ? (
           <form action={actions.runJob}>
             <HiddenFields fields={[['jobId', row.id]]} />
-            <Button type="submit" variant="secondary">
+            <Button
+              type="submit"
+              variant="secondary"
+              aria-label={opsDevCopy.runJob.buttonName(
+                row.kind,
+                row.runAfterLabel,
+              )}
+            >
               Run {row.kind}
             </Button>
           </form>
@@ -88,6 +106,27 @@ export function OpsDevConsole({
             </Button>
           </form>
         </div>
+      </section>
+
+      <section className={styles.section} aria-labelledby="invite-heading">
+        <h2 id="invite-heading" className={styles.heading}>
+          {invites.heading}
+        </h2>
+        <p className={styles.muted}>{invites.intro}</p>
+        {invitableOrders.length === 0 ? (
+          <p className={styles.muted}>{invites.empty}</p>
+        ) : (
+          <form action={actions.sendReviewInvite} className={styles.form}>
+            <Select
+              name="orderId"
+              label={invites.bookingLabel}
+              options={invitableOrders}
+            />
+            <Button type="submit" variant="secondary">
+              {invites.send}
+            </Button>
+          </form>
+        )}
       </section>
 
       <section className={styles.section} aria-labelledby="clock-heading">

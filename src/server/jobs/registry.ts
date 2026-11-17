@@ -8,6 +8,7 @@ import {
 import { AuditExportPayloadSchema, auditExportKind } from '@/lib/audit';
 import { OpsNoticeDataSchema, opsNoticeKind } from '@/lib/email/opsNotice';
 import { MaxAttemptsSchema, jobLimits } from '@/lib/jobs';
+import { ReviewInvitePayloadSchema, reviewInviteKind } from '@/lib/reviews';
 import { GuestMovePayloadSchema } from '@/lib/moveBooking';
 import { GuestResendPayloadSchema, resendJobKind } from '@/lib/opsBookings';
 import {
@@ -38,6 +39,7 @@ import {
 import { sendOpsNotice } from './opsNotice';
 import { sendPaidAfterLapse } from './paidAfterLapseEmail';
 import { handleRefund, prepareRefund } from './refund';
+import { sendReviewInvite } from './reviewInvite';
 import { handleProviderEvent, prepareProviderEvent } from './providerEvents';
 
 type JobContext<Payload> = {
@@ -173,5 +175,10 @@ export const jobRegistry = {
     payload: GuestRefundPayloadSchema,
     maxAttempts: jobLimits.defaultMaxAttempts,
     handleIdempotent: sendGuestRefund,
+  }),
+  [reviewInviteKind]: defineJob({
+    payload: ReviewInvitePayloadSchema,
+    maxAttempts: jobLimits.defaultMaxAttempts,
+    handleIdempotent: sendReviewInvite,
   }),
 } satisfies JobRegistry;

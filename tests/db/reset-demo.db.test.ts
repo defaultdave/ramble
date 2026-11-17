@@ -1,5 +1,6 @@
 import { eq, getTableName, sql } from 'drizzle-orm';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { reviewFixtures } from '@/lib/seed/fixtures/reviews';
 import { insertGift } from './giftFixtures';
 import { insertHold } from './holdFixtures';
 import {
@@ -22,9 +23,10 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 setupRefundsDatabase(raise);
 
 // Behaviours under test, one per decision, branch, or risk:
-// - after a tester has made rows in every table the reset wipes (an order with its lines, payment attempt, ledger rows, refund,
+// - after a tester has made rows in every table the reset wipes (an order with its lines and review, payment attempt, ledger rows, refund,
 //   transfer and provider event; a hold with its line; a gift with its line; a message and a bounce; jobs), the reset leaves
-//   every one of those tables empty, in one go, with the foreign keys between them in the way
+//   every one of those tables empty of what the tester made, in one go, with the foreign keys between them in the way
+// - the seed's past bookings and reviews are the one thing those tables hold afterwards: one order, hold, and line each, and one review per reviewed booking
 // - what the seed owns stays, and a session a tester filled is back to the seats the seed gives it
 // - the ledger refuses to be emptied again once the reset is over (the guard was lifted only inside it)
 
@@ -64,6 +66,12 @@ async function makeTesterRows() {
     .from(schema.orders)
     .where(eq(schema.orders.id, world.orderId));
   if (!order?.holdId) throw new Error('no order or hold');
+  await db.insert(schema.reviews).values({
+    orderId: order.id,
+    experienceId: order.experienceId,
+    rating: 4,
+    body: 'A review a tester left',
+  });
   await db.insert(schema.holdItems).values({
     holdId: order.holdId,
     priceOptionId: parents.priceOptionId,
@@ -172,16 +180,33 @@ describe('resetDemoData', () => {
 
     const report = await reset.resetDemoData({ now });
 
+    const past = reviewFixtures.length;
+    const kept: Record<string, number> = {
+      orders: past,
+      order_items: past,
+      holds: past,
+      hold_items: past,
+      reviews: reviewFixtures.filter((f) => f.review !== null).length,
+    };
     for (const table of reset.wipedTables) {
-      expect(await rowsIn(table), getTableName(table)).toBe(0);
+      expect(await rowsIn(table), getTableName(table)).toBe(
+        kept[getTableName(table)] ?? 0,
+      );
     }
-    expect(await catalogue()).toEqual(keptBefore);
+    // The past bookings are made by guests who stay, so the reset adds them as guests.
+    const bookers = new Set(reviewFixtures.map((f) => f.bookerEmail)).size;
+    expect(await catalogue()).toEqual({
+      ...keptBefore,
+      guests: (keptBefore?.guests ?? 0) + bookers,
+    });
     const seatsAfterReset = await seatsSold();
     for (const [id, seats] of seatsAfterSeed) {
       expect(seatsAfterReset.get(id), id).toBe(seats);
     }
+    // Past sessions of the past bookings are new rows, with the seats those bookings took.
+    const pastSeats = reviewFixtures.reduce((n, f) => n + f.seats, 0);
     expect([...seatsAfterReset.values()].reduce((a, b) => a + b, 0)).toBe(
-      [...seatsAfterSeed.values()].reduce((a, b) => a + b, 0),
+      [...seatsAfterSeed.values()].reduce((a, b) => a + b, 0) + pastSeats,
     );
     expect(report.curated.experiences).toBeGreaterThan(0);
   });

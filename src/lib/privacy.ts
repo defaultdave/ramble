@@ -225,6 +225,15 @@ export const piiColumns: readonly PiiColumn[] = [
       "Not yet anonymized: the same step as the request's own message, keyed on the sender's address",
   },
   {
+    table: 'reviews',
+    column: 'body',
+    kind: 'identifier',
+    data: 'Free text a verified booker wrote about a session, which can name the host, a companion, or the writer',
+    location: databaseLocation,
+    deletionPath:
+      "Not yet anonymized: a review is public once shown, so the erasure step (delete the text, or detach the review from its order) is added with the review display and moderation work, keyed on the order's guest",
+  },
+  {
     table: 'private_requests',
     column: 'name',
     kind: 'identifier',
@@ -453,6 +462,10 @@ export const nonPiiColumns: readonly {
   ...notPersonal('support_requests', aRandomId, ['id']),
   ...notPersonal('support_requests', aFixedList, ['topic']),
   ...notPersonal('support_requests', aTime, ['created_at', 'resolved_at']),
+  ...notPersonal('reviews', aRandomId, ['id']),
+  ...notPersonal('reviews', structure, ['order_id', 'experience_id', 'rating']),
+  ...notPersonal('reviews', aFixedList, ['status']),
+  ...notPersonal('reviews', aTime, ['created_at', 'updated_at']),
   ...notPersonal('private_requests', aRandomId, ['id', 'experience_id']),
   ...notPersonal(
     'private_requests',

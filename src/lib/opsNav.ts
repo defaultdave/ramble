@@ -1,7 +1,9 @@
 import { opsEditorialContentCopy } from '@/lib/copy/opsEditorialContent';
 import { opsEditorialSectionsCopy } from '@/lib/copy/opsEditorialSections';
 import { opsRequestsCopy } from '@/lib/copy/opsRequests';
+import { reviewModerationCopy } from '@/lib/copy/reviewModeration';
 import { opsRequestsPath } from './opsRequests';
+import { reviewModerationPath } from './reviewModeration';
 
 export type OpsNavLink = {
   label: string;
@@ -66,6 +68,11 @@ export const opsNavLinks: readonly OpsNavLink[] = [
     label: 'Review queue',
     href: '/ops/review',
     summary: 'Approve experiences waiting for review, or send them back.',
+  },
+  {
+    label: reviewModerationCopy.nav.label,
+    href: reviewModerationPath,
+    summary: reviewModerationCopy.nav.summary,
   },
   {
     label: 'Staff',

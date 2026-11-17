@@ -3,13 +3,18 @@ import { count } from './format';
 // The review form and the states a review link can open to. The link comes from an email, so the
 // copy never names a booking beyond the experience and the day the booker already knows.
 
+/** "4 out of 5", the one wording of a rating against its top mark. */
+const outOf = (rating: number | string, max: number) =>
+  `${String(rating)} out of ${String(max)}`;
+
 export const reviewCopy = {
   /** What guests read of reviews already posted: the experience page's list and the rating beside a card. */
   display: {
     /** Stands for a booker with no name on the order. */
     anonymousGuest: 'A guest',
     /** What a screen reader says of one review's stars. */
-    ratedOutOf: (rating: number | string) => `Rated ${String(rating)} out of 5`,
+    outOf,
+    ratedOutOf: (rating: number | string) => `Rated ${outOf(rating, 5)}`,
     /** What a screen reader says of the mean and the count together. */
     ratedFrom: (average: string, reviewCount: number) =>
       `Rated ${average} out of 5 from ${count(reviewCount, 'review')}`,

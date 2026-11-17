@@ -57,7 +57,11 @@ export function SessionResultHost({ children }: { children: ReactNode }) {
   }, [result]);
 
   return (
-    <ReportDone value={(message) => setResult({ message })}>
+    <ReportDone
+      value={(message) => {
+        setResult({ message });
+      }}
+    >
       {result ? (
         <div ref={noticeRef} tabIndex={-1} className={styles.notice}>
           <Alert tone="success" title={result.message} />

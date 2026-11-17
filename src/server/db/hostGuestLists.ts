@@ -19,20 +19,15 @@ import {
   Role,
   type Caller,
 } from '@/server/auth/caller';
-import { liveBookings, selectBookings } from './bookingRows';
+import { liveBookings, seatsOf, selectBookings } from './bookingRows';
 import { db } from './client';
-import { experiences, hosts, orderItems, orders, sessions } from './schema';
+import { experiences, hosts, orders, sessions } from './schema';
 
 // Guest personal data (names, emails, phones, children's ages, guardians) leaves here only for the
 // host that owns the booking (PRD-73). The caller is checked against `hostId` before anything is
 // read, and every query is cut to that host. Read-only host staff get the booking facts and the
 // booker's contact details, never the children's ages or the guardian: their query does not select
 // those columns and their data type has no such fields; they are the host owner's.
-
-const seatsOf = sql<number>`coalesce((
-  select sum(${orderItems.quantity})::int from ${orderItems}
-  where ${orderItems.orderId} = ${orders.id} and ${orderItems.usesSpace}
-), 0)`;
 
 /**
  * A host's bookings, latest first, confirmed and cancelled, optionally those whose reference

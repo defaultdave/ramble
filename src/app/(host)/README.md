@@ -129,7 +129,7 @@ flowchart TD
 | Component | Kind | File | Notes |
 | --- | --- | --- | --- |
 | HostSessionsPage | server | [sessions/page.tsx](./host/sessions/page.tsx) | Reads `?week=`. Owner or staff. Passes the six actions to the view as one prop. |
-| loadHostWeek, readHostWeek | server read | [hostSessions.ts](../../server/hostSessions.ts), [sessions.ts](../../server/db/sessions.ts) | Per request. Repeats the gate by hand instead of using `loadForHostArea`. `buildHostWeek` sets `canEdit` for an owner only. |
+| loadHostWeek, readHostWeek | server read | [hostSessions.ts](../../server/hostSessions.ts), [sessions.ts](../../server/db/sessions.ts) | Per request. Goes through `loadForHostArea` with staff allowed. `buildHostWeek` sets `canEdit` for an owner only. |
 | HostSessions | server | [HostSessions.tsx](../../components/HostSessions/HostSessions.tsx) | Heading, week nav, then the days and rows. |
 | SessionResultHost | client | [HostSessionForms.tsx](../../components/HostSessions/HostSessionForms.tsx) | Wraps the sections. Holds the success notice of a cancelled session, whose own form unmounts when the row stops being editable, and focuses it. Uses Alert. |
 | AccountControl | server | [AccountControl.tsx](../../components/Header/AccountControl.tsx) | Same sign out control as the dashboard. |
@@ -206,7 +206,7 @@ flowchart TD
 | Component | Kind | File | Notes |
 | --- | --- | --- | --- |
 | HostBookingsPage | server | [bookings/page.tsx](./host/bookings/page.tsx) | Reads `?q=`. Owner or staff. |
-| loadHostBookings, readHostBookings | server read | [hostGuestLists.ts](../../server/hostGuestLists.ts), [hostGuestLists.ts](../../server/db/hostGuestLists.ts) | Runs `requireAnyRole` for the host, then narrows by the search term. |
+| loadHostBookings, readHostBookings | server read | [hostGuestLists.ts](../../server/hostGuestLists.ts), [hostGuestLists.ts](../../server/db/hostGuestLists.ts) | Goes through `loadForHostArea` with staff allowed; the read runs `requireAnyRole` for the host, then narrows by the search term. |
 | HostGuestLists | server | [HostGuestLists.tsx](../../components/HostGuestLists/HostGuestLists.tsx) | The list view. |
 | PageHeading | server | [PageHeading.tsx](../../components/PageHeading.tsx) | Page title. |
 | SearchField | server | [SearchField.tsx](../../components/SearchField/SearchField.tsx) | A GET form. The term lives in the address and it works with no script. |
@@ -235,7 +235,7 @@ flowchart TD
 | Component | Kind | File | Notes |
 | --- | --- | --- | --- |
 | HostGuestListPage | server | [session/[sessionId]/page.tsx](./host/bookings/session/%5BsessionId%5D/page.tsx) | Reads `params.sessionId`. Owner or staff. A bad id, a missing session and another host's session all end in not found. |
-| loadHostGuestList, readHostGuestList | server read | [hostGuestLists.ts](../../server/hostGuestLists.ts), [hostGuestLists.ts](../../server/db/hostGuestLists.ts) | Runs `parseSessionId`, then the read checks the session is on the caller's host. |
+| loadHostGuestList, readHostGuestList | server read | [hostGuestLists.ts](../../server/hostGuestLists.ts), [hostGuestLists.ts](../../server/db/hostGuestLists.ts) | Runs `parseSessionId`, goes through `loadForHostArea` with staff allowed, then the read checks the session is on the caller's host. |
 | HostGuestList | server | [HostGuestList.tsx](../../components/HostGuestList/HostGuestList.tsx) | Heading, a link back to bookings, then the guest rows. |
 | PageHeading | server | [PageHeading.tsx](../../components/PageHeading.tsx) | Page title. |
 | GuestRow x n | server | [HostGuestList.tsx](../../components/HostGuestList/HostGuestList.tsx) | One row per guest. |
@@ -334,7 +334,7 @@ flowchart TD
 | Component | Kind | File | Notes |
 | --- | --- | --- | --- |
 | HostStaffPage | server | [staff/page.tsx](./host/staff/page.tsx) | Owner only. Staff are refused. Builds `PageHeading`, `ActionNotice` and `StaffView` itself. |
-| loadHostStaff, readHostStaff | server read | [hostStaff.ts](../../server/hostStaff.ts), [staffRoles.ts](../../server/db/staffRoles.ts) | Owner only. |
+| loadHostStaff, readHostStaff | server read | [hostStaff.ts](../../server/hostStaff.ts), [staffRoles.ts](../../server/db/staffRoles.ts) | Goes through `loadForHostArea`, owner only. |
 | PageHeading | server | [PageHeading.tsx](../../components/PageHeading.tsx) | Page title. |
 | ActionNotice | server | [ActionNotice](../../components/ActionNotice/) | Shows the notice code after an action. |
 | StaffView | server | [StaffView.tsx](../../components/StaffAdmin/StaffView.tsx) | Shared with the ops staff admin. Invite form, a `DataTable` of staff, and per-row resend and revoke forms, all plain `<form action>`. |
@@ -418,7 +418,7 @@ Tag names are in [cacheTags.ts](../../lib/cacheTags.ts). The settings changes co
 
 ## Worth knowing
 
-- The gate is repeated, not shared. The layout has no check by design, and each of the eight pages repeats the same three-line branch. Only the dashboard, experiences, settings and cancel loaders use `loadForHostArea` (in [hostArea.ts](../../server/hostArea.ts)). The week, bookings, guest list and staff loaders rebuild the caller, access and host steps by hand. A new host page that forgets the branch would render for anyone, with the read the only thing stopping it.
+- The gate is shared, and the layout has no check by design. Every host loader (dashboard, week, bookings, guest list, experiences, settings, staff, cancel) goes through `loadForHostArea` (in [hostArea.ts](../../server/hostArea.ts)) and decides with `hostAreaResult`. A new host page that skips them would render for anyone, with the read the only thing stopping it.
 - The catch-all answers 200. An unknown `/host/x` shows the not-found page with status 200, and the page appears only once script runs, because the empty shell has no heading. The code comment says why: a render resumed from the shell cannot change the status.
 - A capacity change clears less than a time or price change. It clears only `session:<id>`, not `experience:<id>`, so the experience page's cached data is not rebuilt by it.
 - Staff are stopped twice on owner pages. The page refuses them, and the db read needs `host_owner`. On sessions they get the page without forms, and publishing uses the owned host only.

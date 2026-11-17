@@ -2,7 +2,7 @@ import 'server-only';
 import { and, asc, eq, inArray, isNull, type SQL } from 'drizzle-orm';
 import { EntityIdSchema } from '@/lib/catalog';
 import { EmailAddressSchema, normalizeEmailAddress } from '@/lib/email/address';
-import { hostStaffGrant, maxHostStaff } from '@/lib/hostStaff';
+import { hostStaffGrant, staffCapDecision } from '@/lib/hostStaff';
 import { isValidGrantScope, type RoleGrant } from '@/lib/roleGrants';
 import {
   groupStaff,
@@ -159,8 +159,7 @@ export async function grantHostStaff(
   const address = EmailAddressSchema.parse(normalizeEmailAddress(email));
   const actorId = requireHostOwnerId(caller, id);
   const held = await listGrantHolders(hostStaffMatch(id));
-  const alreadyStaff = held.some((holder) => holder.email === address);
-  if (!alreadyStaff && held.length >= maxHostStaff) return 'cap_reached';
+  if (staffCapDecision(held, address) === 'cap_reached') return 'cap_reached';
   return grantRoleToAddress(
     { kind: 'user', userId: actorId },
     address,

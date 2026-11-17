@@ -2,7 +2,7 @@
 // code from the PR. Env: PR_TITLE, BASE_REF, HEAD_REF, PR_HEAD (a local ref for the PR head).
 import { readFileSync } from "node:fs";
 
-export const PROTECTED = [".github/", ".claude/", "CLAUDE.md", "scripts/merge-desk/", "docs/adr/", "docs/plan/"];
+export const PROTECTED = [".github/", ".claude/", "CLAUDE.md", "scripts/merge-desk/", "docs/adr/", "docs/plan/", "eslint.config", "tsconfig"];
 export const BOOKKEEPING_FILES = ["docs/plan/units.yaml", "docs/plan/STATUS.md", "docs/plan/delta-log.md"];
 
 export type Tier = "standard" | "critical";

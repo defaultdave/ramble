@@ -365,6 +365,26 @@ describe('cancelSessionAsOps', () => {
     ).toMatchObject({ kind: 'done', result: { ordersRefunded: 2 } });
   });
 
+  it.each(['', 'nope', '1:2:3', '1:2:3:4:5:6:7', '-1:0:0:0:0:0'])(
+    'treats a malformed fingerprint %j as stale and writes nothing',
+    async (fingerprint) => {
+      const session = await newSession();
+      await seedConfirmedOn(session.id, 2);
+      const before = await auditCount();
+
+      expect(
+        await data.cancelSessionAsOps(ops, {
+          sessionId: session.id,
+          reason: 'ramble',
+          fingerprint,
+        }),
+      ).toEqual({ kind: 'stale' });
+
+      expect(await auditCount()).toBe(before);
+      expect((await sessionOf(session.id)).status).toBe('scheduled');
+    },
+  );
+
   it('refuses a session that has started, whatever the form said, and writes nothing', async () => {
     const session = await newSession({
       startsAt: new Date(Date.now() - day),

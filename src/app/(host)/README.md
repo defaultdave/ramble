@@ -1,10 +1,10 @@
 # Host area page map
 
-`/host`, `/host/sessions`, `/host/bookings`, `/host/bookings/session/[sessionId]`, `/host/experiences`, `/host/settings`, `/host/staff`, `/host/[...unknown]`
+`/host`, `/host/sessions`, `/host/sessions/[id]/cancel`, `/host/bookings`, `/host/bookings/session/[sessionId]`, `/host/experiences`, `/host/settings`, `/host/staff`, `/host/[...unknown]`
 
 Read from main at 2db68ea (2026-11-15). A PR that changes this tree (a component, a Suspense or client boundary, a cache tag, an action) updates this file in the same PR.
 
-Every page under `src/app/(host)/` is for signed-in hosts. The area shares one layout, has a dashboard and six more pages, has no cached reads and no Suspense boundary, and ships very little client code.
+Every page under `src/app/(host)/` is for signed-in hosts. The area shares one layout, has a dashboard and seven more pages, has no cached reads and no Suspense boundary, and ships very little client code.
 
 ## Legend
 
@@ -103,6 +103,7 @@ flowchart TD
     SR["SessionRow x n"]:::server
     ESF["EditSessionForms"]:::client
     EA["update capacity, time, price and cancel actions"]:::action
+    CL["ButtonLink Cancel and refund guests<br/>booked rows, owner only"]:::server
     AOF["AddOneOffForm"]:::client
     AOA["addOneOffSessionAction"]:::action
     SP -.-> LW
@@ -114,6 +115,7 @@ flowchart TD
     PWF -.-> PWA
     SRH --> SR
     SR --> ESF
+    SR --> CL
     ESF -.-> EA
     SRH --> AOF
     AOF -.-> AOA
@@ -136,9 +138,48 @@ flowchart TD
 | publishWeekAction | action | [hostSessions.ts](../../server/actions/hostSessions.ts) | For an owner of a host only. The host comes from the grant. |
 | SessionRow x n | server | [HostSessions.tsx](../../components/HostSessions/HostSessions.tsx) | Server markup per session. |
 | EditSessionForms | client | [HostSessionForms.tsx](../../components/HostSessions/HostSessionForms.tsx) | Owner, editable rows only. A `details` holding four forms (Alert, Button, Input, Select), with a hidden session id and expected version. |
+| ButtonLink Cancel and refund guests | server | [HostSessions.tsx](../../components/HostSessions/HostSessions.tsx) | Owner only, on an upcoming scheduled session with seats sold (`cancelHref` from `rowView`). Goes to the cancel page below; the in-row cancel form is for unbooked sessions. |
 | updateSessionCapacityAction, updateSessionTimeAction, updateSessionPriceAction, cancelSessionAction | action | [hostSessions.ts](../../server/actions/hostSessions.ts) | Each runs `run()`: schema parse, `getCaller()`, a db function that checks the session is on the caller's host, then `revalidatePath('/host/sessions')`. |
 | AddOneOffForm | client | [HostSessionForms.tsx](../../components/HostSessions/HostSessionForms.tsx) | Owner with at least one experience. |
 | addOneOffSessionAction | action | [hostSessions.ts](../../server/actions/hostSessions.ts) | Adds one session to an experience of the caller's host. |
+
+#### `/host/sessions/[id]/cancel`
+
+```mermaid
+flowchart TD
+    CP["HostCancelSessionPage<br/>reads id and notice"]:::server
+    LC["loadHostCancel and readHostSessionCancel"]:::server
+    AN["ActionNotice"]:::server
+    HC["HostCancelSession"]:::server
+    PH["PageHeading and AccountControl"]:::server
+    IM["Who this affects<br/>summary, bookings, blocked text"]:::server
+    FM["form with Button submit<br/>session, impact read, confirm box"]:::client
+    CA["cancelHostSessionAction"]:::action
+    CP -.-> LC
+    CP --> AN
+    CP --> HC
+    HC --> PH
+    HC --> IM
+    HC --> FM
+    FM -.-> CA
+    classDef server fill:#e8edf8,stroke:#3b5bab,color:#1b1f27
+    classDef cached fill:#e2f3f0,stroke:#0f7a6c,color:#1b1f27
+    classDef streamed fill:#fbefdc,stroke:#a3610a,color:#1b1f27
+    classDef client fill:#f5e6f8,stroke:#8a2f9c,color:#1b1f27
+    classDef action fill:#fbe6e4,stroke:#b3261e,color:#1b1f27
+```
+
+| Component | Kind | File | Notes |
+| --- | --- | --- | --- |
+| HostCancelSessionPage | server | [sessions/[id]/cancel/page.tsx](./host/sessions/%5Bid%5D/cancel/page.tsx) | Reads `params.id` and `?notice=`. Owner only. Signed out goes to sign in and back; staff, ops, admin, a guest, another host's session, a missing session and a bad id all end in not found. |
+| loadHostCancel, readHostSessionCancel | server read | [hostCancelSession.ts](../../server/hostCancelSession.ts), [hostCancelSession.ts](../../server/db/hostCancelSession.ts) | Through `loadForHostArea` with staff not allowed. The read checks `requireRole(host_owner)` for the grant's host, finds the session on that host only, and reads the impact with `readImpact` (shared with the ops session page, in [sessionImpact.ts](../../server/db/sessionImpact.ts); it takes the caller and the host as its scope and refuses anyone but ops, admin or that host's owner). It writes no audit row. |
+| buildHostCancelView, hostCancelCheck | pure lib | [hostCancelSession.ts](../../lib/hostCancelSession.ts) | Decides the state (ready, blocked, started, completed, cancelled), decides whether a submit is refused as ended, blocked or stale (`hostCancelCheck`; an already cancelled session proceeds), and words the impact with `impactView`, the same words ops shows. Copy is in [hostSessions.ts](../../lib/copy/hostSessions.ts). |
+| ActionNotice | server | [ActionNotice](../../components/ActionNotice/) | The answer after a try: cancelled, payments left, already cancelled, stale, blocked, in the past, not found or invalid. |
+| HostCancelSession | server | [HostCancelSession.tsx](../../components/HostCancelSession/HostCancelSession.tsx) | Session facts, then who it affects, then the confirmation. A session that cannot be cancelled shows its reason in place of the form. |
+| PageHeading, AccountControl | server | [PageHeading.tsx](../../components/PageHeading.tsx), [AccountControl.tsx](../../components/Header/AccountControl.tsx) | Same as the other host pages. |
+| Impact list | server | [HostCancelSession.tsx](../../components/HostCancelSession/HostCancelSession.tsx) | The summary line, each booking with its refund, how many more, and the blocked booking's text. |
+| form, Button (submit) | client | [Button.tsx](../../components/Button/Button.tsx) | A plain `<form action={serverAction}>`: it works with no script. It posts the session id, the fingerprint of the impact that was read, and the ticked box. |
+| cancelHostSessionAction | action | [hostCancelSession.ts](../../server/actions/hostCancelSession.ts) | Reads the form, gets the caller, takes the host from the owner's grant, calls `cancelSessionAsHost`, refreshes `/host/sessions`, and redirects back with a notice. |
 
 #### `/host/bookings`
 
@@ -335,6 +376,7 @@ The gate is not in the proxy or the layout. `src/proxy.ts` only sets the CSP non
 | --- | --- | --- |
 | `/host` | yes, four links | yes, Sessions link only |
 | `/host/sessions` | yes, with forms | read only, no forms |
+| `/host/sessions/[id]/cancel` | yes | not found |
 | `/host/bookings` and a session's guest list | yes | yes |
 | `/host/experiences` | yes | not found |
 | `/host/settings` | yes | not found |
@@ -351,6 +393,7 @@ Ops and admin hold no host grant, so here they are no_host_role and see not foun
 ## Actions by page
 
 - `/host/sessions`: six actions through `useActionState`. Each returns a state (done, problem, invalid, failed) and the page refreshes with `revalidatePath('/host/sessions')`.
+- `/host/sessions/[id]/cancel`: `cancelHostSessionAction`, a plain form post that ends in a redirect with `?notice=`. `cancelSessionAsHost` refuses a started session, a booking that cannot be refunded in full, and an impact that changed since the page was read, then calls `cancelSession` as the host's own cancellation. A repeat submit finds the session cancelled and answers already cancelled: one refund, one email per booking.
 - `/host/settings`: `updateHostSettingsAction`, a plain form post that ends in a redirect with `?notice=`.
 - `/host/staff`: invite, resend and revoke are plain form posts that redirect with a notice code.
 - Dashboard, bookings, guest list and experiences: no actions. The bookings search is a GET form.
@@ -363,6 +406,7 @@ Host pages read the database every time, so their own pages need no clearing. Th
 | --- | --- | --- |
 | Capacity saved | `session:<id>` | On the next request, in the spaces-left count of that session (`'use cache: remote'`). |
 | Time changed, session cancelled | `experience:<id>` and `session:<id>` | On the next request, in the experience page data, its upcoming dates and the spaces left. |
+| Booked session cancelled from its cancel page | `experience:<id>` and `session:<id>`, by `cancelSession` | The same as an unbooked cancel. Refunds and guest emails go through the outbox, not the page. |
 | Price saved | `experience:<id>` | On the next request, in the experience page data and dates for that experience. |
 | One-off session added | `experience:<id>` | On the next request, in the experience page and upcoming dates. |
 | Week published | `experience:<id>` for each experience that gained a session | On the next request, in the same reads. A week that adds nothing clears nothing. |
@@ -374,7 +418,7 @@ Tag names are in [cacheTags.ts](../../lib/cacheTags.ts). The settings changes co
 
 ## Worth knowing
 
-- The gate is repeated, not shared. The layout has no check by design, and each of the seven pages repeats the same three-line branch. Only the dashboard, experiences and settings loaders use `loadForHostArea` (in [hostArea.ts](../../server/hostArea.ts)). The week, bookings, guest list and staff loaders rebuild the caller, access and host steps by hand. A new host page that forgets the branch would render for anyone, with the read the only thing stopping it.
+- The gate is repeated, not shared. The layout has no check by design, and each of the eight pages repeats the same three-line branch. Only the dashboard, experiences, settings and cancel loaders use `loadForHostArea` (in [hostArea.ts](../../server/hostArea.ts)). The week, bookings, guest list and staff loaders rebuild the caller, access and host steps by hand. A new host page that forgets the branch would render for anyone, with the read the only thing stopping it.
 - The catch-all answers 200. An unknown `/host/x` shows the not-found page with status 200, and the page appears only once script runs, because the empty shell has no heading. The code comment says why: a render resumed from the shell cannot change the status.
 - A capacity change clears less than a time or price change. It clears only `session:<id>`, not `experience:<id>`, so the experience page's cached data is not rebuilt by it.
 - Staff are stopped twice on owner pages. The page refuses them, and the db read needs `host_owner`. On sessions they get the page without forms, and publishing uses the owned host only.

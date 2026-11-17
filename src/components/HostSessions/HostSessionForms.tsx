@@ -1,6 +1,14 @@
 'use client';
 
-import { useActionState, useEffect, useRef, type ReactNode } from 'react';
+import {
+  createContext,
+  useActionState,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { Alert } from '@/components/Alert';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
@@ -33,10 +41,39 @@ export type HostSessionActions = {
 
 const idle: HostSessionFormState = { status: 'idle' };
 
+const ReportDone = createContext<((message: string) => void) | null>(null);
+
+/**
+ * Holds the success notice of a form whose own row leaves the page when it succeeds (a cancelled
+ * session stops being editable, so its form unmounts). The notice lives here, above every row, and
+ * takes focus so the result is announced and focus does not fall to the body.
+ */
+export function SessionResultHost({ children }: { children: ReactNode }) {
+  const [result, setResult] = useState<{ message: string } | null>(null);
+  const noticeRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (result) noticeRef.current?.focus();
+  }, [result]);
+
+  return (
+    <ReportDone value={(message) => setResult({ message })}>
+      {result ? (
+        <div ref={noticeRef} tabIndex={-1} className={styles.notice}>
+          <Alert tone="success" title={result.message} />
+        </div>
+      ) : null}
+      {children}
+    </ReportDone>
+  );
+}
+
 type ActionFormProps = {
   action: HostSessionAction;
   submitLabel: string;
   variant?: 'primary' | 'secondary';
+  /** Show a success in the page's result notice instead of in this form, for a form that leaves the page on success. */
+  reportDone?: boolean;
   children: (errors: HostSessionFieldErrors) => ReactNode;
 };
 
@@ -45,9 +82,24 @@ function ActionForm({
   action,
   submitLabel,
   variant = 'primary',
+  reportDone = false,
   children,
 }: ActionFormProps) {
-  const [state, formAction, pending] = useActionState(action, idle);
+  const report = useContext(ReportDone);
+  const announcedOutside = reportDone && report !== null;
+  const [state, formAction, pending] = useActionState<
+    HostSessionFormState,
+    FormData
+  >(
+    announcedOutside
+      ? async (previous, formData) => {
+          const next = await action(previous, formData);
+          if (next.status === 'done') report(next.message);
+          return next;
+        }
+      : action,
+    idle,
+  );
   const formRef = useRef<HTMLFormElement>(null);
   const noticeRef = useRef<HTMLDivElement>(null);
 
@@ -63,7 +115,7 @@ function ActionForm({
 
   return (
     <form ref={formRef} action={formAction} className={styles.form} noValidate>
-      {state.status === 'done' ? (
+      {state.status === 'done' && !announcedOutside ? (
         <div ref={noticeRef} tabIndex={-1} className={styles.notice}>
           <Alert tone="success" title={state.message} />
         </div>
@@ -172,6 +224,7 @@ export function EditSessionForms({
             action={actions.cancelSession}
             submitLabel="Cancel this session"
             variant="secondary"
+            reportDone
           >
             {() => <SessionIds row={row} />}
           </ActionForm>

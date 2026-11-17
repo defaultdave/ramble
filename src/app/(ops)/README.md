@@ -1,6 +1,6 @@
 # Ops area page map
 
-`/ops`, `/ops/mailbox`, `/ops/mailbox/[id]`, `/ops/dev`, `/ops/hosts`, `/ops/hosts/new`, `/ops/hosts/[id]`, `/ops/experiences`, `/ops/experiences/new`, `/ops/experiences/[id]`, `/ops/experiences/[id]/availability`, `/ops/review`, `/ops/review/[id]`, `/ops/sessions`, `/ops/sessions/[sessionId]`, `/ops/bookings`, `/ops/bookings/[id]`, `/ops/staff`, `/ops/support`, `/ops/audit`, and any other address under `/ops`
+`/ops`, `/ops/mailbox`, `/ops/mailbox/[id]`, `/ops/dev`, `/ops/hosts`, `/ops/hosts/new`, `/ops/hosts/[id]`, `/ops/experiences`, `/ops/experiences/new`, `/ops/experiences/[id]`, `/ops/experiences/[id]/availability`, `/ops/review`, `/ops/review/[id]`, `/ops/sessions`, `/ops/sessions/[sessionId]`, `/ops/bookings`, `/ops/bookings/[id]`, `/ops/staff`, `/ops/support`, `/ops/requests`, `/ops/audit`, and any other address under `/ops`
 
 Read from main at 2db68ea (2026-11-15). A PR that changes this tree (a component, a Suspense or client boundary, a cache tag, an action) updates this file in the same PR.
 
@@ -55,7 +55,7 @@ flowchart TD
 | SiteShell | server | [src/components/SiteShell.tsx](../../components/SiteShell.tsx) | Skip link, header (brand link and the word Operations), main, footer. No account control, no banner. |
 | OpsAreaNav | streamed | [src/app/(ops)/OpsAreaNav.tsx](OpsAreaNav.tsx) | Inside `Suspense fallback={null}`. Reads the caller, so it streams. Renders nothing unless the caller holds `ops`. It is not a gate. |
 | readOpsCaller | server (DB read) | [src/server/opsCaller.ts](../../server/opsCaller.ts) | Wraps `getCaller()`. A failure is logged and becomes the anonymous caller, never a role. |
-| holdsOpsRole and opsNavLinks | server (pure lib) | [src/lib/opsNav.ts](../../lib/opsNav.ts) | Roles must include `ops`; `admin` is not enough. Ten links: Dashboard, Mailbox, Hosts, Experiences, Support, Review queue, Staff, Sessions, Audit log, Bookings. The test console is not listed. |
+| holdsOpsRole and opsNavLinks | server (pure lib) | [src/lib/opsNav.ts](../../lib/opsNav.ts) | Roles must include `ops`; `admin` is not enough. Eleven links: Dashboard, Mailbox, Hosts, Experiences, Support, Private requests, Review queue, Staff, Sessions, Audit log, Bookings. The test console is not listed. |
 | OpsNav | server | [src/components/OpsShell/OpsShell.tsx](../../components/OpsShell/OpsShell.tsx) | A `nav` of plain links. |
 | Route page | server |  | Every ops page below. The layout does not wrap it in Suspense, and no page does either. |
 | RenderPerRequest | server | [src/app/renderPerRequest.tsx](../renderPerRequest.tsx) | Sits beside the shell, awaits `connection()`, renders nothing. Pins the whole tree to per-request rendering so every script carries the CSP nonce. |
@@ -88,7 +88,7 @@ Named once here. The page trees below list only what is particular to them.
 ### Audit logging
 
 - Writes: each change writes its audit row with `writeAudit(tx)` in the same transaction, so the row exists exactly when the change does. A change that differs by nothing writes neither.
-- Reads: sensitive reads are recorded with `recordAudit` before they return. These are the ops home, hosts (list, one, new form), sessions (list, one), bookings (list, one), staff, support, audit view, and mailbox (list, message, unlock).
+- Reads: sensitive reads are recorded with `recordAudit` before they return. These are the ops home, hosts (list, one, new form), sessions (list, one), bookings (list, one), staff, support, private requests, audit view, and mailbox (list, message, unlock).
 - Not recorded: experiences, review, availability, host suspension state, and the whole test console, including the demo data reset.
 
 ### Tools
@@ -564,6 +564,10 @@ flowchart TD
     dt2["DataTable"]:::server
     btn2["Button<br/>client submit buttons"]:::client
     rsr["resolveSupportRequestAction"]:::action
+    rq["PrivateRequestsPage<br/>/ops/requests"]:::server
+    rrq["readOpsPrivateRequests"]:::server
+    pq["PrivateRequestsQueue"]:::server
+    dt4["DataTable"]:::server
     au["AuditPage<br/>/ops/audit"]:::server
     pad["parseAuditDay and parseAuditCursor"]:::server
     rau["readAuditForOps"]:::server
@@ -584,6 +588,9 @@ flowchart TD
     sq --> dt2
     sq --> btn2
     btn2 -.-> rsr
+    rq -.-> rrq
+    rq --> pq
+    pq --> dt4
     au --> pad
     au -.-> rau
     au --> av
@@ -614,6 +621,10 @@ flowchart TD
 | DataTable | server | [src/components/DataTable/DataTable.tsx](../../components/DataTable/DataTable.tsx) | Sort links and a Next link; the cursor is in the address. |
 | Button | client | [src/components/Button/Button.tsx](../../components/Button/Button.tsx) | Every submit button. The file is `'use client'`, but the forms post to the action without it. |
 | resolveSupportRequestAction | action | [src/server/actions/opsSupport.ts](../../server/actions/opsSupport.ts) | `resolveSupportRequest`: marks it resolved with the note, audit row in the same transaction. |
+| PrivateRequestsPage | server | [src/app/(ops)/ops/requests/page.tsx](ops/requests/page.tsx) | Gate, then guests' private session requests, newest first. Read-only: a request has no status, so there is no filter. |
+| readOpsPrivateRequests | server (DB read) | [src/server/db/privateRequests.ts](../../server/db/privateRequests.ts) | Called with the cursor; joins the experience's name. Audited: `requests list`. |
+| PrivateRequestsQueue | server | [src/components/PrivateRequestsQueue/PrivateRequestsQueue.tsx](../../components/PrivateRequestsQueue/PrivateRequestsQueue.tsx) | The table: experience, requested day, group, budget, sender, message (cut to a line, the whole text behind a disclosure), received time. |
+| DataTable | server | [src/components/DataTable/DataTable.tsx](../../components/DataTable/DataTable.tsx) | Sort links and a Next link; the cursor is in the address. |
 | AuditPage | server | [src/app/(ops)/ops/audit/page.tsx](ops/audit/page.tsx) | Gate, then one day of the log, paged by id. |
 | parseAuditDay and parseAuditCursor | server (pure lib) | [src/lib/staffAdmin.ts](../../lib/staffAdmin.ts) | The day defaults to today by `systemClock`. |
 | readAuditForOps | server (DB read) | [src/server/db/auditView.ts](../../server/db/auditView.ts) | Audited: reading the log writes `audit viewed` for that day. |
@@ -678,7 +689,7 @@ Ops pages hold no cache of their own. Their changes reach the guest side through
 - Session and booking cancels clear caches more weakly than edits. Edits, pauses, approvals and seat changes use `updateTag`. Both cancels use `revalidateTag(..., 'max')`, so one guest response afterwards can still show the cancelled session as bookable. The `cancelSession` comment says it runs in a Server Action only, which would allow the stronger call.
 - A non-ops visitor gets a 200 sign-in page, and an unknown address is a 200 too. `OpsAccessDenied` is returned, not thrown. The catch-all calls `notFound()` after `connection()`, and the comment in [renderPerRequest.tsx](../renderPerRequest.tsx) admits the status stays 200 and the page appears only once script runs.
 - Reading the audit log writes to it. Opening `/ops/audit`, a blank new-host form, or the ops home each add a row. Experience, review and availability reads, and the entire test console including the demo data reset, write none.
-- The test console is not in the nav. `opsNavLinks` lists ten entries and no `/ops/dev`. It is the only page open to `admin`, and the only place a guard on the environment (`VERCEL_ENV`) decides what an action does.
+- The test console is not in the nav. `opsNavLinks` lists eleven entries and no `/ops/dev`. It is the only page open to `admin`, and the only place a guard on the environment (`VERCEL_ENV`) decides what an action does.
 - The mailbox has no ops check of its own. Its page skips `holdsOpsRole`; `loadMailbox` decides, and `unlockDevMailbox` is the one ops action that does not call `opsCallerOrLeave`.
 - Forms work without script, yet every submit button hydrates. `Button` is a `'use client'` file, so each form's button is a client component. The pages and views around it are server components, and `ButtonLink` deliberately is not.
 - The layout has its own root. [layout.tsx](layout.tsx) renders `html` and `body`. Nothing is shared with the guest layout, and `RenderPerRequest` sits beside the shell so no shell is prerendered.

@@ -1,4 +1,7 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import { Suspense } from 'react';
+import { isSlug } from '@/lib/catalog';
 import { picksPlaceholderSlug } from '@/lib/pages/picks';
 import { CollectionRoute, collectionMetadata } from '../CollectionRoute';
 
@@ -19,5 +22,12 @@ export default async function RamblePicksPage({
   params,
 }: PageProps<'/picks/[slug]'>) {
   const { slug } = await params;
-  return <CollectionRoute kind="pick" slug={slug} />;
+  if (!isSlug(slug)) notFound();
+  // A miss is read with the `uncached` profile, which a prerender of the shell cannot hold. The read
+  // sits behind Suspense so an unknown slug reaches its `notFound()` in the request.
+  return (
+    <Suspense fallback={null}>
+      <CollectionRoute kind="pick" slug={slug} />
+    </Suspense>
+  );
 }

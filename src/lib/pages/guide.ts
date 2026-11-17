@@ -9,6 +9,7 @@ import {
 import { noFilters, type BrowseQuery } from '../filters';
 import { photoView, type PhotoView } from '../photoViews';
 import type { GuestPhoto } from '../photos';
+import { experiencePath, guidePath, type ExperienceAddress } from '../routes';
 import type { Place } from './experience';
 
 /** The most bookable experiences the "you can book" module offers. */
@@ -49,6 +50,19 @@ export type GuideEntryInput = {
   photos: readonly GuestPhoto[];
   place: Place;
 };
+
+/**
+ * Where a request for this entry should have gone, or null when it is already there. The ID is the
+ * key, so a retired or wrong slug finds the entry and is sent to the current one; an entry that
+ * has gone live is sent to its experience page.
+ */
+export function guideRedirectTarget(
+  experience: GuestExperience,
+  requested: ExperienceAddress,
+): string | null {
+  if (experience.status === 'live') return experiencePath(experience);
+  return experience.slug === requested.slug ? null : guidePath(experience);
+}
 
 /** What the guide page says, or null when the experience is not a guide-only entry: a live one has its own page. */
 export function buildGuideEntry({

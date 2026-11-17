@@ -10,6 +10,7 @@ import {
   buildGuideEntry,
   chooseOutbound,
   guideHead,
+  guideRedirectTarget,
   relatedBookableCards,
   relatedBookableLimit,
   relatedQuery,
@@ -20,6 +21,7 @@ import {
 // - a guide-only entry becomes a view with the host, place, duration, and the way out; a live experience is null
 // - the cover is the photo with the lowest position, whatever order they arrive in; none is null
 // - a description with no text gives no paragraphs, and no duration gives no label
+// - a live experience goes to its experience page, a wrong slug to the canonical guide address, the right slug nowhere
 // - the head is the entry's name, with no description; a missing or live experience is the not-found title
 // - the module reads browse's first page for the category and nothing else
 // - the module keeps bookable cards only, never the entry, at most three, and skips one that cannot be a card
@@ -218,5 +220,37 @@ describe('relatedBookableCards', () => {
 
   it('is empty when nothing qualifies', () => {
     expect(relatedBookableCards([card(1)], id(1))).toEqual([]);
+  });
+});
+
+describe('guideRedirectTarget', () => {
+  it.each([
+    {
+      name: 'a live experience goes to its experience page',
+      status: 'live' as const,
+      requestedSlug: 'sourdough-mornings',
+      target: `/experiences/sourdough-mornings-${id(1)}`,
+    },
+    {
+      name: 'a wrong slug goes to the canonical guide address',
+      status: 'guide_only' as const,
+      requestedSlug: 'retired-slug',
+      target: `/guide/sourdough-mornings-${id(1)}`,
+    },
+    {
+      name: 'the right slug stays where it is',
+      status: 'guide_only' as const,
+      requestedSlug: 'sourdough-mornings',
+      target: null,
+    },
+  ])('$name', ({ status, requestedSlug, target }) => {
+    const entry = experience({
+      id: id(1),
+      slug: 'sourdough-mornings',
+      status,
+    });
+    expect(guideRedirectTarget(entry, { slug: requestedSlug, id: id(1) })).toBe(
+      target,
+    );
   });
 });

@@ -58,7 +58,12 @@ import {
   type HomeGiftGuide,
   type HomePick,
 } from '@/lib/pages/home';
+import { experienceChoiceLimits } from '@/lib/experienceEditor';
 import { auditFor, settleEntry, type EntryIntent } from '@/lib/editorialAdmin';
+import {
+  ExperienceChoiceSchema,
+  type ExperienceChoice,
+} from '@/lib/editorialCollections';
 import { WriteIdSchema } from '@/lib/catalog';
 import { writeAudit } from './audit';
 import { guestVisible } from './catalog';
@@ -319,7 +324,6 @@ export async function getPublishedHelpArticle(
 
 // ---- Staff reads: every status, for the editor ----
 
-// TODO(U-076b): first caller
 export async function listCollectionsForEditing(
   caller: Caller,
 ): Promise<Collection[]> {
@@ -327,7 +331,6 @@ export async function listCollectionsForEditing(
   return readCollections(undefined, false);
 }
 
-// TODO(U-076b): first caller
 export async function listHomeModulesForEditing(
   caller: Caller,
 ): Promise<HomeModule[]> {
@@ -337,6 +340,23 @@ export async function listHomeModulesForEditing(
     .from(homeModules)
     .orderBy(asc(homeModules.position));
   return HomeModuleSchema.array().parse(rows);
+}
+
+/** Every experience by name with its status, for the picker of a collection's entries: any status can be listed, though guests see only the live ones. */
+export async function listExperienceChoicesForEditing(
+  caller: Caller,
+): Promise<ExperienceChoice[]> {
+  requireStaff(caller);
+  const rows = await dbRead
+    .select({
+      id: experiences.id,
+      name: experiences.name,
+      status: experiences.status,
+    })
+    .from(experiences)
+    .orderBy(asc(experiences.name), asc(experiences.id))
+    .limit(experienceChoiceLimits.experiences);
+  return ExperienceChoiceSchema.array().parse(rows);
 }
 
 async function readPageCopyForEditing(kind: PageCopyKind): Promise<PageCopy[]> {
@@ -419,7 +439,6 @@ export type SaveCollectionResult =
   | { status: 'gift_guide_exists' }
   | { status: 'unknown_experience' };
 
-// TODO(U-076b): first caller
 /**
  * Creates a collection (no `id`) or replaces one and its whole item list. An `id` that does not
  * match a collection of the same kind is `not_found`: a collection never changes kind.
@@ -538,7 +557,6 @@ export type SaveHomeModulesResult =
   | { status: 'unknown_collection' }
   | { status: 'collection_kind_mismatch' };
 
-// TODO(U-076b): first caller
 /** Replaces the whole home page: the position of a module is its place in the list. */
 export async function saveHomeModules(
   caller: Caller,

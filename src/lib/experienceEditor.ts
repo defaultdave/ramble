@@ -65,7 +65,11 @@ export const experienceLimits = {
 export const experiencesPageSize = 25;
 
 /** The most rows a read of choices returns, so a read cannot grow with the catalog. */
-export const experienceChoiceLimits = { hosts: 500, waivers: 200 } as const;
+export const experienceChoiceLimits = {
+  hosts: 500,
+  waivers: 200,
+  experiences: 500,
+} as const;
 
 export const experiencesPath = '/ops/experiences';
 export const newExperiencePath = '/ops/experiences/new';

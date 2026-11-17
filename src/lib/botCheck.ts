@@ -28,8 +28,3 @@ export function judgeBotVerdict(
     ? 'human'
     : 'bot';
 }
-
-/** `VERCEL` is set on every Vercel build and runtime and nowhere else, so local runs, tests, and CI skip the lookup. */
-export function botCheckIsLive(vercel: string | undefined): boolean {
-  return vercel !== undefined && vercel !== '';
-}

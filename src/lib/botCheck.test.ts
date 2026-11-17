@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  botCheckIsLive,
   BotVerdictSchema,
   judgeBotVerdict,
   type BotCheckResult,
@@ -75,15 +74,5 @@ describe('BotVerdictSchema', () => {
     ['null', null],
   ])('refuses %s', (_name, value) => {
     expect(BotVerdictSchema.safeParse(value).success).toBe(false);
-  });
-});
-
-describe('botCheckIsLive', () => {
-  it.each([
-    ['1', true],
-    [undefined, false],
-    ['', false],
-  ])('is %j -> %s', (vercel, expected) => {
-    expect(botCheckIsLive(vercel)).toBe(expected);
   });
 });

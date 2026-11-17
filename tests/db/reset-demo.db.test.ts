@@ -1,8 +1,7 @@
 import { eq, getTableName, sql } from 'drizzle-orm';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { reviewFixtures } from '@/lib/seed/fixtures/reviews';
 import { insertGift } from './giftFixtures';
-import { serveNeonHttp } from './harness';
 import { insertHold } from './holdFixtures';
 import {
   ask,
@@ -35,17 +34,10 @@ type Tables = typeof import('@/server/db/seed/reset');
 type Schema = typeof import('@/server/db/schema');
 let reset: Tables;
 let schema: Schema;
-let stopHttp: () => Promise<void>;
 
-// The seed reads the current terms through the read client, which speaks the Neon HTTP protocol.
 beforeAll(async () => {
-  stopHttp = await serveNeonHttp(process.env.DATABASE_URL ?? '');
   reset = await import('@/server/db/seed/reset');
   schema = await import('@/server/db/schema');
-});
-
-afterAll(async () => {
-  await stopHttp();
 });
 
 const now = new Date('2026-11-13T15:00:00Z');

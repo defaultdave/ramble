@@ -5,11 +5,7 @@ import { personas } from '@/lib/seed/personas';
 import { experienceId } from '@/lib/seed/rows';
 import { ForbiddenError } from '@/server/auth/caller';
 import { guests, orders, reviews, sessions } from '@/server/db/schema';
-import {
-  createFreshDatabase,
-  serveNeonHttp,
-  type FreshDatabase,
-} from './harness';
+import { createFreshDatabase, type FreshDatabase } from './harness';
 
 vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 vi.mock('@/server/monitoring/logger', () => ({
@@ -22,10 +18,10 @@ vi.mock('@/server/monitoring/logger', () => ({
 // - the guest persona has at least two finished sessions to review, and the invite sweep invites exactly the bookings that have no review
 // - a rerun adds no row and changes no id; a past session the seed has written keeps its time when the clock has moved on
 // - a rerun puts back the seats a past session sold, and leaves a review a booker later changed alone
+// - the whole seed, the terms read included, runs on a plain Postgres with no Neon HTTP server in front, as the seed CLI and CI do
 // - a caller that is not ops is refused before a row is read or written
 
 let fresh: FreshDatabase;
-let stopHttp: () => Promise<void>;
 let client: typeof import('@/server/db/client');
 let seeding: typeof import('@/server/db/seed/run');
 let past: typeof import('@/server/db/seed/reviews');
@@ -36,7 +32,6 @@ const now = new Date();
 
 beforeAll(async () => {
   fresh = await createFreshDatabase(process.env.DATABASE_URL_UNPOOLED ?? '');
-  stopHttp = await serveNeonHttp(fresh.url);
   vi.stubEnv('DATABASE_URL', fresh.url);
   client = await import('@/server/db/client');
   seeding = await import('@/server/db/seed/run');
@@ -48,7 +43,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await client.db.$client.end();
-  await stopHttp();
   await fresh.dispose();
   vi.unstubAllEnvs();
 });

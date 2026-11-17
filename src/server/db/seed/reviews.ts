@@ -25,7 +25,7 @@ import { SeedStepError } from '@/lib/seed/decide';
 // fixed id, so a rerun leaves the same rows and a reset (which wipes orders and reviews) puts them back.
 
 async function readTermsDocumentId(): Promise<string> {
-  const terms = await getCurrentLegalDocument('terms');
+  const terms = await getCurrentLegalDocument('terms', db);
   if (!terms)
     throw new SeedStepError(
       'No published terms document for the past bookings',

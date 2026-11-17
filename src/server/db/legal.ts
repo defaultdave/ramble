@@ -39,13 +39,14 @@ import {
 } from './schema';
 import { requireStaff } from './staff';
 
-/** The highest published version of a document. Null when the key is malformed or nothing is published. */
+/** The highest published version of a document. Null when the key is malformed or nothing is published. The seed passes its own client, since the read client speaks the Neon HTTP protocol and a plain Postgres does not. */
 export async function getCurrentLegalDocument(
   doc: string,
+  reader: Pick<typeof db, 'select'> = dbRead,
 ): Promise<LegalDocument | null> {
   const parsed = LegalDocSchema.safeParse(doc);
   if (!parsed.success) return null;
-  const [row] = await dbRead
+  const [row] = await reader
     .select()
     .from(legalDocuments)
     .where(

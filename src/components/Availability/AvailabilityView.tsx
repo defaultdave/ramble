@@ -18,6 +18,8 @@ import styles from './Availability.module.css';
 
 type FormAction = (formData: FormData) => void | Promise<void>;
 
+const weekdaysErrorId = 'availability-weekdays-error';
+
 export type AvailabilityViewProps = {
   experienceId: string;
   /** The host's zone, which every start time is read in. */
@@ -99,17 +101,21 @@ export function AvailabilityView({
         <input type="hidden" name="experienceId" value={experienceId} />
         <fieldset className={styles.group}>
           <legend className={styles.legend}>Add weekly slots</legend>
-          <fieldset className={styles.group}>
+          <fieldset
+            className={styles.group}
+            aria-describedby={weekdaysProblem ? weekdaysErrorId : undefined}
+          >
             <legend className={styles.muted}>Days of the week</legend>
             {weekdayChoices.map(({ day, label }) => (
               <CheckField
                 key={day}
                 name={weekdayFieldName(day)}
                 label={label}
+                invalid={weekdaysProblem !== undefined}
               />
             ))}
             {weekdaysProblem ? (
-              <p role="alert" className={styles.muted}>
+              <p role="alert" id={weekdaysErrorId} className={styles.muted}>
                 {weekdaysProblem}
               </p>
             ) : null}

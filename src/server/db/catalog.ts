@@ -18,6 +18,7 @@ import {
   type Neighborhood,
   type RetiredSlug,
 } from '@/lib/catalog';
+import { TaxonomyTermSchema, type TaxonomyTerm } from '@/lib/taxonomy';
 import { Role, requireRole, type Caller } from '@/server/auth/caller';
 import { dbRead } from './client';
 import { byNameThenId } from './keysetPage';
@@ -28,6 +29,13 @@ import {
   priceOptions,
   slugHistory,
 } from './schema';
+
+/** The order of a list of categories or neighborhoods: ops's place, then name, then id. */
+export const termOrder = (table: typeof categories | typeof neighborhoods) => [
+  asc(table.position),
+  asc(table.name),
+  asc(table.id),
+];
 
 // The only place that decides what a guest may see. Every guest read goes through it.
 export const guestVisible = inArray(experiences.status, [
@@ -58,22 +66,37 @@ export async function getGuestExperience(
   return row ? GuestExperienceSchema.parse(row) : null;
 }
 
-export async function listCategories(): Promise<Category[]> {
+/** Asks for each term with its place in the list and whether it is retired, for ops. */
+type WithState = { withState: true };
+
+export async function listCategories(): Promise<Category[]>;
+export async function listCategories(
+  options: WithState,
+): Promise<TaxonomyTerm[]>;
+export async function listCategories(options?: WithState) {
   const rows = await dbRead
     .select()
     .from(categories)
-    .orderBy(asc(categories.name), asc(categories.id))
+    .orderBy(...termOrder(categories))
     .limit(catalogLimits.categories);
-  return CategorySchema.array().parse(rows);
+  return options
+    ? TaxonomyTermSchema.array().parse(rows)
+    : CategorySchema.array().parse(rows);
 }
 
-export async function listNeighborhoods(): Promise<Neighborhood[]> {
+export async function listNeighborhoods(): Promise<Neighborhood[]>;
+export async function listNeighborhoods(
+  options: WithState,
+): Promise<TaxonomyTerm[]>;
+export async function listNeighborhoods(options?: WithState) {
   const rows = await dbRead
     .select()
     .from(neighborhoods)
-    .orderBy(asc(neighborhoods.name), asc(neighborhoods.id))
+    .orderBy(...termOrder(neighborhoods))
     .limit(catalogLimits.neighborhoods);
-  return NeighborhoodSchema.array().parse(rows);
+  return options
+    ? TaxonomyTermSchema.array().parse(rows)
+    : NeighborhoodSchema.array().parse(rows);
 }
 
 // TODO(U-091): first caller

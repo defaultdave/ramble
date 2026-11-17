@@ -682,7 +682,7 @@ Five cached reads feed the home page, on five kinds of tag. Each change goes thr
 | An experience's sessions or photos change | `experience:<id>`, which reaches `getHomeContent`, `getThisWeek` and `getCoverPhotos` for any card that shows the experience | After the tag is cleared. `getHomeContent` tags every ID a Pick names, even one a guest cannot see yet, so publishing it adds its card. |
 | A listing is published, edited or taken down | `catalog` (what `getThisWeek` is tagged with) and the experience's own tag | After the tag is cleared. |
 | Settings saved at `/ops/settings` (`updateSettings`) | `settings`: the banner, and the gift guide module's on/off | After the tag is cleared. A save of the stored values clears nothing. |
-| Category or neighborhood names change | Nothing: `taxonomy` has no change kind that reaches it | When the editorial profile runs out (revalidate 1 hour). |
+| A category or neighborhood is added, renamed, moved, retired or brought back | `taxonomy` (the `taxonomy` change, from the ops editorial area) | Next request after the ops action; also when the editorial profile runs out (revalidate 1 hour). |
 | A booking or hold | Only `session:<id>`, which nothing on this page carries | "On this week" catches up when its minute-keyed entry rolls over, about 60 seconds. |
 | Help articles or legal documents change | `helpArticles`, or `legalDocument(doc)` | After the tag is cleared. |
 | A host's own settings change | `catalog`, which `getHostPage` carries | After the tag is cleared. An ops edit to a host's name or about text shows only when the catalog profile runs out. |

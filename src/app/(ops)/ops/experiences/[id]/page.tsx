@@ -45,11 +45,12 @@ export default async function ExperiencePage({
   }
 
   const experienceId = parseIdField(id);
-  const [view, choices] = await Promise.all([
-    experienceId === null ? null : readExperienceForOps(caller, experienceId),
-    readExperienceChoices(caller),
-  ]);
+  const view =
+    experienceId === null
+      ? null
+      : await readExperienceForOps(caller, experienceId);
   if (view === null) notFound();
+  const choices = await readExperienceChoices(caller, view.content);
   const { notice, photoRefusal } = experiencePageNotice(query.notice);
 
   return (

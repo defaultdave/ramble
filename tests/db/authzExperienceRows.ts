@@ -62,6 +62,15 @@ export function experienceEditorRows() {
         }),
       allows: opsOnly,
     },
+    {
+      fn: 'updateGuideLinks',
+      invoke: async (c, t) =>
+        (await editor()).updateGuideLinks(c, t.experienceId, {
+          linkOutUrl: 'https://host.example.com/matrix',
+          affiliateUrl: null,
+        }),
+      allows: opsOnly,
+    },
   ] satisfies {
     fn: string;
     invoke: (caller: Caller, target: Target) => Promise<unknown>;

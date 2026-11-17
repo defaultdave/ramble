@@ -46,7 +46,7 @@ export const entryStatusTones = {
   published: 'success',
 } satisfies Record<PublishStatus, StatusTone>;
 
-const entryIntents = ['save', 'publish', 'unpublish'] as const;
+export const entryIntents = ['save', 'publish', 'unpublish'] as const;
 export type EntryIntent = (typeof entryIntents)[number];
 
 /** The status a form leaves an entry in: saving keeps it where it is, the other two move it. */
@@ -75,23 +75,29 @@ export type SettledEntry =
   | { kind: 'empty_body' };
 
 /**
- * What a save leaves in the row. With an intent (the editor's buttons) a replacement takes status
- * and position from the stored row, not the form's copy, so a stale tab saving a draft cannot
- * unpublish what another tab published. Without one, or for a new article, the input stands. A
- * body with no text cannot stay published.
+ * The status a save leaves a row in. With an intent (the editor's buttons) a replacement takes the
+ * status from the stored row, not the form's copy, so a stale tab saving a draft cannot unpublish
+ * what another tab published. Without one, or for a new row, the input stands.
+ */
+export function settledStatus(
+  intent: EntryIntent | undefined,
+  stored: Pick<StoredEntry, 'status'> | null | undefined,
+  inputStatus: PublishStatus,
+): PublishStatus {
+  return stored && intent ? statusAfter(intent, stored.status) : inputStatus;
+}
+
+/**
+ * What a save leaves in the row: its status (`settledStatus`) and, for an intent, the position of
+ * the stored row. A body with no text cannot stay published.
  */
 export function settleEntry(
   intent: EntryIntent | undefined,
   stored: StoredEntry | null | undefined,
   input: Pick<HelpArticleInput, 'status' | 'position' | 'body'>,
 ): SettledEntry {
-  const { status, position } =
-    stored && intent
-      ? {
-          status: statusAfter(intent, stored.status),
-          position: stored.position,
-        }
-      : input;
+  const status = settledStatus(intent, stored, input.status);
+  const position = stored && intent ? stored.position : input.position;
   if (status === 'published' && !hasContent(input.body)) {
     return { kind: 'empty_body' };
   }
@@ -236,7 +242,7 @@ export const entryNotices = {
 } satisfies Record<EntryNoticeCode, NoticeText>;
 
 /** The notice for a saved entry: what the intent did, which is the point of the click. */
-function savedNotice(intent: EntryIntent): EntryNoticeCode {
+export function savedNotice(intent: EntryIntent): EntryNoticeCode {
   if (intent === 'publish') return 'published';
   return intent === 'unpublish' ? 'unpublished' : 'saved';
 }
@@ -261,43 +267,39 @@ export function buildEntryRows(articles: readonly HelpArticle[]): EntryRow[] {
 
 // ---- Audit ----
 
-/** What a save did to the article, from its status before (none for a new one) and after. */
+/** The kinds of row a save of the editor's entries writes an audit row about. */
+type AuditSubject = 'help_article' | 'page_copy';
+
+/** What a save did to the row, from its status before (none for a new one) and after. */
 function entryAuditAction(
+  subject: AuditSubject,
   before: PublishStatus | undefined,
   after: PublishStatus,
 ): string {
-  if (before === undefined && after === 'draft') return 'help_article.created';
+  if (before === undefined && after === 'draft') return `${subject}.created`;
   if (before !== 'published' && after === 'published') {
-    return 'help_article.published';
+    return `${subject}.published`;
   }
   if (before === 'published' && after === 'draft') {
-    return 'help_article.unpublished';
+    return `${subject}.unpublished`;
   }
-  return 'help_article.saved';
+  return `${subject}.saved`;
 }
 
-/** The audit row for a save by this caller, or none: the seed saves articles as no one, and each run would add rows to a log the reset keeps. */
+/** The audit row for a save by this caller, or none: the seed saves rows as no one, and each run would add rows to a log the reset keeps. One row per save, holding ids and codes, never the text. */
 export function auditFor(
   userId: string | null,
   before: PublishStatus | undefined,
   after: PublishStatus,
-  articleId: string,
+  subjectId: string,
+  subject: AuditSubject = 'help_article',
 ): AuditEntryInput | null {
   if (userId === null) return null;
-  return entryAuditEntry(userId, entryAuditAction(before, after), articleId);
-}
-
-/** One row per save. The text is not written: the audit log holds ids and codes, never words. */
-function entryAuditEntry(
-  userId: string,
-  action: string,
-  articleId: string,
-): AuditEntryInput {
   return {
     ...userActor(userId),
-    action,
-    subjectKind: 'help_article',
-    subjectId: articleId,
+    action: entryAuditAction(subject, before, after),
+    subjectKind: subject,
+    subjectId,
   };
 }
 

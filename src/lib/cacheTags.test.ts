@@ -73,6 +73,7 @@ describe('tagsForChanges for one change', () => {
       ['neighborhood:red-hook'],
     ],
     ['help articles', { kind: 'helpArticles' }, ['help-articles']],
+    ['a category or neighborhood change', { kind: 'taxonomy' }, ['taxonomy']],
     [
       'a legal document',
       { kind: 'legalDocument', doc: 'terms' },

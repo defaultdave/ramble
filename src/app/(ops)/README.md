@@ -1,6 +1,6 @@
 # Ops area page map
 
-`/ops`, `/ops/mailbox`, `/ops/mailbox/[id]`, `/ops/dev`, `/ops/hosts`, `/ops/hosts/new`, `/ops/hosts/[id]`, `/ops/experiences`, `/ops/experiences/new`, `/ops/experiences/[id]`, `/ops/experiences/[id]/availability`, `/ops/editorial`, `/ops/editorial/new`, `/ops/editorial/[id]`, `/ops/editorial/home`, `/ops/editorial/home/[position]`, `/ops/editorial/collections`, `/ops/editorial/collections/new`, `/ops/editorial/collections/[id]`, `/ops/review`, `/ops/review/[id]`, `/ops/reviews`, `/ops/sessions`, `/ops/sessions/[sessionId]`, `/ops/bookings`, `/ops/bookings/[id]`, `/ops/staff`, `/ops/support`, `/ops/requests`, `/ops/audit`, `/ops/settings`, and any other address under `/ops`
+`/ops`, `/ops/mailbox`, `/ops/mailbox/[id]`, `/ops/dev`, `/ops/hosts`, `/ops/hosts/new`, `/ops/hosts/[id]`, `/ops/experiences`, `/ops/experiences/new`, `/ops/experiences/[id]`, `/ops/experiences/[id]/availability`, `/ops/editorial`, `/ops/editorial/new`, `/ops/editorial/[id]`, `/ops/editorial/home`, `/ops/editorial/home/[position]`, `/ops/editorial/collections`, `/ops/editorial/collections/new`, `/ops/editorial/collections/[id]`, `/ops/editorial/pages`, `/ops/editorial/pages/[kind]/[id]`, `/ops/editorial/guides`, `/ops/editorial/guides/[id]`, `/ops/editorial/legal`, `/ops/editorial/legal/[doc]`, `/ops/editorial/legal/[doc]/[id]`, `/ops/editorial/taxonomy`, `/ops/editorial/taxonomy/[kind]/new`, `/ops/editorial/taxonomy/[kind]/[id]`, `/ops/review`, `/ops/review/[id]`, `/ops/reviews`, `/ops/sessions`, `/ops/sessions/[sessionId]`, `/ops/bookings`, `/ops/bookings/[id]`, `/ops/staff`, `/ops/support`, `/ops/requests`, `/ops/audit`, `/ops/settings`, and any other address under `/ops`
 
 Read from main at 2db68ea (2026-11-15). A PR that changes this tree (a component, a Suspense or client boundary, a cache tag, an action) updates this file in the same PR.
 
@@ -55,7 +55,7 @@ flowchart TD
 | SiteShell | server | [src/components/SiteShell.tsx](../../components/SiteShell.tsx) | Skip link, header (brand link and the word Operations), main, footer. No account control, no banner. |
 | OpsAreaNav | streamed | [src/app/(ops)/OpsAreaNav.tsx](OpsAreaNav.tsx) | Inside `Suspense fallback={null}`. Reads the caller, so it streams. Renders nothing unless the caller holds `ops`. It is not a gate. |
 | readOpsCaller | server (DB read) | [src/server/opsCaller.ts](../../server/opsCaller.ts) | Wraps `getCaller()`. A failure is logged and becomes the anonymous caller, never a role. |
-| holdsOpsRole and opsNavLinks | server (pure lib) | [src/lib/opsNav.ts](../../lib/opsNav.ts) | Roles must include `ops`; `admin` is not enough. Sixteen links: Dashboard, Mailbox, Hosts, Experiences, Editorial, Home page, Collections, Support, Private requests, Review queue, Guest reviews, Staff, Sessions, Audit log, Bookings, Settings. The test console is not listed. |
+| holdsOpsRole and opsNavLinks | server (pure lib) | [src/lib/opsNav.ts](../../lib/opsNav.ts) | Roles must include `ops`; `admin` is not enough. Twenty links: Dashboard, Mailbox, Hosts, Experiences, Editorial, Home page, Collections, Page copy, Guide entries, Legal documents, Categories and neighborhoods, Support, Private requests, Review queue, Guest reviews, Staff, Sessions, Audit log, Bookings, Settings. The test console is not listed. |
 | OpsNav | server | [src/components/OpsShell/OpsShell.tsx](../../components/OpsShell/OpsShell.tsx) | A `nav` of plain links. |
 | Route page | server |  | Every ops page below. The layout does not wrap it in Suspense, and no page does either. |
 | RenderPerRequest | server | [src/app/renderPerRequest.tsx](../renderPerRequest.tsx) | Sits beside the shell, awaits `connection()`, renders nothing. Pins the whole tree to per-request rendering so every script carries the CSP nonce. |
@@ -353,7 +353,7 @@ flowchart TD
 | Component | Kind | File | Notes |
 | --- | --- | --- | --- |
 | ExperiencesPage | server | [src/app/(ops)/ops/experiences/page.tsx](ops/experiences/page.tsx) | Gate, then the choices for the filters, then a filtered page. |
-| readExperienceChoices | server (DB read) | [src/server/db/experienceEditor.ts](../../server/db/experienceEditor.ts) | Hosts, categories, neighborhoods, default cancellation tier. Not audited. |
+| readExperienceChoices | server (DB read) | [src/server/db/experienceEditor.ts](../../server/db/experienceEditor.ts) | Hosts, categories, neighborhoods, default cancellation tier. A retired category or neighborhood is left out, except the one the experience being edited already names. Not audited. |
 | readExperiencesForOps | server (DB read) | [src/server/db/experienceEditor.ts](../../server/db/experienceEditor.ts) | Not audited. |
 | ActionNotice | server | [src/components/ActionNotice/ActionNotice.tsx](../../components/ActionNotice/ActionNotice.tsx) | Shows the `?notice=` code from the last redirect, as an Alert. |
 | ButtonLink | server | [src/components/Button/ButtonLink.tsx](../../components/Button/ButtonLink.tsx) | A link styled as a button. |
@@ -840,6 +840,105 @@ flowchart TD
 | saveHomeModuleAction | action | [src/server/actions/editorial.ts](../../server/actions/editorial.ts) | Applies the edit to the settings the kind reads and saves the whole list; a refused field returns to the form. |
 | saveCollectionAction | action | [src/server/actions/editorial.ts](../../server/actions/editorial.ts) | Reads the stored Pick, takes its status and entries from it, and saves with `saveCollection`, which clears the tags of what guests could see before and after. A Pick with no entries is not published, and a form that names a Pick by a bad id is a missing Pick. |
 | collectionItemsAction | action | [src/server/actions/editorial.ts](../../server/actions/editorial.ts) | Reads the stored Pick, applies an add, remove or move, and saves the Pick with its entries changed; removing the last entry of a published Pick saves nothing. |
+
+### Page copy, guide entries, legal documents, categories and neighborhoods
+
+Four more editorial areas. **Page copy** is the heading, search description, introduction and text of each category and neighborhood page, saved as a draft, published, or taken down like a help article; a term has no copy until its first save. **Guide entries** are experiences with the guide-only status: the list is the experiences list filtered to that status, and the form sets only the link-out address (required) and the affiliate address. The save reads the stored experience, replaces those two fields in its content, and goes through the experience editor's own `updateExperience`, so it has that save's rules, audit row and cache clearing. **Legal documents** list each document key with what is live and what is waiting; a document's versions are a table, a new draft starts from the newest version's words, a draft can be edited, and publishing makes it the current version and final. **Categories and neighborhoods** are two ordered lists with move up, move down, retire and bring back, a rename form (the address never changes) and an add form. A retired term stays on the experiences that already name it and cannot be newly named: the experience save reads the term with a shared lock and refuses a retired one it does not already hold, and the last term of a kind that is not retired cannot be retired. A change clears the `taxonomy` tag, which the guest filter options carry. The text editors are the only client islands, and they load only on the editor pages.
+
+```mermaid
+flowchart TD
+    pp["PageCopyPage<br/>/ops/editorial/pages"]:::server
+    pf["EditPageCopyPage<br/>/ops/editorial/pages/kind/id"]:::server
+    gp["GuideEntriesPage<br/>/ops/editorial/guides"]:::server
+    gf["EditGuideEntryPage<br/>/ops/editorial/guides/id"]:::server
+    lp["LegalDocumentsPage<br/>/ops/editorial/legal"]:::server
+    lv["LegalVersionsPage<br/>/ops/editorial/legal/doc"]:::server
+    le["EditLegalDraftPage<br/>/ops/editorial/legal/doc/id"]:::server
+    tp["TaxonomyPage<br/>/ops/editorial/taxonomy"]:::server
+    tn["NewTermPage<br/>/ops/editorial/taxonomy/kind/new"]:::server
+    tr["RenameTermPage<br/>/ops/editorial/taxonomy/kind/id"]:::server
+    lt["listTaxonomyForEditing"]:::server
+    lpc["listPageCopyForEditing"]:::server
+    rxs["readExperiencesForOps"]:::server
+    rxo["readExperienceForOps"]:::server
+    llv["listLegalVersions"]:::server
+    lls["listLegalDocSummaries"]:::server
+    an6["ActionNotice"]:::server
+    rte3["RichTextEditor<br/>Tiptap"]:::client
+    btn5["Button<br/>client submit buttons"]:::client
+    spc["savePageCopyAction"]:::action
+    sgl["saveGuideLinksAction"]:::action
+    sld["startLegalDraftAction"]:::action
+    sle["saveLegalDraftAction"]:::action
+    ata["addTaxonomyAction"]:::action
+    rta["renameTaxonomyAction"]:::action
+    tca["taxonomyClickAction"]:::action
+    pp -.-> lt
+    pp -.-> lpc
+    pf -.-> lt
+    pf -.-> lpc
+    gp -.-> rxs
+    gf -.-> rxo
+    lp -.-> lls
+    lv -.-> llv
+    le -.-> llv
+    tp -.-> lt
+    tr -.-> lt
+    pf --> an6
+    gf --> an6
+    lv --> an6
+    le --> an6
+    tp --> an6
+    pf --> rte3
+    lv --> rte3
+    le --> rte3
+    pf --> btn5
+    gf --> btn5
+    lv --> btn5
+    le --> btn5
+    tp --> btn5
+    tn --> btn5
+    tr --> btn5
+    btn5 -.-> spc
+    btn5 -.-> sgl
+    btn5 -.-> sld
+    btn5 -.-> sle
+    btn5 -.-> ata
+    btn5 -.-> rta
+    btn5 -.-> tca
+    classDef server fill:#e8edf8,stroke:#3b5bab,color:#1b1f27
+    classDef cached fill:#e2f3f0,stroke:#0f7a6c,color:#1b1f27
+    classDef streamed fill:#fbefdc,stroke:#a3610a,color:#1b1f27
+    classDef client fill:#f5e6f8,stroke:#8a2f9c,color:#1b1f27
+    classDef action fill:#fbe6e4,stroke:#b3261e,color:#1b1f27
+```
+
+| Component | Kind | File | Notes |
+| --- | --- | --- | --- |
+| PageCopyPage | server | [src/app/(ops)/ops/editorial/pages/page.tsx](ops/editorial/pages/page.tsx) | Gate, then both term lists and the copy there is. A table per kind, each name opening its copy. A failed read is logged and shows the tables' retry. |
+| EditPageCopyPage | server | [src/app/(ops)/ops/editorial/pages/[kind]/[id]/page.tsx](ops/editorial/pages/%5Bkind%5D/%5Bid%5D/page.tsx) | Gate, then the term and its copy, or none yet. A bad kind, a bad id and an id that is no term of that kind are a 404. |
+| listPageCopyForEditing | server (DB read) | [src/server/db/editorial.ts](../../server/db/editorial.ts) | Staff only; the copy that exists for both kinds, up to 200 each. Not audited. |
+| savePageCopy | server (DB write) | [src/server/db/editorial.ts](../../server/db/editorial.ts) | Creates or replaces the copy under a lock; with an intent the status comes from the locked row. One audit row in the same transaction (`page_copy.created`, saved, published, unpublished; ids only), then `updateTag` for what guests could see before and after. |
+| PageCopyList, PageCopyForm | server | [src/components/EditorialAdmin/PageCopyList.tsx](../../components/EditorialAdmin/PageCopyList.tsx), [PageCopyForm.tsx](../../components/EditorialAdmin/PageCopyForm.tsx) | Two tables; the form with heading, description, two text editors, and save and publish or unpublish buttons. |
+| savePageCopyAction | action | [src/server/actions/editorialContent.ts](../../server/actions/editorialContent.ts) | Parses the form, passes the button's intent to `savePageCopy`, and returns to the page with the result. |
+| GuideEntriesPage | server | [src/app/(ops)/ops/editorial/guides/page.tsx](ops/editorial/guides/page.tsx) | Gate, then `readExperiencesForOps` filtered to guide-only, 25 a page with the cursor in the address. |
+| EditGuideEntryPage | server | [src/app/(ops)/ops/editorial/guides/[id]/page.tsx](ops/editorial/guides/%5Bid%5D/page.tsx) | Gate, then `readExperienceForOps`. A bad id, an unknown id and an experience that is not guide-only are a 404. |
+| GuidesList, GuideLinksForm | server | [src/components/EditorialAdmin/GuidesList.tsx](../../components/EditorialAdmin/GuidesList.tsx), [GuideLinksForm.tsx](../../components/EditorialAdmin/GuideLinksForm.tsx) | The experience columns and a form of two address fields; no client island. |
+| updateGuideLinks | server (DB write) | [src/server/db/experienceEditor.ts](../../server/db/experienceEditor.ts) | Locks the experience, merges the two links into the content of the locked row (so a concurrent edit of another field is kept), and saves through the same step as `updateExperience`: same rules, one audit row naming the links, same cache clearing. Not guide-only is `not_a_guide`. |
+| saveGuideLinksAction | action | [src/server/actions/editorialContent.ts](../../server/actions/editorialContent.ts) | Parses the two addresses and calls `updateGuideLinks`. |
+| LegalDocumentsPage | server | [src/app/(ops)/ops/editorial/legal/page.tsx](ops/editorial/legal/page.tsx) | Gate, then the three fixed document keys and each stored one with what is live and waiting. |
+| LegalVersionsPage | server | [src/app/(ops)/ops/editorial/legal/[doc]/page.tsx](ops/editorial/legal/%5Bdoc%5D/page.tsx) | Gate, then the versions newest first and the form that starts the next one from the newest. A key that is no document key is a 404. |
+| EditLegalDraftPage | server | [src/app/(ops)/ops/editorial/legal/[doc]/[id]/page.tsx](ops/editorial/legal/%5Bdoc%5D/%5Bid%5D/page.tsx) | Gate, then the draft. An unknown id is a 404 and a version that is final returns to the versions with a notice. |
+| listLegalDocSummaries, startLegalDraft, saveLegalDraft, publishLegalDraft | server (DB) | [src/server/db/legalAdmin.ts](../../server/db/legalAdmin.ts) | Staff only. They call `legal.ts` unchanged. That module takes no transaction, so each change's audit row (`legal_document.drafted`, edited, published; the key and version, never the text) is written after the write commits, in its own transaction: it cannot be atomic with the write. `startLegalDraft` answers `unknown_document` and writes nothing for a key that is not a fixed document and has no version. |
+| LegalDocsList, LegalVersions, LegalDraftForm | server | [src/components/EditorialAdmin/LegalDocsList.tsx](../../components/EditorialAdmin/LegalDocsList.tsx), [LegalVersions.tsx](../../components/EditorialAdmin/LegalVersions.tsx), [LegalDraftForm.tsx](../../components/EditorialAdmin/LegalDraftForm.tsx) | The document list, the versions table, and the title and text form with save and publish. |
+| startLegalDraftAction, saveLegalDraftAction | action | [src/server/actions/editorialContent.ts](../../server/actions/editorialContent.ts) | Start a draft (only for a fixed document or a key that already has a version); save a draft, and on the publish button publish it after a save that came through. A final version or a draft below a published one is a notice. |
+| TaxonomyPage | server | [src/app/(ops)/ops/editorial/taxonomy/page.tsx](ops/editorial/taxonomy/page.tsx) | Gate, then both lists, retired terms included. A failed read is logged and shows the lists' retry. |
+| NewTermPage, RenameTermPage | server | [src/app/(ops)/ops/editorial/taxonomy/[kind]/new/page.tsx](ops/editorial/taxonomy/%5Bkind%5D/new/page.tsx), [[kind]/[id]/page.tsx](ops/editorial/taxonomy/%5Bkind%5D/%5Bid%5D/page.tsx) | The add form and the rename form. A bad kind, and an id that is no term of the kind, are a 404. |
+| listTaxonomyForEditing | server (DB read) | [src/server/db/taxonomy.ts](../../server/db/taxonomy.ts) | Staff only; every term of a kind in list order with its state, retired ones too, up to 100, read through `listCategories` and `listNeighborhoods` with `withState`. Not audited. |
+| addTaxonomyTerm, renameTaxonomyTerm, clickTaxonomyTerm | server (DB write) | [src/server/db/taxonomy.ts](../../server/db/taxonomy.ts) | One transaction: the kind's lock, the list read under row locks, the `src/lib/taxonomy.ts` decision, the write, one audit row (`category.retired` and the like; ids only), then `updateTag` for `taxonomy`. A refusal writes nothing. |
+| lockReferencedTerm | server (DB read) | [src/server/db/taxonomy.ts](../../server/db/taxonomy.ts) | The experience save's read of its category and neighborhood, with a shared row lock, so a retire waits for the save or is seen by it. |
+| TaxonomyLists, TaxonomyTermForm | server | [src/components/EditorialAdmin/TaxonomyLists.tsx](../../components/EditorialAdmin/TaxonomyLists.tsx), [TaxonomyTermForm.tsx](../../components/EditorialAdmin/TaxonomyTermForm.tsx) | One form per list with move up, move down, retire or bring back, and a rename link on each row, each naming its term for a screen reader. A disabled button is described by the sentence that says why (already first, already last, the last one in use). |
+| addTaxonomyAction, renameTaxonomyAction, taxonomyClickAction | action | [src/server/actions/editorialContent.ts](../../server/actions/editorialContent.ts) | Parse the form or the click, call the one data-layer function, and return with a `?notice=` code; a taken address or name returns to the form with the field. |
 
 ## Arrival order
 

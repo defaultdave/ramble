@@ -261,7 +261,7 @@ The three schedule reads (`getBrowseResults`, `getBrowseDates`, and the zero-res
 | A host profile changes (`hostProfile`) | `catalog` | The next request after the change |
 | An experience's sessions or photos change (`experience`) | `experience:<id>`, which clears each cached results page that lists that experience | The next request after the change, for pages that list it |
 | A session is added to an experience that is on no cached page | Nothing; the entry waits for the minute to run out | Within about a minute (revalidate 60 s, expire 120 s) |
-| A category or neighborhood is renamed | Nothing; no change reaches `taxonomy` | When the `editorial` profile runs out (revalidate 1 hour, expire 24 hours) |
+| A category or neighborhood is added, renamed, moved, retired or brought back | `taxonomy` | Next request after the ops action; also when the `editorial` profile runs out (revalidate 1 hour, expire 24 hours) |
 | Landing copy is edited (`categoryCopy`, `neighborhoodCopy`) | `category:<slug>` or `neighborhood:<slug>` | The next request after the change |
 
 ## Worth knowing

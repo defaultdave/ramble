@@ -16,6 +16,7 @@ import { experiences } from '@/server/db/schema';
 import { createFakeStorageAdapter } from '@/server/ports/storage/fake';
 import { personaHostSlugs } from '@/lib/seed/personas';
 import { editorialListRows } from './authzEditorialRows';
+import { taxonomyRows } from './authzTaxonomyRows';
 import { experienceEditorRows } from './authzExperienceRows';
 import { accountBookingsRows } from './authzAccountRows';
 import { hostCancelRows } from './authzHostCancelRows';
@@ -72,9 +73,11 @@ type Data = {
   hostGuestLists: typeof import('@/server/db/hostGuestLists');
   ledger: typeof import('@/server/db/ledger');
   legal: typeof import('@/server/db/legal');
+  legalAdmin: typeof import('@/server/db/legalAdmin');
   photos: typeof import('@/server/db/photos');
   sessions: typeof import('@/server/db/sessions');
   settings: typeof import('@/server/db/settings');
+  taxonomy: typeof import('@/server/db/taxonomy');
 };
 
 /** Where an action lands. A host owner is checked against the host of the row, so each place is one cell of the matrix. */
@@ -132,9 +135,11 @@ beforeAll(async () => {
     hostGuestLists: await import('@/server/db/hostGuestLists'),
     ledger: await import('@/server/db/ledger'),
     legal: await import('@/server/db/legal'),
+    legalAdmin: await import('@/server/db/legalAdmin'),
     photos: await import('@/server/db/photos'),
     sessions: await import('@/server/db/sessions'),
     settings: await import('@/server/db/settings'),
+    taxonomy: await import('@/server/db/taxonomy'),
   };
   people = await signInEverySubject();
   upload = await sharp({
@@ -229,6 +234,11 @@ const sessionRules = {
 const rows: Row[] = [
   // Editorial, legal, settings, finance, privacy: ops or admin.
   ...editorialListRows(() => data.editorial),
+  ...taxonomyRows(
+    () => data.taxonomy,
+    () => data.legalAdmin,
+    () => legalDraftId,
+  ),
   {
     fn: 'saveCollection',
     invoke: (c) => data.editorial.saveCollection(c, collectionInput()),

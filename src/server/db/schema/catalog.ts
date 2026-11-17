@@ -20,6 +20,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import {
   ageRules,
+  catalogLimits,
   httpUrlPattern,
   experienceStatuses,
   priceKinds,
@@ -27,7 +28,9 @@ import {
   taxTreatments,
   weatherPolicies,
 } from '@/lib/catalog';
+import { experienceLimits } from '@/lib/experienceEditor';
 import { hostLimits } from '@/lib/hostSetup';
+import { taxonomyLimits } from '@/lib/taxonomy';
 import {
   emailAddressPattern,
   maxEmailAddressLength,
@@ -129,6 +132,10 @@ export const categories = pgTable(
     id: uuid().primaryKey().defaultRandom(),
     slug: text().notNull().unique(),
     name: text().notNull(),
+    /** The place in the list ops orders; ties read by name. */
+    position: integer().notNull().default(0),
+    /** Set when ops retire it: it leaves the pickers, and no experience can newly name it. */
+    retiredAt: timestampTz(),
   },
   (table) => [
     check(
@@ -136,6 +143,16 @@ export const categories = pgTable(
       sql`${table.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`,
     ),
     check('categories_name_not_blank', notBlank(table.name)),
+    check('categories_name_length', maxChars(table.name, taxonomyLimits.name)),
+    check('categories_slug_length', maxChars(table.slug, taxonomyLimits.slug)),
+    check(
+      'categories_position_in_range',
+      sql`${table.position} >= 0 AND ${table.position} < ${sql.raw(String(catalogLimits.categories))}`,
+    ),
+    check(
+      'categories_retired_at_in_range',
+      sql`${table.retiredAt} IS NULL OR (${isReadableDate(table.retiredAt)})`,
+    ),
   ],
 );
 
@@ -145,6 +162,10 @@ export const neighborhoods = pgTable(
     id: uuid().primaryKey().defaultRandom(),
     slug: text().notNull().unique(),
     name: text().notNull(),
+    /** The place in the list ops orders; ties read by name. */
+    position: integer().notNull().default(0),
+    /** Set when ops retire it: it leaves the pickers, and no experience can newly name it. */
+    retiredAt: timestampTz(),
   },
   (table) => [
     check(
@@ -152,6 +173,22 @@ export const neighborhoods = pgTable(
       sql`${table.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`,
     ),
     check('neighborhoods_name_not_blank', notBlank(table.name)),
+    check(
+      'neighborhoods_name_length',
+      maxChars(table.name, taxonomyLimits.name),
+    ),
+    check(
+      'neighborhoods_slug_length',
+      maxChars(table.slug, taxonomyLimits.slug),
+    ),
+    check(
+      'neighborhoods_position_in_range',
+      sql`${table.position} >= 0 AND ${table.position} < ${sql.raw(String(catalogLimits.neighborhoods))}`,
+    ),
+    check(
+      'neighborhoods_retired_at_in_range',
+      sql`${table.retiredAt} IS NULL OR (${isReadableDate(table.retiredAt)})`,
+    ),
   ],
 );
 
@@ -246,6 +283,14 @@ export const experiences = pgTable(
     check(
       'experiences_affiliate_url_http',
       isHttpUrlOrNull(table.affiliateUrl),
+    ),
+    check(
+      'experiences_link_out_url_length',
+      maxChars(table.linkOutUrl, experienceLimits.url),
+    ),
+    check(
+      'experiences_affiliate_url_length',
+      maxChars(table.affiliateUrl, experienceLimits.url),
     ),
   ],
 );

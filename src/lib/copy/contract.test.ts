@@ -3,6 +3,7 @@ import { subjectFor, type EmailRequest } from '../email/templates';
 import { declineNotice, refusedNotice } from '../fakePayment';
 import { demoLabel } from '../pages/legal';
 import { commonCopy } from './common';
+import { signInCopy } from './signIn';
 
 // Strings that matter outside the code: a person, a mail client, or a legal reader depends on the
 // exact words. They are pinned here as literals on purpose, so changing one is a decision made in
@@ -13,6 +14,7 @@ import { commonCopy } from './common';
 // - every email template's subject line, as a mail client shows it
 // - the payment-failure message a guest reads after a declined card, and after a refused payment
 // - the 404 heading
+// - the on-screen sign-in link's title, body and Continue label
 
 const subject = (template: string, data: Record<string, unknown>) =>
   subjectFor({
@@ -102,5 +104,15 @@ describe('the payment-failure message', () => {
 describe('the 404 heading', () => {
   it('says the page cannot be found', () => {
     expect(commonCopy.notFound.title).toBe("We can't find that page");
+  });
+});
+
+describe('the on-screen sign-in link', () => {
+  it('names the address, says the link is not emailed, and labels the link Continue', () => {
+    expect(signInCopy.onScreen.title).toBe('Your sign-in link is ready');
+    expect(signInCopy.onScreen.body('sam@example.com')).toBe(
+      'Email is off in this demo, so we show the link here instead of sending it to sam@example.com. It works once and lasts 5 minutes.',
+    );
+    expect(signInCopy.onScreen.continueLabel).toBe('Continue');
   });
 });

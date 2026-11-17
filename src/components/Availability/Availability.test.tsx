@@ -104,6 +104,29 @@ describe('AvailabilityView add form', () => {
     );
   });
 
+  it('describes the days group by its problem and marks each day invalid', () => {
+    renderView({ problems: ['weekdays'] });
+
+    const group = screen.getByRole('group', { name: 'Days of the week' });
+    expect(group).toHaveAccessibleDescription(
+      availabilityFieldProblems.weekdays,
+    );
+    expect(screen.getByRole('checkbox', { name: 'Monday' })).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+  });
+
+  it('leaves the days group undescribed when no day was refused', () => {
+    renderView();
+
+    const group = screen.getByRole('group', { name: 'Days of the week' });
+    expect(group).not.toHaveAttribute('aria-describedby');
+    expect(
+      screen.getByRole('checkbox', { name: 'Monday' }),
+    ).not.toHaveAttribute('aria-invalid');
+  });
+
   it('shows no problem for a field that was not refused', () => {
     renderView({ problems: ['allocation'] });
 

@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { handleAuthRequest } from './handler';
+import { handleAuthRequest, handleSignInFormRequest } from './handler';
 
 const betterAuthHandler = vi.hoisted(() => vi.fn());
 const consumeRateLimit = vi.hoisted(() => vi.fn());
 const logError = vi.hoisted(() => vi.fn());
+const onScreenSignInLink = vi.hoisted(() => vi.fn());
+vi.mock('./onScreenLink', () => ({ onScreenSignInLink }));
 vi.mock('./auth', () => ({
   getAuth: () => ({ handler: betterAuthHandler }),
 }));
@@ -18,6 +20,9 @@ vi.mock('@/server/monitoring/logger', () => ({
 // - a counter that fails is a 503 and nothing is sent; the log holds the error name only
 // - a body that is too long, not JSON, or not an address is refused unread by the counter and by Better Auth
 // - Better Auth still receives the original body after it was read for the address
+// - through the form's handler, a link the module returns is answered as `{ status: true, signInPath }`, no-store, and Better Auth is not asked; with none returned Better Auth answers as usual
+// - through the API address's handler, the module is never asked and no link is answered
+// - the module is asked with the normalized address and the checked destination, after the count, and never for a refused request
 // - every other request, the verify address included, passes to Better Auth uncounted
 // - every response is no-store and keeps every cookie Better Auth set
 
@@ -167,5 +172,65 @@ describe('the response', () => {
     const response = await handleAuthRequest(post('{}'));
 
     expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+});
+
+describe('a sign-in link request through the form handler', () => {
+  const asked = (email: string, callbackURL?: string) =>
+    handleSignInFormRequest(post(JSON.stringify({ email, callbackURL })));
+
+  it('answers the link the module returns, no-store, and does not ask Better Auth', async () => {
+    onScreenSignInLink.mockResolvedValue('/sign-in/confirm?token=AbC&next=%2F');
+
+    const response = await asked('Sam@Example.COM', '/account');
+
+    expect(await response.json()).toEqual({
+      status: true,
+      signInPath: '/sign-in/confirm?token=AbC&next=%2F',
+    });
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(onScreenSignInLink).toHaveBeenCalledWith(
+      'sam@example.com',
+      '/account',
+    );
+    expect(betterAuthHandler).not.toHaveBeenCalled();
+  });
+
+  it('hands an unsafe destination on as home', async () => {
+    onScreenSignInLink.mockResolvedValue(null);
+
+    await asked('sam@example.com', '//evil.com');
+
+    expect(onScreenSignInLink).toHaveBeenCalledWith('sam@example.com', '/');
+  });
+
+  it('answers as usual, with Better Auth, when the module returns no link', async () => {
+    onScreenSignInLink.mockResolvedValue(null);
+
+    const response = await asked('sam@example.com');
+
+    expect(await response.json()).toEqual({ status: true });
+    expect(betterAuthHandler).toHaveBeenCalledOnce();
+  });
+
+  it('never asks the module for a request the count refused', async () => {
+    consumeRateLimit.mockResolvedValue({
+      allowed: false,
+      retryAfterSeconds: 60,
+    });
+
+    const response = await asked('sam@example.com');
+
+    expect(response.status).toBe(429);
+    expect(onScreenSignInLink).not.toHaveBeenCalled();
+  });
+
+  it('is not asked for at the API address, which never asks', async () => {
+    onScreenSignInLink.mockResolvedValue('/sign-in/confirm?token=AbC');
+
+    const response = await handleAuthRequest(signIn('sam@example.com'));
+
+    expect(await response.json()).toEqual({ status: true });
+    expect(onScreenSignInLink).not.toHaveBeenCalled();
   });
 });

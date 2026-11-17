@@ -14,6 +14,8 @@ import {
   parseIdField,
   parseNotice,
   parseProblemFields,
+  opValue,
+  rawFormFieldLimit,
   splitOp,
   swapAt,
   problemText,
@@ -74,6 +76,29 @@ describe('splitOp', () => {
 
   it('refuses a value over the length limit', () => {
     expect(splitOp('a:b:c', 4, 3)).toBeNull();
+  });
+});
+
+describe('opValue', () => {
+  it('joins its parts the way splitOp reads them back', () => {
+    expect(opValue('up', 3, 'picks')).toBe('up:3:picks');
+    expect(splitOp(opValue('up', 3, 'picks'), 20, 3)).toEqual([
+      'up',
+      '3',
+      'picks',
+    ]);
+  });
+});
+
+describe('rawFormFieldLimit', () => {
+  it('is the length past which oversizedFields names a field', () => {
+    const at = (length: number) => () => 'x'.repeat(length);
+    expect(
+      oversizedFields(at(rawFormFieldLimit), ['a'], rawFormFieldLimit),
+    ).toEqual([]);
+    expect(
+      oversizedFields(at(rawFormFieldLimit + 1), ['a'], rawFormFieldLimit),
+    ).toEqual(['a']);
   });
 });
 

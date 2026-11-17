@@ -103,6 +103,9 @@ export function errorProps<F extends string>(
   return errorText === undefined ? {} : { errorText };
 }
 
+/** The longest a posted text field is read; a longer one is refused unread, so no rule walks an unbounded string. */
+export const rawFormFieldLimit = 1000;
+
 /** The fields whose posted text is over the limit, so no rule walks an unbounded string. */
 export function oversizedFields<F extends string>(
   get: FormGetter,
@@ -215,6 +218,11 @@ export function splitOp(
   if (raw === undefined || raw.length > maxLength) return null;
   const split = raw.split(':');
   return split.length === parts ? split : null;
+}
+
+/** A button's `name:place:id` value from its parts: the encoder that `splitOp` undoes. */
+export function opValue(...parts: readonly (string | number)[]): string {
+  return parts.join(':');
 }
 
 /** The list with the entries at `from` and `to` swapped, or null when either place is past an end. */

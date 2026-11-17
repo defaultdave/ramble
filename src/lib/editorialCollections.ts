@@ -24,7 +24,9 @@ import {
   formJson,
   formText,
   noticeHref,
+  opValue,
   oversizedFields,
+  rawFormFieldLimit,
   parseIdField,
   slugFor,
   splitOp,
@@ -112,8 +114,6 @@ export function refusedCollectionOutcome(
     : { status: 'invalid', fields: form.fields };
 }
 
-const rawFieldLimit = 1000;
-
 /**
  * The posted details form. A blank address keeps the one the Pick has, or is made from the title
  * for a new one. The status the buttons mean is settled later against the stored row. A refused
@@ -121,7 +121,7 @@ const rawFieldLimit = 1000;
  */
 export function parseCollectionForm(get: FormGetter): CollectionForm {
   const oversized: readonly string[] = [
-    ...oversizedFields(get, ['title', 'slug', 'summary'], rawFieldLimit),
+    ...oversizedFields(get, ['title', 'slug', 'summary'], rawFormFieldLimit),
     ...oversizedFields(get, ['intro'], editorialLimits.richTextStoredBytes),
   ];
   if (oversized.length > 0) {
@@ -228,7 +228,7 @@ function itemOpValue(
   index: number,
   experienceId: string,
 ): string {
-  return `${action}:${String(index)}:${experienceId}`;
+  return opValue(action, index, experienceId);
 }
 
 export type ItemForm =

@@ -14,6 +14,7 @@ import {
   invalidFormNotice,
   noticeHref,
   oversizedFields,
+  rawFormFieldLimit,
   parseIdField,
   slugFor,
   slugProblemStart,
@@ -111,8 +112,6 @@ export type EntryForm =
   | { ok: true; value: { input: HelpArticleInput; intent: EntryIntent } }
   | { ok: false; fields: EntryFormField[] };
 
-const rawFieldLimit = 1000;
-
 /**
  * The posted entry form. A blank slug keeps the address the entry has, or is made from the title
  * for a new one. The status and position a form carries are only what it was opened with: the
@@ -122,7 +121,7 @@ const rawFieldLimit = 1000;
 export function parseEntryForm(get: FormGetter): EntryForm {
   const textFields = ['title', 'slug', 'summary'] as const;
   const oversized = [
-    ...oversizedFields(get, textFields, rawFieldLimit),
+    ...oversizedFields(get, textFields, rawFormFieldLimit),
     ...oversizedFields(get, ['body'], editorialLimits.richTextStoredBytes),
   ];
   if (oversized.length > 0) {

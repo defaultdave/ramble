@@ -16,7 +16,9 @@ import {
   formJson,
   formText,
   noticeHref,
+  opValue,
   oversizedFields,
+  rawFormFieldLimit,
   splitOp,
   swapAt,
   parseIdField,
@@ -102,7 +104,7 @@ function homeModuleOpValue(
   position: number,
   kind: HomeModuleKind,
 ): string {
-  return `${action}:${String(position)}:${kind}`;
+  return opValue(action, position, kind);
 }
 
 /** The click a posted form names, or null when it names none that can be read. */
@@ -179,8 +181,6 @@ export type HomeModuleForm =
   | { ok: true; value: HomeModuleEdit }
   | { ok: false; position: number; fields: HomeModuleField[] };
 
-const rawHeadingLimit = 1000;
-
 /**
  * The posted edit form. A form that does not name a module is `null`. A field too long to be read
  * is refused unread. The editor only posts the fields its kind shows, and `applyHomeModuleEdit`
@@ -193,7 +193,7 @@ export function parseHomeModuleForm(get: FormGetter): HomeModuleForm | null {
     return null;
   }
   const oversized: readonly string[] = [
-    ...oversizedFields(get, ['heading'], rawHeadingLimit),
+    ...oversizedFields(get, ['heading'], rawFormFieldLimit),
     ...oversizedFields(get, ['body'], editorialLimits.richTextStoredBytes),
   ];
   if (oversized.length > 0) {

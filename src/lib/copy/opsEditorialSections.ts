@@ -171,7 +171,7 @@ export const opsEditorialSectionsCopy = {
       },
       no_entries: {
         tone: 'warning',
-        title: 'Add at least one experience before publishing.',
+        title: 'A published collection needs at least one experience.',
       },
       unknown_experience: {
         tone: 'warning',

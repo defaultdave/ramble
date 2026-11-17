@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { dedupeKeyPattern } from './jobs';
 import {
   bookingEmailKey,
   bookingCalendarEvent,
@@ -18,7 +19,10 @@ import {
   refundArrivalLine,
   reminderDecision,
   reminderLeadMs,
+  reminderAfterMove,
+  reminderMoveJobKey,
   reminderRunAt,
+  sessionReminderEmailKey,
   sessionReminderData,
   type BookingEmailSource,
   type CancelledBy,
@@ -52,6 +56,8 @@ import { orderStatuses } from './orders';
 // - the host notice names the guest and the party and carries no payment or link
 // - the cancellation reason is worded for each reader and each canceller; only a guest's email carries a refund line
 //   and, when the guest did not cancel, a link to other dates
+// - a move re-times a waiting reminder, queues a fresh one when none waits, and does nothing for a session that has started
+// - the reminder's email key is the order's, or the order's with the move id; the move's job key fits the dedupe pattern
 // - the refund and S10 data hold the amounts and pass their schemas
 
 describe('confirmationDecision', () => {
@@ -535,5 +541,83 @@ describe('bookingEmailKey', () => {
   ] as const)('builds one key per order for %s', (kind) => {
     expect(bookingEmailKey(kind, 'abc')).toBe(`${kind}:abc`);
     expect(bookingEmailKey(kind, 'abc')).not.toBe(bookingEmailKey(kind, 'abd'));
+  });
+});
+
+describe('reminderAfterMove', () => {
+  const startsAt = new Date('2026-11-20T21:00:00Z');
+
+  it.each([
+    [
+      'waiting, moved days ahead: re-timed to 24 hours before',
+      true,
+      '2026-11-01T00:00:00Z',
+      { kind: 'retime', runAfter: new Date('2026-11-19T21:00:00Z') },
+    ],
+    [
+      'waiting, moved inside 24 hours: re-timed to now',
+      true,
+      '2026-11-20T10:00:00Z',
+      { kind: 'retime', runAfter: new Date('2026-11-20T10:00:00Z') },
+    ],
+    [
+      'none waiting: a fresh one for 24 hours before',
+      false,
+      '2026-11-01T00:00:00Z',
+      { kind: 'enqueue', runAfter: new Date('2026-11-19T21:00:00Z') },
+    ],
+    [
+      'none waiting, inside 24 hours: a fresh one now',
+      false,
+      '2026-11-20T10:00:00Z',
+      { kind: 'enqueue', runAfter: new Date('2026-11-20T10:00:00Z') },
+    ],
+    [
+      'a session that has started, waiting or not: nothing',
+      true,
+      '2026-11-20T21:00:00Z',
+      { kind: 'none' },
+    ],
+    [
+      'a session that has started, none waiting',
+      false,
+      '2026-11-21T00:00:00Z',
+      { kind: 'none' },
+    ],
+  ])('%s', (_label, hasPendingReminder, now, expected) => {
+    expect(
+      reminderAfterMove({ startsAt, now: new Date(now), hasPendingReminder }),
+    ).toEqual(expected);
+  });
+});
+
+describe('the reminder keys', () => {
+  const orderId = '0b4f2a8e-3c1d-4e5f-8a6b-7c9d0e1f2a3b';
+  const moveId = '1C2D3E4F-5A6B-4C7D-8E9F-0A1B2C3D4E5F';
+
+  it('keeps the order key with no move id, and adds the lower-cased move id with one', () => {
+    expect(sessionReminderEmailKey(orderId)).toBe(
+      `session-reminder:${orderId}`,
+    );
+    expect(sessionReminderEmailKey(orderId, moveId)).toBe(
+      `session-reminder:${orderId}:${moveId.toLowerCase()}`,
+    );
+  });
+
+  it('gives each move its own email key, none equal to the order key', () => {
+    const other = '9c8d7e6f-5a4b-4c3d-8e2f-1a0b9c8d7e6f';
+    const keys = [
+      sessionReminderEmailKey(orderId),
+      sessionReminderEmailKey(orderId, moveId),
+      sessionReminderEmailKey(orderId, other),
+    ];
+    expect(new Set(keys).size).toBe(3);
+  });
+
+  it('builds a move job key the job dedupe pattern accepts', () => {
+    expect(reminderMoveJobKey(moveId)).toBe(
+      `session-reminder-move:${moveId.toLowerCase()}`,
+    );
+    expect(reminderMoveJobKey(moveId)).toMatch(new RegExp(dedupeKeyPattern));
   });
 });

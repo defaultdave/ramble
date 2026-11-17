@@ -22,11 +22,11 @@ import {
   termsId,
   waiverId,
   sessionId,
-  at,
   parsed,
   adult,
   child,
 } from './checkout.fixtures';
+import { at } from './testClock';
 
 // Behaviours under test, one per decision, branch or risk:
 // - the party's children are the quantity on the child price option

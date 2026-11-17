@@ -279,7 +279,7 @@ flowchart TD
 | HostDetailView | server | [src/components/HostSetup/HostDetailView.tsx](../../components/HostSetup/HostDetailView.tsx) | Profile form (HostForm fields), agreement state, the owner invite. Also uses StatusBadge and Alert. |
 | HostForm | server | [src/components/HostSetup/HostForm.tsx](../../components/HostSetup/HostForm.tsx) | The same form as on the new-host page. |
 | Button | client | [src/components/Button/Button.tsx](../../components/Button/Button.tsx) | Every submit button. The file is `'use client'`, but the forms post to the action without it. |
-| updateHostAction | action | [src/server/actions/hosts.ts](../../server/actions/hosts.ts) | `updateHost` via `saveHostFields`. Writes nothing, audit row included, when nothing differs. No cache is cleared. |
+| updateHostAction | action | [src/server/actions/hosts.ts](../../server/actions/hosts.ts) | `updateHost` via `saveHostFields`. Writes nothing, audit row included, when nothing differs. A new name, slug, about text, or time zone clears `catalog` (`hostProfile`) and each of the host's experiences, after the commit (`hostProfileChanges`, applied by `withLockedHost`); a notice address alone clears nothing. |
 | acceptHostAgreementAction | action | [src/server/actions/hosts.ts](../../server/actions/hosts.ts) | `recordHostAcceptance` for the chosen legal document. |
 | resendHostInviteAction | action | [src/server/actions/hosts.ts](../../server/actions/hosts.ts) | `inviteHostOwner`: a fresh sign-in link by email. |
 | HostSuspension | server | [src/components/HostSetup/HostSuspension.tsx](../../components/HostSetup/HostSuspension.tsx) | Suspend or unsuspend the whole host. |
@@ -869,14 +869,14 @@ Ops pages hold no cache of their own. Their changes reach the guest side through
 | Cancel a booking (`cancelBookingAction`) | `session:id`, only if it was cancelled | After one stale response, through `revalidateTag` with `max` |
 | Save, publish or unpublish a help article (`saveEntryAction`) | Only when guests could see the article before or after: `help-articles` only (there is no per-article tag). Saving a draft that stays a draft clears nothing | At once, through `updateTag` |
 | Reject a review, create an experience (`rejectExperienceAction`, `createExperienceAction`) | Nothing, because the experience is never guest-visible | Not applicable |
-| Edit a host, accept the agreement, invites (`updateHostAction`, `acceptHostAgreementAction`, `resendHostInviteAction`, `createHostAction`) | Nothing | A host name or about edit shows when the `catalog` profile runs out |
+| Edit a host (`updateHostAction`) | A new name, slug, about text, or time zone: `catalog` and the host's experiences. A notice address alone: nothing | At once, through `updateTag` |
+| Accept the agreement, invites (`acceptHostAgreementAction`, `resendHostInviteAction`, `createHostAction`) | Nothing | Not applicable |
 | Refund, retry, resend, void links (`refundBookingAction`, `retryRefundAction`, `resendConfirmationAction`, `voidLinksAction`) | Nothing | Not applicable |
 | Save settings (`updateSettingsAction`) | The `settings` tag, only when a setting changed: the banner and switches `getGuestSettings` serves | At once, through `updateTag` |
 | Staff, support, audit, mailbox, test console (all of their actions) | Nothing | Not applicable; the demo reset clears no tag either |
 
 ## Worth knowing
 
-- An ops host edit never reaches the host page. A host's own settings change clears `catalog` (`hostProfile`). The ops `updateHost` goes through `saveHostFields` and returns no cache change, so a new name or about text shows only when the `catalog` profile lapses (15 minutes to revalidate, a day to expire). [src/server/hostPage.ts](../../server/hostPage.ts) says so in a comment.
 - Session and booking cancels clear caches more weakly than edits. Edits, pauses, approvals and seat changes use `updateTag`. Both cancels use `revalidateTag(..., 'max')`, so one guest response afterwards can still show the cancelled session as bookable. The `cancelSession` comment says it runs in a Server Action only, which would allow the stronger call.
 - A non-ops visitor gets a 200 sign-in page, and an unknown address is a 200 too. `OpsAccessDenied` is returned, not thrown. The catch-all calls `notFound()` after `connection()`, and the comment in [renderPerRequest.tsx](../renderPerRequest.tsx) admits the status stays 200 and the page appears only once script runs.
 - Reading the audit log writes to it. Opening `/ops/audit`, a blank new-host form, or the ops home each add a row. Experience, review and availability reads, and the entire test console including the demo data reset, write none.

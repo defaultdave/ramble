@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { WriteIdSchema } from './catalog';
-import { isSafeIntegerInRange } from './integers';
+import { requireIntegerInRange } from './integers';
 import { orderCurrency, orderLimits } from './orders';
 import { ProviderIdSchema } from './payments';
 import { addRuleIssues, type RuleIssue } from './rules';
@@ -356,11 +356,7 @@ type Draft = {
 };
 
 function requireMinor(value: number, what: string, minimum: 0 | 1): void {
-  if (!isSafeIntegerInRange(value, minimum)) {
-    throw new RangeError(
-      `${what} must be a whole number of at least ${String(minimum)}, got ${String(value)}`,
-    );
-  }
+  requireIntegerInRange(value, minimum, Number.MAX_SAFE_INTEGER, what);
 }
 
 /** The legs of a split: what the host keeps of the ticket, the commission, and the tax. */

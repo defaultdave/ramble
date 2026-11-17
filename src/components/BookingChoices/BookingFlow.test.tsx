@@ -29,7 +29,7 @@ import { fromPriceLabel } from '@/lib/pricing';
 // Behaviours under test, one per decision, branch or risk:
 // - the bar opens the sheet from Choose date; the sheet picks a date, a time, and a party, and Continue asks for the hold and goes to checkout
 // - the bar, the sheet, and the panel share one draft: a choice in one shows in the others; leaving the page starts the next visit fresh
-// - ?date= preselects its date, and its lone time
+// - ?date= preselects its date, and its lone time; a date that is sold out or not listed is ignored
 // - every answer the reserve can give says what happened in the sheet and the panel: sold out with other dates that can be chosen, a block with its time, the limit, a struck session
 // - paused: the bar, the sheet, and the panel say so, from the start and when an answer says so
 // - a reserve that throws says nothing was held, and the guest can try again; a hold that was placed never says so
@@ -226,6 +226,33 @@ describe('the bar and the sheet', () => {
     expect(screen.getByText('Thu, Oct 22 · 5:30 PM EDT')).toBeVisible();
     expect(screen.getByText(chosenPartyLabel(2, twoGuestsMinor))).toBeVisible();
   });
+
+  it.each([
+    ['sold out', '2026-10-29'],
+    ['not listed', '2026-12-01'],
+  ])(
+    'ignores a date in the address that is %s, and still offers the next date',
+    async (_why, date) => {
+      render(<Page offer={{ ...kayakOffer, preselectedDate: date }} />);
+
+      expect(screen.getByText(perPersonLabel(nextDayLabel))).toBeVisible();
+      expect(
+        screen.queryByText(chosenPartyLabel(2, twoGuestsMinor)),
+      ).toBeNull();
+
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Choose date' }),
+      );
+
+      expect(within(sheet()).getByText('Pick a date')).toBeVisible();
+      expect(
+        within(sheet())
+          .queryAllByRole('button', { pressed: true })
+          .map((button) => button.textContent),
+      ).toEqual(['Book for me']);
+      expect(within(sheet()).queryByRole('group')).toBeNull();
+    },
+  );
 
   it('sends the guest to similar experiences when no date has room', () => {
     render(

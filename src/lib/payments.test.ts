@@ -13,6 +13,7 @@ import {
   paymentLimits,
   type AttemptStatus,
 } from './payments';
+import { at } from './testClock';
 import { isTerminal } from './transitions';
 import { id } from '../../tests/support/ids';
 
@@ -24,7 +25,7 @@ import { id } from '../../tests/support/ids';
 // - ProviderEventSchema: valid rows pass; amount and currency come together; the body is bounded and storable
 
 const orderId = id(1);
-const created = new Date('2026-11-01T12:00:00Z');
+const created = at;
 const later = new Date('2026-11-01T12:05:00Z');
 
 describe('attempt transitions', () => {

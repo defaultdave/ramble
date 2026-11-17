@@ -6,7 +6,8 @@ import {
   holdsToSupersede,
   seatLimitRefusal,
 } from './holds';
-import { at, later, minuteMs, deviceKey, open } from './holds.fixtures';
+import { minuteMs, deviceKey, open } from './holds.fixtures';
+import { at, msFrom } from './testClock';
 
 // Behaviours under test, one per decision, branch or risk:
 // - supersede: only the device's own open active holds; a paying, lapsed, released, converted, or another
@@ -24,7 +25,7 @@ describe('holdsToSupersede', () => {
     ['a lapsed active hold', open({ expiresAt: at }), []],
     [
       'a paying hold, because a payment is in flight',
-      open({ status: 'paying', payingUntil: later(minuteMs) }),
+      open({ status: 'paying', payingUntil: msFrom(minuteMs) }),
       [],
     ],
     ['another device’s hold', open({ deviceKey: 'b'.repeat(64) }), []],
@@ -53,7 +54,7 @@ describe('seatLimitRefusal', () => {
   const seatsHeld = (seats: number, overrides = {}) => ({
     seats,
     status: 'active' as const,
-    expiresAt: later(minuteMs),
+    expiresAt: msFrom(minuteMs),
     payingUntil: null,
     ...overrides,
   });
@@ -76,7 +77,7 @@ describe('seatLimitRefusal', () => {
         seatsHeld(4, {
           status: 'paying',
           expiresAt: at,
-          payingUntil: later(minuteMs),
+          payingUntil: msFrom(minuteMs),
         }),
       ],
       3,
@@ -98,14 +99,14 @@ describe('seatLimitRefusal', () => {
 });
 
 describe('which holds lapse, and when (through blockRefusal)', () => {
-  const expiresAt = later(-10 * minuteMs);
-  const payingUntil = later(-5 * minuteMs);
+  const expiresAt = msFrom(-10 * minuteMs);
+  const payingUntil = msFrom(-5 * minuteMs);
   const hold = (overrides = {}) => ({
     status: 'active' as const,
     expiresAt,
     payingUntil: null,
     releasedReason: null,
-    updatedAt: later(-20 * minuteMs),
+    updatedAt: msFrom(-20 * minuteMs),
     ...overrides,
   });
   const released = (releasedReason: string, overrides = {}) =>
@@ -137,7 +138,7 @@ describe('which holds lapse, and when (through blockRefusal)', () => {
     ],
     [
       'a guest leaving before the deadline is no lapse',
-      released('guest_left', { updatedAt: later(-11 * minuteMs) }),
+      released('guest_left', { updatedAt: msFrom(-11 * minuteMs) }),
       null,
     ],
     [
@@ -147,7 +148,7 @@ describe('which holds lapse, and when (through blockRefusal)', () => {
     ],
     [
       'a guest releasing after the deadline cannot clear it',
-      released('guest_left', { updatedAt: later(-1) }),
+      released('guest_left', { updatedAt: msFrom(-1) }),
       expiresAt,
     ],
     ['a superseded hold is no lapse', released('superseded'), null],
@@ -165,7 +166,7 @@ describe('which holds lapse, and when (through blockRefusal)', () => {
   ])('%s', (_name, candidate, expected) => {
     // Two newer lapses make the candidate the third most recent, so `until` is its deadline plus 15 minutes.
     const newer = [1, 2].map((minutesAgo) =>
-      hold({ expiresAt: later(-minutesAgo * minuteMs) }),
+      hold({ expiresAt: msFrom(-minutesAgo * minuteMs) }),
     );
     expect(blockRefusal([candidate, ...newer], at)).toEqual(
       expected === null
@@ -182,16 +183,16 @@ describe('which holds lapse, and when (through blockRefusal)', () => {
 describe('blockRefusal', () => {
   const lapsed = (minutesAgo: number, overrides = {}) => ({
     status: 'active' as const,
-    expiresAt: later(-minutesAgo * minuteMs),
+    expiresAt: msFrom(-minutesAgo * minuteMs),
     payingUntil: null,
     releasedReason: null,
-    updatedAt: later(-60 * minuteMs),
+    updatedAt: msFrom(-60 * minuteMs),
     ...overrides,
   });
   const blockedUntil = (minutesAgo: number) => ({
     status: 'blocked',
     reason: 'too_many_holds',
-    until: later((15 - minutesAgo) * minuteMs).toISOString(),
+    until: msFrom((15 - minutesAgo) * minuteMs).toISOString(),
   });
 
   it('lets a device through with two lapses', () => {
@@ -206,7 +207,7 @@ describe('blockRefusal', () => {
 
   it('ends the block at `until`, and not a moment before', () => {
     const rows = [lapsed(1), lapsed(2), lapsed(3)];
-    const until = new Date(later(12 * minuteMs));
+    const until = new Date(msFrom(12 * minuteMs));
 
     expect(blockRefusal(rows, new Date(until.getTime() - 1))).toEqual(
       blockedUntil(3),
@@ -259,6 +260,6 @@ describe('blockRefusal', () => {
 
 describe('blockWindowStart', () => {
   it('is 15 minutes before `at`', () => {
-    expect(blockWindowStart(at)).toEqual(later(-15 * minuteMs));
+    expect(blockWindowStart(at)).toEqual(msFrom(-15 * minuteMs));
   });
 });

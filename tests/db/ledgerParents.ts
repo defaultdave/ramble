@@ -1,5 +1,6 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
+import { at } from '@/lib/testClock';
 import { insertHold } from './holdFixtures';
 import { createOrderParents } from './orderParents';
 
@@ -15,7 +16,7 @@ export type LedgerParents = Awaited<ReturnType<typeof createLedgerParents>>;
 /** Order parents plus helpers that make the rows a ledger entry can point at, with the least a row needs. */
 export async function createLedgerParents(db: Client['db'], tag: string) {
   const parents = await createOrderParents(db, tag);
-  const created = '2026-11-01T12:00:00Z';
+  const created = at.toISOString();
 
   async function newOrder(): Promise<string> {
     const id = randomUUID();

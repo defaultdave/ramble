@@ -18,9 +18,11 @@ import { orders, refunds } from './schema';
 type RetryRefundOutcome = RequestRefundResult['status'] | 'not_found';
 
 /**
- * Asks again for the refund of an order that failed, for that refund's own ticket part, and takes the
- * order out of the refund-failed queue, in one transaction under the order's lock: the new refund,
- * the cleared flag, and the audit row commit together or not at all. A request the refund path
+ * Asks again for the refund of an order that failed, for that refund's own ticket part, and, once no
+ * other failed refund is left to retry, takes the order out of the refund-failed queue, in one
+ * transaction under the order's lock: the new refund, the cleared flag, and the audit row commit
+ * together or not at all. An order with more failed refunds stays in the queue, and each click
+ * retries the next one. A request the refund path
  * refuses (the refunds standing plus this one would pass what the card paid), a repeat of the same
  * retry, or any error leaves the flag set and writes nothing. If the new refund fails too, the
  * provider's event flags the order again.
@@ -68,7 +70,9 @@ export async function retryFailedRefund(
     const result = await requestAuditedRefund(tx, plan.request, (refundId) =>
       refundAuditEntry('booking.ops_refund_retried', userId, id, refundId),
     );
-    if (result.status === 'requested') await clearRefundFailed(tx, id);
+    if (result.status === 'requested' && plan.clearsFlag) {
+      await clearRefundFailed(tx, id);
+    }
     return result.status;
   });
 }

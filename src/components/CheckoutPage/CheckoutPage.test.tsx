@@ -16,7 +16,7 @@ import { CheckoutPage, type CheckoutActions } from './CheckoutPage';
 // - Continue checks the form first; a form with problems sends nothing and says which
 // - a filled form sends one `startPayment`, once, and opens the payment form with its secret
 // - each answer lands on its state: invalid (inline errors), expired, sold out with other dates, too many tries
-// - paying goes to the confirmation with the order token
+// - paying goes to the confirmation with the order token; a declined card and a 3-D Secure step stay on the page
 // - the maintenance switch shows the notice and no form
 
 const push = vi.fn();
@@ -258,6 +258,43 @@ describe('CheckoutPage', () => {
       plan: { outcome: 'succeeded', method: 'card' },
     });
   });
+
+  it.each([
+    [
+      { status: 'declined', failureCode: 'insufficient_funds' } as const,
+      'Your card has insufficient funds',
+    ],
+    [{ status: 'requires_action' } as const, "Verify it's you"],
+  ])(
+    'stays on the page and does not go to the confirmation when payment answers %j',
+    async (answer, shown) => {
+      const a = actions();
+      a.confirm = vi.fn(() => Promise.resolve(answer));
+      const user = userEvent.setup();
+      render(<CheckoutPage view={view} actions={a} />);
+      await fill(user);
+      await user.click(
+        screen.getByRole('button', { name: 'Continue to payment' }),
+      );
+      await screen.findByText('Demo payment form');
+
+      await user.type(screen.getByLabelText('Card number'), '4242424242424242');
+      await user.type(
+        screen.getByLabelText('Expiry date, month and year'),
+        '1299',
+      );
+      await user.type(screen.getByLabelText('Security code'), '123');
+      await user.type(screen.getByLabelText('ZIP code'), '10001');
+      await user.click(
+        screen.getByRole('button', {
+          name: `Pay ${formatMoney(view.totalMinor)}`,
+        }),
+      );
+
+      expect(await screen.findByText(shown)).toBeVisible();
+      expect(push).not.toHaveBeenCalled();
+    },
+  );
 
   it('shows the server field errors under their fields', async () => {
     const a = actions(() =>

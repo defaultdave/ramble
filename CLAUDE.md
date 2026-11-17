@@ -11,6 +11,7 @@ Demo marketplace for bookable experiences, built to prove a planning method and 
 - Mobile first. Min-width breakpoints.
 - Page maps: each route tree under `src/app` has a README mapping its render tree (index in `src/app/README.md`). A PR that changes a tree (a component, a Suspense or client boundary, a cache tag, an action) updates that README in the same PR, and its review checks it.
 - Comments only when the code cannot say it itself: name things so the code documents itself. A comment states a non-obvious why, never what the next line does.
+- Local gates for a change under `src/server/db/schema/`: `pnpm db:generate` must report no changes, so the migration is committed with the schema.
 - Prior client work is evidence, never a template. No names, URLs, copy, or URL shapes from it.
 - Plan files are read-only after the `plan-frozen-*` tag. Reality goes in `delta-log.md` in `ramble-pm`.
 - The client brief in `docs/product/discovery/sealed/` is the PRD's source since 2026-10-18 (see `DECISIONS.md` in `ramble-pm`). `ramble-pm` may read it.

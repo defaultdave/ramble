@@ -162,6 +162,8 @@ export const opsDevNoticeCodes = [
   'reset_done',
   'reset_unconfirmed',
   'reset_failed',
+  'invite_queued',
+  'invite_not_eligible',
 ] as const;
 export type OpsDevNoticeCode = (typeof opsDevNoticeCodes)[number];
 
@@ -214,7 +216,34 @@ export const opsDevNotices = {
     title:
       'The reset did not finish. Check the console and run it again; the seed is safe to rerun.',
   },
+  invite_queued: {
+    tone: 'success',
+    title:
+      'The review invite is queued. Drain the queue to send it to the dev mailbox.',
+  },
+  invite_not_eligible: {
+    tone: 'warning',
+    title:
+      'That booking cannot be invited now: it was cancelled, is not over yet, has a review already, or is past the review window.',
+  },
 } as const satisfies Record<OpsDevNoticeCode, NoticeText>;
+
+export type InvitableOrderOption = { value: string; label: string };
+
+/** The bookings the console offers a review invite for: reference, experience, and when the session ended. */
+export function invitableOrderOptions(
+  rows: readonly {
+    orderId: string;
+    reference: string;
+    experienceName: string;
+    endsAt: Date;
+  }[],
+): InvitableOrderOption[] {
+  return rows.map((row) => ({
+    value: row.orderId,
+    label: `${row.reference} · ${row.experienceName} · ended ${utcLabel(row.endsAt)}`,
+  }));
+}
 
 /** What the console shows of a run's counts. Each is a whole number in the address, so no text rides in a link. */
 const reportFields = [

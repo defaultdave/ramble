@@ -55,6 +55,7 @@ describe('canRehash', () => {
   it.each([
     ['manage', true],
     ['order', false],
+    ['review', false],
     ['gift', false],
   ] as const)('a rotation re-hashes %s: %s', (kind, expected) => {
     expect(canRehash(kind)).toBe(expected);

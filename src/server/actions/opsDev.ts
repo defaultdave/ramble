@@ -23,6 +23,7 @@ import { callerOrLeave, idOrLeave } from '@/server/opsAccess';
 import { logger } from '@/server/monitoring/logger';
 import { readOpsCaller } from '@/server/opsCaller';
 import { fixedClock, systemClock, type Clock } from '@/server/ports/clock';
+import { queueReviewInviteNow } from '@/server/jobs/reviewInviteSchedule';
 import { runPulse } from '@/server/pulse';
 import { readTestClock, writeTestClock } from '@/server/testClock';
 
@@ -123,4 +124,19 @@ export async function resetDemoDataAction(formData: FormData): Promise<void> {
     logger.error('demo data reset failed', { errorKind: errorKind(error) });
   }
   redirect(noticeHref(opsDevPath, done ? 'reset_done' : 'reset_failed'));
+}
+
+/** Queues the review invite for the chosen booking to run at once; the next drain sends it. A booking that cannot be invited now says so. */
+export async function sendReviewInviteAction(
+  formData: FormData,
+): Promise<void> {
+  await guardOrLeave();
+  const orderId = idOrLeave(formData, 'orderId', opsDevPath);
+  const queued = await queueReviewInviteNow(await readOpsCaller(), orderId);
+  redirect(
+    noticeHref(
+      opsDevPath,
+      queued === 'queued' ? 'invite_queued' : 'invite_not_eligible',
+    ),
+  );
 }

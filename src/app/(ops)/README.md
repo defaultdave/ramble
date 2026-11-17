@@ -111,6 +111,7 @@ flowchart TD
     mmv["MailboxMessageView"]:::server
     dev["OpsDevPage<br/>/ops/dev"]:::server
     jobs["readRecentJobs"]:::server
+    invitable["readInvitableOrderRows"]:::server
     clock["readTestClock"]:::server
     an2["ActionNotice"]:::server
     con["OpsDevConsole"]:::server
@@ -120,6 +121,7 @@ flowchart TD
     drain["drainOpsJobsAction and runOpsPulseAction"]:::action
     setclock["setOpsClockAction"]:::action
     reset["resetDemoDataAction"]:::action
+    sendinvite["sendReviewInviteAction"]:::action
     unk["UnknownPage<br/>/ops/..."]:::server
     nfpr["notFoundPerRequest"]:::server
     home -.-> rec
@@ -133,6 +135,7 @@ flowchart TD
     mm -.-> lmm
     mm --> mmv
     dev -.-> jobs
+    dev -.-> invitable
     dev -.-> clock
     dev --> an2
     dev --> con
@@ -142,6 +145,7 @@ flowchart TD
     btn2 -.-> drain
     btn2 -.-> setclock
     btn2 -.-> reset
+    btn2 -.-> sendinvite
     unk -.-> nfpr
     classDef server fill:#e8edf8,stroke:#3b5bab,color:#1b1f27
     classDef cached fill:#e2f3f0,stroke:#0f7a6c,color:#1b1f27
@@ -167,15 +171,17 @@ flowchart TD
 | MailboxMessageView | server | [src/components/DevMailbox/DevMailbox.tsx](../../components/DevMailbox/DevMailbox.tsx) | One message with its links. |
 | OpsDevPage | server | [src/app/(ops)/ops/dev/page.tsx](ops/dev/page.tsx) | Gate is wider: `ops` or `admin`. Then a second check: not a production deployment. |
 | readRecentJobs | server (DB read) | [src/server/db/opsJobs.ts](../../server/db/opsJobs.ts) | Not audited. |
+| readInvitableOrderRows | server (DB read) | [src/server/db/reviews.ts](../../server/db/reviews.ts) | The newest 25 confirmed bookings whose session has ended inside the review window and that have no review, read as the caller (ops or admin). Not audited. |
 | readTestClock | server (DB read) | [src/server/testClock.ts](../../server/testClock.ts) | The tester's test time, from a cookie. |
 | ActionNotice | server | [src/components/ActionNotice/ActionNotice.tsx](../../components/ActionNotice/ActionNotice.tsx) | Shows the `?notice=` code from the last redirect, as an Alert. |
-| OpsDevConsole | server | [src/components/OpsDev/OpsDevConsole.tsx](../../components/OpsDev/OpsDevConsole.tsx) | Recent jobs table with a run button each, drain, pulse, clock controls and a reset form that needs a typed confirmation. |
+| OpsDevConsole | server | [src/components/OpsDev/OpsDevConsole.tsx](../../components/OpsDev/OpsDevConsole.tsx) | Recent jobs table with a run button each, drain, pulse, a review-invite form (a booking to choose and a send button, or a line saying none can be invited), clock controls and a reset form that needs a typed confirmation. |
 | DataTable | server | [src/components/DataTable/DataTable.tsx](../../components/DataTable/DataTable.tsx) | Sort links and a Next link; the cursor is in the address. |
 | Button | client | [src/components/Button/Button.tsx](../../components/Button/Button.tsx) | Every submit button. The file is `'use client'`, but the forms post to the action without it. |
 | runOpsJobAction | action | [src/server/actions/opsDev.ts](../../server/actions/opsDev.ts) | Every action here checks the production guard, then the role, then runs on the real or test clock. |
 | drainOpsJobsAction and runOpsPulseAction | action | [src/server/actions/opsDev.ts](../../server/actions/opsDev.ts) | The same drain and pulse the schedule runs. A hand-run pulse sends no heartbeat. |
+| sendReviewInviteAction | action | [src/server/actions/opsDev.ts](../../server/actions/opsDev.ts) | `queueReviewInviteNow` for the chosen booking: re-checks that it can be invited at the database's time, then queues the `review-invite` job to run at once under its own send id. The next drain sends it; a second send is a second email. |
 | setOpsClockAction | action | [src/server/actions/opsDev.ts](../../server/actions/opsDev.ts) | Writes or clears the test-clock cookie. |
-| resetDemoDataAction | action | [src/server/actions/opsDev.ts](../../server/actions/opsDev.ts) | `resetDemoData` after the confirmation text matches. No audit row; only a log line on failure. |
+| resetDemoDataAction | action | [src/server/actions/opsDev.ts](../../server/actions/opsDev.ts) | `resetDemoData` after the confirmation text matches. It wipes tester orders and reviews, reruns the seed, and writes the seed's past bookings and reviews again. No audit row; only a log line on failure. |
 | UnknownPage | server | [src/app/(ops)/ops/[...unknown]/page.tsx](ops/%5B...unknown%5D/page.tsx) | Any other address under `/ops`. |
 | notFoundPerRequest | server (pure lib) | [src/app/renderPerRequest.tsx](../renderPerRequest.tsx) | Awaits `connection()` first, then `notFound()`, so the group's not-found page renders with the nonce. |
 

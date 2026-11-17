@@ -98,6 +98,9 @@ export const editorialLine = (
 export const helpLine = (articles: number) =>
   `Help articles ${String(articles)}`;
 
+export const reviewsLine = (bookings: number, reviews: number) =>
+  `Past bookings ${String(bookings)}, reviews ${String(reviews)}`;
+
 export const scaleLine = (counts: CatalogCounts) =>
   `Scale: ${String(counts.hosts)} hosts, ${String(counts.experiences)} experiences, ${String(counts.sessionsCreated)} sessions created`;
 

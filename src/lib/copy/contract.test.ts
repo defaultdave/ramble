@@ -74,6 +74,11 @@ describe('email subjects', () => {
       { hostName: 'Fort Greene Pottery' },
       'You are set up on Ramble: Fort Greene Pottery',
     ],
+    [
+      'review-invite',
+      { experienceName: 'Pottery wheel night' },
+      'How was Pottery wheel night?',
+    ],
     ['ops-notice', { subject: 'New contact message' }, 'New contact message'],
   ])('%s reads the same', (template, data, expected) => {
     expect(subject(template, data)).toBe(expected);

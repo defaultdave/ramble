@@ -5,7 +5,12 @@ import { EntityIdSchema } from './catalog';
 // random: an HMAC of its kind, the row id, and a version, so any server code can rebuild a link and
 // a bump of the version voids the earlier ones (design doc 4.2.3, the capability-token amendment).
 
-export const capabilityTokenKinds = ['manage', 'order', 'gift'] as const;
+export const capabilityTokenKinds = [
+  'manage',
+  'order',
+  'review',
+  'gift',
+] as const;
 export type CapabilityTokenKind = (typeof capabilityTokenKinds)[number];
 
 // TODO(U-099): `gift` joins these kinds when the rotation re-hash covers gifts.

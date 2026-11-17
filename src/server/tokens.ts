@@ -35,8 +35,8 @@ import { secureEqual, sha256Hex } from '@/server/hash';
 
 // Capability links (design doc 4.2.3, the accepted amendment, option A): a token is derived from
 // the row, so any server code can rebuild a link, and the version bumps to void the earlier ones.
-// The `manage` and `order` kinds live on `orders` and share its `manage_token_version`, so one bump
-// voids the manage link and the confirmation URL together. A `gift` token lives on `gifts`.
+// The `manage`, `order`, and `review` kinds live on `orders` and share its `manage_token_version`, so one bump
+// voids the manage link, the confirmation URL, and the review link together. A `gift` token lives on `gifts`.
 
 function secret(): string {
   const configured = pickCapabilityTokenSecret(
@@ -72,13 +72,13 @@ export async function resolveToken(
   token: string,
 ): Promise<ResolvedToken | null>;
 export async function resolveToken(
-  kind: 'order',
+  kind: 'order' | 'review',
   token: string,
   reference: string,
 ): Promise<ResolvedToken | null>;
 /**
  * The row a token opens, or null. A `manage` token is found by its stored hash on an order, a
- * `gift` token by its stored hash on a gift; an `order` token stores none, so it is found by the
+ * `gift` token by its stored hash on a gift; an `order` or `review` token stores none, so it is found by the
  * order's reference. Either way the token is then compared, in constant time, against the one recomputed for the row's current version, so a token from before a
  * bump, a token of another kind, and a token that merely hashes alike all resolve to nothing.
  */
@@ -130,6 +130,7 @@ export async function bumpTokenVersion(
   switch (kind) {
     case 'manage':
     case 'order':
+    case 'review':
     case 'gift':
       break;
     default:

@@ -13,7 +13,7 @@ There is no `src/app/layout.tsx`. Each route group's own layout draws `<html>`.
 | Experience page | `/experiences/[slugAndId]` | [`(guest)/experiences/[slugAndId]/README.md`](<(guest)/experiences/[slugAndId]/README.md>) |
 | Sign-in and account | `/sign-in`, `/sign-in/confirm`, `/account` | [`(guest)/sign-in/README.md`](<(guest)/sign-in/README.md>) |
 | Checkout | `/checkout/[holdId]` | [`(checkout)/checkout/README.md`](<(checkout)/checkout/README.md>) |
-| Confirmation and manage | `/orders/[reference]`, `/manage/[token]` | [`(checkout)/(site)/README.md`](<(checkout)/(site)/README.md>) |
+| Confirmation, manage and review | `/orders/[reference]`, `/manage/[token]`, `/review/[reference]/[token]` | [`(checkout)/(site)/README.md`](<(checkout)/(site)/README.md>) |
 | Host area | `/host/*` | [`(host)/README.md`](<(host)/README.md>) |
 | Ops area | `/ops/*` | [`(ops)/README.md`](<(ops)/README.md>) |
 

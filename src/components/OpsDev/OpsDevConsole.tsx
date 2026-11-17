@@ -4,7 +4,12 @@ import { HiddenFields } from '@/components/HiddenFields';
 import { Input } from '@/components/Input';
 import { Select } from '@/components/Select';
 import { StatusBadge } from '@/components/StatusBadge';
-import { clockUnits, opsDevPath, type OpsJobRow } from '@/lib/opsDev';
+import {
+  clockUnits,
+  opsDevPath,
+  type InvitableOrderOption,
+  type OpsJobRow,
+} from '@/lib/opsDev';
 import { resetConfirmPhrase } from '@/lib/seed/resetTarget';
 import type { TableQuery } from '@/lib/tableQuery';
 import styles from './OpsDev.module.css';
@@ -17,10 +22,13 @@ export type OpsDevActions = {
   pulse: FormAction;
   setClock: FormAction;
   reset: FormAction;
+  sendReviewInvite: FormAction;
 };
 
 export type OpsDevConsoleProps = {
   rows: readonly OpsJobRow[];
+  /** Bookings a review invite can be sent for now, newest first. */
+  invitableOrders: readonly InvitableOrderOption[];
   query: TableQuery;
   /** The test time now in words, or null when runs use the real time. */
   testTimeLabel: string | null;
@@ -34,6 +42,7 @@ const unitOptions = clockUnits.map((unit) => ({ value: unit, label: unit }));
 /** The jobs and the three things a tester does to them on a deployment nothing runs by itself: run one, drain the queue, pulse. Every control is a plain form, so it works with no script. */
 export function OpsDevConsole({
   rows,
+  invitableOrders,
   query,
   testTimeLabel,
   demoClockOn,
@@ -88,6 +97,33 @@ export function OpsDevConsole({
             </Button>
           </form>
         </div>
+      </section>
+
+      <section className={styles.section} aria-labelledby="invite-heading">
+        <h2 id="invite-heading" className={styles.heading}>
+          Review invites
+        </h2>
+        <p className={styles.muted}>
+          Sends a booker the email that links to the review form, as if the
+          session had just ended. Run the queue afterwards to deliver it.
+        </p>
+        {invitableOrders.length === 0 ? (
+          <p className={styles.muted}>
+            No booking can be invited now: none has a finished session without a
+            review.
+          </p>
+        ) : (
+          <form action={actions.sendReviewInvite} className={styles.form}>
+            <Select
+              name="orderId"
+              label="Booking"
+              options={invitableOrders.map((order) => ({ ...order }))}
+            />
+            <Button type="submit" variant="secondary">
+              Send invite now
+            </Button>
+          </form>
+        )}
       </section>
 
       <section className={styles.section} aria-labelledby="clock-heading">

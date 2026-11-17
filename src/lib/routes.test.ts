@@ -16,6 +16,7 @@ import {
   hostPath,
   legalPath,
   managePath,
+  reviewPath,
   maxAddressLength,
   neighborhoodPath,
   orderConfirmationPath,
@@ -136,6 +137,11 @@ describe('literal addresses', () => {
       `/experiences/thing-1-${id(1)}/private-session`,
     ],
     ['a manage page', managePath('abc'), '/manage/abc'],
+    [
+      'a review page',
+      reviewPath('RMB-ABC123', 'abc'),
+      '/review/RMB-ABC123/abc',
+    ],
   ])('writes %s', (_name, actual, expected) => {
     expect(actual).toBe(expected);
   });

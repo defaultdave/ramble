@@ -112,6 +112,10 @@ export const accountPath = '/account';
 /** The manage page a booking email links to. The token is a capability: it is never logged or stored. */
 export const managePath = (token: string) => `/manage/${token}`;
 
+/** The review form a review invite links to: the order's reference and a capability token, never logged or stored. */
+export const reviewPath = (reference: string, token: string) =>
+  `/review/${reference}/${token}`;
+
 /** The private session request form for one experience. */
 export const privateSessionPath = (address: ExperienceAddress): string =>
   `${experiencePath(address)}/private-session`;

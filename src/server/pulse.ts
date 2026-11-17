@@ -24,6 +24,7 @@ import {
 import { chooseDemoClock } from '@/server/demoClock';
 import { env } from '@/server/env';
 import { scheduleAuditExports } from '@/server/jobs/auditSchedule';
+import { scheduleReviewInvites } from '@/server/jobs/reviewInviteSchedule';
 import { drainJobs } from '@/server/jobs/drain';
 import { sendHeartbeat } from '@/server/monitoring/heartbeat';
 import { logger } from '@/server/monitoring/logger';
@@ -111,6 +112,21 @@ async function queueAuditExports(): Promise<void> {
 }
 
 /**
+ * Queues the review invites for sessions that have ended. A failure is logged by name and not
+ * thrown, for the reason given on `queueAuditExports`: an invite is not on the money path, and the
+ * next pulse looks for the same bookings again.
+ */
+async function queueReviewInvites(now: Date): Promise<void> {
+  try {
+    await scheduleReviewInvites(now);
+  } catch (error) {
+    const errorName = errorKind(error, 'NonError');
+    logger.error('review invites could not be queued', { errorName });
+    alerts.raise('review-invite-queue-failed', 'error', 'queue', { errorName });
+  }
+}
+
+/**
  * Keeps the rolling window of sessions generated, on the pulse's clock. The experiences that gained
  * sessions are revalidated first, then each failure is logged and alerted by name. A failure is not thrown, for the reason given on `queueAuditExports`: the next pulse tries the same range
  * again, and a date already generated is left alone. Returns how many sessions were created.
@@ -169,6 +185,7 @@ export async function runPulse(
   const startedAt = performance.now();
   await queueAuditExports();
   const clock = asOf ? fixedClock(asOf) : systemClock;
+  await queueReviewInvites(clock.now());
   const report = await drainJobs(clock);
   const sessionsCreated = await extendSessions(clock.now());
   const purged = await purgeRateLimits(startedAt);

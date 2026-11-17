@@ -11,10 +11,13 @@ import {
   entryPath,
   parseEntryForm,
   savedNotice,
+  settleEntry,
   statusAfter,
+  toggleLabel,
 } from './editorialAdmin';
 import type { HelpArticle } from './editorial';
 import { parseAuditEntry } from './audit';
+import type { RichTextDoc } from './richText/format';
 
 // Behaviours under test:
 // - saving keeps an entry's status, publishing and unpublishing move it
@@ -51,6 +54,106 @@ describe('statusAfter', () => {
     ['unpublish', 'published', 'draft'],
   ] as const)('%s on a %s entry leaves it %s', (intent, current, expected) => {
     expect(statusAfter(intent, current)).toBe(expected);
+  });
+});
+
+const textDoc: RichTextDoc = {
+  type: 'doc',
+  content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello' }] }],
+};
+const publishedRow = { status: 'published', position: 4 } as const;
+const draftRow = { status: 'draft', position: 4 } as const;
+type Input = Parameters<typeof settleEntry>[2];
+const text: Input = { status: 'draft', position: 9, body: textDoc };
+const empty: Input = { ...text, body: { type: 'doc', content: [] } };
+
+describe('settleEntry', () => {
+  it.each([
+    [
+      'a new article with an intent keeps the form status',
+      'publish',
+      null,
+      text,
+      'draft',
+      9,
+    ],
+    [
+      'a new article with no intent keeps the form status and position',
+      undefined,
+      null,
+      text,
+      'draft',
+      9,
+    ],
+    [
+      'an existing article with no intent keeps the form status and position',
+      undefined,
+      draftRow,
+      { ...text, status: 'published' },
+      'published',
+      9,
+    ],
+    [
+      'a stale tab saving a draft cannot unpublish',
+      'save',
+      publishedRow,
+      text,
+      'published',
+      4,
+    ],
+    [
+      'publish moves a draft to published',
+      'publish',
+      draftRow,
+      text,
+      'published',
+      4,
+    ],
+    [
+      'unpublish moves a published article to draft',
+      'unpublish',
+      publishedRow,
+      text,
+      'draft',
+      4,
+    ],
+  ] as const)('%s', (_name, intent, stored, input, status, position) => {
+    expect(settleEntry(intent, stored, input)).toEqual({
+      kind: 'settled',
+      status,
+      position,
+    });
+  });
+
+  it.each([
+    ['publishing', 'publish', draftRow],
+    ['saving a published article', 'save', publishedRow],
+    ['a new article published by the form', 'publish', null],
+  ] as const)('refuses an empty body when %s', (_name, intent, stored) => {
+    expect(
+      settleEntry(intent, stored, { ...empty, status: 'published' }),
+    ).toEqual({ kind: 'empty_body' });
+  });
+
+  it('saves an empty body as a draft and takes down an empty published one', () => {
+    expect(settleEntry('save', draftRow, empty)).toMatchObject({
+      kind: 'settled',
+      status: 'draft',
+    });
+    expect(settleEntry('unpublish', publishedRow, empty)).toMatchObject({
+      kind: 'settled',
+      status: 'draft',
+    });
+  });
+});
+
+describe('toggleLabel', () => {
+  it.each([
+    ['published', 'Unpublish'],
+    ['draft', 'Publish'],
+    [undefined, 'Publish'],
+  ] as const)('%s offers %s', (status, label) => {
+    expect(toggleLabel(status)).toBe(label);
   });
 });
 
@@ -102,13 +205,10 @@ describe('parseEntryForm', () => {
     ).toMatchObject({ value: { input: { status: 'draft' } } });
   });
 
-  it('saves an empty body as a draft but refuses to publish it', () => {
-    expect(parseEntryForm(form({ ...base, body: emptyBody }))).toMatchObject({
-      ok: true,
-    });
+  it('leaves an empty body to the settle rule, which refuses only a published one', () => {
     expect(
       parseEntryForm(form({ ...base, body: emptyBody, intent: 'publish' })),
-    ).toEqual({ ok: false, fields: ['body'] });
+    ).toMatchObject({ ok: true, value: { input: { status: 'published' } } });
   });
 
   it.each([

@@ -58,8 +58,7 @@ import {
   type HomeGiftGuide,
   type HomePick,
 } from '@/lib/pages/home';
-import { auditFor, statusAfter, type EntryIntent } from '@/lib/editorialAdmin';
-import { hasContent } from '@/lib/richText/paragraphs';
+import { auditFor, settleEntry, type EntryIntent } from '@/lib/editorialAdmin';
 import { WriteIdSchema } from '@/lib/catalog';
 import { writeAudit } from './audit';
 import { guestVisible } from './catalog';
@@ -703,16 +702,8 @@ export async function saveHelpArticle(
       .limit(1);
     if (slugClash) return { status: 'slug_taken' } as const;
 
-    const settled =
-      before && intent
-        ? {
-            status: statusAfter(intent, before.status),
-            position: before.position,
-          }
-        : { status: parsed.status, position: parsed.position };
-    if (settled.status === 'published' && !hasContent(parsed.body)) {
-      return { status: 'empty_body' } as const;
-    }
+    const settled = settleEntry(intent, before, parsed);
+    if (settled.kind === 'empty_body') return { status: 'empty_body' } as const;
 
     const stamp = publishedAtAfter(before, settled.status);
     const values = {

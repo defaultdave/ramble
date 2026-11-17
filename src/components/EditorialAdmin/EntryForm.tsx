@@ -7,6 +7,7 @@ import {
   entryFieldProblems,
   saveLabel,
   toggleIntent,
+  toggleLabel,
   type EntryFormField,
 } from '@/lib/editorialAdmin';
 import { errorProps } from '@/lib/opsForm';
@@ -77,7 +78,7 @@ export function EntryForm({ entry, problems, save }: EntryFormProps) {
           {saveLabel(entry?.status)}
         </Button>
         <Button type="submit" name="intent" value={intent} variant="secondary">
-          {intent === 'unpublish' ? 'Unpublish' : 'Publish'}
+          {toggleLabel(entry?.status)}
         </Button>
       </div>
     </form>

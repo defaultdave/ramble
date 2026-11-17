@@ -41,7 +41,7 @@ export const entryStatusTones = {
   published: 'success',
 } satisfies Record<PublishStatus, StatusTone>;
 
-export const entryIntents = ['save', 'publish', 'unpublish'] as const;
+const entryIntents = ['save', 'publish', 'unpublish'] as const;
 export type EntryIntent = (typeof entryIntents)[number];
 
 /** The status a form leaves an entry in: saving keeps it where it is, the other two move it. */
@@ -52,6 +52,37 @@ export function statusAfter(
   if (intent === 'publish') return 'published';
   if (intent === 'unpublish') return 'draft';
   return current;
+}
+
+/** The stored row a save settles against: the one it locked, or none for a new article. */
+export type StoredEntry = { status: PublishStatus; position: number };
+
+export type SettledEntry =
+  | { kind: 'settled'; status: PublishStatus; position: number }
+  | { kind: 'empty_body' };
+
+/**
+ * What a save leaves in the row. With an intent (the editor's buttons) a replacement takes status
+ * and position from the stored row, not the form's copy, so a stale tab saving a draft cannot
+ * unpublish what another tab published. Without one, or for a new article, the input stands. A
+ * body with no text cannot stay published.
+ */
+export function settleEntry(
+  intent: EntryIntent | undefined,
+  stored: StoredEntry | null | undefined,
+  input: Pick<HelpArticleInput, 'status' | 'position' | 'body'>,
+): SettledEntry {
+  const { status, position } =
+    stored && intent
+      ? {
+          status: statusAfter(intent, stored.status),
+          position: stored.position,
+        }
+      : input;
+  if (status === 'published' && !hasContent(input.body)) {
+    return { kind: 'empty_body' };
+  }
+  return { kind: 'settled', status, position };
 }
 
 export const entryFormFields = ['title', 'slug', 'summary', 'body'] as const;
@@ -83,7 +114,7 @@ export function parseBody(raw: string | undefined): unknown {
 /**
  * The posted entry form. A blank slug keeps the address the entry has, or is made from the title
  * for a new one. The status and position a form carries are only what it was opened with: the
- * save settles them against the stored row (`saveHelpArticle`). A refused form names the fields
+ * save settles them against the stored row (`settleEntry`). A refused form names the fields
  * to look at and changes nothing.
  */
 export function parseEntryForm(get: FormGetter): EntryForm {
@@ -123,9 +154,6 @@ export function parseEntryForm(get: FormGetter): EntryForm {
       ok: false,
       fields: fieldsFromIssues(parsed.error.issues, entryFormFields),
     };
-  }
-  if (parsed.data.status === 'published' && !hasContent(parsed.data.body)) {
-    return { ok: false, fields: ['body'] };
   }
   return { ok: true, value: { input: parsed.data, intent } };
 }
@@ -261,4 +289,9 @@ export function toggleIntent(
   status: PublishStatus | undefined,
 ): Extract<EntryIntent, 'publish' | 'unpublish'> {
   return status === 'published' ? 'unpublish' : 'publish';
+}
+
+/** The label of the second button, from the intent it posts. */
+export function toggleLabel(status: PublishStatus | undefined): string {
+  return toggleIntent(status) === 'unpublish' ? 'Unpublish' : 'Publish';
 }

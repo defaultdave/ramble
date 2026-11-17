@@ -2,7 +2,7 @@ import 'server-only';
 import {
   openReviewGate,
   reviewRefusalFor,
-  reviewSummary,
+  reviewPageFor,
   type ReviewInput,
   type ReviewRead,
   type ReviewSubmitStatus,
@@ -52,11 +52,7 @@ export async function readReviewPage(
     order: await readReviewOrder(tx, id),
     now: await readDatabaseTime(tx),
   }));
-  if (!read.order) return { read: { kind: 'invalid' }, summary: null };
-  return {
-    read: { kind: 'found', facts: read.order.facts, now: read.now },
-    summary: reviewSummary(read.order),
-  };
+  return reviewPageFor(read.order, read.now);
 }
 
 /**

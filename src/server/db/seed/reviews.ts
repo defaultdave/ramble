@@ -1,13 +1,13 @@
 import 'server-only';
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { asc, eq, inArray } from 'drizzle-orm';
 import { requireRole, Role, type Caller } from '@/server/auth/caller';
 import { db } from '@/server/db/client';
+import { getCurrentLegalDocument } from '@/server/db/legal';
 import {
   experiences,
   guests,
   holdItems,
   holds,
-  legalDocuments,
   orderItems,
   orders,
   priceOptions,
@@ -25,22 +25,12 @@ import { SeedStepError } from '@/lib/seed/decide';
 // fixed id, so a rerun leaves the same rows and a reset (which wipes orders and reviews) puts them back.
 
 async function readTermsDocumentId(): Promise<string> {
-  const [row] = await db
-    .select({ id: legalDocuments.id })
-    .from(legalDocuments)
-    .where(
-      and(
-        eq(legalDocuments.doc, 'terms'),
-        eq(legalDocuments.status, 'published'),
-      ),
-    )
-    .orderBy(desc(legalDocuments.version))
-    .limit(1);
-  if (!row)
+  const terms = await getCurrentLegalDocument('terms');
+  if (!terms)
     throw new SeedStepError(
       'No published terms document for the past bookings',
     );
-  return row.id;
+  return terms.id;
 }
 
 /** How many bookings and reviews were written. */
@@ -83,7 +73,7 @@ export async function seedReviews(
       );
     }
     const rows = reviewSeedRows(fixture, price, now);
-    await db.transaction(async (tx) => {
+    const written = await db.transaction(async (tx) => {
       await tx
         .insert(guests)
         .values({ email: fixture.bookerEmail })
@@ -113,11 +103,15 @@ export async function seedReviews(
         })
         .onConflictDoNothing();
       await tx.insert(orderItems).values(rows.orderItem).onConflictDoNothing();
-      if (rows.review) {
-        await tx.insert(reviews).values(rows.review).onConflictDoNothing();
-        reviewCount += 1;
-      }
+      if (!rows.review) return 0;
+      const inserted = await tx
+        .insert(reviews)
+        .values(rows.review)
+        .onConflictDoNothing()
+        .returning({ id: reviews.id });
+      return inserted.length;
     });
+    reviewCount += written;
   }
   return { bookings: reviewFixtures.length, reviews: reviewCount };
 }

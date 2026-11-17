@@ -8,6 +8,7 @@ import {
   type FormResult,
   type NoticeText,
 } from './opsForm';
+import { opsDevCopy } from './copy/opsDev';
 import { pickKnown } from './pickKnown';
 import type { StatusTone } from './statusBadge';
 import { tableHref } from './tableQuery';
@@ -218,13 +219,11 @@ export const opsDevNotices = {
   },
   invite_queued: {
     tone: 'success',
-    title:
-      'The review invite is queued. Drain the queue to send it to the dev mailbox.',
+    title: opsDevCopy.invites.queued,
   },
   invite_not_eligible: {
     tone: 'warning',
-    title:
-      'That booking cannot be invited now: it was cancelled, is not over yet, has a review already, or is past the review window.',
+    title: opsDevCopy.invites.notEligible,
   },
 } as const satisfies Record<OpsDevNoticeCode, NoticeText>;
 

@@ -15,5 +15,9 @@ export const opsDevCopy = {
       'No booking can be invited now: none has a finished session without a review.',
     bookingLabel: 'Booking',
     send: 'Send invite now',
+    queued:
+      'The review invite is queued. Drain the queue to send it to the dev mailbox.',
+    notEligible:
+      'That booking cannot be invited now: it was cancelled, was refunded, is not over yet, has a review already, or is past the review window.',
   },
 } as const;

@@ -9,6 +9,7 @@ import {
   SessionReminderDataSchema,
   bookingSubjects,
   confirmationAttachments,
+  link,
 } from './bookingTemplates';
 import { HostInviteDataSchema, hostInviteSubject } from './hostInvite';
 import { IdempotencyKeySchema, type EmailAttachment } from './message';
@@ -33,7 +34,7 @@ const templateSchemas = {
   'host-invite': HostInviteDataSchema,
   'review-invite': ReviewInviteDataSchema,
   'sign-in-link': z.object({
-    url: z.url({ protocol: /^https?$/ }).max(2048),
+    url: link,
     expiresInMinutes: z.int().min(1).max(60),
   }),
 } as const;

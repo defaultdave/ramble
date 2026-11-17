@@ -120,7 +120,7 @@ export function OpsDevConsole({
             <Select
               name="orderId"
               label={invites.bookingLabel}
-              options={invitableOrders.map((order) => ({ ...order }))}
+              options={invitableOrders}
             />
             <Button type="submit" variant="secondary">
               {invites.send}

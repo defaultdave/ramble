@@ -11,7 +11,12 @@ import {
 import type { RateLimitDecision } from './rateLimits';
 import { reviewPath } from './routes';
 import { msPerDay, msPerHour } from './time';
-import { oneLineClipped, requiredText, wholeNumberText } from './text';
+import {
+  nameClip,
+  oneLineClipped,
+  requiredText,
+  wholeNumberText,
+} from './text';
 import { zonedDayLabel } from './zonedLabels';
 
 // Review collection (PRD-29). A verified booker is the contact on a confirmed booking whose session
@@ -167,10 +172,21 @@ const ReviewLinkSchema = z.object({
   token: CapabilityTokenSchema,
 });
 
+/** Whether a reference and token have the shape of a review link, so a link that could never open a form is never built. */
+export function isReviewLink(reference: string, token: string): boolean {
+  return ReviewLinkSchema.safeParse({ reference, token }).success;
+}
+
 const ReviewFieldsSchema = z.object({
   rating: wholeNumberText(reviewLimits.minRating, reviewLimits.maxRating),
   body: requiredText(reviewLimits.bodyMaxChars),
 });
+
+/** The rating a form field holds, or null when it is not a whole number from the lowest to the highest. */
+export function parseReviewRating(value: unknown): number | null {
+  const parsed = ReviewFieldsSchema.shape.rating.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
 
 export type ReviewInput = {
   reference: string;
@@ -406,6 +422,18 @@ export function reviewProblemState(problems: readonly ReviewFormField[]): {
   };
 }
 
+/** What the page reads from a lookup of the link's order: no order is the one `invalid` answer, with no summary to show. */
+export function reviewPageFor(
+  order: (Parameters<typeof reviewSummary>[0] & { facts: ReviewFacts }) | null,
+  now: Date,
+): { read: ReviewRead; summary: ReviewSummary | null } {
+  if (order === null) return { read: { kind: 'invalid' }, summary: null };
+  return {
+    read: { kind: 'found', facts: order.facts, now },
+    summary: reviewSummary(order),
+  };
+}
+
 /** What the page says about the session being reviewed: finished text, so no stored name of any length can break the layout. */
 export type ReviewSummary = {
   experienceName: string;
@@ -420,8 +448,8 @@ export function reviewSummary(source: {
   timeZone: string;
 }): ReviewSummary {
   return {
-    experienceName: oneLineClipped(source.experienceName, 200),
-    hostName: oneLineClipped(source.hostName, 120),
+    experienceName: oneLineClipped(source.experienceName, nameClip.experience),
+    hostName: oneLineClipped(source.hostName, nameClip.person),
     dayLabel: zonedDayLabel(source.startsAt, source.timeZone),
   };
 }

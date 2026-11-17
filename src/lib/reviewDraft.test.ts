@@ -94,9 +94,9 @@ describe('reviewDraftFate', () => {
     ['rate_limited', 'keep'],
     ['created', 'forget'],
     ['invalid', 'leave'],
-    ['already_reviewed', 'leave'],
-    ['expired', 'leave'],
-    ['not_found', 'leave'],
+    ['already_reviewed', 'forget'],
+    ['expired', 'forget'],
+    ['not_found', 'forget'],
   ] as const)('does %s to the draft: %s', (status, fate) => {
     expect(reviewDraftFate(status)).toBe(fate);
   });

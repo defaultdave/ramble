@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  isReviewLink,
   openReviewGate,
   parseReviewForm,
+  parseReviewRating,
   ReviewInvitePayloadSchema,
   reviewEligibility,
   reviewInviteDecision,
@@ -13,6 +15,7 @@ import {
   reviewInviteRunAt,
   reviewInviteWindow,
   reviewLimits,
+  reviewPageFor,
   reviewProblemPath,
   reviewProblemState,
   reviewRefusalFor,
@@ -58,6 +61,8 @@ import {
 // - the form's problem flags name each field and the first in reading order, or none
 // - the summary is dropped for an invalid screen and kept otherwise
 // - paths: a created review lands on the page with done, anything else on the bare page, a bad field list names the fields
+// - an order lookup that found nothing is the invalid read with no summary; one that found an order reads as found with the order's summary
+// - a review link's shape is a reference and a token, each well formed; a rating text is a whole number in the limits or none
 // - the summary clips long names to one line and words the day in the session's zone
 
 const now = new Date('2026-11-17T12:00:00Z');
@@ -572,5 +577,53 @@ describe('reviewSummary', () => {
     expect(summary.experienceName).not.toContain('\n');
     expect(summary.hostName).toBe('Hudson Paddle Club');
     expect(summary.dayLabel).toBe('Saturday, November 14, 2026');
+  });
+});
+
+describe('reviewPageFor', () => {
+  it('is the invalid read, with no summary, when no order was found', () => {
+    expect(reviewPageFor(null, now)).toEqual({
+      read: { kind: 'invalid' },
+      summary: null,
+    });
+  });
+
+  it('reads as found with the order facts and the session summary when an order was found', () => {
+    const order = {
+      facts: facts(),
+      experienceName: 'Sunset kayak',
+      hostName: 'Hudson Paddle Club',
+      startsAt: new Date('2026-11-15T02:30:00Z'),
+      timeZone: 'America/New_York',
+    };
+    expect(reviewPageFor(order, now)).toEqual({
+      read: { kind: 'found', facts: order.facts, now },
+      summary: reviewSummary(order),
+    });
+  });
+});
+
+describe('isReviewLink', () => {
+  it.each([
+    [reference, token, true],
+    ['not a reference', token, false],
+    [reference, 'short', false],
+  ])('is %s with %s: %s', (ref, tok, ok) => {
+    expect(isReviewLink(ref, tok)).toBe(ok);
+  });
+});
+
+describe('parseReviewRating', () => {
+  it.each([
+    ['1', 1],
+    [' 5 ', 5],
+    ['0', null],
+    ['6', null],
+    ['2.5', null],
+    ['', null],
+    [4, null],
+    [undefined, null],
+  ])('reads %j as %j', (value, rating) => {
+    expect(parseReviewRating(value)).toBe(rating);
   });
 });

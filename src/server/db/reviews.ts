@@ -1,15 +1,5 @@
 import 'server-only';
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  gt,
-  isNull,
-  lte,
-  sql,
-  type SQL,
-} from 'drizzle-orm';
+import { and, asc, desc, eq, gt, lte, sql, type SQL } from 'drizzle-orm';
 import {
   reviewEligibility,
   reviewInviteKeyPrefix,
@@ -136,6 +126,24 @@ export async function insertReview(
 }
 
 /**
+ * The orders an invite can go to under `window`: confirmed, unrefunded bookings whose session ended
+ * between the window's two bounds, with no review. Both readers of invitable orders add to it.
+ */
+function invitableOrderCondition(
+  window: ReturnType<typeof reviewInviteWindow>,
+): SQL | undefined {
+  return and(
+    eq(orders.kind, 'booking'),
+    eq(orders.status, 'confirmed'),
+    eq(orders.refundedTicketMinor, 0),
+    eq(orders.refundedTaxMinor, 0),
+    lte(sessions.endsAt, window.endedBefore),
+    gt(sessions.endsAt, window.endedAfter),
+    sql`NOT EXISTS (SELECT 1 FROM ${reviews} WHERE ${reviews.orderId} = ${orders.id})`,
+  );
+}
+
+/**
  * The bookings a sweep at `now` should invite, oldest session first, at most `limit`: confirmed
  * bookings whose session ended between the window's two bounds, with no review and no invite job
  * ever queued (the job's dedupe key is how the sweep tells). Where an order has had its invite,
@@ -153,13 +161,7 @@ export async function readInvitableOrders(
     .innerJoin(sessions, eq(sessions.id, orders.sessionId))
     .where(
       and(
-        eq(orders.kind, 'booking'),
-        eq(orders.status, 'confirmed'),
-        lte(sessions.endsAt, window.endedBefore),
-        gt(sessions.endsAt, window.endedAfter),
-        sql`NOT EXISTS (SELECT 1 FROM ${reviews} WHERE ${reviews.orderId} = ${orders.id})`,
-        eq(orders.refundedTicketMinor, 0),
-        eq(orders.refundedTaxMinor, 0),
+        invitableOrderCondition(window),
         sql`NOT EXISTS (SELECT 1 FROM ${jobs} WHERE ${jobs.dedupeKey} = ${reviewInviteKeyPrefix}::text || ${orders.id}::text)`,
       ),
     )
@@ -196,18 +198,7 @@ export async function readInvitableOrderRows(
     .from(orders)
     .innerJoin(experiences, eq(experiences.id, orders.experienceId))
     .innerJoin(sessions, eq(sessions.id, orders.sessionId))
-    .leftJoin(reviews, eq(reviews.orderId, orders.id))
-    .where(
-      and(
-        eq(orders.kind, 'booking'),
-        eq(orders.status, 'confirmed'),
-        eq(orders.refundedTicketMinor, 0),
-        eq(orders.refundedTaxMinor, 0),
-        isNull(reviews.id),
-        lte(sessions.endsAt, window.endedBefore),
-        gt(sessions.endsAt, window.endedAfter),
-      ),
-    )
+    .where(invitableOrderCondition(window))
     .orderBy(desc(sessions.endsAt), desc(orders.id))
     .limit(invitableShown);
 }

@@ -145,12 +145,12 @@ describe('submitReviewForm', () => {
   });
 
   it.each(['already_reviewed', 'expired', 'not_found'])(
-    'leaves the kept draft alone when the answer is %s',
+    'ends the kept draft when the answer is %s, as the link takes no review now',
     async (status) => {
       mocks.submitReview.mockResolvedValue(status);
       await outcome(form({ reference, token, rating: '4', body: 'Lovely' }));
       expect(mocks.keepReviewDraft).not.toHaveBeenCalled();
-      expect(mocks.forgetReviewDraft).not.toHaveBeenCalled();
+      expect(mocks.forgetReviewDraft).toHaveBeenCalledTimes(1);
     },
   );
 

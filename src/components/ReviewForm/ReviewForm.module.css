@@ -1,0 +1,149 @@
+.page {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 40rem);
+  justify-content: center;
+  gap: var(--space-6);
+  padding: var(--space-6) var(--size-gutter) var(--space-10);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  color: var(--color-text-primary);
+}
+
+.head {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.eyebrow,
+.meta,
+.fine {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  line-height: var(--font-line-height-caption);
+  color: var(--color-text-secondary);
+}
+
+.heading {
+  margin: 0;
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-heading-l);
+  line-height: var(--font-line-height-heading-l);
+  font-weight: var(--font-weight-semibold);
+}
+
+.form {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.rating {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.legend {
+  padding: 0;
+  margin-block-end: var(--space-2);
+  font-weight: var(--font-weight-semibold);
+}
+
+.options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.option {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-1);
+  min-height: 3.5rem;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+  text-align: center;
+  cursor: pointer;
+}
+
+/* The radio is the control; it covers the label so the whole tile is the target. */
+.radio {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.option:has(.radio:checked) {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-sunken);
+  outline: 2px solid var(--color-border-strong);
+  outline-offset: -2px;
+}
+
+.option:has(.radio:focus-visible) {
+  outline: 2px solid transparent;
+  box-shadow:
+    0 0 0 2px var(--color-bg-canvas),
+    0 0 0 4px var(--color-focus-ring);
+}
+
+.optionNumber {
+  font-size: var(--font-size-heading-s);
+  line-height: var(--font-line-height-heading-s);
+  font-weight: var(--font-weight-semibold);
+}
+
+.optionText {
+  font-size: var(--font-size-caption);
+  line-height: var(--font-line-height-caption);
+  color: var(--color-text-secondary);
+}
+
+.problem {
+  margin: 0;
+  font-size: var(--font-size-body-s);
+  line-height: var(--font-line-height-body-s);
+  color: var(--color-status-danger-text);
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.jump {
+  color: var(--color-text-link);
+}
+
+/* Five tiles fit one row once the page is wide enough for each to hold "Very good" without clipping. */
+@media (min-width: 480px) {
+  .options {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 768px) {
+  .page {
+    padding-block-start: var(--space-8);
+  }
+
+  .heading {
+    font-size: var(--font-size-display-m);
+    line-height: var(--font-line-height-display-m);
+  }
+
+  .option {
+    min-height: 4rem;
+  }
+}

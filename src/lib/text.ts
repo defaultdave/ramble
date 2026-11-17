@@ -121,6 +121,19 @@ export function oneLineClipped(text: string, max: number): string {
   return clipOneLine(text, max).text;
 }
 
+/** How long a name may run where a message or page shows it, before it is cut to one line. */
+export const nameClip = {
+  /** In a subject, where a long name pushes the rest off the line. */
+  subject: 70,
+  person: 120,
+  experience: 200,
+} as const;
+
+/** The size of a string in UTF-8 bytes, which is what a cookie, a job payload, or a column limit counts. */
+export function utf8Bytes(text: string): number {
+  return new TextEncoder().encode(text).length;
+}
+
 /** The first value of a query parameter, which Next gives as one string or a list when it repeats. */
 export function firstQueryValue(
   raw: string | string[] | undefined,

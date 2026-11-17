@@ -14,7 +14,7 @@ import { orderSummaryAmounts, type TaxTreatment } from './orderSummary';
 import { isCapabilityTokenShape } from './capabilityTokens';
 import type { orderCancelledBys, OrderStatus } from './orders';
 import { browsePath, managePath } from './routes';
-import { oneLineClipped } from './text';
+import { nameClip, oneLineClipped } from './text';
 import {
   zonedDayLabel,
   zonedDeadlineLabel,
@@ -165,17 +165,15 @@ export function reminderDecision(
   return source.startsAt.getTime() <= now.getTime() ? 'skip' : 'send';
 }
 
-const nameMax = 120;
-
 /** The name a message greets. An order with no name yet is greeted as "there". */
 export function greetingName(name: string | null): string {
-  const clipped = oneLineClipped(name ?? '', nameMax);
+  const clipped = oneLineClipped(name ?? '', nameClip.person);
   return clipped === '' ? 'there' : clipped;
 }
 
 /** What a host's notice calls a guest who gave no name. */
 function guestNameForHost(name: string | null): string {
-  const clipped = oneLineClipped(name ?? '', nameMax);
+  const clipped = oneLineClipped(name ?? '', nameClip.person);
   return clipped === '' ? 'A guest' : clipped;
 }
 
@@ -214,12 +212,11 @@ function requireConfirmedAt(source: BookingEmailSource): Date {
   return source.confirmedAt;
 }
 
-function absolute(path: string, appUrl: string): string {
+export function absolute(path: string, appUrl: string): string {
   return new URL(path, appUrl).toString();
 }
 
 const meetingPointMax = 600;
-const nameOfExperienceMax = 200;
 const calendarLocationMax = 300;
 
 /** The event a booking adds to a calendar. Its UID is the order, so a second copy updates the first. */
@@ -232,12 +229,12 @@ export function bookingCalendarEvent(
     startsAt: source.startsAt,
     endsAt: source.endsAt,
     stampedAt: requireConfirmedAt(source),
-    summary: oneLineClipped(source.experienceName, nameOfExperienceMax),
+    summary: oneLineClipped(source.experienceName, nameClip.experience),
     location:
       source.meetingPoint === null
         ? null
         : oneLineClipped(source.meetingPoint, calendarLocationMax) || null,
-    description: `Booking ${source.reference} with ${oneLineClipped(source.hostName, nameMax)}.`,
+    description: `Booking ${source.reference} with ${oneLineClipped(source.hostName, nameClip.person)}.`,
   };
 }
 
@@ -288,8 +285,8 @@ export function bookingSummaryData(
   return {
     recipientName: greetingName(source.leadGuestName),
     reference: source.reference,
-    experienceName: oneLineClipped(source.experienceName, nameOfExperienceMax),
-    hostName: oneLineClipped(source.hostName, nameMax),
+    experienceName: oneLineClipped(source.experienceName, nameClip.experience),
+    hostName: oneLineClipped(source.hostName, nameClip.person),
     dayLabel: zonedDayLabel(source.startsAt, source.timeZone),
     timeLabel: zonedTimeLabel(source.startsAt, source.timeZone),
     durationLabel:
@@ -340,9 +337,9 @@ export function hostBookingNoticeData(
   source: BookingEmailSource,
 ): HostBookingNoticeData {
   return {
-    hostName: oneLineClipped(source.hostName, nameMax),
+    hostName: oneLineClipped(source.hostName, nameClip.person),
     reference: source.reference,
-    experienceName: oneLineClipped(source.experienceName, nameOfExperienceMax),
+    experienceName: oneLineClipped(source.experienceName, nameClip.experience),
     dayLabel: zonedDayLabel(source.startsAt, source.timeZone),
     timeLabel: zonedTimeLabel(source.startsAt, source.timeZone),
     guestName: guestNameForHost(source.leadGuestName),
@@ -357,8 +354,8 @@ export function sessionReminderData(
   return {
     recipientName: greetingName(source.leadGuestName),
     reference: source.reference,
-    experienceName: oneLineClipped(source.experienceName, nameOfExperienceMax),
-    hostName: oneLineClipped(source.hostName, nameMax),
+    experienceName: oneLineClipped(source.experienceName, nameClip.experience),
+    hostName: oneLineClipped(source.hostName, nameClip.person),
     dayLabel: zonedDayLabel(source.startsAt, source.timeZone),
     timeLabel: zonedTimeLabel(source.startsAt, source.timeZone),
     durationLabel:
@@ -430,7 +427,7 @@ export function bookingCancellationData(
     audience: input.audience,
     recipientName: greetingName(input.recipientName),
     reference: input.reference,
-    experienceName: oneLineClipped(input.experienceName, nameOfExperienceMax),
+    experienceName: oneLineClipped(input.experienceName, nameClip.experience),
     dayLabel: zonedDayLabel(input.startsAt, input.timeZone),
     timeLabel: zonedTimeLabel(input.startsAt, input.timeZone),
     partyLabel: partyLabel(input.items),
@@ -459,7 +456,7 @@ export function bookingRefundData(input: {
   return {
     recipientName: greetingName(input.recipientName),
     reference: input.reference,
-    experienceName: oneLineClipped(input.experienceName, nameOfExperienceMax),
+    experienceName: oneLineClipped(input.experienceName, nameClip.experience),
     amount: formatMoney(input.refundMinor),
     arrivalLine: refundArrivalLine,
   };
@@ -492,7 +489,7 @@ export function paidAfterLapseData(input: {
   return {
     recipientName: greetingName(input.recipientName),
     reference: input.reference,
-    experienceName: oneLineClipped(input.experienceName, nameOfExperienceMax),
+    experienceName: oneLineClipped(input.experienceName, nameClip.experience),
     dayLabel: zonedDayLabel(input.startsAt, input.timeZone),
     timeLabel: zonedTimeLabel(input.startsAt, input.timeZone),
     amount: formatMoney(input.amountMinor),

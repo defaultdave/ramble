@@ -14,7 +14,7 @@ import { orderConfirmationPath } from './routes';
 //   or missing part (reference, token, query key, other path, deeper path) hands off nothing
 // - the cookie is HttpOnly, Lax, scoped to the one order's path, short-lived, and Secure only when told
 // - the page takes the cookie before the address, and refuses a malformed value of either
-// - an order's page carries noindex and no-store headers; other routes, the manage route included, carry none
+// - an order's page, a manage page, and a review page carry noindex and no-store headers; other routes carry none
 // - the link the checkout builds is the address the handoff reads
 
 const token = 'A'.repeat(43);
@@ -139,6 +139,8 @@ describe('tokenRouteHeaders', () => {
     `/orders/${reference}/`,
     `/manage/${token}`,
     `/manage/${token}/`,
+    `/review/${reference}/${token}`,
+    `/review/${reference}/${token}/`,
   ])('keeps %s out of indexes and caches', (pathname) => {
     expect(tokenRouteHeaders(pathname)).toEqual([
       { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' },
@@ -154,6 +156,9 @@ describe('tokenRouteHeaders', () => {
     '/manage',
     '/manage/',
     `/manage/${token}/extra`,
+    '/review',
+    `/review/${reference}`,
+    `/review/${reference}/${token}/extra`,
   ])('adds nothing to %s', (pathname) => {
     expect(tokenRouteHeaders(pathname)).toEqual([]);
   });

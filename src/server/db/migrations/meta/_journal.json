@@ -232,6 +232,13 @@
       "when": 1794450189998,
       "tag": "0032_support_resolution",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1794893012773,
+      "tag": "0033_reviews",
+      "breakpoints": true
     }
   ]
 }

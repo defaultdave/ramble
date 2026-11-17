@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { botCheckIsLive } from './botCheck';
 import {
   botChallengeIsLive,
   botProtectedRoutes,
@@ -40,8 +39,7 @@ describe('botChallengeIsLive', () => {
     [undefined, false],
     ['', false],
     ['1', true],
-  ])('with VERCEL %j: %s, as botCheckIsLive says', (vercel, expected) => {
+  ])('with VERCEL %j: %s', (vercel, expected) => {
     expect(botChallengeIsLive(vercel)).toBe(expected);
-    expect(botCheckIsLive(vercel)).toBe(expected);
   });
 });

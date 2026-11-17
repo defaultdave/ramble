@@ -5,6 +5,7 @@ import { PURGE_BATCH, purgeExpiredRateLimits } from '@/server/db/rateLimits';
 import { revalidateTagsForChanges } from '@/server/cache/invalidate';
 import { extendSessionHorizon } from '@/server/db/sessions';
 import { scheduleAuditExports } from '@/server/jobs/auditSchedule';
+import { scheduleReviewInvites } from '@/server/jobs/reviewInviteSchedule';
 import { drainJobs } from '@/server/jobs/drain';
 import { sendHeartbeat } from '@/server/monitoring/heartbeat';
 import { logger } from '@/server/monitoring/logger';
@@ -18,6 +19,9 @@ vi.mock('@/server/cache/invalidate', () => ({
   revalidateTagsForChanges: vi.fn(),
 }));
 vi.mock('@/server/jobs/drain', () => ({ drainJobs: vi.fn() }));
+vi.mock('@/server/jobs/reviewInviteSchedule', () => ({
+  scheduleReviewInvites: vi.fn(),
+}));
 vi.mock('@/server/jobs/auditSchedule', () => ({
   scheduleAuditExports: vi.fn(),
 }));
@@ -51,6 +55,8 @@ vi.mock('@/server/ports/rate-limit', () => ({ consumeRateLimit: vi.fn() }));
 // - a plain pulse drains on the system clock, purges until a short batch, pings the heartbeat once, and answers counts only
 // - asOf with DEMO_CLOCK on drains on a clock fixed at asOf and sends no heartbeat
 // - the audit exports are queued before the drain, so the same pulse runs them
+// - the review invites are queued before the drain, on the pulse's clock (fixed at asOf when one is given), so the same pulse sends them
+// - a failure queueing the invites is logged and alerted by name and does not stop the drain or the rest of the pulse
 // - a failure queueing the exports is logged by name and does not stop the drain, the purge, the hold cleanup, or the heartbeat
 // - the session horizon is extended after the drain on the pulse's clock (fixed at asOf when one is given), its created count is answered, and the experiences that gained sessions have their schedule tag revalidated
 // - a failure extending the horizon is logged and alerted by name, counts zero, revalidates nothing, and does not stop the rest of the pulse or the heartbeat
@@ -98,6 +104,7 @@ beforeEach(() => {
   });
   vi.mocked(consumeRateLimit).mockReset().mockResolvedValue(allowed);
   vi.mocked(scheduleAuditExports).mockReset().mockResolvedValue(0);
+  vi.mocked(scheduleReviewInvites).mockReset().mockResolvedValue(0);
   vi.mocked(drainJobs).mockReset().mockResolvedValue(report);
   vi.mocked(extendSessionHorizon).mockReset().mockResolvedValue({
     created: 0,
@@ -515,6 +522,47 @@ describe('a good pulse', () => {
     await pulseResponse(post());
 
     expect(order).toEqual(['schedule', 'drain']);
+  });
+
+  it('queues the review invites before it drains, on the pulse clock, so the same pulse sends them', async () => {
+    const order: string[] = [];
+    vi.mocked(scheduleReviewInvites).mockImplementation(() => {
+      order.push('invites');
+      return Promise.resolve(1);
+    });
+    vi.mocked(drainJobs).mockImplementation(() => {
+      order.push('drain');
+      return Promise.resolve(report);
+    });
+    Object.assign(testEnv, { DEMO_CLOCK: 'on' });
+    const asOf = new Date(realNowMs() + 24 * 60 * 60 * 1000);
+
+    await pulseResponse(post(JSON.stringify({ asOf: asOf.toISOString() })));
+
+    expect(order).toEqual(['invites', 'drain']);
+    expect(scheduleReviewInvites).toHaveBeenCalledExactlyOnceWith(asOf);
+  });
+
+  it('logs and alerts on a failure queueing the invites by name and carries on with the rest of the pulse', async () => {
+    vi.mocked(scheduleReviewInvites).mockRejectedValue(
+      new TypeError('invites down at postgres://user:pw@host'),
+    );
+
+    const response = await pulseResponse(post());
+
+    expect(response.status).toBe(200);
+    expect(logger.error).toHaveBeenCalledExactlyOnceWith(
+      'review invites could not be queued',
+      { errorName: 'TypeError' },
+    );
+    expect(raise).toHaveBeenCalledExactlyOnceWith(
+      'review-invite-queue-failed',
+      'error',
+      'queue',
+      { errorName: 'TypeError' },
+    );
+    expect(drainJobs).toHaveBeenCalled();
+    expect(sendHeartbeat).toHaveBeenCalled();
   });
 
   it('logs and alerts on a failure queueing the exports by name and carries on with the rest of the pulse', async () => {

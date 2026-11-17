@@ -1,6 +1,6 @@
-# Order confirmation and manage page map
+# Order confirmation, manage and review page map
 
-`/orders/[reference]`, `/manage/[token]`, and the catch-alls `/orders`, `/manage`, `/orders/[...unknown]`, `/manage/[...unknown]`
+`/orders/[reference]`, `/manage/[token]`, `/review/[reference]/[token]`, and the catch-alls `/orders`, `/manage`, `/review`, `/orders/[...unknown]`, `/manage/[...unknown]`, `/review/[...unknown]`
 
 Read from main at 2db68ea (2026-11-15). A PR that changes this tree (a component, a Suspense or client boundary, a cache tag, an action) updates this file in the same PR.
 
@@ -10,7 +10,7 @@ The gift routes in this folder (`gift/`, `gifts/checkout/`) are parked stubs, ma
 
 server = rendered on the server per request; cached = `'use cache'` read; streamed = inside a Suspense boundary; client = `'use client'` island; action = server action.
 
-Nothing on these pages is a cached read and nothing is streamed. There is no `'use cache'`, `cacheTag`, `cacheLife` or Suspense boundary in either route. Both pages are per request, and every read is behind a secret in the address.
+Nothing on these pages is a cached read and nothing is streamed. There is no `'use cache'`, `cacheTag`, `cacheLife` or Suspense boundary in any of the three routes. Every page is per request, and every read is behind a secret in the address.
 
 ## Render tree
 
@@ -33,6 +33,7 @@ flowchart TD
   M["main#main"]:::server
   O["/orders/[reference]<br/>tree below"]:::server
   MG["/manage/[token]<br/>tree below"]:::server
+  RV["/review/[reference]/[token]<br/>tree below"]:::server
   NF["Catch-all pages<br/>notFoundPerRequest()"]:::server
   F[Footer]:::server
 
@@ -44,6 +45,7 @@ flowchart TD
   G --> M
   M --> O
   M --> MG
+  M --> RV
   M --> NF
   G --> F
 ```
@@ -57,7 +59,7 @@ flowchart TD
 | AccountControl signedIn=false | server | [AccountControl.tsx](../../../components/Header/AccountControl.tsx) | A plain "Sign in" link. |
 | SiteMenu | client | [SiteMenu.tsx](../../../components/GuestShell/SiteMenu.tsx) | Phone menu, with its own copy of the account control. |
 | main#main | server | [GuestShell.tsx](../../../components/GuestShell/GuestShell.tsx) | The route renders inside it. |
-| Catch-all pages | server | [orders/page.tsx](orders/page.tsx), [manage/page.tsx](manage/page.tsx), [orders/[...unknown]/page.tsx](<orders/[...unknown]/page.tsx>), [manage/[...unknown]/page.tsx](<manage/[...unknown]/page.tsx>) | All four are the same page: `await notFoundPerRequest()`, which awaits `connection()` and then calls `notFound()`. It is read after the request so the not-found page carries the nonce. The status is 200, not 404. |
+| Catch-all pages | server | [orders/page.tsx](orders/page.tsx), [manage/page.tsx](manage/page.tsx), [review/page.tsx](review/page.tsx), [orders/[...unknown]/page.tsx](<orders/[...unknown]/page.tsx>), [manage/[...unknown]/page.tsx](<manage/[...unknown]/page.tsx>), [review/[...unknown]/page.tsx](<review/[...unknown]/page.tsx>) | All six are the same page: `await notFoundPerRequest()`, which awaits `connection()` and then calls `notFound()`. It is read after the request so the not-found page carries the nonce. The status is 200, not 404. |
 | Footer | server | [Footer.tsx](../../../components/Footer/Footer.tsx) | Footer links, tagline and copyright. |
 
 Failure frames: [error.tsx](error.tsx) in this folder is a client `ErrorNotice` inside the shell. [`(checkout)/error.tsx`](../error.tsx) is a client `ErrorFrame` around `ErrorNotice`, for errors in the layouts themselves. [`(checkout)/not-found.tsx`](../not-found.tsx) brings its own `GuestShell` with `NotFoundNotice`, because it sits above the `(site)` layout.
@@ -202,9 +204,61 @@ flowchart TD
 | Button: submit (cancel) | client | [Button.tsx](../../../components/Button/Button.tsx) | Submit button of the cancel form. |
 | ButtonLink x several | server | [ManageBooking.tsx](../../../components/ManageBooking/ManageBooking.tsx) | "Keep my booking", "Explore more" (cancelled only), and the help and contact links. Plain anchors, no script. |
 
+### Review page
+
+```mermaid
+flowchart TD
+  classDef server fill:#e8edf8,stroke:#3b5bab,color:#1b1f27
+  classDef cached fill:#e2f3f0,stroke:#0f7a6c,color:#1b1f27
+  classDef streamed fill:#fbefdc,stroke:#a3610a,color:#1b1f27
+  classDef client fill:#f5e6f8,stroke:#8a2f9c,color:#1b1f27
+  classDef action fill:#fbe6e4,stroke:#b3261e,color:#1b1f27
+
+  P["ReviewPage<br/>per request, no Suspense"]:::server
+  RR["readReviewPage(reference, token)<br/>uncached"]:::server
+  RD["readReviewDraft(reference)<br/>the booker's own cookie"]:::server
+  RS["reviewView(page, query)"]:::server
+  RF["ReviewForm<br/>switches on screen.kind"]:::server
+
+  FM["form: rating radios, Textarea, note<br/>summary alert links to the first field to fix"]:::server
+  BT["Button: Post review"]:::client
+  SR["submitReviewForm(formData)"]:::action
+  ST["success, already reviewed, expired, invalid, too many tries"]:::server
+  AL[Alert]:::server
+  BL["ButtonLink: explore, help"]:::server
+
+  P -.-> RR
+  P -.-> RD
+  P --> RS
+  P --> RF
+  RF --> FM
+  FM --> BT
+  BT -.-> SR
+  RF --> ST
+  ST --> AL
+  ST --> BL
+```
+
+| Component | Kind | File | Notes |
+| --- | --- | --- | --- |
+| ReviewPage | server | [review/[reference]/[token]/page.tsx](<review/[reference]/[token]/page.tsx>) | Awaits `connection()`, then `params` and `searchParams`. Per request, no Suspense. Private metadata like the manage page, except `referrer: origin`: `no-referrer` makes a browser send `Origin: null` on the form post, which a Server Action refuses, so the form would fail with scripting off. Reads the draft cookie beside the page. Every state, an invalid link included, is a 200 page with its own notice; only a form post with no usable link is `notFound()`. |
+| readReviewPage(reference, token) | server | [reviewForm.ts](../../../server/reviewForm.ts) | Uncached. `openReviewGate` shape-checks the link, spends one try of the `manage` rate limit (the same count the manage links use, per token), then `resolveToken('review', ...)` finds the order by its reference and compares the HMAC. A link of the wrong shape ends there: it spends no try and reaches no database. Otherwise one transaction reads the order with its review state ([db/reviews.ts](../../../server/db/reviews.ts)) and the database clock, and the page gets both in the `found` read. |
+| readReviewDraft(reference) | server | [reviewDraft.ts](../../../server/reviewDraft.ts) | What the booker had typed when a submit did not go through, from their own short-lived cookie (`ramble_review_draft`, http only, scoped to `/review`), for this order only. Never in an address, never stored on the server. |
+| reviewView(page, query) | server | [reviews.ts](../../../lib/reviews.ts) | Pure function: `reviewScreen` plus the session summary, which an invalid screen drops. `reviewEligibility` decides: a confirmed booking, not refunded, whose session ended, with no review, inside 90 days, is the `form`; a review that exists is `already_reviewed` (or `success` when the address says `?done=1`); a closed window is `expired`; a cancelled or refunded booking, a gift purchase, a session not over, and a link that opens nothing are all the same `invalid`. |
+| ReviewForm | server | [ReviewForm.tsx](../../../components/ReviewForm/ReviewForm.tsx) | No `'use client'`. Works with scripting off: native required radios and a native textarea, posting to the action. The session is named only when the link opened an order. After a failed submit the form comes back with the rating and the words from the draft, a summary alert that links to the first field to fix, the rating group described by its own error, and `aria-invalid` on its first radio only. The rating tiles are three to a row on a phone and five from 480px. |
+| submitReviewForm(formData) | action | [reviews.ts](../../../server/actions/reviews.ts) | `parseReviewForm`, then `submitReview` (the same gate, then `insertReview`), then `redirect`s to the same page, with `?done=1` only for a review just written and `?problem=rating,body` for a bad field. A bad field or a wait keeps what was typed in the draft cookie; a review made ends it. A review is written under the order's row lock, so a cancel and a submit cannot both win. |
+| Button: Post review | client | [Button.tsx](../../../components/Button/Button.tsx) | Submit button of the form. |
+| Alert, ButtonLink | server | [Alert](../../../components/Alert/) | The state notices, with links to browsing and help. |
+
+## How a review link is made
+
+1. The review-invite job runs for a confirmed, non-refunded booking about three hours after its session ends (the pulse queues one job per order; the test console can queue one at once). It reads the order, rebuilds `capabilityToken('review', orderId, manageTokenVersion)`, and emails the order's contact address a link to `/review/<reference>/<token>`.
+2. The token is of its own kind, so a manage token for the same order does not open the form, and a bump of the order's token version voids the manage link, the confirmation URL, and the review link together. No hash is stored.
+3. The email is queued once per order (job dedupe key `review-invite:<orderId>`), and a gift is no special case: the redemption is the recipient's own booking, so the invite goes to the recipient.
+
 ## What arrives when
 
-1. One response per page. Neither page has a Suspense boundary, so the shell and the body arrive together after the order read. The only thing that streams separately is `RenderPerRequest` from the `(checkout)` layout, which renders nothing.
+1. One response per page. No page has a Suspense boundary, so the shell and the body arrive together after the order read. The only thing that streams separately is `RenderPerRequest` from the `(checkout)` layout, which renders nothing.
 2. Hydration. A confirmed receipt hydrates only `SiteMenu`. A pending order hydrates `SiteMenu` and `OrderStatusPoller`. The manage page hydrates `SiteMenu` and the `Button` module, which ships because `ManageBooking` imports it.
 3. Pending to settled. The poller asks `getOrderStatus` on its timer. When the state is anything but pending, it shows one announcement and calls `router.refresh()`. The server component runs again, re-checks the token, and swaps the poller for the receipt or notice.
 
@@ -225,12 +279,13 @@ flowchart TD
 
 ## How its caches are cleared
 
-These pages hold nothing in the cache and nothing is cleared for them. The next view always reads the database, and both routes send `Cache-Control: no-store` through `tokenRouteHeaders` in the proxy. The actions do reach out the other way.
+These pages hold nothing in the cache and nothing is cleared for them. The next view always reads the database, and all three routes send `Cache-Control: no-store` through `tokenRouteHeaders` in the proxy. The actions do reach out the other way.
 
 | Change | What clears | When the guest sees it |
 | --- | --- | --- |
 | Cancel goes through | `revalidateTagsForChanges` with a `spaces` change for the session, which clears that date's `session` tag ([orderCancel.ts](../../../server/db/orderCancel.ts)) | The experience page's sold-out and spaces-left reads rebuild. The next view may still show the old spaces count once while it rebuilds. |
 | Move goes through | The same call for each affected session, old and new ([orderMove.ts](../../../server/db/orderMove.ts)) | Same as above. |
+| A review is written | Nothing: no page shows reviews yet, so there is no tag to clear | The review page itself reads the database, so it says "already reviewed" at once. |
 | Refused or unchanged result | Nothing | No change. |
 | Any view of these pages | Nothing, and nothing is stored | The next view reads the database. |
 

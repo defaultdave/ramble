@@ -2,18 +2,16 @@ import { z } from 'zod';
 import { buildIcs } from '../ics';
 import { isOrderReference } from '../orders';
 import { MAX_LINES } from '../pricing';
-import { oneLineClipped } from '../text';
+import { nameClip, oneLineClipped } from '../text';
 import type { EmailAttachment } from './message';
 
 // The data each booking email takes, its subject, and its calendar file. The values are finished
 // text: src/lib/bookingEmails.ts decides what to say, the markup only lays it out. Every field has a
 // size limit, so a stored name of any length cannot make a message the log would refuse.
 
-const subjectNameMax = 70;
-
-const line = (max: number) => z.string().min(1).max(max);
+export const line = (max: number) => z.string().min(1).max(max);
 const instant = z.iso.datetime();
-const link = z.url({ protocol: /^https?$/ }).max(2048);
+export const link = z.url({ protocol: /^https?$/ }).max(2048);
 
 const Reference = z.string().max(10).refine(isOrderReference);
 const Money = z.object({ label: line(120), amount: line(20) });
@@ -115,7 +113,7 @@ export type BookingCancellationData = z.infer<
 export type BookingRefundData = z.infer<typeof BookingRefundDataSchema>;
 export type PaidAfterLapseData = z.infer<typeof PaidAfterLapseDataSchema>;
 
-const named = (name: string) => oneLineClipped(name, subjectNameMax);
+const named = (name: string) => oneLineClipped(name, nameClip.subject);
 
 export const bookingSubjects = {
   guestConfirmation: (data: GuestConfirmationData) =>

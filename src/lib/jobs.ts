@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { isSlug } from './catalog';
 import { redactString } from './redact';
+import { utf8Bytes } from './text';
 
 export const jobStatuses = ['pending', 'running', 'succeeded', 'dead'] as const;
 export type JobStatus = (typeof jobStatuses)[number];
@@ -54,7 +55,7 @@ export const EnqueueInputSchema = z.object({
 /** Serialized size of a payload, the figure the 16 KB cap is judged on before the insert. */
 function payloadBytes(payload: unknown): number {
   const text = JSON.stringify(payload) as string | undefined;
-  return new TextEncoder().encode(text ?? '').length;
+  return utf8Bytes(text ?? '');
 }
 
 export function payloadFits(payload: unknown): boolean {

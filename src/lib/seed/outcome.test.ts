@@ -11,6 +11,7 @@ import {
   photosLine,
   refusalLine,
   scaleLine,
+  seedsPastBookings,
   seedsPersonas,
   startLine,
   stepNames,
@@ -150,6 +151,18 @@ describe('personas', () => {
   ] as const)('are seeded on %s: %s', (target, expected) => {
     expect(seedsPersonas(target)).toBe(expected);
   });
+
+  it.each([
+    ['local', true],
+    ['staging', true],
+    ['load-test', true],
+    ['production-demo', false],
+  ] as const)(
+    'go with the past bookings and reviews on %s: %s',
+    (target, expected) => {
+      expect(seedsPastBookings(target)).toBe(expected);
+    },
+  );
 
   it('says how many were written', () => {
     expect(personasLine(7)).toBe('Personas: 7 sign-in people, one per role');

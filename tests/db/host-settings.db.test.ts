@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { updateTag } from 'next/cache';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HostSettingsInput } from '@/lib/hostSetup';
 import {
@@ -11,6 +11,7 @@ import {
 } from '@/server/auth/caller';
 import { testCaller } from '@/server/auth/test-caller';
 import { auditLog, hosts } from '@/server/db/schema';
+import { raceAgainstOpenTransaction } from './harness';
 import { client, parents, setupOrdersDatabase } from './orderFixtures';
 
 vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
@@ -24,6 +25,8 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 // - values equal to the stored ones write nothing: no audit row, no invalidation
 // - a blank about text and address save as null
 // - the slug and time zone are never written
+// - a save that waits for the host row judges the row another save left: an edit that now matches writes nothing,
+//   and two identical saves at once make one change and one audit row
 // - a host that is gone is not_found for a caller granted it, and writes nothing
 
 setupOrdersDatabase();
@@ -182,6 +185,60 @@ describe('updateHostSettings', () => {
       description: null,
       notificationEmail: null,
     });
+  });
+
+  it('judges the row another save left while it waited, so an edit that now matches writes nothing', async () => {
+    await client.db
+      .update(hosts)
+      .set({ name: 'Before', description: null, notificationEmail: null })
+      .where(eq(hosts.id, parents.hostId));
+    const audited = (await auditRows(parents.hostId)).length;
+    vi.mocked(updateTag).mockClear();
+
+    const result = await raceAgainstOpenTransaction(
+      (body) => client.db.transaction(body),
+      async (tx) => {
+        await tx.execute(
+          sql`SELECT id FROM hosts WHERE id = ${parents.hostId} FOR UPDATE`,
+        );
+        await tx.execute(
+          sql`UPDATE hosts SET name = 'Concurrent' WHERE id = ${parents.hostId}`,
+        );
+      },
+      () =>
+        settings.updateHostSettings(
+          owner(parents.hostId),
+          parents.hostId,
+          edit({
+            name: 'Concurrent',
+            description: null,
+            notificationEmail: null,
+          }),
+        ),
+    );
+
+    expect(result).toBe('unchanged');
+    expect(await auditRows(parents.hostId)).toHaveLength(audited);
+    expect(updateTag).not.toHaveBeenCalled();
+  });
+
+  it('makes one change and one audit row of two identical saves at once', async () => {
+    await client.db
+      .update(hosts)
+      .set({ name: 'Before', description: null, notificationEmail: null })
+      .where(eq(hosts.id, parents.hostId));
+    const audited = (await auditRows(parents.hostId)).length;
+    const save = () =>
+      settings.updateHostSettings(
+        owner(parents.hostId),
+        parents.hostId,
+        edit({ name: 'Twice', description: null, notificationEmail: null }),
+      );
+
+    const results = await Promise.all([save(), save()]);
+
+    expect([...results].sort()).toEqual(['unchanged', 'updated']);
+    expect(await auditRows(parents.hostId)).toHaveLength(audited + 1);
   });
 
   it('is not_found for a host that is gone, writing nothing', async () => {

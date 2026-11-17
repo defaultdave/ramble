@@ -12,10 +12,12 @@
   scroll-snap-type: x mandatory;
 }
 
-/* An outline paints above the photos; an inset shadow paints beneath them and never shows. */
+/* The photos cover the strip's whole box, so a ring inside it, outline or inset shadow, is hidden beneath them. */
 .strip:focus-visible {
-  outline: 4px solid var(--color-focus-ring);
-  outline-offset: -4px;
+  outline: 2px solid transparent;
+  box-shadow:
+    0 0 0 2px var(--color-bg-canvas),
+    0 0 0 4px var(--color-focus-ring);
 }
 
 .list {

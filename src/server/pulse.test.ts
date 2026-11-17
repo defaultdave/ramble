@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { holdLimits } from '@/lib/holds';
 import { releaseLapsedHolds, scrubReleasedHolds } from '@/server/db/holds';
+import {
+  purgeLapsedAuthSessions,
+  purgeLapsedAuthVerifications,
+} from '@/server/db/authPurge';
 import { PURGE_BATCH, purgeExpiredRateLimits } from '@/server/db/rateLimits';
 import { revalidateTagsForChanges } from '@/server/cache/invalidate';
 import { extendSessionHorizon } from '@/server/db/sessions';
@@ -29,6 +33,10 @@ vi.mock('@/server/db/rateLimits', () => ({
   PURGE_BATCH: 1000,
   purgeExpiredRateLimits: vi.fn(),
 }));
+vi.mock('@/server/db/authPurge', () => ({
+  purgeLapsedAuthVerifications: vi.fn(),
+  purgeLapsedAuthSessions: vi.fn(),
+}));
 vi.mock('@/server/db/holds', () => ({
   releaseLapsedHolds: vi.fn(),
   scrubReleasedHolds: vi.fn(),
@@ -50,6 +58,8 @@ vi.mock('@/server/ports/rate-limit', () => ({ consumeRateLimit: vi.fn() }));
 // - a limiter store failure is thrown, not let through
 // - a body over 1 KB (declared or streamed) gets 413, and a body that is not { asOf } gets 400, before any work
 // - asOf while DEMO_CLOCK is off, or beyond 400 days, gets 400 and no work
+// - the pulse purges lapsed sign-in link rows and lapsed session rows, each in batches until a short batch, and answers their total as authPurged
+// - the auth purge stops at the call's time budget, and a failure in it is thrown with no heartbeat
 // - the pulse releases lapsed holds and scrubs old ones in batches until a short batch or the batch cap, on a
 //   manual time as well (holds are judged at database time), and a failed cleanup is thrown with no heartbeat
 // - a plain pulse drains on the system clock, purges until a short batch, pings the heartbeat once, and answers counts only
@@ -115,6 +125,8 @@ beforeEach(() => {
   });
   vi.mocked(revalidateTagsForChanges).mockReset();
   vi.mocked(purgeExpiredRateLimits).mockReset().mockResolvedValue(0);
+  vi.mocked(purgeLapsedAuthVerifications).mockReset().mockResolvedValue(0);
+  vi.mocked(purgeLapsedAuthSessions).mockReset().mockResolvedValue(0);
   vi.mocked(releaseLapsedHolds).mockReset().mockResolvedValue(0);
   vi.mocked(scrubReleasedHolds).mockReset().mockResolvedValue(0);
   vi.mocked(sendHeartbeat).mockReset().mockResolvedValue('sent');
@@ -295,6 +307,7 @@ describe('a good pulse', () => {
     expect(await response.json()).toEqual({
       ...report,
       purged: 2017,
+      authPurged: 0,
       holdsReleased: 0,
       holdsScrubbed: 0,
       sessionsCreated: 0,
@@ -318,6 +331,41 @@ describe('a good pulse', () => {
 
     expect(purgeExpiredRateLimits).toHaveBeenCalledOnce();
     clockReads.mockRestore();
+  });
+
+  it('purges lapsed sign-in link rows and session rows in batches until a short batch, and counts both', async () => {
+    vi.mocked(purgeLapsedAuthVerifications)
+      .mockResolvedValueOnce(PURGE_BATCH)
+      .mockResolvedValueOnce(5);
+    vi.mocked(purgeLapsedAuthSessions).mockResolvedValueOnce(3);
+
+    const response = await pulseResponse(post());
+
+    expect(await response.json()).toMatchObject({ authPurged: 1008 });
+    expect(purgeLapsedAuthVerifications).toHaveBeenCalledTimes(2);
+    expect(purgeLapsedAuthSessions).toHaveBeenCalledOnce();
+  });
+
+  it('stops the auth purge when the time budget is spent', async () => {
+    vi.mocked(purgeLapsedAuthVerifications).mockResolvedValue(PURGE_BATCH);
+    vi.mocked(purgeLapsedAuthSessions).mockResolvedValue(PURGE_BATCH);
+    const clockReads = vi.spyOn(performance, 'now');
+    clockReads.mockReturnValueOnce(0).mockReturnValue(61_000);
+
+    await pulseResponse(post());
+
+    expect(purgeLapsedAuthVerifications).toHaveBeenCalledOnce();
+    expect(purgeLapsedAuthSessions).toHaveBeenCalledOnce();
+    clockReads.mockRestore();
+  });
+
+  it('throws when the auth purge fails, without a heartbeat', async () => {
+    vi.mocked(purgeLapsedAuthSessions).mockRejectedValue(
+      new Error('auth purge down'),
+    );
+
+    await expect(pulseResponse(post())).rejects.toThrow('auth purge down');
+    expect(sendHeartbeat).not.toHaveBeenCalled();
   });
 
   it('releases lapsed holds and scrubs old ones in batches until a short batch, and counts both', async () => {
@@ -494,6 +542,7 @@ describe('a good pulse', () => {
       ...report,
       unrecorded: 1,
       purged: 0,
+      authPurged: 0,
       holdsReleased: 0,
       holdsScrubbed: 0,
       sessionsCreated: 0,

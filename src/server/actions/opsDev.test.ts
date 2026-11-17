@@ -135,6 +135,7 @@ beforeEach(() => {
   mocks.runPulse.mockResolvedValue({
     ...counts,
     purged: 0,
+    authPurged: 0,
     holdsReleased: 1,
     holdsScrubbed: 0,
     sessionsCreated: 5,

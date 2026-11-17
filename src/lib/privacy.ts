@@ -14,6 +14,9 @@ export type PiiColumn = {
   deletionPath: string;
 };
 
+/** How long a sign-in row is kept after its own `expires_at`; the pulse's auth purge and the retention schedule both read it (owner ruling, 2026-11-17). */
+export const authRowRetentionDays = 30;
+
 const databaseLocation = 'Neon Postgres, US East (ADR 0002, ADR 0007)';
 
 export const piiColumns: readonly PiiColumn[] = [
@@ -140,8 +143,7 @@ export const piiColumns: readonly PiiColumn[] = [
     kind: 'identifier',
     data: 'The address a sign-in link was sent to, until the link is used or lapses (5 minutes)',
     location: databaseLocation,
-    deletionPath:
-      'The row is deleted when the link is used. A link that is never used lapses but its row stays until a purge is built; the expiry job (a suggestion in the U-004a report) removes them',
+    deletionPath: `The row is deleted when the link is used. A link that is never used lapses after 5 minutes, and the pulse deletes the row ${String(authRowRetentionDays)} days after that`,
   },
   {
     table: 'auth_sessions',
@@ -149,8 +151,7 @@ export const piiColumns: readonly PiiColumn[] = [
     kind: 'link',
     data: 'Which signed-in person a session belongs to',
     location: databaseLocation,
-    deletionPath:
-      'Deleted with the sign-in user (cascade) by the privacy-requests work (U-085)',
+    deletionPath: `A lapsed session is deleted by the pulse ${String(authRowRetentionDays)} days after it expires. A live one is deleted with the sign-in user (cascade) by the privacy-requests work (U-085)`,
   },
   {
     table: 'auth_accounts',
@@ -1081,7 +1082,9 @@ export const piiVendors: readonly PiiVendor[] = [
 // number goes in as `{ status: 'set', months }` with the answer; nothing else in the code changes.
 export type RetentionPeriod =
   | { status: 'pending_counsel'; question: 'Q-16' }
-  | { status: 'set'; months: number };
+  | { status: 'set'; months: number }
+  /** Decided by the owner, not counsel, and enforced by a job. */
+  | { status: 'set_days'; days: number };
 
 export type RetentionRow = {
   dataset: string;
@@ -1132,5 +1135,17 @@ export const retentionSchedule: readonly RetentionRow[] = [
     startsAt: 'The end of the tax year of the payment',
     period: pendingCounsel,
     note: 'PRD-73: kept to the minimum, access-limited, and never removed by a deletion request',
+  },
+  {
+    dataset: 'auth_verifications',
+    startsAt: "The link's expiry (5 minutes after it was requested)",
+    period: { status: 'set_days', days: authRowRetentionDays },
+    note: 'The pulse deletes the row, which holds the address the link was sent to. A link that is used is deleted at once',
+  },
+  {
+    dataset: 'auth_sessions',
+    startsAt: "The session's expiry",
+    period: { status: 'set_days', days: authRowRetentionDays },
+    note: 'The pulse deletes a lapsed session. A live session is removed only with its sign-in user, by the privacy-requests work (U-085)',
   },
 ];

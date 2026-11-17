@@ -40,7 +40,7 @@ Ramble's answers to every rule that [`react-nextjs.md`](~/.claude/standards/reac
 | UI-2 | Styling system: CSS Modules or Tailwind | CSS Modules beside the component | CSS Modules, with Figma-sourced tokens as CSS custom properties (ADR 0005) |
 | PERF-6 | Bundle analyzer | Decide before the first dependency review | |
 | PERF-7 | Hand memoization | Follows STATE-14: none in new code when the compiler is on | Allowed in new code while the compiler is off (follows STATE-14) |
-| SEC-10 | Content Security Policy | Report-only first | Report-only first. Checkout carries no third-party tags, and its script inventory lists the payment scripts and Ramble's first-party web-vitals and events reporter, for PCI SAQ A (ADR 0003, ADR 0007) |
+| SEC-10 | Content Security Policy | Enforced on per-request routes, report-only on cached ones | The proxy enforces a nonce policy with `'strict-dynamic'` on checkout, gift, gift checkout, manage, orders, host, and ops (`src/lib/securityHeaders.ts`). Cached guest routes stay report-only, because the prerendered shell's inline scripts carry no nonce, and no report endpoint exists yet. Checkout carries no third-party tags, and its script inventory lists the payment scripts and Ramble's first-party web-vitals and events reporter, for PCI SAQ A (ADR 0003, ADR 0007) |
 
 ## Departures
 

@@ -23,6 +23,7 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 
 // Behaviours under test, one per decision, branch or risk:
 // - guest reads return published content only; collection entries a guest cannot see are left out
+// - the staff experience choices list every experience in every status, by name, whatever a guest could see
 // - the home Picks read finds the Picks it is asked for however many others are published, reads their
 //   first entries and a count of the rest, and never the intro
 
@@ -314,5 +315,24 @@ describe('the home Picks read when many Picks are published', () => {
     const full = await editorial.getPublishedPick(`${crowd}-named`);
     expect(full?.items).toHaveLength(experienceIds.length);
     expect(full?.intro).toEqual(doc('A long intro'));
+  });
+});
+
+describe('experience choices for the editor', () => {
+  it('lists experiences in every status by name, each with its status', async () => {
+    const live = await insertExperience('live', { name: 'Zz choice live' });
+    const draft = await insertExperience('draft', { name: 'Aa choice draft' });
+    const paused = await insertExperience('paused', {
+      name: 'Mm choice paused',
+    });
+
+    const choices = await editorial.listExperienceChoicesForEditing(ops);
+    const ours = choices.filter(({ name }) => name.includes(' choice '));
+
+    expect(ours).toEqual([
+      { id: draft.id, name: 'Aa choice draft', status: 'draft' },
+      { id: paused.id, name: 'Mm choice paused', status: 'paused' },
+      { id: live.id, name: 'Zz choice live', status: 'live' },
+    ]);
   });
 });

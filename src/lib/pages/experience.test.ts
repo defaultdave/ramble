@@ -34,6 +34,7 @@ import type { GuestPhoto } from '../photos';
 // - the badges: outdoor, 21+, kids; each only when it applies
 // - the streamed dates are handed the experience and only the price fields they read
 // - gifts switched off leave the gift entry out; the private-session entry stays
+// - the reviews block is in the view from five reviews and null below, and lists the rows it is given newest first
 // - the gallery is in the order staff set; a blank text section is left out
 // - the gallery layout follows the photo count (none, one, two, three, many); only the first photo leads; each photo of a set says its place and a lone one says nothing; "See all" appears only past the grid and every photo stays in the one list
 // - the head: a plain title for a guide entry or a missing experience, the name and an opening otherwise; the opening is cut at a word
@@ -55,10 +56,42 @@ const build = (overrides: Partial<ExperiencePageInput> = {}) =>
     experience: experience(),
     photos: [],
     place,
+    reviews: { rating: null, rows: [] },
     giftsEnabled: true,
     bookingsPaused: false,
     ...overrides,
   });
+
+describe('the reviews of the page', () => {
+  const written = (n: number) => ({
+    id: id(200 + n),
+    rating: 5,
+    body: `Lovely ${String(n)}`,
+    createdAt: new Date(Date.UTC(2026, 10, n, 15)),
+    guestName: 'Pat Rivera',
+  });
+
+  it('are none without reviews, and none below the threshold', () => {
+    expect(build()?.reviews).toBeNull();
+    expect(
+      build({
+        reviews: { rating: { average: 5, count: 4 }, rows: [written(1)] },
+      })?.reviews,
+    ).toBeNull();
+  });
+
+  it('are the block from five, newest first', () => {
+    const view = build({
+      reviews: {
+        rating: { average: 4.5, count: 5 },
+        rows: [written(1), written(2)],
+      },
+    })?.reviews;
+    expect(view?.average).toBe('4.5');
+    expect(view?.items.map((item) => item.author)).toEqual(['Pat', 'Pat']);
+    expect(view?.items.map((item) => item.id)).toEqual([id(202), id(201)]);
+  });
+});
 
 describe('ageLabel', () => {
   it.each([

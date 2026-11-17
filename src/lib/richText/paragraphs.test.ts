@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  docOrNull,
   editorStartContent,
   emptyDoc,
   hasContent,
@@ -9,6 +10,7 @@ import {
 // Behaviours under test, one per decision, branch or risk:
 // - one text is one paragraph, the exact document a single sentence of copy has always been
 // - several texts are several paragraphs in order, and no text is an empty document
+// - a document edited down to nothing is none, and one with content is kept
 // - the editor starts from a document with content and from an empty string without one
 // - a document has content when it is not null and has at least one block
 
@@ -55,5 +57,19 @@ describe('editorStartContent', () => {
 
   it('starts from an empty string when the document has none', () => {
     expect(editorStartContent(emptyDoc)).toBe('');
+  });
+});
+
+describe('docOrNull', () => {
+  it.each([
+    ['null', null, null],
+    ['an empty document', emptyDoc, null],
+  ])('%s is none', (_name, doc, expected) => {
+    expect(docOrNull(doc)).toBe(expected);
+  });
+
+  it('keeps a document with content as it is', () => {
+    const doc = paragraphs('x');
+    expect(docOrNull(doc)).toBe(doc);
   });
 });

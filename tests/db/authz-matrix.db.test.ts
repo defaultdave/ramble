@@ -18,6 +18,7 @@ import { personaHostSlugs } from '@/lib/seed/personas';
 import { editorialListRows } from './authzEditorialRows';
 import { experienceEditorRows } from './authzExperienceRows';
 import { accountBookingsRows } from './authzAccountRows';
+import { hostCancelRows } from './authzHostCancelRows';
 import { hostSetupRows } from './authzHostRows';
 import { opsBookingActionRows } from './authzBookingActionRows';
 import { opsBookingRows } from './authzBookingRows';
@@ -29,6 +30,7 @@ import {
 import { seedRows } from './authzSeedRows';
 import { opsSessionRows } from './authzOpsSessionRows';
 import { staffRows } from './authzStaffRows';
+import { opsDashboardRows } from './authzDashboardRows';
 import { supportQueueRows } from './authzSupportRows';
 import { experienceReviewRows } from './authzReviewRows';
 import { cancelSessionRows } from './authzSessionRows';
@@ -496,10 +498,12 @@ const rows: Row[] = [
   ...hostStaffRows(),
   ...opsSessionRows(),
   ...supportQueueRows(),
+  ...opsDashboardRows(),
   ...experienceEditorRows(),
   ...experienceReviewRows(),
   ...opsBookingRows(),
   ...opsBookingActionRows(),
+  ...hostCancelRows(),
   ...cancelSessionRows(sessionRules, 'ownerA', staff),
   // Seed and persona writes: ops alone. These write the most, so they come last.
   ...seedRows(),

@@ -1,6 +1,5 @@
 import {
   bookingCalendarEvent,
-  greetingName,
   guestConfirmationData,
   type BookingEmailSource,
 } from './bookingEmails';
@@ -9,7 +8,7 @@ import { buildIcs } from './ics';
 import { mapsHref } from './maps';
 import { orderStatusState, type OrderStatusState } from './orderStatus';
 import { browsePath, managePath } from './routes';
-import { oneLineClipped } from './text';
+import { firstNameOr, nameClip, oneLineClipped } from './text';
 
 // What the confirmation page says for an order in each state. The receipt reuses the booking
 // email's data, so the page and the email never disagree about the date, the party, or the total.
@@ -64,10 +63,8 @@ export function sellerOfRecordLine(hostName: string): string {
 
 /** "You're booked, Alex": the first word of the name, or no name when there is none. */
 export function confirmationHeading(leadGuestName: string | null): string {
-  const name = greetingName(leadGuestName);
-  return name === 'there'
-    ? "You're booked"
-    : `You're booked, ${name.split(' ')[0] ?? name}`;
+  const first = firstNameOr(leadGuestName, '', nameClip.person);
+  return first === '' ? "You're booked" : `You're booked, ${first}`;
 }
 
 function icsDataHref(ics: string): string {

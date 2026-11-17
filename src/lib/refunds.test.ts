@@ -8,6 +8,7 @@ import {
   refundTransitions,
   type RefundStatus,
 } from './refunds';
+import { at } from './testClock';
 import { isTerminal } from './transitions';
 import { id } from '../../tests/support/ids';
 
@@ -17,7 +18,7 @@ import { id } from '../../tests/support/ids';
 // - RefundSchema: valid rows pass; each row rule refuses its bad row
 
 const refundId = id(5);
-const created = new Date('2026-11-01T12:00:00Z');
+const created = at;
 const later = new Date('2026-11-01T12:05:00Z');
 
 describe('refund transitions', () => {

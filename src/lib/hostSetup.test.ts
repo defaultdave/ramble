@@ -23,6 +23,7 @@ import {
   hostFieldProblems,
   hostFormFields,
   hostNoticeCodes,
+  hostProfileChanges,
 } from './hostSetup';
 import { noticeHref, parseNotice } from './opsForm';
 
@@ -37,6 +38,7 @@ import { noticeHref, parseNotice } from './opsForm';
 // - a host stands as accepted, outdated, missing, or without a document to accept
 // - the list and the detail pick each host's own owners and acceptances
 // - addresses name a known notice only and the fields a refused form needs another look at
+// - a new name, slug, about text, or time zone invalidates the host page and each experience of the host; a new notice address alone invalidates nothing
 // - every result of an invite or an acceptance has one notice, and a lapsed host or owner is a failure to send
 
 const filled = {
@@ -528,5 +530,33 @@ describe('hostSaveOutcome', () => {
     [['name', 'description'], 'updated'],
   ])('%j is %s', (changed, expected) => {
     expect(hostSaveOutcome(changed)).toBe(expected);
+  });
+});
+
+describe('hostProfileChanges', () => {
+  const profile = [
+    { kind: 'hostProfile' },
+    { kind: 'experience', experienceId: 'e1' },
+    { kind: 'experience', experienceId: 'e2' },
+  ];
+
+  it.each([
+    ['a new name', ['name'] as const, profile],
+    ['a new slug', ['slug'] as const, profile],
+    ['a new about text', ['description'] as const, profile],
+    ['a new time zone', ['timeZone'] as const, profile],
+    [
+      'the notice address and a name',
+      ['notificationEmail', 'name'] as const,
+      profile,
+    ],
+    ['the notice address alone', ['notificationEmail'] as const, []],
+    ['nothing', [] as const, []],
+  ])('%s', (_case, changed, expected) => {
+    expect(hostProfileChanges(changed, ['e1', 'e2'])).toEqual(expected);
+  });
+
+  it('still invalidates the host page for a host with no experiences', () => {
+    expect(hostProfileChanges(['slug'], [])).toEqual([{ kind: 'hostProfile' }]);
   });
 });

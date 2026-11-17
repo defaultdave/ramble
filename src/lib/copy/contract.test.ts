@@ -3,6 +3,7 @@ import { subjectFor, type EmailRequest } from '../email/templates';
 import { declineNotice, refusedNotice } from '../fakePayment';
 import { demoLabel } from '../pages/legal';
 import { commonCopy } from './common';
+import { reviewCopy } from './review';
 import { signInCopy } from './signIn';
 
 // Strings that matter outside the code: a person, a mail client, or a legal reader depends on the
@@ -15,6 +16,7 @@ import { signInCopy } from './signIn';
 // - the payment-failure message a guest reads after a declined card, and after a refused payment
 // - the 404 heading
 // - the on-screen sign-in link's title, body and Continue label
+// - what a screen reader says of a review's stars and of the mean with its count, and the nameless author
 
 const subject = (template: string, data: Record<string, unknown>) =>
   subjectFor({
@@ -114,5 +116,18 @@ describe('the on-screen sign-in link', () => {
       'Email is off in this demo, so we show the link here instead of sending it to sam@example.com. It works once and lasts 5 minutes.',
     );
     expect(signInCopy.onScreen.continueLabel).toBe('Continue');
+  });
+});
+
+describe('the review display copy', () => {
+  it('names the stars, the mean with its count, and a guest with no name', () => {
+    expect(reviewCopy.display.ratedOutOf(4)).toBe('Rated 4 out of 5');
+    expect(reviewCopy.display.ratedFrom('4.6', 12)).toBe(
+      'Rated 4.6 out of 5 from 12 reviews',
+    );
+    expect(reviewCopy.display.ratedFrom('5.0', 1)).toBe(
+      'Rated 5.0 out of 5 from 1 review',
+    );
+    expect(reviewCopy.display.anonymousGuest).toBe('A guest');
   });
 });

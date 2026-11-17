@@ -64,6 +64,7 @@ setupRefundsDatabase(raise);
 // retry
 // - a booking whose refund failed gets one new refund of that refund's own amount, the flag cleared, and one audit row in one transaction; a second try finds nothing to retry; a retry after the retry failed too asks again
 // - a refund's id is the same from the request that wrote it and from the lookup the retry skips by
+// - an order with two failed refunds stays in the refund-failed queue after the first retry and leaves it after the second; a third click is refused
 // - an older failed refund is retried once the newer one has its retry; two parallel retries ask once and refuse once
 // - a failed partial refund of a confirmed booking retries for only its amount; a second retry of the same failed refund is a no-op; a retry that would take the refunds past what the card paid is refused and writes nothing
 // - a retry the refund path refuses leaves the flag set and writes nothing; one whose audit row cannot be written leaves the flag set and no new refund
@@ -481,6 +482,40 @@ describe('retrying a failed refund', () => {
       3_000, 4_000,
     ]);
     expect((await orderOf(world)).refundFailed).toBe(false);
+  });
+
+  it('keeps the order in the refund-failed queue until every failed refund has been retried', async () => {
+    const world = await seedCancellable({ gatewayPayment: true });
+    const request = async (key: string, ticketMinor: number) => {
+      const asked = await ask(world, { reason: 'goodwill', key, ticketMinor });
+      if (asked.status !== 'requested') throw new Error('not requested');
+      return {
+        id: asked.refund.refundId,
+        amountMinor: asked.refund.amountMinor,
+      };
+    };
+    const older = await request('older', 3_000);
+    const newer = await request('newer', 4_000);
+    await handleEvent(
+      await storeEvent(refundEvent(world, older, 'refund.failed')),
+    );
+    await handleEvent(
+      await storeEvent(refundEvent(world, newer, 'refund.failed')),
+    );
+
+    expect(await retry.retryFailedRefund(ops, world.orderId)).toBe('requested');
+    expect((await orderOf(world)).refundFailed).toBe(true);
+
+    expect(await retry.retryFailedRefund(ops, world.orderId)).toBe('requested');
+    expect((await orderOf(world)).refundFailed).toBe(false);
+
+    expect(await retry.retryFailedRefund(ops, world.orderId)).toBe('refused');
+    const pending = (await refundsOf(world)).filter(
+      (refund) => refund.status === 'pending',
+    );
+    expect(pending.map((refund) => refund.ticketMinor).toSorted()).toEqual([
+      3_000, 4_000,
+    ]);
   });
 
   it('names a refund by the same id whether it is requested or looked up for a retry', async () => {

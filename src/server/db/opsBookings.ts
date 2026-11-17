@@ -56,6 +56,9 @@ import { readDatabaseTime } from './time';
 // its audit row before it returns anything. Money moves only through `requestRefund` and the guest
 // cancel; nothing here decides an amount. A failed retry of a refund is in `./orderRefundRetry`.
 
+/** A booking whose refund failed: the bookings list filters by it and the ops landing counts by it. */
+export const refundFailedCondition = eq(orders.refundFailed, true);
+
 const refundsShownLimit = 50;
 const historyShownLimit = 50;
 
@@ -138,9 +141,7 @@ export async function readOpsBookings(
       and(
         eq(orders.kind, 'booking'),
         searchCondition(options.search),
-        options.filter === 'refund_failed'
-          ? eq(orders.refundFailed, true)
-          : undefined,
+        options.filter === 'refund_failed' ? refundFailedCondition : undefined,
         pastKeysetCursor(orders, orders.createdAt, 'desc', cursor),
       ),
     )

@@ -1,3 +1,4 @@
+import { opsEditorialSectionsCopy } from '@/lib/copy/opsEditorialSections';
 import { opsRequestsCopy } from '@/lib/copy/opsRequests';
 import { opsRequestsPath } from './opsRequests';
 
@@ -34,6 +35,16 @@ export const opsNavLinks: readonly OpsNavLink[] = [
     label: 'Editorial',
     href: '/ops/editorial',
     summary: 'Write help articles, then save them as drafts or publish them.',
+  },
+  {
+    label: opsEditorialSectionsCopy.nav.home.label,
+    href: '/ops/editorial/home',
+    summary: opsEditorialSectionsCopy.nav.home.summary,
+  },
+  {
+    label: opsEditorialSectionsCopy.nav.collections.label,
+    href: '/ops/editorial/collections',
+    summary: opsEditorialSectionsCopy.nav.collections.summary,
   },
   {
     label: 'Support',

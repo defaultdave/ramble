@@ -11,6 +11,7 @@ import {
 // - a retry asks for the failed refund's own ticket part, never the rest of the order, under a key named for that refund
 // - it keeps the failed refund's reason when the refund path takes it, and uses the ops reason otherwise
 // - it stops for no order, an order not flagged, a gift purchase, and no failed refund to retry
+// - the retry clears the order's flag only when no other failed refund is left to retry: one failure clears it, two keep it, a second whose retry stands or that has no ticket part does not count
 // - a failed refund with no ticket part, or whose retry already exists, is passed over and an older one is retried instead; when none is left it stops
 // - the audit row is valid and names the new refund by id, for a request and for a retry
 
@@ -54,6 +55,7 @@ describe('pickRetry', () => {
         ticketMinor: 8500,
         initiatedBy: userId,
       },
+      clearsFlag: true,
     });
   });
 
@@ -100,6 +102,51 @@ describe('pickRetry', () => {
       ticketMinor: 3000,
     });
   });
+
+  it.each([
+    [
+      'one failed refund',
+      [{ id: 'a', reason: 'goodwill', ticketMinor: 1000 }],
+      [],
+      true,
+    ],
+    [
+      'two failed refunds that can be retried',
+      [
+        { id: 'a', reason: 'goodwill', ticketMinor: 1000 },
+        { id: 'b', reason: 'goodwill', ticketMinor: 2000 },
+      ],
+      [],
+      false,
+    ],
+    [
+      'a second failed refund whose retry already stands',
+      [
+        { id: 'a', reason: 'goodwill', ticketMinor: 1000 },
+        { id: 'b', reason: 'goodwill', ticketMinor: 2000 },
+      ],
+      ['id-of-retry:b'],
+      true,
+    ],
+    [
+      'a second failed refund with no ticket part',
+      [
+        { id: 'a', reason: 'goodwill', ticketMinor: 1000 },
+        { id: 'b', reason: 'goodwill', ticketMinor: 0 },
+      ],
+      [],
+      true,
+    ],
+  ])(
+    'sets the flag decision for %s',
+    (_name, failedRefunds, standing, clears) => {
+      const plan = pick({
+        failed: failedRefunds,
+        standingIds: new Set(standing),
+      });
+      expect(plan.kind === 'retry' && plan.clearsFlag).toBe(clears);
+    },
+  );
 
   it('stops when every failed refund is passed over', () => {
     expect(

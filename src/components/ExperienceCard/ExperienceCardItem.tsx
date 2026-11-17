@@ -48,6 +48,7 @@ export function ExperienceCardItem({
       meta={card.meta}
       href={card.href}
       price={card.price}
+      {...(card.rating ? { rating: card.rating } : {})}
       image={image}
     />
   );

@@ -171,7 +171,7 @@ flowchart TD
 | CategoryRail | server | [`CategoryRail.tsx`](../../components/HomeModules/CategoryRail.tsx) | The row of category chips. |
 | ChipLink x n | server | [`ChipLink.tsx`](../../components/Chip/ChipLink.tsx) | Links to each category page, with `prefetch={false}`. |
 | PicksSection | server | [`PicksSection.tsx`](../../components/HomeModules/PicksSection.tsx) | The first one gets `id="picks"`, the target of `/#picks`. Ends with a "See all N picks" link. |
-| ExperienceCardItem x n (vertical) | server | [`ExperienceCardItem.tsx`](../../components/ExperienceCard/ExperienceCardItem.tsx) | Vertical layout, h3. |
+| ExperienceCardItem x n (vertical) | server | [`ExperienceCardItem.tsx`](../../components/ExperienceCard/ExperienceCardItem.tsx) | Vertical layout, h3. Shows the rating when the card carries one (the card model adds it from five visible reviews). |
 | Card, Photo | server | [`Card`](../../components/Card), [`Photo`](../../components/Photo) | The card frame and the cover image. |
 | GiftGuideSection | server | [`GiftGuideSection.tsx`](../../components/HomeModules/GiftGuideSection.tsx) | Left out when gifts are switched off. Eyebrow, copy, a `ButtonLink` to the gift guide, a fixed sponsor line and an Illustration. |
 | ThisWeekSection | server | [`ThisWeekSection.tsx`](../../components/HomeModules/ThisWeekSection.tsx) | The "On this week" row. |

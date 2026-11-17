@@ -95,6 +95,11 @@ export function readReviewOrder(
   return readOrder(executor, eq(orders.id, orderId), false);
 }
 
+/** What a write came to; a created review names its experience, so the caller can refresh what shows it. */
+export type ReviewWrite =
+  | { status: 'created'; experienceId: string }
+  | { status: Exclude<ReviewSubmitStatus, 'created'> };
+
 /**
  * Writes the review for an order, in the caller's transaction, if the order's booker may review it
  * now. The order is locked first, so a cancel that is committing and this write cannot both
@@ -104,14 +109,14 @@ export function readReviewOrder(
 export async function insertReview(
   tx: Transaction,
   input: { orderId: string; rating: number; body: string },
-): Promise<ReviewSubmitStatus> {
+): Promise<ReviewWrite> {
   const order = await readOrder(tx, eq(orders.id, input.orderId), true);
-  if (!order) return 'not_found';
+  if (!order) return { status: 'not_found' };
   const eligibility = reviewEligibility(
     order.facts,
     await readDatabaseTime(tx),
   );
-  if (!eligibility.ok) return reviewSubmitStatus(eligibility);
+  if (!eligibility.ok) return { status: reviewSubmitStatus(eligibility) };
   const [written] = await tx
     .insert(reviews)
     .values({
@@ -122,7 +127,9 @@ export async function insertReview(
     })
     .onConflictDoNothing({ target: reviews.orderId })
     .returning({ id: reviews.id });
-  return written ? 'created' : 'already_reviewed';
+  return written
+    ? { status: 'created', experienceId: order.experienceId }
+    : { status: 'already_reviewed' };
 }
 
 /**

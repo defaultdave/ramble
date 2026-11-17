@@ -1,12 +1,10 @@
 import 'server-only';
 import { eq } from 'drizzle-orm';
 import { EntityIdSchema } from '@/lib/catalog';
-import {
-  hostSettingsChanges,
-  type HostSettingsSaveResult,
-} from '@/lib/hostSettings';
+import type { HostSettingsSaveResult } from '@/lib/hostSettings';
 import {
   changedHostSettings,
+  hostProfileChanges,
   hostSaveOutcome,
   type HostSettingsInput,
 } from '@/lib/hostSetup';
@@ -39,7 +37,7 @@ export async function readHostSettings(
  * Saves the name, about text and notice address of the host the caller owns. The host row is
  * locked, and the change and its audit row are one transaction (`saveHostFields`). A new name or
  * about text invalidates the host page and the host's experiences after the commit
- * (`hostSettingsChanges`). Runs in a Server Action only.
+ * (`hostProfileChanges`). Runs in a Server Action only.
  */
 export async function updateHostSettings(
   caller: Caller,
@@ -69,7 +67,7 @@ export async function updateHostSettings(
         .where(eq(experiences.hostId, host.id));
       return {
         result,
-        changes: hostSettingsChanges(
+        changes: hostProfileChanges(
           changed,
           owned.map(({ id }) => id),
         ),

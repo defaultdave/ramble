@@ -32,6 +32,8 @@ describe('opsLandingLinks', () => {
       '/ops/hosts',
       '/ops/experiences',
       '/ops/editorial',
+      '/ops/editorial/home',
+      '/ops/editorial/collections',
       '/ops/support',
       '/ops/requests',
       '/ops/review',

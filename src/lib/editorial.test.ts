@@ -19,6 +19,7 @@ import {
   isSameCollectionKind,
   isSingleCollection,
   pageCopyChange,
+  picksOf,
   positioned,
   publishedAtAfter,
   visibleChange,
@@ -26,6 +27,7 @@ import {
 } from './editorial';
 
 // Behaviours under test, one per decision, branch or risk:
+// - the Picks are kept from a list of collections, and the gift guide is left out
 // - a stored document is refused when it needs repair, or is over the size limit, and a read repairs instead of throwing
 // - a text field counts characters the way Postgres does, and refuses blank text and text over its limit
 // - a collection refuses a repeated experience, too many entries, an unknown key, and a bad slug
@@ -676,5 +678,16 @@ describe('ids written in capitals', () => {
     ]);
 
     expect(hasMissingIds([parsed?.collectionId ?? ''], [lower])).toBe(false);
+  });
+});
+
+describe('picksOf', () => {
+  it('keeps the Picks, in order, and leaves the gift guide out', () => {
+    const list = [
+      { id: 'a', kind: 'pick' },
+      { id: 'b', kind: 'gift_guide' },
+      { id: 'c', kind: 'pick' },
+    ];
+    expect(picksOf(list).map(({ id }) => id)).toEqual(['a', 'c']);
   });
 });

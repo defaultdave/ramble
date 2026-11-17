@@ -401,7 +401,7 @@ export type OpsCancelInput = {
 export type ImpactFormInput = Pick<OpsCancelInput, 'sessionId' | 'fingerprint'>;
 
 /** What the cancel and pause forms share: the session, the impact that was read, and the box ticked to say so. Nothing is repaired. */
-function parseImpactForm(get: FormGetter): ImpactFormInput | null {
+export function parseImpactForm(get: FormGetter): ImpactFormInput | null {
   const sessionId = parseIdField(get('sessionId'));
   const fingerprint = ImpactFingerprintSchema.safeParse(
     formText(get, 'fingerprint'),
@@ -531,6 +531,19 @@ export const opsSessionNotices = {
   invalid: invalidFormNotice,
 } as const satisfies Record<OpsSessionNoticeCode, NoticeText>;
 
+/** The notices a cancellation can end in, for ops and for the host's own cancel page. */
+export type CancelNoticeCode = Extract<
+  OpsSessionNoticeCode,
+  | 'cancelled'
+  | 'cancelled_payments_left'
+  | 'already_cancelled'
+  | 'completed'
+  | 'not_found'
+  | 'blocked'
+  | 'stale'
+  | 'in_the_past'
+>;
+
 /** What asking to cancel came to: refused before anything was written, or handed to `cancelSession`. */
 export type OpsCancelOutcome =
   | { kind: 'blocked' | 'stale' | 'ended' }
@@ -539,7 +552,7 @@ export type OpsCancelOutcome =
 /** The notice an outcome names. */
 export function cancelOutcomeNotice(
   outcome: OpsCancelOutcome,
-): OpsSessionNoticeCode {
+): CancelNoticeCode {
   switch (outcome.kind) {
     case 'blocked':
     case 'stale':
@@ -551,7 +564,7 @@ export function cancelOutcomeNotice(
   }
 }
 
-function cancelNotice(result: CancelSessionResult): OpsSessionNoticeCode {
+function cancelNotice(result: CancelSessionResult): CancelNoticeCode {
   switch (result.status) {
     case 'cancelled':
       return result.attemptsLeft > 0 ? 'cancelled_payments_left' : 'cancelled';

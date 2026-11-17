@@ -1,5 +1,6 @@
 import { samplePhotos } from '@/components/Photo/Photo.fixtures';
 import { basicsOf, kayakOffer, kidsOffer } from '@/lib/bookingDraft.fixtures';
+import { reviewsFixture } from './ReviewsBlock.fixtures';
 import { galleryView, type ExperiencePageView } from '@/lib/pages/experience';
 
 /** The experience of Figma frame 03: outdoor, with a weather call, a host, a meeting point, and fifteen photos. */
@@ -53,6 +54,7 @@ export const sunsetKayak: ExperiencePageView = {
     'Free cancellation up to 24 hours before start. After that, no refund. If the host or the weather cancels, you get everything back.',
   booking: basicsOf(kayakOffer),
   giftHref: '/gifts/checkout/00000000-0000-4000-8000-000000000001',
+  reviews: null,
   privateSessionHref: '/contact',
 };
 
@@ -104,6 +106,7 @@ export const kidsClass: ExperiencePageView = {
     'Free cancellation up to 2 days before start. After that, no refund. If the host or the weather cancels, you get everything back.',
   booking: basicsOf(kidsOffer, 48),
   giftHref: null,
+  reviews: null,
   privateSessionHref: '/contact',
 };
 
@@ -156,5 +159,12 @@ export const bareExperience: ExperiencePageView = {
     ],
   }),
   giftHref: null,
+  reviews: null,
   privateSessionHref: '/contact',
+};
+
+/** The kayak trip with its reviews block: twelve reviews, the newest ten listed. */
+export const reviewedKayak: ExperiencePageView = {
+  ...sunsetKayak,
+  reviews: reviewsFixture,
 };

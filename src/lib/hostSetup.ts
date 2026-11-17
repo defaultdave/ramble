@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { CacheChange } from './cacheTags';
 import { SlugSchema, WriteIdSchema } from './catalog';
 import {
   EmailAddressSchema,
@@ -249,6 +250,25 @@ export function changedHostSettings(
   after: HostSettingsInput,
 ): HostSettingsField[] {
   return changedFields(hostSettingsFields, before, after);
+}
+
+/**
+ * The cache changes of a host save, ops or owner. A new name, slug, about text, or time zone is
+ * shown on the host page and on every experience of the host; a new notice address is shown to no
+ * guest, so it changes nothing.
+ */
+export function hostProfileChanges(
+  changed: readonly HostEditableField[],
+  experienceIds: readonly string[],
+): CacheChange[] {
+  if (!changed.some((field) => field !== 'notificationEmail')) return [];
+  return [
+    { kind: 'hostProfile' },
+    ...experienceIds.map((experienceId): CacheChange => ({
+      kind: 'experience',
+      experienceId,
+    })),
+  ];
 }
 
 /** What a save came to: nothing differing is `unchanged`, anything else `updated`. */

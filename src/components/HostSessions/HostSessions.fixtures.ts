@@ -14,6 +14,7 @@ const row = (overrides: Partial<HostWeekRowView>): HostWeekRowView => ({
   adultPrice: '85',
   editable: true,
   movable: true,
+  cancelHref: null,
   ...overrides,
 });
 
@@ -43,6 +44,8 @@ export const week: HostWeekView = {
           soldLabel: '4 of 8 seats sold',
           movable: false,
           allocation: 8,
+          cancelHref:
+            '/host/sessions/00000000-0000-4000-8000-000000000002/cancel',
         }),
       ],
     },

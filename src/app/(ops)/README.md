@@ -1,6 +1,6 @@
 # Ops area page map
 
-`/ops`, `/ops/mailbox`, `/ops/mailbox/[id]`, `/ops/dev`, `/ops/hosts`, `/ops/hosts/new`, `/ops/hosts/[id]`, `/ops/experiences`, `/ops/experiences/new`, `/ops/experiences/[id]`, `/ops/experiences/[id]/availability`, `/ops/editorial`, `/ops/editorial/new`, `/ops/editorial/[id]`, `/ops/review`, `/ops/review/[id]`, `/ops/sessions`, `/ops/sessions/[sessionId]`, `/ops/bookings`, `/ops/bookings/[id]`, `/ops/staff`, `/ops/support`, `/ops/requests`, `/ops/audit`, and any other address under `/ops`
+`/ops`, `/ops/mailbox`, `/ops/mailbox/[id]`, `/ops/dev`, `/ops/hosts`, `/ops/hosts/new`, `/ops/hosts/[id]`, `/ops/experiences`, `/ops/experiences/new`, `/ops/experiences/[id]`, `/ops/experiences/[id]/availability`, `/ops/editorial`, `/ops/editorial/new`, `/ops/editorial/[id]`, `/ops/editorial/home`, `/ops/editorial/home/[position]`, `/ops/editorial/collections`, `/ops/editorial/collections/new`, `/ops/editorial/collections/[id]`, `/ops/review`, `/ops/review/[id]`, `/ops/sessions`, `/ops/sessions/[sessionId]`, `/ops/bookings`, `/ops/bookings/[id]`, `/ops/staff`, `/ops/support`, `/ops/requests`, `/ops/audit`, and any other address under `/ops`
 
 Read from main at 2db68ea (2026-11-15). A PR that changes this tree (a component, a Suspense or client boundary, a cache tag, an action) updates this file in the same PR.
 
@@ -55,7 +55,7 @@ flowchart TD
 | SiteShell | server | [src/components/SiteShell.tsx](../../components/SiteShell.tsx) | Skip link, header (brand link and the word Operations), main, footer. No account control, no banner. |
 | OpsAreaNav | streamed | [src/app/(ops)/OpsAreaNav.tsx](OpsAreaNav.tsx) | Inside `Suspense fallback={null}`. Reads the caller, so it streams. Renders nothing unless the caller holds `ops`. It is not a gate. |
 | readOpsCaller | server (DB read) | [src/server/opsCaller.ts](../../server/opsCaller.ts) | Wraps `getCaller()`. A failure is logged and becomes the anonymous caller, never a role. |
-| holdsOpsRole and opsNavLinks | server (pure lib) | [src/lib/opsNav.ts](../../lib/opsNav.ts) | Roles must include `ops`; `admin` is not enough. Twelve links: Dashboard, Mailbox, Hosts, Experiences, Editorial, Support, Private requests, Review queue, Staff, Sessions, Audit log, Bookings. The test console is not listed. |
+| holdsOpsRole and opsNavLinks | server (pure lib) | [src/lib/opsNav.ts](../../lib/opsNav.ts) | Roles must include `ops`; `admin` is not enough. Fourteen links: Dashboard, Mailbox, Hosts, Experiences, Editorial, Home page, Collections, Support, Private requests, Review queue, Staff, Sessions, Audit log, Bookings. The test console is not listed. |
 | OpsNav | server | [src/components/OpsShell/OpsShell.tsx](../../components/OpsShell/OpsShell.tsx) | A `nav` of plain links. |
 | Route page | server |  | Every ops page below. The layout does not wrap it in Suspense, and no page does either. |
 | RenderPerRequest | server | [src/app/renderPerRequest.tsx](../renderPerRequest.tsx) | Sits beside the shell, awaits `connection()`, renders nothing. Pins the whole tree to per-request rendering so every script carries the CSP nonce. |
@@ -89,7 +89,7 @@ Named once here. The page trees below list only what is particular to them.
 
 - Writes: each change writes its audit row with `writeAudit(tx)` in the same transaction, so the row exists exactly when the change does. A change that differs by nothing writes neither.
 - Reads: sensitive reads are recorded with `recordAudit` before they return. These are the ops home, hosts (list, one, new form), sessions (list, one), bookings (list, one), staff, support, private requests, audit view, and mailbox (list, message, unlock).
-- Not recorded: experiences, review, availability, host suspension state, and the whole test console, including the demo data reset.
+- Not recorded: the landing's counts and its latest audit rows (the visit is), experiences, review, availability, host suspension state, and the whole test console, including the demo data reset.
 
 ### Tools
 
@@ -99,7 +99,10 @@ flowchart TD
     home["OperationsPage<br/>/ops"]:::server
     rec["recordOpsAccess"]:::server
     links["opsLandingLinks"]:::server
+    counts["Counts and recent audit rows<br/>five counts, one audit read"]:::server
+    tiles["dashboardTiles"]:::server
     land["OpsLanding"]:::server
+    dash["OpsDashboard"]:::server
     mb["MailboxPage<br/>/ops/mailbox"]:::server
     lm["loadMailbox"]:::server
     unl["MailboxUnlockForm"]:::server
@@ -126,7 +129,10 @@ flowchart TD
     nfpr["notFoundPerRequest"]:::server
     home -.-> rec
     home -.-> links
+    home -.-> counts
+    home --> tiles
     home --> land
+    land --> dash
     mb -.-> lm
     mb --> unl
     mb --> mlist
@@ -156,10 +162,13 @@ flowchart TD
 
 | Component | Kind | File | Notes |
 | --- | --- | --- | --- |
-| OperationsPage | server | [src/app/(ops)/ops/page.tsx](ops/page.tsx) | Gate, then records that ops opened the area. |
+| OperationsPage | server | [src/app/(ops)/ops/page.tsx](ops/page.tsx) | Gate, then records that ops opened the area, then reads the counts and the latest audit rows. |
 | recordOpsAccess | server (DB read) | [src/server/db/audit.ts](../../server/db/audit.ts) | Audited: `ops.accessed`. Throws for a non-ops caller, as a second check. |
 | opsLandingLinks | server (pure lib) | [src/lib/opsNav.ts](../../lib/opsNav.ts) | Every link but Dashboard. |
-| OpsLanding | server | [src/components/OpsShell/OpsShell.tsx](../../components/OpsShell/OpsShell.tsx) | Heading and a list of areas with a summary each. |
+| Counts and recent audit rows | server (DB read) | [src/server/db/opsDashboard.ts](../../server/db/opsDashboard.ts) | Read in parallel after the visit is recorded, each for the ops caller: experiences in review, bookings with a failed refund, open support requests, sessions starting today in New York (`countOpsPrivateRequests` in [privateRequests.ts](../../server/db/privateRequests.ts) counts every private request received), and the newest five audit rows. Not audited one by one: the visit is. A failed read fails the page. |
+| dashboardTiles | server (pure lib) | [src/lib/opsDashboard.ts](../../lib/opsDashboard.ts) | The five counts as tiles in a fixed order: label, queue link (filtered for refund-failed and open support), the count in words, and whether it needs attention. The sessions-today window is `zonedDayWindow` in [src/lib/zonedDay.ts](../../lib/zonedDay.ts). |
+| OpsLanding | server | [src/components/OpsShell/OpsShell.tsx](../../components/OpsShell/OpsShell.tsx) | Heading, its children (the dashboard), and a list of areas with a summary each. |
+| OpsDashboard | server | [src/components/OpsDashboard/OpsDashboard.tsx](../../components/OpsDashboard/OpsDashboard.tsx) | The tiles, each a link with its count and a needs-attention badge, then the recent audit rows with a link to the audit log. |
 | MailboxPage | server | [src/app/(ops)/ops/mailbox/page.tsx](ops/mailbox/page.tsx) | No `holdsOpsRole` check of its own. Access is decided in `loadMailbox`: the ops role, or a cookie proving the shared secret, off production. |
 | loadMailbox | server (DB read) | [src/server/ports/email/mailbox.ts](../../server/ports/email/mailbox.ts) | Audited: `mailbox listed`, with how access was gained. Status is disabled, locked or open. |
 | MailboxUnlockForm | server | [src/components/DevMailbox/DevMailbox.tsx](../../components/DevMailbox/DevMailbox.tsx) | Locked state: a secret field and a message for a wrong or rate-limited try. |
@@ -269,7 +278,7 @@ flowchart TD
 | HostDetailView | server | [src/components/HostSetup/HostDetailView.tsx](../../components/HostSetup/HostDetailView.tsx) | Profile form (HostForm fields), agreement state, the owner invite. Also uses StatusBadge and Alert. |
 | HostForm | server | [src/components/HostSetup/HostForm.tsx](../../components/HostSetup/HostForm.tsx) | The same form as on the new-host page. |
 | Button | client | [src/components/Button/Button.tsx](../../components/Button/Button.tsx) | Every submit button. The file is `'use client'`, but the forms post to the action without it. |
-| updateHostAction | action | [src/server/actions/hosts.ts](../../server/actions/hosts.ts) | `updateHost` via `saveHostFields`. Writes nothing, audit row included, when nothing differs. No cache is cleared. |
+| updateHostAction | action | [src/server/actions/hosts.ts](../../server/actions/hosts.ts) | `updateHost` via `saveHostFields`. Writes nothing, audit row included, when nothing differs. A new name, slug, about text, or time zone clears `catalog` (`hostProfile`) and each of the host's experiences, after the commit (`hostProfileChanges`, applied by `withLockedHost`); a notice address alone clears nothing. |
 | acceptHostAgreementAction | action | [src/server/actions/hosts.ts](../../server/actions/hosts.ts) | `recordHostAcceptance` for the chosen legal document. |
 | resendHostInviteAction | action | [src/server/actions/hosts.ts](../../server/actions/hosts.ts) | `inviteHostOwner`: a fresh sign-in link by email. |
 | HostSuspension | server | [src/components/HostSetup/HostSuspension.tsx](../../components/HostSetup/HostSuspension.tsx) | Suspend or unsuspend the whole host. |
@@ -684,6 +693,94 @@ flowchart TD
 | Button | client | [src/components/Button/Button.tsx](../../components/Button/Button.tsx) | Every submit button. |
 | saveEntryAction | action | [src/server/actions/editorial.ts](../../server/actions/editorial.ts) | `saveHelpArticle`: one audit row in the same transaction (created, saved, published or unpublished; ids only), then `updateTag` for what guests could see before and after. A save keeps the stored status and position (a stale tab cannot unpublish), and a missing article returns to the list with a notice. |
 
+### Home page modules and collections
+
+Staff arrange the home page and write Ramble Picks. Home modules are the six kinds the guest home page reads; the list reorders them and switches them on and off, and each module's editor shows only the settings its kind reads (heading, text, Pick). The gift guide module is listed and can be moved, but it has no switch and no editor here. A Pick is a title, address, summary and introduction, saved as a draft, published, or taken down, with an ordered list of experiences (add, remove, move). A Pick with no experiences cannot be published, and the last experience of a published Pick cannot be removed. Every button posts to a server action that reads the stored rows, applies the click with a plain `src/lib` function, and saves the whole list; the result comes back as a `?notice=` code. The introduction and text editors are the only client islands, and they load only on the two editor pages.
+
+```mermaid
+flowchart TD
+    hp["HomeModulesPage<br/>/ops/editorial/home"]:::server
+    hl["HomeModulesList"]:::server
+    hep["EditHomeModulePage<br/>/ops/editorial/home/position"]:::server
+    hf["HomeModuleForm"]:::server
+    cp["CollectionsPage<br/>/ops/editorial/collections"]:::server
+    cl["CollectionsList"]:::server
+    dt4["DataTable"]:::server
+    cn["NewCollectionPage<br/>/ops/editorial/collections/new"]:::server
+    ce["EditCollectionPage<br/>/ops/editorial/collections/id"]:::server
+    cf["CollectionForm"]:::server
+    ci["CollectionItems"]:::server
+    lhm["listHomeModulesForEditing"]:::server
+    lce["listCollectionsForEditing"]:::server
+    lxc["listExperienceChoicesForEditing"]:::server
+    an5["ActionNotice"]:::server
+    rte2["RichTextEditor<br/>Tiptap"]:::client
+    btn4["Button<br/>client submit buttons"]:::client
+    hoa["homeModuleOpAction"]:::action
+    shm["saveHomeModuleAction"]:::action
+    sca["saveCollectionAction"]:::action
+    cia["collectionItemsAction"]:::action
+    hp -.-> lhm
+    hp -.-> lce
+    hp --> an5
+    hp --> hl
+    hep -.-> lhm
+    hep -.-> lce
+    hep --> an5
+    hep --> hf
+    cp -.-> lce
+    cp --> an5
+    cp --> cl
+    cl --> dt4
+    cn --> an5
+    cn --> cf
+    ce -.-> lce
+    ce -.-> lxc
+    ce --> an5
+    ce --> cf
+    ce --> ci
+    hf --> rte2
+    cf --> rte2
+    hl --> btn4
+    hf --> btn4
+    cf --> btn4
+    ci --> btn4
+    btn4 -.-> hoa
+    btn4 -.-> shm
+    btn4 -.-> sca
+    btn4 -.-> cia
+    classDef server fill:#e8edf8,stroke:#3b5bab,color:#1b1f27
+    classDef cached fill:#e2f3f0,stroke:#0f7a6c,color:#1b1f27
+    classDef streamed fill:#fbefdc,stroke:#a3610a,color:#1b1f27
+    classDef client fill:#f5e6f8,stroke:#8a2f9c,color:#1b1f27
+    classDef action fill:#fbe6e4,stroke:#b3261e,color:#1b1f27
+```
+
+| Component | Kind | File | Notes |
+| --- | --- | --- | --- |
+| HomeModulesPage | server | [src/app/(ops)/ops/editorial/home/page.tsx](ops/editorial/home/page.tsx) | Gate, then the modules and the collections (for the Pick names). A failed read is logged and shows the list's retry, not the group error. |
+| HomeModulesLoading | server | [src/app/(ops)/ops/editorial/home/loading.tsx](ops/editorial/home/loading.tsx) | The loading state for the two home pages. |
+| EditHomeModulePage | server | [src/app/(ops)/ops/editorial/home/[position]/page.tsx](ops/editorial/home/%5Bposition%5D/page.tsx) | Gate, then the module at that place. A bad place, an empty one, the gift guide module, and a module with no settings are a 404. |
+| listHomeModulesForEditing | server (DB read) | [src/server/db/editorial.ts](../../server/db/editorial.ts) | Staff only; every module, on or off. Not audited. |
+| HomeModulesList | server | [src/components/EditorialAdmin/HomeModulesList.tsx](../../components/EditorialAdmin/HomeModulesList.tsx) | One form around the ordered list; each row has move up, move down, turn on or off, and an edit link. Each button posts the module's place and kind, so a stale page cannot change a different module, and each button and link names its module for a screen reader. |
+| HomeModuleForm | server | [src/components/EditorialAdmin/HomeModuleForm.tsx](../../components/EditorialAdmin/HomeModuleForm.tsx) | The state box and the settings the module's kind reads: heading, Pick list, text editor. |
+| CollectionsPage | server | [src/app/(ops)/ops/editorial/collections/page.tsx](ops/editorial/collections/page.tsx) | Gate, then every Pick, drafts included. A failed read is logged and shows the table's retry. |
+| CollectionsLoading | server | [src/app/(ops)/ops/editorial/collections/loading.tsx](ops/editorial/collections/loading.tsx) | The loading state for the three collection pages. |
+| NewCollectionPage | server | [src/app/(ops)/ops/editorial/collections/new/page.tsx](ops/editorial/collections/new/page.tsx) | Gate, then an empty form that saves a draft. |
+| EditCollectionPage | server | [src/app/(ops)/ops/editorial/collections/[id]/page.tsx](ops/editorial/collections/%5Bid%5D/page.tsx) | Gate, then the Pick, its form, and its experience list. A bad id, an unknown id, and the gift guide are a 404. |
+| listCollectionsForEditing | server (DB read) | [src/server/db/editorial.ts](../../server/db/editorial.ts) | Staff only; every collection with its entries, up to 200. The pages and actions keep the Picks. Not audited. |
+| listExperienceChoicesForEditing | server (DB read) | [src/server/db/editorial.ts](../../server/db/editorial.ts) | Staff only; experience names and statuses for the entry picker, up to 500 (`experienceChoiceLimits.experiences`). |
+| CollectionsList | server | [src/components/EditorialAdmin/CollectionsList.tsx](../../components/EditorialAdmin/CollectionsList.tsx) | A new-collection link and a table with an empty state. |
+| CollectionForm | server | [src/components/EditorialAdmin/CollectionForm.tsx](../../components/EditorialAdmin/CollectionForm.tsx) | Title, address, summary, introduction. A new Pick can only be saved as a draft; an existing one saves and publishes, or saves and unpublishes. |
+| CollectionItems | server | [src/components/EditorialAdmin/CollectionItems.tsx](../../components/EditorialAdmin/CollectionItems.tsx) | The experiences in order with move up, move down and remove, in one form; the add form is a second form, so Enter in the note adds. |
+| ActionNotice | server | [src/components/ActionNotice/ActionNotice.tsx](../../components/ActionNotice/ActionNotice.tsx) | Shows the `?notice=` code from the last redirect. |
+| RichTextEditor | client | [src/components/RichTextEditor/RichTextEditor.tsx](../../components/RichTextEditor/RichTextEditor.tsx) | The text of a hero module and a Pick's introduction. Imported only by the ops editorial forms. |
+| Button | client | [src/components/Button/Button.tsx](../../components/Button/Button.tsx) | Every submit button. |
+| homeModuleOpAction | action | [src/server/actions/editorial.ts](../../server/actions/editorial.ts) | Reads the stored list, applies a move or a switch, and saves the whole list with `saveHomeModules`, which clears the home tag. A click for a module no longer at that place saves nothing. |
+| saveHomeModuleAction | action | [src/server/actions/editorial.ts](../../server/actions/editorial.ts) | Applies the edit to the settings the kind reads and saves the whole list; a refused field returns to the form. |
+| saveCollectionAction | action | [src/server/actions/editorial.ts](../../server/actions/editorial.ts) | Reads the stored Pick, takes its status and entries from it, and saves with `saveCollection`, which clears the tags of what guests could see before and after. A Pick with no entries is not published, and a form that names a Pick by a bad id is a missing Pick. |
+| collectionItemsAction | action | [src/server/actions/editorial.ts](../../server/actions/editorial.ts) | Reads the stored Pick, applies an add, remove or move, and saves the Pick with its entries changed; removing the last entry of a published Pick saves nothing. |
+
 ## Arrival order
 
 Nothing on an ops page is cached, and the only Suspense boundary is the nav in the layout, so there is no staged arrival. The order below is the same for every page.
@@ -732,13 +829,13 @@ Ops pages hold no cache of their own. Their changes reach the guest side through
 | Cancel a booking (`cancelBookingAction`) | `session:id`, only if it was cancelled | After one stale response, through `revalidateTag` with `max` |
 | Save, publish or unpublish a help article (`saveEntryAction`) | Only when guests could see the article before or after: `help-articles` only (there is no per-article tag). Saving a draft that stays a draft clears nothing | At once, through `updateTag` |
 | Reject a review, create an experience (`rejectExperienceAction`, `createExperienceAction`) | Nothing, because the experience is never guest-visible | Not applicable |
-| Edit a host, accept the agreement, invites (`updateHostAction`, `acceptHostAgreementAction`, `resendHostInviteAction`, `createHostAction`) | Nothing | A host name or about edit shows when the `catalog` profile runs out |
+| Edit a host (`updateHostAction`) | A new name, slug, about text, or time zone: `catalog` and the host's experiences. A notice address alone: nothing | At once, through `updateTag` |
+| Accept the agreement, invites (`acceptHostAgreementAction`, `resendHostInviteAction`, `createHostAction`) | Nothing | Not applicable |
 | Refund, retry, resend, void links (`refundBookingAction`, `retryRefundAction`, `resendConfirmationAction`, `voidLinksAction`) | Nothing | Not applicable |
 | Staff, support, audit, mailbox, test console (all of their actions) | Nothing | Not applicable; the demo reset clears no tag either |
 
 ## Worth knowing
 
-- An ops host edit never reaches the host page. A host's own settings change clears `catalog` (`hostProfile`). The ops `updateHost` goes through `saveHostFields` and returns no cache change, so a new name or about text shows only when the `catalog` profile lapses (15 minutes to revalidate, a day to expire). [src/server/hostPage.ts](../../server/hostPage.ts) says so in a comment.
 - Session and booking cancels clear caches more weakly than edits. Edits, pauses, approvals and seat changes use `updateTag`. Both cancels use `revalidateTag(..., 'max')`, so one guest response afterwards can still show the cancelled session as bookable. The `cancelSession` comment says it runs in a Server Action only, which would allow the stronger call.
 - A non-ops visitor gets a 200 sign-in page, and an unknown address is a 200 too. `OpsAccessDenied` is returned, not thrown. The catch-all calls `notFound()` after `connection()`, and the comment in [renderPerRequest.tsx](../renderPerRequest.tsx) admits the status stays 200 and the page appears only once script runs.
 - Reading the audit log writes to it. Opening `/ops/audit`, a blank new-host form, or the ops home each add a row. Experience, review and availability reads, and the entire test console including the demo data reset, write none.

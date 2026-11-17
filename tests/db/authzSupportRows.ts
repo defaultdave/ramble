@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Caller } from '@/server/auth/caller';
 
-// The support-queue rows of the authorization matrix. Both functions are ops alone; a missing
+// The support-queue and private-requests-queue rows of the authorization matrix. Every function is ops alone; a missing
 // request answers not found to ops and is refused to everyone else.
 
 const opsOnly = { platform: ['ops'] } as const;
@@ -16,6 +16,15 @@ export function supportQueueRows() {
           status: null,
           cursor: null,
         }),
+      allows: opsOnly,
+    },
+    {
+      fn: 'readOpsPrivateRequests',
+      invoke: async (c) =>
+        (await import('@/server/db/privateRequests')).readOpsPrivateRequests(
+          c,
+          { cursor: null },
+        ),
       allows: opsOnly,
     },
     {

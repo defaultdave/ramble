@@ -97,16 +97,28 @@ export function optionalText(max: number) {
 /**
  * One line of at most `max` characters: runs of whitespace (line breaks included) become one
  * space, and a longer text is cut and ends in an ellipsis. For text that sits in a subject or a
- * heading, where a stored description of unknown length must not break the layout.
+ * heading, where a stored description of unknown length must not break the layout. `cut` says
+ * whether the ellipsis was needed.
  */
-export function oneLineClipped(text: string, max: number): string {
+export function clipOneLine(
+  text: string,
+  max: number,
+): { text: string; cut: boolean } {
   const collapsed = text.split(/\s+/).filter(Boolean).join(' ');
   const characters = Array.from(collapsed);
-  if (characters.length <= max) return collapsed;
-  return `${characters
-    .slice(0, max - 1)
-    .join('')
-    .trimEnd()}…`;
+  if (characters.length <= max) return { text: collapsed, cut: false };
+  return {
+    text: `${characters
+      .slice(0, max - 1)
+      .join('')
+      .trimEnd()}…`,
+    cut: true,
+  };
+}
+
+/** `clipOneLine`'s text alone. */
+export function oneLineClipped(text: string, max: number): string {
+  return clipOneLine(text, max).text;
 }
 
 /** The first value of a query parameter, which Next gives as one string or a list when it repeats. */

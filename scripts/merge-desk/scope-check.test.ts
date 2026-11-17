@@ -114,7 +114,7 @@ test("rule 3: a bookkeeping PR touching any other file fails", () => {
   expect(check({ title: "PM bookkeeping: x", head: "pm/x", changedFiles }).ok).toBe(false);
 });
 
-test.each(["docs/plan/units.yaml", "Docs/Plan/UNITS.yaml", "CLAUDE.MD", ".GitHub/workflows/x.yml", "Scripts/Merge-Desk/a.ts"])(
+test.each(["docs/plan/units.yaml", "Docs/Plan/UNITS.yaml", "CLAUDE.MD", ".GitHub/workflows/x.yml", "Scripts/Merge-Desk/a.ts", "eslint.config.mjs", "eslint.config.copy.mjs", "tsconfig.json"])(
   "rule 3: protected paths match case-insensitively (%s)",
   (file) => {
     expect(check({ changedFiles: [file] }).ok).toBe(false);

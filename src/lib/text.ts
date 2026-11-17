@@ -126,6 +126,8 @@ export const nameClip = {
   /** In a subject, where a long name pushes the rest off the line. */
   subject: 70,
   person: 120,
+  /** Where only the first name of a person shows, such as a review's author. */
+  firstName: 40,
   experience: 200,
 } as const;
 

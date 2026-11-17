@@ -8,6 +8,7 @@ import {
 import { durationLabel } from './duration';
 import type { PhotoView } from './photoViews';
 import { cardPriceLabel, type CardPriceOption } from './pricing';
+import { hasEnoughReviews, RatingSchema, type Rating } from './rating';
 import { experienceCardPath } from './routes';
 
 /** The part of a price option a card reads: its amount, and whether a guest holding it takes a space. */
@@ -35,6 +36,8 @@ export const CardExperienceSchema = z.object({
   durationMinutes: z.int().positive().nullable(),
   linkOutUrl: HttpUrlSchema.nullable(),
   priceOptions: z.array(CardPriceOptionSchema),
+  /** The mean of the visible reviews and their count, for a read that has them; the card shows it only from the threshold. */
+  rating: RatingSchema.nullish(),
   /** The cover, for a read that joins it in; a read that does not leaves it out and the page sets it. */
   image: CardImageSchema.nullish(),
 });
@@ -58,6 +61,22 @@ export function withPriceOptions<T extends { id: string }>(
   }));
 }
 
+export const RatingRowSchema = RatingSchema.extend({ experienceId: z.guid() });
+export type RatingRow = z.infer<typeof RatingRowSchema>;
+
+/** Each experience with the rating its reviews make, left off one with no reviews. A rating for an experience that is not listed is ignored. */
+export function withRatings<T extends { id: string }>(
+  rows: readonly T[],
+  ratings: readonly RatingRow[],
+): (T & { rating?: Rating })[] {
+  return rows.map((row) => {
+    const found = ratings.find(({ experienceId }) => experienceId === row.id);
+    return found
+      ? { ...row, rating: { average: found.average, count: found.count } }
+      : row;
+  });
+}
+
 export type ExperienceCard = {
   id: string;
   title: string;
@@ -66,7 +85,8 @@ export type ExperienceCard = {
   /** The experience's cover photo; null shows the card's missing-image state. */
   image: PhotoView | null;
 } & (
-  { kind: 'bookable'; price: string } | { kind: 'guide-only'; hostHref: string }
+  | { kind: 'bookable'; price: string; rating?: Rating }
+  | { kind: 'guide-only'; hostHref: string }
 );
 
 /**
@@ -100,7 +120,11 @@ export function toExperienceCard(
       : { ...base, kind: 'guide-only', hostHref: experience.linkOutUrl };
   }
   const price = cardPriceLabel(experience.priceOptions);
-  return price === null ? null : { ...base, kind: 'bookable', price };
+  if (price === null) return null;
+  const { rating } = experience;
+  return rating && hasEnoughReviews(rating)
+    ? { ...base, kind: 'bookable', price, rating }
+    : { ...base, kind: 'bookable', price };
 }
 
 /** The cards for `ids`, in that order. An ID with no experience, or one that cannot be a card, is skipped. */

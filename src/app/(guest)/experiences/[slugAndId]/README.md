@@ -40,6 +40,8 @@ flowchart TD
   US["UpcomingSessions"]:::server
   USE["UpcomingSessionsError"]:::server
   SEC["Section x 7 and links<br/>About to Cancellation, gift, private session"]:::server
+  RV["Reviews section<br/>only from 5 visible reviews"]:::server
+  RB["ReviewsBlock<br/>mean, count, newest 10"]:::server
   SB["Suspense: booking<br/>fallback BookingSlots with BookingPanelSkeleton"]:::streamed
   BCN["BookingContent<br/>see the booking controls diagram"]:::streamed
   PE["PageError<br/>retry link"]:::server
@@ -62,6 +64,8 @@ flowchart TD
   USC --> US
   USC -.-> USE
   EP --> SEC
+  EP --> RV
+  RV --> RB
   EP --> SB
   SB --> BCN
 ```
@@ -73,9 +77,9 @@ flowchart TD
 | generateMetadata | server | [`page.tsx`](./page.tsx) | Reads the same cached `getExperiencePage` entry for the title and description. A failed read falls back to the plain title. |
 | generateStaticParams | server | [`page.tsx`](./page.tsx) | Returns one sample address, `sample`, so the route has a static param to build from. |
 | parseExperienceAddress | server | [`src/lib/routes.ts`](../../../../lib/routes.ts) | A plain function. Splits the slug from the id. |
-| getExperiencePage | cached | [`src/server/experiencePage.ts`](../../../../server/experiencePage.ts) | `cacheLife('catalog')`, tag `experience:<id>`. A missing experience is not cached (it switches to the `uncached` profile). |
+| getExperiencePage | cached | [`src/server/experiencePage.ts`](../../../../server/experiencePage.ts) | `cacheLife('catalog')`, tag `experience:<id>`. A missing experience is not cached (it switches to the `uncached` profile). Also reads the experience's rating and its newest visible reviews ([`reviewsRead.ts`](../../../../server/db/reviewsRead.ts)), so a new review clears it through the same tag. |
 | getCachedGuestSettings | cached | [`src/server/siteSettings.ts`](../../../../server/siteSettings.ts) | `cacheLife('settings')`, tag `settings`. Gives `giftsEnabled` and `bookingsPaused`. |
-| buildExperiencePage | server | [`src/lib/pages/experience.ts`](../../../../lib/pages/experience.ts) | A plain function. Turns the rows plus `giftsEnabled` and `bookingsPaused` into the view the components render. |
+| buildExperiencePage | server | [`src/lib/pages/experience.ts`](../../../../lib/pages/experience.ts) | A plain function. Turns the rows plus `giftsEnabled` and `bookingsPaused` into the view the components render. The reviews part comes from `reviewsView` in [`reviewList.ts`](../../../../lib/reviewList.ts): null below five reviews, else the mean, the count, and the newest ten, each with a first name only. |
 | ExperiencePage | server | [`ExperiencePage.tsx`](../../../../components/ExperiencePage/ExperiencePage.tsx) | The static body. It takes two slots, `dates` and `booking`, that the route streams in. |
 | Breadcrumbs and Badge | server | [`ExperiencePage.tsx`](../../../../components/ExperiencePage/ExperiencePage.tsx) | Rendered inside the page body. |
 | ExperienceGallery | server | [`ExperienceGallery.tsx`](../../../../components/ExperienceGallery/ExperienceGallery.tsx) | Renders each `Photo` on the server, or a placeholder when there are none (the case locally). The lead `Photo` draws a hidden copy at the card's width first, which a guest who came from a card already has cached, then the full photo over it. |
@@ -86,6 +90,8 @@ flowchart TD
 | UpcomingSessions | server | [`src/components/UpcomingSessions/`](../../../../components/UpcomingSessions/) | The dates list. |
 | UpcomingSessionsError | server | [`src/components/UpcomingSessions/`](../../../../components/UpcomingSessions/) | Shown when the read fails, with a retry link. |
 | Section x 7 and links | server | [`ExperiencePage.tsx`](../../../../components/ExperiencePage/ExperiencePage.tsx) | About, What's included, Your host (link to `/hosts/<slug>`), Meeting point (Maps `ButtonLink`), Accessibility, Weather, Cancellation, then the gift link (when gifts are on) and the private-session link. |
+| Reviews section | server | [`ExperiencePage.tsx`](../../../../components/ExperiencePage/ExperiencePage.tsx) | After "Your host". Left out whole when the view has no reviews (fewer than five). No sort, no replies, no paging. |
+| ReviewsBlock | server | [`ReviewsBlock.tsx`](../../../../components/ExperiencePage/ReviewsBlock.tsx) | The mean and count as one spoken sentence, then one list item per review: rating (spoken), first name, day, words. |
 | Suspense: booking | streamed | [`page.tsx`](./page.tsx) | Fallback is `BookingSlots` with `BookingPanelSkeleton`, so the panel's space is held. |
 | BookingContent | streamed | [`BookingContent.tsx`](./BookingContent.tsx) | Detailed in the next diagram. |
 | PageError | server | [`src/components/PageError/`](../../../../components/PageError/) | Shown instead of the page when the page data or settings read fails. |
@@ -169,6 +175,7 @@ flowchart TD
 | Publishing or editing the experience, or taking it down | Tag `experience:<id>` (and the other tags the listing change names) through `tagsForChanges()` in [`src/lib/cacheTags.ts`](../../../../lib/cacheTags.ts). This clears `getExperiencePage` and `getUpcomingSessions`. | The next request rebuilds the shell and the session lists. |
 | Sessions or photos change, or the pulse job extends the schedule | Tag `experience:<id>` through `updateTagsForChanges()` or `revalidateTagsForChanges()` in [`src/server/cache/invalidate.ts`](../../../../server/cache/invalidate.ts). The pulse job in [`src/server/pulse.ts`](../../../../server/pulse.ts) uses the revalidate form. | An action's change shows on the next request. A job's change may show one response late (stale-while-revalidate). |
 | A hold is placed, released or superseded, a booking is made or cancelled, the cleanup job runs, or capacity changes | Tag `session:<id>` (a `spaces` change), which clears the remote `getSpacesLeft` entry for that session. | The next request reads the new count. The entry also lives only a few seconds (`spacesLeft`), for deadlines that pass without a write. |
+| A review is written | Tag `experience:<id>` (an `experience` change) through `updateTagsForChanges()`, called by `submitReview` in [`src/server/reviewForm.ts`](../../../../server/reviewForm.ts) after the commit. This clears the page above and every cached browse or home entry that lists the experience, whose cards show its rating. | The next request. |
 | Site settings change (bookings paused, gifts on) | Tag `settings`, which clears `getCachedGuestSettings`. | The next request. |
 | A category or neighborhood is renamed | No tag reaches it. | When the `catalog` profile of the cached page runs out. |
 

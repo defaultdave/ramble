@@ -48,6 +48,11 @@ const free = {
   price: 'Free',
 } satisfies ExperienceCard;
 
+const rated = {
+  ...bookable,
+  rating: { average: 4.6, count: 12 },
+} satisfies ExperienceCard;
+
 export const Vertical: Story = {
   args: { card: bookable, layout: 'vertical', headingLevel: 3 },
 };
@@ -65,4 +70,10 @@ export const VerticalGuideOnly: Story = {
 };
 export const HorizontalGuideOnly: Story = {
   args: { card: guideOnly, layout: 'horizontal', headingLevel: 3 },
+};
+export const VerticalRated: Story = {
+  args: { card: rated, layout: 'vertical', headingLevel: 3 },
+};
+export const HorizontalRated: Story = {
+  args: { card: rated, layout: 'horizontal', headingLevel: 3 },
 };

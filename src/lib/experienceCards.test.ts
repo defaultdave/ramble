@@ -5,6 +5,7 @@ import {
   cardsInOrder,
   toExperienceCard,
   withPriceOptions,
+  withRatings,
   type CardExperience,
 } from './experienceCards';
 import { id } from '../../tests/support/ids';
@@ -14,6 +15,8 @@ import { id } from '../../tests/support/ids';
 // - a card carries neighborhood, duration and price of a bookable experience, and links a guide entry out
 // - a card price comes only from options that take a space, so a kids class with a free accompanying adult reads the child price
 // - a price of nothing reads "Free", never "From Free" or "From $0"
+// - a rating is attached to its experience by id, and an experience with no reviews, or a rating of an unlisted one, changes nothing
+// - a card shows its rating only from the review threshold; below it, and for a guide entry, the card carries none
 // - a card is left out when it cannot be shown: no price to book, or no link out
 // - cards follow the order given, skip what is missing, and stop at the limit
 // - the row schema keeps what a card needs and refuses a negative or fractional price
@@ -152,6 +155,50 @@ describe('toExperienceCard', () => {
   });
 });
 
+describe('withRatings', () => {
+  it('gives each row its own rating and leaves a row with no reviews as it was', () => {
+    const rows = [experience(1), experience(2)];
+    const rated = withRatings(rows, [
+      { experienceId: id(2), average: 4.6, count: 12 },
+      { experienceId: id(99), average: 5, count: 50 },
+    ]);
+    expect(rated[0]).toBe(rows[0]);
+    expect(rated[1]).toEqual({
+      ...rows[1],
+      rating: { average: 4.6, count: 12 },
+    });
+  });
+});
+
+describe('a card rating', () => {
+  it.each([
+    { count: 4, shown: false },
+    { count: 5, shown: true },
+    { count: 230, shown: true },
+  ])('with $count reviews is shown: $shown', ({ count, shown }) => {
+    const card = toExperienceCard(
+      experience(1, { rating: { average: 4.6, count } }),
+    );
+    expect(card?.kind === 'bookable' ? card.rating : 'guide').toEqual(
+      shown ? { average: 4.6, count } : undefined,
+    );
+  });
+
+  it('is absent from a card whose read had no rating, and from a guide entry', () => {
+    const plain = toExperienceCard(experience(1));
+    expect(plain && 'rating' in plain).toBe(false);
+    const guide = toExperienceCard(
+      experience(2, {
+        status: 'guide_only',
+        linkOutUrl: 'https://host.example',
+        priceOptions: [],
+        rating: { average: 4.6, count: 12 },
+      }),
+    );
+    expect(guide && 'rating' in guide).toBe(false);
+  });
+});
+
 describe('cardsInOrder', () => {
   const all = [experience(1), experience(2), experience(3), experience(4)];
   const noPrice = experience(5, { priceOptions: [] });
@@ -210,6 +257,27 @@ describe('the card schemas', () => {
     ['a missing usesSpace', { priceMinor: 100 }],
   ])('refuses %s', (_name, option) => {
     expect(CardPriceOptionSchema.safeParse(option).success).toBe(false);
+  });
+
+  it.each([
+    ['no rating', undefined],
+    ['a null rating', null],
+    ['a rating', { average: 4.6, count: 12 }],
+  ])('accepts %s', (_name, rating) => {
+    expect(
+      CardExperienceSchema.safeParse({ ...experience(1), rating }).success,
+    ).toBe(true);
+  });
+
+  it.each([
+    ['a mean over 5', { average: 5.1, count: 12 }],
+    ['a mean under 1', { average: 0.5, count: 12 }],
+    ['a count of nothing', { average: 4, count: 0 }],
+    ['a fractional count', { average: 4, count: 1.5 }],
+  ])('refuses a rating with %s', (_name, rating) => {
+    expect(
+      CardExperienceSchema.safeParse({ ...experience(1), rating }).success,
+    ).toBe(false);
   });
 
   it('refuses a status a guest may not see', () => {

@@ -13,6 +13,7 @@ import { makeDriverError } from '../../tests/support/driverError';
 // - an ID that is no guid gives null before anything is tagged or read; the tag is the lower-case ID
 // - an experience that is not visible to guests gives null, and nothing else is read for it
 // - a visible one comes back with its photos and its place, from the lists of categories and neighborhoods
+// - its reviews come back as the rating over every visible review and the newest rows, and no rating at all for an experience with none
 // - a miss, a hidden experience, and an ID that is no guid are not kept: the uncached profile is named; a visible one names no other profile
 // - a failed read throws only the kind of the failure, never the query or its values
 
@@ -27,6 +28,8 @@ const db = vi.hoisted(() => ({
   photos: vi.fn(),
   categories: vi.fn(),
   neighborhoods: vi.fn(),
+  ratings: vi.fn(),
+  reviewRows: vi.fn(),
 }));
 vi.mock('@/server/db/catalog', () => ({
   getGuestExperience: db.experience,
@@ -34,6 +37,10 @@ vi.mock('@/server/db/catalog', () => ({
   listNeighborhoods: db.neighborhoods,
 }));
 vi.mock('@/server/db/photos', () => ({ listGuestPhotos: db.photos }));
+vi.mock('@/server/db/reviewsRead', () => ({
+  readRatings: db.ratings,
+  listReviewRows: db.reviewRows,
+}));
 
 const driverError = makeDriverError('secret-id');
 
@@ -45,6 +52,8 @@ beforeEach(() => {
     neighborhoodId: id(4),
   });
   db.photos.mockResolvedValue([{ id: id(100) }]);
+  db.ratings.mockResolvedValue([]);
+  db.reviewRows.mockResolvedValue([]);
   db.categories.mockResolvedValue([
     { id: id(3), slug: 'outdoors', name: 'Outdoors' },
   ]);
@@ -101,6 +110,24 @@ describe('getExperiencePage', () => {
         category: { slug: 'outdoors', name: 'Outdoors' },
         neighborhood: { slug: 'tribeca', name: 'Tribeca' },
       },
+      reviews: { rating: null, rows: [] },
+    });
+  });
+
+  it('carries the rating of the visible reviews and the newest rows', async () => {
+    const rows = [{ id: id(300) }];
+    db.ratings.mockResolvedValue([
+      { experienceId: id(1), average: 4.6, count: 12 },
+    ]);
+    db.reviewRows.mockResolvedValue(rows);
+
+    const data = await getExperiencePage(id(1));
+
+    expect(db.ratings).toHaveBeenCalledExactlyOnceWith([id(1)]);
+    expect(db.reviewRows).toHaveBeenCalledExactlyOnceWith(id(1));
+    expect(data?.reviews).toEqual({
+      rating: { average: 4.6, count: 12 },
+      rows,
     });
   });
 

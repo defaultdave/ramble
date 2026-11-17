@@ -5,11 +5,15 @@ const mocks = vi.hoisted(() => ({
   readDatabaseTime: vi.fn(),
   readReviewOrder: vi.fn(),
   insertReview: vi.fn(),
+  updateTagsForChanges: vi.fn(),
   consumeRateLimit: vi.fn(),
   resolveToken: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
+vi.mock('@/server/cache/invalidate', () => ({
+  updateTagsForChanges: mocks.updateTagsForChanges,
+}));
 vi.mock('@/server/db/client', () => ({
   db: { transaction: mocks.transaction },
 }));
@@ -31,6 +35,7 @@ import { readReviewPage, submitReview } from './reviewForm';
 // - a link of the wrong shape is invalid before anything is counted, looked up, or read from the database, for the page and for the submit
 // - a link counted out is told to wait, for the page and for the submit, with no read of the order
 // - a link that opens nothing is invalid
+// - a created review refreshes the experience's cache tag after the write; no other answer does
 // - a link that opens an order is read with the database's time in one transaction, and the page carries the order's facts and its summary
 
 const reference = 'RMB-7K3M9Q';
@@ -145,7 +150,10 @@ describe('submitReview', () => {
 
   it('writes the review for the order the link opens and answers what the write answers', async () => {
     mocks.resolveToken.mockResolvedValue({ id: 'order-1' });
-    mocks.insertReview.mockResolvedValue('created');
+    mocks.insertReview.mockResolvedValue({
+      status: 'created',
+      experienceId: 'experience-1',
+    });
     expect(await submitReview(input)).toBe('created');
     expect(mocks.insertReview).toHaveBeenCalledExactlyOnceWith(tx, {
       orderId: 'order-1',
@@ -153,4 +161,26 @@ describe('submitReview', () => {
       body: 'Lovely',
     });
   });
+
+  it('refreshes what shows the experience once a review is made, and only then', async () => {
+    mocks.resolveToken.mockResolvedValue({ id: 'order-1' });
+    mocks.insertReview.mockResolvedValue({
+      status: 'created',
+      experienceId: 'experience-1',
+    });
+    await submitReview(input);
+    expect(mocks.updateTagsForChanges).toHaveBeenCalledExactlyOnceWith([
+      { kind: 'experience', experienceId: 'experience-1' },
+    ]);
+  });
+
+  it.each(['already_reviewed', 'expired', 'not_found'] as const)(
+    'leaves every cache alone for a submit that comes to %s',
+    async (status) => {
+      mocks.resolveToken.mockResolvedValue({ id: 'order-1' });
+      mocks.insertReview.mockResolvedValue({ status });
+      expect(await submitReview(input)).toBe(status);
+      expect(mocks.updateTagsForChanges).not.toHaveBeenCalled();
+    },
+  );
 });

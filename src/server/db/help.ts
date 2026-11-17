@@ -5,7 +5,7 @@ import {
   editorialLimits,
   type HelpArticleSummary,
 } from '@/lib/editorial';
-import { containsPattern } from '@/lib/pages/help';
+import { containsPattern } from '@/lib/text';
 import { dbRead } from './client';
 import { helpArticles } from './schema';
 

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildHelpIndex,
-  containsPattern,
   helpArticleHead,
   helpArticlePath,
   helpIndexHead,
@@ -43,18 +42,6 @@ describe('parseHelpQuery', () => {
     const long = `${'a'.repeat(helpSearchMaxLength - 1)} ${'b'.repeat(500)}`;
     const term = parseHelpQuery(long);
     expect(term).toBe('a'.repeat(helpSearchMaxLength - 1));
-  });
-});
-
-describe('containsPattern', () => {
-  it.each([
-    ['a plain word', 'cancel', '%cancel%'],
-    ['a percent sign', '100%', '%100\\%%'],
-    ['an underscore', 'a_b', '%a\\_b%'],
-    ['a backslash', 'a\\b', '%a\\\\b%'],
-    ['every wildcard at once', '%_\\', '%\\%\\_\\\\%'],
-  ])('escapes %s', (_name, term, pattern) => {
-    expect(containsPattern(term)).toBe(pattern);
   });
 });
 

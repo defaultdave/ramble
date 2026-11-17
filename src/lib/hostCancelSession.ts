@@ -123,7 +123,7 @@ export function parseHostCancelForm(
 }
 
 /** What an attempt can end in: what `cancelSession` or the refusals before it say, or a form refused before anything was read. */
-export const hostCancelNoticeCodes = [
+const hostCancelNoticeCodes = [
   'cancelled',
   'cancelled_payments_left',
   'already_cancelled',

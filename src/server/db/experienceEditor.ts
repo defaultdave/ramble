@@ -33,19 +33,21 @@ import {
   type PlaceSlugs,
 } from '@/lib/experienceEditor';
 import { isGuestVisible } from '@/lib/catalog';
+import { settleGuide, type GuideLinks } from '@/lib/editorialGuides';
 import { isPublishedWaiver } from '@/lib/legal';
-import { isOfferable, mayReference } from '@/lib/taxonomy';
+import { mayReference } from '@/lib/taxonomy';
 import { GuestPhotoSchema } from '@/lib/photos';
 import { splitPage } from '@/lib/pagination';
 import { Role, requireRole, type Caller } from '@/server/auth/caller';
-import { withLockedExperience } from './lockedExperience';
+import { withLockedExperience, type Done } from './lockedExperience';
 import { requireOpsUserId, writeAudit } from './audit';
 import { byNameThenId, pastNameCursor } from './keysetPage';
+import { listCategories, listNeighborhoods } from './catalog';
 import { db, dbRead, type Transaction } from './client';
 import { getPublishedLegalDocument } from './legal';
 import { galleryWith } from './photos';
 import { listCancellationTiers } from './policies';
-import { lockReferencedTerm, readTaxonomyTerms } from './taxonomy';
+import { lockReferencedTerm } from './taxonomy';
 import {
   categories,
   experiences,
@@ -129,8 +131,8 @@ export async function readExperienceChoices(
         .from(hosts)
         .orderBy(asc(hosts.name), asc(hosts.id))
         .limit(experienceChoiceLimits.hosts),
-      readTaxonomyTerms('category'),
-      readTaxonomyTerms('neighborhood'),
+      listCategories({ withState: true }),
+      listNeighborhoods({ withState: true }),
       listCancellationTiers(),
       dbRead
         .select({
@@ -150,14 +152,11 @@ export async function readExperienceChoices(
     ]);
   return buildExperienceChoices({
     hosts: hostRows,
-    categories: categoryRows.filter((term) =>
-      isOfferable(term, kept.categoryId),
-    ),
-    neighborhoods: neighborhoodRows.filter((term) =>
-      isOfferable(term, kept.neighborhoodId),
-    ),
+    categories: categoryRows,
+    neighborhoods: neighborhoodRows,
     cancellationTiers: tiers,
     waivers,
+    kept,
   });
 }
 
@@ -284,10 +283,64 @@ export type UpdateExperienceResult =
 type Saved = { result: UpdateExperienceResult; changes: CacheChange[] };
 
 /**
- * Saves the experience's content and prices. Nothing differing writes nothing, audit row
- * included. A rule that depends on the status (a guide entry links out) and a price taken away
- * are refused with the fields to look at. A change to a listing guests can see invalidates its
- * tags, for the old and the new place.
+ * What a save does with the content it is given, in the transaction that holds the experience
+ * row. Nothing differing writes nothing, audit row included.
+ */
+async function saveLocked(
+  tx: Transaction,
+  userId: string,
+  current: typeof experiences.$inferSelect,
+  before: ExperienceContent,
+  input: ExperienceContent,
+): Promise<Saved> {
+  const id = current.id;
+  const changed = changedExperienceFields(before, input);
+  if (changed.length === 0) {
+    return { result: { status: 'unchanged' }, changes: [] };
+  }
+
+  const refused = [
+    ...experienceRuleFailures(input, current.status),
+    ...removedPriceFields(before, input),
+  ];
+  if (refused.length > 0) {
+    return { result: { status: 'invalid', fields: refused }, changes: [] };
+  }
+  if (!(await referencesExist(tx, input, current))) {
+    return { result: { status: 'reference_missing' }, changes: [] };
+  }
+
+  await tx
+    .update(experiences)
+    .set(experienceColumnsOf(input))
+    .where(eq(experiences.id, id));
+  await writePriceOptions(tx, id, input);
+  await writeAudit(tx, experienceUpdatedEntry(userId, id, changed, input));
+  const changes = isGuestVisible(current.status)
+    ? listingChanges(
+        id,
+        await placeSlugs(tx, before),
+        await placeSlugs(tx, input),
+      )
+    : [];
+  return { result: { status: 'updated' }, changes };
+}
+
+async function contentIn(
+  tx: Transaction,
+  current: typeof experiences.$inferSelect,
+): Promise<ExperienceContent> {
+  const prices = await tx
+    .select()
+    .from(priceOptions)
+    .where(eq(priceOptions.experienceId, current.id));
+  return experienceContentOf(current, prices);
+}
+
+/**
+ * Saves the experience's content and prices. A rule that depends on the status (a guide entry
+ * links out) and a price taken away are refused with the fields to look at. A change to a
+ * listing guests can see invalidates its tags, for the old and the new place.
  */
 export async function updateExperience(
   caller: Caller,
@@ -298,46 +351,38 @@ export async function updateExperience(
   return await withLockedExperience<UpdateExperienceResult>(
     experienceId,
     { status: 'not_found' },
-    async (tx, current): Promise<Saved> => {
-      const id = current.id;
-      const prices = await tx
-        .select()
-        .from(priceOptions)
-        .where(eq(priceOptions.experienceId, id));
-      const before = experienceContentOf(current, prices);
-      const changed = changedExperienceFields(before, input);
-      if (changed.length === 0) {
-        return { result: { status: 'unchanged' }, changes: [] };
-      }
+    async (tx, current) =>
+      saveLocked(tx, userId, current, await contentIn(tx, current), input),
+  );
+}
 
-      const refused = [
-        ...experienceRuleFailures(input, current.status),
-        ...removedPriceFields(before, input),
-      ];
-      if (refused.length > 0) {
-        return {
-          result: { status: 'invalid', fields: refused },
-          changes: [],
-        };
-      }
-      if (!(await referencesExist(tx, input, current))) {
-        return { result: { status: 'reference_missing' }, changes: [] };
-      }
+export type UpdateGuideLinksResult =
+  UpdateExperienceResult | { status: 'not_a_guide' };
 
-      await tx
-        .update(experiences)
-        .set(experienceColumnsOf(input))
-        .where(eq(experiences.id, id));
-      await writePriceOptions(tx, id, input);
-      await writeAudit(tx, experienceUpdatedEntry(userId, id, changed, input));
-      const changes = isGuestVisible(current.status)
-        ? listingChanges(
-            id,
-            await placeSlugs(tx, before),
-            await placeSlugs(tx, input),
-          )
-        : [];
-      return { result: { status: 'updated' }, changes };
+/**
+ * Sets the two links of a guide-only entry. The links are merged into the content of the row as
+ * locked here, so a change to any other field committed since the form was read is kept, and the
+ * audit row names only the links. An experience that is not guide-only is `not_a_guide`.
+ */
+export async function updateGuideLinks(
+  caller: Caller,
+  experienceId: string,
+  links: GuideLinks,
+): Promise<UpdateGuideLinksResult> {
+  const userId = requireOpsUserId(caller);
+  return await withLockedExperience<UpdateGuideLinksResult>(
+    experienceId,
+    { status: 'not_found' },
+    async (tx, current): Promise<Done<UpdateGuideLinksResult>> => {
+      const before = await contentIn(tx, current);
+      const settled = settleGuide(
+        { status: current.status, content: before },
+        links,
+      );
+      if (settled.status !== 'ready') {
+        return { result: { status: settled.status }, changes: [] };
+      }
+      return saveLocked(tx, userId, current, before, settled.content);
     },
   );
 }

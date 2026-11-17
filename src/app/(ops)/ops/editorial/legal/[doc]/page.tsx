@@ -15,6 +15,7 @@ import {
   legalFormFields,
   legalNoticeCodes,
   legalNotices,
+  mayStartDraft,
   parseLegalDocParam,
 } from '@/lib/editorialLegal';
 import { noticeText, parseNotice, parseProblemFields } from '@/lib/opsForm';
@@ -49,6 +50,12 @@ export default async function LegalVersionsPage({
       return null;
     },
   );
+  if (
+    versions !== null &&
+    !mayStartDraft(doc, versions.length > 0 ? [doc] : [])
+  ) {
+    notFound();
+  }
   const start = draftStart(versions ?? []);
   return (
     <PageHeading title={legalDocLabel(doc)}>

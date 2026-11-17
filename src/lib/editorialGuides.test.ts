@@ -13,7 +13,7 @@ import { newExperienceValues } from './experienceEditor';
 // - only a guide-only experience has links to set here
 // - the link-out is required and both addresses must be http(s) with a host; a blank affiliate address is none
 // - an address over the limit is refused unread and named, so no rule walks it
-// - the stored content is kept whole and only the two links replace what it had; an entry that is gone or no longer guide-only settles to a refusal
+// - the stored content is kept whole and only the two links replace what it had; an entry no longer guide-only settles to a refusal
 // - a refusal from the save names only this form's fields; the outcomes go back to the entry, or to the list when it is gone or not a guide
 
 const id = '00000000-0000-4000-8000-000000000001';
@@ -101,15 +101,10 @@ describe('settleGuide', () => {
     });
   });
 
-  it.each([
-    ['an entry that is gone', null, 'not_found'],
-    [
-      'an entry that went live',
-      { status: 'live' as const, content },
-      'not_a_guide',
-    ],
-  ])('settles %s to %s', (_label, view, status) => {
-    expect(settleGuide(view, links)).toEqual({ status });
+  it('settles an entry that went live to not_a_guide', () => {
+    expect(settleGuide({ status: 'live', content }, links)).toEqual({
+      status: 'not_a_guide',
+    });
   });
 });
 

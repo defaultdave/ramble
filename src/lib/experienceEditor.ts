@@ -1,3 +1,4 @@
+import { isOfferable } from './taxonomy';
 import { z } from 'zod';
 import type { CacheChange } from './cacheTags';
 import { cancellationTerms } from './cancellation';
@@ -13,7 +14,6 @@ import {
   type CancellationTier,
   type Category,
   type HostExperience,
-  type Neighborhood,
 } from './catalog';
 import { parseSingle, type SelectOption } from './filters';
 import { priceInputTextOrNull, priceMinorFromText } from './money';
@@ -617,23 +617,37 @@ export type ExperienceChoices = {
 
 type WaiverVersion = { id: string; title: string; version: number };
 
+/** A category or neighborhood as the choices read it; one with no `retiredAt` is not retired. */
+type OfferedTerm = Category & { retiredAt?: Date | null };
+
+/** The options for the terms that may be offered: a retired one only as the one the experience names. */
+function offeredOptions(
+  terms: readonly OfferedTerm[],
+  keptId: string | undefined,
+): SelectOption[] {
+  return terms
+    .filter((term) =>
+      isOfferable({ id: term.id, retiredAt: term.retiredAt ?? null }, keptId),
+    )
+    .map(({ id, name }) => ({ value: id, label: name }));
+}
+
 export function buildExperienceChoices(input: {
   hosts: readonly { id: string; name: string }[];
-  categories: readonly Category[];
-  neighborhoods: readonly Neighborhood[];
+  categories: readonly OfferedTerm[];
+  neighborhoods: readonly OfferedTerm[];
   cancellationTiers: readonly CancellationTier[];
   waivers: readonly WaiverVersion[];
+  /** The category and neighborhood the experience being edited names: a retired one is offered only as that. */
+  kept?: Partial<Pick<ExperienceContent, 'categoryId' | 'neighborhoodId'>>;
 }): ExperienceChoices {
   return {
     hosts: input.hosts.map(({ id, name }) => ({ value: id, label: name })),
-    categories: input.categories.map(({ id, name }) => ({
-      value: id,
-      label: name,
-    })),
-    neighborhoods: input.neighborhoods.map(({ id, name }) => ({
-      value: id,
-      label: name,
-    })),
+    categories: offeredOptions(input.categories, input.kept?.categoryId),
+    neighborhoods: offeredOptions(
+      input.neighborhoods,
+      input.kept?.neighborhoodId,
+    ),
     cancellationTiers: input.cancellationTiers.map((tier) => ({
       value: tier.id,
       label: `${tier.name}: ${cancellationTerms(tier).fact}`,

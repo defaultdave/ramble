@@ -39,6 +39,7 @@ export function RichTextEditor({
   const labelId = useId();
   const errorId = useId();
   const linkErrorId = useId();
+  const loadingId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const [value, setValue] = useState(() => encodeRichText(initial));
   const [linkHref, setLinkHref] = useState<string | null>(null);
@@ -190,6 +191,7 @@ export function RichTextEditor({
               ? { 'aria-pressed': tool.pressed ?? false }
               : { 'aria-expanded': tool.expanded })}
             disabled={!editor}
+            {...(editor ? {} : { 'aria-describedby': loadingId })}
             onClick={tool.run}
           >
             {tool.label}
@@ -238,7 +240,7 @@ export function RichTextEditor({
         {editor ? (
           <EditorContent editor={editor} />
         ) : (
-          <p className={styles.loading} role="status">
+          <p className={styles.loading} id={loadingId} role="status">
             Loading the editor…
           </p>
         )}

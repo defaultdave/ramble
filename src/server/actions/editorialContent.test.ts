@@ -4,8 +4,8 @@ const mocks = vi.hoisted(() => ({
   opsCallerOrLeave: vi.fn(),
   idOrLeave: vi.fn(),
   savePageCopy: vi.fn(),
-  readExperienceForOps: vi.fn(),
-  updateExperience: vi.fn(),
+  updateGuideLinks: vi.fn(),
+  listLegalDocSummaries: vi.fn(),
   startLegalDraft: vi.fn(),
   saveLegalDraft: vi.fn(),
   publishLegalDraft: vi.fn(),
@@ -33,10 +33,10 @@ vi.mock('@/server/db/editorial', () => ({
   savePageCopy: mocks.savePageCopy,
 }));
 vi.mock('@/server/db/experienceEditor', () => ({
-  readExperienceForOps: mocks.readExperienceForOps,
-  updateExperience: mocks.updateExperience,
+  updateGuideLinks: mocks.updateGuideLinks,
 }));
 vi.mock('@/server/db/legalAdmin', () => ({
+  listLegalDocSummaries: mocks.listLegalDocSummaries,
   startLegalDraft: mocks.startLegalDraft,
   saveLegalDraft: mocks.saveLegalDraft,
   publishLegalDraft: mocks.publishLegalDraft,
@@ -47,7 +47,6 @@ vi.mock('@/server/db/taxonomy', () => ({
   clickTaxonomyTerm: mocks.clickTaxonomyTerm,
 }));
 
-import { newExperienceValues } from '@/lib/experienceEditor';
 import {
   addTaxonomyAction,
   renameTaxonomyAction,
@@ -114,8 +113,7 @@ describe('the caller is checked first', () => {
 
     for (const mock of [
       mocks.savePageCopy,
-      mocks.readExperienceForOps,
-      mocks.updateExperience,
+      mocks.updateGuideLinks,
       mocks.startLegalDraft,
       mocks.saveLegalDraft,
       mocks.publishLegalDraft,
@@ -187,35 +185,21 @@ describe('saveGuideLinksAction', () => {
     linkOutUrl: 'https://host.example.com/classes',
     affiliateUrl: 'https://host.example.com/classes?ref=ramble',
   };
-  const content = newExperienceValues({
-    categoryId: id,
-    neighborhoodId: id,
-    cancellationTierId: id,
-  });
 
-  it('replaces only the two links in the stored content and reports the save', async () => {
-    mocks.readExperienceForOps.mockResolvedValue({
-      status: 'guide_only',
-      content,
-    });
-    mocks.updateExperience.mockResolvedValue({ status: 'updated' });
+  it('hands the two links to the locked save and reports what it answered', async () => {
+    mocks.updateGuideLinks.mockResolvedValue({ status: 'updated' });
 
     const href = await destination(saveGuideLinksAction(form(links)));
 
     expect(href).toBe(`/ops/editorial/guides/${id}?notice=updated`);
-    expect(mocks.updateExperience).toHaveBeenCalledWith(ops, id, {
-      ...content,
+    expect(mocks.updateGuideLinks).toHaveBeenCalledWith(ops, id, {
       linkOutUrl: links.linkOutUrl,
       affiliateUrl: links.affiliateUrl,
     });
   });
 
   it('names only this form’s fields when the save refuses others', async () => {
-    mocks.readExperienceForOps.mockResolvedValue({
-      status: 'guide_only',
-      content,
-    });
-    mocks.updateExperience.mockResolvedValue({
+    mocks.updateGuideLinks.mockResolvedValue({
       status: 'invalid',
       fields: ['description', 'linkOutUrl'],
     });
@@ -226,29 +210,21 @@ describe('saveGuideLinksAction', () => {
   });
 
   it.each([
-    [
-      'a refused form',
-      { id, linkOutUrl: 'nope' },
-      null,
-      `/ops/editorial/guides/${id}?notice=invalid&fields=linkOutUrl`,
-    ],
-    [
-      'an entry that is gone',
-      links,
-      null,
-      '/ops/editorial/guides?notice=not_found',
-    ],
-    [
-      'an entry that went live',
-      links,
-      { status: 'live', content },
-      '/ops/editorial/guides?notice=not_a_guide',
-    ],
-  ])('saves nothing for %s', async (_label, fields, view, href) => {
-    mocks.readExperienceForOps.mockResolvedValue(view);
+    ['an entry that is gone', 'not_found'],
+    ['an entry that went live', 'not_a_guide'],
+  ])('goes to the list for %s', async (_label, status) => {
+    mocks.updateGuideLinks.mockResolvedValue({ status });
 
-    expect(await destination(saveGuideLinksAction(form(fields)))).toBe(href);
-    expect(mocks.updateExperience).not.toHaveBeenCalled();
+    expect(await destination(saveGuideLinksAction(form(links)))).toBe(
+      `/ops/editorial/guides?notice=${status}`,
+    );
+  });
+
+  it('returns a refused form to the entry and saves nothing', async () => {
+    expect(
+      await destination(saveGuideLinksAction(form({ id, linkOutUrl: 'nope' }))),
+    ).toBe(`/ops/editorial/guides/${id}?notice=invalid&fields=linkOutUrl`);
+    expect(mocks.updateGuideLinks).not.toHaveBeenCalled();
   });
 });
 
@@ -272,6 +248,7 @@ describe('the legal actions', () => {
   });
 
   it('starts a draft and shows it on the versions', async () => {
+    mocks.listLegalDocSummaries.mockResolvedValue([]);
     mocks.startLegalDraft.mockResolvedValue({ id });
 
     const href = await destination(
@@ -285,7 +262,34 @@ describe('the legal actions', () => {
     );
   });
 
+  it('leaves for the documents when the key is valid but no document has it', async () => {
+    mocks.listLegalDocSummaries.mockResolvedValue([]);
+
+    expect(
+      await destination(
+        startLegalDraftAction(
+          form({ ...fields, doc: 'waiver-new-thing', intent: 'save' }),
+        ),
+      ),
+    ).toBe('/ops/editorial/legal');
+    expect(mocks.startLegalDraft).not.toHaveBeenCalled();
+  });
+
+  it('starts a draft of a waiver that already has a version', async () => {
+    mocks.listLegalDocSummaries.mockResolvedValue([{ doc: 'waiver-kayak' }]);
+    mocks.startLegalDraft.mockResolvedValue({ id });
+
+    expect(
+      await destination(
+        startLegalDraftAction(
+          form({ ...fields, doc: 'waiver-kayak', intent: 'save' }),
+        ),
+      ),
+    ).toBe('/ops/editorial/legal/waiver-kayak?notice=drafted');
+  });
+
   it('returns a refused new draft to the versions with the field', async () => {
+    mocks.listLegalDocSummaries.mockResolvedValue([]);
     expect(
       await destination(
         startLegalDraftAction(form({ ...fields, title: '', intent: 'save' })),

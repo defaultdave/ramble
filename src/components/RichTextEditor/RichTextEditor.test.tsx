@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { RichTextDoc } from '@/lib/richText/format';
 import { RichTextEditor } from './RichTextEditor';
@@ -13,6 +14,7 @@ import { RichTextEditor } from './RichTextEditor';
 // - opening the link panel focuses its address field, and Cancel gives focus back to the editor
 // - the link button says whether the panel is open, and a refused address is announced
 // - headings, lists and bold text typed in the editor reach the form field whole
+// - before the editor loads, the toolbar buttons are disabled and each points at the loading status that says why
 // - a refused field is named in the error text and the textbox points at it
 
 // jsdom does no layout, and ProseMirror asks for the rectangles of a range when it scrolls the cursor into view.
@@ -203,5 +205,25 @@ describe('RichTextEditor', () => {
         ],
       });
     });
+  });
+});
+
+describe('RichTextEditor before it loads', () => {
+  it('disables the toolbar buttons and describes each by the loading status', () => {
+    const page = new DOMParser().parseFromString(
+      renderToStaticMarkup(
+        <RichTextEditor name="body" label="Body" initial={doc} />,
+      ),
+      'text/html',
+    );
+    const status = page.querySelector('[role="status"]');
+    const buttons = [...page.querySelectorAll('button')];
+
+    expect(status?.textContent).toContain('Loading the editor');
+    expect(buttons.length).toBeGreaterThan(0);
+    for (const button of buttons) {
+      expect(button.hasAttribute('disabled')).toBe(true);
+      expect(button.getAttribute('aria-describedby')).toBe(status?.id);
+    }
   });
 });

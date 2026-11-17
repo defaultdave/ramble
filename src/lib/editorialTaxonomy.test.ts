@@ -250,6 +250,19 @@ describe('buildTaxonomyRows', () => {
     expect(rows[0]).toMatchObject({ switchLabel: 'Retire', canSwitch: false });
   });
 
+  it('gives the reason each disabled button has, and none for one that works', () => {
+    expect(rows[0]).toMatchObject({
+      moveUpReason: 'Already first.',
+      moveDownReason: null,
+      switchReason: 'The last one that is not retired cannot be retired.',
+    });
+    expect(rows[1]).toMatchObject({
+      moveUpReason: null,
+      moveDownReason: 'Already last.',
+      switchReason: null,
+    });
+  });
+
   it('lets a row be retired while another is in use', () => {
     expect(
       buildTaxonomyRows('neighborhood', [term(id), term(other)]).map(

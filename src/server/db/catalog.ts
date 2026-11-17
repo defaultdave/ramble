@@ -18,6 +18,7 @@ import {
   type Neighborhood,
   type RetiredSlug,
 } from '@/lib/catalog';
+import { TaxonomyTermSchema, type TaxonomyTerm } from '@/lib/taxonomy';
 import { Role, requireRole, type Caller } from '@/server/auth/caller';
 import { dbRead } from './client';
 import { byNameThenId } from './keysetPage';
@@ -58,16 +59,29 @@ export async function getGuestExperience(
   return row ? GuestExperienceSchema.parse(row) : null;
 }
 
-export async function listCategories(): Promise<Category[]> {
+/** Asks for each term with its place in the list and whether it is retired, for ops. */
+type WithState = { withState: true };
+
+export async function listCategories(): Promise<Category[]>;
+export async function listCategories(
+  options: WithState,
+): Promise<TaxonomyTerm[]>;
+export async function listCategories(options?: WithState) {
   const rows = await dbRead
     .select()
     .from(categories)
     .orderBy(asc(categories.position), asc(categories.name), asc(categories.id))
     .limit(catalogLimits.categories);
-  return CategorySchema.array().parse(rows);
+  return options
+    ? TaxonomyTermSchema.array().parse(rows)
+    : CategorySchema.array().parse(rows);
 }
 
-export async function listNeighborhoods(): Promise<Neighborhood[]> {
+export async function listNeighborhoods(): Promise<Neighborhood[]>;
+export async function listNeighborhoods(
+  options: WithState,
+): Promise<TaxonomyTerm[]>;
+export async function listNeighborhoods(options?: WithState) {
   const rows = await dbRead
     .select()
     .from(neighborhoods)
@@ -77,7 +91,9 @@ export async function listNeighborhoods(): Promise<Neighborhood[]> {
       asc(neighborhoods.id),
     )
     .limit(catalogLimits.neighborhoods);
-  return NeighborhoodSchema.array().parse(rows);
+  return options
+    ? TaxonomyTermSchema.array().parse(rows)
+    : NeighborhoodSchema.array().parse(rows);
 }
 
 // TODO(U-091): first caller

@@ -34,6 +34,7 @@ import {
 // - the versions table links only a draft to its editor, says when empty, and offers a retry on a failed read
 // - the draft form carries the document and the draft, offers save and publish with the final-version warning; the new draft form has one button and no id
 // - the taxonomy lists show each term in order with its state in words; every button and link names its term; the first cannot move up, the last cannot move down
+// - every disabled move or retire button is described by the sentence that says why, and an enabled one is not
 // - the last term that is not retired has a disabled retire button and says why; a retired term offers to be brought back
 // - the term form asks for a name and an address when adding, and only a name when renaming
 
@@ -337,6 +338,27 @@ describe('TaxonomyLists', () => {
     expect(
       screen.getByRole('button', { name: 'Move down Hiking' }),
     ).toBeEnabled();
+  });
+
+  it('describes each disabled button by the reason it is disabled', () => {
+    render(lists);
+    const described = (name: string) => {
+      const button = screen.getByRole('button', { name });
+      const ids = (button.getAttribute('aria-describedby') ?? '').split(' ');
+      return ids
+        .map((id) => document.getElementById(id)?.textContent)
+        .join(' ');
+    };
+    expect(described('Move up Hiking')).toBe('Already first.');
+    expect(described('Move down Sailing')).toBe('Already last.');
+    expect(described('Retire DUMBO')).toBe(
+      'The last one that is not retired cannot be retired.',
+    );
+    expect(
+      screen
+        .getByRole('button', { name: 'Move down Hiking' })
+        .hasAttribute('aria-describedby'),
+    ).toBe(false);
   });
 
   it('blocks retiring the last term in use and says why', () => {

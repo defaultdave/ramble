@@ -8,6 +8,7 @@ import {
   legalAuditEntry,
   legalDocLabel,
   legalOutcomeFor,
+  mayStartDraft,
   legalRedirect,
   parseLegalDocParam,
   parseLegalForm,
@@ -19,6 +20,7 @@ import { emptyDoc, paragraphs } from './richText/paragraphs';
 // Behaviours under test, one per decision, branch or risk:
 // - the list shows the three fixed documents first even with no version, then each stored waiver, each with what is live and what is waiting
 // - a document key an address names is valid or nothing; labels name the kind
+// - a draft may be started only for a fixed document or a key that already has a version
 // - a draft starts from the newest version's words, and from nothing when there is none
 // - a version is found by id among its document's versions; only a draft has an editor link
 // - the form needs a known button and a title; publishing needs text in the body; a field too long to be read is refused unread
@@ -104,6 +106,18 @@ describe('legalDocLabel and parseLegalDocParam', () => {
     ['x'.repeat(editorialLimits.slug + 1), null],
   ])('%s is %s', (raw, expected) => {
     expect(parseLegalDocParam(raw)).toBe(expected);
+  });
+});
+
+describe('mayStartDraft', () => {
+  it.each([
+    ['a fixed document with none stored', 'terms', [], true],
+    ['the host agreement with none stored', 'host-agreement', [], true],
+    ['a waiver that has a version', 'waiver-kayak', ['waiver-kayak'], true],
+    ['a waiver nothing stores', 'waiver-kayak', ['terms'], false],
+    ['a valid key typed from nothing', 'waiver-new-thing', [], false],
+  ])('%s is %s', (_label, doc, stored, expected) => {
+    expect(mayStartDraft(doc, stored)).toBe(expected);
   });
 });
 

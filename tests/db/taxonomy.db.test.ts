@@ -30,7 +30,7 @@ vi.mock('next/cache', () => ({ updateTag: vi.fn(), revalidateTag: vi.fn() }));
 // - an address or name another term has, and a full list, are refused and write no row, no audit row and clear no tag
 // - renaming changes the name only and keeps the address; the same name writes and clears nothing
 // - moving writes the places that changed, the guest read follows them, and a list that began with ties ends with none
-// - retiring stamps the time, hides nothing from the guest read, and can be undone; the last term that is not retired cannot be retired
+// - retiring stamps the time and can be undone; the last term that is not retired cannot be retired
 // - a button for a term that is gone or already in that state is stale and writes nothing
 // - the database refuses a position or name or address or time the rules would refuse
 // - the editor read returns retired terms in the list order
@@ -379,7 +379,7 @@ describe('moving', () => {
 });
 
 describe('retiring', () => {
-  it('stamps the time, keeps the term in the guest read, and can be undone', async () => {
+  it('stamps the time and can be undone', async () => {
     const [a] = await seed('category', ['A', 'B']);
     const click = (action: 'retire' | 'restore') =>
       taxonomy.clickTaxonomyTerm(ops, {
@@ -391,7 +391,6 @@ describe('retiring', () => {
     expect(await click('retire')).toEqual({ status: 'saved', done: 'retired' });
     const [retired] = await taxonomy.listTaxonomyForEditing(ops, 'category');
     expect(retired?.retiredAt).toBeInstanceOf(Date);
-    expect(await catalog.listCategories()).toHaveLength(2);
     expect(tagsUpdated()).toEqual(['taxonomy']);
 
     expect(await click('restore')).toEqual({

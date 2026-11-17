@@ -42,6 +42,16 @@ export const legalVersionPath = (doc: string, id: string) =>
 /** The documents that exist from the start: a first version can be drafted before any is stored. */
 const fixedLegalDocs = ['terms', 'privacy', 'host-agreement'] as const;
 
+/** Whether a first or next draft may be started for this key: one of the fixed documents, or a key that already has a version. A typed key never makes a new document. */
+export function mayStartDraft(
+  doc: string,
+  storedDocs: readonly string[],
+): boolean {
+  return (
+    pickKnown(doc, fixedLegalDocs, null) !== null || storedDocs.includes(doc)
+  );
+}
+
 /** One stored document key with its counts, as the read groups them. */
 export type LegalDocSummary = {
   doc: string;

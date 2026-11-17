@@ -224,6 +224,7 @@ export const opsEditorialContentCopy = {
       rename: 'Rename',
     },
     lastActive: 'The last one that is not retired cannot be retired.',
+    reasons: { first: 'Already first.', last: 'Already last.' },
     add: {
       heading: {
         category: 'Add a category',

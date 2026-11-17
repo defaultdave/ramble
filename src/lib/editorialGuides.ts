@@ -64,15 +64,13 @@ export function parseGuideForm(get: FormGetter): GuideForm {
 }
 
 export type SettledGuide =
-  | { status: 'ready'; content: ExperienceContent }
-  | { status: 'not_found' | 'not_a_guide' };
+  { status: 'ready'; content: ExperienceContent } | { status: 'not_a_guide' };
 
-/** The experience's stored content with the two links replaced, or why there is nothing to save. */
+/** The experience's locked content with the two links replaced, or that it is not a guide entry. */
 export function settleGuide(
-  view: Pick<ExperienceEditView, 'status' | 'content'> | null,
+  view: Pick<ExperienceEditView, 'status' | 'content'>,
   links: GuideLinks,
 ): SettledGuide {
-  if (view === null) return { status: 'not_found' };
   if (!isGuideEntry(view.status)) return { status: 'not_a_guide' };
   return { status: 'ready', content: { ...view.content, ...links } };
 }
@@ -89,7 +87,14 @@ export const guideNotices = opsEditorialContentCopy.guides.notices;
 
 /** The save's answer as far as the redirect needs it: the data layer's result fits this shape. */
 export type GuideSaveResult =
-  | { status: 'updated' | 'unchanged' | 'not_found' | 'reference_missing' }
+  | {
+      status:
+        | 'updated'
+        | 'unchanged'
+        | 'not_found'
+        | 'not_a_guide'
+        | 'reference_missing';
+    }
   | { status: 'invalid'; fields: readonly ExperienceFormField[] };
 
 export type GuideOutcome =

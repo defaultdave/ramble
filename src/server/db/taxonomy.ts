@@ -24,7 +24,8 @@ import type { Caller } from '@/server/auth/caller';
 import { Role } from '@/server/auth/caller';
 import { updateTagsForChanges } from '@/server/cache/invalidate';
 import { requireUserId, writeAudit } from './audit';
-import { db, dbRead, type Transaction } from './client';
+import { listCategories, listNeighborhoods } from './catalog';
+import { db, type Transaction } from './client';
 import { lockFor } from './locks';
 import { categories, neighborhoods } from './schema';
 import { requireStaff } from './staff';
@@ -43,26 +44,15 @@ const orderOf = (table: ReturnType<typeof tableOf>) => [
   asc(table.id),
 ];
 
-/** Every term of a kind, retired ones too, in the order guests see them. Up to the kind's capacity. */
-export async function readTaxonomyTerms(
-  kind: TaxonomyKind,
-): Promise<TaxonomyTerm[]> {
-  const table = tableOf(kind);
-  const rows = await dbRead
-    .select()
-    .from(table)
-    .orderBy(...orderOf(table))
-    .limit(taxonomyCapacity(kind));
-  return TaxonomyTermSchema.array().parse(rows);
-}
-
 /** The terms of a kind for the editor, retired ones included. */
 export async function listTaxonomyForEditing(
   caller: Caller,
   kind: TaxonomyKind,
 ): Promise<TaxonomyTerm[]> {
   requireStaff(caller);
-  return readTaxonomyTerms(kind);
+  return kind === 'category'
+    ? listCategories({ withState: true })
+    : listNeighborhoods({ withState: true });
 }
 
 /**

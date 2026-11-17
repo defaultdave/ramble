@@ -26,6 +26,11 @@ export type TaxonomyListsProps = {
   failed?: boolean;
 };
 
+/** The props that tie a disabled button to the sentence that says why, or none while it works. */
+function describedBy(reason: string | null, id: string) {
+  return reason === null ? {} : { 'aria-describedby': id };
+}
+
 function TaxonomySection({
   kind,
   rows,
@@ -36,6 +41,9 @@ function TaxonomySection({
   act: FormAction;
 }) {
   const headingId = useId();
+  const reasonPrefix = useId();
+  const reasonId = (rowId: string, button: string) =>
+    `${reasonPrefix}-${rowId}-${button}`;
   return (
     <section className={styles.stack} aria-labelledby={headingId}>
       <h2 id={headingId}>{copy.sections[kind]}</h2>
@@ -66,8 +74,29 @@ function TaxonomySection({
                     <StatusBadge tone={row.stateTone} label={row.stateLabel} />
                   </span>
                   <p className={styles.rowDetail}>{row.slug}</p>
-                  {row.canSwitch ? null : (
-                    <p className={styles.rowDetail}>{copy.lastActive}</p>
+                  {row.switchReason === null ? null : (
+                    <p
+                      className={styles.rowDetail}
+                      id={reasonId(row.id, 'switch')}
+                    >
+                      {row.switchReason}
+                    </p>
+                  )}
+                  {row.moveUpReason === null ? null : (
+                    <span
+                      className={styles.visuallyHidden}
+                      id={reasonId(row.id, 'up')}
+                    >
+                      {row.moveUpReason}
+                    </span>
+                  )}
+                  {row.moveDownReason === null ? null : (
+                    <span
+                      className={styles.visuallyHidden}
+                      id={reasonId(row.id, 'down')}
+                    >
+                      {row.moveDownReason}
+                    </span>
                   )}
                 </div>
                 <div className={styles.rowActions}>
@@ -77,6 +106,7 @@ function TaxonomySection({
                     value={row.moveUpValue}
                     variant="secondary"
                     disabled={!row.canMoveUp}
+                    {...describedBy(row.moveUpReason, reasonId(row.id, 'up'))}
                   >
                     {copy.actions.up}{' '}
                     <span className={styles.visuallyHidden}>{row.name}</span>
@@ -87,6 +117,10 @@ function TaxonomySection({
                     value={row.moveDownValue}
                     variant="secondary"
                     disabled={!row.canMoveDown}
+                    {...describedBy(
+                      row.moveDownReason,
+                      reasonId(row.id, 'down'),
+                    )}
                   >
                     {copy.actions.down}{' '}
                     <span className={styles.visuallyHidden}>{row.name}</span>
@@ -97,6 +131,10 @@ function TaxonomySection({
                     value={row.switchValue}
                     variant="secondary"
                     disabled={!row.canSwitch}
+                    {...describedBy(
+                      row.switchReason,
+                      reasonId(row.id, 'switch'),
+                    )}
                   >
                     {row.switchLabel}{' '}
                     <span className={styles.visuallyHidden}>{row.name}</span>

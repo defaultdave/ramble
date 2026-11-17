@@ -205,6 +205,10 @@ export type TaxonomyRow = {
   switchValue: string;
   /** False for the last term that is not retired: the lib's rule, shown as a disabled button and a line of text. */
   canSwitch: boolean;
+  /** Why a button is disabled, or null while it works: the sentence the disabled button is described by. */
+  moveUpReason: string | null;
+  moveDownReason: string | null;
+  switchReason: string | null;
   renameHref: string;
 };
 
@@ -216,6 +220,9 @@ export function buildTaxonomyRows(
   return terms.map((term, place) => {
     const retired = term.retiredAt !== null;
     const switchAction = retired ? 'restore' : 'retire';
+    const canSwitch =
+      decideClick(terms, { action: switchAction, id: term.id }).status ===
+      'apply';
     const click = (action: TaxonomyClick['action']) =>
       clickValue({ action, kind, id: term.id });
     return {
@@ -227,13 +234,14 @@ export function buildTaxonomyRows(
       stateTone: retired ? 'neutral' : 'success',
       canMoveUp: place > 0,
       canMoveDown: place < last,
+      moveUpReason: place > 0 ? null : copy.reasons.first,
+      moveDownReason: place < last ? null : copy.reasons.last,
       moveUpValue: click('up'),
       moveDownValue: click('down'),
       switchLabel: copy.actions[switchAction],
       switchValue: click(switchAction),
-      canSwitch:
-        decideClick(terms, { action: switchAction, id: term.id }).status ===
-        'apply',
+      canSwitch: canSwitch,
+      switchReason: canSwitch ? null : copy.lastActive,
       renameHref: renamePath(kind, term.id),
     };
   });

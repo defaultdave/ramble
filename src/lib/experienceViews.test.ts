@@ -119,6 +119,45 @@ describe('buildExperienceChoices', () => {
   });
 });
 
+describe('buildExperienceChoices and retired terms', () => {
+  const retiredAt = new Date('2026-11-01T00:00:00Z');
+  const input = {
+    hosts: [],
+    categories: [
+      { id: id(3), slug: 'classes', name: 'Classes', retiredAt: null },
+      { id: id(4), slug: 'old', name: 'Old', retiredAt },
+    ],
+    neighborhoods: [
+      { id: id(5), slug: 'soho', name: 'SoHo', retiredAt },
+      { id: id(8), slug: 'noho', name: 'NoHo' },
+    ],
+    cancellationTiers: [],
+    waivers: [],
+  };
+  const values = (options: { value: string }[]) =>
+    options.map((option) => option.value);
+
+  it('leaves a retired category and neighborhood out when none is kept', () => {
+    const choices = buildExperienceChoices(input);
+    expect(values(choices.categories)).toEqual([id(3)]);
+    expect(values(choices.neighborhoods)).toEqual([id(8)]);
+  });
+
+  it('offers a retired term as the one the experience names, and no other retired one', () => {
+    const choices = buildExperienceChoices({
+      ...input,
+      kept: { categoryId: id(4), neighborhoodId: id(5) },
+    });
+    expect(values(choices.categories)).toEqual([id(3), id(4)]);
+    expect(values(choices.neighborhoods)).toEqual([id(5), id(8)]);
+    const other = buildExperienceChoices({
+      ...input,
+      kept: { categoryId: id(3) },
+    });
+    expect(values(other.categories)).toEqual([id(3)]);
+  });
+});
+
 describe('buildExperienceEditView', () => {
   it('carries the host name, the status and the content with its prices', () => {
     const content = newExperienceValues({

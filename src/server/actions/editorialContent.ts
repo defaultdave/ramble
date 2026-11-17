@@ -6,12 +6,12 @@ import {
   guidesPath,
   guideRedirect,
   parseGuideForm,
-  settleGuide,
 } from '@/lib/editorialGuides';
 import {
   legalAdminPath,
   legalOutcomeFor,
   legalRedirect,
+  mayStartDraft,
   parseLegalDocParam,
   parseLegalForm,
   wantsPublish,
@@ -34,11 +34,9 @@ import {
 } from '@/lib/editorialTaxonomy';
 import { formText } from '@/lib/opsForm';
 import { savePageCopy } from '@/server/db/editorial';
+import { updateGuideLinks } from '@/server/db/experienceEditor';
 import {
-  readExperienceForOps,
-  updateExperience,
-} from '@/server/db/experienceEditor';
-import {
+  listLegalDocSummaries,
   publishLegalDraft,
   saveLegalDraft,
   startLegalDraft,
@@ -88,14 +86,7 @@ export async function saveGuideLinksAction(formData: FormData): Promise<void> {
     redirect(guideRedirect(id, { status: 'invalid', fields: form.fields }));
   }
 
-  const settled = settleGuide(
-    await readExperienceForOps(caller, id),
-    form.value,
-  );
-  if (settled.status !== 'ready') {
-    redirect(guideRedirect(id, { status: settled.status }));
-  }
-  const result = await updateExperience(caller, id, settled.content);
+  const result = await updateGuideLinks(caller, id, form.value);
   redirect(guideRedirect(id, guideOutcomeFor(result)));
 }
 
@@ -105,6 +96,15 @@ export async function startLegalDraftAction(formData: FormData): Promise<void> {
   const get = (name: string) => formData.get(name);
   const doc = parseLegalDocParam(formText(get, 'doc') ?? '');
   if (doc === null) redirect(legalAdminPath);
+  const stored = await listLegalDocSummaries(caller);
+  if (
+    !mayStartDraft(
+      doc,
+      stored.map((row) => row.doc),
+    )
+  ) {
+    redirect(legalAdminPath);
+  }
   const form = parseLegalForm(get);
   if (!form.ok) {
     redirect(

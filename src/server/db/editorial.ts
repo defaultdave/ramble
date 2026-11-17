@@ -58,10 +58,10 @@ import {
   type HomeGiftGuide,
   type HomePick,
 } from '@/lib/pages/home';
+import { experienceChoiceLimits } from '@/lib/experienceEditor';
 import { auditFor, settleEntry, type EntryIntent } from '@/lib/editorialAdmin';
 import {
   ExperienceChoiceSchema,
-  experienceChoiceLimit,
   type ExperienceChoice,
 } from '@/lib/editorialCollections';
 import { WriteIdSchema } from '@/lib/catalog';
@@ -355,7 +355,7 @@ export async function listExperienceChoicesForEditing(
     })
     .from(experiences)
     .orderBy(asc(experiences.name), asc(experiences.id))
-    .limit(experienceChoiceLimit);
+    .limit(experienceChoiceLimits.experiences);
   return ExperienceChoiceSchema.array().parse(rows);
 }
 

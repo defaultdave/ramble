@@ -10,12 +10,10 @@ import {
   type ItemFormField,
   type ItemRow,
 } from '@/lib/editorialCollections';
-import { errorProps } from '@/lib/opsForm';
+import { errorProps, type FormAction } from '@/lib/opsForm';
 import styles from './EditorialAdmin.module.css';
 
 const copy = opsEditorialSectionsCopy.collections.items;
-
-type FormAction = (formData: FormData) => void | Promise<void>;
 
 export type CollectionItemsProps = {
   collectionId: string;
@@ -65,7 +63,8 @@ export function CollectionItems({
                     variant="secondary"
                     disabled={!row.canMoveUp}
                   >
-                    {copy.actions.up}
+                    {copy.actions.up}{' '}
+                    <span className={styles.visuallyHidden}>{row.name}</span>
                   </Button>
                   <Button
                     type="submit"
@@ -74,7 +73,8 @@ export function CollectionItems({
                     variant="secondary"
                     disabled={!row.canMoveDown}
                   >
-                    {copy.actions.down}
+                    {copy.actions.down}{' '}
+                    <span className={styles.visuallyHidden}>{row.name}</span>
                   </Button>
                   <Button
                     type="submit"
@@ -82,7 +82,8 @@ export function CollectionItems({
                     value={row.removeValue}
                     variant="secondary"
                   >
-                    {copy.actions.remove}
+                    {copy.actions.remove}{' '}
+                    <span className={styles.visuallyHidden}>{row.name}</span>
                   </Button>
                 </div>
               </li>

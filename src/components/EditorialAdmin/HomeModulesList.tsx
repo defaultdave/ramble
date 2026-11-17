@@ -10,11 +10,10 @@ import {
   type HomeModuleRow,
 } from '@/lib/editorialHome';
 import { classNames } from '@/lib/classNames';
+import type { FormAction } from '@/lib/opsForm';
 import styles from './EditorialAdmin.module.css';
 
 const copy = opsEditorialSectionsCopy.home;
-
-type FormAction = (formData: FormData) => void | Promise<void>;
 
 export type HomeModulesListProps = {
   rows: readonly HomeModuleRow[];
@@ -73,7 +72,8 @@ export function HomeModulesList({
                 variant="secondary"
                 disabled={!row.canMoveUp}
               >
-                {copy.actions.up}
+                {copy.actions.up}{' '}
+                <span className={styles.visuallyHidden}>{row.label}</span>
               </Button>
               <Button
                 type="submit"
@@ -82,7 +82,8 @@ export function HomeModulesList({
                 variant="secondary"
                 disabled={!row.canMoveDown}
               >
-                {copy.actions.down}
+                {copy.actions.down}{' '}
+                <span className={styles.visuallyHidden}>{row.label}</span>
               </Button>
               {row.canSwitch ? (
                 <Button
@@ -91,12 +92,17 @@ export function HomeModulesList({
                   value={row.switchValue}
                   variant="secondary"
                 >
-                  {row.switchLabel}
+                  {row.switchLabel}{' '}
+                  <span className={styles.visuallyHidden}>{row.label}</span>
                 </Button>
               ) : null}
               {row.editable ? (
-                <Link href={homeModulePath(row.position)}>
-                  {copy.actions.edit}
+                <Link
+                  href={homeModulePath(row.position)}
+                  className={styles.rowLink}
+                >
+                  {copy.actions.edit}{' '}
+                  <span className={styles.visuallyHidden}>{row.label}</span>
                 </Link>
               ) : null}
             </div>

@@ -3,6 +3,7 @@ import {
   HomeModulesInputSchema,
   RichTextInputSchema,
   editorialLimits,
+  picksOf,
   homeModuleKinds,
   type Collection,
   type HomeModule,
@@ -16,6 +17,8 @@ import {
   formText,
   noticeHref,
   oversizedFields,
+  splitOp,
+  swapAt,
   parseIdField,
   type FormGetter,
 } from './opsForm';
@@ -84,7 +87,7 @@ export function toHomeModulesInput(
 // ---- Buttons on the list: move, turn on, turn off ----
 
 const opActions = ['up', 'down', 'enable', 'disable'] as const;
-export type HomeModuleAction = (typeof opActions)[number];
+type HomeModuleAction = (typeof opActions)[number];
 
 /** A click on the list. The module's kind rides along so a stale page cannot move a different module. */
 export type HomeModuleOp = {
@@ -94,7 +97,7 @@ export type HomeModuleOp = {
 };
 
 /** What a list button posts: the action, the place and the kind of the module it was drawn for. */
-export function homeModuleOpValue(
+function homeModuleOpValue(
   action: HomeModuleAction,
   position: number,
   kind: HomeModuleKind,
@@ -104,16 +107,13 @@ export function homeModuleOpValue(
 
 /** The click a posted form names, or null when it names none that can be read. */
 export function parseHomeModuleOp(get: FormGetter): HomeModuleOp | null {
-  const raw = formText(get, 'op');
-  if (raw === undefined || raw.length > 40) return null;
-  const [action, place, kind, ...rest] = raw.split(':');
+  const [action, place, kind] = splitOp(formText(get, 'op'), 40, 3) ?? [];
   const known = pickKnown(action, opActions, null);
   const knownKind = pickKnown(kind, homeModuleKinds, null);
   if (
     known === null ||
     knownKind === null ||
     place === undefined ||
-    rest.length > 0 ||
     !wholeNumberPattern.test(place)
   ) {
     return null;
@@ -159,11 +159,8 @@ export function applyHomeModuleOp(
     };
   }
   const to = op.action === 'up' ? op.position - 1 : op.position + 1;
-  const neighbour = modules[to];
-  if (neighbour === undefined) return { status: 'stale' };
-  const moved = [...modules];
-  moved[op.position] = neighbour;
-  moved[to] = target;
+  const moved = swapAt(modules, op.position, to);
+  if (moved === null) return { status: 'stale' };
   return { status: 'changed', done, modules: moved };
 }
 
@@ -299,13 +296,13 @@ export type HomeOutcome =
 /** What the action did with a click or an edit, from what it applied and what the save answered. */
 export function homeOutcomeFor(
   applied: AppliedEdit,
-  saved: HomeSaveResult | null,
+  saved: HomeSaveResult | undefined,
 ): HomeOutcome {
   if (applied.status !== 'changed') return applied;
-  if (saved === null || saved.status === 'saved') {
-    return { status: applied.done };
-  }
-  return { status: saved.status };
+  if (saved === undefined) throw new Error('A changed list was not saved');
+  return saved.status === 'saved'
+    ? { status: applied.done }
+    : { status: saved.status };
 }
 
 /** Where an outcome sends the editor: the list, or for a refusal of an edit the form it came from. */
@@ -403,12 +400,10 @@ export function buildHomeModuleRows(
 export function pickOptions(
   collections: readonly Pick<Collection, 'id' | 'title' | 'kind' | 'status'>[],
 ): { value: string; label: string }[] {
-  return collections
-    .filter((collection) => collection.kind === 'pick')
-    .map(({ id, title, status }) => ({
-      value: id,
-      label: status === 'draft' ? `${title}${copy.fields.draftSuffix}` : title,
-    }));
+  return picksOf(collections).map(({ id, title, status }) => ({
+    value: id,
+    label: status === 'draft' ? `${title}${copy.fields.draftSuffix}` : title,
+  }));
 }
 
 export const homeFieldProblems = {

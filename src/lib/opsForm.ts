@@ -199,3 +199,35 @@ export const inviteFailureNotices = {
     title: 'Too many sign-in links went to this address. Try again later.',
   },
 } as const satisfies Record<string, NoticeText>;
+
+/** A server action as a form posts to it. */
+export type FormAction = (formData: FormData) => void | Promise<void>;
+
+/**
+ * The parts of a button's `name:place:id` value, or null when it is missing, over `maxLength`, or
+ * not exactly `parts` long. Every list button posts its click this way.
+ */
+export function splitOp(
+  raw: string | undefined,
+  maxLength: number,
+  parts: number,
+): string[] | null {
+  if (raw === undefined || raw.length > maxLength) return null;
+  const split = raw.split(':');
+  return split.length === parts ? split : null;
+}
+
+/** The list with the entries at `from` and `to` swapped, or null when either place is past an end. */
+export function swapAt<T>(
+  list: readonly T[],
+  from: number,
+  to: number,
+): T[] | null {
+  const a = list[from];
+  const b = list[to];
+  if (a === undefined || b === undefined) return null;
+  const swapped = [...list];
+  swapped[from] = b;
+  swapped[to] = a;
+  return swapped;
+}

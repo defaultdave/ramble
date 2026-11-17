@@ -22,6 +22,7 @@ import {
 
 // Behaviours under test:
 // - the home list shows each module in order with its state in words, and the buttons that apply to it
+// - every button and link in a row names its module or experience after the visible text
 // - the first module cannot move up and the last cannot move down, and the gift guide has no switch and no editor
 // - an empty list says so, and a failed read offers a retry
 // - the module form shows only the settings its kind reads, carries its place and kind, and shows a refused field's sentence
@@ -62,13 +63,13 @@ describe('HomeModulesList', () => {
     const items = screen.getAllByRole('listitem');
     const first = at(items, 0);
     const second = at(items, 1);
-    expect(within(second).getByRole('button', { name: 'Move up' })).toHaveValue(
-      'up:1:picks',
-    );
-    expect(within(first).getByRole('button', { name: 'Turn off' })).toHaveValue(
-      'disable:0:hero_search',
-    );
-    expect(within(first).getByRole('link', { name: 'Edit' })).toHaveAttribute(
+    expect(
+      within(second).getByRole('button', { name: /^Move up/ }),
+    ).toHaveValue('up:1:picks');
+    expect(
+      within(first).getByRole('button', { name: /^Turn off/ }),
+    ).toHaveValue('disable:0:hero_search');
+    expect(within(first).getByRole('link', { name: /^Edit/ })).toHaveAttribute(
       'href',
       '/ops/editorial/home/0',
     );
@@ -78,13 +79,13 @@ describe('HomeModulesList', () => {
     render(<HomeModulesList rows={homeRows} act={noop} />);
     const items = screen.getAllByRole('listitem');
     expect(
-      within(at(items, 0)).getByRole('button', { name: 'Move up' }),
+      within(at(items, 0)).getByRole('button', { name: /^Move up/ }),
     ).toBeDisabled();
     expect(
-      within(at(items, 3)).getByRole('button', { name: 'Move down' }),
+      within(at(items, 3)).getByRole('button', { name: /^Move down/ }),
     ).toBeDisabled();
     expect(
-      within(at(items, 3)).getByRole('button', { name: 'Turn on' }),
+      within(at(items, 3)).getByRole('button', { name: /^Turn on/ }),
     ).toBeEnabled();
   });
 
@@ -92,7 +93,7 @@ describe('HomeModulesList', () => {
     render(<HomeModulesList rows={homeRows} act={noop} />);
     const gift = at(screen.getAllByRole('listitem'), 2);
     expect(within(gift).queryByRole('button', { name: /Turn o/ })).toBeNull();
-    expect(within(gift).queryByRole('link', { name: 'Edit' })).toBeNull();
+    expect(within(gift).queryByRole('link', { name: /^Edit/ })).toBeNull();
     expect(
       within(gift).getByText('Managed with the gift guide.'),
     ).toBeVisible();
@@ -112,6 +113,47 @@ describe('HomeModulesList', () => {
       'href',
       '/ops/editorial/home',
     );
+  });
+});
+
+describe('row context in button and link names', () => {
+  it('names the module in every home list button and link, keeping the visible text first', () => {
+    render(<HomeModulesList rows={homeRows} act={noop} />);
+    const first = at(screen.getAllByRole('listitem'), 0);
+    for (const name of [
+      'Move down Hero and search',
+      'Turn off Hero and search',
+    ]) {
+      expect(within(first).getByRole('button', { name })).toBeVisible();
+    }
+    expect(
+      within(first).getByRole('link', { name: 'Edit Hero and search' }),
+    ).toBeVisible();
+    expect(
+      within(at(screen.getAllByRole('listitem'), 3)).getByRole('button', {
+        name: 'Turn on On this week',
+      }),
+    ).toBeVisible();
+  });
+
+  it('names the experience in every entry button', () => {
+    render(
+      <CollectionItems
+        collectionId={pickId}
+        rows={itemRows}
+        options={addOptions}
+        problems={[]}
+        act={noop}
+      />,
+    );
+    const first = at(screen.getAllByRole('listitem'), 0);
+    for (const name of [
+      'Move up Pottery night',
+      'Move down Pottery night',
+      'Remove Pottery night',
+    ]) {
+      expect(within(first).getByRole('button', { name })).toBeVisible();
+    }
   });
 });
 
@@ -292,9 +334,9 @@ describe('CollectionItems', () => {
       screen.getByRole('list', { name: 'Experiences in this collection' }),
     ).getAllByRole('listitem');
     expect(items).toHaveLength(2);
-    expect(within(at(items, 0)).getByText('Pottery night')).toBeVisible();
+    expect(at(items, 0)).toHaveTextContent(/^Pottery night/);
     expect(within(at(items, 0)).getByText('Good for beginners')).toBeVisible();
-    expect(within(at(items, 1)).getByText('Weaving for two')).toBeVisible();
+    expect(at(items, 1)).toHaveTextContent(/^Weaving for two/);
   });
 
   it('posts the place and experience of the entry each button belongs to, and disables a move past either end', () => {
@@ -303,15 +345,15 @@ describe('CollectionItems', () => {
     const first = at(items, 0);
     const second = at(items, 1);
     expect(
-      within(first).getByRole('button', { name: 'Move up' }),
+      within(first).getByRole('button', { name: /^Move up/ }),
     ).toBeDisabled();
     expect(
-      within(first).getByRole('button', { name: 'Move down' }),
+      within(first).getByRole('button', { name: /^Move down/ }),
     ).toHaveValue(at(itemRows, 0).downValue);
     expect(
-      within(second).getByRole('button', { name: 'Move down' }),
+      within(second).getByRole('button', { name: /^Move down/ }),
     ).toBeDisabled();
-    expect(within(second).getByRole('button', { name: 'Remove' })).toHaveValue(
+    expect(within(second).getByRole('button', { name: /^Remove/ })).toHaveValue(
       at(itemRows, 1).removeValue,
     );
   });

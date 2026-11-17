@@ -9,13 +9,11 @@ import {
   collectionFieldProblems,
   type CollectionFormField,
 } from '@/lib/editorialCollections';
-import { errorProps } from '@/lib/opsForm';
+import { errorProps, type FormAction } from '@/lib/opsForm';
 import { emptyDoc } from '@/lib/richText/paragraphs';
 import styles from './EditorialAdmin.module.css';
 
 const copy = opsEditorialSectionsCopy.collections;
-
-type FormAction = (formData: FormData) => void | Promise<void>;
 
 export type CollectionFormProps = {
   /** The Pick being edited, or null for a new one. */

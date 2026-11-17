@@ -5,6 +5,7 @@ type Notices = { notices: Record<string, NoticeText>; [key: string]: unknown };
 // The ops editorial sections for the home page modules and the Ramble Picks collections.
 
 export const opsEditorialSectionsCopy = {
+  loading: 'Loading…',
   nav: {
     home: {
       label: 'Home page',
@@ -197,6 +198,7 @@ export const opsEditorialSectionsCopy = {
     },
   },
 } as const satisfies {
+  loading: string;
   nav: unknown;
   home: Notices;
   collections: Notices;

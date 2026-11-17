@@ -79,3 +79,14 @@
     justify-content: flex-end;
   }
 }
+
+.visuallyHidden {
+  composes: visuallyHidden from '../../styles/visually-hidden.module.css';
+}
+
+.rowLink {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--size-touch-target);
+  min-inline-size: var(--size-touch-target);
+}

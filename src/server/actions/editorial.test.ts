@@ -50,6 +50,7 @@ import {
 // - a home module click reads the stored list, saves the changed list, and redirects with what it did; a stale or gift guide click saves nothing
 // - a home module edit saves the edited list, and returns to the form on a refusal
 // - a collection save settles against the stored Pick, publishes only with entries, and sends a new Pick to its own page
+// - removing the last entry of a published Pick, and a form that names a Pick by a bad id, save nothing
 // - a click on a collection's list saves the stored Pick with its entries changed, and a stale or unreadable click saves nothing
 
 const id = '0f1e2d3c-4b5a-4697-8a9b-0c1d2e3f4a5b';
@@ -346,6 +347,15 @@ describe('saveCollectionAction', () => {
     expect(mocks.saveCollection).not.toHaveBeenCalled();
   });
 
+  it('sends a form that names a Pick by something that is not an id to the list, saving nothing', async () => {
+    await expect(
+      saveCollectionAction(form({ intent: 'save', title: 'A', id: 'nope' })),
+    ).rejects.toMatchObject({
+      href: '/ops/editorial/collections?notice=not_found',
+    });
+    expect(mocks.saveCollection).not.toHaveBeenCalled();
+  });
+
   it('sends a Pick that is gone to the list', async () => {
     mocks.listCollectionsForEditing.mockResolvedValue([]);
     await expect(
@@ -400,6 +410,18 @@ describe('collectionItemsAction', () => {
         items: [...storedPick.items, { experienceId: other, note: 'Hi' }],
       }),
     );
+  });
+
+  it('refuses to remove the last entry of a published Pick, saving nothing', async () => {
+    mocks.listCollectionsForEditing.mockResolvedValue([
+      { ...storedPick, status: 'published' },
+    ]);
+    await expect(
+      collectionItemsAction(form({ id, op: `remove:0:${experience}` })),
+    ).rejects.toMatchObject({
+      href: `/ops/editorial/collections/${id}?notice=no_entries`,
+    });
+    expect(mocks.saveCollection).not.toHaveBeenCalled();
   });
 
   it('removes an entry', async () => {

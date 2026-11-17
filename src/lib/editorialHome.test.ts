@@ -6,7 +6,6 @@ import {
   buildHomeModuleRows,
   editableModule,
   homeModuleFields,
-  homeModuleOpValue,
   homeOutcomeFor,
   homeRedirect,
   parseHomeModuleForm,
@@ -85,9 +84,11 @@ describe('toHomeModulesInput', () => {
 
 describe('parseHomeModuleOp', () => {
   it('reads what a button posts', () => {
-    expect(
-      parseHomeModuleOp(form({ op: homeModuleOpValue('down', 3, 'picks') })),
-    ).toEqual({ action: 'down', position: 3, kind: 'picks' });
+    expect(parseHomeModuleOp(form({ op: 'down:3:picks' }))).toEqual({
+      action: 'down',
+      position: 3,
+      kind: 'picks',
+    });
   });
 
   it.each([
@@ -338,13 +339,13 @@ describe('homeOutcomeFor and homeRedirect', () => {
     [
       'a click with no save to make',
       { status: 'stale' },
-      null,
+      undefined,
       '/ops/editorial/home?notice=stale',
     ],
     [
       'a gift guide click',
       { status: 'managed_elsewhere' },
-      null,
+      undefined,
       '/ops/editorial/home?notice=managed_elsewhere',
     ],
   ] as const)('sends %s to the list', (_name, applied, saved, href) => {
@@ -369,13 +370,19 @@ describe('homeOutcomeFor and homeRedirect', () => {
     ).toBe('/ops/editorial/home?notice=unknown_collection');
   });
 
+  it('refuses to call a changed list saved when no save answered', () => {
+    expect(() => homeOutcomeFor(changed, undefined)).toThrow(
+      'A changed list was not saved',
+    );
+  });
+
   it('sends an invalid edit back to its form with the fields', () => {
     expect(
       homeRedirect(
         2,
         homeOutcomeFor(
           { status: 'invalid', fields: ['heading', 'body'] },
-          null,
+          undefined,
         ),
       ),
     ).toBe('/ops/editorial/home/2?notice=invalid&fields=heading%2Cbody');

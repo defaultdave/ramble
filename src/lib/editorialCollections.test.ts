@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Collection } from './editorial';
+import { picksOf, type Collection } from './editorial';
 import {
   addableOptions,
-  applyItemOp,
   buildCollectionRows,
   buildItemRows,
   collectionOutcomeFor,
@@ -10,11 +9,12 @@ import {
   findPick,
   parseCollectionForm,
   parseItemOp,
-  picksOf,
+  refusedCollectionOutcome,
   savedCollectionNotice,
   settleCollection,
   settleItems,
   type ExperienceChoice,
+  type ItemOp,
 } from './editorialCollections';
 import { paragraphs } from './richText/paragraphs';
 
@@ -168,6 +168,26 @@ describe('parseCollectionForm', () => {
   });
 });
 
+describe('a details form that names a Pick by something that is not an id', () => {
+  it('is refused as a missing Pick, not saved as a new one', () => {
+    const refused = parseCollectionForm(
+      form({ intent: 'save', title: 'A', id: 'nope' }),
+    );
+    expect(refused).toEqual({ ok: false, fields: [], notFound: true });
+    if (refused.ok) throw new Error('Expected a refusal');
+    expect(refusedCollectionOutcome(refused)).toEqual({ status: 'not_found' });
+  });
+
+  it('names the fields for any other refusal', () => {
+    const refused = parseCollectionForm(form({ intent: 'save', title: '' }));
+    if (refused.ok) throw new Error('Expected a refusal');
+    expect(refusedCollectionOutcome(refused)).toEqual({
+      status: 'invalid',
+      fields: ['title', 'slug'],
+    });
+  });
+});
+
 describe('settleCollection', () => {
   it('writes a new Pick as a draft with no entries', () => {
     expect(settleCollection(details({ id: undefined }), null)).toEqual({
@@ -290,6 +310,17 @@ describe('parseItemOp', () => {
   });
 });
 
+/** The click applied to a draft Pick's entries, through the one function that settles it. */
+function applyItemOp(items: Collection['items'], op: ItemOp) {
+  const settled = settleItems(
+    { ...pick, status: 'draft', items: [...items] },
+    op,
+  );
+  return settled.status === 'ready'
+    ? { status: 'changed', done: settled.done, items: settled.input.items }
+    : settled;
+}
+
 describe('applyItemOp', () => {
   const items = [
     { experienceId: a, note: 'Warm up' },
@@ -369,6 +400,31 @@ describe('applyItemOp', () => {
       applyItemOp(ids(59), { action: 'add', experienceId: c, note: null })
         .status,
     ).toBe('changed');
+  });
+});
+
+describe('settleItems and the last entry of a published Pick', () => {
+  const one = {
+    ...pick,
+    status: 'published' as const,
+    items: [{ experienceId: a, note: null }],
+  };
+  const removeLast = { action: 'remove', index: 0, experienceId: a } as const;
+
+  it('refuses to remove the last entry of a published Pick', () => {
+    expect(settleItems(one, removeLast)).toEqual({ status: 'no_entries' });
+  });
+
+  it('removes the last entry of a draft, and any entry but the last of a published Pick', () => {
+    expect(settleItems({ ...one, status: 'draft' }, removeLast).status).toBe(
+      'ready',
+    );
+    expect(
+      settleItems(
+        { ...one, items: [...one.items, { experienceId: b, note: null }] },
+        removeLast,
+      ).status,
+    ).toBe('ready');
   });
 });
 

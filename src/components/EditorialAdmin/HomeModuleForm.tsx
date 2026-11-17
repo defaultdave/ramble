@@ -10,13 +10,11 @@ import {
   homeModuleFields,
   type HomeModuleField,
 } from '@/lib/editorialHome';
-import { errorProps } from '@/lib/opsForm';
+import { errorProps, type FormAction } from '@/lib/opsForm';
 import { emptyDoc } from '@/lib/richText/paragraphs';
 import styles from './EditorialAdmin.module.css';
 
 const copy = opsEditorialSectionsCopy.home;
-
-type FormAction = (formData: FormData) => void | Promise<void>;
 
 export type HomeModuleFormProps = {
   module: HomeModule;

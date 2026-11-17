@@ -14,6 +14,7 @@ import {
   findPick,
   parseCollectionForm,
   parseItemOp,
+  refusedCollectionOutcome,
   savedCollectionNotice,
   settleCollection,
   settleItems,
@@ -71,7 +72,7 @@ export async function homeModuleOpAction(formData: FormData): Promise<void> {
   const saved =
     applied.status === 'changed'
       ? await saveHomeModules(caller, applied.modules)
-      : null;
+      : undefined;
   redirect(homeRedirect(null, homeOutcomeFor(applied, saved)));
 }
 
@@ -91,7 +92,7 @@ export async function saveHomeModuleAction(formData: FormData): Promise<void> {
   const saved =
     applied.status === 'changed'
       ? await saveHomeModules(caller, applied.modules)
-      : null;
+      : undefined;
   redirect(homeRedirect(form.value.position, homeOutcomeFor(applied, saved)));
 }
 
@@ -105,12 +106,7 @@ export async function saveCollectionAction(formData: FormData): Promise<void> {
   const parsed = parseCollectionForm((name) => formData.get(name));
   const postedId = parseIdField(formData.get('id'));
   if (!parsed.ok) {
-    redirect(
-      collectionRedirect(postedId, {
-        status: 'invalid',
-        fields: parsed.fields,
-      }),
-    );
+    redirect(collectionRedirect(postedId, refusedCollectionOutcome(parsed)));
   }
 
   const { value } = parsed;

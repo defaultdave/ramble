@@ -4,6 +4,7 @@ import { EntityIdSchema } from './catalog';
 import { experienceStatuses } from './catalog';
 import {
   CollectionInputSchema,
+  picksOf,
   editorialLimits,
   type Collection,
   type CollectionInput,
@@ -26,6 +27,8 @@ import {
   oversizedFields,
   parseIdField,
   slugFor,
+  splitOp,
+  swapAt,
   type FormGetter,
 } from './opsForm';
 import { pickKnown } from './pickKnown';
@@ -49,9 +52,6 @@ export {
   entryStatusTones as collectionStatusTones,
 };
 
-/** The most experiences a read of choices returns, so the picker cannot grow with the catalog. */
-export const experienceChoiceLimit = 500;
-
 export const ExperienceChoiceSchema = z.object({
   id: EntityIdSchema,
   name: z.string(),
@@ -59,20 +59,11 @@ export const ExperienceChoiceSchema = z.object({
 });
 export type ExperienceChoice = z.infer<typeof ExperienceChoiceSchema>;
 
-type PickCollection = Collection & { kind: 'pick' };
-
-/** The Picks among the collections read, in the order read. */
-export function picksOf(collections: readonly Collection[]): PickCollection[] {
-  return collections.filter(
-    (collection): collection is PickCollection => collection.kind === 'pick',
-  );
-}
-
 /** The Pick with this id, or none for a missing id or a collection of another kind. */
 export function findPick(
   collections: readonly Collection[],
   id: string,
-): PickCollection | null {
+): (Collection & { kind: 'pick' }) | null {
   return picksOf(collections).find((pick) => pick.id === id) ?? null;
 }
 
@@ -110,7 +101,16 @@ export type CollectionDetails = {
 
 export type CollectionForm =
   | { ok: true; value: CollectionDetails }
-  | { ok: false; fields: CollectionFormField[] };
+  | { ok: false; fields: CollectionFormField[]; notFound?: true };
+
+/** What a refused details form comes to: a form for a Pick whose id is not one is a missing Pick, any other is the fields to look at. */
+export function refusedCollectionOutcome(
+  form: Extract<CollectionForm, { ok: false }>,
+): CollectionOutcome {
+  return form.notFound
+    ? { status: 'not_found' }
+    : { status: 'invalid', fields: form.fields };
+}
 
 const rawFieldLimit = 1000;
 
@@ -132,7 +132,9 @@ export function parseCollectionForm(get: FormGetter): CollectionForm {
   }
   const intent = pickKnown(formText(get, 'intent'), collectionIntents, null);
   if (intent === null) return { ok: false, fields: [] };
-  const id = parseIdField(get('id')) ?? undefined;
+  const postedId = formText(get, 'id');
+  const id = postedId === undefined ? undefined : parseIdField(postedId);
+  if (id === null) return { ok: false, fields: [], notFound: true };
   const slug =
     slugFor(
       formText(get, 'title') ?? '',
@@ -171,6 +173,14 @@ export function parseCollectionForm(get: FormGetter): CollectionForm {
   };
 }
 
+/** A published Pick has at least one experience: the rule for publishing and for removing the last entry. */
+function lacksEntries(
+  status: PublishStatus,
+  items: readonly CollectionItem[],
+): boolean {
+  return status === 'published' && items.length === 0;
+}
+
 export type SettledCollection =
   | { status: 'ready'; input: CollectionInput }
   | { status: 'not_found' | 'no_entries' };
@@ -191,9 +201,7 @@ export function settleCollection(
   const current: PublishStatus = stored?.status ?? 'draft';
   const status = statusAfter(details.intent, current);
   const items = stored?.items ?? [];
-  if (status === 'published' && items.length === 0) {
-    return { status: 'no_entries' };
-  }
+  if (lacksEntries(status, items)) return { status: 'no_entries' };
   return {
     status: 'ready',
     input: {
@@ -229,7 +237,6 @@ export type ItemForm =
 /** The click a posted list form names. `null` when it names none that can be read. */
 export function parseItemOp(get: FormGetter): ItemForm {
   const raw = formText(get, 'op');
-  if (raw === undefined || raw.length > 60) return null;
   if (raw === 'add') {
     const experienceId = parseIdField(formText(get, 'experienceId'));
     if (experienceId === null) return { ok: false, fields: ['experienceId'] };
@@ -239,14 +246,14 @@ export function parseItemOp(get: FormGetter): ItemForm {
     }
     return { ok: true, op: { action: 'add', experienceId, note } };
   }
-  const [action, place, experienceId, ...rest] = raw.split(':');
+  const parts = splitOp(raw, 60, 3);
+  const [action, place, experienceId] = parts ?? [];
   const known = pickKnown(action, ['up', 'down', 'remove'] as const, null);
   const id = parseIdField(experienceId);
   if (
     known === null ||
     id === null ||
     place === undefined ||
-    rest.length > 0 ||
     !wholeNumberPattern.test(place)
   ) {
     return null;
@@ -259,12 +266,12 @@ export function parseItemOp(get: FormGetter): ItemForm {
 
 type ItemDone = 'entry_added' | 'entry_removed' | 'entry_moved';
 
-export type AppliedItems =
+type AppliedItems =
   | { status: 'changed'; items: CollectionItem[]; done: ItemDone }
   | { status: 'entry_stale' | 'entry_listed' | 'list_full' };
 
 /** What a click does to the stored list. A click drawn for an entry no longer at that place changes nothing. */
-export function applyItemOp(
+function applyItemOp(
   items: readonly CollectionItem[],
   op: ItemOp,
 ): AppliedItems {
@@ -293,17 +300,21 @@ export function applyItemOp(
     };
   }
   const to = op.action === 'up' ? op.index - 1 : op.index + 1;
-  const neighbour = items[to];
-  if (neighbour === undefined) return { status: 'entry_stale' };
-  const moved = [...items];
-  moved[op.index] = neighbour;
-  moved[to] = target;
+  const moved = swapAt(items, op.index, to);
+  if (moved === null) return { status: 'entry_stale' };
   return { status: 'changed', done: 'entry_moved', items: moved };
 }
 
 export type SettledItems =
   | { status: 'ready'; input: CollectionInput; done: ItemDone }
-  | { status: 'not_found' | 'entry_stale' | 'entry_listed' | 'list_full' };
+  | {
+      status:
+        | 'not_found'
+        | 'no_entries'
+        | 'entry_stale'
+        | 'entry_listed'
+        | 'list_full';
+    };
 
 /** The input a click on the list saves: the stored Pick with its entries changed. A missing Pick, or one of another kind, is `not_found`. */
 export function settleItems(
@@ -315,6 +326,9 @@ export function settleItems(
   }
   const applied = applyItemOp(stored.items, op);
   if (applied.status !== 'changed') return applied;
+  if (lacksEntries(stored.status, applied.items)) {
+    return { status: 'no_entries' };
+  }
   return {
     status: 'ready',
     done: applied.done,

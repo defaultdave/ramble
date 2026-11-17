@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, asc, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import {
   fanOutHoldStatuses,
   fanOutLimit,
@@ -17,7 +17,13 @@ import {
 } from '@/server/auth/caller';
 import type { db } from './client';
 import { refundableOrderColumns } from './orderColumns';
-import { holds, orders, paymentAttempts } from './schema';
+import {
+  experiences,
+  holds,
+  orders,
+  paymentAttempts,
+  sessions,
+} from './schema';
 
 // What cancelling sessions would do, read as it stands now. The ops session page and the host's
 // cancel page show it before anyone confirms, and both read it here so the two cannot disagree. It
@@ -31,6 +37,24 @@ function requireImpactReader(caller: Caller, scope: Resource) {
 }
 
 export type Executor = Pick<typeof db, 'select'>;
+
+/**
+ * The session ids the read may see. Ops and admin pass `{}` and see every id given; a host owner's
+ * scope names the host, so an id of another host's session matches nothing, in the query itself.
+ */
+function scopedIds(scope: Resource, executor: Executor, sessionIds: string[]) {
+  if (scope.hostId === undefined) return sessionIds;
+  return executor
+    .select({ id: sessions.id })
+    .from(sessions)
+    .innerJoin(experiences, eq(experiences.id, sessions.experienceId))
+    .where(
+      and(
+        inArray(sessions.id, sessionIds),
+        eq(experiences.hostId, scope.hostId),
+      ),
+    );
+}
 
 /** The holds a cancellation would release, for the sessions given. */
 export async function readReleasableHolds(
@@ -53,7 +77,7 @@ export async function readReleasableHolds(
       .from(holds)
       .where(
         and(
-          inArray(holds.sessionId, sessionIds),
+          inArray(holds.sessionId, scopedIds(scope, executor, sessionIds)),
           inArray(holds.status, fanOutHoldStatuses),
         ),
       )
@@ -82,7 +106,7 @@ export async function readImpact(
       .from(orders)
       .where(
         and(
-          inArray(orders.sessionId, sessionIds),
+          inArray(orders.sessionId, scopedIds(scope, executor, sessionIds)),
           inArray(orders.status, fanOutOrderStatuses),
         ),
       )

@@ -204,6 +204,52 @@ describe('access', () => {
   });
 });
 
+describe('the shared impact reads, bound to the scope host in the query', () => {
+  it('reads the owner’s own session, and nothing of another host’s session', async () => {
+    const { readImpact, readReleasableHolds } =
+      await import('@/server/db/sessionImpact');
+    const { db } = await import('@/server/db/client');
+    const session = await newSession({ allocation: 10 });
+    await seedConfirmedOn(session.id, 2);
+    await seedUnpaidOn(session.id);
+    await seedActiveHoldOn(session.id, 2);
+    const hostId = getParents().hostId;
+    const elsewhere = randomUUID();
+
+    const own = await readImpact(
+      ownerOf(hostId),
+      { hostId },
+      db,
+      [session.id],
+      new Date(),
+    );
+    const foreign = await readImpact(
+      ownerOf(elsewhere),
+      { hostId: elsewhere },
+      db,
+      [session.id],
+      new Date(),
+    );
+
+    expect(own.refunds).toHaveLength(1);
+    expect(own.unpaidCount).toBe(1);
+    expect(own.openHolds).toBeGreaterThan(0);
+    expect(foreign.refunds).toHaveLength(0);
+    expect(foreign.unpaidCount).toBe(0);
+    expect(foreign.openHolds).toBe(0);
+    expect(foreign.heldSeats).toBe(0);
+    expect(
+      (await readReleasableHolds(ownerOf(hostId), { hostId }, db, [session.id]))
+        .length,
+    ).toBeGreaterThan(0);
+    expect(
+      await readReleasableHolds(ownerOf(elsewhere), { hostId: elsewhere }, db, [
+        session.id,
+      ]),
+    ).toEqual([]);
+  });
+});
+
 describe('readHostSessionCancel', () => {
   it('shows the bookings with their refunds, the unpaid orders and the holds, and writes no audit row', async () => {
     const session = await newSession({ allocation: 10 });

@@ -236,6 +236,8 @@ export async function cancelSessionAsOps(
 ): Promise<OpsCancelOutcome> {
   requireOpsUserId(caller);
   const sessionId = WriteIdSchema.parse(input.sessionId);
+  const fingerprint = ImpactFingerprintSchema.safeParse(input.fingerprint);
+  if (!fingerprint.success) return { kind: 'stale' };
   const at = await currentDatabaseTime();
   const [session] = await db
     .select({ startsAt: sessions.startsAt })
@@ -245,7 +247,7 @@ export async function cancelSessionAsOps(
   if (cancelGate(session, at) === 'ended') return { kind: 'ended' };
   const impact = await readImpact(caller, {}, db, [sessionId], at);
   if (cancelBlocked(impact)) return { kind: 'blocked' };
-  if (!impactIsCurrent(input.fingerprint, impact)) return { kind: 'stale' };
+  if (!impactIsCurrent(fingerprint.data, impact)) return { kind: 'stale' };
   return {
     kind: 'done',
     result: await cancelSession(caller, { sessionId, reason: input.reason }),

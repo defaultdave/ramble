@@ -260,6 +260,13 @@ export function legalOutcomeFor(
   return { status: published.status };
 }
 
+/** What starting a draft came to, as an outcome. */
+export function legalStartOutcome(result: {
+  status: 'drafted' | 'unknown_document';
+}): LegalOutcome {
+  return { status: result.status };
+}
+
 /**
  * Where an outcome sends the editor. A draft just made opens in its editor; a refused form returns
  * to the form it came from; the rest go back to the document's versions.

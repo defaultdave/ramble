@@ -10,6 +10,7 @@ import {
   legalOutcomeFor,
   mayStartDraft,
   legalRedirect,
+  legalStartOutcome,
   parseLegalDocParam,
   parseLegalForm,
   wantsPublish,
@@ -239,6 +240,15 @@ describe('what a save and its publish come to', () => {
       legalOutcomeFor('publish', { status: 'saved' }, undefined),
     ).toThrow('The publish was not made');
   });
+});
+
+describe('legalStartOutcome', () => {
+  it.each(['drafted', 'unknown_document'] as const)(
+    'passes %s through as the outcome',
+    (status) => {
+      expect(legalStartOutcome({ status })).toEqual({ status });
+    },
+  );
 });
 
 describe('legalRedirect', () => {

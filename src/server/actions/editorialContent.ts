@@ -11,6 +11,7 @@ import {
   legalAdminPath,
   legalOutcomeFor,
   legalRedirect,
+  legalStartOutcome,
   parseLegalDocParam,
   parseLegalForm,
   wantsPublish,
@@ -103,11 +104,7 @@ export async function startLegalDraftAction(formData: FormData): Promise<void> {
 
   const { title, body } = form.value;
   const result = await startLegalDraft(caller, { doc, title, body });
-  redirect(
-    legalRedirect(doc, null, {
-      status: result.status === 'drafted' ? 'drafted' : 'unknown_document',
-    }),
-  );
+  redirect(legalRedirect(doc, null, legalStartOutcome(result)));
 }
 
 /** The edit form of a draft: saves it, or saves it and publishes it as the button pressed says. */

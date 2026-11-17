@@ -1,3 +1,4 @@
+import { opsEditorialContentCopy } from '@/lib/copy/opsEditorialContent';
 import { opsEditorialSectionsCopy } from '@/lib/copy/opsEditorialSections';
 import { opsRequestsCopy } from '@/lib/copy/opsRequests';
 import { opsRequestsPath } from './opsRequests';
@@ -46,6 +47,11 @@ export const opsNavLinks: readonly OpsNavLink[] = [
     href: '/ops/editorial/collections',
     summary: opsEditorialSectionsCopy.nav.collections.summary,
   },
+  ...(['pages', 'guides', 'legal', 'taxonomy'] as const).map((area) => ({
+    label: opsEditorialContentCopy.nav[area].label,
+    href: `/ops/editorial/${area}`,
+    summary: opsEditorialContentCopy.nav[area].summary,
+  })),
   {
     label: 'Support',
     href: '/ops/support',

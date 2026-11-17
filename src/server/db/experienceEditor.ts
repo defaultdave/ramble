@@ -34,17 +34,18 @@ import {
 } from '@/lib/experienceEditor';
 import { isGuestVisible } from '@/lib/catalog';
 import { isPublishedWaiver } from '@/lib/legal';
+import { isOfferable, mayReference } from '@/lib/taxonomy';
 import { GuestPhotoSchema } from '@/lib/photos';
 import { splitPage } from '@/lib/pagination';
 import { Role, requireRole, type Caller } from '@/server/auth/caller';
 import { withLockedExperience } from './lockedExperience';
 import { requireOpsUserId, writeAudit } from './audit';
-import { listCategories, listNeighborhoods } from './catalog';
 import { byNameThenId, pastNameCursor } from './keysetPage';
 import { db, dbRead, type Transaction } from './client';
 import { getPublishedLegalDocument } from './legal';
 import { galleryWith } from './photos';
 import { listCancellationTiers } from './policies';
+import { lockReferencedTerm, readTaxonomyTerms } from './taxonomy';
 import {
   categories,
   experiences,
@@ -111,9 +112,14 @@ export async function readExperiencesForOps(
   return { rows: items, nextCursor };
 }
 
-/** The choices a list filter or a form offers: hosts, categories, neighborhoods, the shared cancellation tiers, and the published waivers. */
+/**
+ * The choices a list filter or a form offers: hosts, categories, neighborhoods, the shared
+ * cancellation tiers, and the published waivers. A retired category or neighborhood is offered
+ * only as the one the experience being edited already names (`kept`).
+ */
 export async function readExperienceChoices(
   caller: Caller,
+  kept: Partial<Pick<ExperienceContent, 'categoryId' | 'neighborhoodId'>> = {},
 ): Promise<ExperienceChoices> {
   requireRole(caller, Role.Ops, {});
   const [hostRows, categoryRows, neighborhoodRows, tiers, waivers] =
@@ -123,8 +129,8 @@ export async function readExperienceChoices(
         .from(hosts)
         .orderBy(asc(hosts.name), asc(hosts.id))
         .limit(experienceChoiceLimits.hosts),
-      listCategories(),
-      listNeighborhoods(),
+      readTaxonomyTerms('category'),
+      readTaxonomyTerms('neighborhood'),
       listCancellationTiers(),
       dbRead
         .select({
@@ -144,8 +150,12 @@ export async function readExperienceChoices(
     ]);
   return buildExperienceChoices({
     hosts: hostRows,
-    categories: categoryRows,
-    neighborhoods: neighborhoodRows,
+    categories: categoryRows.filter((term) =>
+      isOfferable(term, kept.categoryId),
+    ),
+    neighborhoods: neighborhoodRows.filter((term) =>
+      isOfferable(term, kept.neighborhoodId),
+    ),
     cancellationTiers: tiers,
     waivers,
   });
@@ -181,10 +191,15 @@ type References = Pick<
   'categoryId' | 'neighborhoodId' | 'cancellationTierId' | 'waiverDocumentId'
 > & { hostId?: string };
 
-/** Whether every row the content points at is there, and the waiver is a published waiver. Reference data is never deleted, so this only catches a stale form. */
+/**
+ * Whether every row the content points at is there, and the waiver is a published waiver. A
+ * category or neighborhood is read with a shared lock, so a retire waits for this save or is seen
+ * by it, and a retired one is accepted only where the experience already names it (`current`).
+ */
 async function referencesExist(
   tx: Transaction,
   refs: References,
+  current?: Pick<ExperienceContent, 'categoryId' | 'neighborhoodId'>,
 ): Promise<boolean> {
   const found = async (rows: PromiseLike<readonly unknown[]>) =>
     (await rows).length > 0;
@@ -196,23 +211,21 @@ async function referencesExist(
   ) {
     return false;
   }
-  const checks = [
-    tx
-      .select({ id: categories.id })
-      .from(categories)
-      .where(eq(categories.id, refs.categoryId)),
-    tx
-      .select({ id: neighborhoods.id })
-      .from(neighborhoods)
-      .where(eq(neighborhoods.id, refs.neighborhoodId)),
-    tx
-      .select({ id: cancellationTiers.id })
-      .from(cancellationTiers)
-      .where(eq(cancellationTiers.id, refs.cancellationTierId)),
+  const [category, neighborhood] = [
+    await lockReferencedTerm(tx, 'category', refs.categoryId),
+    await lockReferencedTerm(tx, 'neighborhood', refs.neighborhoodId),
   ];
-  for (const check of checks) {
-    if (!(await found(check))) return false;
+  if (
+    !mayReference(category, current?.categoryId) ||
+    !mayReference(neighborhood, current?.neighborhoodId)
+  ) {
+    return false;
   }
+  const tier = tx
+    .select({ id: cancellationTiers.id })
+    .from(cancellationTiers)
+    .where(eq(cancellationTiers.id, refs.cancellationTierId));
+  if (!(await found(tier))) return false;
   if (refs.waiverDocumentId === null) return true;
   const waiver = await getPublishedLegalDocument(refs.waiverDocumentId, tx);
   return waiver !== null && isPublishedWaiver(waiver);
@@ -307,7 +320,7 @@ export async function updateExperience(
           changes: [],
         };
       }
-      if (!(await referencesExist(tx, input))) {
+      if (!(await referencesExist(tx, input, current))) {
         return { result: { status: 'reference_missing' }, changes: [] };
       }
 

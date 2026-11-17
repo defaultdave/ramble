@@ -59,7 +59,12 @@ import {
   type HomePick,
 } from '@/lib/pages/home';
 import { experienceChoiceLimits } from '@/lib/experienceEditor';
-import { auditFor, settleEntry, type EntryIntent } from '@/lib/editorialAdmin';
+import {
+  auditFor,
+  settleEntry,
+  settledStatus,
+  type EntryIntent,
+} from '@/lib/editorialAdmin';
 import {
   ExperienceChoiceSchema,
   type ExperienceChoice,
@@ -373,7 +378,6 @@ async function readPageCopyForEditing(kind: PageCopyKind): Promise<PageCopy[]> {
   );
 }
 
-// TODO(U-076c): first caller
 export async function listPageCopyForEditing(
   caller: Caller,
 ): Promise<PageCopy[]> {
@@ -605,11 +609,16 @@ export async function saveHomeModules(
 export type SavePageCopyResult =
   { status: 'saved'; value: PageCopy } | { status: 'unknown_target' };
 
-// TODO(U-076c): first caller
-/** Creates the copy of a category or neighborhood page, or replaces what it has. */
+/**
+ * Creates the copy of a category or neighborhood page, or replaces what it has, and writes an
+ * audit row in the same transaction. With an `intent` (the editor's buttons) a replacement takes
+ * its status from the row locked here, not the form's copy, so a stale tab saving a draft cannot
+ * unpublish what another tab published.
+ */
 export async function savePageCopy(
   caller: Caller,
   input: PageCopyInput,
+  intent?: EntryIntent,
 ): Promise<SavePageCopyResult> {
   requireStaff(caller);
   const parsed = PageCopyInputSchema.parse(input);
@@ -635,15 +644,16 @@ export async function savePageCopy(
       )
       .for('update');
 
-    const stamp = publishedAtAfter(before, parsed.status);
+    const status = settledStatus(intent, before, parsed.status);
+    const stamp = publishedAtAfter(before, status);
     const values = {
       heading: parsed.heading,
       metaDescription: parsed.metaDescription,
       intro: parsed.intro,
       body: parsed.body,
-      status: parsed.status,
-      publishedAt: stamp === 'now' ? sql`now()` : stamp,
-      updatedAt: sql`now()`,
+      status,
+      publishedAt: stamp === 'now' ? sql`clock_timestamp()` : stamp,
+      updatedAt: sql`clock_timestamp()`,
     };
     const [row] = before
       ? await tx
@@ -660,6 +670,14 @@ export async function savePageCopy(
           })
           .returning();
     if (!row) throw new Error('The page copy write returned no row');
+    const audit = auditFor(
+      caller.userId,
+      before?.status,
+      status,
+      row.id,
+      'page_copy',
+    );
+    if (audit) await writeAudit(tx, audit);
 
     const change = pageCopyChange(parsed.kind, owner.slug);
     return {
@@ -671,7 +689,7 @@ export async function savePageCopy(
       }),
       changes: changesWhenSaved(
         before && visibleChange(before.status, change),
-        visibleChange(parsed.status, change),
+        visibleChange(status, change),
       ),
     } as const;
   });

@@ -10,6 +10,7 @@ import {
   entryPath,
   parseEntryForm,
   settleEntry,
+  settledStatus,
   toggleLabel,
 } from './editorialAdmin';
 import type { HelpArticle } from './editorial';
@@ -422,6 +423,56 @@ describe('auditFor', () => {
       subjectKind: 'help_article',
       subjectId: id,
     });
+  });
+});
+
+describe('auditFor for page copy', () => {
+  it.each([
+    [undefined, 'draft', 'page_copy.created'],
+    ['draft', 'published', 'page_copy.published'],
+    ['published', 'draft', 'page_copy.unpublished'],
+    ['published', 'published', 'page_copy.saved'],
+  ] as const)('%s to %s is %s', (before, after, action) => {
+    const row = auditFor(id, before, after, id, 'page_copy');
+    expect(parseAuditEntry(row)).toMatchObject({
+      action,
+      subjectKind: 'page_copy',
+      subjectId: id,
+    });
+  });
+});
+
+describe('settledStatus', () => {
+  it.each([
+    [
+      'a button on a stored row takes the stored status',
+      'save',
+      'published',
+      'draft',
+      'published',
+    ],
+    ['publish moves a stored draft', 'publish', 'draft', 'draft', 'published'],
+    [
+      'unpublish moves a stored published row',
+      'unpublish',
+      'published',
+      'published',
+      'draft',
+    ],
+    [
+      'no button keeps the form status',
+      undefined,
+      'published',
+      'draft',
+      'draft',
+    ],
+  ] as const)('%s', (_label, intent, stored, input, expected) => {
+    expect(settledStatus(intent, { status: stored }, input)).toBe(expected);
+  });
+
+  it('keeps the form status for a row that is new', () => {
+    expect(settledStatus('save', null, 'draft')).toBe('draft');
+    expect(settledStatus('publish', undefined, 'published')).toBe('published');
   });
 });
 

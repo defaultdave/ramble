@@ -11,9 +11,8 @@ export const tags = {
   /** The reads that depend on which experiences are listed: browse results and dates, and `On this week`. The home entry names its cards instead. */
   catalog: 'catalog',
   /**
-   * The names of the categories and neighborhoods, which the filter chips, the home rails, and an
-   * experience's place line show. No change kind reaches it, because no unit renames a category or
-   * neighborhood, so a new name shows when the entry's cache profile runs out.
+   * The names and order of the categories and neighborhoods, which the filter chips, the home
+   * rails, and an experience's place line show. The `taxonomy` change reaches it.
    */
   taxonomy: 'taxonomy',
   settings: 'settings',
@@ -47,6 +46,8 @@ export type CacheChange =
   | { kind: 'categoryCopy'; slug: string }
   | { kind: 'neighborhoodCopy'; slug: string }
   | { kind: 'helpArticles' }
+  /** A category or neighborhood is added, renamed, moved, retired, or brought back. */
+  | { kind: 'taxonomy' }
   | { kind: 'legalDocument'; doc: string }
   /** A host's name or about text changed: the host page, which the catalog tag reaches. The host's experiences are named by their own `experience` changes. */
   | { kind: 'hostProfile' }
@@ -78,6 +79,8 @@ function tagsFor(change: CacheChange): string[] {
       return [tags.neighborhood(change.slug)];
     case 'helpArticles':
       return [tags.helpArticles];
+    case 'taxonomy':
+      return [tags.taxonomy];
     case 'legalDocument':
       return [tags.legalDocument(change.doc)];
     case 'hostProfile':

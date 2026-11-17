@@ -590,8 +590,20 @@ export const nonPiiColumns: readonly {
     'A host business as published on its listings; hosts are suppliers, and no guest data lives here',
     ['id', 'slug', 'name', 'description', 'time_zone', 'created_at'],
   ),
-  ...notPersonal('categories', publishedCopy, ['id', 'slug', 'name']),
-  ...notPersonal('neighborhoods', publishedCopy, ['id', 'slug', 'name']),
+  ...notPersonal('categories', publishedCopy, [
+    'id',
+    'slug',
+    'name',
+    'position',
+    'retired_at',
+  ]),
+  ...notPersonal('neighborhoods', publishedCopy, [
+    'id',
+    'slug',
+    'name',
+    'position',
+    'retired_at',
+  ]),
   ...notPersonal('experiences', publishedCopy, [
     'slug',
     'name',

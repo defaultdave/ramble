@@ -18,3 +18,6 @@ export const Ticked: Story = { args: { defaultChecked: true } };
 export const WithProblem: Story = {
   args: { problem: 'The agreement version could not be read.' },
 };
+export const InvalidInAGroup: Story = {
+  args: { label: 'Monday', invalid: true },
+};

@@ -3,6 +3,7 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   buildHostDetail,
+  hostFieldProblems,
   type HostDetail,
   type HostListRow,
 } from '@/lib/hostSetup';
@@ -12,6 +13,7 @@ import { HostsTable } from './HostsTable';
 
 // Behaviours under test:
 // - the create form asks for the owner and offers the agreement box for the version it is given, and says so when there is none
+// - a refused agreement box is marked invalid and described by its problem
 // - the edit form is prefilled, carries the host id, has no owner field, and no agreement box
 // - a field the last try refused shows its problem text and is marked invalid
 // - the list links each host, shows the owner and the agreement standing in words, and pages by link
@@ -74,6 +76,24 @@ describe('HostForm', () => {
     expect(
       screen.getByRole('button', { name: 'Create host and email owner' }),
     ).toBeInTheDocument();
+  });
+
+  it('ties a refused agreement box to its problem text', () => {
+    render(
+      <HostForm
+        action={noop}
+        agreement={agreement}
+        problems={['acceptLegalDocumentId']}
+      />,
+    );
+
+    const box = screen.getByRole('checkbox', {
+      name: /accepted the current Host agreement/,
+    });
+    expect(box).toHaveAttribute('aria-invalid', 'true');
+    expect(box).toHaveAccessibleDescription(
+      hostFieldProblems.acceptLegalDocumentId,
+    );
   });
 
   it('says acceptance cannot be recorded when no agreement is published', () => {

@@ -10,7 +10,7 @@ import {
   type HostFormField,
   type HostInput,
 } from '@/lib/hostSetup';
-import { errorProps } from '@/lib/opsForm';
+import { errorProps, problemText } from '@/lib/opsForm';
 import { maxTimeZoneLength } from '@/lib/sessions';
 import {
   HostDescriptionField,
@@ -88,16 +88,16 @@ export function HostForm({
             hint="The owner gets a sign-in link at this address. No password."
             {...errorFor('ownerEmail')}
           />
-          {problems.includes('acceptLegalDocumentId') ? (
-            <p role="alert" className={styles.muted}>
-              {hostFieldProblems.acceptLegalDocumentId}
-            </p>
-          ) : null}
           {agreement ? (
             <CheckField
               name="acceptLegalDocumentId"
               value={agreement.id}
               label={agreementTickLabel(agreement)}
+              problem={problemText(
+                problems,
+                hostFieldProblems,
+                'acceptLegalDocumentId',
+              )}
             />
           ) : (
             <p className={styles.muted}>

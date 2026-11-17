@@ -13,6 +13,7 @@ import { SignInProblem } from './SignInProblem';
 // - a counted-out request names the wait (singular and plural) and keeps the form
 // - a failed request shows its notice and keeps the form with what was typed
 // - a sent link replaces the form with the check-your-email notice naming the address, and a link back that keeps the destination
+// - an on-screen link replaces the form with a notice naming the address and one Continue link to the confirm page, and says nothing about email having been sent
 // - the button shows pending and blocks a second press while the action runs
 // - each link problem shows its own notice
 // - the confirm page shows one button that posts the token and destination to the confirm address, and the page itself holds no link to it
@@ -67,6 +68,21 @@ describe('the sign-in form', () => {
     await waitFor(() => {
       expect(field).toHaveFocus();
     });
+  });
+
+  it('shows an on-screen link as a Continue link to the confirm page, not the check-your-email notice', async () => {
+    const href = '/sign-in/confirm?token=AbCdEf&next=%2Faccount';
+    await submitWith(
+      { status: 'link', email: 'sam@example.com', href },
+      '/account',
+    );
+
+    expect(
+      await screen.findByRole('link', { name: 'Continue' }),
+    ).toHaveAttribute('href', href);
+    expect(screen.getByText(/sam@example.com/)).toBeInTheDocument();
+    expect(screen.queryByText('Check your email')).toBeNull();
+    expect(screen.queryByLabelText('Email')).toBeNull();
   });
 
   it.each([

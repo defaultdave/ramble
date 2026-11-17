@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef } from 'react';
 import { Alert } from '@/components/Alert';
 import { Button, ButtonLink } from '@/components/Button';
 import { Input } from '@/components/Input';
+import { signInCopy } from '@/lib/copy/signIn';
 import {
   rateLimitBody,
   signInHref,
@@ -44,6 +45,23 @@ export function SignInForm({
       noticeRef.current?.focus();
     }
   }, [state]);
+
+  if (state.status === 'link') {
+    return (
+      <div ref={noticeRef} tabIndex={-1} className={styles.notice}>
+        <Alert
+          tone="success"
+          title={signInCopy.onScreen.title}
+          body={signInCopy.onScreen.body(state.email)}
+          action={
+            <ButtonLink href={state.href}>
+              {signInCopy.onScreen.continueLabel}
+            </ButtonLink>
+          }
+        />
+      </div>
+    );
+  }
 
   if (state.status === 'sent') {
     return (

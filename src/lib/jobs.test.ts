@@ -87,6 +87,11 @@ describe('EnqueueInputSchema', () => {
       false,
     ],
     [
+      'the last instant of year 9999',
+      { kind: 'a', runAfter: new Date('9999-12-31T23:59:59.999Z') },
+      true,
+    ],
+    [
       'a runAfter in year 10000',
       { kind: 'a', runAfter: new Date('+010000-01-01') },
       false,

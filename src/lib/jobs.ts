@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { isSlug } from './catalog';
 import { redactString } from './redact';
 import { utf8Bytes } from './text';
+import { isReadableInstant } from './time';
 
 export const jobStatuses = ['pending', 'running', 'succeeded', 'dead'] as const;
 export type JobStatus = (typeof jobStatuses)[number];
@@ -42,14 +43,13 @@ const DedupeKeySchema = z
   .max(jobLimits.dedupeKeyMaxChars)
   .regex(new RegExp(dedupeKeyPattern));
 
-// Postgres reads a timestamp outside these years back as something JavaScript cannot hold.
-const earliestRunAfter = new Date(Date.UTC(1000, 0, 1));
-const latestRunAfter = new Date(Date.UTC(9999, 11, 31));
-
 export const EnqueueInputSchema = z.object({
   kind: JobKindSchema,
   dedupeKey: DedupeKeySchema.optional(),
-  runAfter: z.date().min(earliestRunAfter).max(latestRunAfter).optional(),
+  runAfter: z
+    .date()
+    .refine(isReadableInstant, { message: 'Not a readable time' })
+    .optional(),
 });
 
 /** Serialized size of a payload, the figure the 16 KB cap is judged on before the insert. */

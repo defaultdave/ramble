@@ -31,6 +31,13 @@ type Story = StoryObj<typeof meta>;
 
 const consoleProps = {
   rows: [pendingRow, retryingRow, deadRow, doneRow],
+  invitableOrders: [
+    {
+      value: 'a0000000-0000-4000-8000-000000000001',
+      label:
+        'RMB-7K3M9Q · Sunset kayak on the Hudson · ended 2026-11-10 23:00 UTC',
+    },
+  ],
   query: {},
   testTimeLabel: null,
   demoClockOn: true,
@@ -40,6 +47,7 @@ const consoleProps = {
     pulse: noop,
     setClock: noop,
     reset: noop,
+    sendReviewInvite: noop,
   },
 };
 
@@ -63,6 +71,14 @@ export const DemoClockOff: Story = {
   render: () => (
     <PageHeading title="Test console">
       <OpsDevConsole {...consoleProps} demoClockOn={false} />
+    </PageHeading>
+  ),
+};
+
+export const NoInvitableBookings: Story = {
+  render: () => (
+    <PageHeading title="Test console">
+      <OpsDevConsole {...consoleProps} invitableOrders={[]} />
     </PageHeading>
   ),
 };

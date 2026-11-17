@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { hostLimits } from '../hostSetup';
 import { signInLinkData, signInPath } from '../signIn';
 import { oneLineClipped } from '../text';
+import { link } from './bookingTemplates';
 
 // The email that tells a new host owner they have been set up and carries their first sign-in link.
 
@@ -10,9 +11,9 @@ const hostInviteHostNameMaxChars = hostLimits.name;
 export const HostInviteDataSchema = z.object({
   hostName: z.string().min(1).max(hostInviteHostNameMaxChars),
   /** The sign-in link: a Ramble page that asks for a click before it uses the token. */
-  url: z.url({ protocol: /^https?$/ }).max(2048),
+  url: link,
   /** The page to ask for a new link once this one has lapsed. */
-  signInUrl: z.url({ protocol: /^https?$/ }).max(2048),
+  signInUrl: link,
   expiresInMinutes: z.int().min(1).max(60),
 });
 

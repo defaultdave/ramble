@@ -5,11 +5,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Behaviours under test:
 // - on a production deployment, and on the production-demo target, the reset throws before it opens a transaction, writes anything or runs the seed
 // - elsewhere it lifts the ledger's keep-table guard, empties the wiped tables in one statement, puts the guard back, and clears seats sold, all in one transaction, then reruns the seed once as the seed caller with the clock it was given
-// - a failure in the transaction means the seed does not run
+// - after the seed it writes the past bookings and reviews again, as the seed caller with the same clock, since the wipe took them
+// - a failure in the transaction means neither the seed nor the past bookings run
 
 const mocks = vi.hoisted(() => ({
   env: { VERCEL_ENV: undefined as string | undefined, SEED_TARGET: 'staging' },
   runSeed: vi.fn(),
+  seedReviews: vi.fn(),
   executed: [] as SQL[],
   updated: [] as unknown[],
   transaction:
@@ -18,6 +20,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/server/env', () => ({ env: mocks.env }));
 vi.mock('./run', () => ({ runSeed: mocks.runSeed }));
+vi.mock('./reviews', () => ({ seedReviews: mocks.seedReviews }));
 vi.mock('@/server/db/client', () => ({
   db: { transaction: mocks.transaction },
 }));
@@ -35,6 +38,7 @@ beforeEach(() => {
   mocks.executed.length = 0;
   mocks.updated.length = 0;
   mocks.runSeed.mockReset().mockResolvedValue({ seeded: true });
+  mocks.seedReviews.mockReset().mockResolvedValue({ bookings: 11, reviews: 9 });
   mocks.transaction.mockReset().mockImplementation((body) =>
     body({
       execute: (query: SQL) => {
@@ -101,9 +105,18 @@ describe('resetDemoData', () => {
     });
   });
 
-  it('does not run the seed when the wipe fails', async () => {
+  it('writes the past bookings and reviews again after the seed, as the seed caller with the same clock', async () => {
+    await resetDemoData({ now });
+    expect(mocks.seedReviews).toHaveBeenCalledExactlyOnceWith(seedCaller, now);
+    expect(mocks.seedReviews.mock.invocationCallOrder[0]).toBeGreaterThan(
+      mocks.runSeed.mock.invocationCallOrder[0] ?? Infinity,
+    );
+  });
+
+  it('does not run the seed or write the past bookings when the wipe fails', async () => {
     mocks.transaction.mockRejectedValue(new Error('refused'));
     await expect(resetDemoData({ now })).rejects.toThrow('refused');
     expect(mocks.runSeed).not.toHaveBeenCalled();
+    expect(mocks.seedReviews).not.toHaveBeenCalled();
   });
 });

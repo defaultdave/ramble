@@ -16,11 +16,13 @@ import {
   paymentAttempts,
   providerEvents,
   refunds,
+  reviews,
   sessions,
   transfers,
 } from '@/server/db/schema';
 import { env } from '@/server/env';
 import { seedCaller } from './caller';
+import { seedReviews } from './reviews';
 import { runSeed, type SeedReport } from './run';
 
 // What a tester creates by using the site, and nothing the seed owns. Catalogue, hosts, people,
@@ -37,6 +39,7 @@ export const wipedTables = [
   giftItems,
   gifts,
   orderItems,
+  reviews,
   orders,
   holdItems,
   holds,
@@ -60,9 +63,10 @@ export type ResetOptions = {
 
 /**
  * Empties what testers created (`wipedTables`), sets every session back to no seats sold, then
- * reruns the seed, which puts the seats its coverage matrix needs back. The refusal is here and
- * not only in the callers, so the console and the command line both inherit it: nothing is read
- * or written before it.
+ * reruns the seed, which puts the seats its coverage matrix needs back, and writes the past
+ * bookings and reviews again, which the wipe took with the orders. The refusal is here and not
+ * only in the callers, so the console and the command line both inherit it: nothing is read or
+ * written before it.
  */
 export async function resetDemoData(
   options: ResetOptions,
@@ -93,5 +97,7 @@ export async function resetDemoData(
   });
   log(`Wiped ${String(wipedTables.length)} tables`);
 
-  return runSeed({ caller: seedCaller, now: options.now, log });
+  const report = await runSeed({ caller: seedCaller, now: options.now, log });
+  await seedReviews(seedCaller, options.now);
+  return report;
 }

@@ -58,6 +58,9 @@ import {
   type HomeGiftGuide,
   type HomePick,
 } from '@/lib/pages/home';
+import { auditFor, settleEntry, type EntryIntent } from '@/lib/editorialAdmin';
+import { WriteIdSchema } from '@/lib/catalog';
+import { writeAudit } from './audit';
 import { guestVisible } from './catalog';
 import { db, dbRead } from './client';
 import {
@@ -361,7 +364,6 @@ export async function listPageCopyForEditing(
   ];
 }
 
-// TODO(U-076c): first caller
 export async function listHelpArticlesForEditing(
   caller: Caller,
 ): Promise<HelpArticle[]> {
@@ -376,6 +378,22 @@ export async function listHelpArticlesForEditing(
     )
     .limit(editorialLimits.listed);
   return HelpArticleSchema.array().parse(rows);
+}
+
+/** One article with its draft or published body, for the editor; null when there is none. */
+export async function getHelpArticleForEditing(
+  caller: Caller,
+  id: string,
+): Promise<HelpArticle | null> {
+  requireStaff(caller);
+  const parsedId = WriteIdSchema.safeParse(id);
+  if (!parsedId.success) return null;
+  const [row] = await dbRead
+    .select()
+    .from(helpArticles)
+    .where(eq(helpArticles.id, parsedId.data))
+    .limit(1);
+  return row ? HelpArticleSchema.parse(row) : null;
 }
 
 // ---- Staff writes ----
@@ -645,13 +663,19 @@ export async function savePageCopy(
 export type SaveHelpArticleResult =
   | { status: 'saved'; value: HelpArticle }
   | { status: 'not_found' }
-  | { status: 'slug_taken' };
+  | { status: 'slug_taken' }
+  | { status: 'empty_body' };
 
-// TODO(U-076c): first caller
-/** Creates an article (no `id`) or replaces one. */
+/**
+ * Creates an article (no `id`) or replaces one, and writes an audit row in the same transaction
+ * for a signed-in caller. With an `intent` (the editor's buttons) a replacement settles status and
+ * position against the row locked here, not the form's copy: a stale tab saving a draft cannot
+ * unpublish what another tab published. A body with no text cannot stay published: `empty_body`.
+ */
 export async function saveHelpArticle(
   caller: Caller,
   input: HelpArticleInput,
+  intent?: EntryIntent,
 ): Promise<SaveHelpArticleResult> {
   requireStaff(caller);
   const parsed = HelpArticleInputSchema.parse(input);
@@ -678,14 +702,17 @@ export async function saveHelpArticle(
       .limit(1);
     if (slugClash) return { status: 'slug_taken' } as const;
 
-    const stamp = publishedAtAfter(before, parsed.status);
+    const settled = settleEntry(intent, before, parsed);
+    if (settled.kind === 'empty_body') return { status: 'empty_body' } as const;
+
+    const stamp = publishedAtAfter(before, settled.status);
     const values = {
       slug: parsed.slug,
       title: parsed.title,
       summary: parsed.summary,
       body: parsed.body,
-      position: parsed.position,
-      status: parsed.status,
+      position: settled.position,
+      status: settled.status,
       publishedAt: stamp === 'now' ? sql`now()` : stamp,
       updatedAt: sql`now()`,
     };
@@ -697,6 +724,13 @@ export async function saveHelpArticle(
           .returning()
       : await tx.insert(helpArticles).values(values).returning();
     if (!row) throw new Error('The help article write returned no row');
+    const audit = auditFor(
+      caller.userId,
+      before?.status,
+      settled.status,
+      row.id,
+    );
+    if (audit) await writeAudit(tx, audit);
 
     const change: CacheChange = { kind: 'helpArticles' };
     return {
@@ -704,7 +738,7 @@ export async function saveHelpArticle(
       value: HelpArticleSchema.parse(row),
       changes: changesWhenSaved(
         before && visibleChange(before.status, change),
-        visibleChange(parsed.status, change),
+        visibleChange(settled.status, change),
       ),
     } as const;
   });

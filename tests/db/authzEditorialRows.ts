@@ -29,6 +29,15 @@ export function editorialListRows(editorial: () => Editorial) {
       invoke: (c) => editorial().listHelpArticlesForEditing(c),
       allows: { platform: staff },
     },
+    {
+      fn: 'getHelpArticleForEditing',
+      invoke: (c) =>
+        editorial().getHelpArticleForEditing(
+          c,
+          '00000000-0000-4000-8000-000000000404',
+        ),
+      allows: { platform: staff },
+    },
   ] satisfies {
     fn: string;
     invoke: (caller: Caller) => Promise<unknown>;

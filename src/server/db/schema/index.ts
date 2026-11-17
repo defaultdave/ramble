@@ -13,3 +13,4 @@ export * from './orders';
 export * from './gifts';
 export * from './payments';
 export * from './ledger';
+export * from './reviews';

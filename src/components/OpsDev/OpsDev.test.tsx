@@ -6,11 +6,12 @@ import { OpsDevConsole } from './OpsDevConsole';
 
 // Behaviours under test:
 // - the jobs are listed with status in words, attempts, due time and last error
-// - only a waiting job has a run form, and it carries that job's id
+// - only a waiting job has a run form, and it carries that job's id; each run button is named for its job and due time
 // - the drain and the pulse are forms of their own
 // - with the demo clock on, the clock can be set, moved on and reset; with it off, only reset, and the page says why
 // - the clock line says whether runs use the real time or the test time
 // - an empty list says so
+// - with bookings that can be invited, a form lists them and posts the chosen order id; with none, it says so and offers no form
 // - the reset is a form with a typed confirmation that is required, and says what goes and what stays
 
 const noop = () => undefined;
@@ -20,16 +21,19 @@ const actions = {
   pulse: noop,
   setClock: noop,
   reset: noop,
+  sendReviewInvite: noop,
 };
 
 function renderConsole(props: {
   rows?: Parameters<typeof OpsDevConsole>[0]['rows'];
   testTimeLabel?: string | null;
   demoClockOn?: boolean;
+  invitableOrders?: Parameters<typeof OpsDevConsole>[0]['invitableOrders'];
 }) {
   return render(
     <OpsDevConsole
       rows={props.rows ?? [pendingRow, retryingRow, deadRow, doneRow]}
+      invitableOrders={props.invitableOrders ?? []}
       query={{}}
       testTimeLabel={props.testTimeLabel ?? null}
       demoClockOn={props.demoClockOn ?? true}
@@ -37,6 +41,39 @@ function renderConsole(props: {
     />,
   );
 }
+
+const invitable = [
+  {
+    value: 'a0000000-0000-4000-8000-000000000001',
+    label: 'RMB-7K3M9Q · Sunset kayak · ended 2026-11-10 23:00 UTC',
+  },
+  {
+    value: 'a0000000-0000-4000-8000-000000000002',
+    label: 'RMB-2H4J6N · Wheel throwing · ended 2026-11-08 21:00 UTC',
+  },
+];
+
+describe('OpsDevConsole review invites', () => {
+  it('lists the invitable bookings and posts the chosen order id with a send button', () => {
+    const { container } = renderConsole({ invitableOrders: invitable });
+    const select = screen.getByRole('combobox', { name: 'Booking' });
+    expect(within(select).getAllByRole('option')).toHaveLength(2);
+    expect(container.querySelector('select[name="orderId"]')).not.toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Send invite now' }),
+    ).toBeInTheDocument();
+  });
+
+  it('says so and offers no form when no booking can be invited', () => {
+    renderConsole({ invitableOrders: [] });
+    expect(
+      screen.getByText(/No booking can be invited now/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Send invite now' }),
+    ).not.toBeInTheDocument();
+  });
+});
 
 describe('OpsDevConsole', () => {
   it('lists each job with its status, attempts, due time and last error', () => {
@@ -57,6 +94,20 @@ describe('OpsDevConsole', () => {
       ...container.querySelectorAll<HTMLInputElement>('input[name="jobId"]'),
     ].map((input) => input.value);
     expect(ids).toEqual([pendingRow.id, retryingRow.id]);
+  });
+
+  it('names each run button for its own job and due time, so two of one kind can be told apart', () => {
+    renderConsole({});
+    expect(
+      screen.getByRole('button', {
+        name: `Run ${pendingRow.kind}, due ${pendingRow.runAfterLabel}`,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: `Run ${retryingRow.kind}, due ${retryingRow.runAfterLabel}`,
+      }),
+    ).toBeInTheDocument();
   });
 
   it('has a drain button and a pulse button', () => {

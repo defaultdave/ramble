@@ -6,6 +6,7 @@ import { PageHeading } from '@/components/PageHeading';
 import {
   devConsoleOpen,
   holdsDevConsoleRole,
+  invitableOrderOptions,
   opsDevNoticeCodes,
   opsDevNotices,
   opsDevPath,
@@ -18,9 +19,11 @@ import {
   resetDemoDataAction,
   runOpsJobAction,
   runOpsPulseAction,
+  sendReviewInviteAction,
   setOpsClockAction,
 } from '@/server/actions/opsDev';
 import { readRecentJobs } from '@/server/db/opsJobs';
+import { readInvitableOrderRows } from '@/server/db/reviews';
 import { env } from '@/server/env';
 import { readOpsCaller } from '@/server/opsCaller';
 import { readTestClock } from '@/server/testClock';
@@ -42,8 +45,9 @@ export default async function OpsDevPage({
     );
   }
 
-  const [rows, testClock] = await Promise.all([
+  const [rows, invitable, testClock] = await Promise.all([
     readRecentJobs(),
+    readInvitableOrderRows(caller),
     readTestClock(),
   ]);
   const report = reportLine(query);
@@ -58,6 +62,7 @@ export default async function OpsDevPage({
       {report === null ? null : <p role="status">{report}.</p>}
       <OpsDevConsole
         rows={rows}
+        invitableOrders={invitableOrderOptions(invitable)}
         query={query}
         testTimeLabel={testClock ? utcLabel(testClock) : null}
         demoClockOn={env.DEMO_CLOCK === 'on'}
@@ -67,6 +72,7 @@ export default async function OpsDevPage({
           pulse: runOpsPulseAction,
           setClock: setOpsClockAction,
           reset: resetDemoDataAction,
+          sendReviewInvite: sendReviewInviteAction,
         }}
       />
     </PageHeading>

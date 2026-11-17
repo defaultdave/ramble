@@ -30,6 +30,10 @@ export const startLine = (verdict: Accepted): string =>
 export const seedsPersonas = (target: Accepted['target']): boolean =>
   target !== 'production-demo';
 
+/** The past bookings and reviews are made-up guests' data, so they go where the personas go and never onto the production demo. */
+export const seedsPastBookings = (target: Accepted['target']): boolean =>
+  seedsPersonas(target);
+
 export const personasLine = (count: number): string =>
   `Personas: ${String(count)} sign-in people, one per role`;
 
@@ -97,6 +101,9 @@ export const editorialLine = (
 
 export const helpLine = (articles: number) =>
   `Help articles ${String(articles)}`;
+
+export const reviewsLine = (bookings: number, reviews: number) =>
+  `Past bookings ${String(bookings)}, reviews ${String(reviews)}`;
 
 export const scaleLine = (counts: CatalogCounts) =>
   `Scale: ${String(counts.hosts)} hosts, ${String(counts.experiences)} experiences, ${String(counts.sessionsCreated)} sessions created`;

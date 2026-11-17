@@ -8,6 +8,7 @@ import {
   type FormResult,
   type NoticeText,
 } from './opsForm';
+import { opsDevCopy } from './copy/opsDev';
 import { pickKnown } from './pickKnown';
 import type { StatusTone } from './statusBadge';
 import { tableHref } from './tableQuery';
@@ -162,6 +163,8 @@ export const opsDevNoticeCodes = [
   'reset_done',
   'reset_unconfirmed',
   'reset_failed',
+  'invite_queued',
+  'invite_not_eligible',
 ] as const;
 export type OpsDevNoticeCode = (typeof opsDevNoticeCodes)[number];
 
@@ -214,7 +217,39 @@ export const opsDevNotices = {
     title:
       'The reset did not finish. Check the console and run it again; the seed is safe to rerun.',
   },
+  invite_queued: {
+    tone: 'success',
+    title: opsDevCopy.invites.queued,
+  },
+  invite_not_eligible: {
+    tone: 'warning',
+    title: opsDevCopy.invites.notEligible,
+  },
 } as const satisfies Record<OpsDevNoticeCode, NoticeText>;
+
+/** The notice for what queueing a review invite came to. */
+export function inviteNoticeFor(
+  queued: 'queued' | 'not_eligible',
+): OpsDevNoticeCode {
+  return queued === 'queued' ? 'invite_queued' : 'invite_not_eligible';
+}
+
+export type InvitableOrderOption = { value: string; label: string };
+
+/** The bookings the console offers a review invite for: reference, experience, and when the session ended. */
+export function invitableOrderOptions(
+  rows: readonly {
+    orderId: string;
+    reference: string;
+    experienceName: string;
+    endsAt: Date;
+  }[],
+): InvitableOrderOption[] {
+  return rows.map((row) => ({
+    value: row.orderId,
+    label: `${row.reference} · ${row.experienceName} · ended ${utcLabel(row.endsAt)}`,
+  }));
+}
 
 /** What the console shows of a run's counts. Each is a whole number in the address, so no text rides in a link. */
 const reportFields = [

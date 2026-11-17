@@ -29,6 +29,7 @@ import {
 import { seedRows } from './authzSeedRows';
 import { opsSessionRows } from './authzOpsSessionRows';
 import { staffRows } from './authzStaffRows';
+import { opsDashboardRows } from './authzDashboardRows';
 import { supportQueueRows } from './authzSupportRows';
 import { experienceReviewRows } from './authzReviewRows';
 import { cancelSessionRows } from './authzSessionRows';
@@ -496,6 +497,7 @@ const rows: Row[] = [
   ...hostStaffRows(),
   ...opsSessionRows(),
   ...supportQueueRows(),
+  ...opsDashboardRows(),
   ...experienceEditorRows(),
   ...experienceReviewRows(),
   ...opsBookingRows(),

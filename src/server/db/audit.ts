@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, asc, gt, gte, lt } from 'drizzle-orm';
+import { and, asc, desc, gt, gte, lt } from 'drizzle-orm';
 import {
   parseAuditEntry,
   type AuditEntryInput,
@@ -98,4 +98,9 @@ export async function readAuditPage(
     )
     .orderBy(asc(auditLog.id))
     .limit(limit);
+}
+
+/** The newest `limit` rows, newest first. */
+export async function readLatestAuditRows(limit: number): Promise<AuditRow[]> {
+  return db.select().from(auditLog).orderBy(desc(auditLog.id)).limit(limit);
 }

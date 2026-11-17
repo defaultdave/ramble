@@ -89,7 +89,7 @@ Named once here. The page trees below list only what is particular to them.
 
 - Writes: each change writes its audit row with `writeAudit(tx)` in the same transaction, so the row exists exactly when the change does. A change that differs by nothing writes neither.
 - Reads: sensitive reads are recorded with `recordAudit` before they return. These are the ops home, hosts (list, one, new form), sessions (list, one), bookings (list, one), staff, support, private requests, audit view, and mailbox (list, message, unlock).
-- Not recorded: experiences, review, availability, host suspension state, and the whole test console, including the demo data reset.
+- Not recorded: the landing's counts and its latest audit rows (the visit is), experiences, review, availability, host suspension state, and the whole test console, including the demo data reset.
 
 ### Tools
 
@@ -99,7 +99,10 @@ flowchart TD
     home["OperationsPage<br/>/ops"]:::server
     rec["recordOpsAccess"]:::server
     links["opsLandingLinks"]:::server
+    counts["Counts and recent audit rows<br/>five counts, one audit read"]:::server
+    tiles["dashboardTiles"]:::server
     land["OpsLanding"]:::server
+    dash["OpsDashboard"]:::server
     mb["MailboxPage<br/>/ops/mailbox"]:::server
     lm["loadMailbox"]:::server
     unl["MailboxUnlockForm"]:::server
@@ -124,7 +127,10 @@ flowchart TD
     nfpr["notFoundPerRequest"]:::server
     home -.-> rec
     home -.-> links
+    home -.-> counts
+    home --> tiles
     home --> land
+    land --> dash
     mb -.-> lm
     mb --> unl
     mb --> mlist
@@ -152,10 +158,13 @@ flowchart TD
 
 | Component | Kind | File | Notes |
 | --- | --- | --- | --- |
-| OperationsPage | server | [src/app/(ops)/ops/page.tsx](ops/page.tsx) | Gate, then records that ops opened the area. |
+| OperationsPage | server | [src/app/(ops)/ops/page.tsx](ops/page.tsx) | Gate, then records that ops opened the area, then reads the counts and the latest audit rows. |
 | recordOpsAccess | server (DB read) | [src/server/db/audit.ts](../../server/db/audit.ts) | Audited: `ops.accessed`. Throws for a non-ops caller, as a second check. |
 | opsLandingLinks | server (pure lib) | [src/lib/opsNav.ts](../../lib/opsNav.ts) | Every link but Dashboard. |
-| OpsLanding | server | [src/components/OpsShell/OpsShell.tsx](../../components/OpsShell/OpsShell.tsx) | Heading and a list of areas with a summary each. |
+| Counts and recent audit rows | server (DB read) | [src/server/db/opsDashboard.ts](../../server/db/opsDashboard.ts) | Read in parallel after the visit is recorded, each for the ops caller: experiences in review, bookings with a failed refund, open support requests, sessions starting today in New York (`countOpsPrivateRequests` in [privateRequests.ts](../../server/db/privateRequests.ts) counts every private request received), and the newest five audit rows. Not audited one by one: the visit is. A failed read fails the page. |
+| dashboardTiles | server (pure lib) | [src/lib/opsDashboard.ts](../../lib/opsDashboard.ts) | The five counts as tiles in a fixed order: label, queue link (filtered for refund-failed and open support), the count in words, and whether it needs attention. The sessions-today window is `zonedDayWindow` in [src/lib/zonedDay.ts](../../lib/zonedDay.ts). |
+| OpsLanding | server | [src/components/OpsShell/OpsShell.tsx](../../components/OpsShell/OpsShell.tsx) | Heading, its children (the dashboard), and a list of areas with a summary each. |
+| OpsDashboard | server | [src/components/OpsDashboard/OpsDashboard.tsx](../../components/OpsDashboard/OpsDashboard.tsx) | The tiles, each a link with its count and a needs-attention badge, then the recent audit rows with a link to the audit log. |
 | MailboxPage | server | [src/app/(ops)/ops/mailbox/page.tsx](ops/mailbox/page.tsx) | No `holdsOpsRole` check of its own. Access is decided in `loadMailbox`: the ops role, or a cookie proving the shared secret, off production. |
 | loadMailbox | server (DB read) | [src/server/ports/email/mailbox.ts](../../server/ports/email/mailbox.ts) | Audited: `mailbox listed`, with how access was gained. Status is disabled, locked or open. |
 | MailboxUnlockForm | server | [src/components/DevMailbox/DevMailbox.tsx](../../components/DevMailbox/DevMailbox.tsx) | Locked state: a secret field and a message for a wrong or rate-limited try. |

@@ -34,9 +34,8 @@ import {
 const copy = opsEditorialContentCopy.taxonomy;
 
 export const taxonomyPath = `${editorialPath}/taxonomy`;
-export const newTermPath = (kind: TaxonomyKind) =>
-  `${taxonomyPath}/${kind}/new`;
-export const renamePath = (kind: TaxonomyKind, id: string) =>
+export const newTermPath = (kind: string) => `${taxonomyPath}/${kind}/new`;
+export const renamePath = (kind: string, id: string) =>
   `${taxonomyPath}/${kind}/${id}`;
 
 /** The kind an address names, or null. */
@@ -240,7 +239,7 @@ export function buildTaxonomyRows(
       moveDownValue: click('down'),
       switchLabel: copy.actions[switchAction],
       switchValue: click(switchAction),
-      canSwitch: canSwitch,
+      canSwitch,
       switchReason: canSwitch ? null : copy.lastActive,
       renameHref: renamePath(kind, term.id),
     };

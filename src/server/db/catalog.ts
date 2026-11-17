@@ -30,6 +30,13 @@ import {
   slugHistory,
 } from './schema';
 
+/** The order of a list of categories or neighborhoods: ops's place, then name, then id. */
+export const termOrder = (table: typeof categories | typeof neighborhoods) => [
+  asc(table.position),
+  asc(table.name),
+  asc(table.id),
+];
+
 // The only place that decides what a guest may see. Every guest read goes through it.
 export const guestVisible = inArray(experiences.status, [
   ...guestVisibleStatuses,
@@ -70,7 +77,7 @@ export async function listCategories(options?: WithState) {
   const rows = await dbRead
     .select()
     .from(categories)
-    .orderBy(asc(categories.position), asc(categories.name), asc(categories.id))
+    .orderBy(...termOrder(categories))
     .limit(catalogLimits.categories);
   return options
     ? TaxonomyTermSchema.array().parse(rows)
@@ -85,11 +92,7 @@ export async function listNeighborhoods(options?: WithState) {
   const rows = await dbRead
     .select()
     .from(neighborhoods)
-    .orderBy(
-      asc(neighborhoods.position),
-      asc(neighborhoods.name),
-      asc(neighborhoods.id),
-    )
+    .orderBy(...termOrder(neighborhoods))
     .limit(catalogLimits.neighborhoods);
   return options
     ? TaxonomyTermSchema.array().parse(rows)

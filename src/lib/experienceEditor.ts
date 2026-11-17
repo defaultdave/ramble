@@ -1,4 +1,3 @@
-import { isOfferable } from './taxonomy';
 import { z } from 'zod';
 import type { CacheChange } from './cacheTags';
 import { cancellationTerms } from './cancellation';
@@ -38,6 +37,7 @@ import {
   type StatusFilterOption,
   type StatusTone,
 } from './statusBadge';
+import { isOfferable } from './taxonomy';
 import type { TableQuery } from './tableQuery';
 import { requiredText, wholeNumberText } from './text';
 

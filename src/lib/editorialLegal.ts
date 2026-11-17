@@ -237,7 +237,15 @@ export const legalNoticeCodes = [
 export const legalNotices = copy.notices;
 
 export type LegalOutcome =
-  | { status: 'drafted' | 'saved' | 'published' | 'not_a_draft' | 'superseded' }
+  | {
+      status:
+        | 'drafted'
+        | 'saved'
+        | 'published'
+        | 'not_a_draft'
+        | 'superseded'
+        | 'unknown_document';
+    }
   | { status: 'invalid'; fields: readonly LegalFormField[] };
 
 /** What the edit and the publish after it came to. A draft that is gone or final is `not_a_draft`, whichever step found it so. */
@@ -268,6 +276,8 @@ export function legalRedirect(
       return noticeHref(here, 'invalid', outcome.fields);
     case 'saved':
       return noticeHref(here, 'saved');
+    case 'unknown_document':
+      return legalAdminPath;
     default:
       return noticeHref(legalDocPath(doc), outcome.status);
   }

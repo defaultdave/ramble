@@ -262,6 +262,12 @@ describe('legalRedirect', () => {
       '/ops/editorial/legal/terms?notice=drafted',
     ],
     [
+      'a key no document has leaves for the documents',
+      null,
+      { status: 'unknown_document' },
+      '/ops/editorial/legal',
+    ],
+    [
       'a final version shows on the versions',
       { id },
       { status: 'not_a_draft' },

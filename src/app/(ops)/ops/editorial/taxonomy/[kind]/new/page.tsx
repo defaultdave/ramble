@@ -7,6 +7,7 @@ import { OpsAccessDenied } from '@/components/OpsShell';
 import { PageHeading } from '@/components/PageHeading';
 import { opsEditorialContentCopy } from '@/lib/copy/opsEditorialContent';
 import {
+  newTermPath,
   parseKindParam,
   taxonomyFormFields,
   taxonomyNoticeCodes,
@@ -32,7 +33,7 @@ export default async function NewTermPage({
     readOpsCaller(),
   ]);
   if (!holdsOpsRole(caller.roles)) {
-    return <OpsAccessDenied next={`${taxonomyPath}/${rawKind}/new`} />;
+    return <OpsAccessDenied next={newTermPath(rawKind)} />;
   }
 
   const kind = parseKindParam(rawKind);

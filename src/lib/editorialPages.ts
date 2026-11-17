@@ -42,7 +42,7 @@ import { zonedDeadlineLabel } from './zonedLabels';
 const copy = opsEditorialContentCopy.pages;
 
 export const pagesPath = `${editorialPath}/pages`;
-const pageCopyPath = (kind: PageCopy['kind'], id: string) =>
+export const pageCopyPath = (kind: string, id: string) =>
   `${pagesPath}/${kind}/${id}`;
 
 export type PageKind = PageCopy['kind'];

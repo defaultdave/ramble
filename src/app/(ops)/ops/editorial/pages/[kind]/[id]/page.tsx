@@ -10,6 +10,7 @@ import { opsEditorialContentCopy } from '@/lib/copy/opsEditorialContent';
 import { entryStatusLabels, entryStatusTones } from '@/lib/editorialAdmin';
 import {
   findPageTarget,
+  pageCopyPath,
   pageFormFields,
   pageNoticeCodes,
   pageNotices,
@@ -37,7 +38,7 @@ export default async function EditPageCopyPage({
     readOpsCaller(),
   ]);
   if (!holdsOpsRole(caller.roles)) {
-    return <OpsAccessDenied next={`${pagesPath}/${rawKind}/${id}`} />;
+    return <OpsAccessDenied next={pageCopyPath(rawKind, id)} />;
   }
 
   const kind = parsePageKind(rawKind);

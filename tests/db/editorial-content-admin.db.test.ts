@@ -40,6 +40,7 @@ let stopHttp: () => Promise<void>;
 let client: typeof import('@/server/db/client');
 let editorial: typeof import('@/server/db/editorial');
 let legalAdmin: typeof import('@/server/db/legalAdmin');
+let legal: typeof import('@/server/db/legal');
 
 beforeAll(async () => {
   fresh = await createFreshDatabase(process.env.DATABASE_URL_UNPOOLED ?? '');
@@ -48,6 +49,7 @@ beforeAll(async () => {
   client = await import('@/server/db/client');
   editorial = await import('@/server/db/editorial');
   legalAdmin = await import('@/server/db/legalAdmin');
+  legal = await import('@/server/db/legal');
 });
 
 afterAll(async () => {
@@ -165,8 +167,14 @@ describe('the legal documents', () => {
     body: doc('Secret body words'),
   });
 
+  async function started(docKey: string) {
+    const result = await legalAdmin.startLegalDraft(ops, draftOf(docKey));
+    if (result.status !== 'drafted') throw new Error('expected a draft');
+    return result.value;
+  }
+
   it('audits a started draft, an edit and a publish, with the key and version and no words', async () => {
-    const draft = await legalAdmin.startLegalDraft(ops, draftOf('privacy'));
+    const draft = await started('privacy');
     const edited = await legalAdmin.saveLegalDraft(ops, draft.id, {
       title: 'Edited title words',
       body: doc('Edited body words'),
@@ -191,14 +199,8 @@ describe('the legal documents', () => {
   });
 
   it('writes no audit row for a version that is final, a draft that is gone, or one below a published version', async () => {
-    const first = await legalAdmin.startLegalDraft(
-      ops,
-      draftOf('host-agreement'),
-    );
-    const second = await legalAdmin.startLegalDraft(
-      ops,
-      draftOf('host-agreement'),
-    );
+    const first = await started('host-agreement');
+    const second = await started('host-agreement');
     await legalAdmin.publishLegalDraft(ops, second.id);
     const rowsBefore = (await client.db.select().from(auditLog)).length;
 
@@ -216,9 +218,9 @@ describe('the legal documents', () => {
   });
 
   it('lists each key once with its counts, newest and newest published', async () => {
-    const one = await legalAdmin.startLegalDraft(ops, draftOf('waiver-kayak'));
+    const one = await legal.createLegalDraft(ops, draftOf('waiver-kayak'));
     await legalAdmin.publishLegalDraft(ops, one.id);
-    await legalAdmin.startLegalDraft(ops, draftOf('waiver-kayak'));
+    await started('waiver-kayak');
 
     const summaries = await legalAdmin.listLegalDocSummaries(ops);
 
@@ -228,6 +230,22 @@ describe('the legal documents', () => {
       latestVersion: 2,
       publishedVersion: 1,
     });
+  });
+
+  it('refuses to start a draft of a key no document has, and starts one for a waiver that has a version', async () => {
+    const rowsBefore = (await client.db.select().from(auditLog)).length;
+
+    expect(
+      await legalAdmin.startLegalDraft(ops, draftOf('waiver-nothing-here')),
+    ).toEqual({ status: 'unknown_document' });
+    expect(await client.db.select().from(auditLog)).toHaveLength(rowsBefore);
+
+    await legal.createLegalDraft(ops, draftOf('waiver-has-one'));
+    const next = await legalAdmin.startLegalDraft(
+      ops,
+      draftOf('waiver-has-one'),
+    );
+    expect(next.status).toBe('drafted');
   });
 
   it.each([

@@ -1,7 +1,11 @@
 import 'server-only';
 import { asc, sql } from 'drizzle-orm';
 import { editorialLimits } from '@/lib/editorial';
-import { legalAuditEntry, type LegalDocSummary } from '@/lib/editorialLegal';
+import {
+  legalAuditEntry,
+  mayStartDraft,
+  type LegalDocSummary,
+} from '@/lib/editorialLegal';
 import type { AuditEntryInput } from '@/lib/audit';
 import {
   LegalDocSchema,
@@ -32,6 +36,10 @@ export async function listLegalDocSummaries(
   caller: Caller,
 ): Promise<LegalDocSummary[]> {
   requireStaff(caller);
+  return readSummaries();
+}
+
+async function readSummaries(): Promise<LegalDocSummary[]> {
   const rows = await dbRead
     .select({
       doc: legalDocuments.doc,
@@ -59,16 +67,32 @@ async function audited<T>(
   return written;
 }
 
-/** Starts the next version of a document as a draft. */
+export type StartLegalDraftResult =
+  { status: 'drafted'; value: LegalDocument } | { status: 'unknown_document' };
+
+/**
+ * Starts the next version of a document as a draft. A key that is not a fixed document and has
+ * no version yet is `unknown_document` (`mayStartDraft`), and nothing is written.
+ */
 export async function startLegalDraft(
   caller: Caller,
   input: LegalDraftInput,
-): Promise<LegalDocument> {
+): Promise<StartLegalDraftResult> {
   requireStaff(caller);
   const userId = requireUserId(caller, Role.Ops);
-  return audited(createLegalDraft(caller, input), (document) =>
+  const stored = await readSummaries();
+  if (
+    !mayStartDraft(
+      input.doc,
+      stored.map((row) => row.doc),
+    )
+  ) {
+    return { status: 'unknown_document' };
+  }
+  const value = await audited(createLegalDraft(caller, input), (document) =>
     legalAuditEntry(userId, 'drafted', document),
   );
+  return { status: 'drafted', value };
 }
 
 /** Edits a draft; a version already published is final. */

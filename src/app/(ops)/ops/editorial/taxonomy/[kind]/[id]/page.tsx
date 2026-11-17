@@ -9,6 +9,7 @@ import { opsEditorialContentCopy } from '@/lib/copy/opsEditorialContent';
 import {
   findTerm,
   parseKindParam,
+  renamePath,
   taxonomyFormFields,
   taxonomyNoticeCodes,
   taxonomyNotices,
@@ -34,7 +35,7 @@ export default async function RenameTermPage({
     readOpsCaller(),
   ]);
   if (!holdsOpsRole(caller.roles)) {
-    return <OpsAccessDenied next={`${taxonomyPath}/${rawKind}/${id}`} />;
+    return <OpsAccessDenied next={renamePath(rawKind, id)} />;
   }
 
   const kind = parseKindParam(rawKind);

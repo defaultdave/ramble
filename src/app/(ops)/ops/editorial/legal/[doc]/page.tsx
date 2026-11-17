@@ -52,7 +52,10 @@ export default async function LegalVersionsPage({
   );
   if (
     versions !== null &&
-    !mayStartDraft(doc, versions.length > 0 ? [doc] : [])
+    !mayStartDraft(
+      doc,
+      versions.map((version) => version.doc),
+    )
   ) {
     notFound();
   }

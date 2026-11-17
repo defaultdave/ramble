@@ -5,7 +5,6 @@ const mocks = vi.hoisted(() => ({
   idOrLeave: vi.fn(),
   savePageCopy: vi.fn(),
   updateGuideLinks: vi.fn(),
-  listLegalDocSummaries: vi.fn(),
   startLegalDraft: vi.fn(),
   saveLegalDraft: vi.fn(),
   publishLegalDraft: vi.fn(),
@@ -36,7 +35,6 @@ vi.mock('@/server/db/experienceEditor', () => ({
   updateGuideLinks: mocks.updateGuideLinks,
 }));
 vi.mock('@/server/db/legalAdmin', () => ({
-  listLegalDocSummaries: mocks.listLegalDocSummaries,
   startLegalDraft: mocks.startLegalDraft,
   saveLegalDraft: mocks.saveLegalDraft,
   publishLegalDraft: mocks.publishLegalDraft,
@@ -248,8 +246,10 @@ describe('the legal actions', () => {
   });
 
   it('starts a draft and shows it on the versions', async () => {
-    mocks.listLegalDocSummaries.mockResolvedValue([]);
-    mocks.startLegalDraft.mockResolvedValue({ id });
+    mocks.startLegalDraft.mockResolvedValue({
+      status: 'drafted',
+      value: { id },
+    });
 
     const href = await destination(
       startLegalDraftAction(form({ ...fields, intent: 'save' })),
@@ -262,8 +262,8 @@ describe('the legal actions', () => {
     );
   });
 
-  it('leaves for the documents when the key is valid but no document has it', async () => {
-    mocks.listLegalDocSummaries.mockResolvedValue([]);
+  it('leaves for the documents when the data layer says no document has the key', async () => {
+    mocks.startLegalDraft.mockResolvedValue({ status: 'unknown_document' });
 
     expect(
       await destination(
@@ -272,24 +272,9 @@ describe('the legal actions', () => {
         ),
       ),
     ).toBe('/ops/editorial/legal');
-    expect(mocks.startLegalDraft).not.toHaveBeenCalled();
-  });
-
-  it('starts a draft of a waiver that already has a version', async () => {
-    mocks.listLegalDocSummaries.mockResolvedValue([{ doc: 'waiver-kayak' }]);
-    mocks.startLegalDraft.mockResolvedValue({ id });
-
-    expect(
-      await destination(
-        startLegalDraftAction(
-          form({ ...fields, doc: 'waiver-kayak', intent: 'save' }),
-        ),
-      ),
-    ).toBe('/ops/editorial/legal/waiver-kayak?notice=drafted');
   });
 
   it('returns a refused new draft to the versions with the field', async () => {
-    mocks.listLegalDocSummaries.mockResolvedValue([]);
     expect(
       await destination(
         startLegalDraftAction(form({ ...fields, title: '', intent: 'save' })),

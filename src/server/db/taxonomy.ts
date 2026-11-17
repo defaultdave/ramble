@@ -1,5 +1,5 @@
 import 'server-only';
-import { asc, eq, sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import {
   TaxonomyAddSchema,
   TaxonomyClickSchema,
@@ -24,7 +24,7 @@ import type { Caller } from '@/server/auth/caller';
 import { Role } from '@/server/auth/caller';
 import { updateTagsForChanges } from '@/server/cache/invalidate';
 import { requireUserId, writeAudit } from './audit';
-import { listCategories, listNeighborhoods } from './catalog';
+import { listCategories, listNeighborhoods, termOrder } from './catalog';
 import { db, type Transaction } from './client';
 import { lockFor } from './locks';
 import { categories, neighborhoods } from './schema';
@@ -37,12 +37,6 @@ import { requireStaff } from './staff';
 
 const tableOf = (kind: TaxonomyKind) =>
   kind === 'category' ? categories : neighborhoods;
-
-const orderOf = (table: ReturnType<typeof tableOf>) => [
-  asc(table.position),
-  asc(table.name),
-  asc(table.id),
-];
 
 /** The terms of a kind for the editor, retired ones included. */
 export async function listTaxonomyForEditing(
@@ -82,6 +76,12 @@ export type SaveTaxonomyResult =
       reason: Extract<TaxonomyDecision, { status: 'refused' }>['reason'];
     };
 
+/** The `retired_at` a change asks for: untouched, the database clock now, or cleared. */
+function retiredAtFor(retired: boolean | undefined) {
+  if (retired === undefined) return undefined;
+  return retired ? sql`clock_timestamp()` : null;
+}
+
 async function writeChanges(
   tx: Transaction,
   kind: TaxonomyKind,
@@ -94,12 +94,7 @@ async function writeChanges(
       .set({
         name: change.name,
         position: change.position,
-        retiredAt:
-          change.retired === undefined
-            ? undefined
-            : change.retired
-              ? sql`clock_timestamp()`
-              : null,
+        retiredAt: retiredAtFor(change.retired),
       })
       .where(eq(table.id, change.id));
   }
@@ -124,7 +119,7 @@ async function changeTerms(
       const rows = await tx
         .select()
         .from(table)
-        .orderBy(...orderOf(table))
+        .orderBy(...termOrder(table))
         .limit(taxonomyCapacity(kind))
         .for('update');
       const decision = decide(TaxonomyTermSchema.array().parse(rows));

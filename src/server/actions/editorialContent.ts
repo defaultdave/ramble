@@ -11,7 +11,6 @@ import {
   legalAdminPath,
   legalOutcomeFor,
   legalRedirect,
-  mayStartDraft,
   parseLegalDocParam,
   parseLegalForm,
   wantsPublish,
@@ -36,7 +35,6 @@ import { formText } from '@/lib/opsForm';
 import { savePageCopy } from '@/server/db/editorial';
 import { updateGuideLinks } from '@/server/db/experienceEditor';
 import {
-  listLegalDocSummaries,
   publishLegalDraft,
   saveLegalDraft,
   startLegalDraft,
@@ -96,15 +94,6 @@ export async function startLegalDraftAction(formData: FormData): Promise<void> {
   const get = (name: string) => formData.get(name);
   const doc = parseLegalDocParam(formText(get, 'doc') ?? '');
   if (doc === null) redirect(legalAdminPath);
-  const stored = await listLegalDocSummaries(caller);
-  if (
-    !mayStartDraft(
-      doc,
-      stored.map((row) => row.doc),
-    )
-  ) {
-    redirect(legalAdminPath);
-  }
   const form = parseLegalForm(get);
   if (!form.ok) {
     redirect(
@@ -113,8 +102,12 @@ export async function startLegalDraftAction(formData: FormData): Promise<void> {
   }
 
   const { title, body } = form.value;
-  await startLegalDraft(caller, { doc, title, body });
-  redirect(legalRedirect(doc, null, { status: 'drafted' }));
+  const result = await startLegalDraft(caller, { doc, title, body });
+  redirect(
+    legalRedirect(doc, null, {
+      status: result.status === 'drafted' ? 'drafted' : 'unknown_document',
+    }),
+  );
 }
 
 /** The edit form of a draft: saves it, or saves it and publishes it as the button pressed says. */

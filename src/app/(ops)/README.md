@@ -1,6 +1,6 @@
 # Ops area page map
 
-`/ops`, `/ops/mailbox`, `/ops/mailbox/[id]`, `/ops/dev`, `/ops/hosts`, `/ops/hosts/new`, `/ops/hosts/[id]`, `/ops/experiences`, `/ops/experiences/new`, `/ops/experiences/[id]`, `/ops/experiences/[id]/availability`, `/ops/review`, `/ops/review/[id]`, `/ops/sessions`, `/ops/sessions/[sessionId]`, `/ops/bookings`, `/ops/bookings/[id]`, `/ops/staff`, `/ops/support`, `/ops/requests`, `/ops/audit`, and any other address under `/ops`
+`/ops`, `/ops/mailbox`, `/ops/mailbox/[id]`, `/ops/dev`, `/ops/hosts`, `/ops/hosts/new`, `/ops/hosts/[id]`, `/ops/experiences`, `/ops/experiences/new`, `/ops/experiences/[id]`, `/ops/experiences/[id]/availability`, `/ops/editorial`, `/ops/editorial/new`, `/ops/editorial/[id]`, `/ops/review`, `/ops/review/[id]`, `/ops/sessions`, `/ops/sessions/[sessionId]`, `/ops/bookings`, `/ops/bookings/[id]`, `/ops/staff`, `/ops/support`, `/ops/requests`, `/ops/audit`, and any other address under `/ops`
 
 Read from main at 2db68ea (2026-11-15). A PR that changes this tree (a component, a Suspense or client boundary, a cache tag, an action) updates this file in the same PR.
 
@@ -55,7 +55,7 @@ flowchart TD
 | SiteShell | server | [src/components/SiteShell.tsx](../../components/SiteShell.tsx) | Skip link, header (brand link and the word Operations), main, footer. No account control, no banner. |
 | OpsAreaNav | streamed | [src/app/(ops)/OpsAreaNav.tsx](OpsAreaNav.tsx) | Inside `Suspense fallback={null}`. Reads the caller, so it streams. Renders nothing unless the caller holds `ops`. It is not a gate. |
 | readOpsCaller | server (DB read) | [src/server/opsCaller.ts](../../server/opsCaller.ts) | Wraps `getCaller()`. A failure is logged and becomes the anonymous caller, never a role. |
-| holdsOpsRole and opsNavLinks | server (pure lib) | [src/lib/opsNav.ts](../../lib/opsNav.ts) | Roles must include `ops`; `admin` is not enough. Eleven links: Dashboard, Mailbox, Hosts, Experiences, Support, Private requests, Review queue, Staff, Sessions, Audit log, Bookings. The test console is not listed. |
+| holdsOpsRole and opsNavLinks | server (pure lib) | [src/lib/opsNav.ts](../../lib/opsNav.ts) | Roles must include `ops`; `admin` is not enough. Twelve links: Dashboard, Mailbox, Hosts, Experiences, Editorial, Support, Private requests, Review queue, Staff, Sessions, Audit log, Bookings. The test console is not listed. |
 | OpsNav | server | [src/components/OpsShell/OpsShell.tsx](../../components/OpsShell/OpsShell.tsx) | A `nav` of plain links. |
 | Route page | server |  | Every ops page below. The layout does not wrap it in Suspense, and no page does either. |
 | RenderPerRequest | server | [src/app/renderPerRequest.tsx](../renderPerRequest.tsx) | Sits beside the shell, awaits `connection()`, renders nothing. Pins the whole tree to per-request rendering so every script carries the CSP nonce. |
@@ -626,6 +626,58 @@ flowchart TD
 | DataTable | server | [src/components/DataTable/DataTable.tsx](../../components/DataTable/DataTable.tsx) | Sort links and a Next link; the cursor is in the address. |
 | Button | client | [src/components/Button/Button.tsx](../../components/Button/Button.tsx) | Every submit button. The file is `'use client'`, but the forms post to the action without it. |
 
+### Editorial
+
+Help articles are the first editorial entries: a title, an address, a summary and a rich-text body, saved as a draft, published, or taken down. The body editor is the only client island here, and it loads only on these two pages.
+
+```mermaid
+flowchart TD
+    ed["EditorialPage<br/>/ops/editorial"]:::server
+    lhe["listHelpArticlesForEditing"]:::server
+    ent["EntriesList"]:::server
+    dt3["DataTable"]:::server
+    ld["EditorialLoading<br/>loading.tsx"]:::server
+    ne["NewEntryPage<br/>/ops/editorial/new"]:::server
+    ee["EditEntryPage<br/>/ops/editorial/id"]:::server
+    ghe["getHelpArticleForEditing"]:::server
+    an4["ActionNotice"]:::server
+    ef["EntryForm"]:::server
+    rte["RichTextEditor<br/>Tiptap"]:::client
+    btn3["Button<br/>client submit buttons"]:::client
+    sea["saveEntryAction"]:::action
+    ed -.-> lhe
+    ed --> ent
+    ent --> dt3
+    ne --> an4
+    ne --> ef
+    ee -.-> ghe
+    ee --> an4
+    ee --> ef
+    ef --> rte
+    ef --> btn3
+    btn3 -.-> sea
+    classDef server fill:#e8edf8,stroke:#3b5bab,color:#1b1f27
+    classDef cached fill:#e2f3f0,stroke:#0f7a6c,color:#1b1f27
+    classDef streamed fill:#fbefdc,stroke:#a3610a,color:#1b1f27
+    classDef client fill:#f5e6f8,stroke:#8a2f9c,color:#1b1f27
+    classDef action fill:#fbe6e4,stroke:#b3261e,color:#1b1f27
+```
+
+| Component | Kind | File | Notes |
+| --- | --- | --- | --- |
+| EditorialPage | server | [src/app/(ops)/ops/editorial/page.tsx](ops/editorial/page.tsx) | Gate, then every help article, drafts included. A failed read is logged and shows the table's retry, not the group error. |
+| EditorialLoading | server | [src/app/(ops)/ops/editorial/loading.tsx](ops/editorial/loading.tsx) | The loading state for the three pages. |
+| listHelpArticlesForEditing | server (DB read) | [src/server/db/editorial.ts](../../server/db/editorial.ts) | Staff only, up to 200 rows. Not audited. |
+| EntriesList | server | [src/components/EditorialAdmin/EntriesList.tsx](../../components/EditorialAdmin/EntriesList.tsx) | A new-article link and a table with an empty state. |
+| NewEntryPage | server | [src/app/(ops)/ops/editorial/new/page.tsx](ops/editorial/new/page.tsx) | Gate, then an empty form. |
+| EditEntryPage | server | [src/app/(ops)/ops/editorial/[id]/page.tsx](ops/editorial/%5Bid%5D/page.tsx) | Gate, then the article. A bad or unknown id is a 404. |
+| getHelpArticleForEditing | server (DB read) | [src/server/db/editorial.ts](../../server/db/editorial.ts) | Staff only. Not audited. |
+| ActionNotice | server | [src/components/ActionNotice/ActionNotice.tsx](../../components/ActionNotice/ActionNotice.tsx) | Shows the `?notice=` code from the last redirect. |
+| EntryForm | server | [src/components/EditorialAdmin/EntryForm.tsx](../../components/EditorialAdmin/EntryForm.tsx) | Title, address, summary, body. Save and publish, or save and unpublish, are two submit buttons on one form. |
+| RichTextEditor | client | [src/components/RichTextEditor/RichTextEditor.tsx](../../components/RichTextEditor/RichTextEditor.tsx) | Tiptap on the format in `src/lib/richText`. Writes the sanitized document into a hidden field. Imported only here, so no guest page loads Tiptap. |
+| Button | client | [src/components/Button/Button.tsx](../../components/Button/Button.tsx) | Every submit button. |
+| saveEntryAction | action | [src/server/actions/editorial.ts](../../server/actions/editorial.ts) | `saveHelpArticle`: one audit row in the same transaction (created, saved, published or unpublished; ids only), then `updateTag` for what guests could see before and after. A save keeps the stored status and position (a stale tab cannot unpublish), and a missing article returns to the list with a notice. |
+
 ## Arrival order
 
 Nothing on an ops page is cached, and the only Suspense boundary is the nav in the layout, so there is no staged arrival. The order below is the same for every page.
@@ -672,6 +724,7 @@ Ops pages hold no cache of their own. Their changes reach the guest side through
 | Cancel a session (`cancelOpsSessionAction`, and each step of `pauseOpsExperienceAction`) | `session:id` and `experience:id` | After one stale response, through `revalidateTag` with `max` |
 | Pause from the session page (`pauseOpsExperienceAction`, the pause itself) | The listing tags, as the pause above | At once, through `updateTag` |
 | Cancel a booking (`cancelBookingAction`) | `session:id`, only if it was cancelled | After one stale response, through `revalidateTag` with `max` |
+| Save, publish or unpublish a help article (`saveEntryAction`) | Only when guests could see the article before or after: `help-articles` only (there is no per-article tag). Saving a draft that stays a draft clears nothing | At once, through `updateTag` |
 | Reject a review, create an experience (`rejectExperienceAction`, `createExperienceAction`) | Nothing, because the experience is never guest-visible | Not applicable |
 | Edit a host, accept the agreement, invites (`updateHostAction`, `acceptHostAgreementAction`, `resendHostInviteAction`, `createHostAction`) | Nothing | A host name or about edit shows when the `catalog` profile runs out |
 | Refund, retry, resend, void links (`refundBookingAction`, `retryRefundAction`, `resendConfirmationAction`, `voidLinksAction`) | Nothing | Not applicable |

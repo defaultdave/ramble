@@ -157,6 +157,9 @@ export function noticeHref(
   return tableHref(path, { notice, fields: fields.join(',') });
 }
 
+/** The start of the problem line every ops form shows for a slug it refused; each form adds its own ending. */
+export const slugProblemStart = 'Use lower-case words joined by hyphens';
+
 /** The notice every refused ops form names, whichever form it was. */
 export const invalidFormNotice = {
   tone: 'danger',

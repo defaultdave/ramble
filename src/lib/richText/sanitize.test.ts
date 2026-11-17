@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RichTextDoc } from './format';
-import { sanitizeRichText } from './sanitize';
+import { encodeRichText, sanitizeRichText } from './sanitize';
 
 const text = (value: string, marks?: unknown[]) => ({
   type: 'text',
@@ -379,5 +379,16 @@ describe('sanitizeRichText', () => {
       }
       expect(JSON.stringify(sanitizeRichText(doc(node)))).toContain('Deep');
     });
+  });
+});
+
+describe('encodeRichText', () => {
+  it('posts the sanitized document as JSON', () => {
+    const input = doc(paragraph(text('Hi')));
+    expect(JSON.parse(encodeRichText(input))).toEqual(sanitizeRichText(input));
+  });
+
+  it('posts an empty document for input that is not one', () => {
+    expect(JSON.parse(encodeRichText('nonsense'))).toEqual(doc());
   });
 });

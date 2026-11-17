@@ -1,0 +1,103 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.label {
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-label);
+  line-height: var(--font-line-height-label);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.linkActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.surface {
+  box-sizing: border-box;
+  min-block-size: calc(var(--space-16) * 3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-body-m);
+  line-height: var(--font-line-height-body-m);
+  color: var(--color-text-primary);
+}
+
+.surface:focus-within {
+  border-color: var(--color-focus-ring);
+  box-shadow:
+    inset 0 0 0 1px var(--color-focus-ring),
+    0 0 0 2px var(--color-bg-canvas),
+    0 0 0 4px var(--color-focus-ring);
+}
+
+.surface[data-invalid='true'] {
+  border-color: var(--color-status-danger-text);
+}
+
+/* Tiptap renders its own editable element, so the document's styles reach it by its class. */
+.surface :global(.ProseMirror) {
+  min-block-size: calc(var(--space-16) * 2);
+  outline: none;
+  overflow-wrap: anywhere;
+}
+
+.surface :global(.ProseMirror) > * {
+  margin: 0;
+}
+
+.surface :global(.ProseMirror) > * + * {
+  margin-top: var(--space-4);
+}
+
+.surface :global(.ProseMirror) :is(h2, h3, h4) {
+  font-family: var(--font-family-display);
+  font-weight: var(--font-weight-semibold);
+}
+
+.surface :global(.ProseMirror) :is(ul, ol) {
+  padding-left: var(--space-6);
+}
+
+.surface :global(.ProseMirror) blockquote {
+  padding-left: var(--space-4);
+  border-left: 2px solid var(--color-border-strong);
+  color: var(--color-text-secondary);
+}
+
+.surface :global(.ProseMirror) a {
+  color: var(--color-text-link);
+  text-decoration: underline;
+}
+
+.loading {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.error {
+  margin: 0;
+  font-size: var(--font-size-body-s);
+  line-height: var(--font-line-height-body-s);
+  color: var(--color-status-danger-text);
+}

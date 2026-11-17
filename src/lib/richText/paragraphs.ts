@@ -14,3 +14,11 @@ export function paragraphs(...texts: string[]): RichTextDoc {
 export function hasContent(doc: RichTextDoc | null): doc is RichTextDoc {
   return doc !== null && doc.content.length > 0;
 }
+
+/** A document with nothing in it: where a new body starts. */
+export const emptyDoc: RichTextDoc = { type: 'doc', content: [] };
+
+/** What the editor starts from: the document, or an empty string when it has nothing in it. */
+export function editorStartContent(doc: RichTextDoc): RichTextDoc | '' {
+  return hasContent(doc) ? doc : '';
+}

@@ -20,7 +20,8 @@ import {
   type NoticeText,
 } from './opsForm';
 import { pickKnown } from './pickKnown';
-import { hasContent } from './richText/paragraphs';
+import { emptyDoc, hasContent } from './richText/paragraphs';
+import type { RichTextDoc } from './richText/format';
 import type { StatusTone } from './statusBadge';
 import { zonedDeadlineLabel } from './zonedLabels';
 
@@ -58,6 +59,11 @@ function statusAfter(
 
 /** What a new article starts as; the form carries a status and position only for an article that exists. */
 const newEntry: StoredEntry = { status: 'draft', position: 0 };
+
+/** The body the editor opens with: the article's own, or an empty one for a new article. */
+export function entryBody(entry: HelpArticle | null): RichTextDoc {
+  return entry?.body ?? emptyDoc;
+}
 
 /** The stored row a save settles against: the one it locked, or none for a new article. */
 export type StoredEntry = { status: PublishStatus; position: number };
@@ -225,7 +231,7 @@ export const entryNotices = {
 } satisfies Record<EntryNoticeCode, NoticeText>;
 
 /** The notice for a saved entry: what the intent did, which is the point of the click. */
-export function savedNotice(intent: EntryIntent): EntryNoticeCode {
+function savedNotice(intent: EntryIntent): EntryNoticeCode {
   if (intent === 'publish') return 'published';
   return intent === 'unpublish' ? 'unpublished' : 'saved';
 }
@@ -251,7 +257,7 @@ export function buildEntryRows(articles: readonly HelpArticle[]): EntryRow[] {
 // ---- Audit ----
 
 /** What a save did to the article, from its status before (none for a new one) and after. */
-export function entryAuditAction(
+function entryAuditAction(
   before: PublishStatus | undefined,
   after: PublishStatus,
 ): string {

@@ -4,6 +4,7 @@ import { RichTextEditor } from '@/components/RichTextEditor';
 import { Textarea } from '@/components/Textarea';
 import { editorialLimits, type HelpArticle } from '@/lib/editorial';
 import {
+  entryBody,
   entryFieldProblems,
   saveLabel,
   toggleIntent,
@@ -11,7 +12,6 @@ import {
   type EntryFormField,
 } from '@/lib/editorialAdmin';
 import { errorProps } from '@/lib/opsForm';
-import type { RichTextDoc } from '@/lib/richText/format';
 import styles from './EditorialAdmin.module.css';
 
 type FormAction = (formData: FormData) => void | Promise<void>;
@@ -22,8 +22,6 @@ export type EntryFormProps = {
   problems: readonly EntryFormField[];
   save: FormAction;
 };
-
-const emptyBody: RichTextDoc = { type: 'doc', content: [] };
 
 /**
  * Title, address, summary and body, with the buttons that save a draft, publish, or take the
@@ -72,7 +70,7 @@ export function EntryForm({ entry, problems, save }: EntryFormProps) {
       <RichTextEditor
         name="body"
         label="Body"
-        initial={entry?.body ?? emptyBody}
+        initial={entryBody(entry)}
         {...errorProps(problems, entryFieldProblems, 'body')}
       />
       <div className={styles.actions}>

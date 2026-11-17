@@ -2,14 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   auditFor,
   buildEntryRows,
+  entryBody,
   entryRedirect,
   parseBody,
   saveLabel,
   toggleIntent,
-  entryAuditAction,
   entryPath,
   parseEntryForm,
-  savedNotice,
   settleEntry,
   toggleLabel,
 } from './editorialAdmin';
@@ -29,6 +28,7 @@ import type { RichTextDoc } from './richText/format';
 // - each outcome of a save has one destination, and the list shows the missing-article notice
 // - the seed (no user) writes no audit row, a person writes one
 // - the audit action says what happened to the article, and its row holds ids, never words
+// - the editor opens on the article's body, or an empty one for a new article
 // - a row shows the status and the time the way the other ops lists do
 
 const body = JSON.stringify({
@@ -250,29 +250,6 @@ describe('parseEntryForm', () => {
   });
 });
 
-describe('savedNotice', () => {
-  it.each([
-    ['save', 'saved'],
-    ['publish', 'published'],
-    ['unpublish', 'unpublished'],
-  ] as const)('%s is the %s notice', (intent, notice) => {
-    expect(savedNotice(intent)).toBe(notice);
-  });
-});
-
-describe('entryAuditAction', () => {
-  it.each([
-    [undefined, 'draft', 'help_article.created'],
-    [undefined, 'published', 'help_article.published'],
-    ['draft', 'draft', 'help_article.saved'],
-    ['draft', 'published', 'help_article.published'],
-    ['published', 'published', 'help_article.saved'],
-    ['published', 'draft', 'help_article.unpublished'],
-  ] as const)('%s to %s is %s', (before, after, action) => {
-    expect(entryAuditAction(before, after)).toBe(action);
-  });
-});
-
 describe('buildEntryRows and entryPath', () => {
   it('shows each article with its status and New York time', () => {
     const article = {
@@ -397,6 +374,11 @@ describe('entryRedirect', () => {
       { status: 'saved', id, intent: 'save' },
       `/ops/editorial/${id}?notice=saved`,
     ],
+    [
+      id,
+      { status: 'saved', id, intent: 'unpublish' },
+      `/ops/editorial/${id}?notice=unpublished`,
+    ],
   ] as const)('%s with %j goes to %s', (postedId, outcome, href) => {
     expect(entryRedirect(postedId, outcome)).toBe(href);
   });
@@ -407,6 +389,17 @@ describe('auditFor', () => {
     expect(auditFor(null, undefined, 'published', id)).toBeNull();
   });
 
+  it.each([
+    [undefined, 'draft', 'help_article.created'],
+    [undefined, 'published', 'help_article.published'],
+    ['draft', 'draft', 'help_article.saved'],
+    ['draft', 'published', 'help_article.published'],
+    ['published', 'published', 'help_article.saved'],
+    ['published', 'draft', 'help_article.unpublished'],
+  ] as const)('%s to %s is %s', (before, after, action) => {
+    expect(auditFor(id, before, after, id)?.action).toBe(action);
+  });
+
   it('names the user and what the save did, and passes the audit schema', () => {
     const row = auditFor(id, 'published', 'draft', id);
     expect(parseAuditEntry(row)).toMatchObject({
@@ -415,6 +408,13 @@ describe('auditFor', () => {
       subjectKind: 'help_article',
       subjectId: id,
     });
+  });
+});
+
+describe('entryBody', () => {
+  it('is the article body, or an empty document for a new article', () => {
+    expect(entryBody({ body: textDoc } as HelpArticle)).toBe(textDoc);
+    expect(entryBody(null)).toEqual({ type: 'doc', content: [] });
   });
 });
 

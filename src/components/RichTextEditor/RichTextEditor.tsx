@@ -11,6 +11,7 @@ import {
   isAllowedLinkUri,
   safeLinkHref,
 } from '@/lib/richText/href';
+import { editorStartContent } from '@/lib/richText/paragraphs';
 import { encodeRichText } from '@/lib/richText/sanitize';
 import type { RichTextDoc } from '@/lib/richText/format';
 import styles from './RichTextEditor.module.css';
@@ -59,7 +60,7 @@ export function RichTextEditor({
         },
       }),
     ],
-    content: initial.content.length > 0 ? initial : '',
+    content: editorStartContent(initial),
     editorProps: {
       attributes: {
         role: 'textbox',

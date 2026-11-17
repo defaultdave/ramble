@@ -653,3 +653,11 @@ export function inspectRichText(input: unknown): {
 export function sanitizeRichText(input: unknown): RichTextDoc {
   return inspectRichText(input).doc;
 }
+
+/**
+ * A document as the editor form posts it: sanitized, then JSON. The server's `parseBody` reads it
+ * back. It lives here, not beside `parseBody`, so the editor's client bundle stays free of ops code.
+ */
+export function encodeRichText(input: unknown): string {
+  return JSON.stringify(sanitizeRichText(input));
+}

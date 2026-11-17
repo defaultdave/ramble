@@ -10,15 +10,17 @@ import { defaultHostTimeZone } from './hostSetup';
 import {
   fieldsFromIssues,
   formText,
+  invalidFormNotice,
   noticeHref,
   oversizedFields,
   parseIdField,
+  slugFor,
+  slugProblemStart,
   type FormGetter,
   type NoticeText,
 } from './opsForm';
 import { pickKnown } from './pickKnown';
 import { hasContent } from './richText/paragraphs';
-import { slugify } from './catalog';
 import type { StatusTone } from './statusBadge';
 import { zonedDeadlineLabel } from './zonedLabels';
 
@@ -45,7 +47,7 @@ const entryIntents = ['save', 'publish', 'unpublish'] as const;
 export type EntryIntent = (typeof entryIntents)[number];
 
 /** The status a form leaves an entry in: saving keeps it where it is, the other two move it. */
-export function statusAfter(
+function statusAfter(
   intent: EntryIntent,
   current: PublishStatus,
 ): PublishStatus {
@@ -53,6 +55,9 @@ export function statusAfter(
   if (intent === 'unpublish') return 'draft';
   return current;
 }
+
+/** What a new article starts as; the form carries a status and position only for an article that exists. */
+const newEntry: StoredEntry = { status: 'draft', position: 0 };
 
 /** The stored row a save settles against: the one it locked, or none for a new article. */
 export type StoredEntry = { status: PublishStatus; position: number };
@@ -90,7 +95,7 @@ export type EntryFormField = (typeof entryFormFields)[number];
 
 export const entryFieldProblems = {
   title: `Add a title of up to ${String(editorialLimits.title)} characters.`,
-  slug: 'Use lower-case words joined by hyphens, such as how-to-cancel.',
+  slug: `${slugProblemStart}, such as how-to-cancel.`,
   summary: `Keep the summary to ${String(editorialLimits.summary)} characters.`,
   body: 'Add some text to the body before publishing, and check each link.',
 } satisfies Record<EntryFormField, string>;
@@ -132,20 +137,28 @@ export function parseEntryForm(get: FormGetter): EntryForm {
 
   const intent = pickKnown(formText(get, 'intent'), entryIntents, null);
   if (intent === null) return { ok: false, fields: [] };
-  const current = pickKnown(formText(get, 'status'), publishStatuses, 'draft');
+  const current = pickKnown(
+    formText(get, 'status'),
+    publishStatuses,
+    newEntry.status,
+  );
   const title = formText(get, 'title');
   const id = parseIdField(get('id')) ?? undefined;
   const slug =
-    formText(get, 'slug') ??
-    (id === undefined ? undefined : formText(get, 'currentSlug')) ??
-    slugify(title ?? '');
+    slugFor(
+      title ?? '',
+      formText(get, 'slug') ??
+        (id === undefined ? undefined : formText(get, 'currentSlug')),
+      true,
+      editorialLimits.slug,
+    ) ?? undefined;
 
   const parsed = HelpArticleInputSchema.safeParse({
     id,
     slug,
     title,
     summary: formText(get, 'summary') ?? null,
-    position: Number(formText(get, 'position') ?? 0),
+    position: Number(formText(get, 'position') ?? newEntry.position),
     status: statusAfter(intent, current),
     body: parseBody(formText(get, 'body')),
   });
@@ -208,7 +221,7 @@ export const entryNotices = {
     title: 'Another article already uses that address. Choose another.',
   },
   not_found: { tone: 'warning', title: 'That article could not be found.' },
-  invalid: { tone: 'danger', title: 'Some details need another look.' },
+  invalid: invalidFormNotice,
 } satisfies Record<EntryNoticeCode, NoticeText>;
 
 /** The notice for a saved entry: what the intent did, which is the point of the click. */
@@ -264,7 +277,7 @@ export function auditFor(
 }
 
 /** One row per save. The text is not written: the audit log holds ids and codes, never words. */
-export function entryAuditEntry(
+function entryAuditEntry(
   userId: string,
   action: string,
   articleId: string,

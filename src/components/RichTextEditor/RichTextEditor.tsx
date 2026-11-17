@@ -5,8 +5,13 @@ import StarterKit from '@tiptap/starter-kit';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
-import { linkPanelStart, safeLinkHref } from '@/lib/richText/href';
-import { sanitizeRichText } from '@/lib/richText/sanitize';
+import {
+  linkPanelStart,
+  linkProblem,
+  isAllowedLinkUri,
+  safeLinkHref,
+} from '@/lib/richText/href';
+import { encodeRichText } from '@/lib/richText/sanitize';
 import type { RichTextDoc } from '@/lib/richText/format';
 import styles from './RichTextEditor.module.css';
 
@@ -17,9 +22,6 @@ export type RichTextEditorProps = {
   initial: RichTextDoc;
   errorText?: string;
 };
-
-const linkProblem =
-  'Use a web, email or phone link, or a path on this site, such as /help.';
 
 /**
  * Edits a document in the one format the site renders (`src/lib/richText`): the nodes and marks
@@ -37,9 +39,7 @@ export function RichTextEditor({
   const errorId = useId();
   const linkErrorId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
-  const [value, setValue] = useState(() =>
-    JSON.stringify(sanitizeRichText(initial)),
-  );
+  const [value, setValue] = useState(() => encodeRichText(initial));
   const [linkHref, setLinkHref] = useState<string | null>(null);
   const [linkError, setLinkError] = useState(false);
 
@@ -55,7 +55,7 @@ export function RichTextEditor({
         link: {
           openOnClick: false,
           autolink: false,
-          isAllowedUri: (url) => safeLinkHref(url) !== null,
+          isAllowedUri: isAllowedLinkUri,
         },
       }),
     ],
@@ -71,7 +71,7 @@ export function RichTextEditor({
       },
     },
     onUpdate: ({ editor: updated }) => {
-      setValue(JSON.stringify(sanitizeRichText(updated.getJSON())));
+      setValue(encodeRichText(updated.getJSON()));
     },
   });
 

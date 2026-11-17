@@ -26,6 +26,7 @@ import {
   invalidFormNotice,
   oversizedFields,
   slugFor,
+  slugProblemStart,
   type FormGetter,
   type NoticeText,
 } from './opsForm';
@@ -669,7 +670,7 @@ export function parseExperienceFilters(
 export const experienceFieldProblems = {
   hostId: 'Choose the host this experience belongs to.',
   name: 'Enter the experience name, up to 120 characters.',
-  slug: 'Use lower-case words joined by hyphens, up to 80 characters. The old address keeps working.',
+  slug: `${slugProblemStart}, up to 80 characters. The old address keeps working.`,
   description: 'Keep the description under 5000 characters, or leave it empty.',
   meetingPoint: 'Keep the meeting point under 500 characters.',
   included: 'Keep this under 1000 characters.',

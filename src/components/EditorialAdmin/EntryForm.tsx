@@ -34,10 +34,12 @@ export function EntryForm({ entry, problems, save }: EntryFormProps) {
   return (
     <form action={save} className={styles.form}>
       {entry ? <input type="hidden" name="id" value={entry.id} /> : null}
-      <input type="hidden" name="status" value={entry?.status ?? 'draft'} />
-      <input type="hidden" name="position" value={entry?.position ?? 0} />
       {entry ? (
-        <input type="hidden" name="currentSlug" value={entry.slug} />
+        <>
+          <input type="hidden" name="status" value={entry.status} />
+          <input type="hidden" name="position" value={entry.position} />
+          <input type="hidden" name="currentSlug" value={entry.slug} />
+        </>
       ) : null}
       <Input
         name="title"

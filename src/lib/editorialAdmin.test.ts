@@ -7,12 +7,10 @@ import {
   saveLabel,
   toggleIntent,
   entryAuditAction,
-  entryAuditEntry,
   entryPath,
   parseEntryForm,
   savedNotice,
   settleEntry,
-  statusAfter,
   toggleLabel,
 } from './editorialAdmin';
 import type { HelpArticle } from './editorial';
@@ -45,17 +43,6 @@ function form(fields: Record<string, string>) {
 }
 
 const base = { intent: 'save', title: 'How to cancel', body };
-
-describe('statusAfter', () => {
-  it.each([
-    ['save', 'draft', 'draft'],
-    ['save', 'published', 'published'],
-    ['publish', 'draft', 'published'],
-    ['unpublish', 'published', 'draft'],
-  ] as const)('%s on a %s entry leaves it %s', (intent, current, expected) => {
-    expect(statusAfter(intent, current)).toBe(expected);
-  });
-});
 
 const textDoc: RichTextDoc = {
   type: 'doc',
@@ -286,17 +273,6 @@ describe('entryAuditAction', () => {
   });
 });
 
-describe('entryAuditEntry', () => {
-  it('names the user and passes the audit schema', () => {
-    const user = entryAuditEntry(id, 'help_article.saved', id);
-    expect(parseAuditEntry(user)).toMatchObject({
-      actorKind: 'user',
-      subjectKind: 'help_article',
-      subjectId: id,
-    });
-  });
-});
-
 describe('buildEntryRows and entryPath', () => {
   it('shows each article with its status and New York time', () => {
     const article = {
@@ -431,9 +407,12 @@ describe('auditFor', () => {
     expect(auditFor(null, undefined, 'published', id)).toBeNull();
   });
 
-  it('names the user and what the save did', () => {
-    expect(auditFor('u1', 'published', 'draft', id)).toMatchObject({
+  it('names the user and what the save did, and passes the audit schema', () => {
+    const row = auditFor(id, 'published', 'draft', id);
+    expect(parseAuditEntry(row)).toMatchObject({
+      actorKind: 'user',
       action: 'help_article.unpublished',
+      subjectKind: 'help_article',
       subjectId: id,
     });
   });

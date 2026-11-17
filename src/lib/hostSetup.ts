@@ -18,6 +18,7 @@ import {
   oversizedFields,
   parseNotice,
   slugFor,
+  slugProblemStart,
   type FormGetter,
   type InviteResult,
   type NoticeText,
@@ -479,7 +480,7 @@ export function acceptanceRecordLabel(
 
 export const hostFieldProblems = {
   name: 'Enter the host name, up to 120 characters.',
-  slug: 'Use lower-case words joined by hyphens, up to 80 characters, that no other host uses.',
+  slug: `${slugProblemStart}, up to 80 characters, that no other host uses.`,
   description: 'Keep the description under 2000 characters, or leave it empty.',
   timeZone: 'Enter a time zone name such as America/New_York.',
   notificationEmail: 'Enter an email address, like bookings@example.com.',

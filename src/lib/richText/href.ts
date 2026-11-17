@@ -32,6 +32,20 @@ export function safeLinkHref(value: unknown): string | null {
   return WEB_AND_CONTACT_PROTOCOLS.has(new URL(href).protocol) ? href : null;
 }
 
+/** Tiptap's link policy: the editor accepts exactly the links the site renders. */
+export function isAllowedLinkUri(url: string): boolean {
+  return safeLinkHref(url) !== null;
+}
+
+/** What the editor says to a link it refuses. */
+export const linkProblem =
+  'Use a web, email or phone link, or a path on this site, such as /help.';
+
 export function isWebUrl(href: string): boolean {
   return /^https?:/i.test(href);
+}
+
+/** The text a link panel opens with: the address of the link under the cursor, or blank. */
+export function linkPanelStart(attributes: { href?: unknown }): string {
+  return typeof attributes.href === 'string' ? attributes.href : '';
 }

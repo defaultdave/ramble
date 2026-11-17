@@ -28,6 +28,7 @@ import {
 import type { ResolvedManageToken } from './orderTokens';
 import { readMoveSubject, readMoveTarget } from './ordersMoveFacts';
 import { holds, orders, sessions } from './schema';
+import { retimeSessionReminder } from './sessionReminder';
 import { readDatabaseTime } from './time';
 
 // Moving a booking to another date by its manage link. Every decision (whether the booking is
@@ -118,6 +119,7 @@ async function moveInTransaction(
     payload: { orderId: parsed.orderId, moveId },
     dedupeKey: moveEmailKey(moveId),
   });
+  await retimeSessionReminder(tx, { orderId: parsed.orderId, moveId, now });
   return { kind: 'done', value: { result: { status: 'moved' }, plan } };
 }
 
@@ -127,7 +129,7 @@ async function moveInTransaction(
  * order and the version it was opened at come from it and not from the caller. Both sessions, the
  * hold, and the order are locked and the move is judged again under them, so a move that lost a
  * race to a cancellation or another move answers its refusal and writes nothing. The order, the
- * hold, both sessions' seats, the audit row, and the email job commit together or not at all.
+ * hold, both sessions' seats, the audit row, the email job, and the re-timed reminder commit together or not at all.
  */
 export async function moveBookingOrder(input: {
   token: ResolvedManageToken;

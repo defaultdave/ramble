@@ -6,7 +6,8 @@ import {
   liveAttemptStatuses,
   payingLapse,
 } from './holdLapse';
-import { at, later, otherUuid, uuid } from './holds.fixtures';
+import { otherUuid, uuid } from './holds.fixtures';
+import { at, msFrom } from './testClock';
 import { orderStatuses, type OrderStatus } from './orders';
 import { attemptStatuses, type AttemptStatus } from './payments';
 
@@ -32,9 +33,9 @@ const attemptOf = (
   status,
   providerPaymentId,
 });
-const paying = (payingUntil: Date | null = later(-1)) => ({
+const paying = (payingUntil: Date | null = msFrom(-1)) => ({
   status: 'paying' as const,
-  expiresAt: later(-60_000),
+  expiresAt: msFrom(-60_000),
   payingUntil,
 });
 
@@ -56,13 +57,13 @@ const lapse = (
 
 describe('payingLapse: which holds', () => {
   it.each([
-    ['open', { hold: paying(later(1)) }],
+    ['open', { hold: paying(msFrom(1)) }],
     [
       'active',
       {
         hold: {
           status: 'active' as const,
-          expiresAt: later(-1),
+          expiresAt: msFrom(-1),
           payingUntil: null,
         },
       },
@@ -157,7 +158,7 @@ describe('payingLapse: the attempt', () => {
   });
 
   it('is judged again after the cancel: a hold that opened meanwhile is left alone', () => {
-    expect(lapse({ hold: paying(later(1)) }, uuid)).toEqual({ kind: 'skip' });
+    expect(lapse({ hold: paying(msFrom(1)) }, uuid)).toEqual({ kind: 'skip' });
   });
 });
 

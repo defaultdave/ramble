@@ -18,7 +18,7 @@ import {
   requireHoldTransition,
 } from './holds';
 import { jobLimits } from './jobs';
-import { at, later } from './holds.fixtures';
+import { at, msFrom } from './testClock';
 
 // Behaviours under test, one per decision, branch or risk:
 // - cleanup: holdsToRelease splits by reason from status and deadline, the batch continues only on a full batch inside both caps
@@ -31,7 +31,7 @@ import { at, later } from './holds.fixtures';
 describe('holdsToRelease', () => {
   const times = (overrides = {}) => ({
     status: 'active' as const,
-    expiresAt: later(-1),
+    expiresAt: msFrom(-1),
     payingUntil: null,
     ...overrides,
   });
@@ -43,7 +43,11 @@ describe('holdsToRelease', () => {
       times({ expiresAt: at }),
       'expired',
     ],
-    ['an open active hold is left alone', times({ expiresAt: later(1) }), null],
+    [
+      'an open active hold is left alone',
+      times({ expiresAt: msFrom(1) }),
+      null,
+    ],
     [
       'a paying hold past paying_until was abandoned',
       times({ status: 'paying', payingUntil: at }),
@@ -51,7 +55,7 @@ describe('holdsToRelease', () => {
     ],
     [
       'a paying hold past expires_at but inside paying_until is left alone',
-      times({ status: 'paying', payingUntil: later(1) }),
+      times({ status: 'paying', payingUntil: msFrom(1) }),
       null,
     ],
     ['a converted hold is left alone', times({ status: 'converted' }), null],
@@ -70,8 +74,8 @@ describe('holdsToRelease', () => {
         [
           { id: 'a', ...times() },
           { id: 'b', ...times({ status: 'paying', payingUntil: at }) },
-          { id: 'c', ...times({ expiresAt: later(1) }) },
-          { id: 'd', ...times({ expiresAt: later(-5) }) },
+          { id: 'c', ...times({ expiresAt: msFrom(1) }) },
+          { id: 'd', ...times({ expiresAt: msFrom(-5) }) },
           { id: 'e', ...times({ status: 'converted' }) },
         ],
         at,
@@ -143,10 +147,10 @@ describe('remaining spaces', () => {
 
 describe('the paying deadline', () => {
   it.each([
-    ['expiry still ahead', later(5 * 60_000), 5, later(10 * 60_000)],
-    ['expiry already past', later(-60_000), 5, later(5 * 60_000)],
+    ['expiry still ahead', msFrom(5 * 60_000), 5, msFrom(10 * 60_000)],
+    ['expiry already past', msFrom(-60_000), 5, msFrom(5 * 60_000)],
     ['expiry now', at, 0, at],
-    ['the largest grace', later(60_000), 30, later(31 * 60_000)],
+    ['the largest grace', msFrom(60_000), 30, msFrom(31 * 60_000)],
   ])(
     'is the later of expiry and now plus the grace: %s',
     (_name, expiresAt, grace, expected) => {
@@ -165,23 +169,23 @@ describe('the paying deadline', () => {
 describe('making a hold paying', () => {
   const hold = (change: Partial<HoldTimes>): HoldTimes => ({
     status: 'active',
-    expiresAt: later(5 * 60_000),
+    expiresAt: msFrom(5 * 60_000),
     payingUntil: null,
     ...change,
   });
 
   it('moves an open active hold to paying with the deadline', () => {
     expect(payingHold(hold({}), at, 5)).toEqual({
-      payingUntil: later(10 * 60_000),
+      payingUntil: msFrom(10 * 60_000),
     });
   });
 
   it.each([
-    ['an active hold past its expiry', hold({ expiresAt: later(-1) })],
+    ['an active hold past its expiry', hold({ expiresAt: msFrom(-1) })],
     ['an active hold expiring now', hold({ expiresAt: at })],
     [
       'a paying hold, which keeps its deadline',
-      hold({ status: 'paying', payingUntil: later(60_000) }),
+      hold({ status: 'paying', payingUntil: msFrom(60_000) }),
     ],
     ['a converted hold', hold({ status: 'converted' })],
     ['a released hold', hold({ status: 'released' })],

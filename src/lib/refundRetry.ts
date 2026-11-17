@@ -38,7 +38,8 @@ export const opsFullRefundRequest = (orderId: string, userId: string) =>
   });
 
 export type RetryPlan =
-  { kind: 'retry'; request: RefundRequestInput } | { kind: 'stop' };
+  | { kind: 'retry'; request: RefundRequestInput; clearsFlag: boolean }
+  | { kind: 'stop' };
 
 type FailedRefund = { id: string; reason: string; ticketMinor: number };
 
@@ -64,7 +65,9 @@ function retryRequest(
  * first. A failed refund is passed over when it has no ticket part to ask for or when its retry
  * already exists (`standingIds` holds the order's refund ids, and `refundIdOf` names the refund a
  * request would write), so an older failure is never stuck behind a newer one. An order that is not
- * a flagged booking, or has no failed refund left to retry, is left alone.
+ * a flagged booking, or has no failed refund left to retry, is left alone. The plan also says whether
+ * the retry clears the order's refund-failed flag: only when no other failed refund is left to retry,
+ * so the flag stays up until every failure has been asked for again.
  */
 export function pickRetry(input: {
   orderId: string;
@@ -78,14 +81,14 @@ export function pickRetry(input: {
   if (order === null || order.kind !== 'booking' || !order.refundFailed) {
     return { kind: 'stop' };
   }
-  for (const failed of input.failed) {
-    if (failed.ticketMinor < 1) continue;
+  const retryable = input.failed.flatMap((failed) => {
+    if (failed.ticketMinor < 1) return [];
     const request = retryRequest(input.orderId, input.userId, failed);
-    if (!input.standingIds.has(input.refundIdOf(request))) {
-      return { kind: 'retry', request };
-    }
-  }
-  return { kind: 'stop' };
+    return input.standingIds.has(input.refundIdOf(request)) ? [] : [request];
+  });
+  const [request, ...others] = retryable;
+  if (request === undefined) return { kind: 'stop' };
+  return { kind: 'retry', request, clearsFlag: others.length === 0 };
 }
 
 /** An ops refund was requested or retried: the new refund's id names it. */

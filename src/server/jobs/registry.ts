@@ -25,6 +25,7 @@ import type { Clock } from '@/server/ports/clock';
 import { exportAuditDay } from './auditExport';
 import {
   BookingEmailPayloadSchema,
+  SessionReminderPayloadSchema,
   sendGuestConfirmation,
   sendGuestMoveConfirmation,
   sendGuestResend,
@@ -141,7 +142,7 @@ export const jobRegistry = {
     handleIdempotent: sendHostBookingNotice,
   }),
   'session-reminder': defineJob({
-    payload: BookingEmailPayloadSchema,
+    payload: SessionReminderPayloadSchema,
     maxAttempts: jobLimits.defaultMaxAttempts,
     handleIdempotent: sendSessionReminder,
   }),

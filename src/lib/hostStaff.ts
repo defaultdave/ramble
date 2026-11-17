@@ -1,5 +1,5 @@
 import type { HostAccess } from './hostAccess';
-import { ownedHostId } from './hostAccess';
+import { hostAreaResult } from './hostAccess';
 import { hostExperiencesPath } from './hostExperiences';
 import { hostSessionsPath } from './hostSessions';
 import { hostSettingsPath } from './hostSettings';
@@ -27,6 +27,19 @@ export const hostStaffGrant = (hostId: string) =>
 
 /** The most staff one host has. Under the staff read limit, so the page never hides one. */
 export const maxHostStaff = 10;
+
+/**
+ * Whether a host may give the staff role to `address`, given who holds it. An address already
+ * holding it is not new, so it is never turned away; any other waits for room under the cap.
+ * Addresses are compared as given: the caller normalizes `address`, the holders come stored so.
+ */
+export function staffCapDecision(
+  held: readonly { readonly email: string }[],
+  address: string,
+): 'grant' | 'cap_reached' {
+  const alreadyStaff = held.some((holder) => holder.email === address);
+  return !alreadyStaff && held.length >= maxHostStaff ? 'cap_reached' : 'grant';
+}
 
 export const hostStaffInviteHint =
   'Staff can see your dashboard, sessions and guest lists, and change nothing. They get a single-use sign-in link.';
@@ -90,9 +103,5 @@ export function hostStaffResult(
   access: HostAccess,
   rows: readonly StaffRow[] | null,
 ): HostStaffResult {
-  if (access.kind === 'signed_out') return { status: 'signed_out' };
-  if (ownedHostId(access) === null || rows === null) {
-    return { status: 'refused' };
-  }
-  return { status: 'ok', rows };
+  return hostAreaResult(access, rows, (read) => ({ status: 'ok', rows: read }));
 }

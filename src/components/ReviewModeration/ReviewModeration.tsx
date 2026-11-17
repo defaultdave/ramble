@@ -10,10 +10,9 @@ import {
   reviewStatusTones,
   type ReviewModerationRow,
 } from '@/lib/reviewModeration';
+import type { FormAction } from '@/lib/opsForm';
 import type { TableQuery } from '@/lib/tableQuery';
 import styles from './ReviewModeration.module.css';
-
-type FormAction = (formData: FormData) => void | Promise<void>;
 
 export type ReviewModerationProps = {
   rows: readonly ReviewModerationRow[];
@@ -75,19 +74,27 @@ export function ReviewModeration({
             <input type="hidden" name="id" value={row.id} />
             <Select
               name="reason"
-              label={copy.hideReasonLabel(row.firstName)}
+              label={copy.hideReasonLabel(row.firstName, row.experienceName)}
               options={reviewHideReasonOptions}
               placeholder={copy.hideReasonPlaceholder}
               required
             />
-            <Button type="submit" variant="secondary">
+            <Button
+              type="submit"
+              variant="secondary"
+              aria-label={copy.hideLabel(row.firstName, row.experienceName)}
+            >
               {copy.hide}
             </Button>
           </form>
         ) : (
           <form action={unhide} className={styles.actionForm}>
             <input type="hidden" name="id" value={row.id} />
-            <Button type="submit" variant="secondary">
+            <Button
+              type="submit"
+              variant="secondary"
+              aria-label={copy.unhideLabel(row.firstName, row.experienceName)}
+            >
               {copy.unhide}
             </Button>
           </form>

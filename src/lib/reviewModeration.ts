@@ -3,18 +3,19 @@ import { userActor, type AuditEntryInput } from './audit';
 import { WriteIdSchema } from './catalog';
 import { reviewCopy } from './copy/review';
 import { reviewModerationCopy } from './copy/reviewModeration';
-import { defaultHostTimeZone } from './hostSetup';
 import {
   formText,
   oversizedFields,
+  rawFormFieldLimit,
   type FormGetter,
   type FormResult,
   type NoticeText,
 } from './opsForm';
-import type { ReviewRow } from './reviewList';
+import { ReviewRowSchema } from './reviewList';
 import { reviewLimits, reviewStatuses } from './reviews';
 import { statusFilter, type StatusTone } from './statusBadge';
 import { firstNameOr, nameClip } from './text';
+import { venueTimeZone } from './venue';
 import { zonedDeadlineLabel } from './zonedLabels';
 
 // Ops hiding a review from guests and showing it again (PRD-32). A hidden review stays in the table;
@@ -53,10 +54,16 @@ export const reviewHideReasonOptions = reviewHideReasons.map((value) => ({
   label: reviewModerationCopy.hideReasons[value],
 }));
 
-export type ReviewModerationRecord = ReviewRow & {
-  experienceName: string;
-  status: ReviewStatus;
-};
+export const ReviewStatusSchema = z.enum(reviewStatuses);
+
+/** One review as the data layer reads it for the table. */
+export const ReviewModerationRecordSchema = ReviewRowSchema.extend({
+  experienceName: z.string(),
+  status: ReviewStatusSchema,
+});
+export type ReviewModerationRecord = z.infer<
+  typeof ReviewModerationRecordSchema
+>;
 
 export type ReviewModerationRow = {
   id: string;
@@ -75,10 +82,7 @@ export function buildReviewModerationRows(
   return records.map((record) => ({
     id: record.id,
     experienceName: record.experienceName,
-    ratingText: reviewModerationCopy.ratingText(
-      record.rating,
-      reviewLimits.maxRating,
-    ),
+    ratingText: reviewCopy.display.outOf(record.rating, reviewLimits.maxRating),
     body: record.body,
     firstName: firstNameOr(
       record.guestName,
@@ -86,7 +90,7 @@ export function buildReviewModerationRows(
       nameClip.firstName,
     ),
     status: record.status,
-    writtenLabel: zonedDeadlineLabel(record.createdAt, defaultHostTimeZone),
+    writtenLabel: zonedDeadlineLabel(record.createdAt, venueTimeZone),
   }));
 }
 
@@ -95,7 +99,21 @@ export type ReviewModerationAction = 'hide' | 'unhide';
 export type ReviewModerationOutcome =
   'hidden' | 'unhidden' | 'already_hidden' | 'already_visible' | 'not_found';
 
+type FoundOutcome = Exclude<ReviewModerationOutcome, 'not_found'>;
+
 /** What hiding or showing a review does with the row as it stands under the lock: nothing for a missing one or one already in that state. */
+export function reviewModerationOutcome(
+  row: undefined,
+  action: ReviewModerationAction,
+): 'not_found';
+export function reviewModerationOutcome(
+  row: { status: ReviewStatus },
+  action: ReviewModerationAction,
+): FoundOutcome;
+export function reviewModerationOutcome(
+  row: { status: ReviewStatus } | undefined,
+  action: ReviewModerationAction,
+): ReviewModerationOutcome;
 export function reviewModerationOutcome(
   row: { status: ReviewStatus } | undefined,
   action: ReviewModerationAction,
@@ -114,14 +132,32 @@ export function reviewModerationChanged(
   return outcome === 'hidden' || outcome === 'unhidden';
 }
 
+/** What a hide or a show came to; the experience is known for every outcome but a missing review. */
+export type ReviewModerationResult =
+  | { outcome: 'not_found'; experienceId: null }
+  | {
+      outcome: FoundOutcome;
+      experienceId: string;
+    };
+
+/** The cache changes a result calls for: the experience's pages when the review changed, so a card and the experience page drop or restore it, and none otherwise. */
+export function reviewModerationRefresh(
+  result: ReviewModerationResult,
+): { kind: 'experience'; experienceId: string }[] {
+  if (
+    result.outcome === 'not_found' ||
+    !reviewModerationChanged(result.outcome)
+  ) {
+    return [];
+  }
+  return [{ kind: 'experience', experienceId: result.experienceId }];
+}
+
 /** The status a review takes when an action changes it. */
 export const reviewStatusAfter = {
   hide: 'hidden',
   unhide: 'visible',
 } as const satisfies Record<ReviewModerationAction, ReviewStatus>;
-
-/** A longer field than this is refused unread, so no rule walks an unbounded string. */
-const rawFieldMax = 200;
 
 const HideSchema = z.strictObject({
   id: WriteIdSchema,
@@ -136,7 +172,7 @@ export type ReviewUnhideInput = z.output<typeof UnhideSchema>;
 export function parseReviewHideForm(
   get: FormGetter,
 ): FormResult<ReviewHideInput> {
-  if (oversizedFields(get, ['id', 'reason'], rawFieldMax).length > 0) {
+  if (oversizedFields(get, ['id', 'reason'], rawFormFieldLimit).length > 0) {
     return { ok: false };
   }
   const parsed = HideSchema.safeParse({
@@ -150,7 +186,7 @@ export function parseReviewHideForm(
 export function parseReviewUnhideForm(
   get: FormGetter,
 ): FormResult<ReviewUnhideInput> {
-  if (oversizedFields(get, ['id'], rawFieldMax).length > 0) {
+  if (oversizedFields(get, ['id'], rawFormFieldLimit).length > 0) {
     return { ok: false };
   }
   const parsed = UnhideSchema.safeParse({ id: formText(get, 'id') });

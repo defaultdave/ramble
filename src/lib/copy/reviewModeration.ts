@@ -18,9 +18,12 @@ export const reviewModerationCopy = {
     action: 'Action',
   },
   statusLabels: { visible: 'Visible', hidden: 'Hidden' },
-  ratingText: (rating: number, max: number) =>
-    `${String(rating)} out of ${String(max)}`,
-  hideReasonLabel: (name: string) => `Reason for hiding the review by ${name}`,
+  hideReasonLabel: (name: string, experience: string) =>
+    `Reason for hiding the review by ${name}, ${experience}`,
+  hideLabel: (name: string, experience: string) =>
+    `Hide review by ${name}, ${experience}`,
+  unhideLabel: (name: string, experience: string) =>
+    `Show again the review by ${name}, ${experience}`,
   hideReasonPlaceholder: 'Choose a reason',
   hideReasons: {
     spam: 'Spam or an advertisement',
@@ -39,7 +42,7 @@ export const reviewModerationCopy = {
     hidden: 'Review hidden. Guests no longer see it.',
     unhidden: 'Review shown again.',
     already_hidden: 'That review was already hidden.',
-    already_visible: 'That review was already visible.',
+    already_visible: 'That review is already visible.',
     not_found: 'That review could not be found.',
     invalid: 'Choose a reason to hide a review.',
   },

@@ -8,6 +8,9 @@ import {
   reviewHiddenEntry,
   reviewHideReasons,
   reviewModerationChanged,
+  ReviewModerationRecordSchema,
+  reviewModerationRefresh,
+  type ReviewModerationResult,
   reviewModerationNotices,
   reviewModerationNoticeCodes,
   reviewModerationOutcome,
@@ -58,6 +61,53 @@ describe('reviewModerationChanged', () => {
     ['not_found', false],
   ] as [ReviewModerationOutcome, boolean][])('%s is %s', (outcome, changed) => {
     expect(reviewModerationChanged(outcome)).toBe(changed);
+  });
+});
+
+describe('reviewModerationRefresh', () => {
+  const experienceId = '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d';
+
+  it.each(['hidden', 'unhidden'] as const)(
+    'refreshes the experience after %s',
+    (outcome) => {
+      expect(reviewModerationRefresh({ outcome, experienceId })).toEqual([
+        { kind: 'experience', experienceId },
+      ]);
+    },
+  );
+
+  it.each([
+    { outcome: 'already_hidden', experienceId },
+    { outcome: 'already_visible', experienceId },
+    { outcome: 'not_found', experienceId: null },
+  ] as ReviewModerationResult[])('refreshes nothing for $outcome', (result) => {
+    expect(reviewModerationRefresh(result)).toEqual([]);
+  });
+});
+
+describe('ReviewModerationRecordSchema', () => {
+  const record = {
+    id,
+    experienceName: 'Pottery wheel night',
+    rating: 4,
+    body: 'Lovely.',
+    guestName: null,
+    status: 'visible',
+    createdAt: new Date('2026-11-09T15:30:00Z'),
+  };
+
+  it('reads a review row', () => {
+    expect(ReviewModerationRecordSchema.parse(record)).toEqual(record);
+  });
+
+  it.each([
+    ['a status the page does not have', { status: 'removed' }],
+    ['a rating out of range', { rating: 9 }],
+    ['no experience name', { experienceName: undefined }],
+  ])('refuses %s', (_name, change) => {
+    expect(
+      ReviewModerationRecordSchema.safeParse({ ...record, ...change }).success,
+    ).toBe(false);
   });
 });
 
@@ -172,6 +222,15 @@ describe('buildReviewModerationRows first name', () => {
 });
 
 describe('notices', () => {
+  it('says a show of a visible review and a hide of a hidden one apart', () => {
+    expect(reviewModerationNotices.already_visible.title).toBe(
+      'That review is already visible.',
+    );
+    expect(reviewModerationNotices.already_hidden.title).toBe(
+      'That review was already hidden.',
+    );
+  });
+
   it('has text for every code', () => {
     expect(Object.keys(reviewModerationNotices).sort()).toEqual(
       [...reviewModerationNoticeCodes].sort(),

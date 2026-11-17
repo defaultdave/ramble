@@ -1,17 +1,21 @@
 import 'server-only';
 import { and, eq, sql } from 'drizzle-orm';
+import { WriteIdSchema } from '@/lib/catalog';
 import { splitPage } from '@/lib/pagination';
 import {
   buildReviewModerationRows,
   reviewHiddenEntry,
   reviewModerationChanged,
   reviewModerationOutcome,
+  ReviewModerationRecordSchema,
   reviewStatusAfter,
+  ReviewStatusSchema,
   reviewUnhiddenEntry,
-  type ReviewHideReason,
-  type ReviewModerationOutcome,
+  type ReviewHideInput,
+  type ReviewModerationResult,
   type ReviewModerationRow,
   type ReviewStatus,
+  type ReviewUnhideInput,
 } from '@/lib/reviewModeration';
 import { opsListPageSize } from '@/lib/tableQuery';
 import type { Caller } from '@/server/auth/caller';
@@ -34,6 +38,11 @@ export async function readReviewsForModeration(
   options: { status: ReviewStatus | null; cursor: string | null },
 ): Promise<ReviewModerationPage> {
   requireOpsUserId(caller);
+  const status = ReviewStatusSchema.nullable()
+    .catch(null)
+    .parse(options.status);
+  const cursor =
+    options.cursor === null ? null : WriteIdSchema.parse(options.cursor);
   const fetched = await dbRead
     .select({
       id: reviews.id,
@@ -49,27 +58,24 @@ export async function readReviewsForModeration(
     .innerJoin(orders, eq(orders.id, reviews.orderId))
     .where(
       and(
-        options.status === null
-          ? undefined
-          : eq(reviews.status, options.status),
-        pastKeysetCursor(reviews, reviews.createdAt, 'desc', options.cursor),
+        status === null ? undefined : eq(reviews.status, status),
+        pastKeysetCursor(reviews, reviews.createdAt, 'desc', cursor),
       ),
     )
     .orderBy(...byColumnThenId(reviews, reviews.createdAt, 'desc'))
     .limit(opsListPageSize + 1);
   const { items, nextCursor } = splitPage(fetched, opsListPageSize);
-  return { rows: buildReviewModerationRows(items), nextCursor };
+  return {
+    rows: buildReviewModerationRows(
+      ReviewModerationRecordSchema.array().parse(items),
+    ),
+    nextCursor,
+  };
 }
 
-export type ReviewModerationResult = {
-  outcome: ReviewModerationOutcome;
-  /** Whose pages show the review, for the cache refresh after a change; null when nothing was found. */
-  experienceId: string | null;
-};
-
 type Change =
-  | { action: 'hide'; id: string; reason: ReviewHideReason }
-  | { action: 'unhide'; id: string };
+  | ({ action: 'hide' } & ReviewHideInput)
+  | ({ action: 'unhide' } & ReviewUnhideInput);
 
 /** Hides or shows one review and records who did it, in one transaction. A review already in that state is left as it was. */
 export async function setReviewVisibility(
@@ -77,14 +83,17 @@ export async function setReviewVisibility(
   change: Change,
 ): Promise<ReviewModerationResult> {
   const userId = requireOpsUserId(caller);
+  const id = WriteIdSchema.parse(change.id);
   return db.transaction(async (tx) => {
     const [current] = await tx
       .select({ status: reviews.status, experienceId: reviews.experienceId })
       .from(reviews)
-      .where(eq(reviews.id, change.id))
+      .where(eq(reviews.id, id))
       .for('update');
+    if (current === undefined) {
+      return { outcome: 'not_found', experienceId: null };
+    }
     const outcome = reviewModerationOutcome(current, change.action);
-    if (current === undefined) return { outcome, experienceId: null };
     const experienceId = current.experienceId;
     if (!reviewModerationChanged(outcome)) {
       return { outcome, experienceId };
@@ -95,12 +104,12 @@ export async function setReviewVisibility(
         status: reviewStatusAfter[change.action],
         updatedAt: sql`clock_timestamp()`,
       })
-      .where(eq(reviews.id, change.id));
+      .where(eq(reviews.id, id));
     await writeAudit(
       tx,
       change.action === 'hide'
-        ? reviewHiddenEntry(userId, change.id, change.reason)
-        : reviewUnhiddenEntry(userId, change.id),
+        ? reviewHiddenEntry(userId, id, change.reason)
+        : reviewUnhiddenEntry(userId, id),
     );
     return { outcome, experienceId };
   });

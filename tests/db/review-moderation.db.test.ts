@@ -26,6 +26,7 @@ import { insertBooking } from './reviewFixtures';
 // - every function refuses a guest, a host owner, an admin, and nobody with ForbiddenError, and writes nothing
 // - the list is newest first, pages by cursor so each review shows once, and shows the first name, the experience and the status
 // - the status filter returns only visible or only hidden reviews
+// - a status that is not one lists every review; a cursor or review id that is not an id is refused before any query
 // - hiding stores the hidden status and a new updated time, and writes one audit row naming the ops user, the review and the reason code
 // - showing a hidden review again writes one audit row and no reason
 // - hiding a hidden review and showing a visible one are no-ops that write no audit row and leave the row as it was
@@ -193,6 +194,35 @@ describe('readReviewsForModeration', () => {
     expect(await ids('visible')).toEqual([visible.id]);
     expect(await ids('hidden')).toEqual([hidden.id]);
     expect(await ids(null)).toHaveLength(2);
+  });
+});
+
+describe('inputs the data layer reads', () => {
+  it('lists every review for a status that is not one', async () => {
+    await review();
+    await review({ status: 'hidden' });
+    const page = await moderation.readReviewsForModeration(ops, {
+      status: 'removed' as never,
+      cursor: null,
+    });
+    expect(page.rows).toHaveLength(2);
+  });
+
+  it('refuses a cursor that is not an id before it reaches the query', async () => {
+    await expect(
+      moderation.readReviewsForModeration(ops, {
+        status: null,
+        cursor: "x'; drop table reviews; --",
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('refuses a review id that is not one', async () => {
+    const before = await auditCount();
+    await expect(
+      moderation.setReviewVisibility(ops, { action: 'unhide', id: 'abc' }),
+    ).rejects.toThrow();
+    expect(await auditCount()).toBe(before);
   });
 });
 

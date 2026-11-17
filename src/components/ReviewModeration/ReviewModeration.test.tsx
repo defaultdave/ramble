@@ -6,8 +6,8 @@ import { hiddenRow, visibleRow } from './ReviewModeration.fixtures';
 
 // Behaviours under test:
 // - each review shows its experience, rating, body, first name and status in words
-// - a visible review has a hide form carrying its id, with a required reason choice named for the author
-// - a hidden review has a show-again form carrying its id and no reason choice
+// - a visible review has a hide form carrying its id, with a required reason choice and a Hide button named for the review's author and experience
+// - a hidden review has a show-again form carrying its id, named for the review, and no reason choice
 // - the status filter links to the list by status, and an empty list says so
 
 const noop = () => undefined;
@@ -46,10 +46,16 @@ describe('ReviewModeration', () => {
       visibleRow.id,
     );
     expect(
-      screen.getByLabelText('Reason for hiding the review by Pat'),
+      screen.getByLabelText(
+        'Reason for hiding the review by Pat, Pottery wheel night',
+      ),
     ).toBeRequired();
-    expect(screen.getByRole('button', { name: 'Hide' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Show again' })).toBeNull();
+    expect(
+      screen.getByRole('button', {
+        name: 'Hide review by Pat, Pottery wheel night',
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Show again/ })).toBeNull();
   });
 
   it('offers show again, with no reason, on a hidden review', () => {
@@ -59,7 +65,9 @@ describe('ReviewModeration', () => {
     );
     expect(container.querySelector('select')).toBeNull();
     expect(
-      screen.getByRole('button', { name: 'Show again' }),
+      screen.getByRole('button', {
+        name: 'Show again the review by A guest, Sunrise kayak paddle',
+      }),
     ).toBeInTheDocument();
   });
 

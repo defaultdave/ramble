@@ -1,3 +1,4 @@
+import { reviewCopy } from '@/lib/copy/review';
 import type { ReviewModerationRow } from '@/lib/reviewModeration';
 
 export const visibleRow: ReviewModerationRow = {
@@ -15,7 +16,7 @@ export const hiddenRow: ReviewModerationRow = {
   experienceName: 'Sunrise kayak paddle',
   ratingText: '1 out of 5',
   body: 'Buy cheap watches at example.test.',
-  firstName: 'A guest',
+  firstName: reviewCopy.display.anonymousGuest,
   status: 'hidden',
   writtenLabel: 'Sun, Nov 8, 9:00 AM EST',
 };

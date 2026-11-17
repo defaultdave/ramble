@@ -5,22 +5,18 @@ import { noticeHref } from '@/lib/opsForm';
 import {
   parseReviewHideForm,
   parseReviewUnhideForm,
-  reviewModerationChanged,
   reviewModerationPath,
+  reviewModerationRefresh,
+  type ReviewModerationResult,
 } from '@/lib/reviewModeration';
 import { updateTagsForChanges } from '@/server/cache/invalidate';
-import {
-  setReviewVisibility,
-  type ReviewModerationResult,
-} from '@/server/db/reviewModeration';
+import { setReviewVisibility } from '@/server/db/reviewModeration';
 import { opsCallerOrLeave } from '@/server/opsAccess';
 
 /** Refreshes the experience's pages when the review changed, so a card and the experience page drop or restore it, then returns with the outcome. */
-function leaveWith({ outcome, experienceId }: ReviewModerationResult): never {
-  if (experienceId !== null && reviewModerationChanged(outcome)) {
-    updateTagsForChanges([{ kind: 'experience', experienceId }]);
-  }
-  redirect(noticeHref(reviewModerationPath, outcome));
+function leaveWith(result: ReviewModerationResult): never {
+  updateTagsForChanges(reviewModerationRefresh(result));
+  redirect(noticeHref(reviewModerationPath, result.outcome));
 }
 
 export async function hideReviewAction(formData: FormData): Promise<void> {

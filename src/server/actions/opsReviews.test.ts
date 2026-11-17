@@ -34,7 +34,7 @@ import { hideReviewAction, unhideReviewAction } from './opsReviews';
 // - a refused form redirects with the invalid notice and changes nothing
 // - a hide passes the id and reason, an unhide the id, to the data layer with the ops caller
 // - a hide or show that changed the review refreshes its experience's tag, then redirects with the outcome
-// - an outcome that changed nothing redirects with its notice and refreshes nothing
+// - an outcome that changed nothing redirects with its notice and asks for no refresh
 
 const id = '0f1e2d3c-4b5a-4697-8a9b-0c1d2e3f4a5b';
 const experienceId = '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d';
@@ -120,7 +120,7 @@ describe('unhideReviewAction', () => {
   it.each([
     ['already_visible', experienceId],
     ['not_found', null],
-  ])('redirects with %s and refreshes nothing', async (outcome, found) => {
+  ])('redirects with %s and refreshes no page', async (outcome, found) => {
     mocks.setReviewVisibility.mockResolvedValue({
       outcome,
       experienceId: found,
@@ -128,6 +128,6 @@ describe('unhideReviewAction', () => {
     await expect(unhideReviewAction(form({ id }))).rejects.toMatchObject({
       href: `${path}?notice=${outcome}`,
     });
-    expect(mocks.updateTagsForChanges).not.toHaveBeenCalled();
+    expect(mocks.updateTagsForChanges).toHaveBeenCalledWith([]);
   });
 });

@@ -15,6 +15,7 @@ import { ButtonLink } from '@/components/Button';
 import { ExperienceGallery } from '@/components/ExperienceGallery';
 import type { ExperiencePageView, KeyFactIcon } from '@/lib/pages/experience';
 import styles from './ExperiencePage.module.css';
+import { ReviewsBlock } from './ReviewsBlock';
 import { StickyAside } from './StickyAside';
 
 export type ExperiencePageProps = {
@@ -162,6 +163,12 @@ export function ExperiencePage({ view, dates, booking }: ExperiencePageProps) {
             </div>
           </div>
         </Section>
+
+        {view.reviews ? (
+          <Section heading="Reviews">
+            <ReviewsBlock view={view.reviews} />
+          </Section>
+        ) : null}
 
         {view.meeting ? (
           <Section heading="Meeting point">

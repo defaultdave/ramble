@@ -18,6 +18,7 @@ import { makeDriverError } from '../../../../../tests/support/driverError';
 // - an address that is not a slug and an ID is a not-found, before anything is read
 // - an experience that is not visible to guests, and a guide entry, are a not-found
 // - a visible experience renders its page, with the gift entry only while gifts are on
+// - the reviews block is on the page from five reviews, with the first names of the bookers, and absent below
 // - the upcoming dates sit under their heading and are handed the experience, its prices, the book link, the address's query unread, and the page's own address
 // - the booking controls are handed the experience's booking basics (paused as settings say), the address's query unread, and the page's own address
 // - a failed read logs only the digest and kind and renders the error state, which retries at the page's own address
@@ -71,6 +72,7 @@ beforeEach(() => {
     experience: experience(),
     photos: [],
     place,
+    reviews: { rating: null, rows: [] },
   });
   server.settings.mockResolvedValue({ giftsEnabled: true, bannerText: null });
 });
@@ -112,6 +114,7 @@ describe('the experience route', () => {
       }),
       photos: [],
       place,
+      reviews: { rating: null, rows: [] },
     });
 
     await expect(ExperienceRoute(props(address))).rejects.toMatchObject({
@@ -129,6 +132,40 @@ describe('the experience route', () => {
       screen.getByRole('link', { name: 'Give this as a gift' }),
     ).toHaveAttribute('href', `/gifts/checkout/${id(1)}`);
   });
+
+  it.each([
+    { count: 5, shown: true },
+    { count: 4, shown: false },
+  ])(
+    'shows the reviews section for $count reviews: $shown',
+    async ({ count, shown }) => {
+      server.page.mockResolvedValue({
+        experience: experience(),
+        photos: [],
+        place,
+        reviews: {
+          rating: { average: 4.5, count },
+          rows: [
+            {
+              id: id(9),
+              rating: 5,
+              body: 'Lovely evening.',
+              createdAt: new Date('2026-11-01T15:00:00Z'),
+              guestName: 'Pat Rivera',
+            },
+          ],
+        },
+      });
+
+      render(await ExperienceRoute(props(address)));
+
+      expect(screen.queryByRole('region', { name: 'Reviews' }) !== null).toBe(
+        shown,
+      );
+      expect(screen.queryByText('Pat') !== null).toBe(shown);
+      expect(screen.queryByText(/Rivera/)).toBeNull();
+    },
+  );
 
   it('puts the streamed dates under their heading, with what they read and the way back', async () => {
     const searchParams = Promise.resolve({ date: '2026-10-24' });

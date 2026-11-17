@@ -18,6 +18,8 @@ import { createOrderParents } from './orderParents';
 import { day, hour, insertBooking } from './reviewFixtures';
 
 const testEnv = vi.hoisted((): Record<string, unknown> => ({}));
+const updateTag = vi.hoisted(() => vi.fn());
+vi.mock('next/cache', () => ({ updateTag, revalidateTag: vi.fn() }));
 vi.mock('@/server/env', () => ({ env: testEnv }));
 vi.mock('@/server/monitoring/alerts', () => ({ alerts: { raise: vi.fn() } }));
 vi.mock('@/server/monitoring/logger', () => ({
@@ -455,6 +457,10 @@ describe('the page and the submit', () => {
     );
     expect(await form.submitReview({ ...input, token: 'A'.repeat(43) })).toBe(
       'not_found',
+    );
+    // Only the review that was made refreshed the experience's cache tag.
+    expect(updateTag).toHaveBeenCalledExactlyOnceWith(
+      `experience:${parents.experienceId}`,
     );
     const rows = await client.db
       .select()

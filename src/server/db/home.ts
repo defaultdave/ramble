@@ -2,6 +2,7 @@ import 'server-only';
 import { and, asc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 import {
   CardExperienceSchema,
+  withRatings,
   type CardExperience,
 } from '@/lib/experienceCards';
 import {
@@ -15,6 +16,7 @@ import { soldOutAtSpacesLeft } from '@/lib/spaces';
 import { guestVisible } from './catalog';
 import { dbRead } from './client';
 import { coverImage, coverWith } from './photos';
+import { readRatings } from './reviewsRead';
 import { experiences, sessions } from './schema';
 
 /**
@@ -48,17 +50,17 @@ export async function listHomeExperiences(
     orderBy: [asc(experiences.name), asc(experiences.id)],
     limit: homeLimits.maxCardIds,
   });
-  return CardExperienceSchema.array().parse(
-    rows.map(({ neighborhood, photos: coverRows, ...row }) => {
-      // Without `covers` the query did not load photos, so there is no cover row to read.
-      const [cover] = covers ? coverRows : [];
-      return {
-        ...row,
-        neighborhoodName: neighborhood.name,
-        ...(covers ? { image: coverImage(cover ?? null) } : {}),
-      };
-    }),
-  );
+  const ratings = await readRatings(rows.map((row) => row.id));
+  const cards = rows.map(({ neighborhood, photos: coverRows, ...row }) => {
+    // Without `covers` the query did not load photos, so there is no cover row to read.
+    const [cover] = covers ? coverRows : [];
+    return {
+      ...row,
+      neighborhoodName: neighborhood.name,
+      ...(covers ? { image: coverImage(cover ?? null) } : {}),
+    };
+  });
+  return CardExperienceSchema.array().parse(withRatings(cards, ratings));
 }
 
 /**

@@ -1,0 +1,8 @@
+.frame {
+  box-sizing: border-box;
+  max-inline-size: 40rem;
+  padding: var(--space-4);
+  background: var(--color-bg-canvas);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-body);
+}

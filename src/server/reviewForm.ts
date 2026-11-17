@@ -8,6 +8,7 @@ import {
   type ReviewSubmitStatus,
   type ReviewSummary,
 } from '@/lib/reviews';
+import { updateTagsForChanges } from '@/server/cache/invalidate';
 import { db } from '@/server/db/client';
 import { insertReview, readReviewOrder } from '@/server/db/reviews';
 import { readDatabaseTime } from '@/server/db/time';
@@ -65,11 +66,19 @@ export async function submitReview(
 ): Promise<ReviewSubmitStatus> {
   const gate = await openReviewLink(input.reference, input.token);
   if (gate.kind === 'refused') return reviewRefusalFor(gate).submit;
-  return db.transaction((tx) =>
+  const written = await db.transaction((tx) =>
     insertReview(tx, {
       orderId: gate.row.id,
       rating: input.rating,
       body: input.body,
     }),
   );
+  // After the commit, so a page rebuilt by this call reads the review. It reaches the experience's
+  // page, and every browse and home card that lists the experience.
+  if (written.status === 'created') {
+    updateTagsForChanges([
+      { kind: 'experience', experienceId: written.experienceId },
+    ]);
+  }
+  return written.status;
 }

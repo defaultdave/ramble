@@ -10,6 +10,7 @@ import { ExperienceCardItem } from './ExperienceCardItem';
 // - a free card shows "Free per person", never "$0"
 // - a guide entry links out to the host and shows no price
 // - the heading level is the one the surface asks for
+// - a rating on the card is read out as the mean out of 5 and the count, and a card without one draws none
 // - a cover photo is drawn with its alt text, and a card with none draws no image
 
 const bookable = {
@@ -33,6 +34,27 @@ const guideOnly = {
 } satisfies ExperienceCard;
 
 describe('ExperienceCardItem', () => {
+  it('draws the rating, with a spoken name that says the mean and the count', () => {
+    render(
+      <ExperienceCardItem
+        card={{ ...bookable, rating: { average: 4.6, count: 12 } }}
+        layout="vertical"
+        headingLevel={3}
+      />,
+    );
+    expect(screen.getByText('4.6 (12)')).toBeInTheDocument();
+    expect(
+      screen.getByText('Rated 4.6 out of 5 from 12 reviews'),
+    ).toBeInTheDocument();
+  });
+
+  it('draws no rating for a card without one', () => {
+    render(
+      <ExperienceCardItem card={bookable} layout="vertical" headingLevel={3} />,
+    );
+    expect(screen.queryByText(/out of 5/)).not.toBeInTheDocument();
+  });
+
   it('links the title and shows the price per person', () => {
     render(
       <ExperienceCardItem card={bookable} layout="vertical" headingLevel={3} />,

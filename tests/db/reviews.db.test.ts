@@ -40,9 +40,9 @@ afterAll(async () => {
 });
 
 const submit = (orderId: string, rating = 5, body = 'A lovely evening.') =>
-  client.db.transaction((tx) =>
-    write.insertReview(tx, { orderId, rating, body }),
-  );
+  client.db
+    .transaction((tx) => write.insertReview(tx, { orderId, rating, body }))
+    .then((written) => written.status);
 
 const reviewsOf = (orderId: string) =>
   client.db.select().from(reviews).where(eq(reviews.orderId, orderId));

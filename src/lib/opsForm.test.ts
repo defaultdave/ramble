@@ -4,6 +4,7 @@ import {
   errorProps,
   fieldsFromIssues,
   formHas,
+  formJson,
   inFieldOrder,
   formText,
   formWholeNumber,
@@ -13,6 +14,10 @@ import {
   parseIdField,
   parseNotice,
   parseProblemFields,
+  opValue,
+  rawFormFieldLimit,
+  splitOp,
+  swapAt,
   problemText,
   slugFor,
 } from './opsForm';
@@ -20,6 +25,9 @@ import {
 // Behaviours under test, one per decision, branch or risk:
 // - posted text is trimmed, and missing, blank or non-text reads as absent
 // - a posted whole number is digits only, trimmed, and anything else reads as absent
+// - a posted JSON field is parsed, text that is not JSON goes on as text, and a blank field is absent
+// - a button value splits into exactly the parts it should, within its length
+// - two places of a list swap, and a place past an end is none
 // - a checkbox is ticked when the form carries it at all
 // - fields over the raw limit are named, in the list's order
 // - a slug is typed or derived when asked, and a missing, over-long or empty one is refused
@@ -41,6 +49,72 @@ describe('formText', () => {
     [42, undefined],
   ])('%j reads as %j', (raw, expected) => {
     expect(formText(form({ name: raw }), 'name')).toBe(expected);
+  });
+});
+
+describe('formJson', () => {
+  it.each([
+    ['{"type":"doc"}', { type: 'doc' }],
+    ['not json', 'not json'],
+    ['   ', undefined],
+    [null, undefined],
+  ])('%j reads as %j', (raw, expected) => {
+    expect(formJson(form({ body: raw }), 'body')).toEqual(expected);
+  });
+});
+
+describe('splitOp', () => {
+  it.each([
+    ['up:1:picks', 3, ['up', '1', 'picks']],
+    ['up:1', 3, null],
+    ['up:1:picks:more', 3, null],
+    ['up:1:picks', 5, null],
+    [undefined, 3, null],
+  ])('%j in %i parts is %j', (raw, parts, expected) => {
+    expect(splitOp(raw, 20, parts)).toEqual(expected);
+  });
+
+  it('refuses a value over the length limit', () => {
+    expect(splitOp('a:b:c', 4, 3)).toBeNull();
+  });
+});
+
+describe('opValue', () => {
+  it('joins its parts the way splitOp reads them back', () => {
+    expect(opValue('up', 3, 'picks')).toBe('up:3:picks');
+    expect(splitOp(opValue('up', 3, 'picks'), 20, 3)).toEqual([
+      'up',
+      '3',
+      'picks',
+    ]);
+  });
+});
+
+describe('rawFormFieldLimit', () => {
+  it('is the length past which oversizedFields names a field', () => {
+    const at = (length: number) => () => 'x'.repeat(length);
+    expect(
+      oversizedFields(at(rawFormFieldLimit), ['a'], rawFormFieldLimit),
+    ).toEqual([]);
+    expect(
+      oversizedFields(at(rawFormFieldLimit + 1), ['a'], rawFormFieldLimit),
+    ).toEqual(['a']);
+  });
+});
+
+describe('swapAt', () => {
+  it('swaps two places without changing the list given', () => {
+    const list = ['a', 'b', 'c'];
+    expect(swapAt(list, 0, 1)).toEqual(['b', 'a', 'c']);
+    expect(list).toEqual(['a', 'b', 'c']);
+  });
+
+  it.each([
+    [0, -1],
+    [2, 3],
+    [5, 4],
+  ])('is null when %i or %i is past an end', (from, to) => {
+    expect(swapAt(['a', 'b', 'c'], from, to)).toBeNull();
   });
 });
 

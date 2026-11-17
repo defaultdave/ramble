@@ -9,6 +9,7 @@ import { BookingSlots, ExperiencePage } from './ExperiencePage';
 import {
   bareExperience,
   kidsClass,
+  reviewedKayak,
   sunsetKayak,
 } from './ExperiencePage.fixtures';
 
@@ -41,7 +42,28 @@ afterEach(() => {
 // - the gift entry goes to the gift checkout, and is absent when gifts are off; the private-session entry is always there and goes to contact
 // - a section with nothing to say is left out whole, and the cancellation terms always stay
 // - two prices name who each is for
+// - the reviews block has its own heading, after the host, when the view has reviews; a view with none leaves the section out whole
 // - the booking slot is the page's last child, with the bar and the panel in their own slots, the panel an aside
+
+describe('the reviews section', () => {
+  it('sits under its own heading, after the host, with the review count', () => {
+    render(<ExperiencePage view={reviewedKayak} dates={dates} />);
+    const headings = screen
+      .getAllByRole('heading', { level: 2 })
+      .map((heading) => heading.textContent);
+    expect(headings.indexOf('Reviews')).toBe(headings.indexOf('Your host') + 1);
+    const section = screen.getByRole('region', { name: 'Reviews' });
+    expect(
+      within(section).getByText('Rated 4.6 out of 5 from 12 reviews'),
+    ).toBeInTheDocument();
+  });
+
+  it('is left out whole when the view has no reviews to show', () => {
+    render(<ExperiencePage view={sunsetKayak} dates={dates} />);
+    expect(screen.queryByRole('heading', { name: 'Reviews' })).toBeNull();
+    expect(screen.queryByText(/out of 5/)).toBeNull();
+  });
+});
 
 describe('the booking slot', () => {
   it('sits after the content, inside the article, so the bar can stick against the whole page', () => {

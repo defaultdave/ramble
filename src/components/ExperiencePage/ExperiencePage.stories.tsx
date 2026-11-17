@@ -20,6 +20,7 @@ import { mixed } from '@/components/UpcomingSessions/UpcomingSessions.fixtures';
 import {
   bareExperience,
   kidsClass,
+  reviewedKayak,
   sunsetKayak,
 } from './ExperiencePage.fixtures';
 
@@ -139,6 +140,16 @@ export const BareDesktop: Story = {
 };
 
 // The booking controls in place (Figma 03 with its bar, D03 with its panel).
+// Twelve reviews: the block sits under "Your host".
+export const ReviewedMobile: Story = {
+  args: { view: reviewedKayak },
+  globals: mobile,
+};
+export const ReviewedDesktop: Story = {
+  args: { view: reviewedKayak },
+  globals: desktop,
+  parameters: fullWidth,
+};
 export const WithBookingMobile: Story = {
   args: { booking },
   globals: mobile,

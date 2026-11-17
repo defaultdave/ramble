@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, eq } from 'drizzle-orm';
+import { and, count, eq } from 'drizzle-orm';
 import {
   buildOpsRequestRows,
   requestsListEntry,
@@ -8,7 +8,7 @@ import {
 import { splitPage } from '@/lib/pagination';
 import type { PrivateRequestInput } from '@/lib/privateSession';
 import { opsListPageSize } from '@/lib/tableQuery';
-import type { Caller } from '@/server/auth/caller';
+import { Role, requireRole, type Caller } from '@/server/auth/caller';
 import { recordAudit, requireOpsUserId } from './audit';
 import { guestVisible } from './catalog';
 import { dbRead, type Transaction } from './client';
@@ -93,4 +93,14 @@ export async function readOpsPrivateRequests(
   const { items, nextCursor } = splitPage(fetched, opsListPageSize);
   await recordAudit(requestsListEntry(userId));
   return { rows: buildOpsRequestRows(items), nextCursor };
+}
+
+/**
+ * How many private requests have been received, all of them. Ops alone. It names no one, so it
+ * records no audit row: the page that shows it records the visit.
+ */
+export async function countOpsPrivateRequests(caller: Caller): Promise<number> {
+  requireRole(caller, Role.Ops, {});
+  const [row] = await dbRead.select({ total: count() }).from(privateRequests);
+  return row?.total ?? 0;
 }

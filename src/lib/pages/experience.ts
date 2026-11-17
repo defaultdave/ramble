@@ -12,6 +12,8 @@ import { mapsHref } from '../maps';
 import type { GuestPhoto } from '../photos';
 import { photoView, type PhotoView } from '../photoViews';
 import { perPersonAmount, type CardPriceOption } from '../pricing';
+import type { Rating } from '../rating';
+import { reviewsView, type ReviewRow, type ReviewsView } from '../reviewList';
 import type { BookingOffer } from '../bookingDraft';
 import {
   categoryPath,
@@ -231,6 +233,8 @@ export type ExperiencePageView = {
   /** Goes to the gift checkout, or null while gifts are switched off. */
   giftHref: string | null;
   booking: BookingBasics;
+  /** Null below the rating threshold, when the page draws no reviews block. */
+  reviews: ReviewsView | null;
   privateSessionHref: string;
 };
 
@@ -238,6 +242,7 @@ export type ExperiencePageInput = {
   experience: GuestExperience;
   photos: readonly GuestPhoto[];
   place: Place;
+  reviews: { rating: Rating | null; rows: readonly ReviewRow[] };
   giftsEnabled: boolean;
   bookingsPaused: boolean;
 };
@@ -264,7 +269,8 @@ function badgesFor(experience: GuestExperience): ExperienceBadge[] {
 export function buildExperiencePage(
   input: ExperiencePageInput,
 ): ExperiencePageView | null {
-  const { experience, photos, place, giftsEnabled, bookingsPaused } = input;
+  const { experience, photos, place, reviews, giftsEnabled, bookingsPaused } =
+    input;
   if (experience.status === 'guide_only') return null;
 
   const cancellation = cancellationTerms(experience.cancellationTier);
@@ -358,6 +364,7 @@ export function buildExperiencePage(
       privateSessionHref: privateSessionPath(experience),
       fullRefundHoursBefore: experience.cancellationTier.fullRefundHoursBefore,
     },
+    reviews: reviewsView(reviews.rating, reviews.rows),
     privateSessionHref: privateSessionPath(experience),
   };
 }

@@ -21,6 +21,17 @@ export function formText(get: FormGetter, name: string): string | undefined {
   return trimmed === '' ? undefined : trimmed;
 }
 
+/** A posted JSON field as parsed; text that is not JSON goes on as it is, so a schema refuses it and names the field. */
+export function formJson(get: FormGetter, name: string): unknown {
+  const raw = formText(get, name);
+  if (raw === undefined) return undefined;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+}
+
 /** A posted whole number, digits only, or undefined for anything else, so a schema names the field instead of a parser throwing. */
 export function formWholeNumber(
   get: FormGetter,
@@ -91,6 +102,9 @@ export function errorProps<F extends string>(
   const errorText = problemText(problems, texts, field);
   return errorText === undefined ? {} : { errorText };
 }
+
+/** The longest a posted text field is read; a longer one is refused unread, so no rule walks an unbounded string. */
+export const rawFormFieldLimit = 1000;
 
 /** The fields whose posted text is over the limit, so no rule walks an unbounded string. */
 export function oversizedFields<F extends string>(
@@ -188,3 +202,40 @@ export const inviteFailureNotices = {
     title: 'Too many sign-in links went to this address. Try again later.',
   },
 } as const satisfies Record<string, NoticeText>;
+
+/** A server action as a form posts to it. */
+export type FormAction = (formData: FormData) => void | Promise<void>;
+
+/**
+ * The parts of a button's `name:place:id` value, or null when it is missing, over `maxLength`, or
+ * not exactly `parts` long. Every list button posts its click this way.
+ */
+export function splitOp(
+  raw: string | undefined,
+  maxLength: number,
+  parts: number,
+): string[] | null {
+  if (raw === undefined || raw.length > maxLength) return null;
+  const split = raw.split(':');
+  return split.length === parts ? split : null;
+}
+
+/** A button's `name:place:id` value from its parts: the encoder that `splitOp` undoes. */
+export function opValue(...parts: readonly (string | number)[]): string {
+  return parts.join(':');
+}
+
+/** The list with the entries at `from` and `to` swapped, or null when either place is past an end. */
+export function swapAt<T>(
+  list: readonly T[],
+  from: number,
+  to: number,
+): T[] | null {
+  const a = list[from];
+  const b = list[to];
+  if (a === undefined || b === undefined) return null;
+  const swapped = [...list];
+  swapped[from] = b;
+  swapped[to] = a;
+  return swapped;
+}

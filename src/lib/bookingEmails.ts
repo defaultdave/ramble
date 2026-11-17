@@ -11,10 +11,11 @@ import { googleCalendarUrl, type CalendarEvent } from './ics';
 import { formatMoney } from './money';
 import { guestsLabel } from './copy/format';
 import { orderSummaryAmounts, type TaxTreatment } from './orderSummary';
+import { reviewCopy } from './copy/review';
 import { isCapabilityTokenShape } from './capabilityTokens';
 import type { orderCancelledBys, OrderStatus } from './orders';
 import { browsePath, managePath } from './routes';
-import { nameClip, oneLineClipped } from './text';
+import { nameClip, nameOr, oneLineClipped } from './text';
 import {
   zonedDayLabel,
   zonedDeadlineLabel,
@@ -167,14 +168,12 @@ export function reminderDecision(
 
 /** The name a message greets. An order with no name yet is greeted as "there". */
 export function greetingName(name: string | null): string {
-  const clipped = oneLineClipped(name ?? '', nameClip.person);
-  return clipped === '' ? 'there' : clipped;
+  return nameOr(name, 'there', nameClip.person);
 }
 
 /** What a host's notice calls a guest who gave no name. */
 function guestNameForHost(name: string | null): string {
-  const clipped = oneLineClipped(name ?? '', nameClip.person);
-  return clipped === '' ? 'A guest' : clipped;
+  return nameOr(name, reviewCopy.display.anonymousGuest, nameClip.person);
 }
 
 /** The spaces the order takes: items that use a space, counted by quantity. */

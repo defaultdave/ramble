@@ -20,6 +20,11 @@ export function editorialListRows(editorial: () => Editorial) {
       allows: { platform: staff },
     },
     {
+      fn: 'listExperienceChoicesForEditing',
+      invoke: (c) => editorial().listExperienceChoicesForEditing(c),
+      allows: { platform: staff },
+    },
+    {
       fn: 'listPageCopyForEditing',
       invoke: (c) => editorial().listPageCopyForEditing(c),
       allows: { platform: staff },

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { ButtonLink } from '@/components/Button';
 import { PageHeading } from '@/components/PageHeading';
 import { signInHref } from '@/lib/signIn';
@@ -21,10 +22,18 @@ export function OpsNav({ links }: { links: readonly OpsNavLink[] }) {
   );
 }
 
-export function OpsLanding({ areas }: { areas: readonly OpsNavLink[] }) {
+export function OpsLanding({
+  areas,
+  children,
+}: {
+  areas: readonly OpsNavLink[];
+  /** What goes between the intro and the list of areas: the landing's counts. */
+  children?: ReactNode;
+}) {
   return (
     <PageHeading title="Operations">
       <p>Tools for the Ramble team.</p>
+      {children}
       <ul className={styles.areas} aria-label="Areas">
         {areas.map((area) => (
           <li key={area.href} className={styles.area}>

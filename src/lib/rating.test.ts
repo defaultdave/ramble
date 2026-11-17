@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { ratingDescription, ratingLabel } from './rating';
+import {
+  hasEnoughReviews,
+  minReviewsToShow,
+  ratingDescription,
+  ratingLabel,
+} from './rating';
 
 describe('ratingLabel', () => {
   it.each([
@@ -31,4 +36,19 @@ describe('ratingDescription', () => {
       expect(ratingDescription({ average, count })).toBe(expected);
     },
   );
+});
+
+describe('hasEnoughReviews', () => {
+  it.each([
+    { count: 0, expected: false },
+    { count: minReviewsToShow - 1, expected: false },
+    { count: minReviewsToShow, expected: true },
+    { count: 500, expected: true },
+  ])('$count reviews is $expected', ({ count, expected }) => {
+    expect(hasEnoughReviews({ count })).toBe(expected);
+  });
+
+  it('is five, as the PRD says', () => {
+    expect(minReviewsToShow).toBe(5);
+  });
 });

@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   wholeNumberText,
   everyJsonNode,
+  firstNameOr,
   firstQueryValue,
   isStorableJson,
+  nameOr,
   notBlankPattern,
   oneLineClipped,
   requiredText,
@@ -140,5 +142,41 @@ describe('utf8Bytes', () => {
     ['😀', 4],
   ])('counts %j as %i bytes', (text, bytes) => {
     expect(utf8Bytes(text)).toBe(bytes);
+  });
+});
+
+describe('nameOr', () => {
+  it.each([
+    ['Noor Haddad', 'Noor Haddad'],
+    ['  Noor \n Haddad ', 'Noor Haddad'],
+    [null, 'there'],
+    ['', 'there'],
+    ['   ', 'there'],
+  ])('reads %j as %j', (name, expected) => {
+    expect(nameOr(name, 'there', 40)).toBe(expected);
+  });
+
+  it('cuts a long name to one line', () => {
+    expect(Array.from(nameOr('a'.repeat(50), 'there', 10))).toHaveLength(10);
+  });
+});
+
+describe('firstNameOr', () => {
+  it.each([
+    ['Noor Haddad', 'Noor'],
+    ['  Noor   Haddad  ', 'Noor'],
+    ['Mary\nJane Watson', 'Mary'],
+    ['Noor', 'Noor'],
+    [null, 'A guest'],
+    ['', 'A guest'],
+    ['   ', 'A guest'],
+  ])('reads %j as %j', (name, expected) => {
+    expect(firstNameOr(name, 'A guest', 40)).toBe(expected);
+  });
+
+  it('cuts a long first name to one line and ignores the rest', () => {
+    const first = firstNameOr(`${'a'.repeat(50)} Surname`, 'A guest', 10);
+    expect(Array.from(first)).toHaveLength(10);
+    expect(first.endsWith('…')).toBe(true);
   });
 });

@@ -47,6 +47,20 @@ export const ManyMobile: Story = {
     await expect(canvas.getAllByRole('img', { hidden: true })).toHaveLength(30);
   },
 };
+export const ManyMobileFocused: Story = {
+  globals: mobile,
+  play: async ({ canvasElement }) => {
+    // The photos cover the strip's box, so the ring lies outside it: an inset shadow would sit beneath them.
+    const canvas = within(canvasElement);
+    const [strip] = await canvas.findAllByRole('group', { name: photosOf });
+    await waitFor(() => expect(strip).toHaveAttribute('tabindex', '0'));
+    await userEvent.tab();
+    await expect(strip).toHaveFocus();
+    const style = getComputedStyle(strip as HTMLElement);
+    await expect(style.boxShadow).not.toBe('none');
+    await expect(style.boxShadow).not.toContain('inset');
+  },
+};
 export const ManyDesktop: Story = {
   globals: desktop,
   parameters: fullWidth,

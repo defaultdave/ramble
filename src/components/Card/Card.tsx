@@ -13,7 +13,7 @@ export type CardLayout = 'vertical' | 'horizontal';
 // 384px from the tablet width, the whole page on a phone), a fixed square beside the text on a horizontal one.
 export const cardPhotoSizes = {
   vertical: '(min-width: 768px) 384px, 100vw',
-  horizontal: '168px',
+  horizontal: '96px',
 } as const satisfies Record<CardLayout, string>;
 export type CardHeadingLevel = 2 | 3 | 4 | 5;
 export type CardTag = {

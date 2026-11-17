@@ -97,6 +97,8 @@ export async function readOpsSessions(
   const { items, nextCursor } = splitPage(fetched, opsListPageSize);
   const held = openHeldSeatsBySession(
     await readReleasableHolds(
+      caller,
+      {},
       dbRead,
       items.map((item) => item.id),
     ),
@@ -113,6 +115,7 @@ export async function readOpsSessions(
 
 /** The experience's future scheduled sessions the pause would cancel, and what cancelling them does. */
 async function readPauseImpact(
+  caller: Caller,
   executor: Executor,
   experienceId: string,
   at: Date,
@@ -139,6 +142,8 @@ async function readPauseImpact(
   );
   const held = openHeldSeatsBySession(
     await readReleasableHolds(
+      caller,
+      {},
       executor,
       upcoming.map((session) => session.id),
     ),
@@ -154,6 +159,8 @@ async function readPauseImpact(
   return {
     targets,
     impact: await readImpact(
+      caller,
+      {},
       executor,
       targets.map((target) => target.id),
       at,
@@ -197,8 +204,8 @@ export async function readOpsSession(
     .where(eq(sessions.id, id.data));
   if (!row) return null;
 
-  const impact = await readImpact(db, [row.id], at);
-  const pause = await readPauseImpact(db, row.experienceId, at);
+  const impact = await readImpact(caller, {}, db, [row.id], at);
+  const pause = await readPauseImpact(caller, db, row.experienceId, at);
   await recordAudit(sessionViewedEntry(userId, row.id));
   return {
     session: buildOpsSessionView(
@@ -236,7 +243,7 @@ export async function cancelSessionAsOps(
     .where(eq(sessions.id, sessionId));
   if (!session) return { kind: 'done', result: { status: 'not_found' } };
   if (cancelGate(session, at) === 'ended') return { kind: 'ended' };
-  const impact = await readImpact(db, [sessionId], at);
+  const impact = await readImpact(caller, {}, db, [sessionId], at);
   if (cancelBlocked(impact)) return { kind: 'blocked' };
   if (!impactIsCurrent(input.fingerprint, impact)) return { kind: 'stale' };
   return {
@@ -292,6 +299,7 @@ export async function pauseExperienceAndCancel(
 
   if (plan === 'pause') {
     const before = await readPauseImpact(
+      caller,
       db,
       found.experienceId,
       await currentDatabaseTime(),
@@ -313,10 +321,17 @@ export async function pauseExperienceAndCancel(
   let total: number | null = null;
   try {
     const at = await currentDatabaseTime();
-    const { targets } = await readPauseImpact(db, found.experienceId, at);
+    const { targets } = await readPauseImpact(
+      caller,
+      db,
+      found.experienceId,
+      at,
+    );
     total = targets.length;
     for (const target of targets) {
-      if (!shouldCancelTarget(await readImpact(db, [target.id], at))) {
+      if (
+        !shouldCancelTarget(await readImpact(caller, {}, db, [target.id], at))
+      ) {
         steps.push({ kind: 'skipped' });
         continue;
       }

@@ -277,6 +277,24 @@ describe('cancelSessionAsHost', () => {
     });
   });
 
+  it.each([
+    ['empty', ''],
+    ['not counts', 'abc'],
+    ['too few counts', '1:2'],
+    ['a trailing extra', '1:2:3:4:5:6:7'],
+  ])(
+    'refuses a malformed fingerprint (%s) as stale and writes nothing',
+    async (_label, bad) => {
+      const session = await newSession();
+      const before = await auditCount();
+
+      expect(await submit(session.id, bad)).toEqual({ kind: 'stale' });
+
+      expect(await auditCount()).toBe(before);
+      expect((await sessionOf(session.id)).status).toBe('scheduled');
+    },
+  );
+
   it('refuses a session that has started, whatever the form said, and writes nothing', async () => {
     const session = await newSession({
       startsAt: new Date(Date.now() - day),

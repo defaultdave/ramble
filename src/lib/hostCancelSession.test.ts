@@ -3,12 +3,13 @@ import {
   buildHostCancelView,
   hostCancelNotice,
   hostCancelOutcomeCode,
+  hostCancelCheck,
   hostCancelState,
   parseHostCancelForm,
   type HostCancelData,
 } from './hostCancelSession';
 import { hostCancelCopy, hostCancelNotices } from './copy/hostSessions';
-import { sessionImpact } from './opsSessions';
+import { impactView, sessionImpact } from './opsSessions';
 import {
   form,
   now,
@@ -24,6 +25,7 @@ import {
 // - the view names the session, its seats and status, and words the impact as ops does: bookings refunded and the amount, unpaid orders voided, holds released
 // - a blocked booking is named in the view and stops the form
 // - the form is read only when it carries a session id, the impact that was shown and the ticked box; nothing is repaired
+// - the cancel check refuses a started session, then a blocked booking, then a changed impact, and lets a cancelled session through with any fingerprint
 // - each result of an attempt names one notice, and an unknown or repeated notice in the address shows none
 
 const session = (over: Partial<HostCancelData['session']> = {}) => ({
@@ -74,6 +76,73 @@ describe('hostCancelState', () => {
   it('reads a session starting right now as started', () => {
     expect(hostCancelState(data({ startsAt: now }))).toBe('started');
   });
+});
+
+describe('hostCancelCheck', () => {
+  const current = sessionImpact([order()], [], now);
+  const fresh = impactView(current).fingerprint;
+  const old = '9:9:9:9:9:9';
+  const blocked = sessionImpact([order({ attempts: [] })], [], now);
+
+  it.each([
+    [
+      'a started session, whatever else',
+      'scheduled',
+      'ended',
+      current,
+      old,
+      'ended',
+    ],
+    [
+      'a started session that is blocked',
+      'scheduled',
+      'ended',
+      blocked,
+      fresh,
+      'ended',
+    ],
+    [
+      'a blocked booking',
+      'scheduled',
+      'ok',
+      blocked,
+      impactView(blocked).fingerprint,
+      'blocked',
+    ],
+    ['a changed impact', 'scheduled', 'ok', current, old, 'stale'],
+    ['the impact as it was read', 'scheduled', 'ok', current, fresh, 'proceed'],
+    [
+      'a cancelled session with an old fingerprint',
+      'cancelled',
+      'ok',
+      current,
+      old,
+      'proceed',
+    ],
+    [
+      'a cancelled session with the current fingerprint',
+      'cancelled',
+      'ok',
+      current,
+      fresh,
+      'proceed',
+    ],
+    [
+      'a blocked booking on a cancelled session',
+      'cancelled',
+      'ok',
+      blocked,
+      old,
+      'blocked',
+    ],
+  ] as const)(
+    'is for %s',
+    (_label, status, gate, impact, fingerprint, check) => {
+      expect(hostCancelCheck({ status, gate, impact, fingerprint })).toBe(
+        check,
+      );
+    },
+  );
 });
 
 describe('buildHostCancelView', () => {

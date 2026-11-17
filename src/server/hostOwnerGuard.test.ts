@@ -32,6 +32,7 @@ describe('the modules that guard on the host owner role', () => {
       'src/server/db/hostSettings.ts',
       'src/server/db/ledger.ts',
       'src/server/db/photos.ts',
+      'src/server/db/sessionImpact.ts',
       'src/server/db/sessions.ts',
       'src/server/db/staffRoles.ts',
       'src/server/hostStaffInvite.ts',

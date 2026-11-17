@@ -11,6 +11,16 @@ export const hostCancelCopy = {
   impactHeading: 'Who this affects',
   explainer:
     'Cancelling refunds every booking on this session in full and emails each guest. It cannot be undone.',
+  /** The labels of the session's facts, in the order the page lists them. */
+  factLabels: {
+    experience: 'Experience',
+    when: 'When',
+    seats: 'Seats',
+    status: 'Status',
+  },
+  /** The seats line, as "2 of 10 seats sold". */
+  seatsSold: (sold: string, allocation: string) =>
+    `${sold} of ${allocation} seats sold`,
   formHeading: 'Confirm the cancellation',
   confirmLabel: 'I have read who this affects',
   submitLabel: 'Cancel session and refund its bookings',

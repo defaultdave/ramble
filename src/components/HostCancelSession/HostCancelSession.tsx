@@ -39,13 +39,13 @@ export function HostCancelSession({
           <Link href={hostSessionsPath}>{hostCancelCopy.backLabel}</Link>
         </p>
         <dl className={styles.facts}>
-          <dt>Experience</dt>
+          <dt>{hostCancelCopy.factLabels.experience}</dt>
           <dd>{view.experienceName}</dd>
-          <dt>When</dt>
+          <dt>{hostCancelCopy.factLabels.when}</dt>
           <dd>{view.whenLabel}</dd>
-          <dt>Seats</dt>
+          <dt>{hostCancelCopy.factLabels.seats}</dt>
           <dd>{view.seatsLabel}</dd>
-          <dt>Status</dt>
+          <dt>{hostCancelCopy.factLabels.status}</dt>
           <dd>{view.statusLabel}</dd>
         </dl>
 

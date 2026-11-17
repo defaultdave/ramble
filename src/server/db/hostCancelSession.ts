@@ -1,11 +1,10 @@
 import 'server-only';
 import { and, eq } from 'drizzle-orm';
 import { WriteIdSchema } from '@/lib/catalog';
-import type { HostCancelData } from '@/lib/hostCancelSession';
+import { hostCancelCheck, type HostCancelData } from '@/lib/hostCancelSession';
 import {
-  cancelBlocked,
   cancelGate,
-  impactIsCurrent,
+  ImpactFingerprintSchema,
   type ImpactFormInput,
   type OpsCancelOutcome,
 } from '@/lib/opsSessions';
@@ -37,12 +36,6 @@ function ownedSession(hostId: string, sessionId: string) {
     .where(and(eq(sessions.id, sessionId), eq(experiences.hostId, hostId)));
 }
 
-/** The impact moves when a first submit of the same form lands in between, and the session is then cancelled: that repeat is not a changed impact. */
-async function isCancelled(hostId: string, sessionId: string) {
-  const [session] = await ownedSession(hostId, sessionId);
-  return session?.status === 'cancelled';
-}
-
 /** One session of the host with what cancelling it would do to its guests, or null when it is missing or another host's. Refused to everyone but the host's owner. */
 export async function readHostSessionCancel(
   caller: Caller,
@@ -55,7 +48,11 @@ export async function readHostSessionCancel(
   const at = await currentDatabaseTime();
   const [session] = await ownedSession(host, id);
   if (!session) return null;
-  return { session, impact: await readImpact(db, [session.id], at), at };
+  return {
+    session,
+    impact: await readImpact(caller, { hostId: host }, db, [session.id], at),
+    at,
+  };
 }
 
 /**
@@ -74,18 +71,26 @@ export async function cancelSessionAsHost(
   const host = WriteIdSchema.parse(hostId);
   const sessionId = WriteIdSchema.parse(input.sessionId);
   requireRole(caller, Role.HostOwner, { hostId: host });
+  const fingerprint = ImpactFingerprintSchema.safeParse(input.fingerprint);
+  if (!fingerprint.success) return { kind: 'stale' };
   const at = await currentDatabaseTime();
   const [session] = await ownedSession(host, sessionId);
   if (!session) return { kind: 'done', result: { status: 'not_found' } };
-  if (cancelGate(session, at) === 'ended') return { kind: 'ended' };
-  const impact = await readImpact(db, [sessionId], at);
-  if (cancelBlocked(impact)) return { kind: 'blocked' };
-  if (
-    !impactIsCurrent(input.fingerprint, impact) &&
-    !(await isCancelled(host, sessionId))
-  ) {
-    return { kind: 'stale' };
-  }
+  const impact = await readImpact(
+    caller,
+    { hostId: host },
+    db,
+    [sessionId],
+    at,
+  );
+  const [current] = await ownedSession(host, sessionId);
+  const check = hostCancelCheck({
+    status: current?.status ?? session.status,
+    gate: cancelGate(session, at),
+    impact,
+    fingerprint: fingerprint.data,
+  });
+  if (check !== 'proceed') return { kind: check };
   return {
     kind: 'done',
     result: await cancelSession(caller, { sessionId, reason: 'host' }),

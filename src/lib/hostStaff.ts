@@ -28,6 +28,19 @@ export const hostStaffGrant = (hostId: string) =>
 /** The most staff one host has. Under the staff read limit, so the page never hides one. */
 export const maxHostStaff = 10;
 
+/**
+ * Whether a host may give the staff role to `address`, given who holds it. An address already
+ * holding it is not new, so it is never turned away; any other waits for room under the cap.
+ * Addresses are compared as given: the caller normalizes `address`, the holders come stored so.
+ */
+export function staffCapDecision(
+  held: readonly { readonly email: string }[],
+  address: string,
+): 'grant' | 'cap_reached' {
+  const alreadyStaff = held.some((holder) => holder.email === address);
+  return !alreadyStaff && held.length >= maxHostStaff ? 'cap_reached' : 'grant';
+}
+
 export const hostStaffInviteHint =
   'Staff can see your dashboard, sessions and guest lists, and change nothing. They get a single-use sign-in link.';
 export const hostStaffEmptyBody = 'Invite a staff member above.';

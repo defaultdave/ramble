@@ -32,6 +32,11 @@ const settingFields = {
   taxRatePpm: intBetween(settingsBounds.taxRatePpm),
 };
 
+export type SettingKey = keyof typeof settingFields;
+
+/** Every setting a change can name, in the order the table lists them. */
+export const settingKeys = Object.keys(settingFields) as SettingKey[];
+
 export const SettingsSchema = z.object({
   ...settingFields,
   updatedAt: z.date(),

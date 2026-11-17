@@ -41,6 +41,7 @@ describe('opsLandingLinks', () => {
       '/ops/sessions',
       '/ops/audit',
       '/ops/bookings',
+      '/ops/settings',
     ]);
   });
 });

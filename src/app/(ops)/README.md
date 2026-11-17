@@ -1,6 +1,6 @@
 # Ops area page map
 
-`/ops`, `/ops/mailbox`, `/ops/mailbox/[id]`, `/ops/dev`, `/ops/hosts`, `/ops/hosts/new`, `/ops/hosts/[id]`, `/ops/experiences`, `/ops/experiences/new`, `/ops/experiences/[id]`, `/ops/experiences/[id]/availability`, `/ops/editorial`, `/ops/editorial/new`, `/ops/editorial/[id]`, `/ops/editorial/home`, `/ops/editorial/home/[position]`, `/ops/editorial/collections`, `/ops/editorial/collections/new`, `/ops/editorial/collections/[id]`, `/ops/review`, `/ops/review/[id]`, `/ops/sessions`, `/ops/sessions/[sessionId]`, `/ops/bookings`, `/ops/bookings/[id]`, `/ops/staff`, `/ops/support`, `/ops/requests`, `/ops/audit`, and any other address under `/ops`
+`/ops`, `/ops/mailbox`, `/ops/mailbox/[id]`, `/ops/dev`, `/ops/hosts`, `/ops/hosts/new`, `/ops/hosts/[id]`, `/ops/experiences`, `/ops/experiences/new`, `/ops/experiences/[id]`, `/ops/experiences/[id]/availability`, `/ops/editorial`, `/ops/editorial/new`, `/ops/editorial/[id]`, `/ops/editorial/home`, `/ops/editorial/home/[position]`, `/ops/editorial/collections`, `/ops/editorial/collections/new`, `/ops/editorial/collections/[id]`, `/ops/review`, `/ops/review/[id]`, `/ops/sessions`, `/ops/sessions/[sessionId]`, `/ops/bookings`, `/ops/bookings/[id]`, `/ops/staff`, `/ops/support`, `/ops/requests`, `/ops/audit`, `/ops/settings`, and any other address under `/ops`
 
 Read from main at 2db68ea (2026-11-15). A PR that changes this tree (a component, a Suspense or client boundary, a cache tag, an action) updates this file in the same PR.
 
@@ -55,7 +55,7 @@ flowchart TD
 | SiteShell | server | [src/components/SiteShell.tsx](../../components/SiteShell.tsx) | Skip link, header (brand link and the word Operations), main, footer. No account control, no banner. |
 | OpsAreaNav | streamed | [src/app/(ops)/OpsAreaNav.tsx](OpsAreaNav.tsx) | Inside `Suspense fallback={null}`. Reads the caller, so it streams. Renders nothing unless the caller holds `ops`. It is not a gate. |
 | readOpsCaller | server (DB read) | [src/server/opsCaller.ts](../../server/opsCaller.ts) | Wraps `getCaller()`. A failure is logged and becomes the anonymous caller, never a role. |
-| holdsOpsRole and opsNavLinks | server (pure lib) | [src/lib/opsNav.ts](../../lib/opsNav.ts) | Roles must include `ops`; `admin` is not enough. Fourteen links: Dashboard, Mailbox, Hosts, Experiences, Editorial, Home page, Collections, Support, Private requests, Review queue, Staff, Sessions, Audit log, Bookings. The test console is not listed. |
+| holdsOpsRole and opsNavLinks | server (pure lib) | [src/lib/opsNav.ts](../../lib/opsNav.ts) | Roles must include `ops`; `admin` is not enough. Fifteen links: Dashboard, Mailbox, Hosts, Experiences, Editorial, Home page, Collections, Support, Private requests, Review queue, Staff, Sessions, Audit log, Bookings, Settings. The test console is not listed. |
 | OpsNav | server | [src/components/OpsShell/OpsShell.tsx](../../components/OpsShell/OpsShell.tsx) | A `nav` of plain links. |
 | Route page | server |  | Every ops page below. The layout does not wrap it in Suspense, and no page does either. |
 | RenderPerRequest | server | [src/app/renderPerRequest.tsx](../renderPerRequest.tsx) | Sits beside the shell, awaits `connection()`, renders nothing. Pins the whole tree to per-request rendering so every script carries the CSP nonce. |
@@ -89,6 +89,7 @@ Named once here. The page trees below list only what is particular to them.
 
 - Writes: each change writes its audit row with `writeAudit(tx)` in the same transaction, so the row exists exactly when the change does. A change that differs by nothing writes neither.
 - Reads: sensitive reads are recorded with `recordAudit` before they return. These are the ops home, hosts (list, one, new form), sessions (list, one), bookings (list, one), staff, support, private requests, audit view, and mailbox (list, message, unlock).
+- Settings saves are writes: `updateSettings` writes one `settings.changed` row, with the old and new numbers and the new value of a switch, and only flags a changed banner. A save of the stored values writes none. Reading the settings page writes none.
 - Not recorded: the landing's counts and its latest audit rows (the visit is), experiences, review, availability, host suspension state, and the whole test console, including the demo data reset.
 
 ### Tools
@@ -641,6 +642,45 @@ flowchart TD
 | DataTable | server | [src/components/DataTable/DataTable.tsx](../../components/DataTable/DataTable.tsx) | Sort links and a Next link; the cursor is in the address. |
 | Button | client | [src/components/Button/Button.tsx](../../components/Button/Button.tsx) | Every submit button. The file is `'use client'`, but the forms post to the action without it. |
 
+### Settings
+
+The banner, the switches, and the hold, grace and tax numbers, as one plain form. Below it, a read-only list of the experiences paused one by one and of the cancellation tiers. The gift settings are not on the page.
+
+```mermaid
+flowchart TD
+    se["SettingsPage<br/>/ops/settings"]:::server
+    rst["readSettings"]:::server
+    rpe["readExperiencesForOps<br/>status paused"]:::server
+    lct["listCancellationTiers"]:::server
+    an5["ActionNotice"]:::server
+    os["OpsSettings"]:::server
+    btn4["Button<br/>client submit button"]:::client
+    usa["updateSettingsAction"]:::action
+    se -.-> rst
+    se -.-> rpe
+    se -.-> lct
+    se --> an5
+    se --> os
+    os --> btn4
+    btn4 -.-> usa
+    classDef server fill:#e8edf8,stroke:#3b5bab,color:#1b1f27
+    classDef cached fill:#e2f3f0,stroke:#0f7a6c,color:#1b1f27
+    classDef streamed fill:#fbefdc,stroke:#a3610a,color:#1b1f27
+    classDef client fill:#f5e6f8,stroke:#8a2f9c,color:#1b1f27
+    classDef action fill:#fbe6e4,stroke:#b3261e,color:#1b1f27
+```
+
+| Component | Kind | File | Notes |
+| --- | --- | --- | --- |
+| SettingsPage | server | [src/app/(ops)/ops/settings/page.tsx](ops/settings/page.tsx) | Gate, then the settings, the first page of paused experiences and the tiers, read in parallel. The form is filled from the stored values, `?fields=` names the inputs the last try refused. |
+| readSettings | server (DB read) | [src/server/db/settings.ts](../../server/db/settings.ts) | Ops or admin, from the primary so a save shows at once. Not audited. |
+| readExperiencesForOps | server (DB read) | [src/server/db/experienceEditor.ts](../../server/db/experienceEditor.ts) | The experiences list read with the paused status and no cursor: the first 25 by name. |
+| listCancellationTiers | server (DB read) | [src/server/db/policies.ts](../../server/db/policies.ts) | Shortest notice first. Reference data, read and never edited here. |
+| ActionNotice | server | [src/components/ActionNotice/ActionNotice.tsx](../../components/ActionNotice/ActionNotice.tsx) | Shows the `?notice=` code from the last redirect: `saved`, `unchanged` or `invalid`. |
+| OpsSettings | server | [src/components/OpsSettings/OpsSettings.tsx](../../components/OpsSettings/OpsSettings.tsx) | The form (banner, two switches, hold, grace, tax percent), then the paused list with a link to each experience's ops page and to the filtered experiences list when there are more than one page, then the tier list. Uses Input and CheckField. Rules and labels come from [src/lib/opsSettings.ts](../../lib/opsSettings.ts). |
+| Button | client | [src/components/Button/Button.tsx](../../components/Button/Button.tsx) | The submit button. The file is `'use client'`, but the form posts to the action without it. |
+| updateSettingsAction | action | [src/server/actions/settings.ts](../../server/actions/settings.ts) | `updateSettings`: parses the form with `parseSettingsForm`, locks and reads the row, writes only what differs, one audit row in the same transaction, then clears the `settings` tag after the commit. |
+
 ### Editorial
 
 Help articles are the first editorial entries: a title, an address, a summary and a rich-text body, saved as a draft, published, or taken down. The body editor is the only client island here, and it loads only on these two pages.
@@ -831,6 +871,7 @@ Ops pages hold no cache of their own. Their changes reach the guest side through
 | Reject a review, create an experience (`rejectExperienceAction`, `createExperienceAction`) | Nothing, because the experience is never guest-visible | Not applicable |
 | Edit a host, accept the agreement, invites (`updateHostAction`, `acceptHostAgreementAction`, `resendHostInviteAction`, `createHostAction`) | Nothing | A host name or about edit shows when the `catalog` profile runs out |
 | Refund, retry, resend, void links (`refundBookingAction`, `retryRefundAction`, `resendConfirmationAction`, `voidLinksAction`) | Nothing | Not applicable |
+| Save settings (`updateSettingsAction`) | The `settings` tag, only when a setting changed: the banner and switches `getGuestSettings` serves | At once, through `updateTag` |
 | Staff, support, audit, mailbox, test console (all of their actions) | Nothing | Not applicable; the demo reset clears no tag either |
 
 ## Worth knowing
@@ -839,7 +880,7 @@ Ops pages hold no cache of their own. Their changes reach the guest side through
 - Session and booking cancels clear caches more weakly than edits. Edits, pauses, approvals and seat changes use `updateTag`. Both cancels use `revalidateTag(..., 'max')`, so one guest response afterwards can still show the cancelled session as bookable. The `cancelSession` comment says it runs in a Server Action only, which would allow the stronger call.
 - A non-ops visitor gets a 200 sign-in page, and an unknown address is a 200 too. `OpsAccessDenied` is returned, not thrown. The catch-all calls `notFound()` after `connection()`, and the comment in [renderPerRequest.tsx](../renderPerRequest.tsx) admits the status stays 200 and the page appears only once script runs.
 - Reading the audit log writes to it. Opening `/ops/audit`, a blank new-host form, or the ops home each add a row. Experience, review and availability reads, and the entire test console including the demo data reset, write none.
-- The test console is not in the nav. `opsNavLinks` lists eleven entries and no `/ops/dev`. It is the only page open to `admin`, and the only place a guard on the environment (`VERCEL_ENV`) decides what an action does.
+- The test console is not in the nav. `opsNavLinks` lists fifteen entries and no `/ops/dev`. It is the only page open to `admin`, and the only place a guard on the environment (`VERCEL_ENV`) decides what an action does.
 - The mailbox has no ops check of its own. Its page skips `holdsOpsRole`; `loadMailbox` decides, and `unlockDevMailbox` is the one ops action that does not call `opsCallerOrLeave`.
 - Forms work without script, yet every submit button hydrates. `Button` is a `'use client'` file, so each form's button is a client component. The pages and views around it are server components, and `ButtonLink` deliberately is not.
 - The layout has its own root. [layout.tsx](layout.tsx) renders `html` and `body`. Nothing is shared with the guest layout, and `RenderPerRequest` sits beside the shell so no shell is prerendered.

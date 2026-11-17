@@ -1,0 +1,90 @@
+.stack {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  width: 100%;
+  max-width: var(--size-content-max);
+  margin: 0 auto;
+  padding: 0 var(--size-gutter) var(--space-8);
+  font-family: var(--font-family-body);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.legend {
+  padding: 0;
+  margin-bottom: var(--space-3);
+  font-size: var(--font-size-label);
+  line-height: var(--font-line-height-label);
+  font-weight: var(--font-weight-semibold);
+}
+
+.heading {
+  margin: 0;
+  font-size: var(--font-size-label);
+  line-height: var(--font-line-height-label);
+  font-weight: var(--font-weight-semibold);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.muted {
+  composes: muted from '../HostSetup/HostSetup.module.css';
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  overflow-wrap: anywhere;
+}
+
+.link {
+  color: var(--color-text-link);
+  font-weight: var(--font-weight-semibold);
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: var(--size-touch-target);
+  justify-content: center;
+}
+
+/* The button fills the phone width and keeps its own from tablet up. */
+@media (min-width: 768px) {
+  .form > button {
+    align-self: flex-start;
+  }
+
+  .item {
+    flex-direction: row;
+    gap: var(--space-3);
+  }
+}

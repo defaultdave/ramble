@@ -426,7 +426,7 @@ flowchart TD
 
   GR["GuideEntryRoute<br/>parses the address"]:::server
   GE["getExperiencePage(id)<br/>catalog, tag experience:id"]:::cached
-  CP["canonicalPath()<br/>pure lib"]:::server
+  CP["guideRedirectTarget()<br/>pure lib"]:::server
   PE["PageError<br/>read failed"]:::server
   RA["PageHeading, RetryAlert, Alert"]:::server
   BT["Button<br/>Try again"]:::client
@@ -456,7 +456,7 @@ flowchart TD
 | --- | --- | --- | --- |
 | GuideEntryRoute | server | [`guide/[slugAndId]/page.tsx`](guide/[slugAndId]/page.tsx) | Parses the address with `parseExperienceAddress` (a bad address is a 404). Prerender uses `sample`. |
 | getExperiencePage(id) | cached | [`experiencePage.ts`](../../server/experiencePage.ts) | `cacheLife` `catalog`, tag `experience:<id>`. The same cached read the experience page uses. |
-| canonicalPath() | server | [`guide/[slugAndId]/page.tsx`](guide/[slugAndId]/page.tsx) | Pure function in the page file. A live experience gets a `permanentRedirect` to its experience page; a wrong or retired slug is redirected to the current guide URL. |
+| guideRedirectTarget() | server | [`src/lib/pages/guide.ts`](../../lib/pages/guide.ts) | Pure function in lib. A live experience gets a `permanentRedirect` to its experience page; a wrong or retired slug is redirected to the current guide URL. |
 | PageError | server | [`PageError.tsx`](../../components/PageError/PageError.tsx) | Retry goes to `guidePath(address)`. |
 | PageHeading, RetryAlert, Alert | server | [`RetryAlert.tsx`](../../components/PageError/RetryAlert.tsx) | The error frame. |
 | Button (Try again) | client | [`Button.tsx`](../../components/Button/Button.tsx) | A client module, so it ships even from this server-rendered form. |

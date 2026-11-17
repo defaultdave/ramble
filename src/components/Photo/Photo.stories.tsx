@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect } from 'storybook/test';
+import { expect, waitFor } from 'storybook/test';
 import { cardPhotoSizes } from '@/components/Card';
 import { Photo } from '@/components/Photo';
 import { samplePhoto } from './Photo.fixtures';
@@ -35,5 +35,43 @@ export const Underlay: Story = {
     await expect(layers).toHaveLength(2);
     await expect(layers[0]).toHaveAttribute('alt', '');
     await expect(layers[1]).toHaveAttribute('alt', 'Photo 1');
+  },
+};
+
+// A data address that is not an image, so the load fails the way a missing file does.
+const unloadable = 'data:image/png;base64,AAAA';
+
+// The browser draws a failed photo as its icon and alt text unless the stylesheet generates a box first.
+async function expectNoBrokenImageDrawing(canvasElement: HTMLElement) {
+  const light = canvasElement.querySelector('[data-scheme="light"]');
+  const failed = Array.from(light?.querySelectorAll('img') ?? []).filter(
+    (image) => image.alt !== '',
+  );
+  await expect(failed).toHaveLength(1);
+  const [image] = failed;
+  await waitFor(() => expect(image?.complete).toBe(true));
+  await expect(image?.naturalWidth).toBe(0);
+  if (image) {
+    const box = getComputedStyle(image, '::before');
+    await expect(box.display).toBe('block');
+    await expect(box.content).not.toBe('none');
+  }
+}
+
+export const Failed: Story = {
+  args: { photo: samplePhoto(0, { src: unloadable }) },
+  play: async ({ canvasElement }) => {
+    await expectNoBrokenImageDrawing(canvasElement);
+  },
+};
+
+export const FailedOverUnderlay: Story = {
+  args: {
+    photo: samplePhoto(0, { src: unloadable }),
+    underlaySizes: cardPhotoSizes.vertical,
+    sizes: '100vw',
+  },
+  play: async ({ canvasElement }) => {
+    await expectNoBrokenImageDrawing(canvasElement);
   },
 };

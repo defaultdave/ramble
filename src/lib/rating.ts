@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { reviewCopy } from './copy/review';
 
 export type Rating = { average: number; count: number };
 
@@ -24,5 +25,5 @@ export function ratingLabel({ average, count }: Rating): string | null {
 // What a screen reader says in place of the visible "4.9 (12)".
 export function ratingDescription({ average, count }: Rating): string | null {
   if (!hasEnoughReviews({ count })) return null;
-  return `Rated ${average.toFixed(1)} out of 5 from ${String(count)} reviews`;
+  return reviewCopy.display.ratedFrom(average.toFixed(1), count);
 }

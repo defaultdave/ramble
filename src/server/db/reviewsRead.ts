@@ -9,6 +9,9 @@ import { orders, reviews } from './schema';
 // and `src/lib/reviewList.ts` decide when a rating or a list shows. Only visible reviews count, so
 // a review that is hidden later leaves both the mean and the list.
 
+/** The reviews guests see: a hidden one is in neither the mean nor the list. */
+const visibleReview = eq(reviews.status, 'visible');
+
 /** The mean rating and the count of the visible reviews of each of these experiences. One with no reviews has no row. */
 export async function readRatings(
   experienceIds: readonly string[],
@@ -22,10 +25,7 @@ export async function readRatings(
     })
     .from(reviews)
     .where(
-      and(
-        inArray(reviews.experienceId, [...experienceIds]),
-        eq(reviews.status, 'visible'),
-      ),
+      and(inArray(reviews.experienceId, [...experienceIds]), visibleReview),
     )
     .groupBy(reviews.experienceId);
   return RatingRowSchema.array().parse(rows);
@@ -48,12 +48,7 @@ export async function listReviewRows(
     })
     .from(reviews)
     .innerJoin(orders, eq(orders.id, reviews.orderId))
-    .where(
-      and(
-        eq(reviews.experienceId, experienceId),
-        eq(reviews.status, 'visible'),
-      ),
-    )
+    .where(and(eq(reviews.experienceId, experienceId), visibleReview))
     .orderBy(desc(reviews.createdAt), desc(reviews.id))
     .limit(reviewListLimit);
 }

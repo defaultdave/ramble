@@ -1,6 +1,8 @@
-import { presentText, textLines } from './displayText';
+import { count } from './copy/format';
+import { reviewCopy } from './copy/review';
+import { textLines } from './displayText';
 import { hasEnoughReviews, ratingDescription, type Rating } from './rating';
-import { nameClip, oneLineClipped } from './text';
+import { firstNameOr, nameClip } from './text';
 import { venueTimeZone } from './venue';
 import { zonedDayLabel } from './zonedLabels';
 
@@ -41,17 +43,6 @@ export type ReviewsView = {
   items: ReviewItem[];
 };
 
-/** What stands for a booker with no name on the order. */
-export const anonymousReviewer = 'A guest';
-
-/** The booker's first name, cut to one line, or a stand-in when the order has none. Never more of the name than that. */
-export function reviewerName(guestName: string | null): string {
-  const first = presentText(guestName)?.split(/\s+/)[0];
-  return first === undefined
-    ? anonymousReviewer
-    : oneLineClipped(first, nameClip.firstName);
-}
-
 function newestFirst(a: ReviewRow, b: ReviewRow): number {
   const byTime = b.createdAt.getTime() - a.createdAt.getTime();
   if (byTime !== 0) return byTime;
@@ -74,7 +65,7 @@ export function reviewsView(
   return {
     average: rating.average.toFixed(1),
     stars: Math.round(rating.average),
-    countLabel: `${String(rating.count)} reviews`,
+    countLabel: count(rating.count, 'review'),
     spoken,
     items: rows
       .toSorted(newestFirst)
@@ -82,8 +73,12 @@ export function reviewsView(
       .map((row) => ({
         id: row.id,
         rating: row.rating,
-        ratingText: `Rated ${String(row.rating)} out of 5`,
-        author: reviewerName(row.guestName),
+        ratingText: reviewCopy.display.ratedOutOf(row.rating),
+        author: firstNameOr(
+          row.guestName,
+          reviewCopy.display.anonymousGuest,
+          nameClip.firstName,
+        ),
         dateLabel: zonedDayLabel(row.createdAt, venueTimeZone),
         paragraphs: textLines(row.body),
       })),

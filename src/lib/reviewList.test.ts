@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  anonymousReviewer,
-  reviewListLimit,
-  reviewerName,
-  reviewsView,
-  type ReviewRow,
-} from './reviewList';
+import { reviewListLimit, reviewsView, type ReviewRow } from './reviewList';
+import { reviewCopy } from './copy/review';
 import { nameClip } from './text';
 import { id } from '../../tests/support/ids';
 
@@ -109,7 +104,12 @@ describe('reviewsView summary', () => {
   });
 });
 
-describe('reviewerName', () => {
+function authorOf(guestName: string | null): string | undefined {
+  return reviewsView({ average: 5, count: 5 }, [row(1, { guestName })])
+    ?.items[0]?.author;
+}
+
+describe('a review author', () => {
   it.each([
     ['Noor Haddad', 'Noor'],
     ['  Noor   Haddad  ', 'Noor'],
@@ -117,15 +117,15 @@ describe('reviewerName', () => {
     ['Mary Jane Watson', 'Mary'],
     ['Zoë Ångström', 'Zoë'],
   ])('reads %j as %j', (name, expected) => {
-    expect(reviewerName(name)).toBe(expected);
+    expect(authorOf(name)).toBe(expected);
   });
 
   it.each([null, '', '   '])('reads %j as a guest', (name) => {
-    expect(reviewerName(name)).toBe(anonymousReviewer);
+    expect(authorOf(name)).toBe(reviewCopy.display.anonymousGuest);
   });
 
   it('cuts a very long first name to one line', () => {
-    const name = reviewerName(`${'a'.repeat(300)} Surname`);
+    const name = authorOf(`${'a'.repeat(300)} Surname`) ?? '';
     expect(Array.from(name)).toHaveLength(nameClip.firstName);
     expect(name.endsWith('…')).toBe(true);
   });

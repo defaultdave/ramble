@@ -47,8 +47,8 @@ export function ReviewsBlock({ view }: ReviewsBlockProps) {
               <span className={styles.author}>{item.author}</span>
               <span className={styles.date}>{item.dateLabel}</span>
             </p>
-            {item.paragraphs.map((paragraph) => (
-              <p key={paragraph} className={styles.body}>
+            {item.paragraphs.map((paragraph, index) => (
+              <p key={index} className={styles.body}>
                 {paragraph}
               </p>
             ))}

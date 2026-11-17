@@ -35,6 +35,7 @@ describe('opsLandingLinks', () => {
       '/ops/support',
       '/ops/requests',
       '/ops/review',
+      '/ops/reviews',
       '/ops/staff',
       '/ops/sessions',
       '/ops/audit',

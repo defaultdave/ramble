@@ -1,6 +1,9 @@
+import { z } from 'zod';
 import { count } from './copy/format';
+import { EntityIdSchema } from './catalog';
 import { reviewCopy } from './copy/review';
 import { textLines } from './displayText';
+import { reviewLimits } from './reviews';
 import { hasEnoughReviews, ratingDescription, type Rating } from './rating';
 import { firstNameOr, nameClip } from './text';
 import { venueTimeZone } from './venue';
@@ -13,13 +16,14 @@ import { zonedDayLabel } from './zonedLabels';
 export const reviewListLimit = 10;
 
 /** What the page reads of one review. The booker's name is the order's lead guest name, which may be missing; the email is never read. */
-export type ReviewRow = {
-  id: string;
-  rating: number;
-  body: string;
-  createdAt: Date;
-  guestName: string | null;
-};
+export const ReviewRowSchema = z.object({
+  id: EntityIdSchema,
+  rating: z.int().min(reviewLimits.minRating).max(reviewLimits.maxRating),
+  body: z.string(),
+  createdAt: z.date(),
+  guestName: z.string().nullable(),
+});
+export type ReviewRow = z.infer<typeof ReviewRowSchema>;
 
 type ReviewItem = {
   id: string;

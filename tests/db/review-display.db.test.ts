@@ -18,6 +18,7 @@ import { day, insertBooking } from './reviewFixtures';
 // - the rating read is the mean and the count of an experience's visible reviews, one row per experience that has any
 // - a hidden review is in neither the mean nor the count, so hiding one moves the rating
 // - an experience with no reviews has no row, and an empty list of ids reads nothing
+// - a malformed id, or a list holding one, reads nothing from either read, as the sibling reads do
 // - the review list is the newest visible reviews, at most the limit, newest first, with the order's lead guest name and no email
 // - the browse card read and the home card read carry the rating, below the threshold too: the threshold is the lib's, and the card shows it from five
 // - a review written after the first read changes the next read at once: four reviews show no rating on the card, the fifth shows it
@@ -146,6 +147,18 @@ describe('readRatings', () => {
 
     expect(await read.readRatings([])).toEqual([]);
     expect(await read.readRatings([a.experienceId])).toEqual([]);
+  });
+});
+
+describe('a malformed id', () => {
+  it('reads no ratings, alone or among good ids', async () => {
+    const a = await liveExperience();
+    expect(await read.readRatings(['not-an-id'])).toEqual([]);
+    expect(await read.readRatings([a.experienceId, "x' or true"])).toEqual([]);
+  });
+
+  it('lists no reviews', async () => {
+    expect(await read.listReviewRows('not-an-id')).toEqual([]);
   });
 });
 

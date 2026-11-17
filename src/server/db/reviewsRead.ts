@@ -1,7 +1,12 @@
 import 'server-only';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { EntityIdSchema } from '@/lib/catalog';
 import { RatingRowSchema, type RatingRow } from '@/lib/experienceCards';
-import { reviewListLimit, type ReviewRow } from '@/lib/reviewList';
+import {
+  reviewListLimit,
+  ReviewRowSchema,
+  type ReviewRow,
+} from '@/lib/reviewList';
 import { dbRead } from './client';
 import { orders, reviews } from './schema';
 
@@ -12,11 +17,12 @@ import { orders, reviews } from './schema';
 /** The reviews guests see: a hidden one is in neither the mean nor the list. */
 const visibleReview = eq(reviews.status, 'visible');
 
-/** The mean rating and the count of the visible reviews of each of these experiences. One with no reviews has no row. */
+/** The mean rating and the count of the visible reviews of each of these experiences. One with no reviews has no row, and a malformed ID reads nothing. */
 export async function readRatings(
   experienceIds: readonly string[],
 ): Promise<RatingRow[]> {
-  if (experienceIds.length === 0) return [];
+  const ids = EntityIdSchema.array().safeParse(experienceIds);
+  if (!ids.success || ids.data.length === 0) return [];
   const rows = await dbRead
     .select({
       experienceId: reviews.experienceId,
@@ -24,21 +30,22 @@ export async function readRatings(
       count: sql<number>`count(*)::int`,
     })
     .from(reviews)
-    .where(
-      and(inArray(reviews.experienceId, [...experienceIds]), visibleReview),
-    )
+    .where(and(inArray(reviews.experienceId, ids.data), visibleReview))
     .groupBy(reviews.experienceId);
   return RatingRowSchema.array().parse(rows);
 }
 
 /**
  * The newest visible reviews of an experience, at most `reviewListLimit`, with the first name's
- * source (the order's lead guest name). The booker's email is not selected.
+ * source (the order's lead guest name). The booker's email is not selected. A malformed ID reads
+ * nothing.
  */
 export async function listReviewRows(
   experienceId: string,
 ): Promise<ReviewRow[]> {
-  return dbRead
+  const id = EntityIdSchema.safeParse(experienceId);
+  if (!id.success) return [];
+  const rows = await dbRead
     .select({
       id: reviews.id,
       rating: reviews.rating,
@@ -48,7 +55,8 @@ export async function listReviewRows(
     })
     .from(reviews)
     .innerJoin(orders, eq(orders.id, reviews.orderId))
-    .where(and(eq(reviews.experienceId, experienceId), visibleReview))
+    .where(and(eq(reviews.experienceId, id.data), visibleReview))
     .orderBy(desc(reviews.createdAt), desc(reviews.id))
     .limit(reviewListLimit);
+  return ReviewRowSchema.array().parse(rows);
 }

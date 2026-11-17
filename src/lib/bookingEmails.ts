@@ -11,6 +11,7 @@ import { googleCalendarUrl, type CalendarEvent } from './ics';
 import { formatMoney } from './money';
 import { guestsLabel } from './copy/format';
 import { orderSummaryAmounts, type TaxTreatment } from './orderSummary';
+import { reviewCopy } from './copy/review';
 import { isCapabilityTokenShape } from './capabilityTokens';
 import type { orderCancelledBys, OrderStatus } from './orders';
 import { browsePath, managePath } from './routes';
@@ -172,7 +173,7 @@ export function greetingName(name: string | null): string {
 
 /** What a host's notice calls a guest who gave no name. */
 function guestNameForHost(name: string | null): string {
-  return nameOr(name, 'A guest', nameClip.person);
+  return nameOr(name, reviewCopy.display.anonymousGuest, nameClip.person);
 }
 
 /** The spaces the order takes: items that use a space, counted by quantity. */

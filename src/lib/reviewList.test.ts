@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { reviewListLimit, reviewsView, type ReviewRow } from './reviewList';
+import {
+  reviewListLimit,
+  ReviewRowSchema,
+  reviewsView,
+  type ReviewRow,
+} from './reviewList';
 import { reviewCopy } from './copy/review';
 import { nameClip } from './text';
 import { id } from '../../tests/support/ids';
@@ -159,5 +164,26 @@ describe('reviewsView items', () => {
       paragraphs: ['Review 1'],
     });
     expect(JSON.stringify(view)).not.toContain('Haddad');
+  });
+});
+
+describe('ReviewRowSchema', () => {
+  it('accepts a row as the read selects it', () => {
+    expect(ReviewRowSchema.safeParse(row(1)).success).toBe(true);
+    expect(ReviewRowSchema.safeParse(row(1, { guestName: null })).success).toBe(
+      true,
+    );
+  });
+
+  it.each([
+    ['a rating of 0', { rating: 0 }],
+    ['a rating of 6', { rating: 6 }],
+    ['a half rating', { rating: 4.5 }],
+    ['an id that is not a uuid', { id: 'nope' }],
+    ['a created time that is not a date', { createdAt: '2026-11-01' }],
+  ])('refuses %s', (_, overrides) => {
+    expect(ReviewRowSchema.safeParse({ ...row(1), ...overrides }).success).toBe(
+      false,
+    );
   });
 });

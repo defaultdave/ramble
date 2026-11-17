@@ -285,7 +285,7 @@ These pages hold nothing in the cache and nothing is cleared for them. The next 
 | --- | --- | --- |
 | Cancel goes through | `revalidateTagsForChanges` with a `spaces` change for the session, which clears that date's `session` tag ([orderCancel.ts](../../../server/db/orderCancel.ts)) | The experience page's sold-out and spaces-left reads rebuild. The next view may still show the old spaces count once while it rebuilds. |
 | Move goes through | The same call for each affected session, old and new ([orderMove.ts](../../../server/db/orderMove.ts)) | Same as above. |
-| A review is written | Nothing: no page shows reviews yet, so there is no tag to clear | The review page itself reads the database, so it says "already reviewed" at once. |
+| A review is written | `updateTagsForChanges` with an `experience` change, which clears that experience's `experience` tag ([reviewForm.ts](../../../server/reviewForm.ts)) | The experience page and every browse and home card that lists it show the review at once. The review page itself reads the database, so it says "already reviewed" at once. |
 | Refused or unchanged result | Nothing | No change. |
 | Any view of these pages | Nothing, and nothing is stored | The next view reads the database. |
 

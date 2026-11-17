@@ -3,7 +3,7 @@
 import { errorKind } from '@/lib/errorKind';
 import { SignInLinkRequestSchema } from '@/lib/auth';
 import {
-  onScreenLinkHref,
+  onScreenHrefFromBody,
   safeNextPath,
   signInLinkApiPath,
   signInStateFor,
@@ -13,16 +13,11 @@ import { handleSignInFormRequest } from '@/server/auth/handler';
 import { env } from '@/server/env';
 import { logger } from '@/server/monitoring/logger';
 
+// A 200 whose body is not JSON is not an answer this handler gives; the error reaches the catch in
+// `requestSignInLink`, which logs it and reports a failure.
 async function onScreenHrefOf(response: Response): Promise<string | null> {
   if (response.status !== 200) return null;
-  try {
-    const body: unknown = await response.json();
-    return typeof body === 'object' && body !== null && 'signInPath' in body
-      ? onScreenLinkHref(body.signInPath)
-      : null;
-  } catch {
-    return null;
-  }
+  return onScreenHrefFromBody(await response.json());
 }
 
 /**

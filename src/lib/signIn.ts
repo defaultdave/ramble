@@ -172,6 +172,14 @@ export function onScreenLinkHref(value: unknown): string | null {
   return parsed.success ? value : null;
 }
 
+/** The on-screen confirm path in a sign-in answer's JSON body (`{ status: true, signInPath }`), or null when the body carries none that passes `onScreenLinkHref`. */
+export function onScreenHrefFromBody(body: unknown): string | null {
+  if (typeof body !== 'object' || body === null || !('signInPath' in body)) {
+    return null;
+  }
+  return onScreenLinkHref(body.signInPath);
+}
+
 /**
  * The form's state after the sign-in request was answered with `status`. 200 sent (or, when the
  * answer carries an on-screen link, link), 429 counted out, 400 a bad address.

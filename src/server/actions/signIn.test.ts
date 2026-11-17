@@ -152,13 +152,15 @@ describe('requestSignInLink with an on-screen link', () => {
     ).toEqual({ status: 'sent', email: 'sam@example.com' });
   });
 
-  it('reads an answer with no body as sent', async () => {
+  it('reports a 200 whose body is not JSON as failed, and logs without the address', async () => {
     handleSignInFormRequest.mockResolvedValue(
       new Response('', { status: 200 }),
     );
 
     expect(
       await requestSignInLink(idle, form({ email: 'sam@example.com' })),
-    ).toEqual({ status: 'sent', email: 'sam@example.com' });
+    ).toEqual({ status: 'failed', email: 'sam@example.com' });
+    expect(logError).toHaveBeenCalledOnce();
+    expect(JSON.stringify(logError.mock.calls)).not.toContain('sam@example');
   });
 });

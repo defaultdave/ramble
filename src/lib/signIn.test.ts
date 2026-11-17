@@ -16,6 +16,7 @@ import {
   signInProblemFor,
   signInStateFor,
   onScreenLinkHref,
+  onScreenHrefFromBody,
   signInConfirmHref,
   signInLinkDelivery,
 } from './signIn';
@@ -374,6 +375,29 @@ describe('signInConfirmHref', () => {
 
     expect(href).toBe('/sign-in/confirm?token=AbC&next=%2F');
     expect(href.startsWith('/sign-in/confirm?')).toBe(true);
+  });
+});
+
+describe('onScreenHrefFromBody', () => {
+  const good = '/sign-in/confirm?token=AbCdEf&next=%2Faccount';
+
+  it('reads the path of a good answer', () => {
+    expect(onScreenHrefFromBody({ status: true, signInPath: good })).toBe(good);
+  });
+
+  it.each([
+    ['null', null],
+    ['a string', 'signInPath'],
+    ['a number', 7],
+    ['an array', [good]],
+    ['an object without signInPath', { status: true }],
+    ['a path that is not a string', { signInPath: 7 }],
+    ['an absolute address', { signInPath: `https://evil.com${good}` }],
+    ['a protocol-relative address', { signInPath: `//evil.com${good}` }],
+    ['another page', { signInPath: '/account?token=AbC' }],
+    ['a token with a symbol', { signInPath: '/sign-in/confirm?token=a-b' }],
+  ])('gives null for %s', (_label, body) => {
+    expect(onScreenHrefFromBody(body)).toBeNull();
   });
 });
 

@@ -14,6 +14,7 @@ import { emptyWeek, week } from './HostSessions.fixtures';
 //   a cancelled one offers nothing
 // - a form posts its hidden ids and version with what was typed, and the answer is shown in words
 // - a refused field is marked with its message; a refusal and a failure each show a notice
+// - a cancelled session's notice is shown above the rows and takes focus, and survives its form leaving the page
 // - for read-only staff (canEdit false) the week is shown with no form, button, publish or one-off section
 // - publishing posts the week it was drawn for; the one-off form is there only when the host has experiences
 
@@ -188,6 +189,36 @@ describe('HostSessions', () => {
     expect(
       await within(row).findByText(/nothing was saved/),
     ).toBeInTheDocument();
+  });
+
+  it('shows a cancel success in the page notice, with focus, after the form is gone', async () => {
+    const user = userEvent.setup();
+    reply.mockResolvedValue({ status: 'done', message: 'Session cancelled.' });
+    const { rerender } = render(<HostSessions view={week} actions={actions} />);
+    const row = rowFor('Sunset kayak', '4:00 PM EST');
+    await user.click(
+      within(row).getByRole('button', { name: 'Cancel this session' }),
+    );
+
+    const message = await screen.findByText('Session cancelled.');
+    expect(message.closest('[tabindex="-1"]')).toHaveFocus();
+    expect(
+      within(row).queryByText('Session cancelled.'),
+    ).not.toBeInTheDocument();
+
+    const cancelled = {
+      ...week,
+      days: week.days.map((day) => ({
+        ...day,
+        sessions: day.sessions.map((s) =>
+          s.id === '00000000-0000-4000-8000-000000000001'
+            ? { ...s, editable: false }
+            : s,
+        ),
+      })),
+    };
+    rerender(<HostSessions view={cancelled} actions={actions} />);
+    expect(screen.getByText('Session cancelled.')).toBeInTheDocument();
   });
 
   it('publishes the week it shows', async () => {

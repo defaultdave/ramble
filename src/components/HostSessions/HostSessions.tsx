@@ -6,6 +6,7 @@ import {
   AddOneOffForm,
   EditSessionForms,
   PublishWeekForm,
+  SessionResultHost,
   type HostSessionActions,
 } from './HostSessionForms';
 import styles from './HostSessions.module.css';
@@ -56,71 +57,73 @@ export function HostSessions({
         <AccountControl signedIn />
       </PageHeading>
       <div className={styles.sections}>
-        <nav aria-label="Week" className={styles.weekNav}>
-          <p className={styles.week}>{view.weekLabel}</p>
-          {view.prevHref ? (
-            <ButtonLink href={view.prevHref} variant="secondary">
-              Previous week
-            </ButtonLink>
+        <SessionResultHost>
+          <nav aria-label="Week" className={styles.weekNav}>
+            <p className={styles.week}>{view.weekLabel}</p>
+            {view.prevHref ? (
+              <ButtonLink href={view.prevHref} variant="secondary">
+                Previous week
+              </ButtonLink>
+            ) : null}
+            {view.thisWeekHref ? (
+              <ButtonLink href={view.thisWeekHref} variant="secondary">
+                This week
+              </ButtonLink>
+            ) : null}
+            {view.nextHref ? (
+              <ButtonLink href={view.nextHref} variant="secondary">
+                Next week
+              </ButtonLink>
+            ) : null}
+          </nav>
+          <p className={styles.secondary}>Times are in {view.timeZone}.</p>
+          {view.canEdit ? (
+            <section>
+              <h2 className={styles.heading}>Publish this week</h2>
+              <p className={styles.secondary}>
+                Sessions from your weekly slots are bookable as soon as they
+                exist. Publishing adds any that are missing this week and leaves
+                edited or cancelled ones as they are.
+              </p>
+              <PublishWeekForm
+                weekStart={view.weekStart}
+                action={actions.publishWeek}
+              />
+            </section>
           ) : null}
-          {view.thisWeekHref ? (
-            <ButtonLink href={view.thisWeekHref} variant="secondary">
-              This week
-            </ButtonLink>
-          ) : null}
-          {view.nextHref ? (
-            <ButtonLink href={view.nextHref} variant="secondary">
-              Next week
-            </ButtonLink>
-          ) : null}
-        </nav>
-        <p className={styles.secondary}>Times are in {view.timeZone}.</p>
-        {view.canEdit ? (
           <section>
-            <h2 className={styles.heading}>Publish this week</h2>
-            <p className={styles.secondary}>
-              Sessions from your weekly slots are bookable as soon as they
-              exist. Publishing adds any that are missing this week and leaves
-              edited or cancelled ones as they are.
-            </p>
-            <PublishWeekForm
-              weekStart={view.weekStart}
-              action={actions.publishWeek}
-            />
-          </section>
-        ) : null}
-        <section>
-          <h2 className={styles.heading}>Sessions</h2>
-          {view.days.length === 0 ? (
-            <p className={styles.empty}>No sessions this week.</p>
-          ) : (
-            view.days.map((day) => (
-              <div key={day.date}>
-                <h3 className={styles.day}>{day.label}</h3>
-                <ul className={styles.list}>
-                  {day.sessions.map((row) => (
-                    <SessionRow
-                      key={row.id}
-                      row={row}
-                      actions={actions}
-                      canEdit={view.canEdit}
-                    />
-                  ))}
-                </ul>
-              </div>
-            ))
-          )}
-        </section>
-        {view.canEdit ? (
-          <section>
-            <h2 className={styles.heading}>Add a one-off session</h2>
-            {view.experiences.length === 0 ? (
-              <p className={styles.empty}>You have no experiences yet.</p>
+            <h2 className={styles.heading}>Sessions</h2>
+            {view.days.length === 0 ? (
+              <p className={styles.empty}>No sessions this week.</p>
             ) : (
-              <AddOneOffForm view={view} action={actions.addOneOff} />
+              view.days.map((day) => (
+                <div key={day.date}>
+                  <h3 className={styles.day}>{day.label}</h3>
+                  <ul className={styles.list}>
+                    {day.sessions.map((row) => (
+                      <SessionRow
+                        key={row.id}
+                        row={row}
+                        actions={actions}
+                        canEdit={view.canEdit}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              ))
             )}
           </section>
-        ) : null}
+          {view.canEdit ? (
+            <section>
+              <h2 className={styles.heading}>Add a one-off session</h2>
+              {view.experiences.length === 0 ? (
+                <p className={styles.empty}>You have no experiences yet.</p>
+              ) : (
+                <AddOneOffForm view={view} action={actions.addOneOff} />
+              )}
+            </section>
+          ) : null}
+        </SessionResultHost>
       </div>
     </>
   );

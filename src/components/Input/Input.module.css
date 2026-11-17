@@ -57,6 +57,14 @@
   box-shadow: inset 0 0 0 1px var(--color-status-danger-text);
 }
 
+/* After the invalid rule so the ring shows on a focused invalid field; the border stays danger so the state still reads. */
+.input[aria-invalid='true']:focus-visible {
+  box-shadow:
+    inset 0 0 0 1px var(--color-status-danger-text),
+    0 0 0 2px var(--color-bg-canvas),
+    0 0 0 4px var(--color-focus-ring);
+}
+
 .input:disabled {
   background: var(--color-bg-disabled);
   border-color: var(--color-border-default);

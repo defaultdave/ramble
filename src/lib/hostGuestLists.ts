@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { count } from './copy/format';
 import { EntityIdSchema } from './catalog';
-import type { HostAccess } from './hostAccess';
+import { hostAreaResult, type HostAccess } from './hostAccess';
 import {
   bookingStatusLabels,
   hostDashboardBookingStatuses,
@@ -248,11 +248,12 @@ export function hostBookingListResult(
   data: HostBookingListData | null,
   term: string,
 ): HostBookingListResult {
-  if (access.kind === 'signed_out') return { status: 'signed_out' };
-  if (access.kind === 'no_host_role' || data === null) {
-    return { status: 'refused' };
-  }
-  return { status: 'ok', view: buildHostBookingList(data, term) };
+  return hostAreaResult(
+    access,
+    data,
+    (read) => ({ status: 'ok', view: buildHostBookingList(read, term) }),
+    true,
+  );
 }
 
 /** As above; a session that is missing or another host's is `data` null, so it is refused the same way as no session at all. */
@@ -260,9 +261,10 @@ export function hostGuestListResult(
   access: HostAccess,
   data: HostGuestListData | null,
 ): HostGuestListResult {
-  if (access.kind === 'signed_out') return { status: 'signed_out' };
-  if (access.kind === 'no_host_role' || data === null) {
-    return { status: 'refused' };
-  }
-  return { status: 'ok', view: buildHostGuestList(data) };
+  return hostAreaResult(
+    access,
+    data,
+    (read) => ({ status: 'ok', view: buildHostGuestList(read) }),
+    true,
+  );
 }

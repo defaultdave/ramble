@@ -6,6 +6,7 @@ import {
   hostStaffNotices,
   hostStaffResult,
   maxHostStaff,
+  staffCapDecision,
 } from './hostStaff';
 import { isValidGrantScope } from './roleGrants';
 import { staffReadLimit } from './staffAdmin';
@@ -16,6 +17,7 @@ import { staffReadLimit } from './staffAdmin';
 // - nobody signed in signs in; a caller who owns no host, host staff included, is refused
 // - an owner with rows sees them; an owner who could not read them is refused
 // - an owner is linked to the sessions and the staff page; staff only to the sessions
+// - an address that already holds the role is granted at, past and under the cap; a new one is refused at and past it
 // - an invite refused for the cap or the owner's rate says so; every other result is ops staff's notice
 // - every notice the page can name has text
 
@@ -94,5 +96,49 @@ describe('hostInviteNotice', () => {
 
   it('names the cap in its notice', () => {
     expect(hostStaffNotices.staff_cap.title).toContain(String(maxHostStaff));
+  });
+});
+
+describe('staffCapDecision', () => {
+  const holders = (count: number) =>
+    Array.from({ length: count }, (_, i) => ({
+      email: `s${String(i)}@example.com`,
+    }));
+
+  it.each([
+    ['under the cap', holders(maxHostStaff - 1), 'new@example.com', 'grant'],
+    ['no staff yet', [], 'new@example.com', 'grant'],
+    [
+      'at the cap, a new address',
+      holders(maxHostStaff),
+      'new@example.com',
+      'cap_reached',
+    ],
+    [
+      'past the cap, a new address',
+      holders(maxHostStaff + 1),
+      'new@example.com',
+      'cap_reached',
+    ],
+    [
+      'at the cap, already staff',
+      holders(maxHostStaff),
+      's3@example.com',
+      'grant',
+    ],
+    [
+      'past the cap, already staff',
+      holders(maxHostStaff + 1),
+      's0@example.com',
+      'grant',
+    ],
+    [
+      'at the cap, same address in another case',
+      holders(maxHostStaff),
+      'S3@example.com',
+      'cap_reached',
+    ],
+  ] as const)('%s', (_name, held, address, expected) => {
+    expect(staffCapDecision(held, address)).toBe(expected);
   });
 });

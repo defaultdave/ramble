@@ -303,6 +303,11 @@ const rows: Row[] = [
     allows: platform(...staff),
   },
   {
+    fn: 'readSettings',
+    invoke: (c) => data.settings.readSettings(c),
+    allows: platform(...staff),
+  },
+  {
     fn: 'readFinanceExport',
     invoke: (c) => data.ledger.readFinanceExport(c, window),
     allows: platform(...staff),

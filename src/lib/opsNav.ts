@@ -88,6 +88,12 @@ export const opsNavLinks: readonly OpsNavLink[] = [
     summary:
       'Find a booking by reference or guest email, and see its refunds and history.',
   },
+  {
+    label: 'Settings',
+    href: '/ops/settings',
+    summary:
+      'Set the banner, pause bookings, and change the hold, grace and tax numbers.',
+  },
 ];
 
 /** The areas the landing page lists: every link but the landing page itself. */

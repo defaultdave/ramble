@@ -212,7 +212,7 @@ flowchart TD
 
 | Change | What clears | When the guest sees it |
 | --- | --- | --- |
-| Site settings change (no screen yet: `updateSettings` has no caller, `TODO(U-078)`) | Tag `settings`, through `updateTagsForChanges()` once a settings save calls it | The next request. This is the only cached read on this page. |
+| Site settings saved at `/ops/settings` (`updateSettings`) | Tag `settings`, through `updateTagsForChanges()` after a save that changed a setting | The next request. This is the only cached read on this page. |
 | A payment is confirmed | `revalidateTagsForChanges()` from `confirmOrder()` in the job, for the session's `spaces` change, which clears the `session:<id>` tag | Stale while revalidating (`revalidateTag(tag, 'max')`), so one response after the call may still show the old space count on the experience page. |
 | A hold is released, or a lapsed hold is held again | `updateTagsForChanges()` from the action in `holds.ts`, for the session's `spaces` change | The next request, so the experience page rebuilds its space counts. |
 

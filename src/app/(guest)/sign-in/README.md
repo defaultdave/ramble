@@ -209,7 +209,7 @@ These routes have no tagged reads of their own, so nothing here is invalidated b
 
 | Change | What clears | When the guest sees it |
 | --- | --- | --- |
-| Site settings change (no screen yet: `updateSettings` has no caller, `TODO(U-078)`) | The `settings` tag, which `getCachedGuestSettings()` carries | On the next request that streams the banner. |
+| Site settings saved at `/ops/settings` (`updateSettings`) | The `settings` tag, which `getCachedGuestSettings()` carries | On the next request that streams the banner. |
 | Any auth request (sign-in link, confirm, sign out) | Nothing to clear: responses are sent `Cache-Control: no-store` because they may set or clear the cookie. The on-screen link rides a server action's POST answer, which is not cached either | Immediately. |
 | A sign-in link ages out | The verification row's 5 minute expiry and its single use, not a cache | The next confirm attempt shows the expired notice. |
 

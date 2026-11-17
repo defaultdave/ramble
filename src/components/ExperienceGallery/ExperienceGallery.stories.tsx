@@ -47,6 +47,22 @@ export const ManyMobile: Story = {
     await expect(canvas.getAllByRole('img', { hidden: true })).toHaveLength(30);
   },
 };
+export const ManyMobileFocused: Story = {
+  globals: mobile,
+  play: async ({ canvasElement }) => {
+    // The ring is an outline, which paints above the photos; an inset shadow would sit beneath them.
+    const canvas = within(canvasElement);
+    const [strip] = await canvas.findAllByRole('group', { name: photosOf });
+    await waitFor(() => expect(strip).toHaveAttribute('tabindex', '0'));
+    await userEvent.tab();
+    await expect(strip).toHaveFocus();
+    const style = getComputedStyle(strip as HTMLElement);
+    await expect(style.outlineStyle).toBe('solid');
+    await expect(style.outlineWidth).toBe('4px');
+    await expect(style.outlineOffset).toBe('-4px');
+    await expect(style.boxShadow).toBe('none');
+  },
+};
 export const ManyDesktop: Story = {
   globals: desktop,
   parameters: fullWidth,

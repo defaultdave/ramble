@@ -16,6 +16,7 @@ import { ExperienceGallery } from './ExperienceGallery';
 // - with no photo the gallery shows its placeholder and no image
 // - the photos are in the order given, each named by its alt text, inside a group named for the experience that a keyboard can reach before any measuring
 // - once measured, a strip that does not overflow is neither a group nor a tab stop, and one that does keeps both, and the change follows the layout
+// - a strip that stops scrolling while it holds focus stays focusable out of the tab order until it is left; one that stops without focus takes no stop
 // - only the lead photo is the preload photo
 // - only the lead photo is drawn again beneath itself at the card's width, so it can show what the card already fetched
 // - with more than one photo each says where it is in the set; a single photo says nothing
@@ -94,6 +95,37 @@ describe('ExperienceGallery', () => {
       layout.resize({ scrollWidth: 768, clientWidth: 768 });
     });
     expect(screen.queryByRole('group')).not.toBeInTheDocument();
+  });
+
+  it('keeps focus on a strip that stops scrolling while it holds focus, and lets go once it is left', () => {
+    const layout = stubResizeObserver({ scrollWidth: 1200, clientWidth: 390 });
+    gallery(3);
+    const strip = screen.getByRole('group');
+    act(() => {
+      strip.focus();
+    });
+
+    act(() => {
+      layout.resize({ scrollWidth: 844, clientWidth: 844 });
+    });
+    expect(strip).toHaveFocus();
+    expect(strip).toHaveAttribute('tabindex', '-1');
+    expect(screen.queryByRole('group')).not.toBeInTheDocument();
+
+    act(() => {
+      strip.blur();
+    });
+    expect(strip).not.toHaveAttribute('tabindex');
+  });
+
+  it('takes no tab stop when it stops scrolling without focus', () => {
+    const layout = stubResizeObserver({ scrollWidth: 1200, clientWidth: 390 });
+    gallery(3);
+    const strip = screen.getByRole('group');
+    act(() => {
+      layout.resize({ scrollWidth: 844, clientWidth: 844 });
+    });
+    expect(strip).not.toHaveAttribute('tabindex');
   });
 
   it('fetches only the lead photo ahead of the rest', () => {

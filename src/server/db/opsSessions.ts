@@ -1,13 +1,7 @@
 import 'server-only';
-import { and, asc, eq, gt, ilike, inArray, lte, or } from 'drizzle-orm';
-import {
-  fanOutHoldStatuses,
-  fanOutLimit,
-  fanOutOrderStatuses,
-  requireWithinFanOut,
-} from '@/lib/cancelSession';
+import { and, asc, eq, gt, ilike, lte, or } from 'drizzle-orm';
+import { fanOutLimit, requireWithinFanOut } from '@/lib/cancelSession';
 import { WriteIdSchema } from '@/lib/catalog';
-import { requireAtMost } from '@/lib/holds';
 import {
   buildOpsSessionRows,
   buildOpsSessionView,
@@ -23,12 +17,9 @@ import {
   pauseView,
   cursorFrom,
   impactIsCurrent,
-  impactOrders,
   impactView,
   openHeldSeatsBySession,
-  sessionImpact,
   sessionListDirection,
-  type Impact,
   type ImpactView,
   type OpsCancelInput,
   type OpsCancelOutcome,
@@ -41,7 +32,6 @@ import {
 import { containsPattern } from '@/lib/pages/help';
 import { splitPage } from '@/lib/pagination';
 import { opsListPageSize } from '@/lib/tableQuery';
-import { attemptReadLimit } from '@/lib/refunds';
 import { sessionsListEntry, sessionViewedEntry } from '@/lib/sessionAudit';
 import type { UpdateSessionAllocationInput } from '@/lib/sessions';
 import type { Caller } from '@/server/auth/caller';
@@ -50,100 +40,18 @@ import { setExperiencePaused } from './experiencePause';
 import { recordAudit, requireOpsUserId } from './audit';
 import { db, dbRead } from './client';
 import { byColumnThenId, pastKeysetCursor } from './keysetPage';
-import { refundableOrderColumns } from './orderColumns';
+import { experiences, hosts, sessions } from './schema';
 import {
-  experiences,
-  holds,
-  hosts,
-  orders,
-  paymentAttempts,
-  sessions,
-} from './schema';
+  readImpact,
+  readReleasableHolds,
+  type Executor,
+} from './sessionImpact';
 import { updateSessionAllocation } from './sessions';
 import { currentDatabaseTime } from './time';
 
 // For the ops role alone: each function checks it before it reads or writes. Every read records its
 // audit row. Cancelling is `cancelSession`, which writes its audit rows in the transaction that
 // cancels, naming the ops user.
-
-type Executor = Pick<typeof db, 'select'>;
-
-/** The holds a cancellation would release, for the sessions given. */
-async function readReleasableHolds(executor: Executor, sessionIds: string[]) {
-  if (sessionIds.length === 0) return [];
-  return requireWithinFanOut(
-    await executor
-      .select({
-        sessionId: holds.sessionId,
-        status: holds.status,
-        seats: holds.seats,
-        expiresAt: holds.expiresAt,
-        payingUntil: holds.payingUntil,
-      })
-      .from(holds)
-      .where(
-        and(
-          inArray(holds.sessionId, sessionIds),
-          inArray(holds.status, fanOutHoldStatuses),
-        ),
-      )
-      .limit(fanOutLimit + 1),
-    'releasable holds',
-  );
-}
-
-/** What cancelling the sessions given would do to their orders and holds, read as it stands now. */
-async function readImpact(
-  executor: Executor,
-  sessionIds: string[],
-  at: Date,
-): Promise<Impact> {
-  if (sessionIds.length === 0) return sessionImpact([], [], at);
-  const orderRows = requireWithinFanOut(
-    await executor
-      .select({
-        id: orders.id,
-        reference: orders.reference,
-        ...refundableOrderColumns,
-      })
-      .from(orders)
-      .where(
-        and(
-          inArray(orders.sessionId, sessionIds),
-          inArray(orders.status, fanOutOrderStatuses),
-        ),
-      )
-      .orderBy(asc(orders.reference))
-      .limit(fanOutLimit + 1),
-    'orders',
-  );
-  const attempts =
-    orderRows.length === 0
-      ? []
-      : requireAtMost(
-          await executor
-            .select({
-              orderId: paymentAttempts.orderId,
-              status: paymentAttempts.status,
-              providerPaymentId: paymentAttempts.providerPaymentId,
-            })
-            .from(paymentAttempts)
-            .where(
-              inArray(
-                paymentAttempts.orderId,
-                orderRows.map((order) => order.id),
-              ),
-            )
-            .limit(fanOutLimit * attemptReadLimit + 1),
-          fanOutLimit * attemptReadLimit,
-          'payment attempts',
-        );
-  return sessionImpact(
-    impactOrders(orderRows, attempts),
-    await readReleasableHolds(executor, sessionIds),
-    at,
-  );
-}
 
 export type OpsSessionsPage = {
   rows: OpsSessionRow[];

@@ -14,7 +14,8 @@ import { emptyWeek, week } from './HostSessions.fixtures';
 //   a cancelled one offers nothing
 // - a form posts its hidden ids and version with what was typed, and the answer is shown in words
 // - a refused field is marked with its message; a refusal and a failure each show a notice
-// - for read-only staff (canEdit false) the week is shown with no form, button, publish or one-off section
+// - a booked session links to its cancel page (the form cannot cancel it); an unbooked or cancelled one has no link
+// - for read-only staff (canEdit false) the week is shown with no form, button, link, publish or one-off section
 // - publishing posts the week it was drawn for; the one-off form is there only when the host has experiences
 
 const reply =
@@ -75,6 +76,9 @@ describe('HostSessions', () => {
     expect(row).toBeVisible();
     expect(within(row).queryByRole('button')).not.toBeInTheDocument();
     expect(
+      screen.queryByRole('link', { name: 'Cancel and refund guests' }),
+    ).not.toBeInTheDocument();
+    expect(
       screen.queryByRole('button', { name: /Publish|Add/ }),
     ).not.toBeInTheDocument();
     expect(
@@ -121,6 +125,21 @@ describe('HostSessions', () => {
       within(row).queryByRole('button', { name: 'Cancel this session' }),
     ).not.toBeInTheDocument();
     expect(row).toHaveTextContent('Seats are booked');
+  });
+
+  it('links a booked session to its cancel page, and no other row', () => {
+    render(<HostSessions view={week} actions={actions} />);
+    expect(
+      within(rowFor('Harbor tour', '10:00 AM EST')).getByRole('link', {
+        name: 'Cancel and refund guests',
+      }),
+    ).toHaveAttribute(
+      'href',
+      '/host/sessions/00000000-0000-4000-8000-000000000002/cancel',
+    );
+    expect(
+      screen.getAllByRole('link', { name: 'Cancel and refund guests' }),
+    ).toHaveLength(1);
   });
 
   it('offers nothing on a cancelled session', () => {

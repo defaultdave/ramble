@@ -1,6 +1,7 @@
 import { ButtonLink } from '@/components/Button';
 import { AccountControl } from '@/components/Header/AccountControl';
 import { PageHeading } from '@/components/PageHeading';
+import { hostCancelCopy } from '@/lib/copy/hostSessions';
 import type { HostWeekRowView, HostWeekView } from '@/lib/hostSessions';
 import {
   AddOneOffForm,
@@ -33,6 +34,11 @@ function SessionRow({
       </p>
       {row.editable && canEdit ? (
         <EditSessionForms row={row} actions={actions} />
+      ) : null}
+      {row.cancelHref !== null && canEdit ? (
+        <ButtonLink href={row.cancelHref} variant="secondary">
+          {hostCancelCopy.linkLabel}
+        </ButtonLink>
       ) : null}
     </li>
   );

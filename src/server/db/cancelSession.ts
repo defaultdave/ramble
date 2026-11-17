@@ -317,7 +317,6 @@ async function markAttemptCanceled(attempt: {
  * again, finishing what a failed run left, and writes nothing a second time. Runs in a Server Action
  * only (it invalidates cache tags). Commission return and gift reinstatement are not part of it.
  */
-// TODO(U-070): first caller (U-108 also)
 export async function cancelSession(
   caller: Caller,
   input: CancelSessionInput,

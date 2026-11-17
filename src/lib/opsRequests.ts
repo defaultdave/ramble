@@ -52,10 +52,7 @@ export function requestMessageView(
 ): OpsRequestMessage | null {
   const whole = message?.trim() ?? '';
   if (whole === '') return null;
-  const { text: preview, cut } = clipOneLine(
-    whole,
-    requestMessagePreviewChars,
-  );
+  const { text: preview, cut } = clipOneLine(whole, requestMessagePreviewChars);
   return { preview, full: cut ? whole : null };
 }
 

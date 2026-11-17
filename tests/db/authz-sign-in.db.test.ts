@@ -18,7 +18,7 @@ import {
 // - a session past its idle deadline is anonymous; so is one past 8 hours however busy; the deadline never passes the ceiling
 // - getCaller reads grants: guest only with none; host roles with their hosts; ops and admin with none; requireRole accepts and refuses them unchanged
 // - role_grants: a host role needs a host, ops and admin refuse one, a grant is unique per person, role, and host (a null host counts), and leaves with its person
-// - the sixth request in an hour for one address is 429 with Retry-After and sends nothing; spellings of one address share the count; another address is unaffected
+// - the 21st request in an hour for one address is 429 with Retry-After and sends nothing; spellings of one address share the count; another address is unaffected
 // - a malformed request is 400 and not counted
 // - the database refuses an address Zod would refuse
 
@@ -57,11 +57,20 @@ afterAll(async () => {
 let counter = 0;
 const newEmail = () => `person${String((counter += 1))}@example.com`;
 
-const askForLink = (body: unknown) =>
+let clients = 0;
+/** A fresh client address per call unless one is given, so tests do not share the per-client count. */
+const newClient = () =>
+  `198.51.${String(Math.floor((clients += 1) / 250))}.${String(clients % 250)}`;
+
+const askForLink = (body: unknown, client = newClient()) =>
   handle(
     new Request(`${origin}/api/auth/sign-in/magic-link`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', origin },
+      headers: {
+        'content-type': 'application/json',
+        origin,
+        'x-forwarded-for': client,
+      },
       body: typeof body === 'string' ? body : JSON.stringify(body),
     }),
   );
@@ -533,17 +542,12 @@ describe('role_grants constraints', () => {
 });
 
 describe('the sign-in rate limit', () => {
-  it('refuses the sixth request in an hour with Retry-After and sends nothing; spellings of one address share the count, another address does not', async () => {
+  it('refuses the 21st request for an address in an hour with Retry-After and sends nothing; spellings share the count, another address does not', async () => {
     const address = newEmail();
-    const spellings = [
-      address,
-      address.toUpperCase(),
-      ` ${address}`.trim(),
-      address,
-      address.replace('person', 'PERSON'),
-    ];
+    const spellings = [address, address.toUpperCase(), ` ${address}`.trim()];
 
-    for (const spelling of spellings) {
+    for (let i = 0; i < 20; i += 1) {
+      const spelling = spellings[i % spellings.length] ?? address;
       expect((await askForLink({ email: spelling })).status).toBe(200);
     }
     const refused = await askForLink({ email: address });
@@ -552,12 +556,35 @@ describe('the sign-in rate limit', () => {
     const wait = Number(refused.headers.get('retry-after'));
     expect(wait).toBeGreaterThan(3500);
     expect(wait).toBeLessThanOrEqual(3600);
-    expect(await emailsTo(address)).toHaveLength(5);
+    expect(await emailsTo(address)).toHaveLength(20);
     expect((await askForLink({ email: newEmail() })).status).toBe(200);
     const { rows } = await client.db.execute(
       sql`SELECT count FROM rate_limits WHERE key = ${`sign_in_link:${hash.sha256Hex(address)}`}`,
     );
-    expect(rows).toEqual([{ count: 6 }]);
+    expect(rows).toEqual([{ count: 21 }]);
+  });
+
+  it('refuses the 11th request from one client for any address, without spending the address count, while another client still gets a link', async () => {
+    const lockedClient = newClient();
+    const target = newEmail();
+
+    for (let i = 0; i < 10; i += 1) {
+      expect(
+        (await askForLink({ email: newEmail() }, lockedClient)).status,
+      ).toBe(200);
+    }
+    const refused = await askForLink({ email: target }, lockedClient);
+
+    expect(refused.status).toBe(429);
+    expect(Number(refused.headers.get('retry-after'))).toBeGreaterThan(3500);
+    expect(await emailsTo(target)).toHaveLength(0);
+    expect(
+      await client.db.execute(
+        sql`SELECT count FROM rate_limits WHERE key = ${`sign_in_link:${hash.sha256Hex(target)}`}`,
+      ),
+    ).toMatchObject({ rows: [] });
+    expect((await askForLink({ email: target })).status).toBe(200);
+    expect(await emailsTo(target)).toHaveLength(1);
   });
 
   it.each([

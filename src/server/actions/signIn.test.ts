@@ -2,14 +2,24 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { requestSignInLink } from './signIn';
 
 const handleSignInFormRequest = vi.hoisted(() => vi.fn());
+const forwardedFor = vi.hoisted(() => ({ value: null as string | null }));
 const logError = vi.hoisted(() => vi.fn());
 vi.mock('@/server/auth/handler', () => ({ handleSignInFormRequest }));
+vi.mock('next/headers', () => ({
+  headers: () =>
+    Promise.resolve(
+      new Headers(
+        forwardedFor.value ? { 'x-forwarded-for': forwardedFor.value } : {},
+      ),
+    ),
+}));
 vi.mock('@/server/monitoring/logger', () => ({
   logger: { error: logError, warn: vi.fn(), info: vi.fn() },
 }));
 
 // Behaviours under test, one per decision, branch, or risk:
 // - a valid address is asked for through the same handler as the API, lower-cased, with the checked destination as the callback
+// - the caller's forwarded address is passed on to the handler, which counts the client; with none, none is sent
 // - the answer becomes the form's state: sent, rate limited with the wait, or failed
 // - an answer carrying the confirm path becomes the link state; one carrying anything else, or no path, is sent; the on-screen option is asked for in this process only
 // - an address that is blank, malformed, or too long is invalid and never sent
@@ -28,6 +38,7 @@ const sentRequest = () => handleSignInFormRequest.mock.calls[0]?.[0] as Request;
 
 beforeEach(() => {
   vi.resetAllMocks();
+  forwardedFor.value = null;
   handleSignInFormRequest.mockResolvedValue(Response.json({ status: true }));
 });
 
@@ -47,6 +58,21 @@ describe('requestSignInLink', () => {
       email: 'sam@example.com',
       callbackURL: '/account',
     });
+  });
+
+  it.each([
+    [
+      'passes the caller address on',
+      '203.0.113.7, 10.0.0.1',
+      '203.0.113.7, 10.0.0.1',
+    ],
+    ['sends none when there is none', null, null],
+  ])('%s', async (_n, incoming, expected) => {
+    forwardedFor.value = incoming;
+
+    await requestSignInLink(idle, form({ email: 'sam@example.com' }));
+
+    expect(sentRequest().headers.get('x-forwarded-for')).toBe(expected);
   });
 
   it('reports a counted-out request with the wait from Retry-After', async () => {

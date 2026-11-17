@@ -32,6 +32,14 @@ describe('rateLimitPolicies', () => {
     },
   );
 
+  it("keeps the client sign-in count below the address count, so one client cannot spend an address's", () => {
+    expect(rateLimitPolicies.sign_in_link_client.limit).toBe(10);
+    expect(rateLimitPolicies.sign_in_link.limit).toBe(20);
+    expect(rateLimitPolicies.sign_in_link_client.limit).toBeLessThan(
+      rateLimitPolicies.sign_in_link.limit,
+    );
+  });
+
   it('allows five payment tries per hold, for longer than a hold lives', () => {
     expect(rateLimitPolicies.payment_tries.limit).toBe(5);
     expect(rateLimitPolicies.payment_tries.windowSeconds).toBeGreaterThan(
@@ -41,6 +49,7 @@ describe('rateLimitPolicies', () => {
 
   it.each([
     ['sign_in_link', '  Guest@Example.COM ', 'guest@example.com'],
+    ['sign_in_link_client', ' 2001:DB8::1 ', '2001:db8::1'],
     ['reserve', '  device-1 ', 'device-1'],
     ['forms', ' Contact:abc ', 'Contact:abc'],
   ] as const)('%s reads %j as %j', (surface, subject, expected) => {

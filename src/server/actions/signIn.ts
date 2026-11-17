@@ -1,5 +1,6 @@
 'use server';
 
+import { headers } from 'next/headers';
 import { errorKind } from '@/lib/errorKind';
 import { SignInLinkRequestSchema } from '@/lib/auth';
 import {
@@ -37,10 +38,16 @@ export async function requestSignInLink(
 
   const origin = new URL(env.APP_URL).origin;
   try {
+    const forwardedFor = (await headers()).get('x-forwarded-for');
     const response = await handleSignInFormRequest(
       new Request(new URL(signInLinkApiPath, origin), {
         method: 'POST',
-        headers: { 'content-type': 'application/json', origin },
+        // The handler counts the client, and this request is built here, so the caller's address is passed on.
+        headers: {
+          'content-type': 'application/json',
+          origin,
+          ...(forwardedFor ? { 'x-forwarded-for': forwardedFor } : {}),
+        },
         body: JSON.stringify({
           email: parsed.data.email,
           callbackURL: safeNextPath(formData.get('next')),

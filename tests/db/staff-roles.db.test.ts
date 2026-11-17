@@ -46,7 +46,7 @@ vi.mock('@/server/monitoring/logger', () => ({
 // Inviting (fake mailer):
 // - a new address gets an account marked verified, the ops role, one sign-in email, and audit rows for the grant and the link; the link signs them in once as ops
 // - an address that already holds ops gets another link and no second grant; a person who is not ops is not found by a resend and nothing is sent
-// - the sixth link in an hour to one address is rate_limited; a failing mailer says failed, keeps the grant, and logs only the error kind
+// - the 21st link in an hour to one address is rate_limited; a failing mailer says failed, keeps the grant, and logs only the error kind
 // The grant command:
 // - it makes the account, grants once, and records the system as the actor; a repeat says nothing changed
 // - bad arguments print the usage and touch nothing; a failed grant says only the error kind and leaves no account
@@ -506,29 +506,25 @@ describe('inviting staff', () => {
     await grant(target.id, opsGrant);
 
     const results: string[] = [];
-    for (let attempt = 0; attempt < 6; attempt += 1) {
+    for (let attempt = 0; attempt < 21; attempt += 1) {
       results.push(await invite.resendStaffLink(ops, target.id));
     }
 
     expect(results.at(-1)).toBe('rate_limited');
-    expect(await linkEmails('resend-busy@example.com')).toHaveLength(5);
+    expect(await linkEmails('resend-busy@example.com')).toHaveLength(20);
   });
 
-  it('refuses the sixth link in an hour to one address and sends nothing more', async () => {
+  it('refuses the 21st link in an hour to one address and sends nothing more', async () => {
     const results: string[] = [];
-    for (let attempt = 0; attempt < 6; attempt += 1) {
+    for (let attempt = 0; attempt < 21; attempt += 1) {
       results.push(await invite.inviteStaff(ops, 'busy-staff@example.com'));
     }
 
     expect(results).toEqual([
-      'sent',
-      'sent',
-      'sent',
-      'sent',
-      'sent',
+      ...Array.from({ length: 20 }, () => 'sent'),
       'rate_limited',
     ]);
-    expect(await linkEmails('busy-staff@example.com')).toHaveLength(5);
+    expect(await linkEmails('busy-staff@example.com')).toHaveLength(20);
   });
 
   it('says failed for a failing mailer, keeps the grant, and logs only the error kind', async () => {

@@ -51,12 +51,21 @@ export function setupAuthzDatabase() {
   });
 }
 
+let clients = 0;
+/** A fresh client address per request, so tests do not share the per-client sign-in count. */
+const nextClient = () =>
+  `198.51.${String(Math.floor((clients += 1) / 250))}.${String(clients % 250)}`;
+
 /** Asks for a sign-in link the way the form does, and returns the address the email carries. */
 async function linkFor(address: string) {
   const response = await handle(
     new Request(`${origin}/api/auth/sign-in/magic-link`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', origin },
+      headers: {
+        'content-type': 'application/json',
+        origin,
+        'x-forwarded-for': nextClient(),
+      },
       body: JSON.stringify({ email: address, callbackURL: '/' }),
     }),
   );

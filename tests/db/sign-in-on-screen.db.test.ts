@@ -30,6 +30,15 @@ vi.mock('@/server/ports/email/config', async (importOriginal) => {
   };
 });
 
+let clients = 0;
+/** A fresh client address per request, so tests do not share the per-client sign-in count. */
+const nextClient = () => `198.51.100.${String((clients += 1))}`;
+
+vi.mock('next/headers', () => ({
+  headers: () =>
+    Promise.resolve(new Headers({ 'x-forwarded-for': nextClient() })),
+}));
+
 let fresh: FreshDatabase;
 let client: typeof import('@/server/db/client');
 let action: typeof import('@/server/actions/signIn');
@@ -231,7 +240,11 @@ describe('the link on the page', () => {
     const response = await handler.handleAuthRequest(
       new Request(`${origin}/api/auth/sign-in/magic-link`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', origin },
+        headers: {
+          'content-type': 'application/json',
+          origin,
+          'x-forwarded-for': nextClient(),
+        },
         body: JSON.stringify({ email: newEmail(), callbackURL: '/' }),
       }),
     );
@@ -244,7 +257,11 @@ describe('the link on the page', () => {
     const response = await handler.handleSignInFormRequest(
       new Request(`${origin}/api/auth/sign-in/magic-link`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', origin },
+        headers: {
+          'content-type': 'application/json',
+          origin,
+          'x-forwarded-for': nextClient(),
+        },
         body: JSON.stringify({ email: newEmail(), callbackURL: '/' }),
       }),
     );

@@ -2,3 +2,15 @@
   object-fit: cover;
   object-position: 50% 50%;
 }
+
+/*
+ * A photo that fails to load is a broken image, which a browser draws as its own icon and the alt
+ * text over whatever lies beneath. A box generated before a broken image replaces that drawing, so
+ * the frame's background, or the underlay, shows instead. A photo that loads never generates the box.
+ */
+.photo::before {
+  content: '\200B';
+  display: block;
+  width: 100%;
+  height: 100%;
+}

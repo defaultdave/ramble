@@ -33,7 +33,7 @@ flowchart TD
   EP["ExperiencePage<br/>static body with two slots"]:::server
   BC["Breadcrumbs and Badge"]:::server
   GAL["ExperienceGallery<br/>photos or placeholder"]:::server
-  STRIP["GalleryStrip<br/>tab stop while it overflows"]:::client
+  STRIP["GalleryStrip<br/>tab stop while it overflows,<br/>keeps focus once it fits"]:::client
   SD["Suspense: dates<br/>fallback UpcomingSessionsSkeleton"]:::streamed
   USC["UpcomingSessionsContent<br/>awaits searchParams and connection"]:::streamed
   RUS1["readUpcomingSessions<br/>6 sessions"]:::server
@@ -79,7 +79,7 @@ flowchart TD
 | ExperiencePage | server | [`ExperiencePage.tsx`](../../../../components/ExperiencePage/ExperiencePage.tsx) | The static body. It takes two slots, `dates` and `booking`, that the route streams in. |
 | Breadcrumbs and Badge | server | [`ExperiencePage.tsx`](../../../../components/ExperiencePage/ExperiencePage.tsx) | Rendered inside the page body. |
 | ExperienceGallery | server | [`ExperienceGallery.tsx`](../../../../components/ExperienceGallery/ExperienceGallery.tsx) | Renders each `Photo` on the server, or a placeholder when there are none (the case locally). The lead `Photo` draws a hidden copy at the card's width first, which a guest who came from a card already has cached, then the full photo over it. |
-| GalleryStrip | client | [`GalleryStrip.tsx`](../../../../components/ExperienceGallery/GalleryStrip.tsx) | Wraps the server-rendered photos. Its only job is to give the strip a tab stop while it overflows. |
+| GalleryStrip | client | [`GalleryStrip.tsx`](../../../../components/ExperienceGallery/GalleryStrip.tsx) | Wraps the server-rendered photos. It gives the strip a tab stop while it overflows, and if the strip stops overflowing while it has focus it keeps focus, with `tabindex` -1, until blur. |
 | Suspense: dates | streamed | [`page.tsx`](./page.tsx) | Fallback is `UpcomingSessionsSkeleton`. Fills the "Upcoming dates" section. |
 | UpcomingSessionsContent | streamed | [`UpcomingSessionsContent.tsx`](./UpcomingSessionsContent.tsx) | Awaits `searchParams` (for `?date=`) and `connection()`, then reads the time. |
 | readUpcomingSessions | server | [`src/server/upcomingSessions.ts`](../../../../server/upcomingSessions.ts) | A plain function, not itself cached. It wraps the cached `getUpcomingSessions` and then reads each session's spaces. See "How caches are cleared". Here it asks for the list's six sessions within 90 days. |

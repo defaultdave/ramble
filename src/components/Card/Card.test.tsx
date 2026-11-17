@@ -4,6 +4,7 @@ import { describe, expect, it, expectTypeOf } from 'vitest';
 import type { ComponentProps } from 'react';
 import {
   Card,
+  cardPhotoSizes,
   type BookableCardProps,
   type CardProps,
   type GuideOnlyCardProps,
@@ -134,5 +135,12 @@ describe('Card props', () => {
       Omit<GuideOnlyCardProps, 'hostHref'>
     >().not.toExtend<CardProps>();
     expectTypeOf<Omit<BookableCardProps, 'price'>>().not.toExtend<CardProps>();
+  });
+});
+
+describe('cardPhotoSizes', () => {
+  it('asks for the width the photo is drawn at: the 96px square beside the text, and the column on a vertical card', () => {
+    expect(cardPhotoSizes.horizontal).toBe('96px');
+    expect(cardPhotoSizes.vertical).toBe('(min-width: 768px) 384px, 100vw');
   });
 });

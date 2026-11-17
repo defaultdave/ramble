@@ -379,8 +379,8 @@ flowchart TD
   classDef client fill:#f5e6f8,stroke:#8a2f9c,color:#1b1f27
   classDef action fill:#fbe6e4,stroke:#b3261e,color:#1b1f27
 
-  RP["RamblePicksPage<br/>hands the slug on"]:::server
-  CR["CollectionRoute<br/>not streamed"]:::server
+  RP["RamblePicksPage<br/>isSlug check, then Suspense"]:::server
+  CR["CollectionRoute<br/>streamed for a Pick"]:::streamed
   GC["getCollectionPage(kind, slug)<br/>editorial, tags catalog, pick(slug)"]:::cached
   PE["PageError<br/>read failed"]:::server
   RA["PageHeading, RetryAlert, Alert"]:::server
@@ -403,8 +403,8 @@ flowchart TD
 
 | Component | Kind | File | Notes |
 | --- | --- | --- | --- |
-| RamblePicksPage | server | [`picks/[slug]/page.tsx`](picks/[slug]/page.tsx) | Hands the slug to `CollectionRoute`. Prerender uses a placeholder slug; a real Pick renders on its first request and is then cached. |
-| CollectionRoute | server | [`picks/CollectionRoute.tsx`](picks/CollectionRoute.tsx) | Shared with the gift guide. Not streamed: the page awaits the read. `collectionMetadata` reads the same entry. |
+| RamblePicksPage | server | [`picks/[slug]/page.tsx`](picks/[slug]/page.tsx) | If `isSlug` fails, it is a 404 before any read (the build's placeholder slug ends there). Otherwise it renders `CollectionRoute` inside a `Suspense` with no fallback, because an unknown slug is a miss read with `cacheLife('uncached')`, which a prerender of the shell cannot hold: outside Suspense the repeat requests alternated between 200 and 500 (#1002). A real Pick renders on its first request and is then cached. |
+| CollectionRoute | streamed | [`picks/CollectionRoute.tsx`](picks/CollectionRoute.tsx) | Shared with the gift guide, which still awaits the read with no Suspense. For a Pick it runs inside the page's `Suspense`, so an unknown slug calls `notFound()` in the request; the response status is 200 with the not-found page and `noindex`, as on any not-found reached after the shell. `collectionMetadata` reads the same entry. |
 | getCollectionPage(kind, slug) | cached | [`collections.ts`](../../server/collections.ts) | `cacheLife` `editorial`, tags `catalog` and `pick(slug)`. Reads the Pick, then its experiences as home cards (`listHomeExperiences`, with covers), and tags each experience too. A miss is uncached; a non-slug is refused before the cache. |
 | PageError | server | [`PageError.tsx`](../../components/PageError/PageError.tsx) | Retry goes to the collection path. |
 | PageHeading, RetryAlert, Alert | server | [`RetryAlert.tsx`](../../components/PageError/RetryAlert.tsx) | The error frame. |
@@ -470,7 +470,7 @@ flowchart TD
 
 ### Host profile (`/hosts/[slug]`)
 
-All markup is inline in the route; there is no host component folder.
+All markup is inline in `HostContent`; there is no host component folder.
 
 ```mermaid
 flowchart TD
@@ -480,7 +480,8 @@ flowchart TD
   classDef client fill:#f5e6f8,stroke:#8a2f9c,color:#1b1f27
   classDef action fill:#fbe6e4,stroke:#b3261e,color:#1b1f27
 
-  HR["HostRoute<br/>isHostSlug check, markup inline"]:::server
+  HR["HostRoute<br/>isHostSlug check, then Suspense"]:::server
+  HC["HostContent<br/>read, notFound, markup inline"]:::streamed
   GH["getHostPage(slug)<br/>catalog, tag catalog and each live experience"]:::cached
   PE["PageError<br/>read failed"]:::server
   RA["PageHeading, RetryAlert, Alert"]:::server
@@ -489,10 +490,11 @@ flowchart TD
   BR["BrowseResults<br/>the host's experiences"]:::server
   BL["BrowseResultsList"]:::client
 
-  HR -.-> GH
-  HR --> PE
-  HR --> HV
-  HR --> BR
+  HR --> HC
+  HC -.-> GH
+  HC --> PE
+  HC --> HV
+  HC --> BR
   PE --> RA
   RA --> BT
   BR --> BL
@@ -500,7 +502,8 @@ flowchart TD
 
 | Component | Kind | File | Notes |
 | --- | --- | --- | --- |
-| HostRoute | server | [`hosts/[slug]/page.tsx`](hosts/[slug]/page.tsx) | If `isHostSlug` fails, it is a 404 before any read. Prerender uses a placeholder slug. |
+| HostRoute | server | [`hosts/[slug]/page.tsx`](hosts/[slug]/page.tsx) | If `isHostSlug` fails, it is a 404 before any read. Prerender uses a placeholder slug. Otherwise it renders `HostContent` inside a `Suspense` with no fallback (see HostContent). |
+| HostContent | streamed | [`hosts/[slug]/HostContent.tsx`](hosts/[slug]/HostContent.tsx) | Reads the host and calls `notFound()` for a miss. A miss is read with `cacheLife('uncached')`, which a prerender of the shell cannot hold, so outside Suspense the repeat requests for an unknown slug alternated between 200 and 500 (#1002). The status of that not-found is 200 with `noindex`, as on any not-found reached after the shell. |
 | getHostPage(slug) | cached | [`hostPage.ts`](../../server/hostPage.ts) | `cacheLife` `catalog`, tag `catalog` plus each live experience. Returns the host, live experiences as cards, and cancellation tiers. A miss is uncached. |
 | PageError | server | [`PageError.tsx`](../../components/PageError/PageError.tsx) | Retry goes to `hostPath(slug)`. |
 | PageHeading, RetryAlert, Alert | server | [`RetryAlert.tsx`](../../components/PageError/RetryAlert.tsx) | The error frame. |

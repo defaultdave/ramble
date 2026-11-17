@@ -3000,3 +3000,24 @@ units:
     tokens: null
     status: todo
     note: "Added 2026-11-14 (text dictionary, ramble-pm drafts/dictionary-design-2026-11.md; DECISIONS 2026-11-14); PM estimate, not panelled"
+  - id: U-130
+    title: "Guest sign-in link on screen while email is off"
+    section: platform
+    slice: "Access"
+    priority: Must
+    prd: [37]
+    scope: "While EMAIL_MODE is sink, the guest sign-in page shows the sign-in link (the same /sign-in/confirm page the email points to) after a guest submits an address, instead of check-your-email. Refused for any address that holds a role grant (host, host_staff, ops roles), which still goes to the ops mailbox; the refusal looks the same as a normal link-sent reply. Other email modes unchanged. Out: a real email provider, guest passwords, the ?demo=true panel (dropped)"
+    depends_on: [U-004a, U-120]
+    spike: false
+    mode: both
+    phase: P5
+    complexity: 1
+    uncertainty: 1
+    execution: agent-fan-out
+    review: critical
+    estimate_days: { o: 0.5, m: 0.75, p: 1.5 }
+    actual_days: null
+    dave_minutes: null
+    tokens: null
+    status: todo
+    note: "Added 2026-11-16 (guest sign-in without email, issue 989; DECISIONS 2026-11-16); PM estimate, not panelled"

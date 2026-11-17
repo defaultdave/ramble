@@ -1,8 +1,10 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/server/actions/signIn', () => ({ requestSignInLink: vi.fn() }));
+const requestSignInLink = vi.hoisted(() => vi.fn());
+vi.mock('@/server/actions/signIn', () => ({ requestSignInLink }));
 
 import { ConfirmContent } from './confirm/ConfirmContent';
 import { SignInContent } from './SignInContent';
@@ -10,6 +12,8 @@ import { SignInContent } from './SignInContent';
 // Behaviours under test, one per decision, branch or risk:
 // - the sign-in page shows the form with its checked destination in a hidden field: a safe path is kept, an unsafe one is home, a repeated parameter uses the first
 // - the sign-in page shows the link problem its error names, above the form, and none without an error
+// - after the action answers with an on-screen link, the page shows a Continue link to the confirm page in place of the form
+// - after the action answers sent (what a role holder gets in sink mode, and every guest in another mode), the page shows the check-your-email notice and no Continue link
 // - the confirm page, given a token, shows the button with the token and destination in hidden fields, and renders no link that could use the token
 // - the confirm page, given a missing or odd token, shows the expired-or-used notice and a way to ask for a new link that keeps the destination
 
@@ -53,6 +57,33 @@ describe('the sign-in page', () => {
     await signIn({});
 
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+describe('the sign-in page after a request', () => {
+  async function submit(reply: unknown) {
+    requestSignInLink.mockResolvedValue(reply);
+    await signIn({ next: '/account' });
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('Email'), 'sam@example.com');
+    await user.click(screen.getByRole('button', { name: 'Email me a link' }));
+  }
+
+  it('shows the Continue link the action answered with, in place of the form', async () => {
+    const href = '/sign-in/confirm?token=AbCdEf&next=%2Faccount';
+    await submit({ status: 'link', email: 'sam@example.com', href });
+
+    expect(
+      await screen.findByRole('link', { name: 'Continue' }),
+    ).toHaveAttribute('href', href);
+    expect(screen.queryByLabelText('Email')).toBeNull();
+  });
+
+  it('shows the check-your-email notice, and no Continue link, for a sent answer', async () => {
+    await submit({ status: 'sent', email: 'sam@example.com' });
+
+    expect(await screen.findByText('Check your email')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Continue' })).toBeNull();
   });
 });
 

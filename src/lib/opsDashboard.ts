@@ -1,4 +1,5 @@
 import { opsDashboardCopy } from '@/lib/copy/opsDashboard';
+import { count } from './copy/format';
 import { reviewPath } from './experienceReview';
 import { opsBookingsPath } from './opsBookings';
 import { opsRequestsPath } from './opsRequests';
@@ -31,8 +32,9 @@ export type DashboardTile = {
 type TileCopy = {
   label: string;
   zero: string;
-  one: string;
-  many: (count: number) => string;
+  noun: string;
+  plural: string;
+  suffix: string;
 };
 
 const tiles: readonly {
@@ -73,9 +75,9 @@ const tiles: readonly {
   },
 ];
 
-function statusText(count: number, copy: TileCopy): string {
-  if (count === 0) return copy.zero;
-  return count === 1 ? copy.one : copy.many(count);
+function statusText(n: number, copy: TileCopy): string {
+  if (n === 0) return copy.zero;
+  return `${count(n, copy.noun, copy.plural)}${copy.suffix}`;
 }
 
 /** The landing's tiles in the order they are shown, each with its count in words. */

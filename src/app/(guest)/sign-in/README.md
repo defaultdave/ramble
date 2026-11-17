@@ -89,7 +89,8 @@ flowchart TD
   PR["SignInProblem and Alert"]:::server
   FM["SignInForm<br/>useActionState"]:::client
   A["requestSignInLink(previous, formData)"]:::action
-  HR["handleAuthRequest and guardSignInLink<br/>pure lib"]:::server
+  HR["handleSignInFormRequest and guardSignInLink<br/>pure lib"]:::server
+  OS["onScreenSignInLink<br/>pure lib, sink mode only"]:::server
   BA["getAuth() Better Auth magicLink<br/>pure lib"]:::server
 
   P --> C
@@ -99,6 +100,7 @@ flowchart TD
   C --> FM
   FM -.-> A
   A -.-> HR
+  HR -.-> OS
   HR -.-> BA
 ```
 
@@ -109,10 +111,11 @@ flowchart TD
 | safeNextPath, signInProblemFor, firstQueryValue | server | `src/lib/signIn.ts`, `src/lib/text.ts` | Pure library functions. Only a path on this site survives; anything else becomes `/`. Checks several layers of percent-decoding, backslashes, control characters and dot segments. |
 | PageHeading | server | `src/components/PageHeading.tsx` | Page heading. |
 | SignInProblem and Alert | server | `src/components/SignIn/SignInProblem.tsx` | The problem notice shown for an `?error=` value. |
-| SignInForm | client | `src/components/SignIn/SignInForm.tsx` | `useActionState` on the action passed in as a prop. States: idle, invalid, sent, rate limited, failed. Moves focus to the first invalid field or to the notice. Renders `Alert`, `Input`, `Button`, `ButtonLink`. |
-| requestSignInLink(previous, formData) | action | `src/server/actions/signIn.ts` | Trims and validates the email, then builds an in-process POST to `/api/auth/sign-in/magic-link` with `callbackURL` set to the clean `next`, and hands it to `handleAuthRequest`. Maps 200, 429 (with Retry-After), 400 and the rest to form states. Never logs the address. |
-| handleAuthRequest and guardSignInLink | server | `src/server/auth/handler.ts` | Pure library. Refuses a body over 4096 bytes, bad JSON or a bad address, then counts the address with `consumeRateLimit('sign_in_link', email)` in the `rate_limits` table. A counter failure refuses the request (503): nothing is sent uncounted. Responses carry `no-store`. |
-| getAuth() Better Auth magicLink | server | `src/server/auth/auth.ts` | Pure library, built on first use. Stores the token as an HMAC (`SIGN_IN_LINK_SECRET`) in `auth_verifications`, lives 5 minutes. `sendMagicLink` rewrites the link to `/sign-in/confirm?token=&next=` and calls `sendEmail` with the `sign-in-link` template. |
+| SignInForm | client | `src/components/SignIn/SignInForm.tsx` | `useActionState` on the action passed in as a prop. States: idle, invalid, sent, link, rate limited, failed. `link` is the on-screen sign-in link: a success `Alert` ("Your sign-in link is ready", copy in `src/lib/copy/signIn.ts`) with a `Continue` `ButtonLink` to `/sign-in/confirm?token=&next=` in place of the form, shown only while `EMAIL_MODE` is `sink`. Moves focus to the first invalid field or to the notice. Renders `Alert`, `Input`, `Button`, `ButtonLink`. |
+| requestSignInLink(previous, formData) | action | `src/server/actions/signIn.ts` | Trims and validates the email, then builds an in-process POST to `/api/auth/sign-in/magic-link` with `callbackURL` set to the clean `next`, and hands it to `handleAuthRequest`. Calls `handleSignInFormRequest` (not `handleAuthRequest`). Maps 200 (a body carrying `signInPath` becomes `link`, but only when it is the confirm page with a token of the accepted shape; anything else is `sent`), 429 (with Retry-After), 400 and the rest to form states. Never logs the address or the link. |
+| handleSignInFormRequest and guardSignInLink | server | `src/server/auth/handler.ts` | Pure library. `handleAuthRequest` (the `/api/auth` route) and `handleSignInFormRequest` (only the action) share one body; only the second can return an on-screen link, as `{ status: true, signInPath }`, because Next passes a route handler its second argument and an option there would be reachable from outside. Refuses a body over 4096 bytes, bad JSON or a bad address, then counts the address with `consumeRateLimit('sign_in_link', email)` in the `rate_limits` table. A counter failure refuses the request (503): nothing is sent uncounted. Responses carry `no-store`. |
+| onScreenSignInLink | server | `src/server/auth/onScreenLink.ts` | Pure library. Reads `holdsAnyRoleGrant(email)` and the email mode on every call, then `signInLinkDelivery` (`src/lib/signIn.ts`) decides: `sink` and no role grant (host, staff, ops or admin) makes a token with `createSignInLinkToken` (the plugin's own row, single use, 5 minutes), emails it as usual and returns the confirm path; anything else returns null and Better Auth sends the link as before. A role holder's reply is therefore the plain "link sent" one and its link stays in the dev mailbox. |
+| getAuth() Better Auth magicLink | server | `src/server/auth/auth.ts` | Pure library, built on first use. Stores the token as an HMAC (`SIGN_IN_LINK_SECRET`) in `auth_verifications`, lives 5 minutes. `sendMagicLink` (the path for role holders in sink mode, and for everyone in other modes) rewrites the link to `/sign-in/confirm?token=&next=` and calls `sendEmail` with the `sign-in-link` template. |
 
 ### /sign-in/confirm
 
@@ -189,8 +192,8 @@ flowchart TD
 ## The sign-in path
 
 1. A guest opens `/account` signed out. `AccountContent` redirects to `/sign-in?next=%2Faccount` through `signInHref`.
-2. They submit an email. The server action `requestSignInLink` goes through `handleAuthRequest`, which rate limits per address. The form says "if this address can sign in, a link is on its way", whether or not an account exists.
-3. The email links to `/sign-in/confirm?token=…&next=…`, a page that only shows a button. This is so a mail scanner that fetches the link cannot use it up.
+2. They submit an email. The server action `requestSignInLink` goes through `handleAuthRequest`, which rate limits per address. The form says "if this address can sign in, a link is on its way", whether or not an account exists. While `EMAIL_MODE` is `sink` (email is off in the demo), an address with no role grant instead gets a `Continue` link on the page, to the same confirm page the email carries; a role holder still gets "a link is on its way" and its link goes to the dev mailbox only.
+3. The email, or the on-screen `Continue` link, goes to `/sign-in/confirm?token=…&next=…`, a page that only shows a button. This is so a mail scanner that fetches the link cannot use it up.
 4. The button posts to `/api/auth/confirm-sign-in`. `handleConfirmSignIn` asks Better Auth to verify the token; the session cookie is set on that response. A 303 sends the guest to `next`, so they land on `/account`. A used or expired link lands on `/sign-in` with a notice.
 5. Sign out is a form post to `/api/auth/end-session`, which calls Better Auth sign-out with the cookie and sends a 303 to `/`.
 
@@ -207,7 +210,7 @@ These routes have no tagged reads of their own, so nothing here is invalidated b
 | Change | What clears | When the guest sees it |
 | --- | --- | --- |
 | Site settings change (no screen yet: `updateSettings` has no caller, `TODO(U-078)`) | The `settings` tag, which `getCachedGuestSettings()` carries | On the next request that streams the banner. |
-| Any auth request (sign-in link, confirm, sign out) | Nothing to clear: responses are sent `Cache-Control: no-store` because they may set or clear the cookie | Immediately. |
+| Any auth request (sign-in link, confirm, sign out) | Nothing to clear: responses are sent `Cache-Control: no-store` because they may set or clear the cookie. The on-screen link rides a server action's POST answer, which is not cached either | Immediately. |
 | A sign-in link ages out | The verification row's 5 minute expiry and its single use, not a cache | The next confirm attempt shows the expired notice. |
 
 ## Worth knowing
@@ -217,6 +220,7 @@ These routes have no tagged reads of their own, so nothing here is invalidated b
 - **One element, two places.** The same `account` slot is rendered inside the header and inside the `SiteMenu` island's panel. `cache()` keeps it to one session read per request.
 - **The sign-in action calls the auth handler in process.** It builds a synthetic Request with an `Origin` header and passes it to `handleAuthRequest` rather than fetching its own API. The rate limit still applies because it lives in that handler.
 - **Better Auth's own limiter is off.** Its counter would sit in the memory of one serverless instance. The count is in the `rate_limits` table instead.
+- **The on-screen link is a known hole while email is off.** Anyone who types an existing guest's address is shown that guest's link and signs in as them. It is shown only when `EMAIL_MODE` is exactly `sink`, evaluated on the server, and never for an address holding a role grant. Turning email on removes it with no code change.
 - **Two ways to make a token.** `createSignInLinkToken` (`src/server/auth/signInLink.ts`) writes the same verification row as the plugin, for callers that need their own email wording. The `/sign-in` form uses the plugin's path.
 - **The guest check in `readAccountBookings` is not what scopes the data.** `requireRole(caller, Guest, { ownerId: caller.userId })` compares the caller to itself. What limits the rows is the join on an email with `email_verified` true.
 - **The account redirect runs inside Suspense.** By then the shell has started streaming, so Next will most likely deliver it as a client-side redirect rather than a 307. Worth confirming in a browser trace.

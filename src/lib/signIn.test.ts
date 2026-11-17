@@ -15,6 +15,9 @@ import {
   signInHref,
   signInProblemFor,
   signInStateFor,
+  onScreenLinkHref,
+  signInConfirmHref,
+  signInLinkDelivery,
 } from './signIn';
 
 // Behaviours under test, one per decision, branch or risk:
@@ -24,6 +27,9 @@ import {
 // - the confirm post accepts a token of letters and digits and refuses an empty, long, or odd one
 // - a failed link maps to a state: INVALID_TOKEN covers a used, lapsed, or unknown link; any other error is a failure; no error is no problem
 // - the form's state follows the answer: 200 sent, 429 rate limited with a wait in whole minutes (at least one, at most a day), 400 invalid, anything else failed
+// - the sign-in link is shown on the page only in sink mode and only for an address with no role grant; every other mode, and every role holder, is emailed
+// - the confirm href is this site's path alone, with the token and the checked destination
+// - the answer's on-screen path is accepted only when it is the confirm page with a token of the shape it accepts; the form's state is link then, sent otherwise
 // - a post is from this site only when its Origin is the app's origin
 
 describe('safeNextPath', () => {
@@ -341,4 +347,74 @@ describe('endSessionStatus', () => {
       expect(endSessionStatus(ok)).toBe(status);
     },
   );
+});
+
+describe('signInLinkDelivery', () => {
+  it.each([
+    ['sink, no grant', 'sink', false, 'on_screen'],
+    ['sink, a role grant', 'sink', true, 'email'],
+    ['allowlist, no grant', 'allowlist', false, 'email'],
+    ['allowlist, a role grant', 'allowlist', true, 'email'],
+    ['live, no grant', 'live', false, 'email'],
+    ['live, a role grant', 'live', true, 'email'],
+  ] as const)('is %s: %s', (_label, mode, holds, expected) => {
+    expect(signInLinkDelivery(mode, holds)).toBe(expected);
+  });
+});
+
+describe('signInConfirmHref', () => {
+  it('is the confirm page on this site with the token and the checked destination', () => {
+    expect(signInConfirmHref('AbC', '/account?a=1')).toBe(
+      '/sign-in/confirm?token=AbC&next=%2Faccount%3Fa%3D1',
+    );
+  });
+
+  it('turns an unsafe destination into home and never carries an origin', () => {
+    const href = signInConfirmHref('AbC', '//evil.com');
+
+    expect(href).toBe('/sign-in/confirm?token=AbC&next=%2F');
+    expect(href.startsWith('/sign-in/confirm?')).toBe(true);
+  });
+});
+
+describe('onScreenLinkHref and the link state', () => {
+  const good = '/sign-in/confirm?token=AbCdEf&next=%2Faccount';
+
+  it('accepts the confirm path with a good token', () => {
+    expect(onScreenLinkHref(good)).toBe(good);
+  });
+
+  it.each([
+    ['not a string', 42],
+    ['absent', undefined],
+    ['another page', '/account?token=AbC'],
+    ['an absolute address', 'https://evil.com/sign-in/confirm?token=AbC'],
+    ['a protocol-relative address', '//evil.com/sign-in/confirm?token=AbC'],
+    ['a token with a symbol', '/sign-in/confirm?token=a-b'],
+    ['no token', '/sign-in/confirm?next=%2F'],
+    ['too long', `/sign-in/confirm?token=${'a'.repeat(1100)}`],
+  ])('refuses %s', (_label, value) => {
+    expect(onScreenLinkHref(value)).toBeNull();
+  });
+
+  it('makes the state a link when the answer carries one, and sent when it does not', () => {
+    expect(signInStateFor('a@example.com', 200, null, good)).toEqual({
+      status: 'link',
+      email: 'a@example.com',
+      href: good,
+    });
+    expect(signInStateFor('a@example.com', 200, null, null)).toEqual({
+      status: 'sent',
+      email: 'a@example.com',
+    });
+  });
+
+  it('ignores a link on an answer that is not a 200', () => {
+    expect(signInStateFor('a@example.com', 429, '60', good).status).toBe(
+      'rate_limited',
+    );
+    expect(signInStateFor('a@example.com', 503, null, good).status).toBe(
+      'failed',
+    );
+  });
 });

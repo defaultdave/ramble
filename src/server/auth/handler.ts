@@ -9,7 +9,9 @@ import { readBodyText } from '@/server/boundedBody';
 import { logger } from '@/server/monitoring/logger';
 import { consumeRateLimit } from '@/server/ports/rate-limit';
 import { errorKind } from '@/lib/errorKind';
+import { safeNextPath } from '@/lib/signIn';
 import { getAuth } from './auth';
+import { onScreenSignInLink } from './onScreenLink';
 
 const noStore = { 'Cache-Control': 'no-store' } as const;
 
@@ -34,7 +36,9 @@ function withoutContentLength(headers: Headers): Headers {
  */
 async function guardSignInLink(
   request: Request,
-): Promise<{ request: Request } | { refusal: Response }> {
+): Promise<
+  { request: Request; email: string; next: string } | { refusal: Response }
+> {
   if (
     declaredLengthExceeds(
       request.headers.get('content-length'),
@@ -70,6 +74,8 @@ async function guardSignInLink(
     return { refusal: refusal(503) };
   }
   return {
+    email: parsed.data.email,
+    next: safeNextPath(parsed.data.callbackURL),
     request: new Request(request.url, {
       method: request.method,
       // The declared length was the original body's; the rebuilt one sets its own.
@@ -83,13 +89,41 @@ async function guardSignInLink(
  * Every request under /api/auth: the sign-in link request first goes through its rate limit; the
  * rest, including the link's verify address (GET /api/auth/magic-link/verify), go to Better Auth.
  * Nothing here is cached, because a response may set or clear the session cookie.
+ *
+ * Next passes a route's second argument to it, so a request from outside can never turn on the
+ * on-screen link: it has its own function, `handleSignInFormRequest`, which only the form's action calls.
  */
-export async function handleAuthRequest(request: Request): Promise<Response> {
+export function handleAuthRequest(request: Request): Promise<Response> {
+  return handle(request, false);
+}
+
+/**
+ * The sign-in form's request, in this process. As `handleAuthRequest`, except that when the link is
+ * to be shown on the page (src/server/auth/onScreenLink.ts) the answer is `{ status: true,
+ * signInPath }` and no email goes through Better Auth.
+ */
+export function handleSignInFormRequest(request: Request): Promise<Response> {
+  return handle(request, true);
+}
+
+async function handle(
+  request: Request,
+  onScreenLink: boolean,
+): Promise<Response> {
   let forwarded = request;
   if (isSignInLinkRequest(request.method, new URL(request.url).pathname)) {
     const guarded = await guardSignInLink(request);
     if ('refusal' in guarded) return guarded.refusal;
     forwarded = guarded.request;
+    if (onScreenLink) {
+      const signInPath = await onScreenSignInLink(guarded.email, guarded.next);
+      if (signInPath !== null) {
+        return Response.json(
+          { status: true, signInPath },
+          { headers: noStore },
+        );
+      }
+    }
   }
   const response = await getAuth().handler(forwarded);
   const headers = new Headers(response.headers);

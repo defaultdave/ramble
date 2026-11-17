@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { signInLinkTtlSeconds } from './auth';
+import type { EmailMode } from './email/route';
 import { retryAfterMinutes, waitMinutesLabel } from './rateLimits';
 
 // The sign-in pages' decisions: where a person may be sent afterwards, what the link in the email
@@ -90,6 +91,26 @@ export function signInConfirmUrl(
   return url.toString();
 }
 
+/** The confirm page's path and query, for a link shown on this site's own pages. */
+export function signInConfirmHref(token: string, next: unknown): string {
+  const url = new URL(signInConfirmUrl(standInOrigin, token, next));
+  return `${url.pathname}${url.search}`;
+}
+
+export type SignInLinkDelivery = 'on_screen' | 'email';
+
+/**
+ * Where a sign-in link goes. Only while email is in `sink` mode, with no mailbox that reaches a
+ * person, is the link shown on the page; and never for an address that holds a role grant (host,
+ * staff, ops, admin), whose link stays in the mailbox. Every other mode emails.
+ */
+export function signInLinkDelivery(
+  mode: EmailMode,
+  holdsRoleGrant: boolean,
+): SignInLinkDelivery {
+  return mode === 'sink' && !holdsRoleGrant ? 'on_screen' : 'email';
+}
+
 /** The data of every sign-in link email: the confirm address and how long the link lives. */
 export function signInLinkData(token: string, origin: string, next: unknown) {
   return {
@@ -126,6 +147,7 @@ export type SignInFormState =
   | { status: 'idle' }
   | { status: 'invalid'; email: string }
   | { status: 'sent'; email: string }
+  | { status: 'link'; email: string; href: string }
   | { status: 'rate_limited'; email: string; retryAfterMinutes: number }
   | { status: 'failed'; email: string };
 
@@ -138,13 +160,33 @@ function retryMinutes(header: string | null): number {
   return Math.min(maxRetryMinutes, retryAfterMinutes(seconds));
 }
 
-/** The form's state after the sign-in request was answered with `status`. 200 sent, 429 counted out, 400 a bad address. */
+/** The confirm path a sign-in answer carries for on-screen delivery: only this site's own confirm page, with a token of the shape the confirm page accepts. */
+export function onScreenLinkHref(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length > 1024) return null;
+  if (!value.startsWith(`${signInConfirmPath}?`)) return null;
+  const params = new URL(value, standInOrigin).searchParams;
+  const parsed = ConfirmSignInSchema.safeParse({
+    token: params.get('token'),
+    next: params.get('next') ?? undefined,
+  });
+  return parsed.success ? value : null;
+}
+
+/**
+ * The form's state after the sign-in request was answered with `status`. 200 sent (or, when the
+ * answer carries an on-screen link, link), 429 counted out, 400 a bad address.
+ */
 export function signInStateFor(
   email: string,
   status: number,
   retryAfter: string | null,
+  onScreenHref: string | null = null,
 ): SignInFormState {
-  if (status === 200) return { status: 'sent', email };
+  if (status === 200) {
+    return onScreenHref === null
+      ? { status: 'sent', email }
+      : { status: 'link', email, href: onScreenHref };
+  }
   if (status === 429) {
     return {
       status: 'rate_limited',

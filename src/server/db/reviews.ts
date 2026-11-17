@@ -12,8 +12,9 @@ import {
 } from 'drizzle-orm';
 import {
   reviewEligibility,
+  reviewInviteKeyPrefix,
   reviewInviteWindow,
-  reviewWindowMs,
+  reviewSubmitStatus,
   type ReviewFacts,
   type ReviewSubmitStatus,
 } from '@/lib/reviews';
@@ -52,6 +53,8 @@ async function readOrder(
       reference: orders.reference,
       kind: orders.kind,
       status: orders.status,
+      refundedTicketMinor: orders.refundedTicketMinor,
+      refundedTaxMinor: orders.refundedTaxMinor,
       contactEmail: orders.contactEmail,
       leadGuestName: orders.leadGuestName,
       manageTokenVersion: orders.manageTokenVersion,
@@ -72,10 +75,25 @@ async function readOrder(
   // `FOR UPDATE OF orders` locks the order alone, which is the row every writer of its state locks.
   const [row] = await (lock ? query.for('update', { of: orders }) : query);
   if (!row) return null;
-  const { kind, status, endsAt, reviewId, ...rest } = row;
+  const {
+    kind,
+    status,
+    refundedTicketMinor,
+    refundedTaxMinor,
+    endsAt,
+    reviewId,
+    ...rest
+  } = row;
   return {
     ...rest,
-    facts: { kind, status, endsAt, reviewed: reviewId !== null },
+    facts: {
+      kind,
+      status,
+      refundedTicketMinor,
+      refundedTaxMinor,
+      endsAt,
+      reviewed: reviewId !== null,
+    },
   };
 }
 
@@ -103,20 +121,7 @@ export async function insertReview(
     order.facts,
     await readDatabaseTime(tx),
   );
-  if (!eligibility.ok) {
-    switch (eligibility.reason) {
-      case 'already_reviewed':
-        return 'already_reviewed';
-      case 'window_closed':
-        return 'expired';
-      case 'not_a_booking':
-      case 'not_confirmed':
-      case 'session_not_ended':
-        return 'not_found';
-      default:
-        return eligibility.reason satisfies never;
-    }
-  }
+  if (!eligibility.ok) return reviewSubmitStatus(eligibility);
   const [written] = await tx
     .insert(reviews)
     .values({
@@ -153,7 +158,9 @@ export async function readInvitableOrders(
         lte(sessions.endsAt, window.endedBefore),
         gt(sessions.endsAt, window.endedAfter),
         sql`NOT EXISTS (SELECT 1 FROM ${reviews} WHERE ${reviews.orderId} = ${orders.id})`,
-        sql`NOT EXISTS (SELECT 1 FROM ${jobs} WHERE ${jobs.dedupeKey} = 'review-invite:' || ${orders.id}::text)`,
+        eq(orders.refundedTicketMinor, 0),
+        eq(orders.refundedTaxMinor, 0),
+        sql`NOT EXISTS (SELECT 1 FROM ${jobs} WHERE ${jobs.dedupeKey} = ${reviewInviteKeyPrefix}::text || ${orders.id}::text)`,
       ),
     )
     .orderBy(asc(sessions.endsAt), asc(orders.id))
@@ -178,7 +185,7 @@ export async function readInvitableOrderRows(
   caller: Caller,
 ): Promise<InvitableOrderRow[]> {
   requireAnyRole(caller, [Role.Ops, Role.Admin], {});
-  const now = await currentDatabaseTime();
+  const window = reviewInviteWindow(await currentDatabaseTime(), 0);
   return db
     .select({
       orderId: orders.id,
@@ -194,9 +201,11 @@ export async function readInvitableOrderRows(
       and(
         eq(orders.kind, 'booking'),
         eq(orders.status, 'confirmed'),
+        eq(orders.refundedTicketMinor, 0),
+        eq(orders.refundedTaxMinor, 0),
         isNull(reviews.id),
-        lte(sessions.endsAt, now),
-        gt(sessions.endsAt, new Date(now.getTime() - reviewWindowMs)),
+        lte(sessions.endsAt, window.endedBefore),
+        gt(sessions.endsAt, window.endedAfter),
       ),
     )
     .orderBy(desc(sessions.endsAt), desc(orders.id))

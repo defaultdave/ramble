@@ -3,6 +3,7 @@ import {
   buildOpsJobRow,
   devConsoleOpen,
   holdsDevConsoleRole,
+  inviteNoticeFor,
   invitableOrderOptions,
   nextClockInstant,
   parseClockForm,
@@ -23,6 +24,7 @@ import {
 // - advancing moves the test time on, or the real time when none is set; reset clears it
 // - a stored test time that is not a time reads as none
 // - a job row says its status in words, its attempts as "n of max", and is runnable only while waiting
+// - queueing an invite answers with the queued notice, or with the not-invitable one
 // - the console offers each invitable booking by id, with its reference, experience and end time in UTC, and every notice code has a notice
 // - a run's address carries whole-number counts only, and the line it shows is built from those and no other text
 
@@ -185,6 +187,15 @@ describe('invitableOrderOptions', () => {
 
   it('offers nothing when there is nothing to offer', () => {
     expect(invitableOrderOptions([])).toEqual([]);
+  });
+});
+
+describe('inviteNoticeFor', () => {
+  it.each([
+    ['queued', 'invite_queued'],
+    ['not_eligible', 'invite_not_eligible'],
+  ] as const)('answers %s with the %s notice', (queued, code) => {
+    expect(inviteNoticeFor(queued)).toBe(code);
   });
 });
 

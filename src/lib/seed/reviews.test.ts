@@ -5,7 +5,7 @@ import { reviewEligibility, reviewLimits, reviewWindowMs } from '@/lib/reviews';
 import { curated } from './fixtures';
 import { reviewFixtures } from './fixtures/reviews';
 import { personas } from './personas';
-import { reviewSeedRows, seedOrderReference } from './reviews';
+import { pickSeedPrice, reviewSeedRows } from './reviews';
 import { experienceId } from './rows';
 
 // Behaviours under test, one per decision, branch, or risk.
@@ -21,7 +21,8 @@ import { experienceId } from './rows';
 // - a booking with a review is not eligible again; one without is, at the seed's clock
 // - the review is written after the session ended and not after the seed ran, for the order's own experience
 // - ids and references come from the key alone, so a rerun is the same rows
-// - references have the shape an order reference has, and no two fixtures share one
+// - references have the shape an order reference has, no two fixtures share one, and one is the same on every run
+// - the price a fixture books on is the first of its experience's prices, or none when it has none
 
 const now = new Date('2026-11-17T09:30:00Z');
 const price = {
@@ -84,6 +85,8 @@ describe('the review fixtures', () => {
           {
             kind: 'booking',
             status: 'confirmed',
+            refundedTicketMinor: 0,
+            refundedTaxMinor: 0,
             endsAt: session.endsAt,
             reviewed: false,
           },
@@ -97,8 +100,8 @@ describe('the review fixtures', () => {
   });
 
   it('gives every fixture its own order reference, in the shape of one', () => {
-    const references = reviewFixtures.map((fixture) =>
-      seedOrderReference(fixture.key),
+    const references = reviewFixtures.map(
+      (fixture) => reviewSeedRows(fixture, price, now).order.reference,
     );
     expect(new Set(references).size).toBe(references.length);
     for (const reference of references) {
@@ -185,5 +188,38 @@ describe('reviewSeedRows', () => {
     const other = reviewFixtures[1];
     if (!other) throw new Error('no second fixture');
     expect(reviewSeedRows(other, price, now).order.id).not.toBe(a.order.id);
+  });
+});
+
+describe('the seeded order reference', () => {
+  it('is the same value on every run, so a rerun writes the same order', () => {
+    const fixture = reviewFixtures[0];
+    if (!fixture) throw new Error('no fixtures');
+    expect(reviewSeedRows(fixture, price, now).order.reference).toBe(
+      'RMB-CYGQF7',
+    );
+    expect(
+      reviewSeedRows(fixture, price, new Date('2026-12-01T00:00:00Z')).order
+        .reference,
+    ).toBe('RMB-CYGQF7');
+  });
+});
+
+describe('pickSeedPrice', () => {
+  const prices = [
+    { ...price, id: 'p1', experienceId: 'e1' },
+    { ...price, id: 'p2', experienceId: 'e2' },
+    { ...price, id: 'p3', experienceId: 'e2' },
+  ];
+
+  it.each([
+    ['the first price of the experience', 'e2', 'p2'],
+    ['the only price of another', 'e1', 'p1'],
+  ])('picks %s', (_name, experience, expected) => {
+    expect(pickSeedPrice(prices, experience)?.id).toBe(expected);
+  });
+
+  it('picks nothing for an experience with no price', () => {
+    expect(pickSeedPrice(prices, 'e9')).toBeUndefined();
   });
 });

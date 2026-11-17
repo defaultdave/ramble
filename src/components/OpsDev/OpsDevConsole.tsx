@@ -4,6 +4,7 @@ import { HiddenFields } from '@/components/HiddenFields';
 import { Input } from '@/components/Input';
 import { Select } from '@/components/Select';
 import { StatusBadge } from '@/components/StatusBadge';
+import { opsDevCopy } from '@/lib/copy/opsDev';
 import {
   clockUnits,
   opsDevPath,
@@ -37,6 +38,7 @@ export type OpsDevConsoleProps = {
   actions: OpsDevActions;
 };
 
+const invites = opsDevCopy.invites;
 const unitOptions = clockUnits.map((unit) => ({ value: unit, label: unit }));
 
 /** The jobs and the three things a tester does to them on a deployment nothing runs by itself: run one, drain the queue, pulse. Every control is a plain form, so it works with no script. */
@@ -69,7 +71,14 @@ export function OpsDevConsole({
         row.runnable ? (
           <form action={actions.runJob}>
             <HiddenFields fields={[['jobId', row.id]]} />
-            <Button type="submit" variant="secondary">
+            <Button
+              type="submit"
+              variant="secondary"
+              aria-label={opsDevCopy.runJob.buttonName(
+                row.kind,
+                row.runAfterLabel,
+              )}
+            >
               Run {row.kind}
             </Button>
           </form>
@@ -101,26 +110,20 @@ export function OpsDevConsole({
 
       <section className={styles.section} aria-labelledby="invite-heading">
         <h2 id="invite-heading" className={styles.heading}>
-          Review invites
+          {invites.heading}
         </h2>
-        <p className={styles.muted}>
-          Sends a booker the email that links to the review form, as if the
-          session had just ended. Run the queue afterwards to deliver it.
-        </p>
+        <p className={styles.muted}>{invites.intro}</p>
         {invitableOrders.length === 0 ? (
-          <p className={styles.muted}>
-            No booking can be invited now: none has a finished session without a
-            review.
-          </p>
+          <p className={styles.muted}>{invites.empty}</p>
         ) : (
           <form action={actions.sendReviewInvite} className={styles.form}>
             <Select
               name="orderId"
-              label="Booking"
+              label={invites.bookingLabel}
               options={invitableOrders.map((order) => ({ ...order }))}
             />
             <Button type="submit" variant="secondary">
-              Send invite now
+              {invites.send}
             </Button>
           </form>
         )}

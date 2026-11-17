@@ -228,6 +228,13 @@ export const opsDevNotices = {
   },
 } as const satisfies Record<OpsDevNoticeCode, NoticeText>;
 
+/** The notice for what queueing a review invite came to. */
+export function inviteNoticeFor(
+  queued: 'queued' | 'not_eligible',
+): OpsDevNoticeCode {
+  return queued === 'queued' ? 'invite_queued' : 'invite_not_eligible';
+}
+
 export type InvitableOrderOption = { value: string; label: string };
 
 /** The bookings the console offers a review invite for: reference, experience, and when the session ended. */

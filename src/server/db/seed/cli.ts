@@ -10,6 +10,7 @@ import {
   photosLine,
   refusalLine,
   reviewsLine,
+  seedsPastBookings,
   seedsPersonas,
   startLine,
   type SeedExit,
@@ -81,8 +82,10 @@ export async function runSeedCommand(command: SeedCommand): Promise<number> {
       scale: args.scale,
       log: write,
     });
-    const past = await seedReviews(seedCaller, command.now);
-    write(reviewsLine(past.bookings, past.reviews));
+    if (seedsPastBookings(verdict.target)) {
+      const past = await seedReviews(seedCaller, command.now);
+      write(reviewsLine(past.bookings, past.reviews));
+    }
     if (seedsPersonas(verdict.target)) {
       write(personasLine(await seedPersonas(seedCaller)));
     }

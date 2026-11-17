@@ -2,6 +2,7 @@
 // copy never names a booking beyond the experience and the day the booker already knows.
 
 export const reviewCopy = {
+  pageTitle: 'Review your booking',
   eyebrow: 'From your review email · no account needed',
   heading: 'How was it?',
   form: {
@@ -25,6 +26,11 @@ export const reviewCopy = {
     rating: 'Choose a rating from 1 to 5.',
     body: 'Write a few words about it.',
     summary: 'Some details need another look.',
+    /** The link from the summary to the first field to look at again. */
+    jump: {
+      rating: 'Go to your rating',
+      body: 'Go to your review',
+    },
   },
   states: {
     invalid: {
@@ -52,5 +58,19 @@ export const reviewCopy = {
   links: {
     explore: 'Explore more experiences',
     help: 'Get help',
+  },
+  /** The invite email that links to the form. */
+  invite: {
+    preview: (experienceName: string) =>
+      `Tell other guests how ${experienceName} went.`,
+    heading: (experienceName: string) => `How was ${experienceName}?`,
+    greeting: (recipientName: string) => `Hi ${recipientName},`,
+    intro: (hostName: string, dayLabel: string) =>
+      `Thanks for joining ${hostName} on ${dayLabel}. A rating and a few words help the next guest choose.`,
+    buttonLabel: 'Write a review',
+    /** Leads the address written out, for a client that blocks buttons. */
+    linkLead: 'Or paste this address into your browser:',
+    note: (days: number) =>
+      `This link is for your booking only and works for ${String(days)} days. You can leave one review.`,
   },
 } as const;

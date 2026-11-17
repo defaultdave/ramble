@@ -10,6 +10,7 @@ import {
 } from './opsForm';
 import type { RateLimitDecision } from './rateLimits';
 import { reviewPath } from './routes';
+import { msPerDay, msPerHour } from './time';
 import { oneLineClipped, requiredText, wholeNumberText } from './text';
 import { zonedDayLabel } from './zonedLabels';
 
@@ -25,20 +26,20 @@ export const reviewLimits = {
   bodyMaxChars: 2000,
 } as const;
 
-const hourMs = 60 * 60 * 1000;
-const dayMs = 24 * hourMs;
-
 /** How long after a session ends the invite goes out: time to get home, not so long the memory fades. */
-export const reviewInviteDelayMs = 3 * hourMs;
+export const reviewInviteDelayMs = 3 * msPerHour;
 
 /** How long a session's guests can still review it. Past this the link says it has closed. */
-export const reviewWindowMs = 90 * dayMs;
+export const reviewWindowMs = 90 * msPerDay;
 
 /** The most invites one sweep queues, so a long outage catches up over several pulses and no pulse grows with the backlog. */
 export const reviewInviteBatchSize = 200;
 
 /** The job kind that sends one invite. */
 export const reviewInviteKind = 'review-invite';
+
+/** What every order's invite dedupe key starts with, for the sweep's query as well as `reviewInviteKey`. */
+export const reviewInviteKeyPrefix = 'review-invite:';
 
 /** Where a booking's invite becomes due: the delay after its session ends, or `now` when that has passed. */
 export function reviewInviteRunAt(endsAt: Date, now: Date): Date {
@@ -48,28 +49,39 @@ export function reviewInviteRunAt(endsAt: Date, now: Date): Date {
 }
 
 /**
- * The sessions a sweep invites for, as the bounds of their end times: ended at least the delay ago,
- * and not so long ago that the review window has closed. The sweep's WHERE clause reads these two
- * dates and nothing else about time.
+ * The sessions a sweep invites for, as the bounds of their end times: ended at least `delayMs` ago
+ * (the invite delay unless told otherwise; 0 for sessions that have simply ended), and not so long
+ * ago that the review window has closed. A WHERE clause reads these two dates and nothing else
+ * about time.
  */
-export function reviewInviteWindow(now: Date): {
+export function reviewInviteWindow(
+  now: Date,
+  delayMs: number = reviewInviteDelayMs,
+): {
   endedBefore: Date;
   endedAfter: Date;
 } {
   return {
-    endedBefore: new Date(now.getTime() - reviewInviteDelayMs),
+    endedBefore: new Date(now.getTime() - delayMs),
     endedAfter: new Date(now.getTime() - reviewWindowMs),
   };
 }
 
 /** One invite email per order. */
 export function reviewInviteKey(orderId: string): string {
-  return `review-invite:${orderId.toLowerCase()}`;
+  return `${reviewInviteKeyPrefix}${orderId.toLowerCase()}`;
 }
 
 /** One invite email per hand-sent invite, so a tester can send the same order's invite again. */
 export function reviewInviteResendKey(sendId: string): string {
   return `review-invite-resend:${sendId.toLowerCase()}`;
+}
+
+/** The email key for the invite a job sends: the order's own, or the hand-sent invite's when the payload names one. */
+export function reviewInviteEmailKey(payload: ReviewInvitePayload): string {
+  return payload.sendId === undefined
+    ? reviewInviteKey(payload.orderId)
+    : reviewInviteResendKey(payload.sendId);
 }
 
 export const ReviewInvitePayloadSchema = z.strictObject({
@@ -83,6 +95,9 @@ export type ReviewInvitePayload = z.output<typeof ReviewInvitePayloadSchema>;
 export type ReviewFacts = {
   kind: 'booking' | 'gift_purchase';
   status: string;
+  /** What the order has given back to the booker, ticket and tax, in minor units. */
+  refundedTicketMinor: number;
+  refundedTaxMinor: number;
   endsAt: Date;
   reviewed: boolean;
 };
@@ -90,6 +105,7 @@ export type ReviewFacts = {
 type ReviewRefusal =
   | 'not_a_booking'
   | 'not_confirmed'
+  | 'refunded'
   | 'already_reviewed'
   | 'session_not_ended'
   | 'window_closed';
@@ -99,7 +115,8 @@ export type ReviewEligibility =
 
 /**
  * Whether the order's booker may review now. Only a confirmed booking counts (a gift purchase has
- * no session, a cancelled booking was not taken), the session must have ended, nobody has
+ * no session, a cancelled booking was not taken), and a booking that was refunded, in whole or in
+ * part, does not (PRD-29: a paid, non-refunded booking). The session must have ended, nobody has
  * reviewed the order, and the window must still be open. The first rule that fails is the reason.
  */
 export function reviewEligibility(
@@ -109,6 +126,9 @@ export function reviewEligibility(
   if (facts.kind !== 'booking') return { ok: false, reason: 'not_a_booking' };
   if (facts.status !== 'confirmed') {
     return { ok: false, reason: 'not_confirmed' };
+  }
+  if (facts.refundedTicketMinor + facts.refundedTaxMinor > 0) {
+    return { ok: false, reason: 'refunded' };
   }
   if (facts.reviewed) return { ok: false, reason: 'already_reviewed' };
   if (facts.endsAt.getTime() > now.getTime()) {
@@ -206,6 +226,31 @@ export type ReviewSubmitStatus =
   | 'not_found'
   | 'rate_limited';
 
+type ReviewRefused = Extract<ReviewEligibility, { ok: false }>;
+
+/**
+ * What a submit comes to when the booker may not review: a second review is `already_reviewed`, a
+ * closed window is `expired`, and every other reason is `not_found`, so a link says nothing about
+ * an order beyond what its holder is owed.
+ */
+export function reviewSubmitStatus(
+  refusal: ReviewRefused,
+): Exclude<ReviewSubmitStatus, 'created' | 'invalid' | 'rate_limited'> {
+  switch (refusal.reason) {
+    case 'already_reviewed':
+      return 'already_reviewed';
+    case 'window_closed':
+      return 'expired';
+    case 'not_a_booking':
+    case 'not_confirmed':
+    case 'refunded':
+    case 'session_not_ended':
+      return 'not_found';
+    default:
+      return refusal.reason satisfies never;
+  }
+}
+
 /** Where a submit lands the booker: the same page, which reads the answer from the order and says `done` only for a review just made. */
 export function reviewResultPath(
   reference: string,
@@ -275,13 +320,28 @@ export async function openReviewGate<Row>(
     : { kind: 'opened', row };
 }
 
+/** What a refused gate comes to, for the page that read the link and for the submit that posted it. */
+export function reviewRefusalFor(
+  gate: Extract<ReviewGate<unknown>, { kind: 'refused' }>,
+): { read: ReviewRead; submit: ReviewSubmitStatus } {
+  return gate.reason === 'rate_limited'
+    ? {
+        read: {
+          kind: 'rate_limited',
+          retryAfterSeconds: gate.retryAfterSeconds,
+        },
+        submit: 'rate_limited',
+      }
+    : { read: { kind: 'invalid' }, submit: 'not_found' };
+}
+
 // ---- The page ----
 
-/** What the page read for a link: nothing opens, the guest was counted out, or the order with its review state. */
+/** What the page read for a link: nothing opens, the guest was counted out, or the order with its review state and the database's time. */
 export type ReviewRead =
   | { kind: 'invalid' }
   | { kind: 'rate_limited'; retryAfterSeconds: number }
-  | { kind: 'found'; facts: ReviewFacts };
+  | { kind: 'found'; facts: ReviewFacts; now: Date };
 
 export type ReviewScreen =
   | { kind: 'invalid' }
@@ -293,13 +353,12 @@ export type ReviewScreen =
 
 /**
  * The state the page shows. Every reason a link cannot be used for a review that was not made
- * here (not a booking, cancelled, not yet ended) is `invalid`, so the page says nothing about an
- * order beyond what the link's holder is owed. A review just made shows `success` only when the
- * address says so, and `already_reviewed` otherwise.
+ * here (not a booking, cancelled, refunded, not yet ended) is `invalid`, so the page says nothing
+ * about an order beyond what the link's holder is owed. A review just made shows `success` only
+ * when the address says so, and `already_reviewed` otherwise.
  */
 export function reviewScreen(
   read: ReviewRead,
-  now: Date,
   query: ReviewQuery,
 ): ReviewScreen {
   if (read.kind === 'invalid') return { kind: 'invalid' };
@@ -309,21 +368,42 @@ export function reviewScreen(
       retryAfterSeconds: read.retryAfterSeconds,
     };
   }
-  const eligibility = reviewEligibility(read.facts, now);
+  const eligibility = reviewEligibility(read.facts, read.now);
   const state = parseReviewQuery(query);
   if (eligibility.ok) return { kind: 'form', problems: state.problems };
-  switch (eligibility.reason) {
+  switch (reviewSubmitStatus(eligibility)) {
     case 'already_reviewed':
       return state.done ? { kind: 'success' } : { kind: 'already_reviewed' };
-    case 'window_closed':
+    case 'expired':
       return { kind: 'expired' };
-    case 'not_a_booking':
-    case 'not_confirmed':
-    case 'session_not_ended':
+    case 'not_found':
       return { kind: 'invalid' };
-    default:
-      return eligibility.reason satisfies never;
   }
+}
+
+/** The screen for what the page read, and the session summary it may show: none for a link that opens nothing, however the order was read. */
+export function reviewView(
+  page: { read: ReviewRead; summary: ReviewSummary | null },
+  query: ReviewQuery,
+): { screen: ReviewScreen; summary: ReviewSummary | null } {
+  const screen = reviewScreen(page.read, query);
+  return {
+    screen,
+    summary: screen.kind === 'invalid' ? null : page.summary,
+  };
+}
+
+/** Which fields of the form to flag, and the first of them in reading order, which the summary links to. */
+export function reviewProblemState(problems: readonly ReviewFormField[]): {
+  rating: boolean;
+  body: boolean;
+  first: ReviewFormField | null;
+} {
+  return {
+    rating: problems.includes('rating'),
+    body: problems.includes('body'),
+    first: reviewFormFields.find((field) => problems.includes(field)) ?? null,
+  };
 }
 
 /** What the page says about the session being reviewed: finished text, so no stored name of any length can break the layout. */

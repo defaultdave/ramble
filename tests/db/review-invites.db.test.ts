@@ -27,7 +27,7 @@ vi.mock('@/server/monitoring/logger', () => ({
 // Behaviours under test, one per decision, branch, or risk.
 // the sweep
 // - it invites a confirmed booking whose session ended at least the delay ago, and only that: not a cancelled or unpaid one,
-//   not one that ended too recently, not one past the review window, not one that has a review, not one invited before
+//   not one that ended too recently, not one past the review window, not one that has a review, not one refunded, not one invited before
 // - a second sweep queues nothing new, and a sweep at a later time picks up a booking that was too recent before
 // - the job's payload is the order id alone, and it is due now
 // - the sweep reads past orders already invited, so a backlog drains and does not start again at the same rows
@@ -38,7 +38,7 @@ vi.mock('@/server/monitoring/logger', () => ({
 // - running the handler twice sends one message; a cancelled, reviewed, or not-yet-ended booking sends nothing; no such order is refused
 // the test console's invite
 // - queueing for an invitable order sends a message when drained, and a second send is a second message
-// - a booking that cannot be invited now is not queued; a caller without ops or admin is refused
+// - a booking that cannot be invited now (cancelled, refunded, not over, past the window) is not queued; a caller without ops or admin is refused
 // - the console lists invitable bookings newest session first, and only to ops or admin
 // the page and the submit
 // - the page read for a good link finds the order and names its session; a wrong token, a token for another order, and a bad shape are invalid, the bad shape spending no try
@@ -127,6 +127,7 @@ describe('the sweep', () => {
     await insertBooking(client.db, parents, { endedAgoMs: hour });
     await insertBooking(client.db, parents, { status: 'cancelled' });
     await insertBooking(client.db, parents, { status: 'pending_payment' });
+    await insertBooking(client.db, parents, { refundedTicketMinor: 8500 });
     await insertBooking(client.db, parents, {
       endedAgoMs: reviewWindowMs + day,
     });
@@ -299,6 +300,7 @@ describe('the invite email', () => {
 
   it.each([
     ['a booking cancelled since', { status: 'cancelled' as const }],
+    ['a booking refunded since', { refundedTicketMinor: 8500 }],
     ['a session that has not ended', { endedAgoMs: -hour }],
     ['a session past the window', { endedAgoMs: reviewWindowMs + day }],
   ])('sends nothing for %s', async (_label, options) => {
@@ -342,6 +344,7 @@ describe('the test console invite', () => {
 
   it.each([
     ['cancelled', { status: 'cancelled' as const }],
+    ['refunded', { refundedTicketMinor: 2500 }],
     ['not over', { endedAgoMs: -hour }],
     ['past the window', { endedAgoMs: reviewWindowMs + day }],
   ])('does not queue a booking that is %s', async (_label, options) => {
@@ -388,6 +391,7 @@ describe('the test console invite', () => {
     });
     await insertBooking(client.db, parents, { endedAgoMs: -hour });
     await insertBooking(client.db, parents, { status: 'cancelled' });
+    await insertBooking(client.db, parents, { refundedTicketMinor: 8500 });
     const rows = await readModule.readInvitableOrderRows(ops);
     expect(rows.map((row) => row.orderId)).toEqual([newer.id, older.id]);
     expect(rows[0]).toMatchObject({

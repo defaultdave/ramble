@@ -1,8 +1,8 @@
 import { commissionMinor, defaultCommissionRateBps } from '../pricing';
-import { crockfordAlphabet } from '../orders';
+import { newOrderReference } from '../checkout';
 import { priceKindLabel, type priceKinds } from '../catalog';
-import { scrubbedHash } from '../holds';
-import { msPerDay, msPerHour } from '../time';
+import { holdExpiresAt, scrubbedHash } from '../holds';
+import { msPerDay, msPerHour, msPerMinute } from '../time';
 import { venueTimeZone } from '../venue';
 import { experienceId } from './rows';
 import { seedId } from './ids';
@@ -42,14 +42,26 @@ const holdMinutes = 10;
 const dayStartUtc = (now: Date) =>
   Math.floor(now.getTime() / msPerDay) * msPerDay;
 
+/** What the price pick reads of each price: which experience it belongs to, with what a booking is made on. */
+export type ReviewSeedPriceRow = ReviewSeedPrice & { experienceId: string };
+
+/** The first price of an experience, in the order given, which is the order the writer reads them in. */
+export function pickSeedPrice(
+  prices: readonly ReviewSeedPriceRow[],
+  experienceId: string,
+): ReviewSeedPriceRow | undefined {
+  return prices.find((price) => price.experienceId === experienceId);
+}
+
 /** `RMB-` and six Crockford characters taken from the key, so the same fixture always gets the same reference. */
-export function seedOrderReference(key: string): string {
+function seedOrderReference(key: string): string {
   const digits = seedId('order-reference', key).replaceAll('-', '');
-  const characters = Array.from({ length: 6 }, (_, index) => {
-    const value = parseInt(digits.slice(index * 2, index * 2 + 2), 16);
-    return crockfordAlphabet.charAt(value % crockfordAlphabet.length);
+  let position = 0;
+  return newOrderReference((exclusiveMax) => {
+    const pair = digits.slice(position * 2, position * 2 + 2);
+    position += 1;
+    return parseInt(pair, 16) % exclusiveMax;
   });
-  return `RMB-${characters.join('')}`;
 }
 
 export function reviewSeedRows(
@@ -64,7 +76,7 @@ export function reviewSeedRows(
   const holdCreatedAt = new Date(
     startsAt.getTime() - bookedDaysBefore * msPerDay,
   );
-  const confirmedAt = new Date(holdCreatedAt.getTime() + 5 * 60_000);
+  const confirmedAt = new Date(holdCreatedAt.getTime() + 5 * msPerMinute);
   const subtotal = price.priceMinor * fixture.seats;
   const commission = commissionMinor(subtotal, defaultCommissionRateBps);
   const sessionId = seedId('review-session', fixture.key);
@@ -90,7 +102,7 @@ export function reviewSeedRows(
       ipHash: scrubbedHash,
       createdAt: holdCreatedAt,
       updatedAt: confirmedAt,
-      expiresAt: new Date(holdCreatedAt.getTime() + holdMinutes * 60_000),
+      expiresAt: holdExpiresAt(holdCreatedAt, holdMinutes),
     },
     holdItem: {
       holdId,

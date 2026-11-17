@@ -3,8 +3,10 @@ import { Button, ButtonLink } from '@/components/Button';
 import { Textarea } from '@/components/Textarea';
 import { reviewCopy } from '@/lib/copy/review';
 import { browsePath, helpPath } from '@/lib/paths';
+import type { ReviewDraft } from '@/lib/reviewDraft';
 import {
   reviewLimits,
+  reviewProblemState,
   type ReviewFormField,
   type ReviewScreen,
   type ReviewSummary,
@@ -18,6 +20,8 @@ export type ReviewFormProps = {
   screen: ReviewScreen;
   /** The session being reviewed; null when the link opened nothing. */
   summary: ReviewSummary | null;
+  /** What the booker had typed when the last submit did not go through, shown again in the form; null when there is none. */
+  draft: ReviewDraft | null;
   /** The link's own reference and token, posted back with the form. */
   reference: string;
   token: string;
@@ -77,12 +81,12 @@ function StateNotice({
   );
 }
 
-function problemFor(
-  problems: readonly ReviewFormField[],
-  field: ReviewFormField,
-): string | undefined {
-  return problems.includes(field) ? reviewCopy.problems[field] : undefined;
-}
+// The summary links to the first field to look at again, so these ids are the link's targets.
+const fieldIds = {
+  rating: 'review-rating-first',
+  body: 'review-body',
+} as const satisfies Record<ReviewFormField, string>;
+const ratingProblemId = 'review-rating-problem';
 
 /**
  * The review page. A server component that works with scripting off: the form posts the server
@@ -92,6 +96,7 @@ function problemFor(
 export function ReviewForm({
   screen,
   summary,
+  draft,
   reference,
   token,
   action,
@@ -153,27 +158,48 @@ export function ReviewForm({
         </Frame>
       );
     case 'form': {
-      const ratingProblem = problemFor(screen.problems, 'rating');
-      const bodyProblem = problemFor(screen.problems, 'body');
+      const problem = reviewProblemState(screen.problems);
       return (
         <Frame summary={summary}>
-          {screen.problems.length > 0 ? (
-            <Alert tone="danger" title={reviewCopy.problems.summary} />
-          ) : null}
+          {problem.first === null ? null : (
+            <Alert
+              tone="danger"
+              title={reviewCopy.problems.summary}
+              body={
+                <a href={`#${fieldIds[problem.first]}`} className={styles.jump}>
+                  {reviewCopy.problems.jump[problem.first]}
+                </a>
+              }
+            />
+          )}
           <form action={action} className={styles.form}>
-            <fieldset className={styles.rating}>
+            <fieldset
+              className={styles.rating}
+              {...(problem.rating
+                ? { 'aria-describedby': ratingProblemId }
+                : {})}
+            >
               <legend className={styles.legend}>
                 {reviewCopy.form.ratingLegend}
               </legend>
               <div className={styles.options}>
-                {reviewCopy.form.ratingOptions.map((option) => (
+                {reviewCopy.form.ratingOptions.map((option, index) => (
                   <label key={option.value} className={styles.option}>
                     <input
                       type="radio"
                       name="rating"
                       value={option.value}
+                      defaultChecked={draft?.rating === option.value}
                       required
                       className={styles.radio}
+                      {...(index === 0
+                        ? {
+                            id: fieldIds.rating,
+                            ...(problem.rating
+                              ? { 'aria-invalid': true as const }
+                              : {}),
+                          }
+                        : {})}
                     />
                     <span className={styles.optionNumber}>{option.label}</span>
                     <span className={styles.optionText}>
@@ -182,17 +208,19 @@ export function ReviewForm({
                   </label>
                 ))}
               </div>
-              {ratingProblem === undefined ? null : (
-                <p role="alert" className={styles.problem}>
-                  {ratingProblem}
+              {problem.rating ? (
+                <p id={ratingProblemId} role="alert" className={styles.problem}>
+                  {reviewCopy.problems.rating}
                 </p>
-              )}
+              ) : null}
             </fieldset>
             <Textarea
+              id={fieldIds.body}
               name="body"
               label={reviewCopy.form.bodyLabel}
               hint={reviewCopy.form.bodyHint(reviewLimits.bodyMaxChars)}
-              {...(bodyProblem === undefined ? {} : { errorText: bodyProblem })}
+              {...(problem.body ? { errorText: reviewCopy.problems.body } : {})}
+              defaultValue={draft?.body ?? ''}
               required
               maxLength={reviewLimits.bodyMaxChars}
               rows={6}

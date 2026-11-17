@@ -23,6 +23,7 @@ export function ReviewInvite({ data, helpUrl }: Props) {
       <EmailParagraph>{body.greeting}</EmailParagraph>
       <EmailParagraph>{body.intro}</EmailParagraph>
       <EmailButton href={data.reviewUrl}>{body.buttonLabel}</EmailButton>
+      <EmailParagraph muted>{body.linkLead}</EmailParagraph>
       <EmailParagraph muted>
         <EmailTextLink href={data.reviewUrl}>{data.reviewUrl}</EmailTextLink>
       </EmailParagraph>

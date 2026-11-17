@@ -150,6 +150,7 @@ describe('insertReview', () => {
   it.each([
     ['a cancelled booking', { status: 'cancelled' as const }],
     ['an unpaid booking', { status: 'pending_payment' as const }],
+    ['a booking refunded in part', { refundedTicketMinor: 2500 }],
     ['a session still running or ahead', { endedAgoMs: -2 * hour }],
   ])('writes nothing for %s and says not found', async (_label, options) => {
     const order = await insertBooking(client.db, parents, options);

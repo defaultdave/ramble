@@ -30,6 +30,12 @@ test('a review link with a malformed token says the link does not work, noindex,
   await expect(
     page.locator('meta[property^="og:"], meta[name^="twitter:"]'),
   ).toHaveCount(0);
+  // Not `no-referrer`: that makes a browser send `Origin: null` on the form post, which a Server
+  // Action refuses, so the form would fail with scripting off. `origin` still keeps the token out.
+  await expect(page.locator('meta[name="referrer"]')).toHaveAttribute(
+    'content',
+    'origin',
+  );
 });
 
 test('a review address with no token is the not-found page', async ({

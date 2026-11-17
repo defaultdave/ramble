@@ -6,7 +6,7 @@ import { OpsDevConsole } from './OpsDevConsole';
 
 // Behaviours under test:
 // - the jobs are listed with status in words, attempts, due time and last error
-// - only a waiting job has a run form, and it carries that job's id
+// - only a waiting job has a run form, and it carries that job's id; each run button is named for its job and due time
 // - the drain and the pulse are forms of their own
 // - with the demo clock on, the clock can be set, moved on and reset; with it off, only reset, and the page says why
 // - the clock line says whether runs use the real time or the test time
@@ -94,6 +94,20 @@ describe('OpsDevConsole', () => {
       ...container.querySelectorAll<HTMLInputElement>('input[name="jobId"]'),
     ].map((input) => input.value);
     expect(ids).toEqual([pendingRow.id, retryingRow.id]);
+  });
+
+  it('names each run button for its own job and due time, so two of one kind can be told apart', () => {
+    renderConsole({});
+    expect(
+      screen.getByRole('button', {
+        name: `Run ${pendingRow.kind}, due ${pendingRow.runAfterLabel}`,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: `Run ${retryingRow.kind}, due ${retryingRow.runAfterLabel}`,
+      }),
+    ).toBeInTheDocument();
   });
 
   it('has a drain button and a pulse button', () => {

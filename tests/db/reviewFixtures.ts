@@ -22,6 +22,8 @@ export type BookingOptions = {
   status?: 'confirmed' | 'cancelled' | 'pending_payment';
   contactEmail?: string;
   version?: number;
+  /** What the order has given back of its ticket, in minor units; at most the 8500 it cost. */
+  refundedTicketMinor?: number;
 };
 
 /**
@@ -37,6 +39,7 @@ export async function insertBooking(
     status = 'confirmed',
     contactEmail = 'pat@example.com',
     version = 1,
+    refundedTicketMinor = 0,
   }: BookingOptions = {},
 ) {
   const endsAt = new Date(Date.now() - endedAgoMs);
@@ -80,6 +83,7 @@ export async function insertBooking(
       commissionMinor: 1275,
       cancellationTierId: parents.tierId,
       manageTokenVersion: version,
+      refundedTicketMinor,
       confirmedAt: status === 'pending_payment' ? null : sql`clock_timestamp()`,
       cancelledAt: status === 'cancelled' ? sql`clock_timestamp()` : null,
       cancelledBy: status === 'cancelled' ? 'guest' : null,

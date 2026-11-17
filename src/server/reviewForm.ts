@@ -1,6 +1,7 @@
 import 'server-only';
 import {
   openReviewGate,
+  reviewRefusalFor,
   reviewSummary,
   type ReviewInput,
   type ReviewRead,
@@ -30,13 +31,13 @@ function openReviewLink(reference: string, token: string) {
 
 export type ReviewPage = {
   read: ReviewRead;
-  now: Date;
   summary: ReviewSummary | null;
 };
 
 /**
- * What the review page shows for a link. Each view spends one try. The order and the database's
- * clock are read in one snapshot, so the state the page decides on is the state it read.
+ * What the review page shows for a link. Each view spends one try, and a link of the wrong shape
+ * spends none and reaches no database. The order and the database's clock are read in one
+ * snapshot, so the state the page decides on is the state it read.
  */
 export async function readReviewPage(
   reference: string,
@@ -44,25 +45,16 @@ export async function readReviewPage(
 ): Promise<ReviewPage> {
   const gate = await openReviewLink(reference, token);
   if (gate.kind === 'refused') {
-    return {
-      read:
-        gate.reason === 'rate_limited'
-          ? { kind: 'rate_limited', retryAfterSeconds: gate.retryAfterSeconds }
-          : { kind: 'invalid' },
-      now: await readDatabaseTime(db),
-      summary: null,
-    };
+    return { read: reviewRefusalFor(gate).read, summary: null };
   }
   const { id } = gate.row;
   const read = await db.transaction(async (tx) => ({
     order: await readReviewOrder(tx, id),
     now: await readDatabaseTime(tx),
   }));
-  if (!read.order)
-    return { read: { kind: 'invalid' }, now: read.now, summary: null };
+  if (!read.order) return { read: { kind: 'invalid' }, summary: null };
   return {
-    read: { kind: 'found', facts: read.order.facts },
-    now: read.now,
+    read: { kind: 'found', facts: read.order.facts, now: read.now },
     summary: reviewSummary(read.order),
   };
 }
@@ -76,9 +68,7 @@ export async function submitReview(
   input: ReviewInput,
 ): Promise<ReviewSubmitStatus> {
   const gate = await openReviewLink(input.reference, input.token);
-  if (gate.kind === 'refused') {
-    return gate.reason === 'rate_limited' ? 'rate_limited' : 'not_found';
-  }
+  if (gate.kind === 'refused') return reviewRefusalFor(gate).submit;
   return db.transaction((tx) =>
     insertReview(tx, {
       orderId: gate.row.id,

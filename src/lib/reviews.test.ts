@@ -6,15 +6,21 @@ import {
   reviewEligibility,
   reviewInviteDecision,
   reviewInviteDelayMs,
+  reviewInviteEmailKey,
   reviewInviteKey,
+  reviewInviteKeyPrefix,
   reviewInviteResendKey,
   reviewInviteRunAt,
   reviewInviteWindow,
   reviewLimits,
   reviewProblemPath,
+  reviewProblemState,
+  reviewRefusalFor,
   reviewResultPath,
   reviewScreen,
+  reviewSubmitStatus,
   reviewSummary,
+  reviewView,
   reviewWindowMs,
   type ReviewFacts,
   type ReviewRead,
@@ -24,13 +30,18 @@ import {
 // eligibility
 // - a confirmed booking whose session ended, with no review, inside the window, is eligible
 // - each reason it is not, with the first failing rule as the reason: a gift purchase, a cancelled or unpaid order,
-//   a review that exists, a session still running or ahead, a window that has closed; the edges (ended this instant,
+//   a booking refunded in whole or in part, a review that exists, a session still running or ahead, a window that has closed; the edges (ended this instant,
 //   closed this instant) are eligible and still open
+// - a refund of ticket or tax, however small, refuses; a booking with nothing refunded does not
 // - the invite job sends for an eligible booking, refuses what is not a booking, and skips every other reason
 // timing
 // - the invite is due the delay after the session ends, or now when that has passed
-// - the sweep's window is bounded by the delay and by the review window, on the clock it is given
-// - the keys are per order and per hand-sent invite, lower-cased
+// - the sweep's window is bounded by the delay and by the review window, on the clock it is given; with no delay it is bounded by now
+// - the keys are per order and per hand-sent invite, lower-cased, and the per-order one starts with the prefix the sweep's query uses
+// - the email's key is the order's for the sweep and the send's for a hand-sent invite
+// what a refusal comes to
+// - each eligibility reason maps to a submit status: already reviewed, expired, or not found for every other reason
+// - a refused gate reads as invalid or too many tries on the page, and submits as not found or rate limited
 // the form
 // - a good form parses to the reference, token, a whole rating 1 to 5 and the trimmed body
 // - a reference or token of the wrong shape is a bad link, whatever the rest says
@@ -44,6 +55,8 @@ import {
 // - an eligible booking shows the form, with the fields a failed submit named
 // - a reviewed booking says already reviewed, and success only when the address says done
 // - a closed window says expired; a cancelled booking, a gift purchase, and a session not over are all just invalid
+// - the form's problem flags name each field and the first in reading order, or none
+// - the summary is dropped for an invalid screen and kept otherwise
 // - paths: a created review lands on the page with done, anything else on the bare page, a bad field list names the fields
 // - the summary clips long names to one line and words the day in the session's zone
 
@@ -54,6 +67,8 @@ const day = 24 * hour;
 const facts = (overrides: Partial<ReviewFacts> = {}): ReviewFacts => ({
   kind: 'booking',
   status: 'confirmed',
+  refundedTicketMinor: 0,
+  refundedTaxMinor: 0,
   endsAt: new Date(now.getTime() - 5 * hour),
   reviewed: false,
   ...overrides,
@@ -72,6 +87,13 @@ describe('reviewEligibility', () => {
     ['a gift purchase', { kind: 'gift_purchase' as const }, 'not_a_booking'],
     ['a cancelled booking', { status: 'cancelled' }, 'not_confirmed'],
     ['an unpaid booking', { status: 'pending_payment' }, 'not_confirmed'],
+    ['a booking refunded its ticket', { refundedTicketMinor: 1 }, 'refunded'],
+    ['a booking refunded only tax', { refundedTaxMinor: 1 }, 'refunded'],
+    [
+      'a reviewed booking that was then refunded',
+      { reviewed: true, refundedTicketMinor: 8500 },
+      'refunded',
+    ],
     ['a booking already reviewed', { reviewed: true }, 'already_reviewed'],
     [
       'a session still running',
@@ -105,6 +127,15 @@ describe('reviewEligibility', () => {
     expect(reviewEligibility(facts(overrides), now)).toEqual({ ok: true });
   });
 
+  it('lets a booking with nothing refunded review', () => {
+    expect(
+      reviewEligibility(
+        facts({ refundedTicketMinor: 0, refundedTaxMinor: 0 }),
+        now,
+      ),
+    ).toEqual({ ok: true });
+  });
+
   it('names the first rule that fails when several do', () => {
     expect(
       reviewEligibility(
@@ -132,6 +163,7 @@ describe('reviewInviteDecision', () => {
   it.each([
     ['cancelled since', { status: 'cancelled' }],
     ['reviewed already', { reviewed: true }],
+    ['refunded since', { refundedTicketMinor: 100 }],
     ['not over yet', { endsAt: new Date(now.getTime() + hour) }],
     ['past the window', { endsAt: new Date(now.getTime() - 100 * day) }],
   ])('skips a booking %s', (_label, overrides) => {
@@ -159,6 +191,13 @@ describe('invite timing', () => {
       endedAfter: new Date(now.getTime() - reviewWindowMs),
     });
   });
+
+  it('bounds the sessions that have simply ended by now when given no delay', () => {
+    expect(reviewInviteWindow(now, 0)).toEqual({
+      endedBefore: now,
+      endedAfter: new Date(now.getTime() - reviewWindowMs),
+    });
+  });
 });
 
 describe('email keys', () => {
@@ -169,6 +208,65 @@ describe('email keys', () => {
     expect(reviewInviteResendKey('ABCDEF00-0000-4000-8000-000000000001')).toBe(
       'review-invite-resend:abcdef00-0000-4000-8000-000000000001',
     );
+  });
+});
+
+describe('the invite key prefix', () => {
+  it('starts every per-order key, and no hand-sent one', () => {
+    expect(reviewInviteKey(orderId).startsWith(reviewInviteKeyPrefix)).toBe(
+      true,
+    );
+    expect(
+      reviewInviteResendKey(orderId).startsWith(reviewInviteKeyPrefix),
+    ).toBe(false);
+  });
+});
+
+describe('reviewInviteEmailKey', () => {
+  it('is the order key for the sweep, so the order is invited once', () => {
+    expect(reviewInviteEmailKey({ orderId })).toBe(reviewInviteKey(orderId));
+  });
+
+  it('is the send key for a hand-sent invite, so each send is its own email', () => {
+    const sendId = 'b0000000-0000-4000-8000-000000000002';
+    expect(reviewInviteEmailKey({ orderId, sendId })).toBe(
+      reviewInviteResendKey(sendId),
+    );
+  });
+});
+
+describe('reviewSubmitStatus', () => {
+  it.each([
+    ['already_reviewed', 'already_reviewed'],
+    ['window_closed', 'expired'],
+    ['not_a_booking', 'not_found'],
+    ['not_confirmed', 'not_found'],
+    ['refunded', 'not_found'],
+    ['session_not_ended', 'not_found'],
+  ] as const)('answers %s with %s', (reason, status) => {
+    expect(reviewSubmitStatus({ ok: false, reason })).toBe(status);
+  });
+});
+
+describe('reviewRefusalFor', () => {
+  it('reads an invalid link as invalid and submits it as not found', () => {
+    expect(reviewRefusalFor({ kind: 'refused', reason: 'invalid' })).toEqual({
+      read: { kind: 'invalid' },
+      submit: 'not_found',
+    });
+  });
+
+  it('reads a counted-out link as a wait and submits it as rate limited', () => {
+    expect(
+      reviewRefusalFor({
+        kind: 'refused',
+        reason: 'rate_limited',
+        retryAfterSeconds: 42,
+      }),
+    ).toEqual({
+      read: { kind: 'rate_limited', retryAfterSeconds: 42 },
+      submit: 'rate_limited',
+    });
   });
 });
 
@@ -338,41 +436,42 @@ describe('reviewScreen', () => {
   const found = (overrides: Partial<ReviewFacts> = {}): ReviewRead => ({
     kind: 'found',
     facts: facts(overrides),
+    now,
   });
 
   it('is invalid for a link that opened nothing, and too many tries for one counted out', () => {
-    expect(reviewScreen({ kind: 'invalid' }, now, {})).toEqual({
+    expect(reviewScreen({ kind: 'invalid' }, {})).toEqual({
       kind: 'invalid',
     });
     expect(
-      reviewScreen({ kind: 'rate_limited', retryAfterSeconds: 30 }, now, {}),
+      reviewScreen({ kind: 'rate_limited', retryAfterSeconds: 30 }, {}),
     ).toEqual({ kind: 'too_many_tries', retryAfterSeconds: 30 });
   });
 
   it('shows the form for an eligible booking, with the fields a failed submit named', () => {
-    expect(reviewScreen(found(), now, {})).toEqual({
+    expect(reviewScreen(found(), {})).toEqual({
       kind: 'form',
       problems: [],
     });
-    expect(
-      reviewScreen(found(), now, { problem: 'body,rating,elsewhere' }),
-    ).toEqual({ kind: 'form', problems: ['rating', 'body'] });
+    expect(reviewScreen(found(), { problem: 'body,rating,elsewhere' })).toEqual(
+      { kind: 'form', problems: ['rating', 'body'] },
+    );
   });
 
   it('says already reviewed, and success only when the address says done', () => {
-    expect(reviewScreen(found({ reviewed: true }), now, {})).toEqual({
+    expect(reviewScreen(found({ reviewed: true }), {})).toEqual({
       kind: 'already_reviewed',
     });
-    expect(reviewScreen(found({ reviewed: true }), now, { done: '1' })).toEqual(
-      { kind: 'success' },
-    );
-    expect(
-      reviewScreen(found({ reviewed: true }), now, { done: 'yes' }),
-    ).toEqual({ kind: 'already_reviewed' });
+    expect(reviewScreen(found({ reviewed: true }), { done: '1' })).toEqual({
+      kind: 'success',
+    });
+    expect(reviewScreen(found({ reviewed: true }), { done: 'yes' })).toEqual({
+      kind: 'already_reviewed',
+    });
   });
 
   it('never says success for a booking with no review, whatever the address says', () => {
-    expect(reviewScreen(found(), now, { done: '1' })).toMatchObject({
+    expect(reviewScreen(found(), { done: '1' })).toMatchObject({
       kind: 'form',
     });
   });
@@ -381,7 +480,6 @@ describe('reviewScreen', () => {
     expect(
       reviewScreen(
         found({ endsAt: new Date(now.getTime() - reviewWindowMs - 1) }),
-        now,
         {},
       ),
     ).toEqual({ kind: 'expired' });
@@ -389,12 +487,50 @@ describe('reviewScreen', () => {
 
   it.each([
     ['cancelled', { status: 'cancelled' }],
+    ['refunded', { refundedTicketMinor: 500 }],
     ['a gift purchase', { kind: 'gift_purchase' as const }],
     ['not over', { endsAt: new Date(now.getTime() + hour) }],
   ])('says only invalid for a booking that is %s', (_label, overrides) => {
-    expect(reviewScreen(found(overrides), now, {})).toEqual({
+    expect(reviewScreen(found(overrides), {})).toEqual({
       kind: 'invalid',
     });
+  });
+});
+
+describe('reviewProblemState', () => {
+  it.each([
+    [[], { rating: false, body: false, first: null }],
+    [['body'], { rating: false, body: true, first: 'body' }],
+    [['rating'], { rating: true, body: false, first: 'rating' }],
+    [['body', 'rating'], { rating: true, body: true, first: 'rating' }],
+  ] as const)('flags %j as %j', (problems, expected) => {
+    expect(reviewProblemState(problems)).toEqual(expected);
+  });
+});
+
+describe('reviewView', () => {
+  const summary = {
+    experienceName: 'Kayak',
+    hostName: 'Tide',
+    dayLabel: 'Sat',
+  };
+
+  it('drops the summary for an invalid screen, whatever was read', () => {
+    expect(
+      reviewView(
+        {
+          read: { kind: 'found', facts: facts({ status: 'cancelled' }), now },
+          summary,
+        },
+        {},
+      ),
+    ).toEqual({ screen: { kind: 'invalid' }, summary: null });
+  });
+
+  it('keeps the summary for the form', () => {
+    expect(
+      reviewView({ read: { kind: 'found', facts: facts(), now }, summary }, {}),
+    ).toEqual({ screen: { kind: 'form', problems: [] }, summary });
   });
 });
 

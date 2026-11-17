@@ -1,7 +1,10 @@
 import { z } from 'zod';
+import { reviewCopy } from '../copy/review';
 import { reviewWindowMs } from '../reviews';
+
 import { reviewPath } from '../routes';
 import { oneLineClipped } from '../text';
+import { msPerDay } from '../time';
 import { zonedDayLabel } from '../zonedLabels';
 import { isCapabilityTokenShape } from '../capabilityTokens';
 import { isOrderReference } from '../orders';
@@ -13,7 +16,7 @@ import { greetingName } from '../bookingEmails';
 const subjectNameMax = 70;
 const nameMax = 120;
 const experienceNameMax = 200;
-const windowDays = Math.round(reviewWindowMs / (24 * 60 * 60 * 1000));
+const windowDays = Math.round(reviewWindowMs / msPerDay);
 
 const line = (max: number) => z.string().min(1).max(max);
 
@@ -69,12 +72,14 @@ export function reviewInviteData(
 
 /** What the invite says: finished text, so the markup holds no wording. */
 export function reviewInviteBody(data: ReviewInviteData) {
+  const invite = reviewCopy.invite;
   return {
-    preview: `Tell other guests how ${data.experienceName} went.`,
-    heading: `How was ${data.experienceName}?`,
-    greeting: `Hi ${data.recipientName},`,
-    intro: `Thanks for joining ${data.hostName} on ${data.dayLabel}. A rating and a few words help the next guest choose.`,
-    buttonLabel: 'Write a review',
-    note: `This link is for your booking only and works for ${String(data.windowDays)} days. You can leave one review.`,
+    preview: invite.preview(data.experienceName),
+    heading: invite.heading(data.experienceName),
+    greeting: invite.greeting(data.recipientName),
+    intro: invite.intro(data.hostName, data.dayLabel),
+    buttonLabel: invite.buttonLabel,
+    linkLead: invite.linkLead,
+    note: invite.note(data.windowDays),
   };
 }

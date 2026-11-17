@@ -16,7 +16,7 @@ import {
 } from '@/server/db/schema';
 import { reviewFixtures } from '@/lib/seed/fixtures/reviews';
 import { experienceId } from '@/lib/seed/rows';
-import { reviewSeedRows } from '@/lib/seed/reviews';
+import { pickSeedPrice, reviewSeedRows } from '@/lib/seed/reviews';
 import { SeedStepError } from '@/lib/seed/decide';
 
 // Writes the past bookings and reviews. No data-layer function creates an order from outside a
@@ -76,7 +76,7 @@ export async function seedReviews(
     const experience = experienceRows.find(
       (row) => row.id === experienceId(fixture.experienceSlug),
     );
-    const price = prices.find((row) => row.experienceId === experience?.id);
+    const price = pickSeedPrice(prices, experienceId(fixture.experienceSlug));
     if (!experience || !price) {
       throw new SeedStepError(
         `Review fixture "${fixture.key}" names an experience with no price: "${fixture.experienceSlug}"`,

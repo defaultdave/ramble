@@ -55,7 +55,7 @@
 
 .options {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-2);
 }
 
@@ -67,7 +67,7 @@
   gap: var(--space-1);
   min-height: 3.5rem;
   padding: var(--space-2);
-  border: 1px solid var(--color-border-default);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-lg);
   background: var(--color-bg-surface);
   text-align: center;
@@ -120,6 +120,17 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
+}
+
+.jump {
+  color: var(--color-text-link);
+}
+
+/* Five tiles fit one row once the page is wide enough for each to hold "Very good" without clipping. */
+@media (min-width: 480px) {
+  .options {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
 }
 
 @media (min-width: 768px) {

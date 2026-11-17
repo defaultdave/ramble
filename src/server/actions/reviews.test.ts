@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ submitReview: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  submitReview: vi.fn(),
+  keepReviewDraft: vi.fn(),
+  forgetReviewDraft: vi.fn(),
+}));
 
 class Redirected extends Error {
   constructor(readonly href: string) {
@@ -18,6 +22,10 @@ vi.mock('next/navigation', () => ({
   },
 }));
 vi.mock('@/server/reviewForm', () => ({ submitReview: mocks.submitReview }));
+vi.mock('@/server/reviewDraft', () => ({
+  keepReviewDraft: mocks.keepReviewDraft,
+  forgetReviewDraft: mocks.forgetReviewDraft,
+}));
 
 import { submitReviewForm } from './reviews';
 
@@ -26,6 +34,7 @@ import { submitReviewForm } from './reviews';
 // - a bad rating or body goes back to the form with the fields named, and nothing is written
 // - a good form is submitted once with the trimmed values, and the booker lands on the page, with done only for a created review
 // - every other answer lands on the bare page, which says what is true of the booking
+// - what the booker typed is kept for the retry after a bad field and after a wait, ended once a review is made, and left alone otherwise; a form with no usable link keeps nothing
 
 const reference = 'RMB-7K3M9Q';
 const token = 'A'.repeat(43);
@@ -50,6 +59,8 @@ async function outcome(data: FormData): Promise<string> {
 
 beforeEach(() => {
   mocks.submitReview.mockReset().mockResolvedValue('created');
+  mocks.keepReviewDraft.mockReset().mockResolvedValue(undefined);
+  mocks.forgetReviewDraft.mockReset().mockResolvedValue(undefined);
 });
 
 describe('submitReviewForm', () => {
@@ -105,5 +116,46 @@ describe('submitReviewForm', () => {
     expect(
       await outcome(form({ reference, token, rating: '4', body: 'Lovely' })),
     ).toBe(page);
+  });
+
+  it('keeps what was typed when a field was bad, so the form comes back filled in', async () => {
+    await outcome(form({ reference, token, rating: '4', body: '   ' }));
+    expect(mocks.keepReviewDraft).toHaveBeenCalledExactlyOnceWith({
+      reference,
+      rating: 4,
+      body: '   ',
+    });
+    expect(mocks.forgetReviewDraft).not.toHaveBeenCalled();
+  });
+
+  it('keeps what was typed when the link was told to wait', async () => {
+    mocks.submitReview.mockResolvedValue('rate_limited');
+    await outcome(form({ reference, token, rating: '4', body: 'Lovely' }));
+    expect(mocks.keepReviewDraft).toHaveBeenCalledExactlyOnceWith({
+      reference,
+      rating: 4,
+      body: 'Lovely',
+    });
+  });
+
+  it('ends the kept draft when the review is made', async () => {
+    await outcome(form({ reference, token, rating: '4', body: 'Lovely' }));
+    expect(mocks.forgetReviewDraft).toHaveBeenCalledTimes(1);
+    expect(mocks.keepReviewDraft).not.toHaveBeenCalled();
+  });
+
+  it.each(['already_reviewed', 'expired', 'not_found'])(
+    'leaves the kept draft alone when the answer is %s',
+    async (status) => {
+      mocks.submitReview.mockResolvedValue(status);
+      await outcome(form({ reference, token, rating: '4', body: 'Lovely' }));
+      expect(mocks.keepReviewDraft).not.toHaveBeenCalled();
+      expect(mocks.forgetReviewDraft).not.toHaveBeenCalled();
+    },
+  );
+
+  it('keeps nothing for a form with no usable link', async () => {
+    await outcome(form({ token, rating: '5', body: 'Great' }));
+    expect(mocks.keepReviewDraft).not.toHaveBeenCalled();
   });
 });

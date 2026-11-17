@@ -4,7 +4,7 @@ import type { ReviewScreen, ReviewSummary } from '@/lib/reviews';
 import { ReviewForm } from './ReviewForm';
 
 // One story per state the review page can open to: the form, the form after a failed submit, the
-// invalid link, an already reviewed booking, a closed window, success, and too many tries.
+// the form again with what was typed kept, the invalid link, an already reviewed booking, a closed window, success, and too many tries.
 
 const summary: ReviewSummary = {
   experienceName: 'Sunset kayak on the Hudson',
@@ -19,6 +19,7 @@ const meta = {
   args: {
     screen: { kind: 'form', problems: [] } satisfies ReviewScreen,
     summary,
+    draft: null,
     reference: 'RMB-7K3M9Q',
     token: 'A'.repeat(43),
     action: fn(),
@@ -32,6 +33,13 @@ export const Form: Story = {};
 
 export const FormAfterAFailedSubmit: Story = {
   args: { screen: { kind: 'form', problems: ['rating', 'body'] } },
+};
+
+export const FormAfterAFailedSubmitKeepsWhatWasTyped: Story = {
+  args: {
+    screen: { kind: 'form', problems: ['body'] },
+    draft: { reference: 'RMB-7K3M9Q', rating: 4, body: '   ' },
+  },
 };
 
 export const InvalidLink: Story = {

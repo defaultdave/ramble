@@ -7,6 +7,7 @@ import { noticeHref } from '@/lib/opsForm';
 import {
   devConsoleOpen,
   holdsDevConsoleRole,
+  inviteNoticeFor,
   nextClockInstant,
   opsDevPath,
   parseClockForm,
@@ -133,10 +134,5 @@ export async function sendReviewInviteAction(
   await guardOrLeave();
   const orderId = idOrLeave(formData, 'orderId', opsDevPath);
   const queued = await queueReviewInviteNow(await readOpsCaller(), orderId);
-  redirect(
-    noticeHref(
-      opsDevPath,
-      queued === 'queued' ? 'invite_queued' : 'invite_not_eligible',
-    ),
-  );
+  redirect(noticeHref(opsDevPath, inviteNoticeFor(queued)));
 }

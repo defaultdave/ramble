@@ -2,8 +2,7 @@ import 'server-only';
 import { reviewInviteData } from '@/lib/email/reviewInvite';
 import {
   reviewInviteDecision,
-  reviewInviteKey,
-  reviewInviteResendKey,
+  reviewInviteEmailKey,
   type ReviewInvitePayload,
 } from '@/lib/reviews';
 import type { Transaction } from '@/server/db/client';
@@ -57,9 +56,6 @@ export async function sendReviewInvite({
       token: capabilityToken('review', order.orderId, order.manageTokenVersion),
       appUrl: env.APP_URL,
     }),
-    idempotencyKey:
-      payload.sendId === undefined
-        ? reviewInviteKey(order.orderId)
-        : reviewInviteResendKey(payload.sendId),
+    idempotencyKey: reviewInviteEmailKey(payload),
   });
 }

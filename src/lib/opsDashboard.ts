@@ -4,6 +4,7 @@ import { reviewPath } from './experienceReview';
 import { opsBookingsPath } from './opsBookings';
 import { opsRequestsPath } from './opsRequests';
 import { opsSessionsPath } from './opsSessions';
+import { supportQueuePath } from './supportQueue';
 
 /** How many of the latest audit rows the landing shows. */
 export const recentAuditLimit = 5;
@@ -57,7 +58,7 @@ const tiles: readonly {
   },
   {
     id: 'openSupport',
-    href: '/ops/support?status=open',
+    href: `${supportQueuePath}?status=open`,
     copy: opsDashboardCopy.tiles.support,
     actionable: true,
   },

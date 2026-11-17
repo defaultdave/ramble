@@ -23,10 +23,11 @@ export function shouldLoadBotId(pathname: string): boolean {
 }
 
 /**
- * Same rule as `botCheckIsLive` in `botCheck.ts`, kept here because this file is the one the browser
- * may load. `VERCEL` is set on every Vercel build and nowhere else; off Vercel the server check
+ * Whether the bot check is live, for the server check and the build-time client challenge alike.
+ * `VERCEL` is set on every Vercel build and runtime and nowhere else; off Vercel the server check
  * passes everyone, so the challenge script and its rewrite to api.vercel.com have nothing to guard
- * and would only fail on a machine with no route to that host.
+ * and would only fail on a machine with no route to that host. It lives in this Zod-free file because
+ * the browser may load it.
  */
 export function botChallengeIsLive(vercel: string | undefined): boolean {
   return vercel !== undefined && vercel !== '';

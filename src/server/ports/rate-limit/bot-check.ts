@@ -1,7 +1,7 @@
 import 'server-only';
 import { checkBotId } from 'botid/server';
+import { botChallengeIsLive } from '@/lib/botChallenge';
 import {
-  botCheckIsLive,
   BotVerdictSchema,
   judgeBotVerdict,
   type BotCheckResult,
@@ -26,7 +26,7 @@ async function botIdVerdict(): Promise<BotVerdict> {
  * verdict. A failed or malformed lookup throws, so a caller fails closed.
  */
 export async function checkBot(
-  source: BotVerdictSource | undefined = botCheckIsLive(env.VERCEL)
+  source: BotVerdictSource | undefined = botChallengeIsLive(env.VERCEL)
     ? botIdVerdict
     : undefined,
 ): Promise<BotCheckResult> {

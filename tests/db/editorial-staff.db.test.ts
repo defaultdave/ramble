@@ -179,6 +179,10 @@ describe('who may use the staff functions', () => {
       (c: typeof ops) => editorial.listHomeModulesForEditing(c),
     ],
     [
+      'listExperienceChoicesForEditing',
+      (c: typeof ops) => editorial.listExperienceChoicesForEditing(c),
+    ],
+    [
       'listPageCopyForEditing',
       (c: typeof ops) => editorial.listPageCopyForEditing(c),
     ],

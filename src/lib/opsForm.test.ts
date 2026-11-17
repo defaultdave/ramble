@@ -4,6 +4,7 @@ import {
   errorProps,
   fieldsFromIssues,
   formHas,
+  formJson,
   inFieldOrder,
   formText,
   formWholeNumber,
@@ -20,6 +21,7 @@ import {
 // Behaviours under test, one per decision, branch or risk:
 // - posted text is trimmed, and missing, blank or non-text reads as absent
 // - a posted whole number is digits only, trimmed, and anything else reads as absent
+// - a posted JSON field is parsed, text that is not JSON goes on as text, and a blank field is absent
 // - a checkbox is ticked when the form carries it at all
 // - fields over the raw limit are named, in the list's order
 // - a slug is typed or derived when asked, and a missing, over-long or empty one is refused
@@ -41,6 +43,17 @@ describe('formText', () => {
     [42, undefined],
   ])('%j reads as %j', (raw, expected) => {
     expect(formText(form({ name: raw }), 'name')).toBe(expected);
+  });
+});
+
+describe('formJson', () => {
+  it.each([
+    ['{"type":"doc"}', { type: 'doc' }],
+    ['not json', 'not json'],
+    ['   ', undefined],
+    [null, undefined],
+  ])('%j reads as %j', (raw, expected) => {
+    expect(formJson(form({ body: raw }), 'body')).toEqual(expected);
   });
 });
 

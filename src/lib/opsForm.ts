@@ -21,6 +21,17 @@ export function formText(get: FormGetter, name: string): string | undefined {
   return trimmed === '' ? undefined : trimmed;
 }
 
+/** A posted JSON field as parsed; text that is not JSON goes on as it is, so a schema refuses it and names the field. */
+export function formJson(get: FormGetter, name: string): unknown {
+  const raw = formText(get, name);
+  if (raw === undefined) return undefined;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+}
+
 /** A posted whole number, digits only, or undefined for anything else, so a schema names the field instead of a parser throwing. */
 export function formWholeNumber(
   get: FormGetter,

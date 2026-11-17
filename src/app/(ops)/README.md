@@ -1,6 +1,6 @@
 # Ops area page map
 
-`/ops`, `/ops/mailbox`, `/ops/mailbox/[id]`, `/ops/dev`, `/ops/hosts`, `/ops/hosts/new`, `/ops/hosts/[id]`, `/ops/experiences`, `/ops/experiences/new`, `/ops/experiences/[id]`, `/ops/experiences/[id]/availability`, `/ops/editorial`, `/ops/editorial/new`, `/ops/editorial/[id]`, `/ops/review`, `/ops/review/[id]`, `/ops/sessions`, `/ops/sessions/[sessionId]`, `/ops/bookings`, `/ops/bookings/[id]`, `/ops/staff`, `/ops/support`, `/ops/requests`, `/ops/audit`, and any other address under `/ops`
+`/ops`, `/ops/mailbox`, `/ops/mailbox/[id]`, `/ops/dev`, `/ops/hosts`, `/ops/hosts/new`, `/ops/hosts/[id]`, `/ops/experiences`, `/ops/experiences/new`, `/ops/experiences/[id]`, `/ops/experiences/[id]/availability`, `/ops/editorial`, `/ops/editorial/new`, `/ops/editorial/[id]`, `/ops/editorial/home`, `/ops/editorial/home/[position]`, `/ops/editorial/collections`, `/ops/editorial/collections/new`, `/ops/editorial/collections/[id]`, `/ops/review`, `/ops/review/[id]`, `/ops/sessions`, `/ops/sessions/[sessionId]`, `/ops/bookings`, `/ops/bookings/[id]`, `/ops/staff`, `/ops/support`, `/ops/requests`, `/ops/audit`, and any other address under `/ops`
 
 Read from main at 2db68ea (2026-11-15). A PR that changes this tree (a component, a Suspense or client boundary, a cache tag, an action) updates this file in the same PR.
 
@@ -55,7 +55,7 @@ flowchart TD
 | SiteShell | server | [src/components/SiteShell.tsx](../../components/SiteShell.tsx) | Skip link, header (brand link and the word Operations), main, footer. No account control, no banner. |
 | OpsAreaNav | streamed | [src/app/(ops)/OpsAreaNav.tsx](OpsAreaNav.tsx) | Inside `Suspense fallback={null}`. Reads the caller, so it streams. Renders nothing unless the caller holds `ops`. It is not a gate. |
 | readOpsCaller | server (DB read) | [src/server/opsCaller.ts](../../server/opsCaller.ts) | Wraps `getCaller()`. A failure is logged and becomes the anonymous caller, never a role. |
-| holdsOpsRole and opsNavLinks | server (pure lib) | [src/lib/opsNav.ts](../../lib/opsNav.ts) | Roles must include `ops`; `admin` is not enough. Twelve links: Dashboard, Mailbox, Hosts, Experiences, Editorial, Support, Private requests, Review queue, Staff, Sessions, Audit log, Bookings. The test console is not listed. |
+| holdsOpsRole and opsNavLinks | server (pure lib) | [src/lib/opsNav.ts](../../lib/opsNav.ts) | Roles must include `ops`; `admin` is not enough. Fourteen links: Dashboard, Mailbox, Hosts, Experiences, Editorial, Home page, Collections, Support, Private requests, Review queue, Staff, Sessions, Audit log, Bookings. The test console is not listed. |
 | OpsNav | server | [src/components/OpsShell/OpsShell.tsx](../../components/OpsShell/OpsShell.tsx) | A `nav` of plain links. |
 | Route page | server |  | Every ops page below. The layout does not wrap it in Suspense, and no page does either. |
 | RenderPerRequest | server | [src/app/renderPerRequest.tsx](../renderPerRequest.tsx) | Sits beside the shell, awaits `connection()`, renders nothing. Pins the whole tree to per-request rendering so every script carries the CSP nonce. |
@@ -683,6 +683,94 @@ flowchart TD
 | RichTextEditor | client | [src/components/RichTextEditor/RichTextEditor.tsx](../../components/RichTextEditor/RichTextEditor.tsx) | Tiptap on the format in `src/lib/richText`. Writes the sanitized document into a hidden field. Imported only here, so no guest page loads Tiptap. |
 | Button | client | [src/components/Button/Button.tsx](../../components/Button/Button.tsx) | Every submit button. |
 | saveEntryAction | action | [src/server/actions/editorial.ts](../../server/actions/editorial.ts) | `saveHelpArticle`: one audit row in the same transaction (created, saved, published or unpublished; ids only), then `updateTag` for what guests could see before and after. A save keeps the stored status and position (a stale tab cannot unpublish), and a missing article returns to the list with a notice. |
+
+### Home page modules and collections
+
+Staff arrange the home page and write Ramble Picks. Home modules are the six kinds the guest home page reads; the list reorders them and switches them on and off, and each module's editor shows only the settings its kind reads (heading, text, Pick). The gift guide module is listed and can be moved, but it has no switch and no editor here. A Pick is a title, address, summary and introduction, saved as a draft, published, or taken down, with an ordered list of experiences (add, remove, move). A Pick with no experiences cannot be published. Every button posts to a server action that reads the stored rows, applies the click with a plain `src/lib` function, and saves the whole list; the result comes back as a `?notice=` code. The introduction and text editors are the only client islands, and they load only on the two editor pages.
+
+```mermaid
+flowchart TD
+    hp["HomeModulesPage<br/>/ops/editorial/home"]:::server
+    hl["HomeModulesList"]:::server
+    hep["EditHomeModulePage<br/>/ops/editorial/home/position"]:::server
+    hf["HomeModuleForm"]:::server
+    cp["CollectionsPage<br/>/ops/editorial/collections"]:::server
+    cl["CollectionsList"]:::server
+    dt4["DataTable"]:::server
+    cn["NewCollectionPage<br/>/ops/editorial/collections/new"]:::server
+    ce["EditCollectionPage<br/>/ops/editorial/collections/id"]:::server
+    cf["CollectionForm"]:::server
+    ci["CollectionItems"]:::server
+    lhm["listHomeModulesForEditing"]:::server
+    lce["listCollectionsForEditing"]:::server
+    lxc["listExperienceChoicesForEditing"]:::server
+    an5["ActionNotice"]:::server
+    rte2["RichTextEditor<br/>Tiptap"]:::client
+    btn4["Button<br/>client submit buttons"]:::client
+    hoa["homeModuleOpAction"]:::action
+    shm["saveHomeModuleAction"]:::action
+    sca["saveCollectionAction"]:::action
+    cia["collectionItemsAction"]:::action
+    hp -.-> lhm
+    hp -.-> lce
+    hp --> an5
+    hp --> hl
+    hep -.-> lhm
+    hep -.-> lce
+    hep --> an5
+    hep --> hf
+    cp -.-> lce
+    cp --> an5
+    cp --> cl
+    cl --> dt4
+    cn --> an5
+    cn --> cf
+    ce -.-> lce
+    ce -.-> lxc
+    ce --> an5
+    ce --> cf
+    ce --> ci
+    hf --> rte2
+    cf --> rte2
+    hl --> btn4
+    hf --> btn4
+    cf --> btn4
+    ci --> btn4
+    btn4 -.-> hoa
+    btn4 -.-> shm
+    btn4 -.-> sca
+    btn4 -.-> cia
+    classDef server fill:#e8edf8,stroke:#3b5bab,color:#1b1f27
+    classDef cached fill:#e2f3f0,stroke:#0f7a6c,color:#1b1f27
+    classDef streamed fill:#fbefdc,stroke:#a3610a,color:#1b1f27
+    classDef client fill:#f5e6f8,stroke:#8a2f9c,color:#1b1f27
+    classDef action fill:#fbe6e4,stroke:#b3261e,color:#1b1f27
+```
+
+| Component | Kind | File | Notes |
+| --- | --- | --- | --- |
+| HomeModulesPage | server | [src/app/(ops)/ops/editorial/home/page.tsx](ops/editorial/home/page.tsx) | Gate, then the modules and the collections (for the Pick names). A failed read is logged and shows the list's retry, not the group error. |
+| HomeModulesLoading | server | [src/app/(ops)/ops/editorial/home/loading.tsx](ops/editorial/home/loading.tsx) | The loading state for the two home pages. |
+| EditHomeModulePage | server | [src/app/(ops)/ops/editorial/home/[position]/page.tsx](ops/editorial/home/%5Bposition%5D/page.tsx) | Gate, then the module at that place. A bad place, an empty one, the gift guide module, and a module with no settings are a 404. |
+| listHomeModulesForEditing | server (DB read) | [src/server/db/editorial.ts](../../server/db/editorial.ts) | Staff only; every module, on or off. Not audited. |
+| HomeModulesList | server | [src/components/EditorialAdmin/HomeModulesList.tsx](../../components/EditorialAdmin/HomeModulesList.tsx) | One form around the ordered list; each row has move up, move down, turn on or off, and an edit link. Each button posts the module's place and kind, so a stale page cannot change a different module. |
+| HomeModuleForm | server | [src/components/EditorialAdmin/HomeModuleForm.tsx](../../components/EditorialAdmin/HomeModuleForm.tsx) | The state box and the settings the module's kind reads: heading, Pick list, text editor. |
+| CollectionsPage | server | [src/app/(ops)/ops/editorial/collections/page.tsx](ops/editorial/collections/page.tsx) | Gate, then every Pick, drafts included. A failed read is logged and shows the table's retry. |
+| CollectionsLoading | server | [src/app/(ops)/ops/editorial/collections/loading.tsx](ops/editorial/collections/loading.tsx) | The loading state for the three collection pages. |
+| NewCollectionPage | server | [src/app/(ops)/ops/editorial/collections/new/page.tsx](ops/editorial/collections/new/page.tsx) | Gate, then an empty form that saves a draft. |
+| EditCollectionPage | server | [src/app/(ops)/ops/editorial/collections/[id]/page.tsx](ops/editorial/collections/%5Bid%5D/page.tsx) | Gate, then the Pick, its form, and its experience list. A bad id, an unknown id, and the gift guide are a 404. |
+| listCollectionsForEditing | server (DB read) | [src/server/db/editorial.ts](../../server/db/editorial.ts) | Staff only; every collection with its entries, up to 200. The pages and actions keep the Picks. Not audited. |
+| listExperienceChoicesForEditing | server (DB read) | [src/server/db/editorial.ts](../../server/db/editorial.ts) | Staff only; experience names and statuses for the entry picker, up to 500. |
+| CollectionsList | server | [src/components/EditorialAdmin/CollectionsList.tsx](../../components/EditorialAdmin/CollectionsList.tsx) | A new-collection link and a table with an empty state. |
+| CollectionForm | server | [src/components/EditorialAdmin/CollectionForm.tsx](../../components/EditorialAdmin/CollectionForm.tsx) | Title, address, summary, introduction. A new Pick can only be saved as a draft; an existing one saves and publishes, or saves and unpublishes. |
+| CollectionItems | server | [src/components/EditorialAdmin/CollectionItems.tsx](../../components/EditorialAdmin/CollectionItems.tsx) | The experiences in order with move up, move down and remove, in one form; the add form is a second form, so Enter in the note adds. |
+| ActionNotice | server | [src/components/ActionNotice/ActionNotice.tsx](../../components/ActionNotice/ActionNotice.tsx) | Shows the `?notice=` code from the last redirect. |
+| RichTextEditor | client | [src/components/RichTextEditor/RichTextEditor.tsx](../../components/RichTextEditor/RichTextEditor.tsx) | The text of a hero module and a Pick's introduction. Imported only by the ops editorial forms. |
+| Button | client | [src/components/Button/Button.tsx](../../components/Button/Button.tsx) | Every submit button. |
+| homeModuleOpAction | action | [src/server/actions/editorial.ts](../../server/actions/editorial.ts) | Reads the stored list, applies a move or a switch, and saves the whole list with `saveHomeModules`, which clears the home tag. A click for a module no longer at that place saves nothing. |
+| saveHomeModuleAction | action | [src/server/actions/editorial.ts](../../server/actions/editorial.ts) | Applies the edit to the settings the kind reads and saves the whole list; a refused field returns to the form. |
+| saveCollectionAction | action | [src/server/actions/editorial.ts](../../server/actions/editorial.ts) | Reads the stored Pick, takes its status and entries from it, and saves with `saveCollection`, which clears the tags of what guests could see before and after. A Pick with no entries is not published. |
+| collectionItemsAction | action | [src/server/actions/editorial.ts](../../server/actions/editorial.ts) | Reads the stored Pick, applies an add, remove or move, and saves the Pick with its entries changed. |
 
 ## Arrival order
 

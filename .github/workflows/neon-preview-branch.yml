@@ -17,7 +17,8 @@ env:
 jobs:
   expire:
     name: expire preview branch
-    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    # Runs Dependabot triggers get no Actions secrets, and its branches never get a preview.
+    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Set the branch to expire in 7 days
@@ -46,7 +47,7 @@ jobs:
 
   delete:
     name: delete preview branch
-    if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Delete the pull request's branch

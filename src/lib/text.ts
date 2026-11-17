@@ -162,3 +162,8 @@ export function firstQueryValue(
 ): string | undefined {
   return Array.isArray(raw) ? raw[0] : raw;
 }
+
+/** The pattern an ILIKE matches a title against: the term anywhere in it, with `\`, `%` and `_` taken literally. */
+export function containsPattern(term: string): string {
+  return `%${term.replace(/[\\%_]/g, '\\$&')}%`;
+}

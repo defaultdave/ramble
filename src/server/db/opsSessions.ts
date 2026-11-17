@@ -29,7 +29,7 @@ import {
   type OpsSessionView,
   type SessionWhen,
 } from '@/lib/opsSessions';
-import { containsPattern } from '@/lib/pages/help';
+import { containsPattern } from '@/lib/text';
 import { splitPage } from '@/lib/pagination';
 import { opsListPageSize } from '@/lib/tableQuery';
 import { sessionsListEntry, sessionViewedEntry } from '@/lib/sessionAudit';

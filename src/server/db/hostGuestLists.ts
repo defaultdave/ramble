@@ -11,7 +11,7 @@ import {
   type HostBookingListData,
   type HostGuestListData,
 } from '@/lib/hostGuestLists';
-import { containsPattern } from '@/lib/pages/help';
+import { containsPattern } from '@/lib/text';
 import {
   holdsRole,
   hostReaderRoles,

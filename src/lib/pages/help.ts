@@ -27,11 +27,6 @@ export function parseHelpQuery(
   return term === '' ? null : term;
 }
 
-/** The pattern an ILIKE matches a title against: the term anywhere in it, with `\`, `%` and `_` taken literally. */
-export function containsPattern(term: string): string {
-  return `%${term.replace(/[\\%_]/g, '\\$&')}%`;
-}
-
 export type HelpIndexView =
   | { kind: 'articles'; articles: readonly HelpArticleSummary[] }
   | { kind: 'results'; query: string; articles: readonly HelpArticleSummary[] }

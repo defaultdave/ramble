@@ -12,6 +12,7 @@ import {
   agreementRefusal,
   isSlugTakenError,
   changedHostFields,
+  hostProfileChanges,
   hostSaveOutcome,
   hostAgreementDoc,
   type HostCreateInput,
@@ -31,7 +32,8 @@ import {
   readHostAcceptances,
   recordHostAcceptanceIn,
 } from './legal';
-import { authUsers, hosts, roleGrants } from './schema';
+import { withLockedHost } from './lockedExperience';
+import { authUsers, experiences, hosts, roleGrants } from './schema';
 import { ensureAuthUserIn, readRoleHolder } from './staffRoles';
 
 // Everything here is for the ops role: each function checks it, and each read records its audit
@@ -113,7 +115,11 @@ export async function createHost(
 export type UpdateHostResult =
   { status: 'updated' | 'unchanged' | 'slug_taken' } | { status: 'not_found' };
 
-/** Saves the host's editable fields. Nothing differing writes nothing, audit row included. */
+/**
+ * Saves the host's editable fields. Nothing differing writes nothing, audit row included. A new
+ * name, slug, about text, or time zone invalidates the host page and the host's experiences after
+ * the commit (`hostProfileChanges`). Runs in a Server Action only.
+ */
 export async function updateHost(
   caller: Caller,
   hostId: string,
@@ -121,18 +127,33 @@ export async function updateHost(
 ): Promise<UpdateHostResult> {
   requireOpsUserId(caller);
   try {
-    return await db.transaction(async (tx) => {
-      const changed = await saveHostFields(
-        tx,
-        caller,
-        Role.Ops,
-        hostId,
-        input,
-        (current) => changedHostFields(current, input),
-      );
-      if (changed === null) return { status: 'not_found' } as const;
-      return { status: hostSaveOutcome(changed) } as const;
-    });
+    return await withLockedHost<UpdateHostResult>(
+      hostId,
+      { status: 'not_found' },
+      async (tx, host) => {
+        const changed = await saveHostFields(
+          tx,
+          caller,
+          Role.Ops,
+          host.id,
+          input,
+          (current) => changedHostFields(current, input),
+        );
+        if (changed === null)
+          return { result: { status: 'not_found' }, changes: [] };
+        const owned = await tx
+          .select({ id: experiences.id })
+          .from(experiences)
+          .where(eq(experiences.hostId, host.id));
+        return {
+          result: { status: hostSaveOutcome(changed) },
+          changes: hostProfileChanges(
+            changed,
+            owned.map(({ id }) => id),
+          ),
+        };
+      },
+    );
   } catch (error) {
     if (isSlugTakenError(error)) return { status: 'slug_taken' };
     throw error;

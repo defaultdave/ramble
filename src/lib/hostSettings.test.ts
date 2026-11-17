@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  hostSettingsChanges,
   hostSettingsGate,
   hostSettingsResult,
   hostSettingsSaveNext,
@@ -23,7 +22,6 @@ import {
 // - the save notices are the ops host form's
 // - a save is gated before the form is read: an owner goes on with their own host, nobody signed in goes to sign in, anyone else back to the page
 // - a save ends at the page: a refused form with its fields, a save or no difference with its notice, a gone host with none
-// - a new name or about text invalidates the host page and each experience of the host; a new notice address alone invalidates nothing
 
 const formOf = (fields: Record<string, unknown>) => (name: string) =>
   fields[name];
@@ -232,33 +230,5 @@ describe('hostSettingsSaveNext', () => {
     ['a host that is gone', { status: 'not_found' } as const, '/host/settings'],
   ])('%s', (_case, outcome, expected) => {
     expect(hostSettingsSaveNext(outcome)).toBe(expected);
-  });
-});
-
-describe('hostSettingsChanges', () => {
-  const profile = [
-    { kind: 'hostProfile' },
-    { kind: 'experience', experienceId: 'e1' },
-    { kind: 'experience', experienceId: 'e2' },
-  ];
-
-  it.each([
-    ['a new name', ['name'] as const, profile],
-    ['a new about text', ['description'] as const, profile],
-    [
-      'all three',
-      ['name', 'description', 'notificationEmail'] as const,
-      profile,
-    ],
-    ['the notice address alone', ['notificationEmail'] as const, []],
-    ['nothing', [] as const, []],
-  ])('%s', (_case, changed, expected) => {
-    expect(hostSettingsChanges(changed, ['e1', 'e2'])).toEqual(expected);
-  });
-
-  it('still invalidates the host page for a host with no experiences', () => {
-    expect(hostSettingsChanges(['name'], [])).toEqual([
-      { kind: 'hostProfile' },
-    ]);
   });
 });

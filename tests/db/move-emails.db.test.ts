@@ -312,6 +312,76 @@ describe('the guest reminder follows a move', () => {
     expect(await reminders()).toHaveLength(1);
   });
 
+  it.each([
+    [
+      'running',
+      sql`status = 'running', locked_until = now() + interval '5 minutes'`,
+    ],
+    ['dead', sql`status = 'dead', finished_at = now()`],
+  ])(
+    'queues a fresh reminder under the move key when the old one is %s, leaving that row',
+    async (status, set) => {
+      const world = await seedMovable();
+      await queueReminder(world);
+      await client.db.execute(
+        sql`UPDATE jobs SET ${set} WHERE kind = 'session-reminder'`,
+      );
+      const date = await addDate(world, { startsInMinutes: 60 * 24 * 40 });
+
+      await move(world, date);
+
+      const moveId = await lastMoveId();
+      const rows = await reminders();
+      expect(rows.map((row) => row.status)).toEqual([status, 'pending']);
+      expect(rows[0]?.payload).toEqual({ orderId: world.orderId });
+      expect(rows[1]).toMatchObject({
+        dedupe_key: `session-reminder-move:${moveId}`,
+        payload: { orderId: world.orderId, moveId },
+      });
+    },
+  );
+
+  it('judges the reminder again under the lock when a drain claims it first', async () => {
+    const world = await seedMovable();
+    await queueReminder(world);
+    const { retimeSessionReminder } =
+      await import('@/server/db/sessionReminder');
+    const moveId = randomUUID();
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let locked = () => {};
+    const lockTaken = new Promise<void>((resolve) => {
+      locked = resolve;
+    });
+    // A drain's claim: the row is running and locked by a transaction that has not committed yet.
+    const drain = client.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`UPDATE jobs SET status = 'running', locked_until = now() + interval '5 minutes' WHERE kind = 'session-reminder'`,
+      );
+      locked();
+      await held;
+    });
+    await lockTaken;
+
+    const retime = client.db.transaction((tx) =>
+      retimeSessionReminder(tx, {
+        orderId: world.orderId,
+        moveId,
+        now: new Date(),
+      }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    release();
+    await Promise.all([drain, retime]);
+
+    expect((await reminders()).map((row) => row.status)).toEqual([
+      'running',
+      'pending',
+    ]);
+  });
+
   it('leaves exactly one waiting reminder after two moves, due for the last date', async () => {
     const world = await seedMovable();
     await queueReminder(world);

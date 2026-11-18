@@ -2,6 +2,7 @@ import 'server-only';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { EntityIdSchema } from '@/lib/catalog';
 import { editorialLimits } from '@/lib/editorial';
+import type { AuditEntryInput } from '@/lib/audit';
 import { hostAgreementAcceptedEntry } from '@/lib/hostAudit';
 import {
   decideHostAcceptance,
@@ -79,7 +80,6 @@ export async function getPublishedLegalDocument(
   return row ? LegalDocumentSchema.parse(row) : null;
 }
 
-// TODO(U-076c): first caller
 /** Every version of a document, newest first, drafts included. */
 export async function listLegalVersions(
   caller: Caller,
@@ -97,15 +97,18 @@ export async function listLegalVersions(
   return LegalDocumentSchema.array().parse(rows);
 }
 
-// TODO(U-076c): first caller
-/** Starts the next version of a document as a draft. */
+/** The audit entry for a legal write, built from the row it wrote and written in the same transaction. */
+export type LegalAudit = (document: LegalDocument) => AuditEntryInput;
+
+/** Starts the next version of a document as a draft. With `audit`, its row is written in the same transaction. */
 export async function createLegalDraft(
   caller: Caller,
   input: LegalDraftInput,
+  audit?: LegalAudit,
 ): Promise<LegalDocument> {
   requireStaff(caller);
   const parsed = LegalDraftInputSchema.parse(input);
-  const row = await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
     // The same per-document lock the publish trigger takes, so two drafts never pick one number.
     await lockFor(tx, parsed.doc);
     const [latest] = await tx
@@ -118,46 +121,50 @@ export async function createLegalDraft(
       .insert(legalDocuments)
       .values({ ...parsed, version: nextLegalVersion(latest?.version) })
       .returning();
-    return created;
+    if (!created) throw new Error('The legal draft write returned no row');
+    const document = LegalDocumentSchema.parse(created);
+    if (audit) await writeAudit(tx, audit(document));
+    return document;
   });
-  if (!row) throw new Error('The legal draft write returned no row');
-  return LegalDocumentSchema.parse(row);
 }
 
 export type EditLegalDraftResult =
   { status: 'saved'; value: LegalDocument } | { status: 'not_a_draft' };
 
-// TODO(U-076c): first caller
-/** Edits a draft. A published version is final, and an ID that matches no draft is `not_a_draft`. */
+/** Edits a draft. A published version is final, and an ID that matches no draft is `not_a_draft`. With `audit`, its row is written in the same transaction as the edit. */
 export async function editLegalDraft(
   caller: Caller,
   id: string,
   edit: LegalDraftEdit,
+  audit?: LegalAudit,
 ): Promise<EditLegalDraftResult> {
   requireStaff(caller);
   const parsedId = EntityIdSchema.safeParse(id);
   if (!parsedId.success) return { status: 'not_a_draft' };
   const parsed = LegalDraftEditSchema.parse(edit);
-  const [current] = await db
-    .select({ status: legalDocuments.status })
-    .from(legalDocuments)
-    .where(eq(legalDocuments.id, parsedId.data));
-  if (!current || !isDraft(current.status)) return { status: 'not_a_draft' };
-  // The status predicate is the race guard: a publish that commits after the read above leaves
-  // no row to update, and the answer is the same.
-  const [row] = await db
-    .update(legalDocuments)
-    .set(parsed)
-    .where(
-      and(
-        eq(legalDocuments.id, parsedId.data),
-        eq(legalDocuments.status, 'draft'),
-      ),
-    )
-    .returning();
-  return row
-    ? { status: 'saved', value: LegalDocumentSchema.parse(row) }
-    : { status: 'not_a_draft' };
+  return db.transaction(async (tx): Promise<EditLegalDraftResult> => {
+    const [current] = await tx
+      .select({ status: legalDocuments.status })
+      .from(legalDocuments)
+      .where(eq(legalDocuments.id, parsedId.data));
+    if (!current || !isDraft(current.status)) return { status: 'not_a_draft' };
+    // The status predicate is the race guard: a publish that commits after the read above leaves
+    // no row to update, and the answer is the same.
+    const [row] = await tx
+      .update(legalDocuments)
+      .set(parsed)
+      .where(
+        and(
+          eq(legalDocuments.id, parsedId.data),
+          eq(legalDocuments.status, 'draft'),
+        ),
+      )
+      .returning();
+    if (!row) return { status: 'not_a_draft' };
+    const value = LegalDocumentSchema.parse(row);
+    if (audit) await writeAudit(tx, audit(value));
+    return { status: 'saved', value };
+  });
 }
 
 export type PublishLegalResult =
@@ -165,15 +172,16 @@ export type PublishLegalResult =
   | { status: 'not_a_draft' }
   | { status: 'superseded' };
 
-// TODO(U-076c): first caller
 /**
  * Publishes a draft, which makes it the current version and final. A draft below a version
  * already published is `superseded`: publish a new draft instead. Everything is read again after
  * the per-document lock, so a publish that lost a race gets a typed answer, not a database error.
+ * With `audit`, its row is written in the same transaction as the publish.
  */
 export async function publishLegalDocument(
   caller: Caller,
   id: string,
+  audit?: LegalAudit,
 ): Promise<PublishLegalResult> {
   requireStaff(caller);
   const parsedId = EntityIdSchema.safeParse(id);
@@ -219,11 +227,13 @@ export async function publishLegalDocument(
       .where(eq(legalDocuments.id, draft.id))
       .returning();
     if (!row) throw new Error('The legal publish returned no row');
-    return { status: 'published', row } as const;
+    const value = LegalDocumentSchema.parse(row);
+    if (audit) await writeAudit(tx, audit(value));
+    return { status: 'published', value } as const;
   });
   if (outcome.status !== 'published') return outcome;
-  updateTagsForChanges([legalChange(outcome.row.doc)]);
-  return { status: 'published', value: LegalDocumentSchema.parse(outcome.row) };
+  updateTagsForChanges([legalChange(outcome.value.doc)]);
+  return outcome;
 }
 
 export type RecordAcceptancesResult =

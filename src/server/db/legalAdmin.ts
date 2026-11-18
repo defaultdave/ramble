@@ -6,7 +6,6 @@ import {
   mayStartDraft,
   type LegalDocSummary,
 } from '@/lib/editorialLegal';
-import type { AuditEntryInput } from '@/lib/audit';
 import {
   LegalDocSchema,
   type LegalDocument,
@@ -14,7 +13,7 @@ import {
   type LegalDraftInput,
 } from '@/lib/legal';
 import { Role, type Caller } from '@/server/auth/caller';
-import { recordAudit, requireUserId } from './audit';
+import { requireUserId } from './audit';
 import { dbRead } from './client';
 import {
   createLegalDraft,
@@ -26,10 +25,9 @@ import {
 import { legalDocuments } from './schema';
 import { requireStaff } from './staff';
 
-// The ops side of the legal documents. The writes are `legal.ts`'s own, which take no transaction
-// of their own, so the audit row of each is written after the write commits, in a transaction of
-// its own. A failure to write it throws after the change is made; it cannot be made atomic
-// without changing `legal.ts`.
+// The ops side of the legal documents. The writes are `legal.ts`'s own; each is handed the entry
+// builder for its audit row, which the write puts in its own transaction, so the row exists
+// exactly when the change does.
 
 /** Every document key that has a version, with its counts and newest versions. Up to the listed limit. */
 export async function listLegalDocSummaries(
@@ -56,17 +54,6 @@ async function readSummaries(): Promise<LegalDocSummary[]> {
   return rows.map((row) => ({ ...row, doc: LegalDocSchema.parse(row.doc) }));
 }
 
-/** Runs a write, then records its audit row when it changed something. */
-async function audited<T>(
-  write: Promise<T>,
-  entryFor: (written: T) => AuditEntryInput | null,
-): Promise<T> {
-  const written = await write;
-  const entry = entryFor(written);
-  if (entry !== null) await recordAudit(entry);
-  return written;
-}
-
 export type StartLegalDraftResult =
   { status: 'drafted'; value: LegalDocument } | { status: 'unknown_document' };
 
@@ -89,7 +76,7 @@ export async function startLegalDraft(
   ) {
     return { status: 'unknown_document' };
   }
-  const value = await audited(createLegalDraft(caller, input), (document) =>
+  const value = await createLegalDraft(caller, input, (document) =>
     legalAuditEntry(userId, 'drafted', document),
   );
   return { status: 'drafted', value };
@@ -103,10 +90,8 @@ export async function saveLegalDraft(
 ): Promise<EditLegalDraftResult> {
   requireStaff(caller);
   const userId = requireUserId(caller, Role.Ops);
-  return audited(editLegalDraft(caller, id, edit), (result) =>
-    result.status === 'saved'
-      ? legalAuditEntry(userId, 'edited', result.value)
-      : null,
+  return editLegalDraft(caller, id, edit, (document) =>
+    legalAuditEntry(userId, 'edited', document),
   );
 }
 
@@ -117,9 +102,7 @@ export async function publishLegalDraft(
 ): Promise<PublishLegalResult> {
   requireStaff(caller);
   const userId = requireUserId(caller, Role.Ops);
-  return audited(publishLegalDocument(caller, id), (result) =>
-    result.status === 'published'
-      ? legalAuditEntry(userId, 'published', result.value)
-      : null,
+  return publishLegalDocument(caller, id, (document) =>
+    legalAuditEntry(userId, 'published', document),
   );
 }

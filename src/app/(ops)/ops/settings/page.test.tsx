@@ -36,6 +36,7 @@ const props = {
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.readSettings.mockResolvedValue({
+    version: '20261101000000123456',
     bannerText: null,
     bookingsPaused: false,
     giftsEnabled: true,

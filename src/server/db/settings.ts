@@ -1,5 +1,5 @@
 import 'server-only';
-import { eq, sql } from 'drizzle-orm';
+import { eq, getTableColumns, sql } from 'drizzle-orm';
 import {
   GuestSettingsSchema,
   HoldSettingsSchema,
@@ -11,7 +11,12 @@ import {
   type Settings,
   type SettingsChange,
 } from '@/lib/settings';
-import { changedSettingKeys } from '@/lib/opsSettings';
+import {
+  changedSettingKeys,
+  settingsVersionIsCurrent,
+  StaleSettingsError,
+  type SettingsRead,
+} from '@/lib/opsSettings';
 import { settingsChangedEntry } from '@/lib/settingsAudit';
 import { Role, type Caller } from '@/server/auth/caller';
 import { updateTagsForChanges } from '@/server/cache/invalidate';
@@ -64,11 +69,30 @@ export async function readHoldSettings(tx: Transaction): Promise<HoldSettings> {
   return HoldSettingsSchema.parse(onlyRow(rows));
 }
 
-/** Every setting, for ops or admin. Read from the primary, so the page that follows a save shows it. */
-export async function readSettings(caller: Caller): Promise<Settings> {
+/** The update stamp as 20 digits to the microsecond, which the driver's Date would round to the millisecond. */
+const settingsVersion = sql<string>`to_char(${settings.updatedAt} AT TIME ZONE 'UTC', 'YYYYMMDDHH24MISSUS')`;
+const columnsWithVersion = {
+  ...getTableColumns(settings),
+  version: settingsVersion,
+};
+
+function withVersion({
+  version,
+  ...columns
+}: {
+  version: string;
+}): SettingsRead {
+  return { ...SettingsSchema.parse(columns), version };
+}
+
+/** Every setting and its version, for ops or admin. Read from the primary, so the page that follows a save shows it. */
+export async function readSettings(caller: Caller): Promise<SettingsRead> {
   requireStaff(caller);
-  const rows = await db.select().from(settings).where(eq(settings.id, true));
-  return SettingsSchema.parse(onlyRow(rows));
+  const rows = await db
+    .select(columnsWithVersion)
+    .from(settings)
+    .where(eq(settings.id, true));
+  return withVersion(onlyRow(rows));
 }
 
 /** The settings as saved, and which of them the save changed (none for a save of the stored values). */
@@ -77,27 +101,33 @@ export type SettingsSaved = Settings & { changed: SettingKey[] };
 /**
  * Sets the named settings, ops or admin only. The new values are checked here and again by the
  * database. The row is locked and read first, so what counts as changed is judged against what is
- * stored now; a save that changes nothing writes nothing, audit row included. The update and its
- * audit row are one transaction. The banner and switches are cached for guests, so a save that
+ * stored now; a save that changes nothing writes nothing, audit row included. The form carries the
+ * version it was opened at, and a stored version that differs (or a form with none) throws
+ * `StaleSettingsError` before anything is written, so an unticked box on an old page cannot undo
+ * what another save set. The update and its audit row are one transaction. The banner and switches are cached for guests, so a save that
  * changed something invalidates the `settings` tag after the commit.
  */
 export async function updateSettings(
   caller: Caller,
   change: SettingsChange,
+  expectedVersion: string | null,
 ): Promise<SettingsSaved> {
   requireStaff(caller);
   const userId = requireUserId(caller, Role.Ops);
   const parsed = SettingsChangeSchema.parse(change);
   const saved = await db.transaction(async (tx) => {
-    const current = SettingsSchema.parse(
+    const { version, ...current } = withVersion(
       onlyRow(
         await tx
-          .select()
+          .select(columnsWithVersion)
           .from(settings)
           .where(eq(settings.id, true))
           .for('update'),
       ),
     );
+    if (!settingsVersionIsCurrent(expectedVersion, version)) {
+      throw new StaleSettingsError();
+    }
     const changed = changedSettingKeys(current, parsed);
     if (changed.length === 0) return { ...current, changed };
     const rows = await tx

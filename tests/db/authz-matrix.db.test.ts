@@ -299,7 +299,12 @@ const rows: Row[] = [
   },
   {
     fn: 'updateSettings',
-    invoke: (c) => data.settings.updateSettings(c, { bannerText: 'Matrix' }),
+    invoke: async (c) =>
+      data.settings.updateSettings(
+        c,
+        { bannerText: 'Matrix' },
+        (await data.settings.readSettings(people.ops)).version,
+      ),
     allows: platform(...staff),
   },
   {

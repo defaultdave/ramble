@@ -400,10 +400,11 @@ describe('guest reads', () => {
 
   describe('settings', () => {
     it('shows a guest the banner and the switches and no rate, window, or length', async () => {
-      await settingsApi.updateSettings(ops, {
-        bannerText: 'Heads up',
-        bookingsPaused: true,
-      });
+      await settingsApi.updateSettings(
+        ops,
+        { bannerText: 'Heads up', bookingsPaused: true },
+        (await settingsApi.readSettings(ops)).version,
+      );
 
       const visible = await settingsApi.getGuestSettings();
 
@@ -413,10 +414,11 @@ describe('guest reads', () => {
         giftsEnabled: true,
         checkoutMaintenance: false,
       });
-      await settingsApi.updateSettings(ops, {
-        bannerText: null,
-        bookingsPaused: false,
-      });
+      await settingsApi.updateSettings(
+        ops,
+        { bannerText: null, bookingsPaused: false },
+        (await settingsApi.readSettings(ops)).version,
+      );
     });
   });
 });

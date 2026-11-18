@@ -6,6 +6,7 @@ import { experiencesPath } from '@/lib/experienceEditor';
 import { errorProps, type FormAction } from '@/lib/opsForm';
 import {
   settingsFieldProblems,
+  settingsVersionField,
   type CancellationTierRow,
   type PausedExperienceSummary,
   type SettingsFormField,
@@ -36,6 +37,11 @@ export function OpsSettings({
   return (
     <div className={styles.stack}>
       <form action={action} className={styles.form} noValidate>
+        <input
+          type="hidden"
+          name={settingsVersionField}
+          value={values.version}
+        />
         <fieldset className={styles.group}>
           <legend className={styles.legend}>Banner</legend>
           <Input

@@ -429,8 +429,12 @@ describe('text Postgres cannot store', () => {
             title: `Title ${value}`,
             body: doc(),
           }),
-        () =>
-          settingsApi.updateSettings(ops, { bannerText: `Banner ${value}` }),
+        async () =>
+          settingsApi.updateSettings(
+            ops,
+            { bannerText: `Banner ${value}` },
+            (await settingsApi.readSettings(ops)).version,
+          ),
         () =>
           editorial.saveHomeModules(ops, [
             {

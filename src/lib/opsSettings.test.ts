@@ -3,15 +3,22 @@ import {
   cancellationTierRows,
   changedSettingKeys,
   parseSettingsForm,
+  asStaleSettings,
+  parseSettingsVersion,
+  StaleSettingsError,
+  settingsSaveStatus,
   pausedExperienceSummary,
   percentToPpm,
   ppmToPercent,
   settingsFormValues,
   settingsSaveNext,
+  settingsNotices,
   settingsSaveOutcome,
+  readableSettingsVersion,
+  type SettingsRead,
   type SettingsFormField,
 } from './opsSettings';
-import { settingsBounds, type Settings } from './settings';
+import { settingsBounds } from './settings';
 
 // Behaviours under test, one per decision, branch or risk:
 // - a typed percent becomes ppm by integer arithmetic ("8.875" is 88750) and a stored rate shows back as the same text
@@ -24,7 +31,8 @@ import { settingsBounds, type Settings } from './settings';
 // - the form shows the stored values as text; no banner is an empty field
 // - the tier list shows name and terms; the paused list links each experience and links to the full list only when there is more
 
-const stored: Settings = {
+const stored: SettingsRead = {
+  version: '20261101000000123456',
   bannerText: null,
   bookingsPaused: false,
   giftsEnabled: true,
@@ -221,6 +229,7 @@ describe('the save outcome and where it goes', () => {
   it.each([
     [{ status: 'saved' as const }, '/ops/settings?notice=saved'],
     [{ status: 'unchanged' as const }, '/ops/settings?notice=unchanged'],
+    [{ status: 'stale' as const }, '/ops/settings?notice=stale'],
     [
       {
         status: 'invalid' as const,
@@ -238,6 +247,7 @@ describe('settingsFormValues', () => {
     expect(
       settingsFormValues({ ...stored, bannerText: 'Hi', bookingsPaused: true }),
     ).toEqual({
+      version: '20261101000000123456',
       bannerText: 'Hi',
       bookingsPaused: true,
       holdMinutes: '10',
@@ -249,6 +259,75 @@ describe('settingsFormValues', () => {
 
   it('shows no banner as an empty field', () => {
     expect(settingsFormValues(stored).bannerText).toBe('');
+  });
+});
+
+describe('the version a save must still match', () => {
+  const get = (value: string | undefined) => (name: string) =>
+    name === 'version' ? (value ?? null) : null;
+
+  it('reads a 20 digit version from the form, trimmed', () => {
+    expect(parseSettingsVersion(get(' 20261101000000123456 '))).toBe(
+      '20261101000000123456',
+    );
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['blank', '  '],
+    ['too short', '2026110100000012345'],
+    ['too long', '202611010000001234567'],
+    ['not digits', '2026110100000012345a'],
+    ['oversized', '9'.repeat(100_000)],
+    ['a decimal', '2026110100000012.456'],
+  ])('reads a version that is %s as none', (_name, value) => {
+    expect(parseSettingsVersion(get(value))).toBeNull();
+  });
+
+  it('reads a file as none', () => {
+    expect(parseSettingsVersion(() => new File([], 'v'))).toBeNull();
+  });
+
+  it('keeps a well-formed version and reads anything else as none, never throwing', () => {
+    expect(readableSettingsVersion('20261101000000123456')).toBe(
+      '20261101000000123456',
+    );
+    for (const bad of [
+      null,
+      undefined,
+      5,
+      '',
+      'x'.repeat(20),
+      '1'.repeat(21),
+      '9'.repeat(100_000),
+    ]) {
+      expect(readableSettingsVersion(bad)).toBeNull();
+    }
+  });
+
+  it('says in plain words that nothing was saved and the form is current', () => {
+    expect(settingsNotices.stale.tone).toBe('warning');
+    expect(settingsNotices.stale.title).toMatch(
+      /nothing was saved.*current values/,
+    );
+  });
+});
+
+describe('how a save attempt ends', () => {
+  it('is stale for a stale refusal', () => {
+    expect(settingsSaveStatus(new StaleSettingsError())).toBe('stale');
+  });
+
+  it('is saved or unchanged by what the save changed', () => {
+    expect(settingsSaveStatus({ changed: ['holdMinutes'] })).toBe('saved');
+    expect(settingsSaveStatus({ changed: [] })).toBe('unchanged');
+  });
+
+  it('hands back a stale refusal and throws anything else again', () => {
+    const stale = new StaleSettingsError();
+    expect(asStaleSettings(stale)).toBe(stale);
+    const other = new Error('down');
+    expect(() => asStaleSettings(other)).toThrow(other);
   });
 });
 

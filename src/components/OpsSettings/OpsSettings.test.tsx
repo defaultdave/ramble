@@ -16,6 +16,7 @@ import { OpsSettings, type OpsSettingsProps } from './OpsSettings';
 const noop = () => undefined;
 const props: OpsSettingsProps = {
   values: {
+    version: '20261101000000123456',
     bannerText: 'Closed Monday',
     bookingsPaused: true,
     holdMinutes: '10',
@@ -73,6 +74,7 @@ describe('OpsSettings', () => {
       ...container.querySelectorAll<HTMLInputElement>('form [name]'),
     ].map((field) => field.name);
     expect(names).toEqual([
+      'version',
       'bannerText',
       'bookingsPaused',
       'checkoutMaintenance',
@@ -80,6 +82,15 @@ describe('OpsSettings', () => {
       'paymentGraceMinutes',
       'taxRatePercent',
     ]);
+  });
+
+  it('carries the version the form was opened at as a hidden field', () => {
+    const { container } = render(<OpsSettings {...props} />);
+    const field = container.querySelector<HTMLInputElement>(
+      'form input[name="version"]',
+    );
+    expect(field).toHaveAttribute('type', 'hidden');
+    expect(field).toHaveValue('20261101000000123456');
   });
 
   it('carries the limits on the banner and in the hints', () => {

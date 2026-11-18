@@ -10,6 +10,7 @@ const meta = {
   component: OpsSettings,
   args: {
     values: {
+      version: '20261101000000123456',
       bannerText: 'Closed Monday for the holiday.',
       bookingsPaused: false,
       holdMinutes: '10',
@@ -74,11 +75,17 @@ const meta = {
   },
   globals: { viewport: { value: 'mobile1', isRotated: false } },
   decorators: [
-    (Story, { args }) => (
+    (Story, { args, parameters }) => (
       <>
         <PageHeading title="Settings">
           <ActionNotice
-            notice={args.problems.length > 0 ? settingsNotices.invalid : null}
+            notice={
+              args.problems.length > 0
+                ? settingsNotices.invalid
+                : parameters.notice === 'stale'
+                  ? settingsNotices.stale
+                  : null
+            }
           />
         </PageHeading>
         <Story />
@@ -94,12 +101,28 @@ export const Stored: Story = {};
 export const BookingsPausedAndMaintenance: Story = {
   args: {
     values: {
+      version: '20261101000000123456',
       bannerText: '',
       bookingsPaused: true,
       holdMinutes: '15',
       paymentGraceMinutes: '0',
       checkoutMaintenance: true,
       taxRatePercent: '0',
+    },
+  },
+};
+/** The form after a save from a page opened before another save: the notice, and the form showing the current values. */
+export const StaleSave: Story = {
+  parameters: { notice: 'stale' },
+  args: {
+    values: {
+      version: '20261101000000654321',
+      bannerText: 'Closed Monday for the holiday.',
+      bookingsPaused: true,
+      holdMinutes: '10',
+      paymentGraceMinutes: '5',
+      checkoutMaintenance: false,
+      taxRatePercent: '8.875',
     },
   },
 };

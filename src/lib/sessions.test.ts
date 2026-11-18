@@ -609,6 +609,22 @@ describe('checkExpectedVersion', () => {
       ok ? { ok: true } : { ok: false, reason: 'version_conflict' },
     );
   });
+
+  it.each([
+    ['equal strings', '20261101000000123456', '20261101000000123456', true],
+    [
+      'strings a microsecond apart',
+      '20261101000000123456',
+      '20261101000000123457',
+      false,
+    ],
+    ['a missing number', 3, null, false],
+    ['a missing string', '', null, false],
+  ])('%s', (_name, current, expected, ok) => {
+    expect(checkExpectedVersion<number | string>(current, expected)).toEqual(
+      ok ? { ok: true } : { ok: false, reason: 'version_conflict' },
+    );
+  });
 });
 
 describe('checkAllocationEditable', () => {

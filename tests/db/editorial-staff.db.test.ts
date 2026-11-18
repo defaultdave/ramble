@@ -215,7 +215,7 @@ describe('who may use the staff functions', () => {
     ],
     [
       'updateSettings',
-      (c: typeof ops) => settingsApi.updateSettings(c, garbage),
+      (c: typeof ops) => settingsApi.updateSettings(c, garbage, null),
     ],
   ] as const;
 
@@ -365,11 +365,21 @@ describe('legal drafts and publishing', () => {
 });
 
 describe('updating settings', () => {
+  const save = async (
+    caller: typeof ops,
+    change: Parameters<typeof settingsApi.updateSettings>[1],
+  ) =>
+    settingsApi.updateSettings(
+      caller,
+      change,
+      (await settingsApi.readSettings(caller)).version,
+    );
+
   it('changes only the named settings and bumps the update time', async () => {
     const [before] = await client.db.select().from(settings);
     if (!before) throw new Error('The migration inserts the settings row');
 
-    const after = await settingsApi.updateSettings(ops, {
+    const after = await save(ops, {
       holdMinutes: 15,
       giftsEnabled: false,
       taxRatePpm: 80_000,
@@ -386,7 +396,7 @@ describe('updating settings', () => {
     expect(after.updatedAt.getTime()).toBeGreaterThanOrEqual(
       before.updatedAt.getTime(),
     );
-    await settingsApi.updateSettings(admin, {
+    await save(admin, {
       holdMinutes: 10,
       giftsEnabled: true,
       taxRatePpm: 88_750,
@@ -394,18 +404,16 @@ describe('updating settings', () => {
   });
 
   it('turns a banner on and off', async () => {
-    const on = await settingsApi.updateSettings(ops, {
-      bannerText: 'Maintenance tonight',
-    });
-    const off = await settingsApi.updateSettings(ops, { bannerText: null });
+    const on = await save(ops, { bannerText: 'Maintenance tonight' });
+    const off = await save(ops, { bannerText: null });
 
     expect(on.bannerText).toBe('Maintenance tonight');
     expect(off.bannerText).toBeNull();
   });
 
   it('invalidates the settings tag', async () => {
-    await settingsApi.updateSettings(ops, { checkoutMaintenance: true });
-    await settingsApi.updateSettings(ops, { checkoutMaintenance: false });
+    await save(ops, { checkoutMaintenance: true });
+    await save(ops, { checkoutMaintenance: false });
 
     expect(tagsUpdated()).toEqual(['settings', 'settings']);
   });
@@ -416,7 +424,7 @@ describe('updating settings', () => {
     ['a setting that does not exist', { hostPayoutDay: 3 }],
   ])('refuses %s and invalidates nothing', async (_name, change) => {
     await expect(
-      settingsApi.updateSettings(ops, change as never),
+      settingsApi.updateSettings(ops, change as never, null),
     ).rejects.toThrow(ZodError);
 
     expect(updateTag).not.toHaveBeenCalled();

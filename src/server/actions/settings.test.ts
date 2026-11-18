@@ -23,6 +23,7 @@ vi.mock('@/server/db/settings', () => ({
   updateSettings: mocks.updateSettings,
 }));
 
+import { StaleSettingsError } from '@/lib/opsSettings';
 import { updateSettingsAction } from './settings';
 
 // Behaviours under test:
@@ -30,10 +31,13 @@ import { updateSettingsAction } from './settings';
 // - a refused form redirects with the invalid notice and the fields to look at, and saves nothing
 // - the six parsed settings, and no gift setting even if posted, reach the data layer with the ops caller
 // - a save that changed something redirects with saved, and one that changed nothing with unchanged
+// - a form with no readable version, or a save the data layer refuses as stale, redirects with the stale notice before or without saving
 // - an error from the data layer is not caught here
 
 const ops = { userId: 'u', roles: ['ops'], hostIds: [] };
+const version = '20261101000000123456';
 const valid = {
+  version,
   bannerText: 'Closed Monday',
   holdMinutes: '15',
   paymentGraceMinutes: '5',
@@ -81,14 +85,18 @@ describe('updateSettingsAction', () => {
         }),
       ),
     ).rejects.toMatchObject({ href: '/ops/settings?notice=saved' });
-    expect(mocks.updateSettings).toHaveBeenCalledWith(ops, {
-      bannerText: 'Closed Monday',
-      bookingsPaused: true,
-      holdMinutes: 15,
-      paymentGraceMinutes: 5,
-      checkoutMaintenance: false,
-      taxRatePpm: 88_750,
-    });
+    expect(mocks.updateSettings).toHaveBeenCalledWith(
+      ops,
+      {
+        bannerText: 'Closed Monday',
+        bookingsPaused: true,
+        holdMinutes: 15,
+        paymentGraceMinutes: 5,
+        checkoutMaintenance: false,
+        taxRatePpm: 88_750,
+      },
+      version,
+    );
   });
 
   it('redirects a save that changed nothing with the unchanged notice', async () => {
@@ -96,6 +104,25 @@ describe('updateSettingsAction', () => {
     await expect(updateSettingsAction(form(valid))).rejects.toMatchObject({
       href: '/ops/settings?notice=unchanged',
     });
+  });
+
+  it('redirects a save the data layer refuses as stale with the stale notice', async () => {
+    mocks.updateSettings.mockRejectedValue(new StaleSettingsError());
+    await expect(updateSettingsAction(form(valid))).rejects.toMatchObject({
+      href: '/ops/settings?notice=stale',
+    });
+  });
+
+  it('hands a form with no readable version to the data layer as none, which refuses it', async () => {
+    mocks.updateSettings.mockRejectedValue(new StaleSettingsError());
+    await expect(
+      updateSettingsAction(form({ ...valid, version: 'nope' })),
+    ).rejects.toMatchObject({ href: '/ops/settings?notice=stale' });
+    expect(mocks.updateSettings).toHaveBeenCalledWith(
+      ops,
+      expect.anything(),
+      null,
+    );
   });
 
   it('lets a data layer failure through', async () => {

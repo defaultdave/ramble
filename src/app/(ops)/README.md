@@ -89,7 +89,7 @@ Named once here. The page trees below list only what is particular to them.
 
 - Writes: each change writes its audit row with `writeAudit(tx)` in the same transaction, so the row exists exactly when the change does. A change that differs by nothing writes neither.
 - Reads: sensitive reads are recorded with `recordAudit` before they return. These are the ops home, hosts (list, one, new form), sessions (list, one), bookings (list, one), staff, support, private requests, audit view, and mailbox (list, message, unlock).
-- Settings saves are writes: `updateSettings` writes one `settings.changed` row, with the old and new numbers and the new value of a switch, and only flags a changed banner. A save of the stored values writes none. Reading the settings page writes none.
+- Settings saves are writes: `updateSettings` writes one `settings.changed` row, with the old and new numbers and the new value of a switch, and only flags a changed banner. A save of the stored values writes none. Reading the settings page writes none. The form carries the version (the row's update stamp to the microsecond) it was opened at, so a save from a page opened before another save changes nothing.
 - Not recorded: the landing's counts and its latest audit rows (the visit is), experiences, review, guest reviews (list), availability, host suspension state, and the whole test console, including the demo data reset.
 
 ### Tools
@@ -692,14 +692,14 @@ flowchart TD
 
 | Component | Kind | File | Notes |
 | --- | --- | --- | --- |
-| SettingsPage | server | [src/app/(ops)/ops/settings/page.tsx](ops/settings/page.tsx) | Gate, then the settings, the first page of paused experiences and the tiers, read in parallel. The form is filled from the stored values, `?fields=` names the inputs the last try refused. |
-| readSettings | server (DB read) | [src/server/db/settings.ts](../../server/db/settings.ts) | Ops or admin, from the primary so a save shows at once. Not audited. |
+| SettingsPage | server | [src/app/(ops)/ops/settings/page.tsx](ops/settings/page.tsx) | Gate, then the settings, the first page of paused experiences and the tiers, read in parallel. The form is filled from the stored values and the version it was loaded at, `?fields=` names the inputs the last try refused. |
+| readSettings | server (DB read) | [src/server/db/settings.ts](../../server/db/settings.ts) | Ops or admin, from the primary so a save shows at once. Returns the version (the row's update stamp to the microsecond) the form posts back. Not audited. |
 | readExperiencesForOps | server (DB read) | [src/server/db/experienceEditor.ts](../../server/db/experienceEditor.ts) | The experiences list read with the paused status and no cursor: the first 25 by name. |
 | listCancellationTiers | server (DB read) | [src/server/db/policies.ts](../../server/db/policies.ts) | Shortest notice first. Reference data, read and never edited here. |
-| ActionNotice | server | [src/components/ActionNotice/ActionNotice.tsx](../../components/ActionNotice/ActionNotice.tsx) | Shows the `?notice=` code from the last redirect: `saved`, `unchanged` or `invalid`. |
-| OpsSettings | server | [src/components/OpsSettings/OpsSettings.tsx](../../components/OpsSettings/OpsSettings.tsx) | The form (banner, two switches, hold, grace, tax percent), then the paused list with a link to each experience's ops page and to the filtered experiences list when there are more than one page, then the tier list. Uses Input and CheckField. Rules and labels come from [src/lib/opsSettings.ts](../../lib/opsSettings.ts). |
+| ActionNotice | server | [src/components/ActionNotice/ActionNotice.tsx](../../components/ActionNotice/ActionNotice.tsx) | Shows the `?notice=` code from the last redirect: `saved`, `unchanged`, `invalid` or `stale`. |
+| OpsSettings | server | [src/components/OpsSettings/OpsSettings.tsx](../../components/OpsSettings/OpsSettings.tsx) | The form (a hidden `version` field, banner, two switches, hold, grace, tax percent), then the paused list with a link to each experience's ops page and to the filtered experiences list when there are more than one page, then the tier list. Uses Input and CheckField. Rules and labels come from [src/lib/opsSettings.ts](../../lib/opsSettings.ts). |
 | Button | client | [src/components/Button/Button.tsx](../../components/Button/Button.tsx) | The submit button. The file is `'use client'`, but the form posts to the action without it. |
-| updateSettingsAction | action | [src/server/actions/settings.ts](../../server/actions/settings.ts) | `updateSettings`: parses the form with `parseSettingsForm`, locks and reads the row, writes only what differs, one audit row in the same transaction, then clears the `settings` tag after the commit. |
+| updateSettingsAction | action | [src/server/actions/settings.ts](../../server/actions/settings.ts) | `updateSettings`: parses the form with `parseSettingsForm` and `parseSettingsVersion`, locks and reads the row, refuses with the `stale` notice (writing nothing) when the form's version is missing or is not the stored one, writes only what differs, one audit row in the same transaction, then clears the `settings` tag after the commit. |
 
 ### Editorial
 

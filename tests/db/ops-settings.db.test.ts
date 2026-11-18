@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import {
   afterAll,
   beforeAll,
@@ -9,6 +9,7 @@ import {
   vi,
 } from 'vitest';
 import { opsAreaIds } from '@/lib/opsAudit';
+import { StaleSettingsError } from '@/lib/opsSettings';
 import { settingsBounds } from '@/lib/settings';
 import {
   anonymousCaller,
@@ -41,6 +42,9 @@ vi.mock('next/cache', () => ({
 // - a save that changed something clears the settings tag after the commit
 // - the database refuses every out-of-range value and a blank banner, whatever Zod does
 // - a save that waits for another transaction's lock on the row judges what changed against what that transaction committed
+// - a save from a form opened before another save refuses under the lock and writes nothing (row, audit, cache), whatever the unticked boxes say
+// - a save with no version, or one that is not the stored version, refuses and writes nothing
+// - the version changes with every write, even two a microsecond apart
 
 let fresh: FreshDatabase;
 let client: typeof import('@/server/db/client');
@@ -92,6 +96,13 @@ const stored = async () => {
   return row;
 };
 
+const versionOf = async (caller: Caller) =>
+  (await api.readSettings(caller)).version;
+const save = async (
+  caller: Caller,
+  change: Parameters<typeof api.updateSettings>[1],
+) => api.updateSettings(caller, change, await versionOf(caller));
+
 describe('refusals', () => {
   const refused: [string, Caller][] = [
     ['a guest', guest],
@@ -106,7 +117,7 @@ describe('refusals', () => {
       const errors = await Promise.all([
         api.readSettings(caller).catch((e: unknown) => e),
         api
-          .updateSettings(caller, { holdMinutes: 20 })
+          .updateSettings(caller, { holdMinutes: 20 }, null)
           .catch((e: unknown) => e),
       ]);
       for (const error of errors) expect(error).toBeInstanceOf(ForbiddenError);
@@ -131,7 +142,7 @@ describe('refusals', () => {
 describe('saving', () => {
   it('writes one audit row with the numbers, the switch and a flagged banner', async () => {
     const before = (await rows()).length;
-    const saved = await api.updateSettings(ops, {
+    const saved = await save(ops, {
       bannerText: 'Closed Monday',
       bookingsPaused: true,
       holdMinutes: 15,
@@ -165,7 +176,7 @@ describe('saving', () => {
 
   it('lets admin save, auditing the admin', async () => {
     const before = (await rows()).length;
-    await api.updateSettings(admin, { checkoutMaintenance: true });
+    await save(admin, { checkoutMaintenance: true });
     const [row] = (await rows()).slice(before);
     expect(row).toMatchObject({
       actorId: admin.userId,
@@ -175,7 +186,7 @@ describe('saving', () => {
 
   it('audits only the settings that differ from the stored ones', async () => {
     const before = (await rows()).length;
-    const saved = await api.updateSettings(ops, {
+    const saved = await save(ops, {
       holdMinutes: 10,
       paymentGraceMinutes: 7,
     });
@@ -188,14 +199,14 @@ describe('saving', () => {
   });
 
   it('clears the settings tag after a change', async () => {
-    await api.updateSettings(ops, { holdMinutes: 20 });
+    await save(ops, { holdMinutes: 20 });
     expect(cache.updateTag).toHaveBeenCalledExactlyOnceWith('settings');
   });
 
   it('writes nothing for the stored values: no audit row, no update time, no cache clearing', async () => {
     const before = await stored();
     const count = (await rows()).length;
-    const saved = await api.updateSettings(ops, {
+    const saved = await save(ops, {
       holdMinutes: before.holdMinutes,
       bannerText: before.bannerText,
       taxRatePpm: before.taxRatePpm,
@@ -208,9 +219,10 @@ describe('saving', () => {
 
   it('rolls the update back when the audit row is refused', async () => {
     const count = (await rows()).length;
+    const version = await versionOf(ops);
     const badActor = testCaller({ userId: 'not-an-id', roles: [Role.Ops] });
     await expect(
-      api.updateSettings(badActor, { holdMinutes: 30 }),
+      api.updateSettings(badActor, { holdMinutes: 30 }, version),
     ).rejects.toThrow();
     expect((await stored()).holdMinutes).toBe(10);
     expect((await rows()).length).toBe(count);
@@ -273,6 +285,7 @@ describe('a save that waits for the row lock', () => {
 
   it('finds nothing to change when the holder committed the same value, and writes no audit row', async () => {
     const count = (await rows()).length;
+    const version = await versionOf(ops);
     const saved = await raceAgainstOpenTransaction(
       async (tx) => {
         await tx
@@ -280,7 +293,7 @@ describe('a save that waits for the row lock', () => {
           .set({ holdMinutes: 25 })
           .where(eq(settings.id, true));
       },
-      () => api.updateSettings(ops, { holdMinutes: 25 }),
+      async () => api.updateSettings(ops, { holdMinutes: 25 }, version),
     );
     expect(saved.changed).toEqual([]);
     expect((await rows()).length).toBe(count);
@@ -289,6 +302,7 @@ describe('a save that waits for the row lock', () => {
 
   it('records the value the holder committed as the old one', async () => {
     const count = (await rows()).length;
+    const version = await versionOf(ops);
     await raceAgainstOpenTransaction(
       async (tx) => {
         await tx
@@ -296,12 +310,76 @@ describe('a save that waits for the row lock', () => {
           .set({ holdMinutes: 25 })
           .where(eq(settings.id, true));
       },
-      () => api.updateSettings(ops, { holdMinutes: 30 }),
+      async () => api.updateSettings(ops, { holdMinutes: 30 }, version),
     );
     const [row] = (await rows()).slice(count);
     expect(row?.details).toEqual({
       hold_minutes_from: 25,
       hold_minutes_to: 30,
     });
+  });
+});
+
+describe('a form opened before another save', () => {
+  type Tx = Parameters<Parameters<typeof client.db.transaction>[0]>[0];
+  const touch = (tx: Tx, values: Partial<typeof baseline>) =>
+    tx
+      .update(settings)
+      .set({ ...values, updatedAt: sql`clock_timestamp()` })
+      .where(eq(settings.id, true));
+
+  it('refuses under the lock when another save committed first, and writes nothing', async () => {
+    const count = (await rows()).length;
+    const version = await versionOf(ops);
+    const result = await race<Tx, unknown>(
+      (body) => client.db.transaction(body),
+      (tx) => touch(tx, { bookingsPaused: true }).then(() => undefined),
+      () =>
+        api
+          .updateSettings(
+            ops,
+            { bookingsPaused: false, bannerText: 'Stale banner' },
+            version,
+          )
+          .catch((e: unknown) => e),
+    );
+    expect(result).toBeInstanceOf(StaleSettingsError);
+    const row = await stored();
+    expect(row.bookingsPaused).toBe(true);
+    expect(row.bannerText).toBeNull();
+    expect((await rows()).length).toBe(count);
+    expect(cache.updateTag).not.toHaveBeenCalled();
+  });
+
+  it('refuses a version that is not the stored one', async () => {
+    const version = await versionOf(ops);
+    await client.db.transaction((tx) => touch(tx, { holdMinutes: 12 }));
+    await expect(
+      api.updateSettings(ops, { holdMinutes: 30 }, version),
+    ).rejects.toBeInstanceOf(StaleSettingsError);
+    expect((await stored()).holdMinutes).toBe(12);
+  });
+
+  it.each([
+    ['no version', null],
+    ['an unreadable version', 'not-a-version'],
+    ['a version that is too long', '1'.repeat(5000)],
+  ])('refuses %s and writes nothing', async (_name, version) => {
+    const count = (await rows()).length;
+    await expect(
+      api.updateSettings(ops, { holdMinutes: 30 }, version),
+    ).rejects.toBeInstanceOf(StaleSettingsError);
+    expect((await stored()).holdMinutes).toBe(10);
+    expect((await rows()).length).toBe(count);
+    expect(cache.updateTag).not.toHaveBeenCalled();
+  });
+
+  it('gives every write its own version, even writes a microsecond apart', async () => {
+    const seen = new Set<string>([await versionOf(ops)]);
+    for (let n = 0; n < 20; n++) {
+      await client.db.transaction((tx) => touch(tx, { holdMinutes: 11 + n }));
+      seen.add(await versionOf(ops));
+    }
+    expect(seen.size).toBe(21);
   });
 });

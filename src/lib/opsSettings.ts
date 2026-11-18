@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { cancellationTerms } from './cancellation';
 import type { CancellationTier } from './catalog';
 import { experiencePath, experiencesPath } from './experienceEditor';
@@ -125,9 +126,57 @@ export function changedSettingKeys(
   return changedFields(settingKeys, current, { ...current, ...named });
 }
 
-/** What the form shows for the stored settings: text for the fields, flags for the boxes. */
-export function settingsFormValues(settings: Settings) {
+/** The row's `updated_at` to the microsecond, as 20 digits (`YYYYMMDDHH24MISSUS`, UTC). Postgres writes the stamp and a JS Date keeps only milliseconds, so the data layer reads it as text. */
+export const settingsVersionField = 'version';
+
+/** Exactly 20 digits, or null for none. The pattern is anchored with no repeated group, so it is linear. */
+const SettingsVersionSchema = z
+  .string()
+  .max(20)
+  .regex(/^\d{20}$/)
+  .nullable();
+
+/** The version as it can be trusted: a well-formed one, or null for anything else (never a thrown error). A null never matches the stored version. */
+export function readableSettingsVersion(value: unknown): string | null {
+  const parsed = SettingsVersionSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
+/** The settings as read for the page: every setting plus the version the form carries back. */
+export type SettingsRead = Settings & { version: string };
+
+/** The version the form carried, or null when it is missing, repeated, oversized, or not a version. A null is never a match. */
+export function parseSettingsVersion(get: FormGetter): string | null {
+  const text = formText(get, settingsVersionField);
+  return readableSettingsVersion(text ?? null);
+}
+
+/** A save refused because the settings changed after the form was opened. Nothing was written. */
+export class StaleSettingsError extends Error {
+  constructor() {
+    super('The settings changed since the form was opened');
+  }
+}
+
+/** The stale refusal from a caught error; anything else is not this module's to handle and is thrown again. */
+export function asStaleSettings(error: unknown): StaleSettingsError {
+  if (error instanceof StaleSettingsError) return error;
+  throw error;
+}
+
+/** Where a save ended: a refusal as stale, otherwise saved or unchanged by what it changed. */
+export function settingsSaveStatus(
+  result: StaleSettingsError | { changed: readonly SettingKey[] },
+): SettingsSaveOutcome | 'stale' {
+  return result instanceof StaleSettingsError
+    ? 'stale'
+    : settingsSaveOutcome(result.changed);
+}
+
+/** What the form shows for the stored settings: text for the fields, flags for the boxes, and the version the save must still match. */
+export function settingsFormValues(settings: SettingsRead) {
   return {
+    version: settings.version,
     bannerText: settings.bannerText ?? '',
     bookingsPaused: settings.bookingsPaused,
     holdMinutes: String(settings.holdMinutes),
@@ -147,7 +196,12 @@ export function settingsSaveOutcome(
   return changed.length === 0 ? 'unchanged' : 'saved';
 }
 
-export const settingsNoticeCodes = ['saved', 'unchanged', 'invalid'] as const;
+export const settingsNoticeCodes = [
+  'saved',
+  'unchanged',
+  'invalid',
+  'stale',
+] as const;
 export type SettingsNoticeCode = (typeof settingsNoticeCodes)[number];
 
 export const settingsNotices = {
@@ -157,13 +211,18 @@ export const settingsNotices = {
     title: 'Nothing was different, so nothing changed.',
   },
   invalid: invalidFormNotice,
+  stale: {
+    tone: 'warning',
+    title:
+      'The settings changed after you opened this page, so nothing was saved. The form now shows the current values.',
+  },
 } as const satisfies Record<SettingsNoticeCode, NoticeText>;
 
 /** Where a save ends: a refused form back with the fields to look at, a save back with its notice. */
 export function settingsSaveNext(
   outcome:
     | { status: 'invalid'; fields: readonly SettingsFormField[] }
-    | { status: SettingsSaveOutcome },
+    | { status: SettingsSaveOutcome | 'stale' },
 ): string {
   return outcome.status === 'invalid'
     ? noticeHref(settingsPath, 'invalid', outcome.fields)

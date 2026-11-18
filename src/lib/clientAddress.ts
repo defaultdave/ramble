@@ -1,7 +1,7 @@
 const maxAddressLength = 45;
 const addressShape = /^[0-9a-f:.]+$/;
 const hexGroup = /^[0-9a-f]{1,4}$/;
-const decimalOctet = /^\d{1,3}$/;
+const decimalOctet = /^(0|[1-9]\d{0,2})$/;
 
 function parseHexGroups(side: string): number[] | null {
   if (side === '') return [];
@@ -26,7 +26,8 @@ function parseTail(side: string): number[] | null {
     return null;
   }
   const [a, b, c, d] = octets.map(Number) as [number, number, number, number];
-  const head = parseHexGroups(side.slice(0, Math.max(lastColon, 0)));
+  if (lastColon === 0) return null;
+  const head = parseHexGroups(lastColon < 0 ? '' : side.slice(0, lastColon));
   return head && [...head, a * 256 + b, c * 256 + d];
 }
 
@@ -79,7 +80,7 @@ function ipv6Key(text: string): string {
  * `x-forwarded-for` itself and drops client-supplied values, so its first entry is the client.
  * An IPv6 client is keyed by its /64 prefix, not the whole address: one customer holds a whole /64
  * and can rotate the low 64 bits on every request, so a per-address key would give each request a
- * fresh count. An IPv4-mapped IPv6 address is an IPv4 client and keeps its dotted form. Anything
+ * fresh count. An IPv4-mapped IPv6 address is an IPv4 client and keeps its ::ffff: dotted form. Anything
  * absent, over-long, not shaped like an address, or a malformed IPv6 collapses to one shared
  * "unknown", so a forged header can neither grow the key space nor dodge a limit.
  */

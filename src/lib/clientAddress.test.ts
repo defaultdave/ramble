@@ -3,7 +3,7 @@ import { clientAddress } from './clientAddress';
 
 // Behaviours under test, one per branch:
 // - the first x-forwarded-for entry is the address, trimmed and lower-cased
-// - IPv4 passes unchanged; IPv4-mapped IPv6 keys as its IPv4 form, in either spelling
+// - IPv4 passes unchanged; IPv4-mapped IPv6 keeps its ::ffff: dotted form, in either spelling
 // - IPv6 keys by its /64: one canonical prefix for every spelling and every address inside it
 // - malformed IPv6 collapses to "unknown"
 // - an absent, empty, over-long, or non-address value collapses to one shared "unknown"
@@ -50,6 +50,9 @@ describe('clientAddress', () => {
     ['too few groups without ::', '1:2:3:4:5:6:7'],
     ['two ::', '1::2::3'],
     ['three colons', '1:::2'],
+    ['three colons before a dotted tail', ':::1.2.3.4'],
+    ['three colons after a group before a dotted tail', '1:::1.2.3.4'],
+    ['a leading zero in a dotted octet', '::01.2.3.4'],
     ['a group over 4 digits', '2001:db8:12345::1'],
     ['a bare colon', ':'],
     ['a leading single colon', ':1:2:3:4:5:6:7'],

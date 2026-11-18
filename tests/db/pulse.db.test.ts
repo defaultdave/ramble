@@ -129,6 +129,7 @@ describe('POST /api/pulse against a database', () => {
       unrecorded: 0,
       left: 0,
       purged: 1,
+      authPurged: 0,
       holdsReleased: 0,
       holdsScrubbed: 0,
       sessionsCreated: 0,

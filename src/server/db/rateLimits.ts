@@ -6,6 +6,7 @@ import {
   type RateLimitDecision,
 } from '@/lib/rateLimits';
 import { db } from './client';
+import { PURGE_BATCH, purgeExpiredBatch } from './purgeBatch';
 import { rateLimits } from './schema';
 
 /**
@@ -45,26 +46,18 @@ export async function consumeRateLimitRow(input: {
   return decideRateLimit({ ...row, limit });
 }
 
-export const PURGE_BATCH = 1000;
+export { PURGE_BATCH };
 
 /**
  * Deletes rows whose window has ended, at most one batch per call, and returns how many. A row is
  * dead the moment `expires_at` passes (the next try replaces it), so purging only keeps the table
  * small. SKIP LOCKED leaves a row a concurrent try is rewriting for the next call.
  */
-export async function purgeExpiredRateLimits(): Promise<number> {
-  const result = await db.execute(sql`
-    DELETE FROM ${rateLimits}
-    WHERE ${rateLimits.key} IN (
-      SELECT ${rateLimits.key} FROM ${rateLimits}
-      WHERE ${rateLimits.expiresAt} <= now()
-      ORDER BY ${rateLimits.expiresAt}
-      LIMIT ${PURGE_BATCH}
-      FOR UPDATE SKIP LOCKED
-    ) AND ${rateLimits.expiresAt} <= now()
-  `);
-  if (result.rowCount === null) {
-    throw new Error('The driver did not report how many rows were purged');
-  }
-  return result.rowCount;
+export function purgeExpiredRateLimits(): Promise<number> {
+  return purgeExpiredBatch({
+    table: rateLimits,
+    key: rateLimits.key,
+    expiresAt: rateLimits.expiresAt,
+    cutoff: sql`now()`,
+  });
 }

@@ -15,6 +15,10 @@ import {
 import { alerts } from '@/server/monitoring/alerts';
 import { readBodyText } from '@/server/boundedBody';
 import { revalidateTagsForChanges } from '@/server/cache/invalidate';
+import {
+  purgeLapsedAuthSessions,
+  purgeLapsedAuthVerifications,
+} from '@/server/db/authPurge';
 import { releaseLapsedHolds, scrubReleasedHolds } from '@/server/db/holds';
 import { PURGE_BATCH, purgeExpiredRateLimits } from '@/server/db/rateLimits';
 import {
@@ -34,6 +38,7 @@ import { secureEqual } from '@/server/hash';
 
 export type PulseCounts = DrainReport & {
   purged: number;
+  authPurged: number;
   holdsReleased: number;
   holdsScrubbed: number;
   sessionsCreated: number;
@@ -72,6 +77,23 @@ function purgeRateLimits(startedAt: number): Promise<number> {
       batchSize: PURGE_BATCH,
       elapsedMs: progress.elapsedMs,
     }),
+  );
+}
+
+/**
+ * Deletes sign-in link and session rows that expired more than 30 days ago, in capped batches
+ * judged at database time, and returns both tables' total.
+ */
+async function purgeAuthRows(startedAt: number): Promise<number> {
+  const mayContinue = (progress: Progress) =>
+    purgeMayContinue({
+      purged: progress.done,
+      batchSize: PURGE_BATCH,
+      elapsedMs: progress.elapsedMs,
+    });
+  return (
+    (await runBatches(startedAt, purgeLapsedAuthVerifications, mayContinue)) +
+    (await runBatches(startedAt, purgeLapsedAuthSessions, mayContinue))
   );
 }
 
@@ -189,13 +211,21 @@ export async function runPulse(
   const report = await drainJobs(clock);
   const sessionsCreated = await extendSessions(clock.now());
   const purged = await purgeRateLimits(startedAt);
+  const authPurged = await purgeAuthRows(startedAt);
   const { holdsReleased, holdsScrubbed } = await cleanUpHolds(startedAt);
   if (
     heartbeatDue({ sendHeartbeat: heartbeat, unrecorded: report.unrecorded })
   ) {
     await sendHeartbeat(env.BETTERSTACK_HEARTBEAT_URL);
   }
-  return { ...report, purged, holdsReleased, holdsScrubbed, sessionsCreated };
+  return {
+    ...report,
+    purged,
+    authPurged,
+    holdsReleased,
+    holdsScrubbed,
+    sessionsCreated,
+  };
 }
 
 async function handlePulse(request: Request): Promise<PulseResult> {

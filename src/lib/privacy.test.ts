@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  authRowRetentionDays,
   nonPiiColumns,
   piiColumns,
   piiVendors,
@@ -81,12 +82,25 @@ describe('the vendor list', () => {
 describe('the retention schedule', () => {
   const isValid = (period: RetentionPeriod) =>
     period.status === 'pending_counsel' ||
-    (Number.isInteger(period.months) &&
-      period.months >= 1 &&
-      period.months <= 600);
+    (period.status === 'set_days'
+      ? Number.isInteger(period.days) && period.days >= 1 && period.days <= 365
+      : Number.isInteger(period.months) &&
+        period.months >= 1 &&
+        period.months <= 600);
 
   it.each(retentionSchedule)('$dataset has a valid period', ({ period }) => {
     expect(isValid(period)).toBe(true);
+  });
+
+  it('keeps the auth rows for the days the purge uses', () => {
+    const authRows = retentionSchedule.filter(({ dataset }) =>
+      dataset.startsWith('auth_'),
+    );
+
+    expect(authRows.map(({ period }) => period)).toEqual([
+      { status: 'set_days', days: authRowRetentionDays },
+      { status: 'set_days', days: authRowRetentionDays },
+    ]);
   });
 
   it('names each dataset once', () => {
@@ -98,7 +112,13 @@ describe('the retention schedule', () => {
   it('covers every table with a column of ours in the inventory', () => {
     const datasets = new Set(retentionSchedule.map(({ dataset }) => dataset));
 
-    for (const table of ['guests', 'consents', 'privacy_requests']) {
+    for (const table of [
+      'guests',
+      'consents',
+      'privacy_requests',
+      'auth_verifications',
+      'auth_sessions',
+    ]) {
       expect(datasets.has(table), table).toBe(true);
     }
   });

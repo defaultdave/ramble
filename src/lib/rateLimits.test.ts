@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   ConsumeInputSchema,
+  addressCountFollows,
+  counterRefusal,
+  type CounterOutcome,
   maxLimit,
   maxSubjectLength,
   maxWindowSeconds,
@@ -39,6 +42,53 @@ describe('rateLimitPolicies', () => {
       2 * rateLimitPolicies.sign_in_link_client.limit,
     );
   });
+
+  it('gives the two auth form posts their own surfaces, and sign out a looser one than the contact forms', () => {
+    expect(rateLimitSurfaces).toContain('confirm_sign_in');
+    expect(rateLimitSurfaces).toContain('end_session');
+    expect(rateLimitPolicies.confirm_sign_in.limit).toBe(10);
+    expect(rateLimitPolicies.end_session.limit).toBeGreaterThan(
+      rateLimitPolicies.forms.limit,
+    );
+    expect(rateLimitPolicies.end_session.windowSeconds).toBeLessThanOrEqual(
+      rateLimitPolicies.forms.windowSeconds,
+    );
+  });
+
+  it.each<[string, CounterOutcome, unknown]>([
+    [
+      'allowed',
+      { kind: 'counted', decision: { allowed: true, remaining: 0 } },
+      null,
+    ],
+    [
+      'over its limit',
+      { kind: 'counted', decision: { allowed: false, retryAfterSeconds: 90 } },
+      { status: 429, retryAfterSeconds: 90 },
+    ],
+    ['a counter that cannot be read', { kind: 'failed' }, { status: 503 }],
+  ])('answers a try that is %s', (_name, outcome, expected) => {
+    expect(counterRefusal(outcome)).toEqual(expected);
+  });
+
+  it.each<[string, CounterOutcome, boolean]>([
+    [
+      'let through',
+      { kind: 'counted', decision: { allowed: true, remaining: 3 } },
+      true,
+    ],
+    [
+      'refused',
+      { kind: 'counted', decision: { allowed: false, retryAfterSeconds: 90 } },
+      false,
+    ],
+    ['failed', { kind: 'failed' }, false],
+  ])(
+    'spends the address count after a client that was %s: %s',
+    (_name, client, spent) => {
+      expect(addressCountFollows(client)).toBe(spent);
+    },
+  );
 
   it('allows five payment tries per hold, for longer than a hold lives', () => {
     expect(rateLimitPolicies.payment_tries.limit).toBe(5);

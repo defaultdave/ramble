@@ -1,4 +1,5 @@
 import 'server-only';
+import { clientAddress } from '@/lib/clientAddress';
 import {
   ConfirmSignInSchema,
   isOwnOrigin,
@@ -12,12 +13,12 @@ import { readBodyText } from '@/server/boundedBody';
 import { env } from '@/server/env';
 import { logger } from '@/server/monitoring/logger';
 import { handleAuthRequest } from './handler';
+import { noStore, refuseOverLimit } from './refusal';
 
 // The two plain form posts the sign-in pages make. Each turns a form into the Better Auth request
 // it stands for, then sends the browser on with a 303 so the next request is a GET.
 
 const maxFormBytes = 2048;
-const noStore = { 'Cache-Control': 'no-store' } as const;
 
 /** The site's own origin, for an address that goes in an email or a redirect. */
 export const appOrigin = () => new URL(env.APP_URL).origin;
@@ -52,6 +53,11 @@ function signInFailure(next: string): Response {
 export async function handleConfirmSignIn(request: Request): Promise<Response> {
   const foreign = refuseForeignOrigin(request);
   if (foreign) return foreign;
+  const overLimit = await refuseOverLimit(
+    'confirm_sign_in',
+    clientAddress(request.headers.get('x-forwarded-for')),
+  );
+  if (overLimit) return overLimit;
 
   const { text, exceeded } = await readBodyText(request, maxFormBytes);
   const form = new URLSearchParams(exceeded ? '' : text);
@@ -91,6 +97,11 @@ export async function handleConfirmSignIn(request: Request): Promise<Response> {
 export async function handleEndSession(request: Request): Promise<Response> {
   const foreign = refuseForeignOrigin(request);
   if (foreign) return foreign;
+  const overLimit = await refuseOverLimit(
+    'end_session',
+    clientAddress(request.headers.get('x-forwarded-for')),
+  );
+  if (overLimit) return overLimit;
 
   const origin = appOrigin();
   const response = await handleAuthRequest(

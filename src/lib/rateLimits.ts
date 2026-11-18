@@ -4,6 +4,8 @@ import { count } from './copy/format';
 export const rateLimitSurfaces = [
   'sign_in_link',
   'sign_in_link_client',
+  'confirm_sign_in',
+  'end_session',
   'host_staff_invite',
   'reserve',
   'payment_tries',
@@ -47,6 +49,20 @@ export const rateLimitPolicies = {
   sign_in_link_client: {
     limit: 10,
     windowSeconds: 60 * 60,
+    normalizeSubject: (subject) => subject.trim().toLowerCase(),
+  },
+  // The confirm page's post, per client address. A guest confirms a link once and a bad link is
+  // retried rarely; the count bounds guessing of link tokens from one address.
+  confirm_sign_in: {
+    limit: 10,
+    windowSeconds: 60 * 60,
+    normalizeSubject: (subject) => subject.trim().toLowerCase(),
+  },
+  // The header's Sign out post, per client address. Generous, and apart from `forms`, so signing
+  // out is never refused because of the contact forms' tight count; it only bounds a flood.
+  end_session: {
+    limit: 30,
+    windowSeconds: 10 * 60,
     normalizeSubject: (subject) => subject.trim().toLowerCase(),
   },
   // Invitations a host owner sends, per owner: each makes an account and sends an email from our
@@ -160,6 +176,33 @@ export function retryAfterMinutes(seconds: number): number {
 export type RateLimitDecision =
   | { allowed: true; remaining: number }
   | { allowed: false; retryAfterSeconds: number };
+
+/** What a try at a counter came to: its decision, or that the counter could not be reached. */
+export type CounterOutcome =
+  { kind: 'counted'; decision: RateLimitDecision } | { kind: 'failed' };
+
+export type CounterRefusal =
+  { status: 429; retryAfterSeconds: number } | { status: 503 };
+
+/**
+ * What a try is answered with, or `null` while it may go on. A counter that could not be read
+ * refuses with 503: a request that was not counted is never let through.
+ */
+export function counterRefusal(outcome: CounterOutcome): CounterRefusal | null {
+  if (outcome.kind === 'failed') return { status: 503 };
+  return outcome.decision.allowed
+    ? null
+    : { status: 429, retryAfterSeconds: outcome.decision.retryAfterSeconds };
+}
+
+/**
+ * Whether the address counter is spent after the client counter was tried. Only a client the
+ * counter let through spends it: a refused or failed client must not use up the address's count,
+ * or one client could lock a guest out by being refused.
+ */
+export function addressCountFollows(client: CounterOutcome): boolean {
+  return client.kind === 'counted' && client.decision.allowed;
+}
 
 /** `count` is the row's count after this try. It stops at limit + 1, so a refusal reads as limit + 1. */
 export function decideRateLimit(input: {

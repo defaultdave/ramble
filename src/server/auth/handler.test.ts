@@ -99,7 +99,10 @@ describe('a sign-in link request', () => {
     expect(betterAuthHandler).not.toHaveBeenCalled();
     expect(JSON.stringify(logError.mock.calls)).not.toContain('postgres://');
     expect(JSON.stringify(logError.mock.calls)).not.toContain('sam@example');
-    expect(logError.mock.calls[0]?.[1]).toEqual({ errorName: 'TypeError' });
+    expect(logError.mock.calls[0]?.[1]).toEqual({
+      surface: 'sign_in_link_client',
+      errorName: 'TypeError',
+    });
   });
 
   it.each([

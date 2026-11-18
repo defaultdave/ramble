@@ -3,7 +3,9 @@ import { handleConfirmSignIn, handleEndSession } from './forms';
 
 const handleAuthRequest = vi.hoisted(() => vi.fn());
 const logError = vi.hoisted(() => vi.fn());
+const consumeRateLimit = vi.hoisted(() => vi.fn());
 vi.mock('./handler', () => ({ handleAuthRequest }));
+vi.mock('@/server/ports/rate-limit', () => ({ consumeRateLimit }));
 vi.mock('@/server/monitoring/logger', () => ({
   logger: { error: logError, warn: vi.fn(), info: vi.fn() },
 }));
@@ -16,6 +18,9 @@ vi.mock('@/server/monitoring/logger', () => ({
 // - a missing, odd, or oversized token or body never reaches Better Auth and answers 303 to /sign-in with the error
 // - an unsafe `next` becomes home before it reaches Better Auth, in the callback and on the way back
 // - an answer that is not a redirect is a failure, never a sign-in
+// - each post is counted on its own surface against the client address (or 'unknown'), never on 'forms', and only after the origin check
+// - a post over its limit is a 429 with Retry-After and no-store and an empty body, and Better Auth never sees it
+// - a counter that fails is a 503 with no-store, nothing reaches Better Auth, and the log holds the error name only
 // - sign out sends Better Auth's sign-out with the person's cookie, answers 303 home with the cleared cookie, and is a 502 when Better Auth refuses
 
 const origin = 'http://localhost:3000';
@@ -41,6 +46,7 @@ function redirectFromBetterAuth(location: string, cookie?: string) {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  consumeRateLimit.mockResolvedValue({ allowed: true, remaining: 4 });
 });
 
 describe('the confirm post origin', () => {
@@ -282,4 +288,77 @@ describe('the sign-out post', () => {
     expect(response.status).toBe(502);
     expect(response.headers.get('location')).toBeNull();
   });
+});
+
+describe('the form posts rate limit', () => {
+  const signOut = (headers: Record<string, string>) =>
+    new Request(`${origin}/api/auth/end-session`, { method: 'POST', headers });
+  const confirmPost = (headers: Record<string, string>) =>
+    confirm('token=abc123&next=%2F', headers);
+  const posts = [
+    ['confirm_sign_in', handleConfirmSignIn, confirmPost],
+    ['end_session', handleEndSession, signOut],
+  ] as const;
+
+  it.each(posts)(
+    '%s is counted on its own surface against the client address',
+    async (surface, handle, build) => {
+      handleAuthRequest.mockResolvedValue(redirectFromBetterAuth(`${origin}/`));
+
+      await handle(
+        build({ origin, 'x-forwarded-for': '203.0.113.9, 10.0.0.1' }),
+      );
+      await handle(build({ origin }));
+
+      expect(consumeRateLimit.mock.calls).toEqual([
+        [surface, '203.0.113.9'],
+        [surface, 'unknown'],
+      ]);
+    },
+  );
+
+  it.each(posts)(
+    '%s over its limit is a 429 with Retry-After, and Better Auth never sees it',
+    async (_surface, handle, build) => {
+      consumeRateLimit.mockResolvedValue({
+        allowed: false,
+        retryAfterSeconds: 90,
+      });
+
+      const response = await handle(build({ origin }));
+
+      expect(response.status).toBe(429);
+      expect(response.headers.get('retry-after')).toBe('90');
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(await response.text()).toBe('');
+      expect(handleAuthRequest).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(posts)(
+    '%s with a counter that fails is a 503, and the log holds the error name only',
+    async (_surface, handle, build) => {
+      consumeRateLimit.mockRejectedValue(
+        new Error('connection to db.internal failed'),
+      );
+
+      const response = await handle(build({ origin }));
+
+      expect(response.status).toBe(503);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(handleAuthRequest).not.toHaveBeenCalled();
+      expect(logError).toHaveBeenCalledTimes(1);
+      expect(JSON.stringify(logError.mock.calls)).not.toContain('db.internal');
+    },
+  );
+
+  it.each(posts)(
+    '%s from another site is refused without spending a count',
+    async (_surface, handle, build) => {
+      const response = await handle(build({ origin: 'https://evil.com' }));
+
+      expect(response.status).toBe(403);
+      expect(consumeRateLimit).not.toHaveBeenCalled();
+    },
+  );
 });

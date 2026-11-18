@@ -4,13 +4,20 @@ import {
   maxSignInBodyBytes,
   SignInLinkRequestSchema,
 } from '@/lib/auth';
+import { addressCountFollows } from '@/lib/rateLimits';
 import { clientAddress } from '@/lib/clientAddress';
 import { declaredLengthExceeds } from '@/lib/email/message';
 import { readBodyText } from '@/server/boundedBody';
 import { safeNextPath } from '@/lib/signIn';
 import { getAuth } from './auth';
 import { onScreenSignInLink } from './onScreenLink';
-import { noStore, refusal, refuseOverLimit } from './refusal';
+import {
+  countRateLimit,
+  noStore,
+  refusal,
+  refusalFor,
+  refuseOverLimit,
+} from './refusal';
 
 function withoutContentLength(headers: Headers): Headers {
   const copy = new Headers(headers);
@@ -50,11 +57,14 @@ async function guardSignInLink(
 
   // The client first: a request it refuses must not spend the address's count, or one client
   // could still lock a guest out by being refused.
-  const refused =
-    (await refuseOverLimit(
-      'sign_in_link_client',
-      clientAddress(request.headers.get('x-forwarded-for')),
-    )) ?? (await refuseOverLimit('sign_in_link', parsed.data.email));
+  const client = await countRateLimit(
+    'sign_in_link_client',
+    clientAddress(request.headers.get('x-forwarded-for')),
+  );
+  const addressRefused = addressCountFollows(client)
+    ? await refuseOverLimit('sign_in_link', parsed.data.email)
+    : null;
+  const refused = refusalFor(client) ?? addressRefused;
   if (refused) return { refusal: refused };
   return {
     email: parsed.data.email,

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   ConsumeInputSchema,
-  counterFailureStatus,
-  rateLimitRefusal,
+  addressCountFollows,
+  counterRefusal,
+  type CounterOutcome,
   maxLimit,
   maxSubjectLength,
   maxWindowSeconds,
@@ -54,16 +55,40 @@ describe('rateLimitPolicies', () => {
     );
   });
 
-  it('refuses a request over its limit with 429 and the wait, and lets an allowed one go on', () => {
-    expect(rateLimitRefusal({ allowed: true, remaining: 0 })).toBeNull();
-    expect(rateLimitRefusal({ allowed: false, retryAfterSeconds: 90 })).toEqual(
+  it.each<[string, CounterOutcome, unknown]>([
+    [
+      'allowed',
+      { kind: 'counted', decision: { allowed: true, remaining: 0 } },
+      null,
+    ],
+    [
+      'over its limit',
+      { kind: 'counted', decision: { allowed: false, retryAfterSeconds: 90 } },
       { status: 429, retryAfterSeconds: 90 },
-    );
+    ],
+    ['a counter that cannot be read', { kind: 'failed' }, { status: 503 }],
+  ])('answers a try that is %s', (_name, outcome, expected) => {
+    expect(counterRefusal(outcome)).toEqual(expected);
   });
 
-  it('answers a counter that cannot be read with 503', () => {
-    expect(counterFailureStatus).toBe(503);
-  });
+  it.each<[string, CounterOutcome, boolean]>([
+    [
+      'let through',
+      { kind: 'counted', decision: { allowed: true, remaining: 3 } },
+      true,
+    ],
+    [
+      'refused',
+      { kind: 'counted', decision: { allowed: false, retryAfterSeconds: 90 } },
+      false,
+    ],
+    ['failed', { kind: 'failed' }, false],
+  ])(
+    'spends the address count after a client that was %s: %s',
+    (_name, client, spent) => {
+      expect(addressCountFollows(client)).toBe(spent);
+    },
+  );
 
   it('allows five payment tries per hold, for longer than a hold lives', () => {
     expect(rateLimitPolicies.payment_tries.limit).toBe(5);

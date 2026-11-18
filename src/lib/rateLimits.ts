@@ -177,16 +177,31 @@ export type RateLimitDecision =
   | { allowed: true; remaining: number }
   | { allowed: false; retryAfterSeconds: number };
 
-/** The status for a request whose count could not be read: refused, never let through uncounted. */
-export const counterFailureStatus = 503;
+/** What a try at a counter came to: its decision, or that the counter could not be reached. */
+export type CounterOutcome =
+  { kind: 'counted'; decision: RateLimitDecision } | { kind: 'failed' };
 
-/** What a request over its limit is answered with, or `null` while the limit allows it. */
-export function rateLimitRefusal(
-  decision: RateLimitDecision,
-): { status: 429; retryAfterSeconds: number } | null {
-  return decision.allowed
+export type CounterRefusal =
+  { status: 429; retryAfterSeconds: number } | { status: 503 };
+
+/**
+ * What a try is answered with, or `null` while it may go on. A counter that could not be read
+ * refuses with 503: a request that was not counted is never let through.
+ */
+export function counterRefusal(outcome: CounterOutcome): CounterRefusal | null {
+  if (outcome.kind === 'failed') return { status: 503 };
+  return outcome.decision.allowed
     ? null
-    : { status: 429, retryAfterSeconds: decision.retryAfterSeconds };
+    : { status: 429, retryAfterSeconds: outcome.decision.retryAfterSeconds };
+}
+
+/**
+ * Whether the address counter is spent after the client counter was tried. Only a client the
+ * counter let through spends it: a refused or failed client must not use up the address's count,
+ * or one client could lock a guest out by being refused.
+ */
+export function addressCountFollows(client: CounterOutcome): boolean {
+  return client.kind === 'counted' && client.decision.allowed;
 }
 
 /** `count` is the row's count after this try. It stops at limit + 1, so a refusal reads as limit + 1. */

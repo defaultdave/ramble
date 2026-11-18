@@ -114,12 +114,16 @@ test("rule 3: a bookkeeping PR touching any other file fails", () => {
   expect(check({ title: "PM bookkeeping: x", head: "pm/x", changedFiles }).ok).toBe(false);
 });
 
-test.each(["docs/plan/units.yaml", "Docs/Plan/UNITS.yaml", "CLAUDE.MD", ".GitHub/workflows/x.yml", "Scripts/Merge-Desk/a.ts", "eslint.config.mjs", "eslint.config.copy.mjs", "tsconfig.json"])(
+test.each(["docs/plan/units.yaml", "Docs/Plan/UNITS.yaml", "CLAUDE.MD", ".GitHub/workflows/x.yml", "Scripts/Merge-Desk/a.ts", "eslint.config.mjs", "eslint.config.copy.mjs", "tsconfig.json", "vitest.config.ts", ".gitleaks.toml", "knip.json", "playwright.config.ts", "scripts/test-size.ts"])(
   "rule 3: protected paths match case-insensitively (%s)",
   (file) => {
     expect(check({ changedFiles: [file] }).ok).toBe(false);
   },
 );
+
+test.each(["package.json", "pnpm-lock.yaml"])("rule 3: %s stays unprotected", (file) => {
+  expect(check({ changedFiles: [file] }).ok).toBe(true);
+});
 
 const UNITS_YAML = `# header
 units:

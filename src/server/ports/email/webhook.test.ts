@@ -87,7 +87,7 @@ describe('deliveryWebhookResponse', () => {
 
   it.each([
     ['the first x-forwarded-for entry', '203.0.113.7, 10.0.0.1', '203.0.113.7'],
-    ['an IPv6 address in lower case', '2001:DB8::1', '2001:db8::1'],
+    ['an IPv6 address in lower case', '2001:DB8::1', '2001:db8:0:0::/64'],
     ['unknown when the header is absent', undefined, 'unknown'],
     ['unknown when the header is not an address', 'not an address!', 'unknown'],
   ])('counts a failure against %s', async (_label, forwarded, subject) => {

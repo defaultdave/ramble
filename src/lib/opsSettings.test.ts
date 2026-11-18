@@ -3,7 +3,10 @@ import {
   cancellationTierRows,
   changedSettingKeys,
   parseSettingsForm,
+  asStaleSettings,
   parseSettingsVersion,
+  StaleSettingsError,
+  settingsSaveStatus,
   pausedExperienceSummary,
   percentToPpm,
   ppmToPercent,
@@ -303,6 +306,24 @@ describe('the version a save must still match', () => {
     expect(settingsNotices.stale.title).toMatch(
       /nothing was saved.*current values/,
     );
+  });
+});
+
+describe('how a save attempt ends', () => {
+  it('is stale for a stale refusal', () => {
+    expect(settingsSaveStatus(new StaleSettingsError())).toBe('stale');
+  });
+
+  it('is saved or unchanged by what the save changed', () => {
+    expect(settingsSaveStatus({ changed: ['holdMinutes'] })).toBe('saved');
+    expect(settingsSaveStatus({ changed: [] })).toBe('unchanged');
+  });
+
+  it('hands back a stale refusal and throws anything else again', () => {
+    const stale = new StaleSettingsError();
+    expect(asStaleSettings(stale)).toBe(stale);
+    const other = new Error('down');
+    expect(() => asStaleSettings(other)).toThrow(other);
   });
 });
 

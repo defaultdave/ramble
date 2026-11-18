@@ -153,6 +153,21 @@ export class StaleSettingsError extends Error {
   }
 }
 
+/** The stale refusal from a caught error; anything else is not this module's to handle and is thrown again. */
+export function asStaleSettings(error: unknown): StaleSettingsError {
+  if (error instanceof StaleSettingsError) return error;
+  throw error;
+}
+
+/** Where a save ended: a refusal as stale, otherwise saved or unchanged by what it changed. */
+export function settingsSaveStatus(
+  result: StaleSettingsError | { changed: readonly SettingKey[] },
+): SettingsSaveOutcome | 'stale' {
+  return result instanceof StaleSettingsError
+    ? 'stale'
+    : settingsSaveOutcome(result.changed);
+}
+
 /** What the form shows for the stored settings: text for the fields, flags for the boxes, and the version the save must still match. */
 export function settingsFormValues(settings: SettingsRead) {
   return {

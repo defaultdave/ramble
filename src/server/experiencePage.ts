@@ -23,7 +23,7 @@ export type ExperiencePageData = {
 /**
  * What the experience page reads, or null when no experience with this ID is visible to guests.
  * Publishing, editing, or taking the experience down, and a new review, reach it through `tags.experience(id)`; a
- * renamed category or neighborhood reaches it when its profile runs out. A miss is not kept (the
+ * category or neighborhood change (the `taxonomy` change) reaches it through `tags.taxonomy`, which `getFilterOptions` hands to it. A miss is not kept (the
  * `uncached` profile), so made-up IDs fill nothing; a hidden experience costs one read per request.
  */
 export async function getExperiencePage(

@@ -34,8 +34,8 @@ export type HomeContent = {
 
 /**
  * Everything the home modules show except "On this week" and the gift switch. A home module, a
- * Pick, or the gift guide reaches it through `tags.home`. A category or neighborhood rename
- * reaches it when its profile runs out. A listing change reaches it only through the tag of each experience a Pick names. That includes one a guest cannot see
+ * Pick, or the gift guide reaches it through `tags.home`. A category or neighborhood change
+ * (the `taxonomy` change) reaches it through `tags.taxonomy`, which `getFilterOptions` hands to it. A listing change reaches it only through the tag of each experience a Pick names. That includes one a guest cannot see
  * yet, so publishing it adds its card, and it is why the tag follows the IDs asked for and not
  * the cards that came back.
  */

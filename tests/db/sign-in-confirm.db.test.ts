@@ -13,6 +13,15 @@ import { createFreshDatabase, type FreshDatabase } from './harness';
 
 const origin = 'http://localhost:3000';
 
+let clients = 0;
+/** A fresh client address per request, so tests do not share the per-client sign-in count. */
+const nextClient = () => `198.51.100.${String((clients += 1))}`;
+
+vi.mock('next/headers', () => ({
+  headers: () =>
+    Promise.resolve(new Headers({ 'x-forwarded-for': nextClient() })),
+}));
+
 let fresh: FreshDatabase;
 let client: typeof import('@/server/db/client');
 let forms: typeof import('@/server/auth/forms');

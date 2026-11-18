@@ -15,7 +15,12 @@ vi.mock('@/server/monitoring/logger', () => ({
 }));
 
 // Behaviours under test, one per decision, branch, or risk:
-// - a sign-in link request is counted against its lower-cased address on the sign_in_link surface before Better Auth sees it
+// - a sign-in link request is counted against its client address, then its lower-cased address, before Better Auth sees it
+// - the 11th request from one client is refused with Retry-After, and the client limit spans addresses
+// - another client can still ask for an address one client has used up its own limit on
+// - one client at its limit, even straddling its own window, leaves the address's count unspent, so another client is still allowed
+// - a request the client count refuses never spends the address's count
+// - a request with no usable forwarded address shares one 'unknown' client count
 // - a refused count is a 429 with Retry-After, and Better Auth never sees the request
 // - a counter that fails is a 503 and nothing is sent; the log holds the error name only
 // - a body that is too long, not JSON, or not an address is refused unread by the counter and by Better Auth
@@ -47,10 +52,10 @@ describe('a sign-in link request', () => {
   it('is counted against the lower-cased address, then handed on with its body intact', async () => {
     const response = await handleAuthRequest(signIn('Sam@Example.COM'));
 
-    expect(consumeRateLimit).toHaveBeenCalledWith(
-      'sign_in_link',
-      'sam@example.com',
-    );
+    expect(consumeRateLimit.mock.calls).toEqual([
+      ['sign_in_link_client', 'unknown'],
+      ['sign_in_link', 'sam@example.com'],
+    ]);
     expect(response.status).toBe(200);
     const handed = betterAuthHandler.mock.calls[0]?.[0] as Request;
     expect(await handed.json()).toEqual({ email: 'Sam@Example.COM' });
@@ -126,6 +131,109 @@ describe('a sign-in link request', () => {
       expect(betterAuthHandler).not.toHaveBeenCalled();
     },
   );
+});
+
+describe('the client count', () => {
+  const clientLimit = 10;
+  const emailLimit = 25;
+  const spent = new Map<string, number>();
+  const spend = (surface: string, subject: string) => {
+    const key = `${surface}:${subject}`;
+    const n = (spent.get(key) ?? 0) + 1;
+    spent.set(key, n);
+    const limit = surface === 'sign_in_link_client' ? clientLimit : emailLimit;
+    return n <= limit
+      ? { allowed: true, remaining: limit - n }
+      : { allowed: false, retryAfterSeconds: 900 };
+  };
+  const from = (client: string | null, email: string) => {
+    const request = signIn(email);
+    if (client) request.headers.set('x-forwarded-for', client);
+    return handleAuthRequest(request);
+  };
+
+  beforeEach(() => {
+    spent.clear();
+    consumeRateLimit.mockImplementation((surface: string, subject: string) =>
+      Promise.resolve(spend(surface, subject)),
+    );
+  });
+
+  it('refuses the 11th request from one client with Retry-After, whatever the address, and sends nothing for it', async () => {
+    for (let i = 0; i < clientLimit; i += 1) {
+      expect(
+        (await from('203.0.113.7', `a${String(i)}@example.com`)).status,
+      ).toBe(200);
+    }
+
+    const refused = await from('203.0.113.7', 'b@example.com');
+
+    expect(refused.status).toBe(429);
+    expect(refused.headers.get('retry-after')).toBe('900');
+    expect(betterAuthHandler).toHaveBeenCalledTimes(clientLimit);
+  });
+
+  it('leaves another client free to ask for an address the first client used up its limit on', async () => {
+    for (let i = 0; i < clientLimit + 1; i += 1) {
+      await from('203.0.113.7', 'guest@example.com');
+    }
+
+    expect((await from('203.0.113.7', 'other@example.com')).status).toBe(429);
+    expect((await from('198.51.100.2', 'guest@example.com')).status).toBe(200);
+  });
+
+  it('does not spend the address count on a request the client count refused', async () => {
+    for (let i = 0; i < clientLimit + 5; i += 1) {
+      await from('203.0.113.7', 'guest@example.com');
+    }
+
+    expect(spent.get('sign_in_link:guest@example.com')).toBe(clientLimit);
+  });
+
+  it('leaves the address some of its count for a client that straddles its own window', async () => {
+    for (let i = 0; i < clientLimit; i += 1) {
+      await from('203.0.113.7', 'guest@example.com');
+    }
+    for (const key of [...spent.keys()]) {
+      if (key.startsWith('sign_in_link_client:')) spent.delete(key);
+    }
+    for (let i = 0; i < clientLimit; i += 1) {
+      await from('203.0.113.7', 'guest@example.com');
+    }
+
+    expect(spent.get('sign_in_link:guest@example.com')).toBe(2 * clientLimit);
+    expect((await from('198.51.100.2', 'guest@example.com')).status).toBe(200);
+  });
+
+  it('shares one count among requests with no usable forwarded address', async () => {
+    for (let i = 0; i < clientLimit; i += 1) {
+      await from(null, `a${String(i)}@example.com`);
+    }
+
+    expect((await from('not an address', 'z@example.com')).status).toBe(429);
+    expect(spent.get('sign_in_link_client:unknown')).toBe(clientLimit + 1);
+  });
+
+  it('is refused with 503 when the client counter fails, and the address count is never reached', async () => {
+    consumeRateLimit.mockRejectedValue(new TypeError('down'));
+
+    const response = await from('203.0.113.7', 'guest@example.com');
+
+    expect(response.status).toBe(503);
+    expect(consumeRateLimit).toHaveBeenCalledOnce();
+    expect(betterAuthHandler).not.toHaveBeenCalled();
+  });
+
+  it('is refused with 503 when the address counter fails after the client count passed', async () => {
+    consumeRateLimit
+      .mockResolvedValueOnce({ allowed: true, remaining: 9 })
+      .mockRejectedValueOnce(new TypeError('down'));
+
+    const response = await from('203.0.113.7', 'guest@example.com');
+
+    expect(response.status).toBe(503);
+    expect(betterAuthHandler).not.toHaveBeenCalled();
+  });
 });
 
 describe('every other request', () => {

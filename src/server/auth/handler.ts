@@ -4,6 +4,7 @@ import {
   maxSignInBodyBytes,
   SignInLinkRequestSchema,
 } from '@/lib/auth';
+import { clientAddress } from '@/lib/clientAddress';
 import { declaredLengthExceeds } from '@/lib/email/message';
 import { readBodyText } from '@/server/boundedBody';
 import { logger } from '@/server/monitoring/logger';
@@ -28,8 +29,17 @@ function withoutContentLength(headers: Headers): Headers {
   return copy;
 }
 
+/** The client's count, or `undefined` while it allows the request, so the address's count is next. */
+async function consumeClientLimit(request: Request) {
+  const decision = await consumeRateLimit(
+    'sign_in_link_client',
+    clientAddress(request.headers.get('x-forwarded-for')),
+  );
+  return decision.allowed ? undefined : decision;
+}
+
 /**
- * Counts a sign-in link request against its address before Better Auth sees it. Returns the request
+ * Counts a sign-in link request against its client and then its address before Better Auth sees it. Returns the request
  * to pass on (its body was read, so it is rebuilt from the text) or the refusal. A request that
  * cannot be read, or a counter that cannot be reached, is refused: nothing is sent without being
  * counted.
@@ -59,7 +69,11 @@ async function guardSignInLink(
   if (!parsed.success) return { refusal: refusal(400) };
 
   try {
-    const decision = await consumeRateLimit('sign_in_link', parsed.data.email);
+    // The client first: a request it refuses must not spend the address's count, or one client
+    // could still lock a guest out by being refused.
+    const decision =
+      (await consumeClientLimit(request)) ??
+      (await consumeRateLimit('sign_in_link', parsed.data.email));
     if (!decision.allowed) {
       return {
         refusal: refusal(429, {

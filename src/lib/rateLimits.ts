@@ -3,6 +3,7 @@ import { count } from './copy/format';
 
 export const rateLimitSurfaces = [
   'sign_in_link',
+  'sign_in_link_client',
   'host_staff_invite',
   'reserve',
   'payment_tries',
@@ -32,9 +33,19 @@ const trimmed = (subject: string) => subject.trim();
 // capability token, or an address plus a form name. The numbers are demo defaults that change
 // here, without a migration.
 export const rateLimitPolicies = {
-  // Links expire in 5 minutes, so five an hour covers a guest who mistypes and retries.
+  // Per destination address, so it bounds the mail sent to one address. Anyone can spend this
+  // count for an address they do not own, so it sits above twice `sign_in_link_client`: the
+  // windows are fixed, so one client can straddle the end of its own window and send up to twice
+  // its limit inside one address window, and that must still leave the address some of its count.
   sign_in_link: {
-    limit: 5,
+    limit: 25,
+    windowSeconds: 60 * 60,
+    normalizeSubject: (subject) => subject.trim().toLowerCase(),
+  },
+  // Per client address, across every destination. Twice this is below the `sign_in_link` count,
+  // so one client alone cannot use up an address's count and lock its owner out.
+  sign_in_link_client: {
+    limit: 10,
     windowSeconds: 60 * 60,
     normalizeSubject: (subject) => subject.trim().toLowerCase(),
   },

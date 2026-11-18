@@ -194,8 +194,8 @@ flowchart TD
 1. A guest opens `/account` signed out. `AccountContent` redirects to `/sign-in?next=%2Faccount` through `signInHref`.
 2. They submit an email. The server action `requestSignInLink` goes through `handleSignInFormRequest`, which rate limits per address. The form says "if this address can sign in, a link is on its way", whether or not an account exists. While `EMAIL_MODE` is `sink` (email is off in the demo), an address with no role grant instead gets a `Continue` link on the page, to the same confirm page the email carries; a role holder still gets "a link is on its way" and its link goes to the dev mailbox only.
 3. The email, or the on-screen `Continue` link, goes to `/sign-in/confirm?token=…&next=…`, a page that only shows a button. This is so a mail scanner that fetches the link cannot use it up.
-4. The button posts to `/api/auth/confirm-sign-in`. `handleConfirmSignIn` asks Better Auth to verify the token; the session cookie is set on that response. A 303 sends the guest to `next`, so they land on `/account`. A used or expired link lands on `/sign-in` with a notice.
-5. Sign out is a form post to `/api/auth/end-session`, which calls Better Auth sign-out with the cookie and sends a 303 to `/`.
+4. The button posts to `/api/auth/confirm-sign-in`. `handleConfirmSignIn` refuses a foreign origin (403), then counts the client address on the `confirm_sign_in` surface (10 an hour; over it, 429 with `Retry-After`; counter down, 503), then asks Better Auth to verify the token; the session cookie is set on that response. A 303 sends the guest to `next`, so they land on `/account`. A used or expired link lands on `/sign-in` with a notice.
+5. Sign out is a form post to `/api/auth/end-session`, which, after the origin check, counts the client address on the `end_session` surface (30 per 10 minutes, apart from the tight `forms` surface; same 429 and 503 refusals), then calls Better Auth sign-out with the cookie and sends a 303 to `/`.
 
 ## Roles, the caller, and where hosts and ops go
 

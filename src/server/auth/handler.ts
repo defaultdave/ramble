@@ -13,15 +13,7 @@ import { errorKind } from '@/lib/errorKind';
 import { safeNextPath } from '@/lib/signIn';
 import { getAuth } from './auth';
 import { onScreenSignInLink } from './onScreenLink';
-
-const noStore = { 'Cache-Control': 'no-store' } as const;
-
-function refusal(
-  status: 400 | 413 | 429 | 503,
-  headers: Record<string, string> = {},
-) {
-  return new Response(null, { status, headers: { ...noStore, ...headers } });
-}
+import { noStore, refusal } from './refusal';
 
 function withoutContentLength(headers: Headers): Headers {
   const copy = new Headers(headers);

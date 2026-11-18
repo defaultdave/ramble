@@ -40,6 +40,18 @@ describe('rateLimitPolicies', () => {
     );
   });
 
+  it('gives the two auth form posts their own surfaces, and sign out a looser one than the contact forms', () => {
+    expect(rateLimitSurfaces).toContain('confirm_sign_in');
+    expect(rateLimitSurfaces).toContain('end_session');
+    expect(rateLimitPolicies.confirm_sign_in.limit).toBe(10);
+    expect(rateLimitPolicies.end_session.limit).toBeGreaterThan(
+      rateLimitPolicies.forms.limit,
+    );
+    expect(rateLimitPolicies.end_session.windowSeconds).toBeLessThanOrEqual(
+      rateLimitPolicies.forms.windowSeconds,
+    );
+  });
+
   it('allows five payment tries per hold, for longer than a hold lives', () => {
     expect(rateLimitPolicies.payment_tries.limit).toBe(5);
     expect(rateLimitPolicies.payment_tries.windowSeconds).toBeGreaterThan(

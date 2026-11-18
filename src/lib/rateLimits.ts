@@ -4,6 +4,8 @@ import { count } from './copy/format';
 export const rateLimitSurfaces = [
   'sign_in_link',
   'sign_in_link_client',
+  'confirm_sign_in',
+  'end_session',
   'host_staff_invite',
   'reserve',
   'payment_tries',
@@ -47,6 +49,20 @@ export const rateLimitPolicies = {
   sign_in_link_client: {
     limit: 10,
     windowSeconds: 60 * 60,
+    normalizeSubject: (subject) => subject.trim().toLowerCase(),
+  },
+  // The confirm page's post, per client address. A guest confirms a link once and a bad link is
+  // retried rarely; the count bounds guessing of link tokens from one address.
+  confirm_sign_in: {
+    limit: 10,
+    windowSeconds: 60 * 60,
+    normalizeSubject: (subject) => subject.trim().toLowerCase(),
+  },
+  // The header's Sign out post, per client address. Generous, and apart from `forms`, so signing
+  // out is never refused because of the contact forms' tight count; it only bounds a flood.
+  end_session: {
+    limit: 30,
+    windowSeconds: 10 * 60,
     normalizeSubject: (subject) => subject.trim().toLowerCase(),
   },
   // Invitations a host owner sends, per owner: each makes an account and sends an email from our

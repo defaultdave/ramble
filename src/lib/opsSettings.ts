@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { cancellationTerms } from './cancellation';
 import type { CancellationTier } from './catalog';
 import { experiencePath, experiencesPath } from './experienceEditor';
@@ -126,8 +127,20 @@ export function changedSettingKeys(
 }
 
 /** The row's `updated_at` to the microsecond, as 20 digits (`YYYYMMDDHH24MISSUS`, UTC). Postgres writes the stamp and a JS Date keeps only milliseconds, so the data layer reads it as text. */
-const settingsVersionPattern = /^\d{20}$/;
 export const settingsVersionField = 'version';
+
+/** Exactly 20 digits, or null for none. The pattern is anchored with no repeated group, so it is linear. */
+const SettingsVersionSchema = z
+  .string()
+  .max(20)
+  .regex(/^\d{20}$/)
+  .nullable();
+
+/** The version as it can be trusted: a well-formed one, or null for anything else (never a thrown error). A null never matches the stored version. */
+export function readableSettingsVersion(value: unknown): string | null {
+  const parsed = SettingsVersionSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
 
 /** The settings as read for the page: every setting plus the version the form carries back. */
 export type SettingsRead = Settings & { version: string };
@@ -135,15 +148,7 @@ export type SettingsRead = Settings & { version: string };
 /** The version the form carried, or null when it is missing, repeated, oversized, or not a version. A null is never a match. */
 export function parseSettingsVersion(get: FormGetter): string | null {
   const text = formText(get, settingsVersionField);
-  return text !== undefined && settingsVersionPattern.test(text) ? text : null;
-}
-
-/** Whether the version the form was opened at is still the stored one. A form with no readable version is stale: the check is never skipped. */
-export function settingsVersionIsCurrent(
-  posted: string | null,
-  stored: string,
-): boolean {
-  return posted !== null && posted === stored;
+  return readableSettingsVersion(text ?? null);
 }
 
 /** A save refused because the settings changed after the form was opened. Nothing was written. */

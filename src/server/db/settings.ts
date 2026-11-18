@@ -13,10 +13,11 @@ import {
 } from '@/lib/settings';
 import {
   changedSettingKeys,
-  settingsVersionIsCurrent,
+  readableSettingsVersion,
   StaleSettingsError,
   type SettingsRead,
 } from '@/lib/opsSettings';
+import { checkExpectedVersion } from '@/lib/sessions';
 import { settingsChangedEntry } from '@/lib/settingsAudit';
 import { Role, type Caller } from '@/server/auth/caller';
 import { updateTagsForChanges } from '@/server/cache/invalidate';
@@ -115,6 +116,7 @@ export async function updateSettings(
   requireStaff(caller);
   const userId = requireUserId(caller, Role.Ops);
   const parsed = SettingsChangeSchema.parse(change);
+  const posted = readableSettingsVersion(expectedVersion);
   const saved = await db.transaction(async (tx) => {
     const { version, ...current } = withVersion(
       onlyRow(
@@ -125,7 +127,7 @@ export async function updateSettings(
           .for('update'),
       ),
     );
-    if (!settingsVersionIsCurrent(expectedVersion, version)) {
+    if (!checkExpectedVersion(version, posted).ok) {
       throw new StaleSettingsError();
     }
     const changed = changedSettingKeys(current, parsed);

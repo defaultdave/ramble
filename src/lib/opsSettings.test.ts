@@ -14,7 +14,7 @@ import {
   settingsSaveNext,
   settingsNotices,
   settingsSaveOutcome,
-  settingsVersionIsCurrent,
+  readableSettingsVersion,
   type SettingsRead,
   type SettingsFormField,
 } from './opsSettings';
@@ -288,17 +288,21 @@ describe('the version a save must still match', () => {
     expect(parseSettingsVersion(() => new File([], 'v'))).toBeNull();
   });
 
-  it('matches only the identical stored version', () => {
-    const version = '20261101000000123456';
-    expect(settingsVersionIsCurrent(version, version)).toBe(true);
-    expect(settingsVersionIsCurrent('20261101000000123457', version)).toBe(
-      false,
+  it('keeps a well-formed version and reads anything else as none, never throwing', () => {
+    expect(readableSettingsVersion('20261101000000123456')).toBe(
+      '20261101000000123456',
     );
-  });
-
-  it('never matches a missing version, even against an empty stored one', () => {
-    expect(settingsVersionIsCurrent(null, '20261101000000123456')).toBe(false);
-    expect(settingsVersionIsCurrent(null, '')).toBe(false);
+    for (const bad of [
+      null,
+      undefined,
+      5,
+      '',
+      'x'.repeat(20),
+      '1'.repeat(21),
+      '9'.repeat(100_000),
+    ]) {
+      expect(readableSettingsVersion(bad)).toBeNull();
+    }
   });
 
   it('says in plain words that nothing was saved and the form is current', () => {

@@ -358,10 +358,10 @@ export function checkAllocationEditable(
 export type VersionCheck =
   { ok: true } | { ok: false; reason: 'version_conflict' };
 
-/** An edit stands only if the editor read the version the row has now. */
-export function checkExpectedVersion(
-  current: number,
-  expected: number,
+/** An edit stands only if the editor read the version the row has now. A version may be a number or a string; a missing one (`null`) never matches, so a check is never skipped. */
+export function checkExpectedVersion<V extends number | string>(
+  current: V,
+  expected: V | null,
 ): VersionCheck {
   return current === expected
     ? { ok: true }

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   ConsumeInputSchema,
+  counterFailureStatus,
+  rateLimitRefusal,
   maxLimit,
   maxSubjectLength,
   maxWindowSeconds,
@@ -50,6 +52,17 @@ describe('rateLimitPolicies', () => {
     expect(rateLimitPolicies.end_session.windowSeconds).toBeLessThanOrEqual(
       rateLimitPolicies.forms.windowSeconds,
     );
+  });
+
+  it('refuses a request over its limit with 429 and the wait, and lets an allowed one go on', () => {
+    expect(rateLimitRefusal({ allowed: true, remaining: 0 })).toBeNull();
+    expect(rateLimitRefusal({ allowed: false, retryAfterSeconds: 90 })).toEqual(
+      { status: 429, retryAfterSeconds: 90 },
+    );
+  });
+
+  it('answers a counter that cannot be read with 503', () => {
+    expect(counterFailureStatus).toBe(503);
   });
 
   it('allows five payment tries per hold, for longer than a hold lives', () => {

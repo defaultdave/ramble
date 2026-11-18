@@ -177,6 +177,18 @@ export type RateLimitDecision =
   | { allowed: true; remaining: number }
   | { allowed: false; retryAfterSeconds: number };
 
+/** The status for a request whose count could not be read: refused, never let through uncounted. */
+export const counterFailureStatus = 503;
+
+/** What a request over its limit is answered with, or `null` while the limit allows it. */
+export function rateLimitRefusal(
+  decision: RateLimitDecision,
+): { status: 429; retryAfterSeconds: number } | null {
+  return decision.allowed
+    ? null
+    : { status: 429, retryAfterSeconds: decision.retryAfterSeconds };
+}
+
 /** `count` is the row's count after this try. It stops at limit + 1, so a refusal reads as limit + 1. */
 export function decideRateLimit(input: {
   count: number;

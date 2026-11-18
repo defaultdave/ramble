@@ -7,27 +7,15 @@ import {
 import { clientAddress } from '@/lib/clientAddress';
 import { declaredLengthExceeds } from '@/lib/email/message';
 import { readBodyText } from '@/server/boundedBody';
-import { logger } from '@/server/monitoring/logger';
-import { consumeRateLimit } from '@/server/ports/rate-limit';
-import { errorKind } from '@/lib/errorKind';
 import { safeNextPath } from '@/lib/signIn';
 import { getAuth } from './auth';
 import { onScreenSignInLink } from './onScreenLink';
-import { noStore, refusal } from './refusal';
+import { noStore, refusal, refuseOverLimit } from './refusal';
 
 function withoutContentLength(headers: Headers): Headers {
   const copy = new Headers(headers);
   copy.delete('content-length');
   return copy;
-}
-
-/** The client's count, or `undefined` while it allows the request, so the address's count is next. */
-async function consumeClientLimit(request: Request) {
-  const decision = await consumeRateLimit(
-    'sign_in_link_client',
-    clientAddress(request.headers.get('x-forwarded-for')),
-  );
-  return decision.allowed ? undefined : decision;
 }
 
 /**
@@ -60,25 +48,14 @@ async function guardSignInLink(
   }
   if (!parsed.success) return { refusal: refusal(400) };
 
-  try {
-    // The client first: a request it refuses must not spend the address's count, or one client
-    // could still lock a guest out by being refused.
-    const decision =
-      (await consumeClientLimit(request)) ??
-      (await consumeRateLimit('sign_in_link', parsed.data.email));
-    if (!decision.allowed) {
-      return {
-        refusal: refusal(429, {
-          'Retry-After': String(decision.retryAfterSeconds),
-        }),
-      };
-    }
-  } catch (error) {
-    logger.error('The sign-in link counter failed', {
-      errorName: errorKind(error),
-    });
-    return { refusal: refusal(503) };
-  }
+  // The client first: a request it refuses must not spend the address's count, or one client
+  // could still lock a guest out by being refused.
+  const refused =
+    (await refuseOverLimit(
+      'sign_in_link_client',
+      clientAddress(request.headers.get('x-forwarded-for')),
+    )) ?? (await refuseOverLimit('sign_in_link', parsed.data.email));
+  if (refused) return { refusal: refused };
   return {
     email: parsed.data.email,
     next: safeNextPath(parsed.data.callbackURL),

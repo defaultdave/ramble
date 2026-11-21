@@ -253,7 +253,7 @@ async function placePayment(
       ? {
           experienceStatus: locked.experienceStatus,
           sessionStatus: locked.session.status,
-          startsAt: locked.session.startsAt,
+          startsAt: locked.session.endsAt,
         }
       : null,
     order,

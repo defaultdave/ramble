@@ -1,0 +1,228 @@
+name: bug-finder
+# ADR 0012: one agent looks for one real bug or worthwhile improvement in one area of the site and files it as a
+# ticket. Hand-dispatched only for now: there is deliberately no schedule until the owner has read the first rounds.
+# It never labels a ticket nightly-fix; the owner does that by hand to opt a finding in to the fixer (ADR 0011).
+# Jobs are split so no agent shares a runner with the App key:
+#   area (script) -> investigate (agent, site running, no GitHub credentials) -> verify (read-only agent, fresh runner)
+#   -> file (script, fresh runner, opens the issue as the App).
+on:
+  workflow_dispatch:
+    inputs:
+      area:
+        description: "Area to look at (checkout, ops, browse, ...). Empty rotates by day."
+        required: false
+        default: ""
+        type: string
+permissions: {}
+concurrency:
+  group: bug-finder
+  cancel-in-progress: false
+env:
+  BUN_VERSION: 1.3.9
+  # The same repository variable the nightly fix uses; an unset value stops the job.
+  CLAUDE_CODE_VERSION: ${{ vars.CLAUDE_CODE_VERSION }}
+jobs:
+  area:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      slug: ${{ steps.area.outputs.slug }}
+      name: ${{ steps.area.outputs.name }}
+      routes: ${{ steps.area.outputs.routes }}
+      readme: ${{ steps.area.outputs.readme }}
+      dir: ${{ steps.area.outputs.dir }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - id: area
+        env:
+          AREA_INPUT: ${{ inputs.area }}
+        run: |
+          set -euo pipefail
+          area=$(bun scripts/bug-finder/area.ts "$AREA_INPUT")
+          echo "$area"
+          jq -r 'to_entries[] | "\(.key)=\(.value)"' <<<"$area" >> "$GITHUB_OUTPUT"
+          jq -r '"### Bug finder\nArea: \(.name) (\(.slug))"' <<<"$area" >> "$GITHUB_STEP_SUMMARY"
+
+  investigate:
+    needs: area
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: ramble
+          POSTGRES_PASSWORD: ramble
+          POSTGRES_DB: ramble
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ramble -d ramble"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://ramble:ramble@localhost:5432/ramble
+      DATABASE_URL_UNPOOLED: postgres://ramble:ramble@localhost:5432/ramble
+      SITE_URL: http://localhost:3101
+    outputs:
+      found: ${{ steps.finding.outputs.found }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Migrate and seed
+        env:
+          SEED_TARGET: local
+        run: |
+          pnpm db:migrate
+          pnpm db:seed
+      # The same wiring as the booking-path server in playwright.config.ts. The secrets are throwaway values for a
+      # database that lives and dies with this runner.
+      - name: Build and start the site
+        env:
+          DEV_MAILBOX_SECRET: finder-mailbox-secret-xxxxxxxxxxxxxxxxxxxxxxxx
+          CAPABILITY_TOKEN_SECRET: finder-capability-secret-xxxxxxxxxxxxxxxxxxx
+          NEON_HTTP_ENDPOINT: http://127.0.0.1:4444/sql
+        run: |
+          set -euo pipefail
+          nohup pnpm db:http > "$RUNNER_TEMP/db-http.log" 2>&1 &
+          pnpm build
+          nohup pnpm start --port 3101 > "$RUNNER_TEMP/site.log" 2>&1 &
+          for _ in $(seq 60); do curl -fsS -o /dev/null "$SITE_URL" && exit 0; sleep 2; done
+          tail -n 40 "$RUNNER_TEMP/site.log"
+          exit 1
+      - name: Install Claude Code
+        run: |
+          test -n "$CLAUDE_CODE_VERSION" || { echo "::error::Set the CLAUDE_CODE_VERSION repository variable"; exit 1; }
+          npm install -g "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION"
+      # The only step with the Anthropic key, and no GitHub credential anywhere in the job.
+      - name: Investigate the area
+        timeout-minutes: 35
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AREA_SLUG: ${{ needs.area.outputs.slug }}
+          AREA_NAME: ${{ needs.area.outputs.name }}
+          AREA_ROUTES: ${{ needs.area.outputs.routes }}
+          AREA_README: ${{ needs.area.outputs.readme }}
+          AREA_DIR: ${{ needs.area.outputs.dir }}
+        run: |
+          mkdir -p repro
+          claude -p "$(envsubst '$RUNNER_TEMP $SITE_URL $AREA_SLUG $AREA_NAME $AREA_ROUTES $AREA_README $AREA_DIR' < scripts/bug-finder/investigate-prompt.md)" \
+            --add-dir "$RUNNER_TEMP" \
+            --model sonnet \
+            --max-turns 60 \
+            --allowedTools "Read,Glob,Grep,Write,Bash(node repro/*),Bash(pnpm exec vitest run *),Bash(pnpm test),Bash(pnpm test:db*),Bash(curl *),Bash(git log*),Bash(git show*)" \
+            --output-format json > "$RUNNER_TEMP/claude.json" || true
+          jq '{num_turns, total_cost_usd, is_error}' "$RUNNER_TEMP/claude.json" || true
+      - id: finding
+        run: |
+          set -euo pipefail
+          jq -e 'type == "object"' "$RUNNER_TEMP/finding.json" >/dev/null 2>&1 \
+            || echo '{"none":"the investigator wrote no valid finding.json"}' > "$RUNNER_TEMP/finding.json"
+          echo "found=$(jq -r 'has("none") | not' "$RUNNER_TEMP/finding.json")" >> "$GITHUB_OUTPUT"
+          { echo "### Investigator"; jq -r '.none // "Found: \(.title) (\(.file):\(.lines))"' "$RUNNER_TEMP/finding.json"; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: finding
+          path: ${{ runner.temp }}/finding.json
+          retention-days: 14
+
+  # A fresh runner that only reads: it tries to refute the finding from the evidence. Refuted means no ticket.
+  verify:
+    needs: [area, investigate]
+    if: needs.investigate.outputs.found == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v7
+        with:
+          name: finding
+          path: ${{ runner.temp }}
+      - name: Install Claude Code
+        run: |
+          test -n "$CLAUDE_CODE_VERSION" || { echo "::error::Set the CLAUDE_CODE_VERSION repository variable"; exit 1; }
+          npm install -g "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION"
+      - name: Try to refute the finding
+        timeout-minutes: 15
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          claude -p "$(envsubst '$RUNNER_TEMP' < scripts/bug-finder/verify-prompt.md)" \
+            --add-dir "$RUNNER_TEMP" \
+            --model sonnet \
+            --max-turns 30 \
+            --allowedTools "Read,Glob,Grep,Bash(git log*),Bash(git show*)" \
+            --output-format json > "$RUNNER_TEMP/claude.json" || true
+          jq '{num_turns, total_cost_usd, is_error}' "$RUNNER_TEMP/claude.json" || true
+          # The verdict is the agent's final message, so the verifier needs no write tool at all.
+          jq -er .result "$RUNNER_TEMP/claude.json" > "$RUNNER_TEMP/verdict.md" 2>/dev/null \
+            || echo "NO-VERDICT: the verifier returned no verdict" > "$RUNNER_TEMP/verdict.md"
+          { echo "### Verifier"; cat "$RUNNER_TEMP/verdict.md"; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: verdict
+          path: ${{ runner.temp }}/verdict.md
+          retention-days: 14
+
+  # A fresh runner the agents never touched: the only place the App key is written. The finding is data, so
+  # file.ts validates it and builds the issue from fields; the run summary says what was checked even when nothing is filed.
+  file:
+    needs: [area, investigate, verify]
+    if: always() && needs.investigate.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: "{finding,verdict}"
+          merge-multiple: true
+          path: ${{ runner.temp }}/in
+      - name: Write the App config
+        env:
+          RAMBLE_APP_ID: ${{ secrets.RAMBLE_APP_ID }}
+          RAMBLE_APP_INSTALLATION_ID: ${{ secrets.RAMBLE_APP_INSTALLATION_ID }}
+          RAMBLE_APP_PRIVATE_KEY: ${{ secrets.RAMBLE_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p ~/.config/ramble-agents
+          printf '%s\n' "$RAMBLE_APP_PRIVATE_KEY" > ~/.config/ramble-agents/app.pem
+          printf 'RAMBLE_APP_ID=%s\nRAMBLE_APP_INSTALLATION_ID=%s\nRAMBLE_APP_KEY=%s\n' \
+            "$RAMBLE_APP_ID" "$RAMBLE_APP_INSTALLATION_ID" "$HOME/.config/ramble-agents/app.pem" > ~/.config/ramble-agents/app.conf
+      - name: File the finding
+        env:
+          AREA_SLUG: ${{ needs.area.outputs.slug }}
+        run: bun scripts/bug-finder/file.ts "$RUNNER_TEMP/in" "$AREA_SLUG"

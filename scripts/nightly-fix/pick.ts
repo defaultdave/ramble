@@ -8,6 +8,8 @@ export const REPO = "defaultdave/ramble";
 /** The App that files audit tickets. A ticket from anyone else could carry instructions, so it is never picked. */
 export const TICKET_AUTHOR = "app/defaultdave-agents";
 export const OPT_IN_LABEL = "nightly-fix";
+/** Tickets filed by the bug finder (ADR 0012) have no source PR, so they name their unit themselves. */
+export const FINDER_LABEL = "finder";
 const BLOCKING_LABELS = ["needs-owner"];
 /** Files that steer required checks or the rules (issue 999). The agent never edits them, so a ticket citing one is Dave's. */
 export const OFF_LIMITS = [
@@ -47,6 +49,11 @@ export function sourcePr(body: string): number | null {
   return found ? Number(found) : null;
 }
 
+/** The unit a finder ticket names: `- Unit: U-077`. Read only from an App ticket labelled `finder`. */
+export function unitLine(body: string): string | null {
+  return body.match(/^- Unit: (U-[0-9]+[a-z]*)\s*$/m)?.[1] ?? null;
+}
+
 export interface PickInput {
   issues: Issue[];
   /** Head branches of every open PR. */
@@ -68,11 +75,12 @@ export function pick(input: PickInput): Pick {
   for (const issue of candidates) {
     const file = citedFile(issue.body);
     const from = sourcePr(issue.body);
-    const unit = from ? readTitle(input.prTitles.get(from) ?? "").unitId : undefined;
+    const finder = issue.labels.includes(FINDER_LABEL);
+    const unit = from ? readTitle(input.prTitles.get(from) ?? "").unitId : finder ? (unitLine(issue.body) ?? undefined) : undefined;
     const tier = unit ? input.units.get(unit) : undefined;
     if (!file) reasons.push(`#${issue.number}: no cited file`);
     else if (isOffLimits(file)) reasons.push(`#${issue.number}: ${file} is off limits`);
-    else if (!unit || !tier) reasons.push(`#${issue.number}: no unit from its source PR`);
+    else if (!unit || !tier) reasons.push(`#${issue.number}: no unit from its source PR or Unit line`);
     else {
       const short = issue.title.replace(/^[A-Z]+[0-9]*-[0-9]+\s+/, "").slice(0, 60).trim();
       return { issue: issue.number, unit, tier, file, branch: `unit/${unit}-nightly-${issue.number}`, title: `${unit}: ${short} (#${issue.number})` };

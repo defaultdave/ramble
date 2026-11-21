@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { guard, parseNumstat } from "./guard.ts";
-import { type Issue, OPT_IN_LABEL, type PickInput, pick, TICKET_AUTHOR } from "./pick.ts";
+import { FINDER_LABEL, type Issue, OPT_IN_LABEL, type PickInput, pick, TICKET_AUTHOR } from "./pick.ts";
 
 const units = new Map([
   ["U-077", "critical" as const],
@@ -48,6 +48,32 @@ test.each([
   ["no cited file", { body: "Something is wrong.\n- From: 967" }],
 ])("skips a ticket with %s", (_why, over) => {
   expect(pick(input([issue(5, over)]))).toHaveProperty("skip");
+});
+
+const finderIssue = (number: number, over: Partial<Issue> = {}): Issue =>
+  issue(number, {
+    labels: ["audit", FINDER_LABEL, OPT_IN_LABEL],
+    body: "`src/lib/refundRetry.ts:62-71`: wrong.\n- Unit: U-072\n- Lens: bug",
+    ...over,
+  });
+
+test("picks a finder ticket by its Unit line, with no source PR", () => {
+  expect(pick(input([finderIssue(30)]))).toMatchObject({
+    issue: 30,
+    unit: "U-072",
+    tier: "standard",
+    file: "src/lib/refundRetry.ts",
+    branch: "unit/U-072-nightly-30",
+  });
+});
+
+test.each([
+  ["no finder label", { labels: ["audit", OPT_IN_LABEL] }],
+  ["a unit missing from units.yaml", { body: "`src/lib/a.ts:1` x\n- Unit: U-999" }],
+  ["an indented Unit line", { body: "`src/lib/a.ts:1` x\n  - Unit: U-072" }],
+  ["an unopted finder ticket", { labels: ["audit", FINDER_LABEL] }],
+])("skips a finder ticket with %s", (_why, over) => {
+  expect(pick(input([finderIssue(31, over)]))).toHaveProperty("skip");
 });
 
 test("skips the night while a nightly fix PR is open", () => {

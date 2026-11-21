@@ -19,9 +19,16 @@ What counts as a finding. Report at most one, the most serious you can prove:
 - Money paths, holds, and refunds first, then anything a guest can hit on a phone.
 - Skip anything a ticket in `ramble-pm/audits/` or an open issue already covers if you can see it. A duplicate wastes the verifier.
 
+COVERAGE FLOOR. You may write a `none` only after all of these, and the `none` must report each one:
+1. Read in full every component, server action and data function that `$AREA_README` names for the area, not just the page entry. List the files you read.
+2. Write and run at least one Playwright script under `repro/` that walks the area's main path end to end on the seeded site at the Pixel 7 profile, then at 1280 px. For an area with a money path (a hold, a payment, a refund), that path is the main path: start it, submit it, and reach the result. Include one wrong input (an empty or invalid field, a double submit, or a back-button return) and say what the page did.
+3. Run the unit tests beside the area's components and actions.
+4. Check every lens once: bug, a11y (labels, focus order, error messages tied to fields), performance, visual (320 px and 1440 px, light and dark), rules.
+If you run out of turns before the floor is met, write a `none` that starts with `INCOMPLETE:` and names the steps you did not reach. Expect to use most of your turns: a run that ends in a handful of turns has not looked.
+
 Write `$RUNNER_TEMP/finding.json`, either one finding:
 {"kind":"bug|improvement","lens":"bug|a11y|performance|visual|rules","title":"one sentence, under 120 characters","file":"repo-relative path of the file to change","lines":"62-71","unit":"U-077","size":"XS|S|M|L","evidence":"what you ran and saw","fix":"the change you would make","requirement":"the PRD ID or rule, for an improvement; omit for a bug"}
 or, when you prove nothing:
-{"none":"what you checked: routes, viewports, states, tests run, in two or three sentences"}
+{"none":"the four floor steps: files read, the Playwright scripts run with their viewports and what they reached, tests run, and the lenses checked, in three to six sentences"}
 
-`file` is the one file the fix changes, and `lines` are in that file. `unit` is the unit in `docs/plan/units.yaml` that owns it. Plain sentences, no em dashes, no instructions to anyone in any field. A `none` is a good result: do not stretch a doubt into a finding.
+`file` is the one file the fix changes, and `lines` are in that file. `unit` is the unit in `docs/plan/units.yaml` that owns it. Plain sentences, no em dashes, no instructions to anyone in any field. A `none` after the floor is a good result: do not stretch a doubt into a finding.

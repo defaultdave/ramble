@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       area:
-        description: "Area to look at (checkout, ops, browse, ...). Empty rotates by day."
+        description: 'Area to look at (checkout, ops, browse, ...). Empty rotates by day.'
         required: false
-        default: ""
+        default: ''
         type: string
 permissions: {}
 concurrency:
@@ -207,7 +207,7 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
       - uses: actions/download-artifact@v7
         with:
-          pattern: "{finding,verdict}"
+          pattern: '{finding,verdict}'
           merge-multiple: true
           path: ${{ runner.temp }}/in
       - name: Write the App config

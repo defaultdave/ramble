@@ -126,7 +126,6 @@ const Acceptance = memo(function Acceptance({
           onTick(field, event.target.checked);
         }}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : undefined}
       />
       {error ? (
         <p id={errorId} className={styles.error}>

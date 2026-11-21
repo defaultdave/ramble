@@ -1,0 +1,306 @@
+name: nightly-fix
+# ADR 0011: one agent fixes one audit ticket a night, on GitHub's runners. Dave opts a ticket in with the
+# nightly-fix label. Jobs are split so the agent never shares a runner with the App key:
+#   pick (script) -> fix (agent, no GitHub credentials) -> publish (applies the patch on a clean runner, pushes as the App)
+#   -> check (three read-only agents) -> post (posts their verdicts as the App).
+# v1 never queues auto-merge and never posts qa-agent, so every PR waits for the lead PM's qa and Dave.
+on:
+  schedule:
+    - cron: '0 9 * * *' # 04:00 New York in winter, 05:00 in summer: after the local audit and nightly-smoke
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: nightly-fix
+  cancel-in-progress: false
+env:
+  BUN_VERSION: 1.3.9
+  # Dave sets this repository variable to an exact version before the first run; an unset value stops the job.
+  CLAUDE_CODE_VERSION: ${{ vars.CLAUDE_CODE_VERSION }}
+jobs:
+  pick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    outputs:
+      pick: ${{ steps.pick.outputs.pick }}
+      skip: ${{ steps.pick.outputs.skip }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          pick=$(bun scripts/nightly-fix/pick.ts)
+          echo "$pick"
+          echo "pick=$pick" >> "$GITHUB_OUTPUT"
+          echo "skip=$(jq -r 'has("skip")' <<<"$pick")" >> "$GITHUB_OUTPUT"
+          jq -r '"### Nightly fix\n" + (.skip // "Picked #\(.issue) for \(.unit) (\(.tier) tier)")' <<<"$pick" >> "$GITHUB_STEP_SUMMARY"
+
+  fix:
+    needs: pick
+    if: needs.pick.outputs.skip == 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      issues: read
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: ramble
+          POSTGRES_PASSWORD: ramble
+          POSTGRES_DB: ramble
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ramble -d ramble"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://ramble:ramble@localhost:5432/ramble
+      DATABASE_URL_UNPOOLED: postgres://ramble:ramble@localhost:5432/ramble
+      PICK: ${{ needs.pick.outputs.pick }}
+    outputs:
+      outcome: ${{ steps.outcome.outputs.outcome }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
+      - name: Install Claude Code
+        run: |
+          test -n "$CLAUDE_CODE_VERSION" || { echo "::error::Set the CLAUDE_CODE_VERSION repository variable"; exit 1; }
+          npm install -g "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION"
+      - name: Write the ticket for the agent
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo "$PICK" > "$RUNNER_TEMP/pick.json"
+          gh issue view "$(jq -r .issue <<<"$PICK")" --repo "$GITHUB_REPOSITORY" --json title,body \
+            --jq '"# " + .title + "\n\n" + .body' > "$RUNNER_TEMP/ticket.md"
+      # The only step with the Anthropic key, and no GitHub credential anywhere in the job.
+      - name: Fix the ticket
+        timeout-minutes: 30
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          claude -p "$(envsubst '$RUNNER_TEMP' < scripts/nightly-fix/fix-prompt.md)" \
+            --add-dir "$RUNNER_TEMP" \
+            --model sonnet \
+            --max-turns 60 \
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(pnpm format),Bash(pnpm lint),Bash(pnpm typecheck),Bash(pnpm test),Bash(pnpm test:db*),Bash(pnpm exec vitest run *),Bash(git diff*),Bash(git status*)" \
+            --output-format json > "$RUNNER_TEMP/claude.json" || true
+          jq '{num_turns, total_cost_usd, is_error}' "$RUNNER_TEMP/claude.json" || true
+      - id: outcome
+        run: |
+          outcome=$(head -1 "$RUNNER_TEMP/outcome.md" 2>/dev/null || echo "NO-OUTCOME")
+          echo "outcome=$outcome" >> "$GITHUB_OUTPUT"
+          { echo "### Fix agent: $outcome"; cat "$RUNNER_TEMP/outcome.md" 2>/dev/null; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Gates (CI runs them again on the PR)
+        if: steps.outcome.outputs.outcome == 'FIXED'
+        run: |
+          set -euo pipefail
+          pnpm format:check
+          pnpm lint
+          pnpm typecheck
+          pnpm test
+          pnpm test:db
+      - name: Save the change as a patch
+        if: steps.outcome.outputs.outcome == 'FIXED'
+        run: |
+          git add -A
+          git diff --cached --binary > "$RUNNER_TEMP/fix.patch"
+      - if: steps.outcome.outputs.outcome == 'FIXED'
+        uses: actions/upload-artifact@v7
+        with:
+          name: fix
+          path: |
+            ${{ runner.temp }}/fix.patch
+            ${{ runner.temp }}/outcome.md
+            ${{ runner.temp }}/pick.json
+            ${{ runner.temp }}/ticket.md
+          retention-days: 14
+
+  # A clean runner: the agent never ran here, so its hooks, config, and processes cannot reach the App key.
+  publish:
+    needs: [pick, fix]
+    if: needs.fix.outputs.outcome == 'FIXED'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      PICK: ${{ needs.pick.outputs.pick }}
+    outputs:
+      head: ${{ steps.commit.outputs.head }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/download-artifact@v7
+        with:
+          name: fix
+          path: ${{ runner.temp }}/fix
+      - id: commit
+        run: |
+          set -euo pipefail
+          branch=$(jq -r .branch <<<"$PICK")
+          git switch -c "$branch"
+          git apply --index "$RUNNER_TEMP/fix/fix.patch"
+          bun scripts/nightly-fix/guard.ts
+          git -c user.name="defaultdave-agents[bot]" -c user.email="defaultdave-agents[bot]@users.noreply.github.com" \
+            commit -q -m "$(jq -r .title <<<"$PICK")" -m "Nightly fix agent (ADR 0011)." -m "Co-Authored-By: Claude <noreply@anthropic.com>"
+          echo "head=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Write the App config
+        env:
+          RAMBLE_APP_ID: ${{ secrets.RAMBLE_APP_ID }}
+          RAMBLE_APP_INSTALLATION_ID: ${{ secrets.RAMBLE_APP_INSTALLATION_ID }}
+          RAMBLE_APP_PRIVATE_KEY: ${{ secrets.RAMBLE_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p ~/.config/ramble-agents
+          printf '%s\n' "$RAMBLE_APP_PRIVATE_KEY" > ~/.config/ramble-agents/app.pem
+          printf 'RAMBLE_APP_ID=%s\nRAMBLE_APP_INSTALLATION_ID=%s\nRAMBLE_APP_KEY=%s\n' \
+            "$RAMBLE_APP_ID" "$RAMBLE_APP_INSTALLATION_ID" "$HOME/.config/ramble-agents/app.pem" > ~/.config/ramble-agents/app.conf
+      - name: Push, open the PR, request Dave's review
+        run: |
+          set -euo pipefail
+          branch=$(jq -r .branch <<<"$PICK")
+          {
+            tail -n +2 "$RUNNER_TEMP/fix/outcome.md"
+            echo
+            echo "Closes #$(jq -r .issue <<<"$PICK")"
+            echo
+            echo "Opened by the nightly fix workflow (ADR 0011), run $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID."
+            echo "Review-agent, spec-compliance and architecture-audit are posted by the same run. qa-agent and auto-merge are left to the lead PM."
+          } > "$RUNNER_TEMP/body.md"
+          bun scripts/merge-desk/agent-git.ts push "$branch"
+          bun scripts/merge-desk/agent-git.ts pr main "$(jq -r .title <<<"$PICK")" "$RUNNER_TEMP/body.md"
+          bun scripts/merge-desk/agent-git.ts review "$branch"
+
+  check:
+    needs: [pick, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [review-agent, spec-compliance, architecture-audit]
+    env:
+      CHECK_NAME: ${{ matrix.check }}
+      HEAD_SHA: ${{ needs.publish.outputs.head }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.publish.outputs.head }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          repository: defaultdave/ramble-pm
+          path: ramble-pm
+          persist-credentials: false
+      - uses: actions/download-artifact@v7
+        with:
+          name: fix
+          path: ${{ runner.temp }}
+      - name: Install Claude Code
+        run: |
+          test -n "$CLAUDE_CODE_VERSION" || { echo "::error::Set the CLAUDE_CODE_VERSION repository variable"; exit 1; }
+          npm install -g "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION"
+      - name: Run the check
+        timeout-minutes: 15
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          git diff origin/main...HEAD > "$RUNNER_TEMP/diff.patch"
+          claude -p "$(envsubst '$RUNNER_TEMP $CHECK_NAME $HEAD_SHA' < scripts/nightly-fix/check-prompt.md)" \
+            --add-dir "$RUNNER_TEMP" \
+            --model sonnet \
+            --max-turns 30 \
+            --allowedTools "Read,Glob,Grep,Bash(git diff*),Bash(git log*),Bash(git show*)" \
+            --output-format json > "$RUNNER_TEMP/claude.json" || true
+          jq '{num_turns, total_cost_usd, is_error}' "$RUNNER_TEMP/claude.json" || true
+          # The verdict is the agent's final message, so the check needs no write tool at all.
+          jq -er .result "$RUNNER_TEMP/claude.json" > "$RUNNER_TEMP/verdict.md" 2>/dev/null \
+            || echo "NO-VERDICT: the check agent returned no verdict" > "$RUNNER_TEMP/verdict.md"
+          mkdir -p "$RUNNER_TEMP/out" && cp "$RUNNER_TEMP/verdict.md" "$RUNNER_TEMP/out/$CHECK_NAME.md"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: verdict-${{ matrix.check }}
+          path: ${{ runner.temp }}/out/${{ matrix.check }}.md
+          retention-days: 14
+
+  post:
+    needs: [publish, check]
+    if: always() && needs.publish.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      HEAD_SHA: ${{ needs.publish.outputs.head }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: verdict-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/verdicts
+      - name: Write the App config
+        env:
+          RAMBLE_APP_ID: ${{ secrets.RAMBLE_APP_ID }}
+          RAMBLE_APP_INSTALLATION_ID: ${{ secrets.RAMBLE_APP_INSTALLATION_ID }}
+          RAMBLE_APP_PRIVATE_KEY: ${{ secrets.RAMBLE_APP_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p ~/.config/ramble-agents
+          printf '%s\n' "$RAMBLE_APP_PRIVATE_KEY" > ~/.config/ramble-agents/app.pem
+          printf 'RAMBLE_APP_ID=%s\nRAMBLE_APP_INSTALLATION_ID=%s\nRAMBLE_APP_KEY=%s\n' \
+            "$RAMBLE_APP_ID" "$RAMBLE_APP_INSTALLATION_ID" "$HOME/.config/ramble-agents/app.pem" > ~/.config/ramble-agents/app.conf
+      - name: Post the verdicts as check runs
+        run: |
+          set -euo pipefail
+          for name in review-agent spec-compliance architecture-audit; do
+            file="$RUNNER_TEMP/verdicts/$name.md"
+            [ -f "$file" ] || echo "NO-VERDICT: the $name job produced nothing" > "$file"
+            case "$(head -1 "$file")" in
+              PASS) conclusion=success ;;
+              FAIL) conclusion=failure ;;
+              *) conclusion=action_required ;;
+            esac
+            bun scripts/merge-desk/post-check.ts --name "$name" --sha "$HEAD_SHA" --conclusion "$conclusion" --summary-file "$file"
+          done

@@ -16,6 +16,8 @@ Research notes behind the researched ADRs are in `research/`.
 | [0008](0008-seed-content.md) | R8 Seed content | About 60 curated experiences with licensed stock photos, plus a generated 400-experience scale fixture | Accepted |
 | [0009](0009-cat-pass-salvage.md) | R9 Cat Pass salvage | Clean build; Cat Pass for reading only | Accepted |
 | [0010](0010-agent-workflow.md) | R10 Agent workflow wiring | Global `/senior` and `/review-pr`; `units.yaml` as the record, mirrored to Issues once public; actuals from git, Dave's minutes, and token-audit | Accepted |
+| [0011](0011-nightly-fix-agent.md) | Nightly fix agent | One audit ticket a night, opted in by label, fixed and checked by Claude Code on GitHub Actions; pushes and posts as the App from clean runners; no qa-agent or auto-merge in v1 | Proposed |
+| [0012](0012-bug-finder.md) | Bug finder | One finding per run in one area of the site, found and verified by Claude Code on GitHub Actions and filed as the App; Dave opts each one in to the nightly fixer by label; hand-dispatched until read | Proposed |
 
 ## Decided 2026-10-18
 

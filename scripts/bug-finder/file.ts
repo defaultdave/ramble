@@ -21,6 +21,8 @@ export interface Finding {
   file: string;
   /** `62` or `62-71`. */
   lines: string;
+  /** Further ranges in the same file, after the first. */
+  alsoLines?: string;
   unit: string;
   size: (typeof SIZES)[number];
   /** A failing test, a Playwright repro, or the input that breaks the cited line. */
@@ -57,14 +59,17 @@ export function parseFinding(raw: unknown): Parsed {
   if (!size) return { invalid: `size must be one of ${SIZES.join(", ")}` };
   if (!str("title")) return { invalid: "title is empty" };
   if (!FILE_PATH.test(file) || file.includes("..")) return { invalid: `file is not a repo-relative path: ${file.slice(0, 80)}` };
-  if (!/^[0-9]+(-[0-9]+)?$/.test(lines)) return { invalid: "lines must be `62` or `62-71`" };
+  const ranges = lines.split(/\s*,\s*/);
+  if (ranges.some((range) => !LINE_RANGE.test(range))) return { invalid: "lines must be `62`, `62-71`, or a list like `62-71, 90-95`" };
   if (!/^U-[0-9]+[a-z]*$/.test(str("unit"))) return { invalid: "unit must look like U-077" };
   if (!str("evidence")) return { invalid: "a finding needs evidence" };
   if (!str("fix")) return { invalid: "a finding needs a fix suggestion" };
   if (kind === "improvement" && !str("requirement")) return { invalid: "an improvement must cite a requirement or blocking rule" };
   return {
     finding: {
-      kind, lens, size, file, lines,
+      kind, lens, size, file,
+      lines: ranges[0]!,
+      alsoLines: ranges.length > 1 ? ranges.slice(1).join(", ") : undefined,
       title: oneLine(str("title")),
       unit: str("unit"),
       evidence: plain(str("evidence")),
@@ -88,21 +93,37 @@ export interface KnownIssue {
 
 const normalise = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
+const LINE_RANGE = /^[0-9]+(-[0-9]+)?$/;
+const STOP_WORDS = new Set("a an and the of to on in is it its for from with no not when after before by at as or that this".split(" "));
+
+const words = (title: string) => new Set(normalise(title).split(" ").filter((word) => word.length > 2 && !STOP_WORDS.has(word)));
+
+/** Share of the shorter title's words the two titles have in common. */
+function titleOverlap(a: string, b: string): number {
+  const [x, y] = [words(a), words(b)];
+  if (!x.size || !y.size) return 0;
+  const shared = [...x].filter((word) => y.has(word)).length;
+  return shared / Math.min(x.size, y.size);
+}
+
 /** The line range a ticket's first line cites, `` `path:62-71` ``. */
 function citedLines(body: string): [number, number] | null {
   const found = body.match(/^`[^`:\s]+:([0-9]+)(?:-([0-9]+))?`/);
   return found ? [Number(found[1]), Number(found[2] ?? found[1])] : null;
 }
 
-/** An open or closed ticket on the same lines of the same file, or with the same title. */
+/** An open or closed ticket with the same title, or one on overlapping lines of the same file whose title reads alike. */
 export function findDuplicate(finding: Finding, known: KnownIssue[]): number | null {
-  const [start, end] = finding.lines.split("-").map(Number) as [number, number?];
-  const last = end ?? start;
+  const ranges = [finding.lines, ...(finding.alsoLines?.split(", ") ?? [])].map((range) => {
+    const [start, end] = range.split("-").map(Number) as [number, number?];
+    return [start, end ?? start] as const;
+  });
   const title = normalise(finding.title);
   const match = known.find((issue) => {
     if (normalise(issue.title) === title) return true;
     const lines = citedLines(issue.body);
-    return citedFile(issue.body) === finding.file && lines !== null && lines[0] <= last && start <= lines[1];
+    const overlaps = lines !== null && ranges.some(([start, end]) => lines[0] <= end && start <= lines[1]);
+    return citedFile(issue.body) === finding.file && overlaps && titleOverlap(finding.title, issue.title) >= 0.4;
   });
   return match?.number ?? null;
 }
@@ -118,6 +139,7 @@ export interface BodyContext {
 export function issueBody(finding: Finding, ctx: BodyContext): string {
   return [
     `\`${finding.file}:${finding.lines}\`: ${finding.title}`,
+    ...(finding.alsoLines ? [`- Also lines: ${finding.alsoLines}`] : []),
     ...(ctx.unitKnown ? [`- Unit: ${finding.unit}`] : []),
     `- Area: ${ctx.area}`,
     `- Lens: ${finding.lens}`,

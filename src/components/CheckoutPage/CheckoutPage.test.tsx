@@ -20,7 +20,8 @@ import { CheckoutPage, type CheckoutActions } from './CheckoutPage';
 // - the maintenance switch shows the notice and no form
 
 const push = vi.fn();
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
+const replace = vi.fn();
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push, replace }) }));
 
 const renders = vi.hoisted(() => ({
   summary: 0,
@@ -130,6 +131,7 @@ function actions(
 
 beforeEach(() => {
   push.mockReset();
+  replace.mockReset();
   renders.fields.clear();
   vi.stubGlobal(
     'matchMedia',
@@ -250,8 +252,9 @@ describe('CheckoutPage', () => {
     );
 
     await waitFor(() => {
-      expect(push).toHaveBeenCalledWith('/orders/RMB-ABC234?t=order-token');
+      expect(replace).toHaveBeenCalledWith('/orders/RMB-ABC234?t=order-token');
     });
+    expect(push).not.toHaveBeenCalled();
     expect(a.confirm).toHaveBeenCalledWith({
       paymentId: 'fake_pay_1',
       clientSecret: secret,
@@ -293,6 +296,7 @@ describe('CheckoutPage', () => {
 
       expect(await screen.findByText(shown)).toBeVisible();
       expect(push).not.toHaveBeenCalled();
+      expect(replace).not.toHaveBeenCalled();
     },
   );
 

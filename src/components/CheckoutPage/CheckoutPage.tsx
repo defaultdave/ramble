@@ -215,7 +215,7 @@ export function CheckoutPage({
                 focusRef={stepRef}
                 holdAgain={() => void holdAgain()}
                 onPaid={(reference, token) => {
-                  router.push(orderConfirmationPath(reference, token));
+                  router.replace(orderConfirmationPath(reference, token));
                 }}
                 onLost={() => {
                   dispatch({ type: 'connection_lost' });

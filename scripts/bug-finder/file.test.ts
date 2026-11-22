@@ -57,6 +57,16 @@ test("text from the agent is capped, flattened in titles, and cannot mention any
   expect(finding({ title: "line one\nline two" }).title).toBe("line one line two");
 });
 
+test("a list of line ranges cites the first and keeps the rest", () => {
+  const f = finding({ lines: "217-219, 283-291" });
+  expect(f.lines).toBe("217-219");
+  expect(f.alsoLines).toBe("283-291");
+  const body = issueBody(f, { area: "checkout", runUrl: "r", unitKnown: true, offLimits: false });
+  expect(body.split("\n")[0]).toStartWith(`\`${f.file}:217-219\``);
+  expect(body).toContain("- Also lines: 283-291");
+  expect(citedFile(body)).toBe(f.file);
+});
+
 test.each([
   ["CONFIRMED\nwhy", "CONFIRMED"],
   ["REFUTED\nwhy", "REFUTED"],
@@ -68,7 +78,7 @@ test.each([
 });
 
 const known = [
-  { number: 10, title: "Something else", body: "`src/server/db/orderRefundRetry.ts:60-65`: other.\n- Unit: U-077" },
+  { number: 10, title: "Second refund request is refused", body: "`src/server/db/orderRefundRetry.ts:60-65`: other.\n- Unit: U-077" },
   { number: 11, title: "Elsewhere", body: "`src/lib/x.ts:1`: x" },
 ];
 
@@ -79,6 +89,7 @@ test.each([
   ["the same file, other lines", finding({ lines: "70-80" }), null],
   ["another file", finding({ file: "src/lib/y.ts" }), null],
   ["a ticket with no cited lines", finding({ file: "src/lib/z.ts" }), null],
+  ["overlapping lines but an unrelated title", finding({ title: "Focus drops to body on close" }), null],
 ])("duplicate check: %s", (_why, f, number) => {
   expect(findDuplicate(f, known)).toBe(number);
 });
@@ -146,7 +157,7 @@ test.each([
   ["a file that is not in the repo", { fileExists: () => false }, "not in the repository"],
   ["a duplicate", { known }, null],
 ])("files nothing for %s", (_why, over, why) => {
-  const decision = decide(input(over.known ? { known: [{ number: 10, title: "t", body: known[0].body }] } : over));
+  const decision = decide(input(over.known ? { known: [known[0]] } : over));
   expect(decision.action).toBe("stop");
   if (why) expect((decision as { why: string }).why).toContain(why);
   else expect((decision as { why: string }).why).toContain("duplicates #10");
@@ -181,4 +192,13 @@ test("createIssue posts the fields and returns the number; a refusal throws", as
   expect((sent!.init.headers as Record<string, string>).Authorization).toBe("Bearer tok");
   const refused = (async () => new Response("no", { status: 403 })) as unknown as typeof fetch;
   await expect(createIssue(decision, "tok", refused)).rejects.toThrow("HTTP 403");
+});
+
+test("two reports of one bug are duplicates, and an old ticket on the same lines is not", () => {
+  const report = finding({ title: "After paying, Back returns to checkout stuck on 'Taking you to your booking' with no link to the order", file: "src/components/CheckoutPage/CheckoutPage.tsx", lines: "217-219, 283-291" });
+  const body = "`src/components/CheckoutPage/CheckoutPage.tsx:266-293`: x";
+  const again = { number: 20, title: "Back from the order confirmation shows checkout stuck on 'Payment received, taking you to your booking' with no link", body };
+  const other = { number: 21, title: "N1102-43 Refused re-hold drops focus to body; BC-30 closed early", body };
+  expect(findDuplicate(report, [other, again])).toBe(20);
+  expect(findDuplicate(report, [other])).toBeNull();
 });

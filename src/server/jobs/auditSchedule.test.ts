@@ -6,7 +6,7 @@ import type { StoragePort } from '@/server/ports/storage';
 import { enqueue } from './enqueue';
 import { scheduleAuditExports } from './auditSchedule';
 
-const tx = {} as Transaction;
+const tx = {} as unknown as Transaction;
 
 vi.mock('@/server/db/client', () => ({
   db: { transaction: (run: (tx: unknown) => unknown) => run(tx) },

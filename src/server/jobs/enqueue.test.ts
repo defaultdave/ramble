@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 import { jobLimits } from '@/lib/jobs';
 import type { Transaction, db } from '@/server/db/client';
 import { insertJob } from '@/server/db/jobs';
@@ -16,7 +16,7 @@ vi.mock('@/server/db/jobs', () => ({ insertJob: vi.fn() }));
 // - a dedupe key already used returns null
 // - the audit export kind is registered with the table's attempts ceiling
 
-const tx = {} as Transaction;
+const tx = {} as unknown as Transaction;
 const registry = {
   big: {
     payload: z.object({ text: z.string() }),
@@ -135,10 +135,8 @@ describe('registry', () => {
 
 describe('enqueue types', () => {
   it('accepts a transaction and not the plain database handle', () => {
-    const useHandle = (handle: typeof db) =>
-      // @ts-expect-error a job must be written in the caller's transaction, never on the bare handle
-      enqueue(handle, { kind: 'noop', payload: {} });
-
-    expect(useHandle).toBeTypeOf('function');
+    // a job must be written in the caller's transaction, never on the bare handle
+    expectTypeOf<typeof db>().not.toExtend<Parameters<typeof enqueue>[0]>();
+    expectTypeOf<Transaction>().toExtend<Parameters<typeof enqueue>[0]>();
   });
 });

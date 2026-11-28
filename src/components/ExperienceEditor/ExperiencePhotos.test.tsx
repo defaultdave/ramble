@@ -16,6 +16,10 @@ import { ExperiencePhotos } from './ExperiencePhotos';
 
 const noop = () => undefined;
 
+// jest-dom 8 types the description matcher as string | RegExp, which rules out expect.stringContaining (typed any)
+const containing = (text: string) =>
+  new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+
 function renderPhotos(
   props: Partial<Parameters<typeof ExperiencePhotos>[0]> = {},
 ) {
@@ -120,7 +124,7 @@ describe('ExperiencePhotos problems', () => {
     renderPhotos({ problems: ['altText', 'rightsLicense'] });
 
     expect(screen.getByLabelText(/Alt text/)).toHaveAccessibleDescription(
-      expect.stringContaining(photoProblemTexts(null).altText),
+      containing(photoProblemTexts(null).altText),
     );
     expect(screen.getByLabelText(/Alt text/)).toHaveAttribute(
       'aria-invalid',
@@ -141,7 +145,7 @@ describe('ExperiencePhotos problems', () => {
     renderPhotos({ problems: ['photoFile'], refusal: 'too_small' });
 
     expect(screen.getByLabelText('Photo')).toHaveAccessibleDescription(
-      expect.stringContaining(photoRefusalMessage('too_small')),
+      containing(photoRefusalMessage('too_small')),
     );
     expect(screen.getByLabelText('Photo')).toHaveAttribute(
       'aria-invalid',
@@ -153,7 +157,7 @@ describe('ExperiencePhotos problems', () => {
     renderPhotos({ problems: ['photoFile'] });
 
     expect(screen.getByLabelText('Photo')).toHaveAccessibleDescription(
-      expect.stringContaining(photoProblemTexts(null).photoFile),
+      containing(photoProblemTexts(null).photoFile),
     );
   });
 });

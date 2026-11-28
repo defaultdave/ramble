@@ -161,7 +161,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: fix
           path: ${{ runner.temp }}/fix
@@ -227,7 +227,7 @@ jobs:
           repository: defaultdave/ramble-pm
           path: ramble-pm
           persist-credentials: false
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: fix
           path: ${{ runner.temp }}
@@ -274,7 +274,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           pattern: verdict-*
           merge-multiple: true
